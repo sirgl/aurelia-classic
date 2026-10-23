@@ -1,0 +1,7564 @@
+{
+ "schema": "classic-spec/1",
+ "catalog": "promotions",
+ "edition": "Civ 5 inspired rule set (Unciv Gods & Kings ruleset plus own extensions)",
+ "count": 214,
+ "items": [
+  {
+   "id": "core:promotion/insta-heal",
+   "name": "Heal Instantly",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [
+    "core:unit-combat/recon",
+    "core:unit-combat/mounted",
+    "core:unit-combat/melee",
+    "core:unit-combat/gun",
+    "core:unit-combat/armor",
+    "core:unit-combat/archer",
+    "core:unit-combat/siege",
+    "core:unit-combat/navalranged",
+    "core:unit-combat/navalmelee",
+    "core:unit-combat/submarine",
+    "core:unit-combat/carrier",
+    "core:unit-combat/fighter",
+    "core:unit-combat/bomber",
+    "core:unit-combat/helicopter"
+   ],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "promotion.insta_heal",
+     "amount": true,
+     "needs_mechanic": "insta_heal",
+     "source": "own value, unverified"
+    }
+   ],
+   "provenance": "unciv: UnitPromotions.json, Heal Instantly",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:promotion/shock-1",
+   "name": "Shock I",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [
+    "core:unit-combat/mounted",
+    "core:unit-combat/melee",
+    "core:unit-combat/gun",
+    "core:unit-combat/armor"
+   ],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "combat.attack_open_terrain.pct",
+     "amount": 15,
+     "source": "unciv: UnitPromotions.json, Shock I"
+    },
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "combat.defense_open_terrain.pct",
+     "amount": 15,
+     "source": "unciv: UnitPromotions.json, Shock I"
+    }
+   ],
+   "provenance": "unciv: UnitPromotions.json, Shock I",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:promotion/shock-2",
+   "name": "Shock II",
+   "requires": null,
+   "requires_any_of": [
+    "core:promotion/shock-1"
+   ],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [
+    "core:unit-combat/mounted",
+    "core:unit-combat/melee",
+    "core:unit-combat/gun",
+    "core:unit-combat/armor"
+   ],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "combat.attack_open_terrain.pct",
+     "amount": 15,
+     "source": "unciv: UnitPromotions.json, Shock II"
+    },
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "combat.defense_open_terrain.pct",
+     "amount": 15,
+     "source": "unciv: UnitPromotions.json, Shock II"
+    }
+   ],
+   "provenance": "unciv: UnitPromotions.json, Shock II",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:promotion/shock-3",
+   "name": "Shock III",
+   "requires": null,
+   "requires_any_of": [
+    "core:promotion/shock-2"
+   ],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [
+    "core:unit-combat/mounted",
+    "core:unit-combat/melee",
+    "core:unit-combat/gun",
+    "core:unit-combat/armor"
+   ],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "combat.attack_open_terrain.pct",
+     "amount": 15,
+     "source": "unciv: UnitPromotions.json, Shock III"
+    },
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "combat.defense_open_terrain.pct",
+     "amount": 15,
+     "source": "unciv: UnitPromotions.json, Shock III"
+    }
+   ],
+   "provenance": "unciv: UnitPromotions.json, Shock III",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:promotion/drill-1",
+   "name": "Drill I",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [
+    "core:unit-combat/mounted",
+    "core:unit-combat/melee",
+    "core:unit-combat/gun",
+    "core:unit-combat/armor"
+   ],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "combat.attack_rough_terrain.pct",
+     "amount": 15,
+     "source": "unciv: UnitPromotions.json, Drill I"
+    },
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "combat.defense_rough_terrain.pct",
+     "amount": 15,
+     "source": "unciv: UnitPromotions.json, Drill I"
+    }
+   ],
+   "provenance": "unciv: UnitPromotions.json, Drill I",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:promotion/drill-2",
+   "name": "Drill II",
+   "requires": null,
+   "requires_any_of": [
+    "core:promotion/drill-1"
+   ],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [
+    "core:unit-combat/mounted",
+    "core:unit-combat/melee",
+    "core:unit-combat/gun",
+    "core:unit-combat/armor"
+   ],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "combat.attack_rough_terrain.pct",
+     "amount": 15,
+     "source": "unciv: UnitPromotions.json, Drill II"
+    },
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "combat.defense_rough_terrain.pct",
+     "amount": 15,
+     "source": "unciv: UnitPromotions.json, Drill II"
+    }
+   ],
+   "provenance": "unciv: UnitPromotions.json, Drill II",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:promotion/drill-3",
+   "name": "Drill III",
+   "requires": null,
+   "requires_any_of": [
+    "core:promotion/drill-2"
+   ],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [
+    "core:unit-combat/mounted",
+    "core:unit-combat/melee",
+    "core:unit-combat/gun",
+    "core:unit-combat/armor"
+   ],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "combat.attack_rough_terrain.pct",
+     "amount": 15,
+     "source": "unciv: UnitPromotions.json, Drill III"
+    },
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "combat.defense_rough_terrain.pct",
+     "amount": 15,
+     "source": "unciv: UnitPromotions.json, Drill III"
+    }
+   ],
+   "provenance": "unciv: UnitPromotions.json, Drill III",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:promotion/accuracy-1",
+   "name": "Accuracy I",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [
+    "core:unit-combat/archer",
+    "core:unit-combat/siege"
+   ],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "combat.ranged_attack_open_terrain.pct",
+     "amount": 15,
+     "source": "unciv: UnitPromotions.json, Accuracy I"
+    }
+   ],
+   "provenance": "unciv: UnitPromotions.json, Accuracy I",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:promotion/accuracy-2",
+   "name": "Accuracy II",
+   "requires": null,
+   "requires_any_of": [
+    "core:promotion/accuracy-1"
+   ],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [
+    "core:unit-combat/archer",
+    "core:unit-combat/siege"
+   ],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "combat.ranged_attack_open_terrain.pct",
+     "amount": 15,
+     "source": "unciv: UnitPromotions.json, Accuracy II"
+    }
+   ],
+   "provenance": "unciv: UnitPromotions.json, Accuracy II",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:promotion/accuracy-3",
+   "name": "Accuracy III",
+   "requires": null,
+   "requires_any_of": [
+    "core:promotion/accuracy-2"
+   ],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [
+    "core:unit-combat/archer",
+    "core:unit-combat/siege"
+   ],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "combat.ranged_attack_open_terrain.pct",
+     "amount": 15,
+     "source": "unciv: UnitPromotions.json, Accuracy III"
+    }
+   ],
+   "provenance": "unciv: UnitPromotions.json, Accuracy III",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:promotion/barrage-1",
+   "name": "Barrage I",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [
+    "core:unit-combat/archer",
+    "core:unit-combat/siege"
+   ],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "combat.ranged_attack_rough_terrain.pct",
+     "amount": 15,
+     "source": "unciv: UnitPromotions.json, Barrage I"
+    }
+   ],
+   "provenance": "unciv: UnitPromotions.json, Barrage I",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:promotion/barrage-2",
+   "name": "Barrage II",
+   "requires": null,
+   "requires_any_of": [
+    "core:promotion/barrage-1"
+   ],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [
+    "core:unit-combat/archer",
+    "core:unit-combat/siege"
+   ],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "combat.ranged_attack_rough_terrain.pct",
+     "amount": 15,
+     "source": "unciv: UnitPromotions.json, Barrage II"
+    }
+   ],
+   "provenance": "unciv: UnitPromotions.json, Barrage II",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:promotion/barrage-3",
+   "name": "Barrage III",
+   "requires": null,
+   "requires_any_of": [
+    "core:promotion/barrage-2"
+   ],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [
+    "core:unit-combat/archer",
+    "core:unit-combat/siege"
+   ],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "combat.ranged_attack_rough_terrain.pct",
+     "amount": 15,
+     "source": "unciv: UnitPromotions.json, Barrage III"
+    }
+   ],
+   "provenance": "unciv: UnitPromotions.json, Barrage III",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:promotion/targeting-1",
+   "name": "Targeting I",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [
+    "core:unit-combat/navalranged",
+    "core:unit-combat/submarine"
+   ],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": {
+      "opponent": {
+       "domain": "core:domain/sea"
+      }
+     },
+     "trigger": "passive",
+     "modifier": "combat.strength.pct",
+     "amount": 15,
+     "source": "unciv: UnitPromotions.json, Targeting I"
+    }
+   ],
+   "provenance": "unciv: UnitPromotions.json, Targeting I",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:promotion/targeting-2",
+   "name": "Targeting II",
+   "requires": null,
+   "requires_any_of": [
+    "core:promotion/targeting-1"
+   ],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [
+    "core:unit-combat/navalranged",
+    "core:unit-combat/submarine"
+   ],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": {
+      "opponent": {
+       "domain": "core:domain/sea"
+      }
+     },
+     "trigger": "passive",
+     "modifier": "combat.strength.pct",
+     "amount": 15,
+     "source": "unciv: UnitPromotions.json, Targeting II"
+    }
+   ],
+   "provenance": "unciv: UnitPromotions.json, Targeting II",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:promotion/targeting-3",
+   "name": "Targeting III",
+   "requires": null,
+   "requires_any_of": [
+    "core:promotion/targeting-2"
+   ],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [
+    "core:unit-combat/navalranged",
+    "core:unit-combat/submarine"
+   ],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": {
+      "opponent": {
+       "domain": "core:domain/sea"
+      }
+     },
+     "trigger": "passive",
+     "modifier": "combat.strength.pct",
+     "amount": 15,
+     "source": "unciv: UnitPromotions.json, Targeting III"
+    }
+   ],
+   "provenance": "unciv: UnitPromotions.json, Targeting III",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:promotion/sentry",
+   "name": "Sentry",
+   "requires": null,
+   "requires_any_of": [
+    "core:promotion/shock-1",
+    "core:promotion/drill-1",
+    "core:promotion/targeting-1",
+    "core:promotion/bombardment-1",
+    "core:promotion/coastal-raider-1",
+    "core:promotion/boarding-party-1",
+    "core:promotion/wolfpack-1",
+    "core:promotion/flight-deck-1",
+    "core:promotion/armor-plating-1"
+   ],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [
+    "core:unit-combat/mounted",
+    "core:unit-combat/armor",
+    "core:unit-combat/navalranged",
+    "core:unit-combat/navalmelee",
+    "core:unit-combat/submarine",
+    "core:unit-combat/carrier"
+   ],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "unit.sight.flat",
+     "amount": 1,
+     "source": "unciv: UnitPromotions.json, Sentry"
+    }
+   ],
+   "provenance": "unciv: UnitPromotions.json, Sentry",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:promotion/siege",
+   "name": "Siege",
+   "requires": null,
+   "requires_any_of": [
+    "core:promotion/shock-2",
+    "core:promotion/drill-2",
+    "core:promotion/accuracy-1",
+    "core:promotion/barrage-1"
+   ],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [
+    "core:unit-combat/melee",
+    "core:unit-combat/gun"
+   ],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "combat.attack_vs_city.pct",
+     "amount": 50,
+     "source": "unciv: UnitPromotions.json, Besiege"
+    }
+   ],
+   "provenance": "unciv: UnitPromotions.json, Besiege",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:promotion/volley",
+   "name": "Volley",
+   "requires": null,
+   "requires_any_of": [
+    "core:promotion/accuracy-1",
+    "core:promotion/barrage-1"
+   ],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [
+    "core:unit-combat/siege"
+   ],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "combat.attack_vs_fortified.pct",
+     "amount": 50,
+     "source": "own value, unverified"
+    },
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "combat.attack_vs_city.pct",
+     "amount": 50,
+     "source": "unciv: UnitPromotions.json, Volley"
+    }
+   ],
+   "provenance": "unciv: UnitPromotions.json, Volley",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:promotion/medic",
+   "name": "Medic",
+   "requires": null,
+   "requires_any_of": [
+    "core:promotion/shock-1",
+    "core:promotion/drill-1",
+    "core:promotion/scouting-2",
+    "core:promotion/survivalism-2"
+   ],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [
+    "core:unit-combat/recon",
+    "core:unit-combat/mounted",
+    "core:unit-combat/melee",
+    "core:unit-combat/gun"
+   ],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "adjacent_friendly_units"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "heal.flat",
+     "amount": 5,
+     "source": "unciv: UnitPromotions.json, Medic"
+    }
+   ],
+   "provenance": "unciv: UnitPromotions.json, Medic",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:promotion/medic-ii",
+   "name": "Medic II",
+   "requires": null,
+   "requires_any_of": [
+    "core:promotion/medic"
+   ],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [
+    "core:unit-combat/recon",
+    "core:unit-combat/mounted",
+    "core:unit-combat/melee",
+    "core:unit-combat/gun"
+   ],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "adjacent_friendly_units"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "heal.flat",
+     "amount": 5,
+     "source": "unciv: UnitPromotions.json, Medic II"
+    },
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "heal.in_enemy_land.flat",
+     "amount": 5,
+     "source": "unciv: UnitPromotions.json, Medic II"
+    },
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "heal.in_neutral_land.flat",
+     "amount": 5,
+     "source": "unciv: UnitPromotions.json, Medic II"
+    }
+   ],
+   "provenance": "unciv: UnitPromotions.json, Medic II",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:promotion/amphibious",
+   "name": "Amphibious",
+   "requires": null,
+   "requires_any_of": [
+    "core:promotion/shock-1",
+    "core:promotion/drill-1"
+   ],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [
+    "core:unit-combat/melee",
+    "core:unit-combat/gun"
+   ],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "promotion.amphib",
+     "amount": true,
+     "needs_mechanic": "amphib",
+     "source": "unciv: UnitPromotions.json, Amphibious"
+    }
+   ],
+   "provenance": "unciv: UnitPromotions.json, Amphibious",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:promotion/cover-1",
+   "name": "Cover I",
+   "requires": null,
+   "requires_any_of": [
+    "core:promotion/shock-1",
+    "core:promotion/drill-1",
+    "core:promotion/accuracy-1",
+    "core:promotion/barrage-1"
+   ],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [
+    "core:unit-combat/melee",
+    "core:unit-combat/gun",
+    "core:unit-combat/archer",
+    "core:unit-combat/siege"
+   ],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "combat.defense_vs_ranged.pct",
+     "amount": 33,
+     "source": "unciv: UnitPromotions.json, Cover I"
+    }
+   ],
+   "provenance": "unciv: UnitPromotions.json, Cover I",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:promotion/cover-2",
+   "name": "Cover II",
+   "requires": null,
+   "requires_any_of": [
+    "core:promotion/cover-1"
+   ],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [
+    "core:unit-combat/melee",
+    "core:unit-combat/gun",
+    "core:unit-combat/archer",
+    "core:unit-combat/siege"
+   ],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "combat.defense_vs_ranged.pct",
+     "amount": 33,
+     "source": "unciv: UnitPromotions.json, Cover II"
+    }
+   ],
+   "provenance": "unciv: UnitPromotions.json, Cover II",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:promotion/indirect-fire",
+   "name": "Indirect Fire",
+   "requires": null,
+   "requires_any_of": [
+    "core:promotion/targeting-2",
+    "core:promotion/bombardment-2",
+    "core:promotion/accuracy-3",
+    "core:promotion/barrage-3"
+   ],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "promotion.range_attack_ignore_los",
+     "amount": true,
+     "needs_mechanic": "range_attack_ignore_los",
+     "source": "unciv: UnitPromotions.json, Indirect Fire"
+    }
+   ],
+   "provenance": "unciv: UnitPromotions.json, Indirect Fire",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:promotion/charge",
+   "name": "Charge",
+   "requires": null,
+   "requires_any_of": [
+    "core:promotion/shock-2",
+    "core:promotion/drill-2"
+   ],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [
+    "core:unit-combat/mounted",
+    "core:unit-combat/armor"
+   ],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "combat.attack_vs_wounded.pct",
+     "amount": 33,
+     "source": "unciv: UnitPromotions.json, Charge"
+    }
+   ],
+   "provenance": "unciv: UnitPromotions.json, Charge",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:promotion/formation-1",
+   "name": "Formation I",
+   "requires": null,
+   "requires_any_of": [
+    "core:promotion/shock-2",
+    "core:promotion/drill-2",
+    "core:promotion/accuracy-2",
+    "core:promotion/barrage-2"
+   ],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [
+    "core:unit-combat/melee",
+    "core:unit-combat/gun",
+    "core:unit-combat/mounted",
+    "core:unit-combat/armor"
+   ],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": {
+      "opponent": {
+       "unit_combat": "core:unit-combat/mounted"
+      }
+     },
+     "trigger": "passive",
+     "modifier": "combat.strength.pct",
+     "amount": 33,
+     "source": "unciv: UnitPromotions.json, Formation I"
+    }
+   ],
+   "provenance": "unciv: UnitPromotions.json, Formation I",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:promotion/formation-2",
+   "name": "Formation II",
+   "requires": null,
+   "requires_any_of": [
+    "core:promotion/formation-1"
+   ],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": {
+      "opponent": {
+       "unit_combat": "core:unit-combat/mounted"
+      }
+     },
+     "trigger": "passive",
+     "modifier": "combat.strength.pct",
+     "amount": 33,
+     "source": "unciv: UnitPromotions.json, Formation II"
+    }
+   ],
+   "provenance": "unciv: UnitPromotions.json, Formation II",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:promotion/ambush-1",
+   "name": "Ambush I",
+   "requires": null,
+   "requires_any_of": [
+    "core:promotion/shock-2",
+    "core:promotion/drill-2"
+   ],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": "core:tech/combustion",
+   "unit_combats": [
+    "core:unit-combat/melee",
+    "core:unit-combat/gun"
+   ],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": {
+      "opponent": {
+       "unit_combat": "core:unit-combat/armor"
+      }
+     },
+     "trigger": "passive",
+     "modifier": "combat.strength.pct",
+     "amount": 33,
+     "source": "unciv: UnitPromotions.json, Ambush I"
+    }
+   ],
+   "provenance": "unciv: UnitPromotions.json, Ambush I",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:promotion/ambush-2",
+   "name": "Ambush II",
+   "requires": null,
+   "requires_any_of": [
+    "core:promotion/ambush-1"
+   ],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": "core:tech/combustion",
+   "unit_combats": [],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": {
+      "opponent": {
+       "unit_combat": "core:unit-combat/armor"
+      }
+     },
+     "trigger": "passive",
+     "modifier": "combat.strength.pct",
+     "amount": 33,
+     "source": "unciv: UnitPromotions.json, Ambush II"
+    }
+   ],
+   "provenance": "unciv: UnitPromotions.json, Ambush II",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:promotion/supply",
+   "name": "Supply",
+   "requires": null,
+   "requires_any_of": [
+    "core:promotion/targeting-2",
+    "core:promotion/bombardment-2",
+    "core:promotion/coastal-raider-2",
+    "core:promotion/boarding-party-2",
+    "core:promotion/wolfpack-2",
+    "core:promotion/flight-deck-2",
+    "core:promotion/armor-plating-2"
+   ],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [
+    "core:unit-combat/navalranged",
+    "core:unit-combat/navalmelee",
+    "core:unit-combat/submarine",
+    "core:unit-combat/carrier"
+   ],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "heal.in_enemy_land.flat",
+     "amount": 15,
+     "source": "unciv: UnitPromotions.json, Supply"
+    },
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "heal.in_neutral_land.flat",
+     "amount": 15,
+     "source": "unciv: UnitPromotions.json, Supply"
+    },
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "promotion.heal_outside_friendly",
+     "amount": true,
+     "needs_mechanic": "heal_outside_friendly",
+     "source": "unciv: UnitPromotions.json, Supply"
+    }
+   ],
+   "provenance": "unciv: UnitPromotions.json, Supply",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:promotion/march",
+   "name": "March",
+   "requires": null,
+   "requires_any_of": [
+    "core:promotion/shock-3",
+    "core:promotion/drill-3",
+    "core:promotion/accuracy-2",
+    "core:promotion/barrage-2"
+   ],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [
+    "core:unit-combat/melee",
+    "core:unit-combat/gun",
+    "core:unit-combat/archer",
+    "core:unit-combat/siege",
+    "core:unit-combat/mounted"
+   ],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "promotion.always_heal",
+     "amount": true,
+     "needs_mechanic": "always_heal",
+     "source": "unciv: UnitPromotions.json, March"
+    }
+   ],
+   "provenance": "unciv: UnitPromotions.json, March",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:promotion/blitz",
+   "name": "Blitz",
+   "requires": null,
+   "requires_any_of": [
+    "core:promotion/shock-3",
+    "core:promotion/drill-3"
+   ],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [
+    "core:unit-combat/melee",
+    "core:unit-combat/gun",
+    "core:unit-combat/armor",
+    "core:unit-combat/mounted"
+   ],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "promotion.can_move_after_attacking",
+     "amount": true,
+     "needs_mechanic": "can_move_after_attacking",
+     "source": "own value, unverified"
+    },
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "unit.attacks_per_turn.flat",
+     "amount": 1,
+     "source": "unciv: UnitPromotions.json, Blitz"
+    }
+   ],
+   "provenance": "unciv: UnitPromotions.json, Blitz",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:promotion/woodsman",
+   "name": "Woodsman",
+   "requires": null,
+   "requires_any_of": [
+    "core:promotion/shock-3",
+    "core:promotion/drill-3"
+   ],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [
+    "core:unit-combat/melee",
+    "core:unit-combat/gun"
+   ],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": {
+      "on_tile": {
+       "feature": "core:feature/jungle"
+      }
+     },
+     "trigger": "passive",
+     "modifier": "unit.double_move",
+     "amount": true,
+     "source": "unciv: UnitPromotions.json, Woodsman"
+    },
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": {
+      "on_tile": {
+       "feature": "core:feature/forest"
+      }
+     },
+     "trigger": "passive",
+     "modifier": "unit.double_move",
+     "amount": true,
+     "source": "unciv: UnitPromotions.json, Woodsman"
+    }
+   ],
+   "provenance": "unciv: UnitPromotions.json, Woodsman",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:promotion/logistics",
+   "name": "Logistics",
+   "requires": null,
+   "requires_any_of": [
+    "core:promotion/accuracy-3",
+    "core:promotion/barrage-3",
+    "core:promotion/targeting-3",
+    "core:promotion/bombardment-3",
+    "core:promotion/coastal-raider-3",
+    "core:promotion/boarding-party-3",
+    "core:promotion/wolfpack-3"
+   ],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [
+    "core:unit-combat/archer",
+    "core:unit-combat/siege",
+    "core:unit-combat/navalranged",
+    "core:unit-combat/navalmelee",
+    "core:unit-combat/submarine"
+   ],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "promotion.can_move_after_attacking",
+     "amount": true,
+     "needs_mechanic": "can_move_after_attacking",
+     "source": "unciv: UnitPromotions.json, Logistics"
+    },
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "unit.attacks_per_turn.flat",
+     "amount": 1,
+     "source": "unciv: UnitPromotions.json, Logistics"
+    }
+   ],
+   "provenance": "unciv: UnitPromotions.json, Logistics",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:promotion/range",
+   "name": "Range",
+   "requires": null,
+   "requires_any_of": [
+    "core:promotion/accuracy-3",
+    "core:promotion/barrage-3",
+    "core:promotion/targeting-2",
+    "core:promotion/bombardment-2"
+   ],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [
+    "core:unit-combat/archer",
+    "core:unit-combat/siege",
+    "core:unit-combat/navalranged"
+   ],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "unit.range.flat",
+     "amount": 1,
+     "source": "unciv: UnitPromotions.json, Extended Range"
+    }
+   ],
+   "provenance": "unciv: UnitPromotions.json, Extended Range",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:promotion/mobility",
+   "name": "Mobility",
+   "requires": null,
+   "requires_any_of": [
+    "core:promotion/shock-3",
+    "core:promotion/drill-3",
+    "core:promotion/targeting-1",
+    "core:promotion/bombardment-1",
+    "core:promotion/coastal-raider-1",
+    "core:promotion/boarding-party-1",
+    "core:promotion/wolfpack-1",
+    "core:promotion/flight-deck-1",
+    "core:promotion/armor-plating-1"
+   ],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [
+    "core:unit-combat/armor",
+    "core:unit-combat/mounted",
+    "core:unit-combat/navalranged",
+    "core:unit-combat/navalmelee",
+    "core:unit-combat/submarine",
+    "core:unit-combat/carrier"
+   ],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "unit.moves.flat",
+     "amount": 1,
+     "source": "unciv: UnitPromotions.json, Mobility"
+    }
+   ],
+   "provenance": "unciv: UnitPromotions.json, Mobility",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:promotion/interception-1",
+   "name": "Interception I",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [
+    "core:unit-combat/fighter"
+   ],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "air.interception_strength.pct",
+     "amount": 33,
+     "source": "unciv: UnitPromotions.json, Interception I"
+    }
+   ],
+   "provenance": "unciv: UnitPromotions.json, Interception I",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:promotion/interception-2",
+   "name": "Interception II",
+   "requires": null,
+   "requires_any_of": [
+    "core:promotion/interception-1"
+   ],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [
+    "core:unit-combat/fighter"
+   ],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "air.interception_strength.pct",
+     "amount": 33,
+     "source": "unciv: UnitPromotions.json, Interception II"
+    }
+   ],
+   "provenance": "unciv: UnitPromotions.json, Interception II",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:promotion/interception-3",
+   "name": "Interception III",
+   "requires": null,
+   "requires_any_of": [
+    "core:promotion/interception-2"
+   ],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [
+    "core:unit-combat/fighter"
+   ],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "air.interception_strength.pct",
+     "amount": 34,
+     "source": "unciv: UnitPromotions.json, Interception III"
+    }
+   ],
+   "provenance": "unciv: UnitPromotions.json, Interception III",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:promotion/dogfighting-1",
+   "name": "Dogfighting I",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [
+    "core:unit-combat/fighter"
+   ],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "air.sweep_strength.pct",
+     "amount": 33,
+     "source": "unciv: UnitPromotions.json, Dogfighting I"
+    }
+   ],
+   "provenance": "unciv: UnitPromotions.json, Dogfighting I",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:promotion/dogfighting-2",
+   "name": "Dogfighting II",
+   "requires": null,
+   "requires_any_of": [
+    "core:promotion/dogfighting-1"
+   ],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [
+    "core:unit-combat/fighter"
+   ],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "air.sweep_strength.pct",
+     "amount": 33,
+     "source": "unciv: UnitPromotions.json, Dogfighting II"
+    }
+   ],
+   "provenance": "unciv: UnitPromotions.json, Dogfighting II",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:promotion/dogfighting-3",
+   "name": "Dogfighting III",
+   "requires": null,
+   "requires_any_of": [
+    "core:promotion/dogfighting-2"
+   ],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [
+    "core:unit-combat/fighter"
+   ],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "air.sweep_strength.pct",
+     "amount": 34,
+     "source": "unciv: UnitPromotions.json, Dogfighting III"
+    }
+   ],
+   "provenance": "unciv: UnitPromotions.json, Dogfighting III",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:promotion/air-siege-1",
+   "name": "Siege I",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [
+    "core:unit-combat/bomber"
+   ],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "combat.attack_vs_city.pct",
+     "amount": 33,
+     "source": "unciv: UnitPromotions.json, Siege I"
+    }
+   ],
+   "provenance": "unciv: UnitPromotions.json, Siege I",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:promotion/air-siege-2",
+   "name": "Siege II",
+   "requires": null,
+   "requires_any_of": [
+    "core:promotion/air-siege-1"
+   ],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [
+    "core:unit-combat/bomber"
+   ],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "combat.attack_vs_city.pct",
+     "amount": 33,
+     "source": "unciv: UnitPromotions.json, Siege II"
+    }
+   ],
+   "provenance": "unciv: UnitPromotions.json, Siege II",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:promotion/air-siege-3",
+   "name": "Siege III",
+   "requires": null,
+   "requires_any_of": [
+    "core:promotion/air-siege-2"
+   ],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [
+    "core:unit-combat/bomber"
+   ],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "combat.attack_vs_city.pct",
+     "amount": 34,
+     "source": "unciv: UnitPromotions.json, Siege III"
+    }
+   ],
+   "provenance": "unciv: UnitPromotions.json, Siege III",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:promotion/bombardment-1",
+   "name": "Bombardment I",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [
+    "core:unit-combat/navalranged",
+    "core:unit-combat/bomber"
+   ],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": {
+      "opponent": {
+       "domain": "core:domain/land"
+      }
+     },
+     "trigger": "passive",
+     "modifier": "combat.strength.pct",
+     "amount": 33,
+     "source": "unciv: UnitPromotions.json, Bombardment I"
+    }
+   ],
+   "provenance": "unciv: UnitPromotions.json, Bombardment I",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:promotion/bombardment-2",
+   "name": "Bombardment II",
+   "requires": null,
+   "requires_any_of": [
+    "core:promotion/bombardment-1"
+   ],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [
+    "core:unit-combat/navalranged",
+    "core:unit-combat/bomber"
+   ],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": {
+      "opponent": {
+       "domain": "core:domain/land"
+      }
+     },
+     "trigger": "passive",
+     "modifier": "combat.strength.pct",
+     "amount": 33,
+     "source": "unciv: UnitPromotions.json, Bombardment II"
+    }
+   ],
+   "provenance": "unciv: UnitPromotions.json, Bombardment II",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:promotion/bombardment-3",
+   "name": "Bombardment III",
+   "requires": null,
+   "requires_any_of": [
+    "core:promotion/bombardment-2"
+   ],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [
+    "core:unit-combat/navalranged",
+    "core:unit-combat/bomber"
+   ],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": {
+      "opponent": {
+       "domain": "core:domain/land"
+      }
+     },
+     "trigger": "passive",
+     "modifier": "combat.strength.pct",
+     "amount": 34,
+     "source": "unciv: UnitPromotions.json, Bombardment III"
+    }
+   ],
+   "provenance": "unciv: UnitPromotions.json, Bombardment III",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:promotion/air-targeting-1",
+   "name": "Air Targetting I",
+   "requires": null,
+   "requires_any_of": [
+    "core:promotion/interception-1",
+    "core:promotion/dogfighting-1",
+    "core:promotion/air-siege-1",
+    "core:promotion/bombardment-1"
+   ],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [
+    "core:unit-combat/fighter",
+    "core:unit-combat/bomber"
+   ],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": {
+      "opponent": {
+       "domain": "core:domain/sea"
+      }
+     },
+     "trigger": "passive",
+     "modifier": "combat.strength.pct",
+     "amount": 33,
+     "source": "unciv: UnitPromotions.json, Air Targeting I"
+    }
+   ],
+   "provenance": "unciv: UnitPromotions.json, Air Targeting I",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:promotion/air-targeting-2",
+   "name": "Air Targetting II",
+   "requires": null,
+   "requires_any_of": [
+    "core:promotion/air-targeting-1"
+   ],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [
+    "core:unit-combat/fighter",
+    "core:unit-combat/bomber"
+   ],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": {
+      "opponent": {
+       "domain": "core:domain/sea"
+      }
+     },
+     "trigger": "passive",
+     "modifier": "combat.strength.pct",
+     "amount": 33,
+     "source": "unciv: UnitPromotions.json, Air Targeting II"
+    }
+   ],
+   "provenance": "unciv: UnitPromotions.json, Air Targeting II",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:promotion/air-ambush-1",
+   "name": "Air Ambush I",
+   "requires": null,
+   "requires_any_of": [
+    "core:promotion/interception-1",
+    "core:promotion/dogfighting-1",
+    "core:promotion/air-siege-1",
+    "core:promotion/bombardment-1"
+   ],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [
+    "core:unit-combat/fighter",
+    "core:unit-combat/bomber"
+   ],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": {
+      "opponent": {
+       "unit_combat": "core:unit-combat/armor"
+      }
+     },
+     "trigger": "passive",
+     "modifier": "combat.strength.pct",
+     "amount": 33,
+     "source": "unciv: UnitPromotions.json, Ambush I"
+    }
+   ],
+   "provenance": "unciv: UnitPromotions.json, Ambush I",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:promotion/air-ambush-2",
+   "name": "Air Ambush II",
+   "requires": null,
+   "requires_any_of": [
+    "core:promotion/air-ambush-1"
+   ],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [
+    "core:unit-combat/fighter",
+    "core:unit-combat/bomber"
+   ],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": {
+      "opponent": {
+       "unit_combat": "core:unit-combat/armor"
+      }
+     },
+     "trigger": "passive",
+     "modifier": "combat.strength.pct",
+     "amount": 33,
+     "source": "unciv: UnitPromotions.json, Ambush II"
+    }
+   ],
+   "provenance": "unciv: UnitPromotions.json, Ambush II",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:promotion/air-range",
+   "name": "Range",
+   "requires": null,
+   "requires_any_of": [
+    "core:promotion/interception-1",
+    "core:promotion/dogfighting-1",
+    "core:promotion/air-siege-1",
+    "core:promotion/bombardment-1"
+   ],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [
+    "core:unit-combat/fighter",
+    "core:unit-combat/bomber"
+   ],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "unit.range.flat",
+     "amount": 2,
+     "source": "unciv: UnitPromotions.json, Operational Range"
+    }
+   ],
+   "provenance": "unciv: UnitPromotions.json, Operational Range",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:promotion/sortie",
+   "name": "Sortie",
+   "requires": null,
+   "requires_any_of": [
+    "core:promotion/interception-2",
+    "core:promotion/dogfighting-2"
+   ],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [
+    "core:unit-combat/fighter"
+   ],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "air.interceptions_per_turn.flat",
+     "amount": 1,
+     "source": "unciv: UnitPromotions.json, Sortie"
+    }
+   ],
+   "provenance": "unciv: UnitPromotions.json, Sortie",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:promotion/repair",
+   "name": "Repair",
+   "requires": null,
+   "requires_any_of": [
+    "core:promotion/shock-3",
+    "core:promotion/drill-3"
+   ],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [
+    "core:unit-combat/armor"
+   ],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "promotion.always_heal",
+     "amount": true,
+     "needs_mechanic": "always_heal",
+     "source": "unciv: UnitPromotions.json, Air Repair"
+    }
+   ],
+   "provenance": "unciv: UnitPromotions.json, Air Repair",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:promotion/air-repair",
+   "name": "Air Repair",
+   "requires": null,
+   "requires_any_of": [
+    "core:promotion/interception-2",
+    "core:promotion/dogfighting-2",
+    "core:promotion/air-siege-2",
+    "core:promotion/bombardment-2"
+   ],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [
+    "core:unit-combat/fighter",
+    "core:unit-combat/bomber"
+   ],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "promotion.always_heal",
+     "amount": true,
+     "needs_mechanic": "always_heal",
+     "source": "unciv: UnitPromotions.json, Air Repair"
+    }
+   ],
+   "provenance": "unciv: UnitPromotions.json, Air Repair",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:promotion/air-logistics",
+   "name": "Logistics",
+   "requires": null,
+   "requires_any_of": [
+    "core:promotion/air-siege-3",
+    "core:promotion/bombardment-3",
+    "core:promotion/heli-ambush-2",
+    "core:promotion/heli-mobility-2"
+   ],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [
+    "core:unit-combat/bomber",
+    "core:unit-combat/helicopter"
+   ],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "promotion.can_move_after_attacking",
+     "amount": true,
+     "needs_mechanic": "can_move_after_attacking",
+     "source": "unciv: UnitPromotions.json, Logistics"
+    },
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "unit.attacks_per_turn.flat",
+     "amount": 1,
+     "source": "unciv: UnitPromotions.json, Logistics"
+    }
+   ],
+   "provenance": "unciv: UnitPromotions.json, Logistics",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:promotion/evasion",
+   "name": "Evasion",
+   "requires": null,
+   "requires_any_of": [
+    "core:promotion/air-siege-2",
+    "core:promotion/bombardment-2"
+   ],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [
+    "core:unit-combat/bomber"
+   ],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "air.damage_taken_from_interception.pct",
+     "amount": -50,
+     "source": "unciv: UnitPromotions.json, Evasion"
+    }
+   ],
+   "provenance": "unciv: UnitPromotions.json, Evasion",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:promotion/scouting-1",
+   "name": "Scouting I",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [
+    "core:unit-combat/recon"
+   ],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "unit.sight.flat",
+     "amount": 1,
+     "source": "unciv: UnitPromotions.json, Scouting I"
+    }
+   ],
+   "provenance": "unciv: UnitPromotions.json, Scouting I",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:promotion/scouting-2",
+   "name": "Scouting II",
+   "requires": null,
+   "requires_any_of": [
+    "core:promotion/scouting-1"
+   ],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [
+    "core:unit-combat/recon"
+   ],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "unit.sight.flat",
+     "amount": 1,
+     "source": "unciv: UnitPromotions.json, Scouting II"
+    }
+   ],
+   "provenance": "unciv: UnitPromotions.json, Scouting II",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:promotion/scouting-3",
+   "name": "Scouting III",
+   "requires": null,
+   "requires_any_of": [
+    "core:promotion/scouting-2"
+   ],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [
+    "core:unit-combat/recon"
+   ],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "unit.moves.flat",
+     "amount": 1,
+     "source": "unciv: UnitPromotions.json, Scouting III"
+    }
+   ],
+   "provenance": "unciv: UnitPromotions.json, Scouting III",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:promotion/survivalism-1",
+   "name": "Survivalism I",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [
+    "core:unit-combat/recon"
+   ],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "heal.in_enemy_land.flat",
+     "amount": 5,
+     "source": "unciv: UnitPromotions.json, Survivalism I"
+    },
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "heal.in_neutral_land.flat",
+     "amount": 5,
+     "source": "unciv: UnitPromotions.json, Survivalism I"
+    },
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "combat.defense.pct",
+     "amount": 25,
+     "source": "unciv: UnitPromotions.json, Survivalism I"
+    }
+   ],
+   "provenance": "unciv: UnitPromotions.json, Survivalism I",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:promotion/survivalism-2",
+   "name": "Survivalism II",
+   "requires": null,
+   "requires_any_of": [
+    "core:promotion/survivalism-1"
+   ],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [
+    "core:unit-combat/recon"
+   ],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "heal.in_enemy_land.flat",
+     "amount": 5,
+     "source": "unciv: UnitPromotions.json, Survivalism II"
+    },
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "heal.in_neutral_land.flat",
+     "amount": 5,
+     "source": "unciv: UnitPromotions.json, Survivalism II"
+    },
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "combat.defense.pct",
+     "amount": 25,
+     "source": "unciv: UnitPromotions.json, Survivalism II"
+    }
+   ],
+   "provenance": "unciv: UnitPromotions.json, Survivalism II",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:promotion/survivalism-3",
+   "name": "Survivalism III",
+   "requires": null,
+   "requires_any_of": [
+    "core:promotion/survivalism-2"
+   ],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [
+    "core:unit-combat/recon"
+   ],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "promotion.always_heal",
+     "amount": true,
+     "needs_mechanic": "always_heal",
+     "source": "unciv: UnitPromotions.json, Survivalism III"
+    },
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "combat.withdraw_chance.pct",
+     "amount": 75,
+     "source": "unciv: UnitPromotions.json, Survivalism III"
+    }
+   ],
+   "provenance": "unciv: UnitPromotions.json, Survivalism III",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:promotion/heli-ambush-1",
+   "name": "Bonus vs Armored (25)",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [
+    "core:unit-combat/helicopter"
+   ],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": {
+      "opponent": {
+       "unit_combat": "core:unit-combat/armor"
+      }
+     },
+     "trigger": "passive",
+     "modifier": "combat.strength.pct",
+     "amount": 25,
+     "source": "unciv: UnitPromotions.json, Anti-Armor I"
+    }
+   ],
+   "provenance": "unciv: UnitPromotions.json, Anti-Armor I",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:promotion/heli-ambush-2",
+   "name": "Bonus vs Armored (25)",
+   "requires": null,
+   "requires_any_of": [
+    "core:promotion/heli-ambush-1"
+   ],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [
+    "core:unit-combat/helicopter"
+   ],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": {
+      "opponent": {
+       "unit_combat": "core:unit-combat/armor"
+      }
+     },
+     "trigger": "passive",
+     "modifier": "combat.strength.pct",
+     "amount": 25,
+     "source": "unciv: UnitPromotions.json, Anti-Armor II"
+    }
+   ],
+   "provenance": "unciv: UnitPromotions.json, Anti-Armor II",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:promotion/heli-mobility-1",
+   "name": "Mobility I",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [
+    "core:unit-combat/helicopter"
+   ],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "unit.moves.flat",
+     "amount": 1,
+     "source": "unciv: UnitPromotions.json, Mobility I"
+    }
+   ],
+   "provenance": "unciv: UnitPromotions.json, Mobility I",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:promotion/heli-mobility-2",
+   "name": "Mobility II",
+   "requires": null,
+   "requires_any_of": [
+    "core:promotion/heli-mobility-1"
+   ],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [
+    "core:unit-combat/helicopter"
+   ],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "unit.moves.flat",
+     "amount": 1,
+     "source": "unciv: UnitPromotions.json, Mobility II"
+    }
+   ],
+   "provenance": "unciv: UnitPromotions.json, Mobility II",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:promotion/heli-repair",
+   "name": "Repair",
+   "requires": null,
+   "requires_any_of": [
+    "core:promotion/heli-ambush-2",
+    "core:promotion/heli-mobility-2"
+   ],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [
+    "core:unit-combat/helicopter"
+   ],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "promotion.always_heal",
+     "amount": true,
+     "needs_mechanic": "always_heal",
+     "source": "unciv: UnitPromotions.json, Air Repair"
+    }
+   ],
+   "provenance": "unciv: UnitPromotions.json, Air Repair",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:promotion/coastal-raider-1",
+   "name": "Coastal Raider I",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [
+    "core:unit-combat/navalmelee"
+   ],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "combat.attack_vs_city.pct",
+     "amount": 20,
+     "source": "unciv: UnitPromotions.json, Coastal Raider I"
+    },
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "on_attack_city",
+     "modifier": "combat.city_attack_gold.pct_of_damage",
+     "amount": 33,
+     "source": "unciv: UnitPromotions.json, Coastal Raider I"
+    }
+   ],
+   "provenance": "unciv: UnitPromotions.json, Coastal Raider I",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:promotion/coastal-raider-2",
+   "name": "Coastal Raider II",
+   "requires": null,
+   "requires_any_of": [
+    "core:promotion/coastal-raider-1"
+   ],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [
+    "core:unit-combat/navalmelee"
+   ],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "combat.attack_vs_city.pct",
+     "amount": 20,
+     "source": "unciv: UnitPromotions.json, Coastal Raider II"
+    },
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "on_attack_city",
+     "modifier": "combat.city_attack_gold.pct_of_damage",
+     "amount": 33,
+     "source": "unciv: UnitPromotions.json, Coastal Raider II"
+    }
+   ],
+   "provenance": "unciv: UnitPromotions.json, Coastal Raider II",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:promotion/coastal-raider-3",
+   "name": "Coastal Raider III",
+   "requires": null,
+   "requires_any_of": [
+    "core:promotion/coastal-raider-2"
+   ],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [
+    "core:unit-combat/navalmelee"
+   ],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "combat.attack_vs_city.pct",
+     "amount": 20,
+     "source": "unciv: UnitPromotions.json, Coastal Raider III"
+    },
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "on_attack_city",
+     "modifier": "combat.city_attack_gold.pct_of_damage",
+     "amount": 33,
+     "source": "unciv: UnitPromotions.json, Coastal Raider III"
+    }
+   ],
+   "provenance": "unciv: UnitPromotions.json, Coastal Raider III",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:promotion/boarding-party-1",
+   "name": "Boarding Party I",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [
+    "core:unit-combat/navalmelee"
+   ],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": {
+      "opponent": {
+       "domain": "core:domain/sea"
+      }
+     },
+     "trigger": "passive",
+     "modifier": "combat.strength.pct",
+     "amount": 15,
+     "source": "unciv: UnitPromotions.json, Boarding Party I"
+    }
+   ],
+   "provenance": "unciv: UnitPromotions.json, Boarding Party I",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:promotion/boarding-party-2",
+   "name": "Boarding Party II",
+   "requires": null,
+   "requires_any_of": [
+    "core:promotion/boarding-party-1"
+   ],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [
+    "core:unit-combat/navalmelee"
+   ],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": {
+      "opponent": {
+       "domain": "core:domain/sea"
+      }
+     },
+     "trigger": "passive",
+     "modifier": "combat.strength.pct",
+     "amount": 15,
+     "source": "unciv: UnitPromotions.json, Boarding Party II"
+    }
+   ],
+   "provenance": "unciv: UnitPromotions.json, Boarding Party II",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:promotion/boarding-party-3",
+   "name": "Boarding Party III",
+   "requires": null,
+   "requires_any_of": [
+    "core:promotion/boarding-party-2"
+   ],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [
+    "core:unit-combat/navalmelee"
+   ],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": {
+      "opponent": {
+       "domain": "core:domain/sea"
+      }
+     },
+     "trigger": "passive",
+     "modifier": "combat.strength.pct",
+     "amount": 15,
+     "source": "unciv: UnitPromotions.json, Boarding Party III"
+    }
+   ],
+   "provenance": "unciv: UnitPromotions.json, Boarding Party III",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:promotion/wolfpack-1",
+   "name": "Wolfpack I",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [
+    "core:unit-combat/submarine"
+   ],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "combat.attack.pct",
+     "amount": 25,
+     "source": "unciv: UnitPromotions.json, Wolfpack I"
+    }
+   ],
+   "provenance": "unciv: UnitPromotions.json, Wolfpack I",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:promotion/wolfpack-2",
+   "name": "Wolfpack II",
+   "requires": "core:promotion/wolfpack-1",
+   "requires_any_of": [],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [
+    "core:unit-combat/submarine"
+   ],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "combat.attack.pct",
+     "amount": 25,
+     "source": "unciv: UnitPromotions.json, Wolfpack II"
+    }
+   ],
+   "provenance": "unciv: UnitPromotions.json, Wolfpack II",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:promotion/wolfpack-3",
+   "name": "Wolfpack III",
+   "requires": "core:promotion/wolfpack-2",
+   "requires_any_of": [],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [
+    "core:unit-combat/submarine"
+   ],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "combat.attack.pct",
+     "amount": 25,
+     "source": "unciv: UnitPromotions.json, Wolfpack III"
+    }
+   ],
+   "provenance": "unciv: UnitPromotions.json, Wolfpack III",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:promotion/flight-deck-1",
+   "name": "Flight Deck I",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [
+    "core:unit-combat/carrier"
+   ],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "unit.cargo.flat",
+     "amount": 1,
+     "source": "unciv: UnitPromotions.json, Flight Deck I"
+    }
+   ],
+   "provenance": "unciv: UnitPromotions.json, Flight Deck I",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:promotion/flight-deck-2",
+   "name": "Flight Deck II",
+   "requires": "core:promotion/flight-deck-1",
+   "requires_any_of": [],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [
+    "core:unit-combat/carrier"
+   ],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "unit.cargo.flat",
+     "amount": 1,
+     "source": "unciv: UnitPromotions.json, Flight Deck II"
+    }
+   ],
+   "provenance": "unciv: UnitPromotions.json, Flight Deck II",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:promotion/flight-deck-3",
+   "name": "Flight Deck III",
+   "requires": "core:promotion/flight-deck-2",
+   "requires_any_of": [],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [
+    "core:unit-combat/carrier"
+   ],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "unit.cargo.flat",
+     "amount": 1,
+     "source": "unciv: UnitPromotions.json, Flight Deck III"
+    }
+   ],
+   "provenance": "unciv: UnitPromotions.json, Flight Deck III",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:promotion/armor-plating-1",
+   "name": "Armor Plating I",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [
+    "core:unit-combat/carrier"
+   ],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "combat.defense.pct",
+     "amount": 25,
+     "source": "unciv: UnitPromotions.json, Armor Plating I"
+    }
+   ],
+   "provenance": "unciv: UnitPromotions.json, Armor Plating I",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:promotion/armor-plating-2",
+   "name": "Armor Plating II",
+   "requires": "core:promotion/armor-plating-1",
+   "requires_any_of": [],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [
+    "core:unit-combat/carrier"
+   ],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "combat.defense.pct",
+     "amount": 25,
+     "source": "unciv: UnitPromotions.json, Armor Plating II"
+    }
+   ],
+   "provenance": "unciv: UnitPromotions.json, Armor Plating II",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:promotion/armor-plating-3",
+   "name": "Armor Plating III",
+   "requires": "core:promotion/armor-plating-2",
+   "requires_any_of": [],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [
+    "core:unit-combat/carrier"
+   ],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "combat.defense.pct",
+     "amount": 25,
+     "source": "unciv: UnitPromotions.json, Armor Plating III"
+    }
+   ],
+   "provenance": "unciv: UnitPromotions.json, Armor Plating III",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:promotion/morale",
+   "name": "Morale",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": false,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [
+    "core:unit-combat/recon",
+    "core:unit-combat/archer",
+    "core:unit-combat/mounted",
+    "core:unit-combat/melee",
+    "core:unit-combat/siege",
+    "core:unit-combat/gun",
+    "core:unit-combat/armor",
+    "core:unit-combat/helicopter",
+    "core:unit-combat/navalranged",
+    "core:unit-combat/navalmelee",
+    "core:unit-combat/submarine"
+   ],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "combat.strength.pct",
+     "amount": 15,
+     "source": "unciv: UnitPromotions.json, Morale"
+    }
+   ],
+   "provenance": "unciv: UnitPromotions.json, Morale",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:promotion/adjacent-bonus",
+   "name": "Discipline",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": false,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [
+    "core:unit-combat/recon",
+    "core:unit-combat/mounted",
+    "core:unit-combat/melee",
+    "core:unit-combat/gun",
+    "core:unit-combat/armor",
+    "core:unit-combat/helicopter",
+    "core:unit-combat/navalmelee",
+    "core:unit-combat/submarine"
+   ],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "combat.adjacent_friendly_unit.pct",
+     "amount": 15,
+     "source": "unciv: Policies.json, Discipline"
+    }
+   ],
+   "provenance": "unciv: Policies.json, Discipline"
+  },
+  {
+   "id": "core:promotion/himeji-castle",
+   "name": "Himeji Castle",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": false,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [
+    "core:unit-combat/recon",
+    "core:unit-combat/archer",
+    "core:unit-combat/mounted",
+    "core:unit-combat/melee",
+    "core:unit-combat/siege",
+    "core:unit-combat/gun",
+    "core:unit-combat/armor",
+    "core:unit-combat/helicopter",
+    "core:unit-combat/navalranged",
+    "core:unit-combat/navalmelee",
+    "core:unit-combat/submarine"
+   ],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "combat.in_friendly_land.pct",
+     "amount": 15,
+     "source": "unciv: Buildings.json, Himeji Castle"
+    }
+   ],
+   "provenance": "unciv: Buildings.json, Himeji Castle"
+  },
+  {
+   "id": "core:promotion/naval-tradition",
+   "name": "Exploration",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": false,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [
+    "core:unit-combat/navalranged",
+    "core:unit-combat/navalmelee",
+    "core:unit-combat/carrier",
+    "core:unit-combat/submarine"
+   ],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "unit.moves.flat",
+     "amount": 1,
+     "source": "own value"
+    },
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "unit.sight.flat",
+     "amount": 1,
+     "source": "own value"
+    }
+   ],
+   "provenance": "own value"
+  },
+  {
+   "id": "core:promotion/great-lighthouse",
+   "name": "Great Lighthouse",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": false,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [
+    "core:unit-combat/navalranged",
+    "core:unit-combat/navalmelee",
+    "core:unit-combat/submarine",
+    "core:unit-combat/carrier"
+   ],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "unit.moves.flat",
+     "amount": 1,
+     "source": "unciv: Buildings.json, The Great Lighthouse"
+    },
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "unit.sight.flat",
+     "amount": 1,
+     "source": "unciv: Buildings.json, The Great Lighthouse"
+    }
+   ],
+   "provenance": "unciv: Buildings.json, The Great Lighthouse"
+  },
+  {
+   "id": "core:promotion/nationalism",
+   "name": "Patriotic War",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": false,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [
+    "core:unit-combat/recon",
+    "core:unit-combat/archer",
+    "core:unit-combat/mounted",
+    "core:unit-combat/melee",
+    "core:unit-combat/siege",
+    "core:unit-combat/gun",
+    "core:unit-combat/armor",
+    "core:unit-combat/helicopter",
+    "core:unit-combat/navalranged",
+    "core:unit-combat/navalmelee",
+    "core:unit-combat/submarine"
+   ],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "combat.attack_in_friendly_land.pct",
+     "amount": 15,
+     "source": "own value"
+    }
+   ],
+   "provenance": "own value"
+  },
+  {
+   "id": "core:promotion/fast-general",
+   "name": "Mobile General",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": false,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [],
+   "civilian_units": [
+    "core:unit/great-general"
+   ],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "unit.moves.flat",
+     "amount": 3,
+     "source": "own value"
+    }
+   ],
+   "provenance": "own value"
+  },
+  {
+   "id": "core:promotion/fast-admiral",
+   "name": "Mobile Admiral",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": false,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [],
+   "civilian_units": [
+    "core:unit/great-admiral"
+   ],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "unit.moves.flat",
+     "amount": 2,
+     "source": "own value"
+    }
+   ],
+   "provenance": "own value"
+  },
+  {
+   "id": "core:promotion/embarkation",
+   "name": "Embarkation",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": false,
+   "lost_with_upgrade": false,
+   "required_tech": "core:tech/optics",
+   "unit_combats": [
+    "core:unit-combat/recon",
+    "core:unit-combat/archer",
+    "core:unit-combat/mounted",
+    "core:unit-combat/melee",
+    "core:unit-combat/siege",
+    "core:unit-combat/gun",
+    "core:unit-combat/armor",
+    "core:unit-combat/helicopter"
+   ],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "promotion.allows_embarkation",
+     "amount": true,
+     "needs_mechanic": "allows_embarkation",
+     "source": "own value"
+    }
+   ],
+   "provenance": "own value"
+  },
+  {
+   "id": "core:promotion/defensive-embarkation",
+   "name": "Embarkation with Defense",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": false,
+   "lost_with_upgrade": false,
+   "required_tech": "core:tech/optics",
+   "unit_combats": [
+    "core:unit-combat/recon",
+    "core:unit-combat/archer",
+    "core:unit-combat/mounted",
+    "core:unit-combat/melee",
+    "core:unit-combat/siege",
+    "core:unit-combat/gun",
+    "core:unit-combat/armor",
+    "core:unit-combat/helicopter"
+   ],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "promotion.allows_embarkation",
+     "amount": true,
+     "needs_mechanic": "allows_embarkation",
+     "source": "own value, unverified"
+    },
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "combat.embarked_defense.pct",
+     "amount": 100,
+     "source": "unciv: Units.json, Marine"
+    }
+   ],
+   "provenance": "own value, unverified"
+  },
+  {
+   "id": "core:promotion/allwater-embarkation",
+   "name": "Embarkation with Ocean Movement",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": false,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [
+    "core:unit-combat/recon",
+    "core:unit-combat/archer",
+    "core:unit-combat/mounted",
+    "core:unit-combat/melee",
+    "core:unit-combat/siege",
+    "core:unit-combat/gun",
+    "core:unit-combat/armor",
+    "core:unit-combat/helicopter"
+   ],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "promotion.allows_embarkation",
+     "amount": true,
+     "needs_mechanic": "allows_embarkation",
+     "source": "own value, unverified"
+    },
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "promotion.embarked_all_water",
+     "amount": true,
+     "needs_mechanic": "embarked_all_water",
+     "source": "own value, unverified"
+    },
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "unit.embarked_sight.flat",
+     "amount": 2,
+     "source": "own value, unverified"
+    }
+   ],
+   "provenance": "own value, unverified"
+  },
+  {
+   "id": "core:promotion/extra-moves-i",
+   "name": "1 Extra Movement",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "unit.moves.flat",
+     "amount": 1,
+     "source": "own value, unverified"
+    }
+   ],
+   "provenance": "own value, unverified"
+  },
+  {
+   "id": "core:promotion/extra-sight-i",
+   "name": "Extra Sight (1)",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": true,
+   "lost_with_upgrade": true,
+   "required_tech": null,
+   "unit_combats": [],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "unit.sight.flat",
+     "amount": 1,
+     "source": "unciv: Units.json, Nuclear Submarine"
+    }
+   ],
+   "provenance": "unciv: Units.json, Nuclear Submarine"
+  },
+  {
+   "id": "core:promotion/extra-sight-ii",
+   "name": "Extra Sight (2)",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": true,
+   "lost_with_upgrade": true,
+   "required_tech": null,
+   "unit_combats": [],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "unit.sight.flat",
+     "amount": 2,
+     "source": "unciv: Units.json, Conquistador"
+    }
+   ],
+   "provenance": "unciv: Units.json, Conquistador"
+  },
+  {
+   "id": "core:promotion/extra-sight-iii",
+   "name": "Extra Sight (3)",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": true,
+   "lost_with_upgrade": true,
+   "required_tech": null,
+   "unit_combats": [],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "unit.sight.flat",
+     "amount": 3,
+     "source": "own value, unverified"
+    }
+   ],
+   "provenance": "own value, unverified"
+  },
+  {
+   "id": "core:promotion/extra-sight-iv",
+   "name": "Extra Sight (4)",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": true,
+   "lost_with_upgrade": true,
+   "required_tech": null,
+   "unit_combats": [],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "unit.sight.flat",
+     "amount": 4,
+     "source": "own value, unverified"
+    }
+   ],
+   "provenance": "own value, unverified"
+  },
+  {
+   "id": "core:promotion/sight-penalty",
+   "name": "Limited Visibility",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "unit.sight.flat",
+     "amount": -1,
+     "source": "unciv: Units.json, Rocket Artillery"
+    }
+   ],
+   "provenance": "unciv: Units.json, Rocket Artillery"
+  },
+  {
+   "id": "core:promotion/air-recon",
+   "name": "Air Recon",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "promotion.recon",
+     "amount": true,
+     "needs_mechanic": "recon",
+     "source": "own value, unverified"
+    }
+   ],
+   "provenance": "own value, unverified"
+  },
+  {
+   "id": "core:promotion/anti-mounted-i",
+   "name": "Bonus vs Mounted (50)",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": true,
+   "lost_with_upgrade": true,
+   "required_tech": null,
+   "unit_combats": [],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": {
+      "opponent": {
+       "unit_combat": "core:unit-combat/mounted"
+      }
+     },
+     "trigger": "passive",
+     "modifier": "combat.strength.pct",
+     "amount": 50,
+     "source": "unciv: Units.json, Pikeman"
+    }
+   ],
+   "provenance": "unciv: Units.json, Pikeman"
+  },
+  {
+   "id": "core:promotion/anti-mounted-ii",
+   "name": "Bonus vs Mounted (100)",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": true,
+   "lost_with_upgrade": true,
+   "required_tech": null,
+   "unit_combats": [],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": {
+      "opponent": {
+       "unit_combat": "core:unit-combat/mounted"
+      }
+     },
+     "trigger": "passive",
+     "modifier": "combat.strength.pct",
+     "amount": 100,
+     "source": "own value, unverified"
+    }
+   ],
+   "provenance": "own value, unverified"
+  },
+  {
+   "id": "core:promotion/city-siege",
+   "name": "Bonus vs Cities (200)",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": true,
+   "lost_with_upgrade": true,
+   "required_tech": null,
+   "unit_combats": [],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "combat.attack_vs_city.pct",
+     "amount": 200,
+     "source": "unciv: Units.json, Rocket Artillery"
+    }
+   ],
+   "provenance": "unciv: Units.json, Rocket Artillery"
+  },
+  {
+   "id": "core:promotion/city-assault",
+   "name": "Bonus vs Cities (300)",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": true,
+   "lost_with_upgrade": true,
+   "required_tech": null,
+   "unit_combats": [],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "combat.attack_vs_city.pct",
+     "amount": 300,
+     "source": "unciv: Units.json, Battering Ram"
+    }
+   ],
+   "provenance": "unciv: Units.json, Battering Ram"
+  },
+  {
+   "id": "core:promotion/defense-penalty",
+   "name": "Penalty on Defense (33)",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": true,
+   "lost_with_upgrade": true,
+   "required_tech": null,
+   "unit_combats": [],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "combat.defense.pct",
+     "amount": -33,
+     "source": "unciv: Units.json, Battering Ram"
+    }
+   ],
+   "provenance": "unciv: Units.json, Battering Ram"
+  },
+  {
+   "id": "core:promotion/mounted-penalty",
+   "name": "Penalty vs Mounted (33)",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": true,
+   "lost_with_upgrade": true,
+   "required_tech": null,
+   "unit_combats": [],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": {
+      "opponent": {
+       "unit_combat": "core:unit-combat/mounted"
+      }
+     },
+     "trigger": "passive",
+     "modifier": "combat.strength.pct",
+     "amount": -33,
+     "source": "own value, unverified"
+    }
+   ],
+   "provenance": "own value, unverified"
+  },
+  {
+   "id": "core:promotion/city-penalty",
+   "name": "Penalty Attacking Cities (33)",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": false,
+   "lost_with_upgrade": true,
+   "required_tech": null,
+   "unit_combats": [],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "combat.attack_vs_city.pct",
+     "amount": -33,
+     "source": "unciv: Units.json, Cavalry"
+    }
+   ],
+   "provenance": "unciv: Units.json, Cavalry"
+  },
+  {
+   "id": "core:promotion/small-city-penalty",
+   "name": "Penalty Attacking Cities (25)",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": false,
+   "lost_with_upgrade": true,
+   "required_tech": null,
+   "unit_combats": [],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "combat.attack_vs_city.pct",
+     "amount": -25,
+     "source": "unciv: Units.json, Cataphract"
+    }
+   ],
+   "provenance": "unciv: Units.json, Cataphract"
+  },
+  {
+   "id": "core:promotion/interception-i",
+   "name": "Interception (20)",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "air.intercept_chance.flat",
+     "amount": 20,
+     "source": "own value, unverified"
+    }
+   ],
+   "provenance": "own value, unverified"
+  },
+  {
+   "id": "core:promotion/interception-ii",
+   "name": "Interception (40)",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": true,
+   "lost_with_upgrade": true,
+   "required_tech": null,
+   "unit_combats": [],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "air.intercept_chance.flat",
+     "amount": 40,
+     "source": "unciv: Units.json, Destroyer"
+    }
+   ],
+   "provenance": "unciv: Units.json, Destroyer"
+  },
+  {
+   "id": "core:promotion/interception-iii",
+   "name": "Interception (50)",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "air.intercept_chance.flat",
+     "amount": 50,
+     "source": "unciv: Units.json, Triplane"
+    }
+   ],
+   "provenance": "unciv: Units.json, Triplane"
+  },
+  {
+   "id": "core:promotion/interception-iv",
+   "name": "Interception (100)",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "air.intercept_chance.flat",
+     "amount": 100,
+     "source": "unciv: Units.json, Missile Cruiser"
+    }
+   ],
+   "provenance": "unciv: Units.json, Missile Cruiser"
+  },
+  {
+   "id": "core:promotion/air-sweep",
+   "name": "Air Sweep",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "promotion.air_sweep_capable",
+     "amount": true,
+     "needs_mechanic": "air_sweep_capable",
+     "source": "own value, unverified"
+    }
+   ],
+   "provenance": "own value, unverified"
+  },
+  {
+   "id": "core:promotion/weak-ranged",
+   "name": "Weak Ranged Attack",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "combat.ranged_attack.pct",
+     "amount": -50,
+     "source": "own value, unverified"
+    }
+   ],
+   "provenance": "own value, unverified"
+  },
+  {
+   "id": "core:promotion/anti-air",
+   "name": "Bonus vs Aircraft/Helicopters (150)",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": {
+      "opponent": {
+       "unit_combat": "core:unit-combat/fighter"
+      }
+     },
+     "trigger": "passive",
+     "modifier": "combat.strength.pct",
+     "amount": 150,
+     "source": "unciv: Units.json, Mobile SAM"
+    },
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": {
+      "opponent": {
+       "unit_combat": "core:unit-combat/bomber"
+      }
+     },
+     "trigger": "passive",
+     "modifier": "combat.strength.pct",
+     "amount": 150,
+     "source": "unciv: Units.json, Mobile SAM"
+    },
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": {
+      "opponent": {
+       "unit_combat": "core:unit-combat/helicopter"
+      }
+     },
+     "trigger": "passive",
+     "modifier": "combat.strength.pct",
+     "amount": 150,
+     "source": "unciv: Units.json, Mobile SAM"
+    }
+   ],
+   "provenance": "unciv: Units.json, Mobile SAM"
+  },
+  {
+   "id": "core:promotion/anti-air-ii",
+   "name": "Bonus vs Bombers/Helicopters (150)",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": {
+      "opponent": {
+       "unit_combat": "core:unit-combat/bomber"
+      }
+     },
+     "trigger": "passive",
+     "modifier": "combat.strength.pct",
+     "amount": 150,
+     "source": "unciv: Units.json, Jet Fighter"
+    },
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": {
+      "opponent": {
+       "unit_combat": "core:unit-combat/helicopter"
+      }
+     },
+     "trigger": "passive",
+     "modifier": "combat.strength.pct",
+     "amount": 150,
+     "source": "unciv: Units.json, Jet Fighter"
+    }
+   ],
+   "provenance": "unciv: Units.json, Jet Fighter"
+  },
+  {
+   "id": "core:promotion/anti-helicopter",
+   "name": "Bonus vs Helicopters",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "player"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "text_only",
+     "amount": null,
+     "needs_mechanic": "hardcoded_promotion_anti_helicopter",
+     "source": "own value, unverified"
+    }
+   ],
+   "provenance": "own value, unverified"
+  },
+  {
+   "id": "core:promotion/anti-fighter",
+   "name": "Bonus vs Fighters (33)",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": {
+      "opponent": {
+       "unit": "core:unit/triplane"
+      }
+     },
+     "trigger": "passive",
+     "modifier": "combat.strength.pct",
+     "amount": 33,
+     "source": "unciv: Units.json, Zero"
+    },
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": {
+      "opponent": {
+       "unit": "core:unit/fighter"
+      }
+     },
+     "trigger": "passive",
+     "modifier": "combat.strength.pct",
+     "amount": 33,
+     "source": "unciv: Units.json, Zero"
+    }
+   ],
+   "provenance": "unciv: Units.json, Zero"
+  },
+  {
+   "id": "core:promotion/anti-submarine-i",
+   "name": "Attack vs Submarines (33)",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": {
+      "opponent": {
+       "unit": "core:unit/submarine"
+      }
+     },
+     "trigger": "passive",
+     "modifier": "combat.attack.pct",
+     "amount": 33,
+     "source": "own value, unverified"
+    },
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": {
+      "opponent": {
+       "unit": "core:unit/nuclear-submarine"
+      }
+     },
+     "trigger": "passive",
+     "modifier": "combat.attack.pct",
+     "amount": 33,
+     "source": "own value, unverified"
+    }
+   ],
+   "provenance": "own value, unverified"
+  },
+  {
+   "id": "core:promotion/anti-submarine-ii",
+   "name": "Attack vs Submarines (100)",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": {
+      "opponent": {
+       "unit": "core:unit/submarine"
+      }
+     },
+     "trigger": "passive",
+     "modifier": "combat.attack.pct",
+     "amount": 100,
+     "source": "own value, unverified"
+    },
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": {
+      "opponent": {
+       "unit": "core:unit/nuclear-submarine"
+      }
+     },
+     "trigger": "passive",
+     "modifier": "combat.attack.pct",
+     "amount": 100,
+     "source": "own value, unverified"
+    }
+   ],
+   "provenance": "own value, unverified"
+  },
+  {
+   "id": "core:promotion/anti-tank",
+   "name": "Bonus vs Tanks (100)",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": {
+      "opponent": {
+       "unit_combat": "core:unit-combat/armor"
+      }
+     },
+     "trigger": "passive",
+     "modifier": "combat.strength.pct",
+     "amount": 100,
+     "source": "unciv: Units.json, Helicopter Gunship"
+    }
+   ],
+   "provenance": "unciv: Units.json, Helicopter Gunship"
+  },
+  {
+   "id": "core:promotion/evasion-i",
+   "name": "Evasion (50)",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "air.evasion.pct",
+     "amount": 50,
+     "source": "unciv: UnitPromotions.json, Evasion"
+    }
+   ],
+   "provenance": "unciv: UnitPromotions.json, Evasion",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:promotion/evasion-ii",
+   "name": "Evasion (100)",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "air.evasion.pct",
+     "amount": 100,
+     "source": "unciv: Units.json, Stealth Bomber"
+    }
+   ],
+   "provenance": "unciv: Units.json, Stealth Bomber"
+  },
+  {
+   "id": "core:promotion/naval-penalty",
+   "name": "Penalty vs Naval (50)",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": {
+      "opponent": {
+       "unit_combat": "core:unit-combat/navalranged"
+      }
+     },
+     "trigger": "passive",
+     "modifier": "combat.strength.pct",
+     "amount": -50,
+     "source": "own value, unverified"
+    },
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": {
+      "opponent": {
+       "unit_combat": "core:unit-combat/navalmelee"
+      }
+     },
+     "trigger": "passive",
+     "modifier": "combat.strength.pct",
+     "amount": -50,
+     "source": "own value, unverified"
+    },
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": {
+      "opponent": {
+       "unit_combat": "core:unit-combat/submarine"
+      }
+     },
+     "trigger": "passive",
+     "modifier": "combat.strength.pct",
+     "amount": -50,
+     "source": "own value, unverified"
+    },
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": {
+      "opponent": {
+       "unit_combat": "core:unit-combat/carrier"
+      }
+     },
+     "trigger": "passive",
+     "modifier": "combat.strength.pct",
+     "amount": -50,
+     "source": "own value, unverified"
+    }
+   ],
+   "provenance": "own value, unverified"
+  },
+  {
+   "id": "core:promotion/heavy-payload",
+   "name": "Bonus vs Cities (50)",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "combat.attack_vs_city.pct",
+     "amount": 50,
+     "source": "own value, unverified"
+    }
+   ],
+   "provenance": "own value, unverified"
+  },
+  {
+   "id": "core:promotion/fire-support",
+   "name": "Bonus vs Cities (33)",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "combat.attack_vs_city.pct",
+     "amount": 33,
+     "source": "unciv: Units.json, Ironclad"
+    }
+   ],
+   "provenance": "unciv: Units.json, Ironclad"
+  },
+  {
+   "id": "core:promotion/silent-hunter",
+   "name": "Bonus when Attacking (75)",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "combat.attack.pct",
+     "amount": 75,
+     "source": "unciv: Units.json, Nuclear Submarine"
+    }
+   ],
+   "provenance": "unciv: Units.json, Nuclear Submarine"
+  },
+  {
+   "id": "core:promotion/rival-territory",
+   "name": "Can Enter Rival Territory",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "promotion.rival_territory",
+     "amount": true,
+     "needs_mechanic": "rival_territory",
+     "source": "unciv: Units.json, Great Prophet"
+    }
+   ],
+   "provenance": "unciv: Units.json, Great Prophet"
+  },
+  {
+   "id": "core:promotion/cargo-i",
+   "name": "Can Carry 1 Cargo",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "unit.cargo.flat",
+     "amount": 1,
+     "source": "own value, unverified"
+    }
+   ],
+   "provenance": "own value, unverified"
+  },
+  {
+   "id": "core:promotion/cargo-ii",
+   "name": "Can Carry 2 Cargo",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "unit.cargo.flat",
+     "amount": 2,
+     "source": "unciv: Units.json, Nuclear Submarine"
+    }
+   ],
+   "provenance": "unciv: Units.json, Nuclear Submarine"
+  },
+  {
+   "id": "core:promotion/cargo-iii",
+   "name": "Can Carry 3 Cargo",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "unit.cargo.flat",
+     "amount": 3,
+     "source": "unciv: Units.json, Missile Cruiser"
+    }
+   ],
+   "provenance": "unciv: Units.json, Missile Cruiser"
+  },
+  {
+   "id": "core:promotion/cargo-iv",
+   "name": "Can Carry 4 Cargo",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "unit.cargo.flat",
+     "amount": 4,
+     "source": "own value, unverified"
+    }
+   ],
+   "provenance": "own value, unverified"
+  },
+  {
+   "id": "core:promotion/foliage-impassable",
+   "name": "Cannot Enter Forest or Jungle",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": {
+      "on_tile": {
+       "feature": "core:feature/jungle"
+      },
+      "until_tech": null
+     },
+     "trigger": "passive",
+     "modifier": "unit.impassable_terrain",
+     "amount": true,
+     "source": "own value, unverified"
+    },
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": {
+      "on_tile": {
+       "feature": "core:feature/forest"
+      },
+      "until_tech": null
+     },
+     "trigger": "passive",
+     "modifier": "unit.impassable_terrain",
+     "amount": true,
+     "source": "own value, unverified"
+    }
+   ],
+   "provenance": "own value, unverified"
+  },
+  {
+   "id": "core:promotion/rough-terrain-ends-turn",
+   "name": "Rough Terrain Penalty",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": true,
+   "lost_with_upgrade": true,
+   "required_tech": null,
+   "unit_combats": [],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "promotion.rough_terrain_ends_turn",
+     "amount": true,
+     "needs_mechanic": "rough_terrain_ends_turn",
+     "source": "unciv: Units.json, Chariot Archer"
+    }
+   ],
+   "provenance": "unciv: Units.json, Chariot Archer"
+  },
+  {
+   "id": "core:promotion/ocean-impassable-until-astronomy",
+   "name": "Astronomy Needed",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": false,
+   "lost_with_upgrade": true,
+   "required_tech": null,
+   "unit_combats": [],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": {
+      "on_tile": {
+       "terrain": "core:terrain/ocean"
+      },
+      "until_tech": "core:tech/astronomy"
+     },
+     "trigger": "passive",
+     "modifier": "unit.impassable_terrain",
+     "amount": true,
+     "source": "own value, unverified"
+    }
+   ],
+   "provenance": "own value, unverified"
+  },
+  {
+   "id": "core:promotion/ocean-impassable",
+   "name": "Cannot Enter Deep Ocean",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": false,
+   "lost_with_upgrade": true,
+   "required_tech": null,
+   "unit_combats": [],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": {
+      "on_tile": {
+       "terrain": "core:terrain/ocean"
+      },
+      "until_tech": null
+     },
+     "trigger": "passive",
+     "modifier": "unit.impassable_terrain",
+     "amount": true,
+     "source": "own value"
+    }
+   ],
+   "provenance": "own value"
+  },
+  {
+   "id": "core:promotion/steam-powered",
+   "name": "Double movement in Coast",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": false,
+   "lost_with_upgrade": true,
+   "required_tech": null,
+   "unit_combats": [],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": {
+      "on_tile": {
+       "terrain": "core:terrain/coast"
+      }
+     },
+     "trigger": "passive",
+     "modifier": "unit.double_move",
+     "amount": true,
+     "source": "unciv: Units.json, Ironclad"
+    }
+   ],
+   "provenance": "unciv: Units.json, Ironclad"
+  },
+  {
+   "id": "core:promotion/invisible-submarine",
+   "name": "Is Invisible (Submarine)",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "promotion.invisible",
+     "amount": 1,
+     "target": "invisible_submarine",
+     "source": "own value, unverified"
+    }
+   ],
+   "provenance": "own value, unverified"
+  },
+  {
+   "id": "core:promotion/see-invisible-submarine",
+   "name": "Can See Submarines",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "promotion.see_invisible",
+     "amount": 1,
+     "target": "invisible_submarine",
+     "source": "unciv: Units.json, Missile Cruiser"
+    }
+   ],
+   "provenance": "unciv: Units.json, Missile Cruiser"
+  },
+  {
+   "id": "core:promotion/ignore-terrain-cost",
+   "name": "Ignores Terrain Cost",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "promotion.ignore_terrain_cost",
+     "amount": true,
+     "needs_mechanic": "ignore_terrain_cost",
+     "source": "own value"
+    }
+   ],
+   "provenance": "own value"
+  },
+  {
+   "id": "core:promotion/hovering-unit",
+   "name": "Hovering Unit",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "promotion.can_move_impassable",
+     "amount": true,
+     "needs_mechanic": "can_move_impassable",
+     "source": "own value, unverified"
+    },
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "promotion.hovering_unit",
+     "amount": true,
+     "needs_mechanic": "hovering_unit",
+     "source": "own value, unverified"
+    }
+   ],
+   "provenance": "own value, unverified"
+  },
+  {
+   "id": "core:promotion/flat-movement-cost",
+   "name": "All Tiles Cost 1 Move",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "promotion.flat_movement_cost",
+     "amount": true,
+     "needs_mechanic": "flat_movement_cost",
+     "source": "unciv: Units.json, Helicopter Gunship"
+    }
+   ],
+   "provenance": "unciv: Units.json, Helicopter Gunship"
+  },
+  {
+   "id": "core:promotion/can-move-impassable",
+   "name": "May Enter Ice Tiles",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "promotion.can_move_impassable",
+     "amount": true,
+     "needs_mechanic": "can_move_impassable",
+     "source": "own value, unverified"
+    }
+   ],
+   "provenance": "own value, unverified"
+  },
+  {
+   "id": "core:promotion/no-capture",
+   "name": "Unable to Capture Cities",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "promotion.no_capture",
+     "amount": true,
+     "needs_mechanic": "no_capture",
+     "source": "unciv: Units.json, Helicopter Gunship"
+    }
+   ],
+   "provenance": "unciv: Units.json, Helicopter Gunship"
+  },
+  {
+   "id": "core:promotion/only-defensive",
+   "name": "May Not Melee Attack",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": true,
+   "lost_with_upgrade": true,
+   "required_tech": null,
+   "unit_combats": [],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "promotion.only_defensive",
+     "amount": true,
+     "needs_mechanic": "only_defensive",
+     "source": "own value"
+    }
+   ],
+   "provenance": "own value"
+  },
+  {
+   "id": "core:promotion/no-defensive-bonuses",
+   "name": "No Defensive Terrain Bonuses",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": true,
+   "lost_with_upgrade": true,
+   "required_tech": null,
+   "unit_combats": [],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "promotion.no_defensive_bonus",
+     "amount": true,
+     "needs_mechanic": "no_defensive_bonus",
+     "source": "own value"
+    }
+   ],
+   "provenance": "own value"
+  },
+  {
+   "id": "core:promotion/paradrop",
+   "name": "May Paradrop",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "unit.paradrop_range.flat",
+     "amount": 5,
+     "source": "unciv: Units.json, Paratrooper"
+    }
+   ],
+   "provenance": "unciv: Units.json, Paratrooper"
+  },
+  {
+   "id": "core:promotion/must-set-up",
+   "name": "Must Set Up to Ranged Attack",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": true,
+   "lost_with_upgrade": true,
+   "required_tech": null,
+   "unit_combats": [],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "promotion.must_set_up_to_ranged_attack",
+     "amount": true,
+     "needs_mechanic": "must_set_up_to_ranged_attack",
+     "source": "unciv: Units.json, Artillery"
+    }
+   ],
+   "provenance": "unciv: Units.json, Artillery"
+  },
+  {
+   "id": "core:promotion/ranged-support-fire",
+   "name": "Ranged Support Fire",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "promotion.ranged_support_fire",
+     "amount": true,
+     "needs_mechanic": "ranged_support_fire",
+     "source": "own value, unverified"
+    }
+   ],
+   "provenance": "own value, unverified"
+  },
+  {
+   "id": "core:promotion/can-move-after-attacking",
+   "name": "Can Move After Attacking",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "promotion.can_move_after_attacking",
+     "amount": true,
+     "needs_mechanic": "can_move_after_attacking",
+     "source": "unciv: Units.json, Giant Death Robot"
+    }
+   ],
+   "provenance": "unciv: Units.json, Giant Death Robot"
+  },
+  {
+   "id": "core:promotion/open-terrain",
+   "name": "Combat Bonus in Open Terrain",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "combat.attack_open_terrain.pct",
+     "amount": 30,
+     "source": "own value, unverified"
+    },
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "combat.defense_open_terrain.pct",
+     "amount": 30,
+     "source": "own value, unverified"
+    }
+   ],
+   "provenance": "own value, unverified"
+  },
+  {
+   "id": "core:promotion/second-attack",
+   "name": "May Attack Twice",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "promotion.can_move_after_attacking",
+     "amount": true,
+     "needs_mechanic": "can_move_after_attacking",
+     "source": "unciv: Units.json, Chu-Ko-Nu"
+    },
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "unit.attacks_per_turn.flat",
+     "amount": 1,
+     "source": "unciv: Units.json, Chu-Ko-Nu"
+    }
+   ],
+   "provenance": "unciv: Units.json, Chu-Ko-Nu"
+  },
+  {
+   "id": "core:promotion/ocean-movement",
+   "name": "Naval Movement",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "unit.naval_moves.flat",
+     "amount": 2,
+     "source": "unciv: Nations.json, England"
+    }
+   ],
+   "provenance": "unciv: Nations.json, England"
+  },
+  {
+   "id": "core:promotion/great-general",
+   "name": "Leadership",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "promotion.great_general",
+     "amount": true,
+     "needs_mechanic": "great_general",
+     "source": "own value, unverified"
+    }
+   ],
+   "provenance": "own value, unverified"
+  },
+  {
+   "id": "core:promotion/spawn-generals-i",
+   "name": "Great Generals I",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "combat.great_general_bonus.pct",
+     "amount": 50,
+     "source": "unciv: UnitPromotions.json, Great Generals I"
+    }
+   ],
+   "provenance": "unciv: UnitPromotions.json, Great Generals I",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:promotion/spawn-generals-ii",
+   "name": "Great Generals II",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "combat.great_general_bonus.pct",
+     "amount": 100,
+     "source": "unciv: UnitPromotions.json, Great Generals II"
+    }
+   ],
+   "provenance": "unciv: UnitPromotions.json, Great Generals II",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:promotion/free-pillage-moves",
+   "name": "No Movement Cost to Pillage",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "promotion.free_pillage_moves",
+     "amount": true,
+     "needs_mechanic": "free_pillage_moves",
+     "source": "own value"
+    }
+   ],
+   "provenance": "own value"
+  },
+  {
+   "id": "core:promotion/heal-if-destroy-enemy",
+   "name": "Heal 50 Damage If Kills a Unit",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "on_kill",
+     "modifier": "heal.on_kill.flat",
+     "amount": 50,
+     "source": "unciv: Units.json, Janissary"
+    },
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "promotion.heal_if_destroy_excludes_barbarians",
+     "amount": true,
+     "needs_mechanic": "heal_if_destroy_excludes_barbarians",
+     "source": "own value"
+    }
+   ],
+   "provenance": "own value"
+  },
+  {
+   "id": "core:promotion/partial-heal-if-destroy-enemy",
+   "name": "Heals 25 Damage If Kills a Unit",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "on_kill",
+     "modifier": "heal.on_kill.flat",
+     "amount": 25,
+     "source": "unciv: Units.json, Jaguar"
+    }
+   ],
+   "provenance": "unciv: Units.json, Jaguar"
+  },
+  {
+   "id": "core:promotion/attack-bonus",
+   "name": "Combat Bonus When Attacking (25)",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "combat.attack.pct",
+     "amount": 25,
+     "source": "unciv: Units.json, Janissary"
+    }
+   ],
+   "provenance": "unciv: Units.json, Janissary"
+  },
+  {
+   "id": "core:promotion/mohawk",
+   "name": "Combat Bonus in Forest/Jungle (33)",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": {
+      "on_tile": {
+       "feature": "core:feature/forest"
+      }
+     },
+     "trigger": "passive",
+     "modifier": "combat.attack.pct",
+     "amount": 33,
+     "source": "unciv: Units.json, Mohawk Warrior"
+    },
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": {
+      "on_tile": {
+       "feature": "core:feature/forest"
+      }
+     },
+     "trigger": "passive",
+     "modifier": "combat.defense.pct",
+     "amount": 33,
+     "source": "unciv: Units.json, Mohawk Warrior"
+    },
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": {
+      "on_tile": {
+       "feature": "core:feature/jungle"
+      }
+     },
+     "trigger": "passive",
+     "modifier": "combat.attack.pct",
+     "amount": 33,
+     "source": "unciv: Units.json, Mohawk Warrior"
+    },
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": {
+      "on_tile": {
+       "feature": "core:feature/jungle"
+      }
+     },
+     "trigger": "passive",
+     "modifier": "combat.defense.pct",
+     "amount": 33,
+     "source": "unciv: Units.json, Mohawk Warrior"
+    }
+   ],
+   "provenance": "unciv: Units.json, Mohawk Warrior"
+  },
+  {
+   "id": "core:promotion/jaguar",
+   "name": "Combat Bonus in Forest/Jungle (33)",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": {
+      "on_tile": {
+       "feature": "core:feature/forest"
+      }
+     },
+     "trigger": "passive",
+     "modifier": "combat.attack.pct",
+     "amount": 33,
+     "source": "unciv: UnitPromotions.json, [Jaguar] ability"
+    },
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": {
+      "on_tile": {
+       "feature": "core:feature/forest"
+      }
+     },
+     "trigger": "passive",
+     "modifier": "combat.defense.pct",
+     "amount": 33,
+     "source": "unciv: UnitPromotions.json, [Jaguar] ability"
+    },
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": {
+      "on_tile": {
+       "feature": "core:feature/jungle"
+      }
+     },
+     "trigger": "passive",
+     "modifier": "combat.attack.pct",
+     "amount": 33,
+     "source": "unciv: UnitPromotions.json, [Jaguar] ability"
+    },
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": {
+      "on_tile": {
+       "feature": "core:feature/jungle"
+      }
+     },
+     "trigger": "passive",
+     "modifier": "combat.defense.pct",
+     "amount": 33,
+     "source": "unciv: UnitPromotions.json, [Jaguar] ability"
+    }
+   ],
+   "provenance": "unciv: UnitPromotions.json, [Jaguar] ability",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:promotion/foreign-lands",
+   "name": "Foreign Lands Bonus",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "combat.outside_friendly_land.pct",
+     "amount": 20,
+     "source": "unciv: Units.json, Foreign Legion"
+    }
+   ],
+   "provenance": "unciv: Units.json, Foreign Legion"
+  },
+  {
+   "id": "core:promotion/faster-heal",
+   "name": "Heals at Double Rate",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": false,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [
+    "core:unit-combat/recon",
+    "core:unit-combat/mounted",
+    "core:unit-combat/melee",
+    "core:unit-combat/gun",
+    "core:unit-combat/armor",
+    "core:unit-combat/archer",
+    "core:unit-combat/siege"
+   ],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "heal.in_enemy_land.flat",
+     "amount": 10,
+     "source": "own value, unverified"
+    },
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "heal.in_neutral_land.flat",
+     "amount": 10,
+     "source": "own value, unverified"
+    },
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "heal.in_friendly_land.flat",
+     "amount": 10,
+     "source": "own value, unverified"
+    }
+   ],
+   "provenance": "own value"
+  },
+  {
+   "id": "core:promotion/stronger-vs-damaged",
+   "name": "Damaged Enemy Bonus (33)",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "combat.attack_vs_wounded.pct",
+     "amount": 50,
+     "source": "unciv: Units.json, Cossack"
+    }
+   ],
+   "provenance": "unciv: Units.json, Cossack"
+  },
+  {
+   "id": "core:promotion/statue-zeus",
+   "name": "Statue of Zeus",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": false,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [
+    "core:unit-combat/recon",
+    "core:unit-combat/archer",
+    "core:unit-combat/mounted",
+    "core:unit-combat/melee",
+    "core:unit-combat/siege",
+    "core:unit-combat/gun",
+    "core:unit-combat/armor",
+    "core:unit-combat/helicopter",
+    "core:unit-combat/navalmelee",
+    "core:unit-combat/navalranged"
+   ],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "combat.attack_vs_city.pct",
+     "amount": 15,
+     "source": "unciv: Buildings.json, Statue of Zeus"
+    }
+   ],
+   "provenance": "unciv: Buildings.json, Statue of Zeus"
+  },
+  {
+   "id": "core:promotion/naval-bonus",
+   "name": "Bonus vs Naval",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": true,
+   "lost_with_upgrade": true,
+   "required_tech": null,
+   "unit_combats": [],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": {
+      "opponent": {
+       "unit_combat": "core:unit-combat/navalranged"
+      }
+     },
+     "trigger": "passive",
+     "modifier": "combat.strength.pct",
+     "amount": 50,
+     "source": "unciv: Units.json, Dromon"
+    },
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": {
+      "opponent": {
+       "unit_combat": "core:unit-combat/navalmelee"
+      }
+     },
+     "trigger": "passive",
+     "modifier": "combat.strength.pct",
+     "amount": 50,
+     "source": "unciv: Units.json, Dromon"
+    }
+   ],
+   "provenance": "unciv: Units.json, Dromon"
+  },
+  {
+   "id": "core:promotion/feared-elephant",
+   "name": "Feared Elephant",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": false,
+   "lost_with_upgrade": true,
+   "required_tech": null,
+   "unit_combats": [],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "enemy_units_in_range"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "combat.strength.pct",
+     "amount": -10,
+     "source": "unciv: Units.json, African Forest Elephant"
+    },
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "aura.range",
+     "amount": 1,
+     "source": "unciv: Units.json, African Forest Elephant"
+    }
+   ],
+   "provenance": "unciv: Units.json, African Forest Elephant"
+  },
+  {
+   "id": "core:promotion/flank-attack-bonus",
+   "name": "Enhanced Flank Attack",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": false,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "combat.flank_bonus.pct",
+     "amount": 50,
+     "source": "own value"
+    }
+   ],
+   "provenance": "own value"
+  },
+  {
+   "id": "core:promotion/defend-near-capital",
+   "name": "Near Capital Bonus",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": false,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "combat.near_capital.pct",
+     "amount": 30,
+     "source": "own value"
+    },
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "promotion.capital_defense_falloff",
+     "amount": -3,
+     "needs_mechanic": "capital_defense_falloff",
+     "source": "own value, unverified"
+    }
+   ],
+   "provenance": "own value"
+  },
+  {
+   "id": "core:promotion/embarked-sight",
+   "name": "Extra Sight While Embarked",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": false,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "unit.embarked_sight.flat",
+     "amount": 1,
+     "source": "unciv: Units.json, Marine"
+    }
+   ],
+   "provenance": "unciv: Units.json, Marine"
+  },
+  {
+   "id": "core:promotion/movement-to-general",
+   "name": "Transfer Movement to General",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": false,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "promotion.great_general_receives_movement",
+     "amount": true,
+     "needs_mechanic": "great_general_receives_movement",
+     "source": "own value"
+    }
+   ],
+   "provenance": "own value"
+  },
+  {
+   "id": "core:promotion/general-stacking",
+   "name": "Great General Combat Bonus",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": false,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "promotion.great_general_combat_modifier",
+     "amount": 15,
+     "needs_mechanic": "great_general_combat_modifier",
+     "source": "own value"
+    }
+   ],
+   "provenance": "own value"
+  },
+  {
+   "id": "core:promotion/only-attacks-cities",
+   "name": "City Attack Only",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": false,
+   "lost_with_upgrade": true,
+   "required_tech": null,
+   "unit_combats": [],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "promotion.city_attack_only",
+     "amount": true,
+     "needs_mechanic": "city_attack_only",
+     "source": "own value"
+    }
+   ],
+   "provenance": "own value"
+  },
+  {
+   "id": "core:promotion/war-canoes",
+   "name": "War Canoes",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": false,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "combat.embarked_defense.pct",
+     "amount": 100,
+     "source": "unciv: Nations.json, Songhai"
+    },
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "unit.embarked_sight.flat",
+     "amount": 2,
+     "source": "own value, unverified"
+    }
+   ],
+   "provenance": "own value, unverified"
+  },
+  {
+   "id": "core:promotion/prize-ships",
+   "name": "Prize Ships",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "promotion.capture_defeated_enemy",
+     "amount": true,
+     "needs_mechanic": "capture_defeated_enemy",
+     "source": "unciv: Units.json, Privateer"
+    }
+   ],
+   "provenance": "unciv: Units.json, Privateer"
+  },
+  {
+   "id": "core:promotion/great-admiral",
+   "name": "Naval Leadership",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "promotion.great_admiral",
+     "amount": true,
+     "needs_mechanic": "great_admiral",
+     "source": "own value, unverified"
+    }
+   ],
+   "provenance": "own value, unverified"
+  },
+  {
+   "id": "core:promotion/unwelcome-evangelist",
+   "name": "Unwelcome Evangelist",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": false,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "religion.strength_loss_rival_land.pct",
+     "amount": 25,
+     "source": "own value"
+    }
+   ],
+   "provenance": "own value"
+  },
+  {
+   "id": "core:promotion/withdraw-before-melee",
+   "name": "Withdraw Before Melee",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "combat.withdraw_chance.pct",
+     "amount": 80,
+     "source": "unciv: Units.json, Destroyer"
+    }
+   ],
+   "provenance": "unciv: Units.json, Destroyer"
+  },
+  {
+   "id": "core:promotion/buffalo-chest",
+   "name": "Buffalo Chest",
+   "requires": "core:promotion/buffalo-horns",
+   "requires_any_of": [],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [
+    "core:unit-combat/melee"
+   ],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "combat.attack_open_terrain.pct",
+     "amount": 10,
+     "source": "own value"
+    },
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "combat.defense_open_terrain.pct",
+     "amount": 10,
+     "source": "own value"
+    },
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "combat.flank_bonus.pct",
+     "amount": 25,
+     "source": "own value"
+    },
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "combat.defense_vs_ranged.pct",
+     "amount": 10,
+     "source": "own value"
+    }
+   ],
+   "provenance": "own value"
+  },
+  {
+   "id": "core:promotion/buffalo-loins",
+   "name": "Buffalo Loins",
+   "requires": "core:promotion/buffalo-chest",
+   "requires_any_of": [],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [
+    "core:unit-combat/melee"
+   ],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "combat.attack_open_terrain.pct",
+     "amount": 10,
+     "source": "own value"
+    },
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "combat.defense_open_terrain.pct",
+     "amount": 10,
+     "source": "own value"
+    },
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "combat.defense_rough_terrain.pct",
+     "amount": 10,
+     "source": "own value"
+    },
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "combat.attack_rough_terrain.pct",
+     "amount": 10,
+     "source": "own value"
+    },
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "combat.flank_bonus.pct",
+     "amount": 25,
+     "source": "own value"
+    },
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "combat.defense_vs_ranged.pct",
+     "amount": 10,
+     "source": "own value"
+    }
+   ],
+   "provenance": "own value"
+  },
+  {
+   "id": "core:promotion/buffalo-horns",
+   "name": "Buffalo Horns",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": false,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [
+    "core:unit-combat/melee"
+   ],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "combat.flank_bonus.pct",
+     "amount": 25,
+     "source": "own value"
+    },
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "unit.moves.flat",
+     "amount": 1,
+     "source": "own value"
+    },
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "combat.defense_vs_ranged.pct",
+     "amount": 10,
+     "source": "own value"
+    }
+   ],
+   "provenance": "own value"
+  },
+  {
+   "id": "core:promotion/anti-gunpowder",
+   "name": "Spear Throw",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": false,
+   "lost_with_upgrade": true,
+   "required_tech": null,
+   "unit_combats": [],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "promotion.ranged_support_fire",
+     "amount": true,
+     "needs_mechanic": "ranged_support_fire",
+     "source": "own value"
+    },
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": {
+      "opponent": {
+       "unit_combat": "core:unit-combat/gun"
+      }
+     },
+     "trigger": "passive",
+     "modifier": "combat.strength.pct",
+     "amount": 25,
+     "source": "own value"
+    }
+   ],
+   "provenance": "own value"
+  },
+  {
+   "id": "core:promotion/trade-mission-bonus",
+   "name": "Trade Mission Bonus",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": false,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "trade_mission.influence.pct",
+     "amount": 100,
+     "source": "own value"
+    },
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "trade_mission.gold.pct",
+     "amount": 100,
+     "source": "own value"
+    },
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "unit.naval_moves.flat",
+     "amount": 2,
+     "source": "own value, unverified"
+    }
+   ],
+   "provenance": "own value"
+  },
+  {
+   "id": "core:promotion/heavy-charge",
+   "name": "Heavy Charge",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": false,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "promotion.heavy_charge",
+     "amount": true,
+     "needs_mechanic": "heavy_charge",
+     "source": "own value"
+    }
+   ],
+   "provenance": "own value"
+  },
+  {
+   "id": "core:promotion/city-siege-ii",
+   "name": "Bonus vs Cities (250)",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": true,
+   "lost_with_upgrade": true,
+   "required_tech": null,
+   "unit_combats": [],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "combat.attack_vs_city.pct",
+     "amount": 250,
+     "source": "own value, unverified"
+    }
+   ],
+   "provenance": "own value, unverified"
+  },
+  {
+   "id": "core:promotion/sapper",
+   "name": "Sapper",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": false,
+   "lost_with_upgrade": true,
+   "required_tech": null,
+   "unit_combats": [],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "promotion.sapper",
+     "amount": true,
+     "needs_mechanic": "sapper",
+     "source": "own value"
+    }
+   ],
+   "provenance": "own value"
+  },
+  {
+   "id": "core:promotion/golden-age-points",
+   "name": "Golden Age from Victories",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": false,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "on_kill",
+     "modifier": "golden_age_points.on_kill.pct_of_strength",
+     "amount": 100,
+     "source": "own value, unverified"
+    }
+   ],
+   "provenance": "own value"
+  },
+  {
+   "id": "core:promotion/homeland-guardian",
+   "name": "Homeland Guardian",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": false,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "combat.in_friendly_land.pct",
+     "amount": 25,
+     "source": "own value"
+    }
+   ],
+   "provenance": "own value"
+  },
+  {
+   "id": "core:promotion/homeland-guardian-boogaloo",
+   "name": "Pride of the Ancestors",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": false,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [
+    "core:unit-combat/recon",
+    "core:unit-combat/archer",
+    "core:unit-combat/mounted",
+    "core:unit-combat/melee",
+    "core:unit-combat/siege",
+    "core:unit-combat/gun",
+    "core:unit-combat/armor",
+    "core:unit-combat/helicopter",
+    "core:unit-combat/navalranged",
+    "core:unit-combat/navalmelee",
+    "core:unit-combat/submarine"
+   ],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "combat.in_friendly_land.pct",
+     "amount": 15,
+     "source": "own value"
+    }
+   ],
+   "provenance": "own value"
+  },
+  {
+   "id": "core:promotion/desert-warrior",
+   "name": "Desert Warrior",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": false,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": {
+      "on_tile": {
+       "terrain": "core:terrain/desert"
+      }
+     },
+     "trigger": "passive",
+     "modifier": "combat.attack.pct",
+     "amount": 50,
+     "source": "own value"
+    },
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": {
+      "on_tile": {
+       "terrain": "core:terrain/desert"
+      }
+     },
+     "trigger": "passive",
+     "modifier": "combat.defense.pct",
+     "amount": 50,
+     "source": "own value"
+    }
+   ],
+   "provenance": "own value"
+  },
+  {
+   "id": "core:promotion/goody-hut-picker",
+   "name": "Native Tongue",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": false,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "player"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "text_only",
+     "amount": null,
+     "needs_mechanic": "hardcoded_promotion_goody_hut_picker",
+     "source": "own value"
+    }
+   ],
+   "provenance": "own value"
+  },
+  {
+   "id": "core:promotion/moon-striker",
+   "name": "Full Moon Striker",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": false,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "unit.moves.flat",
+     "amount": 1,
+     "source": "own value"
+    }
+   ],
+   "provenance": "own value"
+  },
+  {
+   "id": "core:promotion/altitude-training",
+   "name": "Altitude Training",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": false,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [
+    "core:unit-combat/recon",
+    "core:unit-combat/mounted",
+    "core:unit-combat/melee",
+    "core:unit-combat/gun",
+    "core:unit-combat/armor",
+    "core:unit-combat/archer",
+    "core:unit-combat/siege"
+   ],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "promotion.hills_double_move",
+     "amount": true,
+     "needs_mechanic": "hills_double_move",
+     "source": "own value"
+    },
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": {
+      "on_tile": {
+       "terrain": "core:terrain/hill"
+      }
+     },
+     "trigger": "passive",
+     "modifier": "combat.attack.pct",
+     "amount": 10,
+     "source": "own value, unverified"
+    },
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": {
+      "on_tile": {
+       "terrain": "core:terrain/hill"
+      }
+     },
+     "trigger": "passive",
+     "modifier": "combat.defense.pct",
+     "amount": 10,
+     "source": "own value, unverified"
+    }
+   ],
+   "provenance": "own value"
+  },
+  {
+   "id": "core:promotion/mystic-blade",
+   "name": "Mystic Blade",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": false,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "promotion.has_post_combat_promotions",
+     "amount": true,
+     "needs_mechanic": "has_post_combat_promotions",
+     "source": "own value"
+    },
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "after_first_combat",
+     "modifier": "grant.random_promotion_after_combat",
+     "amount": 1,
+     "target": "core:promotion/invulnerabiility",
+     "needs_mechanic": "post_combat_random_promotion",
+     "source": "own value"
+    },
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "after_first_combat",
+     "modifier": "grant.random_promotion_after_combat",
+     "amount": 1,
+     "target": "core:promotion/sneak-attack",
+     "needs_mechanic": "post_combat_random_promotion",
+     "source": "own value"
+    },
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "after_first_combat",
+     "modifier": "grant.random_promotion_after_combat",
+     "amount": 1,
+     "target": "core:promotion/heroism",
+     "needs_mechanic": "post_combat_random_promotion",
+     "source": "own value"
+    },
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "after_first_combat",
+     "modifier": "grant.random_promotion_after_combat",
+     "amount": 1,
+     "target": "core:promotion/ambition",
+     "needs_mechanic": "post_combat_random_promotion",
+     "source": "own value"
+    },
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "after_first_combat",
+     "modifier": "grant.random_promotion_after_combat",
+     "amount": 1,
+     "target": "core:promotion/restlessness",
+     "needs_mechanic": "post_combat_random_promotion",
+     "source": "own value"
+    },
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "after_first_combat",
+     "modifier": "grant.random_promotion_after_combat",
+     "amount": 1,
+     "target": "core:promotion/recruitment",
+     "needs_mechanic": "post_combat_random_promotion",
+     "source": "own value"
+    },
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "after_first_combat",
+     "modifier": "grant.random_promotion_after_combat",
+     "amount": 1,
+     "target": "core:promotion/enemy-blade",
+     "needs_mechanic": "post_combat_random_promotion",
+     "source": "own value"
+    },
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "after_first_combat",
+     "modifier": "grant.random_promotion_after_combat",
+     "amount": 1,
+     "target": "core:promotion/evil-spirits",
+     "needs_mechanic": "post_combat_random_promotion",
+     "source": "own value"
+    }
+   ],
+   "provenance": "own value"
+  },
+  {
+   "id": "core:promotion/invulnerabiility",
+   "name": "Invulnerability",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": false,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "combat.defense_open_terrain.pct",
+     "amount": 30,
+     "source": "own value"
+    },
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "combat.defense_rough_terrain.pct",
+     "amount": 30,
+     "source": "own value"
+    },
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "heal.in_enemy_land.flat",
+     "amount": 20,
+     "source": "own value"
+    },
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "heal.in_neutral_land.flat",
+     "amount": 20,
+     "source": "own value"
+    },
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "heal.in_friendly_land.flat",
+     "amount": 20,
+     "source": "own value"
+    }
+   ],
+   "provenance": "own value"
+  },
+  {
+   "id": "core:promotion/sneak-attack",
+   "name": "Sneak Attack",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": false,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "combat.flank_bonus.pct",
+     "amount": 50,
+     "source": "own value"
+    }
+   ],
+   "provenance": "own value"
+  },
+  {
+   "id": "core:promotion/heroism",
+   "name": "Heroism",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": false,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "promotion.great_general",
+     "amount": true,
+     "needs_mechanic": "great_general",
+     "source": "own value"
+    }
+   ],
+   "provenance": "own value"
+  },
+  {
+   "id": "core:promotion/ambition",
+   "name": "Ambition",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": false,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "combat.attack_open_terrain.pct",
+     "amount": 50,
+     "source": "own value"
+    },
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "combat.attack_rough_terrain.pct",
+     "amount": 50,
+     "source": "own value"
+    },
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "combat.defense_open_terrain.pct",
+     "amount": -20,
+     "source": "own value"
+    },
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "combat.defense_rough_terrain.pct",
+     "amount": -20,
+     "source": "own value"
+    }
+   ],
+   "provenance": "own value"
+  },
+  {
+   "id": "core:promotion/restlessness",
+   "name": "Restlessness",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": false,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "unit.moves.flat",
+     "amount": 1,
+     "source": "own value"
+    },
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "unit.attacks_per_turn.flat",
+     "amount": 1,
+     "source": "own value"
+    },
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "promotion.can_move_after_attacking",
+     "amount": true,
+     "needs_mechanic": "can_move_after_attacking",
+     "source": "own value"
+    }
+   ],
+   "provenance": "own value"
+  },
+  {
+   "id": "core:promotion/recruitment",
+   "name": "Recruitment",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": false,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "on_kill",
+     "modifier": "heal.on_kill.flat",
+     "amount": 50,
+     "source": "own value"
+    },
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "promotion.heal_if_destroy_excludes_barbarians",
+     "amount": true,
+     "needs_mechanic": "heal_if_destroy_excludes_barbarians",
+     "source": "own value"
+    }
+   ],
+   "provenance": "own value"
+  },
+  {
+   "id": "core:promotion/enemy-blade",
+   "name": "Enemy Blade",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": false,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "adjacent_enemy_units"
+     },
+     "condition": null,
+     "trigger": "on_attack",
+     "modifier": "damage.on_attack.chance_pct",
+     "amount": 100,
+     "source": "own value, unverified"
+    },
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "adjacent_enemy_units"
+     },
+     "condition": null,
+     "trigger": "on_attack",
+     "modifier": "damage.on_attack.flat",
+     "amount": 20,
+     "source": "own value, unverified"
+    }
+   ],
+   "provenance": "own value"
+  },
+  {
+   "id": "core:promotion/evil-spirits",
+   "name": "Evil Spirits",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": false,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "combat.attack_open_terrain.pct",
+     "amount": -10,
+     "source": "own value"
+    },
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "combat.attack_rough_terrain.pct",
+     "amount": -10,
+     "source": "own value"
+    },
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "combat.defense_open_terrain.pct",
+     "amount": -30,
+     "source": "own value"
+    },
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "combat.defense_rough_terrain.pct",
+     "amount": -30,
+     "source": "own value"
+    }
+   ],
+   "provenance": "own value"
+  },
+  {
+   "id": "core:promotion/extended-paradrop",
+   "name": "Skyranger",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": false,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "unit.paradrop_range.flat",
+     "amount": 40,
+     "source": "own value"
+    }
+   ],
+   "provenance": "own value"
+  },
+  {
+   "id": "core:promotion/lightning-warfare",
+   "name": "Lightning Warfare",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": false,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [
+    "core:unit-combat/armor"
+   ],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "unit.moves.flat",
+     "amount": 1,
+     "source": "own value"
+    },
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "combat.attack_open_terrain.pct",
+     "amount": 15,
+     "source": "own value"
+    },
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "combat.attack_rough_terrain.pct",
+     "amount": 15,
+     "source": "own value"
+    },
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "promotion.ignore_zoc",
+     "amount": true,
+     "needs_mechanic": "ignore_zoc",
+     "source": "own value"
+    }
+   ],
+   "provenance": "own value"
+  },
+  {
+   "id": "core:promotion/sell-exotic-goods",
+   "name": "Exotic Cargo",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": false,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "player"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "text_only",
+     "amount": null,
+     "needs_mechanic": "hardcoded_promotion_sell_exotic_goods",
+     "source": "own value, unverified"
+    }
+   ],
+   "provenance": "own value, unverified"
+  },
+  {
+   "id": "core:promotion/double-plunder",
+   "name": "City Plunder",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": false,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "on_attack_city",
+     "modifier": "combat.city_attack_gold.pct_of_damage",
+     "amount": 100,
+     "source": "own value"
+    }
+   ],
+   "provenance": "own value"
+  },
+  {
+   "id": "core:promotion/medic-general",
+   "name": "Enhanced Medic",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "heal.in_enemy_land.flat",
+     "amount": 15,
+     "source": "unciv: Units.json, Khan"
+    },
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "heal.in_neutral_land.flat",
+     "amount": 15,
+     "source": "unciv: Units.json, Khan"
+    },
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "heal.in_friendly_land.flat",
+     "amount": 15,
+     "source": "unciv: Units.json, Khan"
+    },
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "adjacent_friendly_units"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "heal.flat",
+     "amount": 15,
+     "source": "unciv: Units.json, Khan"
+    }
+   ],
+   "provenance": "unciv: Units.json, Khan"
+  },
+  {
+   "id": "core:promotion/gain-experience",
+   "name": "Quick Study",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": true,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "unit.xp_gain.pct",
+     "amount": 50,
+     "source": "unciv: UnitPromotions.json, Quick Study"
+    }
+   ],
+   "provenance": "unciv: UnitPromotions.json, Quick Study",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:promotion/haka-war-dance",
+   "name": "Haka War Dance",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": false,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "enemy_units_in_range"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "combat.strength.pct",
+     "amount": -10,
+     "source": "unciv: UnitPromotions.json, Haka War Dance"
+    },
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "aura.range",
+     "amount": 1,
+     "source": "unciv: UnitPromotions.json, Haka War Dance"
+    }
+   ],
+   "provenance": "unciv: UnitPromotions.json, Haka War Dance",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:promotion/ski-infantry",
+   "name": "Bonuses in Snow, Tundra, and Hills",
+   "requires": null,
+   "requires_any_of": [],
+   "choosable": false,
+   "lost_with_upgrade": false,
+   "required_tech": null,
+   "unit_combats": [],
+   "civilian_units": [],
+   "effects": [
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "promotion.hills_double_move",
+     "amount": true,
+     "needs_mechanic": "hills_double_move",
+     "source": "own value, unverified"
+    },
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": {
+      "on_tile": {
+       "terrain": "core:terrain/snow"
+      }
+     },
+     "trigger": "passive",
+     "modifier": "combat.attack.pct",
+     "amount": 25,
+     "source": "unciv: UnitPromotions.json, [Norwegian Ski Infantry] ability"
+    },
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": {
+      "on_tile": {
+       "terrain": "core:terrain/snow"
+      }
+     },
+     "trigger": "passive",
+     "modifier": "combat.defense.pct",
+     "amount": 25,
+     "source": "unciv: UnitPromotions.json, [Norwegian Ski Infantry] ability"
+    },
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": {
+      "on_tile": {
+       "terrain": "core:terrain/snow"
+      }
+     },
+     "trigger": "passive",
+     "modifier": "unit.double_move",
+     "amount": true,
+     "source": "unciv: UnitPromotions.json, [Norwegian Ski Infantry] ability"
+    },
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": {
+      "on_tile": {
+       "terrain": "core:terrain/tundra"
+      }
+     },
+     "trigger": "passive",
+     "modifier": "combat.attack.pct",
+     "amount": 25,
+     "source": "unciv: UnitPromotions.json, [Norwegian Ski Infantry] ability"
+    },
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": {
+      "on_tile": {
+       "terrain": "core:terrain/tundra"
+      }
+     },
+     "trigger": "passive",
+     "modifier": "combat.defense.pct",
+     "amount": 25,
+     "source": "unciv: UnitPromotions.json, [Norwegian Ski Infantry] ability"
+    },
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": {
+      "on_tile": {
+       "terrain": "core:terrain/tundra"
+      }
+     },
+     "trigger": "passive",
+     "modifier": "unit.double_move",
+     "amount": true,
+     "source": "unciv: UnitPromotions.json, [Norwegian Ski Infantry] ability"
+    },
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": {
+      "on_tile": {
+       "terrain": "core:terrain/hill"
+      }
+     },
+     "trigger": "passive",
+     "modifier": "combat.attack.pct",
+     "amount": 25,
+     "source": "unciv: UnitPromotions.json, [Norwegian Ski Infantry] ability"
+    },
+    {
+     "scope": "unit",
+     "selector": {
+      "kind": "this_unit"
+     },
+     "condition": {
+      "on_tile": {
+       "terrain": "core:terrain/hill"
+      }
+     },
+     "trigger": "passive",
+     "modifier": "combat.defense.pct",
+     "amount": 25,
+     "source": "unciv: UnitPromotions.json, [Norwegian Ski Infantry] ability"
+    }
+   ],
+   "provenance": "unciv: UnitPromotions.json, [Norwegian Ski Infantry] ability",
+   "unciv_fields": []
+  }
+ ],
+ "notice": "Derived from Unciv (https://github.com/yairm210/Unciv), MPL-2.0: rule fields of the entries marked `unciv:` come from Unciv's `Civ V - Gods & Kings` JSON files at commit 18827b1f; entries marked `own value, unverified` have no Unciv counterpart. Listed per file in classic/docs/classic/UNCIV-ATTRIBUTION.md."
+}

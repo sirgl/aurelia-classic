@@ -1,0 +1,92 @@
+// Civ 5 inspired rule set (Unciv Gods & Kings ruleset plus own extensions); generated, do not edit.
+// Derived from Unciv (https://github.com/yairm210/Unciv), MPL-2.0, where the entry says `unciv:`
+// in classic/docs/classic/*.json (see classic/docs/classic/UNCIV-ATTRIBUTION.md); other values are own, unverified.
+// Source: classic/docs/classic/*.json (made by classic/tools/import-unciv.py). Regenerate:
+//   cargo run --release --offline -p classic-content --features importer --bin classic-import
+// Inert effects need a mechanic the engine does not have yet: classic/docs/classic/implemented.md.
+(
+    features: [
+        (
+            id: "core:feature/atoll",
+            name: "Atoll",
+            yields: (food: 1, production: 1),
+            movement_cost: 1,
+            no_improvement: true,
+            valid_terrains: ["core:terrain/coast", "core:terrain/ocean"],
+            unremovable: true,
+        ),
+        (
+            id: "core:feature/fallout",
+            name: "Fallout",
+            yields: (food: -3, production: -3, gold: -3),
+            movement_cost: 2,
+            defense_pct: -15,
+            no_improvement: true,
+            unremovable: true,
+        ),
+        (
+            id: "core:feature/flood-plains",
+            name: "Flood Plains",
+            yields: (food: 2),
+            movement_cost: 1,
+            defense_pct: -10,
+            requires_river: true,
+            requires_flatlands: true,
+            valid_terrains: ["core:terrain/desert"],
+            unremovable: true,
+        ),
+        (
+            id: "core:feature/forest",
+            name: "Forest",
+            yields: (food: 1, production: 1),
+            yield_not_additive: true,
+            movement_cost: 2,
+            defense_pct: 25,
+            rough: true,
+            see_through: 1,
+            valid_terrains: ["core:terrain/grassland", "core:terrain/plains", "core:terrain/tundra"],
+            removal: Some((tech: Some("core:tech/mining"), work_time: 400, production: 20)),
+        ),
+        (
+            id: "core:feature/ice",
+            name: "Ice",
+            movement_cost: 1,
+            impassable: true,
+            valid_terrains: ["core:terrain/coast", "core:terrain/ocean"],
+            unremovable: true,
+        ),
+        (
+            id: "core:feature/jungle",
+            name: "Jungle",
+            yields: (food: 1, production: -1),
+            movement_cost: 2,
+            defense_pct: 25,
+            rough: true,
+            see_through: 1,
+            valid_terrains: ["core:terrain/grassland"],
+            removal: Some((tech: Some("core:tech/bronze-working"), work_time: 700, production: 0)),
+        ),
+        (
+            id: "core:feature/marsh",
+            name: "Marsh",
+            yields: (food: -1),
+            movement_cost: 3,
+            defense_pct: -15,
+            requires_flatlands: true,
+            valid_terrains: ["core:terrain/grassland"],
+            removal: Some((tech: Some("core:tech/masonry"), work_time: 600, production: 0)),
+        ),
+        (
+            id: "core:feature/oasis",
+            name: "Oasis",
+            yields: (food: 3, gold: 1),
+            movement_cost: 1,
+            defense_pct: -10,
+            fresh_water: true,
+            no_improvement: true,
+            requires_flatlands: true,
+            valid_terrains: ["core:terrain/desert"],
+            unremovable: true,
+        ),
+    ],
+)

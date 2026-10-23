@@ -1,0 +1,32 @@
+# Civ V game layer: the city-state cards, quests and notices (game/city_states.rs).
+
+classic.game.city-states.you = Вы
+classic.game.city-states.quest-kill-camp = Уничтожить лагерь варваров
+classic.game.city-states.quest-connect = Соединить ресурс: { $name }
+classic.game.city-states.quest-build = Построить: { $name }
+classic.game.city-states.quest-find = Найти: { $name }
+classic.game.city-states.quest-natural-wonder = Открыть природное чудо
+classic.game.city-states.quest-give-gold = Подарить им золото
+classic.game.city-states.quest-pledge = Обещать им защиту
+classic.game.city-states.quest-bully = Потребовать дань с: { $name }
+classic.game.city-states.quest-denounce = Осудить: { $name }
+classic.game.city-states.quest-contest = Соревнование: изучить больше всех технологий
+classic.game.city-states.quest-invest = Подарки золота дают на 50% больше влияния
+classic.game.city-states.quest-reward = { $task } (+{ $n } влияния)
+classic.game.city-states.done-gift = Подарено золота ({ $gold }): { $name }
+classic.game.city-states.done-bully-gold = Дань золотом взята: { $name }
+classic.game.city-states.done-buyout = Вы выкупили: { $name }
+classic.game.city-states.done-bully-worker = Рабочий отнят: { $name }
+classic.game.city-states.done-pledge = Вы обещали защиту: { $name }
+classic.game.city-states.done-unpledge = Вы отказались от обещания защиты: { $name }
+classic.game.city-states.trait-cultured = Культурный
+classic.game.city-states.trait-militaristic = Воинственный
+classic.game.city-states.trait-maritime = Морской
+classic.game.city-states.trait-mercantile = Торговый
+classic.game.city-states.trait-religious = Религиозный
+classic.game.city-states.trait-none = Город-государство
+classic.game.city-states.status-war = Война
+classic.game.city-states.status-allies = Союзники
+classic.game.city-states.status-friends = Друзья
+classic.game.city-states.status-angry = Недоволен
+classic.game.city-states.status-neutral = Нейтралитет

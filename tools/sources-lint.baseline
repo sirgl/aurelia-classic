@@ -1,0 +1,2 @@
+# Ceilings of classic/tools/sources-lint.sh: <file><TAB><group><TAB><lines>. Never raise one.
+# Empty by rule since the re-sourcing (classic/docs/classic/RESOURCING.md): the old sources (groups A-I) may not be named anywhere outside classic/docs/classic/SOURCES.md and classic/docs/classic/RESOURCING.md.

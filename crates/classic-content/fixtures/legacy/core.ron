@@ -1,0 +1,166 @@
+// Base game content (core set): the main source of truth
+// (plus civs.ron, the set of civilizations, see classic-content/src/civs.rs).
+// Rust code does NOT duplicate it: core_rules() parses this file via include_str!
+// (deterministic, works without the FS: web and tests). Mods go as separate
+// files via the loader + manifest (§17).
+
+(
+    // Units (sorted by key at compile time). required_tech is resolved in
+    // a second pass: without the tech EnqueueProduction is rejected ("unit locked"),
+    // the HUD shows a lock. Placeholders (settler/warrior/worker) are available from the first
+    // turn. movement: base movement points; strength: in combat.
+    units: [
+        (id: "core:unit/archer", movement: 3, strength: 8, founder: false, builder: false, cost: 35, effects: [], required_tech: Some("core:tech/archery")),
+        (id: "core:unit/horseman", movement: 4, strength: 12, founder: false, builder: false, cost: 50, effects: [], required_tech: Some("core:tech/horseback-riding")),
+        (id: "core:unit/settler", movement: 2, strength: 1, founder: true, builder: false, cost: 40, effects: [], required_tech: None),
+        (id: "core:unit/swordsman", movement: 2, strength: 15, founder: false, builder: false, cost: 50, effects: [], required_tech: Some("core:tech/iron-working")),
+        (id: "core:unit/warrior", movement: 2, strength: 10, founder: false, builder: false, cost: 30, effects: [], required_tech: None),
+        (id: "core:unit/worker", movement: 2, strength: 1, founder: false, builder: true, cost: 30, effects: [], required_tech: None),
+    ],
+    // City buildings (sorted by key at compile time): unlocking is by
+    // required_tech, which must also stand in this tech's unlocks_buildings
+    // (a test checks the symmetry). Effects are typed records
+    // (see classic-content/src/effects.rs): AddYield(Output) is a flat +N to the
+    // city's total output (half goes to the production queue), AddYieldPercent
+    // (Output) is +P% to the same (the additive stage).
+    // Wonders (wonder: true) are globally unique: the validator rejects the
+    // order of any player once the wonder is built; in a race of completions
+    // the first city gets it.
+    buildings: [
+        (id: "core:building/bank", cost: 340, effects: [(scope: City, selector: SourceCity, modifier: AddYieldPercent(yield_kind: Output, percent: 15))], required_tech: Some("core:tech/banking")),
+        (id: "core:building/barracks", cost: 80, effects: [(scope: City, selector: SourceCity, modifier: AddYield(yield_kind: Output, amount: 3))], required_tech: Some("core:tech/bronze-working")),
+        (id: "core:building/factory", cost: 450, effects: [(scope: City, selector: SourceCity, modifier: AddYieldPercent(yield_kind: Output, percent: 20))], required_tech: Some("core:tech/industrialization")),
+        (id: "core:building/granary", cost: 60, effects: [(scope: City, selector: SourceCity, modifier: AddYield(yield_kind: Output, amount: 2))], required_tech: Some("core:tech/pottery")),
+        (id: "core:building/great_library", cost: 350, effects: [(scope: City, selector: SourceCity, modifier: AddYield(yield_kind: Output, amount: 5))], required_tech: Some("core:tech/writing"), wonder: true),
+        (id: "core:building/library", cost: 110, effects: [(scope: City, selector: SourceCity, modifier: AddYield(yield_kind: Output, amount: 3))], required_tech: Some("core:tech/writing")),
+        (id: "core:building/lighthouse", cost: 130, effects: [(scope: City, selector: SourceCity, modifier: AddYield(yield_kind: Output, amount: 3))], required_tech: Some("core:tech/optics")),
+        (id: "core:building/market", cost: 150, effects: [(scope: City, selector: SourceCity, modifier: AddYield(yield_kind: Output, amount: 4))], required_tech: Some("core:tech/currency")),
+        (id: "core:building/monument", cost: 50, effects: [(scope: City, selector: SourceCity, modifier: AddYield(yield_kind: Output, amount: 2))], required_tech: None),
+        (id: "core:building/oracle", cost: 300, effects: [(scope: City, selector: SourceCity, modifier: AddYieldPercent(yield_kind: Output, percent: 15))], required_tech: Some("core:tech/philosophy"), wonder: true),
+        (id: "core:building/pyramids", cost: 250, effects: [(scope: City, selector: SourceCity, modifier: AddYield(yield_kind: Output, amount: 4))], required_tech: Some("core:tech/masonry"), wonder: true),
+        (id: "core:building/shrine", cost: 70, effects: [(scope: City, selector: SourceCity, modifier: AddYield(yield_kind: Output, amount: 2))], required_tech: Some("core:tech/calendar")),
+        (id: "core:building/temple", cost: 180, effects: [(scope: City, selector: SourceCity, modifier: AddYield(yield_kind: Output, amount: 4))], required_tech: Some("core:tech/theology")),
+        (id: "core:building/university", cost: 280, effects: [(scope: City, selector: SourceCity, modifier: AddYield(yield_kind: Output, amount: 5))], required_tech: Some("core:tech/education")),
+        (id: "core:building/workshop", cost: 200, effects: [(scope: City, selector: SourceCity, modifier: AddYieldPercent(yield_kind: Output, percent: 15))], required_tech: Some("core:tech/machinery")),
+    ],
+    // Technologies. The v1 rule "+10% to the total output of cities for every
+    // learned technology" is an effect of the technology itself (it used to be code in
+    // yields.rs); remove or replace it with other rules by editing data.
+    technologies: [
+        // ── Ancient Era ──
+        (id: "core:tech/agriculture", era_name: Some("Ancient"), unlocks_buildings: [], cost: 20, requires: [], effects: [(scope: City, selector: OwnerCities, modifier: AddYieldPercent(yield_kind: Output, percent: 10))]),
+        (id: "core:tech/animal-husbandry", era_name: Some("Ancient"), unlocks_buildings: [], cost: 35, requires: ["core:tech/agriculture"], effects: [(scope: City, selector: OwnerCities, modifier: AddYieldPercent(yield_kind: Output, percent: 10))]),
+        (id: "core:tech/archery", era_name: Some("Ancient"), unlocks_buildings: [], cost: 35, requires: ["core:tech/agriculture"], effects: [(scope: City, selector: OwnerCities, modifier: AddYieldPercent(yield_kind: Output, percent: 10))]),
+        (id: "core:tech/bronze-working", era_name: Some("Ancient"), unlocks_buildings: ["core:building/barracks"], cost: 55, requires: ["core:tech/mining"], effects: [(scope: City, selector: OwnerCities, modifier: AddYieldPercent(yield_kind: Output, percent: 10))]),
+        (id: "core:tech/calendar", era_name: Some("Ancient"), unlocks_buildings: ["core:building/shrine"], cost: 55, requires: ["core:tech/pottery"], effects: [(scope: City, selector: OwnerCities, modifier: AddYieldPercent(yield_kind: Output, percent: 10))]),
+        (id: "core:tech/masonry", era_name: Some("Ancient"), unlocks_buildings: ["core:building/pyramids"], cost: 55, requires: ["core:tech/mining"], effects: [(scope: City, selector: OwnerCities, modifier: AddYieldPercent(yield_kind: Output, percent: 10))]),
+        (id: "core:tech/mining", era_name: Some("Ancient"), unlocks_buildings: [], cost: 35, requires: ["core:tech/agriculture"], effects: [(scope: City, selector: OwnerCities, modifier: AddYieldPercent(yield_kind: Output, percent: 10))]),
+        (id: "core:tech/pottery", era_name: Some("Ancient"), unlocks_buildings: ["core:building/granary"], cost: 35, requires: ["core:tech/agriculture"], effects: [(scope: City, selector: OwnerCities, modifier: AddYieldPercent(yield_kind: Output, percent: 10))]),
+        (id: "core:tech/sailing", era_name: Some("Ancient"), unlocks_buildings: [], cost: 55, requires: ["core:tech/pottery"], effects: [(scope: City, selector: OwnerCities, modifier: AddYieldPercent(yield_kind: Output, percent: 10))]),
+        (id: "core:tech/the-wheel", era_name: Some("Ancient"), unlocks_buildings: [], cost: 55, requires: ["core:tech/animal-husbandry", "core:tech/archery"], effects: [(scope: City, selector: OwnerCities, modifier: AddYieldPercent(yield_kind: Output, percent: 10))]),
+        (id: "core:tech/trapping", era_name: Some("Ancient"), unlocks_buildings: [], cost: 55, requires: ["core:tech/animal-husbandry"], effects: [(scope: City, selector: OwnerCities, modifier: AddYieldPercent(yield_kind: Output, percent: 10))]),
+        (id: "core:tech/writing", era_name: Some("Ancient"), unlocks_buildings: ["core:building/great_library", "core:building/library"], cost: 55, requires: ["core:tech/pottery"], effects: [(scope: City, selector: OwnerCities, modifier: AddYieldPercent(yield_kind: Output, percent: 10))]),
+
+        // ── Classical Era ──
+        (id: "core:tech/construction", era_name: Some("Classical"), unlocks_buildings: [], cost: 105, requires: ["core:tech/masonry", "core:tech/the-wheel"], effects: [(scope: City, selector: OwnerCities, modifier: AddYieldPercent(yield_kind: Output, percent: 10))]),
+        (id: "core:tech/currency", era_name: Some("Classical"), unlocks_buildings: ["core:building/market"], cost: 175, requires: ["core:tech/mathematics"], effects: [(scope: City, selector: OwnerCities, modifier: AddYieldPercent(yield_kind: Output, percent: 10))]),
+        (id: "core:tech/drama-and-poetry", era_name: Some("Classical"), unlocks_buildings: [], cost: 175, requires: ["core:tech/writing"], effects: [(scope: City, selector: OwnerCities, modifier: AddYieldPercent(yield_kind: Output, percent: 10))]),
+        (id: "core:tech/engineering", era_name: Some("Classical"), unlocks_buildings: [], cost: 175, requires: ["core:tech/mathematics", "core:tech/construction"], effects: [(scope: City, selector: OwnerCities, modifier: AddYieldPercent(yield_kind: Output, percent: 10))]),
+        (id: "core:tech/horseback-riding", era_name: Some("Classical"), unlocks_buildings: [], cost: 105, requires: ["core:tech/the-wheel", "core:tech/trapping"], effects: [(scope: City, selector: OwnerCities, modifier: AddYieldPercent(yield_kind: Output, percent: 10))]),
+        (id: "core:tech/iron-working", era_name: Some("Classical"), unlocks_buildings: [], cost: 195, requires: ["core:tech/bronze-working"], effects: [(scope: City, selector: OwnerCities, modifier: AddYieldPercent(yield_kind: Output, percent: 10))]),
+        (id: "core:tech/mathematics", era_name: Some("Classical"), unlocks_buildings: [], cost: 105, requires: ["core:tech/the-wheel"], effects: [(scope: City, selector: OwnerCities, modifier: AddYieldPercent(yield_kind: Output, percent: 10))]),
+        (id: "core:tech/optics", era_name: Some("Classical"), unlocks_buildings: ["core:building/lighthouse"], cost: 85, requires: ["core:tech/sailing"], effects: [(scope: City, selector: OwnerCities, modifier: AddYieldPercent(yield_kind: Output, percent: 10))]),
+        (id: "core:tech/philosophy", era_name: Some("Classical"), unlocks_buildings: ["core:building/oracle"], cost: 175, requires: ["core:tech/calendar", "core:tech/writing"], effects: [(scope: City, selector: OwnerCities, modifier: AddYieldPercent(yield_kind: Output, percent: 10))]),
+
+        // ── Medieval Era ──
+        (id: "core:tech/chivalry", era_name: Some("Medieval"), unlocks_buildings: [], cost: 485, requires: ["core:tech/civil-service", "core:tech/guilds"], effects: [(scope: City, selector: OwnerCities, modifier: AddYieldPercent(yield_kind: Output, percent: 10))]),
+        (id: "core:tech/civil-service", era_name: Some("Medieval"), unlocks_buildings: [], cost: 275, requires: ["core:tech/drama-and-poetry", "core:tech/horseback-riding", "core:tech/currency"], effects: [(scope: City, selector: OwnerCities, modifier: AddYieldPercent(yield_kind: Output, percent: 10))]),
+        (id: "core:tech/compass", era_name: Some("Medieval"), unlocks_buildings: [], cost: 375, requires: ["core:tech/optics", "core:tech/theology"], effects: [(scope: City, selector: OwnerCities, modifier: AddYieldPercent(yield_kind: Output, percent: 10))]),
+        (id: "core:tech/education", era_name: Some("Medieval"), unlocks_buildings: ["core:building/university"], cost: 485, requires: ["core:tech/theology", "core:tech/civil-service"], effects: [(scope: City, selector: OwnerCities, modifier: AddYieldPercent(yield_kind: Output, percent: 10))]),
+        (id: "core:tech/guilds", era_name: Some("Medieval"), unlocks_buildings: [], cost: 275, requires: ["core:tech/currency"], effects: [(scope: City, selector: OwnerCities, modifier: AddYieldPercent(yield_kind: Output, percent: 10))]),
+        (id: "core:tech/machinery", era_name: Some("Medieval"), unlocks_buildings: ["core:building/workshop"], cost: 485, requires: ["core:tech/engineering", "core:tech/guilds"], effects: [(scope: City, selector: OwnerCities, modifier: AddYieldPercent(yield_kind: Output, percent: 10))]),
+        (id: "core:tech/metal-casting", era_name: Some("Medieval"), unlocks_buildings: [], cost: 275, requires: ["core:tech/engineering", "core:tech/iron-working"], effects: [(scope: City, selector: OwnerCities, modifier: AddYieldPercent(yield_kind: Output, percent: 10))]),
+        (id: "core:tech/physics", era_name: Some("Medieval"), unlocks_buildings: [], cost: 485, requires: ["core:tech/metal-casting"], effects: [(scope: City, selector: OwnerCities, modifier: AddYieldPercent(yield_kind: Output, percent: 10))]),
+        (id: "core:tech/steel", era_name: Some("Medieval"), unlocks_buildings: [], cost: 485, requires: ["core:tech/metal-casting"], effects: [(scope: City, selector: OwnerCities, modifier: AddYieldPercent(yield_kind: Output, percent: 10))]),
+        (id: "core:tech/theology", era_name: Some("Medieval"), unlocks_buildings: ["core:building/temple"], cost: 275, requires: ["core:tech/drama-and-poetry", "core:tech/philosophy"], effects: [(scope: City, selector: OwnerCities, modifier: AddYieldPercent(yield_kind: Output, percent: 10))]),
+
+        // ── Renaissance Era ──
+        (id: "core:tech/acoustics", era_name: Some("Renaissance"), unlocks_buildings: [], cost: 780, requires: ["core:tech/education"], effects: [(scope: City, selector: OwnerCities, modifier: AddYieldPercent(yield_kind: Output, percent: 10))]),
+        (id: "core:tech/architecture", era_name: Some("Renaissance"), unlocks_buildings: [], cost: 1150, requires: ["core:tech/acoustics", "core:tech/banking"], effects: [(scope: City, selector: OwnerCities, modifier: AddYieldPercent(yield_kind: Output, percent: 10))]),
+        (id: "core:tech/astronomy", era_name: Some("Renaissance"), unlocks_buildings: [], cost: 780, requires: ["core:tech/compass", "core:tech/education"], effects: [(scope: City, selector: OwnerCities, modifier: AddYieldPercent(yield_kind: Output, percent: 10))]),
+        (id: "core:tech/banking", era_name: Some("Renaissance"), unlocks_buildings: ["core:building/bank"], cost: 780, requires: ["core:tech/education", "core:tech/chivalry"], effects: [(scope: City, selector: OwnerCities, modifier: AddYieldPercent(yield_kind: Output, percent: 10))]),
+        (id: "core:tech/chemistry", era_name: Some("Renaissance"), unlocks_buildings: [], cost: 1150, requires: ["core:tech/gunpowder"], effects: [(scope: City, selector: OwnerCities, modifier: AddYieldPercent(yield_kind: Output, percent: 10))]),
+        (id: "core:tech/economics", era_name: Some("Renaissance"), unlocks_buildings: [], cost: 1150, requires: ["core:tech/banking", "core:tech/printing-press"], effects: [(scope: City, selector: OwnerCities, modifier: AddYieldPercent(yield_kind: Output, percent: 10))]),
+        (id: "core:tech/gunpowder", era_name: Some("Renaissance"), unlocks_buildings: [], cost: 780, requires: ["core:tech/physics", "core:tech/steel"], effects: [(scope: City, selector: OwnerCities, modifier: AddYieldPercent(yield_kind: Output, percent: 10))]),
+        (id: "core:tech/metallurgy", era_name: Some("Renaissance"), unlocks_buildings: [], cost: 1150, requires: ["core:tech/gunpowder"], effects: [(scope: City, selector: OwnerCities, modifier: AddYieldPercent(yield_kind: Output, percent: 10))]),
+        (id: "core:tech/navigation", era_name: Some("Renaissance"), unlocks_buildings: [], cost: 1150, requires: ["core:tech/astronomy"], effects: [(scope: City, selector: OwnerCities, modifier: AddYieldPercent(yield_kind: Output, percent: 10))]),
+        (id: "core:tech/printing-press", era_name: Some("Renaissance"), unlocks_buildings: [], cost: 780, requires: ["core:tech/machinery", "core:tech/physics", "core:tech/chivalry"], effects: [(scope: City, selector: OwnerCities, modifier: AddYieldPercent(yield_kind: Output, percent: 10))]),
+
+        // ── Industrial Era ──
+        (id: "core:tech/archaeology", era_name: Some("Industrial"), unlocks_buildings: [], cost: 1600, requires: ["core:tech/navigation", "core:tech/architecture"], effects: [(scope: City, selector: OwnerCities, modifier: AddYieldPercent(yield_kind: Output, percent: 10))]),
+        (id: "core:tech/biology", era_name: Some("Industrial"), unlocks_buildings: [], cost: 2350, requires: ["core:tech/archaeology", "core:tech/scientific-theory"], effects: [(scope: City, selector: OwnerCities, modifier: AddYieldPercent(yield_kind: Output, percent: 10))]),
+        (id: "core:tech/dynamite", era_name: Some("Industrial"), unlocks_buildings: [], cost: 2000, requires: ["core:tech/fertilizer", "core:tech/military-science"], effects: [(scope: City, selector: OwnerCities, modifier: AddYieldPercent(yield_kind: Output, percent: 10))]),
+        (id: "core:tech/electricity", era_name: Some("Industrial"), unlocks_buildings: [], cost: 2350, requires: ["core:tech/scientific-theory"], effects: [(scope: City, selector: OwnerCities, modifier: AddYieldPercent(yield_kind: Output, percent: 10))]),
+        (id: "core:tech/fertilizer", era_name: Some("Industrial"), unlocks_buildings: [], cost: 1300, requires: ["core:tech/chemistry"], effects: [(scope: City, selector: OwnerCities, modifier: AddYieldPercent(yield_kind: Output, percent: 10))]),
+        (id: "core:tech/industrialization", era_name: Some("Industrial"), unlocks_buildings: ["core:building/factory"], cost: 1600, requires: ["core:tech/economics"], effects: [(scope: City, selector: OwnerCities, modifier: AddYieldPercent(yield_kind: Output, percent: 10))]),
+        (id: "core:tech/military-science", era_name: Some("Industrial"), unlocks_buildings: [], cost: 1600, requires: ["core:tech/metallurgy", "core:tech/chemistry"], effects: [(scope: City, selector: OwnerCities, modifier: AddYieldPercent(yield_kind: Output, percent: 10))]),
+        (id: "core:tech/rifling", era_name: Some("Industrial"), unlocks_buildings: [], cost: 1425, requires: ["core:tech/metallurgy"], effects: [(scope: City, selector: OwnerCities, modifier: AddYieldPercent(yield_kind: Output, percent: 10))]),
+        (id: "core:tech/scientific-theory", era_name: Some("Industrial"), unlocks_buildings: [], cost: 1600, requires: ["core:tech/economics", "core:tech/architecture"], effects: [(scope: City, selector: OwnerCities, modifier: AddYieldPercent(yield_kind: Output, percent: 10))]),
+        (id: "core:tech/steam-power", era_name: Some("Industrial"), unlocks_buildings: [], cost: 2350, requires: ["core:tech/scientific-theory", "core:tech/industrialization", "core:tech/rifling"], effects: [(scope: City, selector: OwnerCities, modifier: AddYieldPercent(yield_kind: Output, percent: 10))]),
+
+        // ── Modern Era ──
+        (id: "core:tech/ballistics", era_name: Some("Modern"), unlocks_buildings: [], cost: 4100, requires: ["core:tech/railroad"], effects: [(scope: City, selector: OwnerCities, modifier: AddYieldPercent(yield_kind: Output, percent: 10))]),
+        (id: "core:tech/combustion", era_name: Some("Modern"), unlocks_buildings: [], cost: 4100, requires: ["core:tech/railroad"], effects: [(scope: City, selector: OwnerCities, modifier: AddYieldPercent(yield_kind: Output, percent: 10))]),
+        (id: "core:tech/electronics", era_name: Some("Modern"), unlocks_buildings: [], cost: 4100, requires: ["core:tech/replaceable-parts", "core:tech/flight"], effects: [(scope: City, selector: OwnerCities, modifier: AddYieldPercent(yield_kind: Output, percent: 10))]),
+        (id: "core:tech/flight", era_name: Some("Modern"), unlocks_buildings: [], cost: 3100, requires: ["core:tech/steam-power"], effects: [(scope: City, selector: OwnerCities, modifier: AddYieldPercent(yield_kind: Output, percent: 10))]),
+        (id: "core:tech/plastics", era_name: Some("Modern"), unlocks_buildings: [], cost: 4100, requires: ["core:tech/radio", "core:tech/replaceable-parts"], effects: [(scope: City, selector: OwnerCities, modifier: AddYieldPercent(yield_kind: Output, percent: 10))]),
+        (id: "core:tech/radio", era_name: Some("Modern"), unlocks_buildings: [], cost: 3100, requires: ["core:tech/electricity"], effects: [(scope: City, selector: OwnerCities, modifier: AddYieldPercent(yield_kind: Output, percent: 10))]),
+        (id: "core:tech/railroad", era_name: Some("Modern"), unlocks_buildings: [], cost: 3100, requires: ["core:tech/steam-power", "core:tech/dynamite"], effects: [(scope: City, selector: OwnerCities, modifier: AddYieldPercent(yield_kind: Output, percent: 10))]),
+        (id: "core:tech/refrigeration", era_name: Some("Modern"), unlocks_buildings: [], cost: 3100, requires: ["core:tech/biology", "core:tech/electricity"], effects: [(scope: City, selector: OwnerCities, modifier: AddYieldPercent(yield_kind: Output, percent: 10))]),
+        (id: "core:tech/replaceable-parts", era_name: Some("Modern"), unlocks_buildings: [], cost: 3100, requires: ["core:tech/electricity", "core:tech/steam-power"], effects: [(scope: City, selector: OwnerCities, modifier: AddYieldPercent(yield_kind: Output, percent: 10))]),
+
+        // ── Atomic Era ──
+        (id: "core:tech/atomic-theory", era_name: Some("Atomic"), unlocks_buildings: [], cost: 5100, requires: ["core:tech/electronics", "core:tech/plastics"], effects: [(scope: City, selector: OwnerCities, modifier: AddYieldPercent(yield_kind: Output, percent: 10))]),
+        (id: "core:tech/combined-arms", era_name: Some("Atomic"), unlocks_buildings: [], cost: 5100, requires: ["core:tech/combustion", "core:tech/ballistics"], effects: [(scope: City, selector: OwnerCities, modifier: AddYieldPercent(yield_kind: Output, percent: 10))]),
+        (id: "core:tech/computers", era_name: Some("Atomic"), unlocks_buildings: [], cost: 6400, requires: ["core:tech/radar", "core:tech/combined-arms"], effects: [(scope: City, selector: OwnerCities, modifier: AddYieldPercent(yield_kind: Output, percent: 10))]),
+        (id: "core:tech/ecology", era_name: Some("Atomic"), unlocks_buildings: [], cost: 6400, requires: ["core:tech/atomic-theory", "core:tech/penicillin"], effects: [(scope: City, selector: OwnerCities, modifier: AddYieldPercent(yield_kind: Output, percent: 10))]),
+        (id: "core:tech/nuclear-fission", era_name: Some("Atomic"), unlocks_buildings: [], cost: 6400, requires: ["core:tech/atomic-theory", "core:tech/radar"], effects: [(scope: City, selector: OwnerCities, modifier: AddYieldPercent(yield_kind: Output, percent: 10))]),
+        (id: "core:tech/penicillin", era_name: Some("Atomic"), unlocks_buildings: [], cost: 5100, requires: ["core:tech/refrigeration", "core:tech/plastics"], effects: [(scope: City, selector: OwnerCities, modifier: AddYieldPercent(yield_kind: Output, percent: 10))]),
+        (id: "core:tech/radar", era_name: Some("Atomic"), unlocks_buildings: [], cost: 5100, requires: ["core:tech/ballistics", "core:tech/electronics"], effects: [(scope: City, selector: OwnerCities, modifier: AddYieldPercent(yield_kind: Output, percent: 10))]),
+        (id: "core:tech/rocketry", era_name: Some("Atomic"), unlocks_buildings: [], cost: 6400, requires: ["core:tech/radar"], effects: [(scope: City, selector: OwnerCities, modifier: AddYieldPercent(yield_kind: Output, percent: 10))]),
+
+        // ── Information Era ──
+        (id: "core:tech/advanced-ballistics", era_name: Some("Information"), unlocks_buildings: [], cost: 7700, requires: ["core:tech/rocketry", "core:tech/nuclear-fission"], effects: [(scope: City, selector: OwnerCities, modifier: AddYieldPercent(yield_kind: Output, percent: 10))]),
+        (id: "core:tech/future-tech", era_name: Some("Information"), unlocks_buildings: [], cost: 9500, requires: ["core:tech/nanotechnology", "core:tech/nuclear-fusion", "core:tech/stealth", "core:tech/particle-physics", "core:tech/globalization", "core:tech/the-internet"], effects: [(scope: City, selector: OwnerCities, modifier: AddYieldPercent(yield_kind: Output, percent: 10))]),
+        (id: "core:tech/globalization", era_name: Some("Information"), unlocks_buildings: [], cost: 8800, requires: ["core:tech/telecommunications"], effects: [(scope: City, selector: OwnerCities, modifier: AddYieldPercent(yield_kind: Output, percent: 10))]),
+        (id: "core:tech/lasers", era_name: Some("Information"), unlocks_buildings: [], cost: 7700, requires: ["core:tech/computers"], effects: [(scope: City, selector: OwnerCities, modifier: AddYieldPercent(yield_kind: Output, percent: 10))]),
+        (id: "core:tech/mobile-tactics", era_name: Some("Information"), unlocks_buildings: [], cost: 7700, requires: ["core:tech/ecology", "core:tech/nuclear-fission"], effects: [(scope: City, selector: OwnerCities, modifier: AddYieldPercent(yield_kind: Output, percent: 10))]),
+        (id: "core:tech/nanotechnology", era_name: Some("Information"), unlocks_buildings: [], cost: 8800, requires: ["core:tech/robotics"], effects: [(scope: City, selector: OwnerCities, modifier: AddYieldPercent(yield_kind: Output, percent: 10))]),
+        (id: "core:tech/nuclear-fusion", era_name: Some("Information"), unlocks_buildings: [], cost: 8800, requires: ["core:tech/satellites", "core:tech/robotics", "core:tech/advanced-ballistics"], effects: [(scope: City, selector: OwnerCities, modifier: AddYieldPercent(yield_kind: Output, percent: 10))]),
+        (id: "core:tech/particle-physics", era_name: Some("Information"), unlocks_buildings: [], cost: 8800, requires: ["core:tech/telecommunications", "core:tech/advanced-ballistics", "core:tech/mobile-tactics"], effects: [(scope: City, selector: OwnerCities, modifier: AddYieldPercent(yield_kind: Output, percent: 10))]),
+        (id: "core:tech/robotics", era_name: Some("Information"), unlocks_buildings: [], cost: 7700, requires: ["core:tech/computers", "core:tech/rocketry"], effects: [(scope: City, selector: OwnerCities, modifier: AddYieldPercent(yield_kind: Output, percent: 10))]),
+        (id: "core:tech/satellites", era_name: Some("Information"), unlocks_buildings: [], cost: 7700, requires: ["core:tech/rocketry"], effects: [(scope: City, selector: OwnerCities, modifier: AddYieldPercent(yield_kind: Output, percent: 10))]),
+        (id: "core:tech/stealth", era_name: Some("Information"), unlocks_buildings: [], cost: 8800, requires: ["core:tech/lasers", "core:tech/robotics"], effects: [(scope: City, selector: OwnerCities, modifier: AddYieldPercent(yield_kind: Output, percent: 10))]),
+        (id: "core:tech/telecommunications", era_name: Some("Information"), unlocks_buildings: [], cost: 7700, requires: ["core:tech/ecology"], effects: [(scope: City, selector: OwnerCities, modifier: AddYieldPercent(yield_kind: Output, percent: 10))]),
+        (id: "core:tech/the-internet", era_name: Some("Information"), unlocks_buildings: [], cost: 8800, requires: ["core:tech/telecommunications"], effects: [(scope: City, selector: OwnerCities, modifier: AddYieldPercent(yield_kind: Output, percent: 10))]),
+    ],
+    // Tile improvements (sorted by key at compile time; work_turns > 0,
+    // any land). required_tech is resolved in a second pass; an unknown
+    // tech fails compilation. Farm/mine bonuses are untouched (base).
+    improvements: [
+        (id: "core:improvement/farm", work_turns: 3, food_bonus: 2, prod_bonus: 0, river_food: 1, required_tech: None),
+        (id: "core:improvement/lumber-mill", work_turns: 4, food_bonus: 1, prod_bonus: 2, river_food: 0, required_tech: Some("core:tech/construction")),
+        (id: "core:improvement/mine", work_turns: 3, food_bonus: 0, prod_bonus: 2, river_food: 0, required_tech: None),
+        (id: "core:improvement/pasture", work_turns: 3, food_bonus: 1, prod_bonus: 1, river_food: 0, required_tech: Some("core:tech/animal-husbandry")),
+        (id: "core:improvement/quarry", work_turns: 4, food_bonus: 0, prod_bonus: 3, river_food: 0, required_tech: Some("core:tech/masonry")),
+    ],
+    features: [
+        (id: "core:feature/forest", chop_turns: 2, prod_bonus: 1, chop_grant: 8),
+    ],
+    resources: [
+        (id: "core:resource/wheat", food_bonus: 2, prod_bonus: 0, gold_bonus: 0, requires_improvement: Some("core:improvement/farm"), required_tech: None, terrains: [0, 1], density: 8),
+        (id: "core:resource/iron", food_bonus: 0, prod_bonus: 2, gold_bonus: 0, requires_improvement: Some("core:improvement/mine"), required_tech: None, terrains: [2], density: 8),
+        (id: "core:resource/gold_ore", food_bonus: 0, prod_bonus: 0, gold_bonus: 3, requires_improvement: Some("core:improvement/mine"), required_tech: Some("core:tech/writing"), terrains: [2, 3], density: 4),
+    ],
+    policies: [],
+)

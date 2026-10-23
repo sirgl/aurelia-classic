@@ -1,0 +1,4625 @@
+{
+ "schema": "classic-spec/1",
+ "catalog": "policies",
+ "edition": "Civ 5 inspired rule set (Unciv Gods & Kings ruleset plus own extensions)",
+ "count": 111,
+ "branches": [
+  {
+   "id": "core:policy/tradition",
+   "name": "Tradition",
+   "kind": "branch",
+   "era_prerequisite": null,
+   "opener": "core:policy/tradition/opener",
+   "finisher": "core:policy/tradition/finisher",
+   "mutually_exclusive_with": [],
+   "locked_without_religion": false,
+   "first_adopter_free_policies": 0,
+   "second_adopter_free_policies": 0,
+   "art_id": "tradition",
+   "provenance": "unciv: Policies.json, Tradition",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:policy/liberty",
+   "name": "Liberty",
+   "kind": "branch",
+   "era_prerequisite": null,
+   "opener": "core:policy/liberty/opener",
+   "finisher": "core:policy/liberty/finisher",
+   "mutually_exclusive_with": [],
+   "locked_without_religion": false,
+   "first_adopter_free_policies": 0,
+   "second_adopter_free_policies": 0,
+   "art_id": "liberty",
+   "provenance": "unciv: Policies.json, Liberty",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:policy/honor",
+   "name": "Honor",
+   "kind": "branch",
+   "era_prerequisite": null,
+   "opener": "core:policy/honor/opener",
+   "finisher": "core:policy/honor/finisher",
+   "mutually_exclusive_with": [],
+   "locked_without_religion": false,
+   "first_adopter_free_policies": 0,
+   "second_adopter_free_policies": 0,
+   "art_id": "honor",
+   "provenance": "unciv: Policies.json, Honor",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:policy/piety",
+   "name": "Piety",
+   "kind": "branch",
+   "era_prerequisite": null,
+   "opener": "core:policy/piety/opener",
+   "finisher": "core:policy/piety/finisher",
+   "mutually_exclusive_with": [],
+   "locked_without_religion": true,
+   "first_adopter_free_policies": 0,
+   "second_adopter_free_policies": 0,
+   "art_id": "piety",
+   "provenance": "unciv: Policies.json, Piety",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:policy/patronage",
+   "name": "Patronage",
+   "kind": "branch",
+   "era_prerequisite": "core:era/classical",
+   "opener": "core:policy/patronage/opener",
+   "finisher": "core:policy/patronage/finisher",
+   "mutually_exclusive_with": [],
+   "locked_without_religion": false,
+   "first_adopter_free_policies": 0,
+   "second_adopter_free_policies": 0,
+   "art_id": "patronage",
+   "provenance": "unciv: Policies.json, Patronage",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:policy/aesthetics",
+   "name": "Aesthetics",
+   "kind": "branch",
+   "era_prerequisite": "core:era/classical",
+   "opener": "core:policy/aesthetics/opener",
+   "finisher": "core:policy/aesthetics/finisher",
+   "mutually_exclusive_with": [],
+   "locked_without_religion": false,
+   "first_adopter_free_policies": 0,
+   "second_adopter_free_policies": 0,
+   "art_id": "aesthetics",
+   "provenance": "unciv: Policies.json, Aesthetics",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:policy/commerce",
+   "name": "Commerce",
+   "kind": "branch",
+   "era_prerequisite": "core:era/medieval",
+   "opener": "core:policy/commerce/opener",
+   "finisher": "core:policy/commerce/finisher",
+   "mutually_exclusive_with": [],
+   "locked_without_religion": false,
+   "first_adopter_free_policies": 0,
+   "second_adopter_free_policies": 0,
+   "art_id": "commerce",
+   "provenance": "unciv: Policies.json, Commerce",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:policy/exploration",
+   "name": "Exploration",
+   "kind": "branch",
+   "era_prerequisite": "core:era/medieval",
+   "opener": "core:policy/exploration/opener",
+   "finisher": "core:policy/exploration/finisher",
+   "mutually_exclusive_with": [],
+   "locked_without_religion": false,
+   "first_adopter_free_policies": 0,
+   "second_adopter_free_policies": 0,
+   "art_id": "exploration",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:policy/rationalism",
+   "name": "Rationalism",
+   "kind": "branch",
+   "era_prerequisite": "core:era/renaissance",
+   "opener": "core:policy/rationalism/opener",
+   "finisher": "core:policy/rationalism/finisher",
+   "mutually_exclusive_with": [],
+   "locked_without_religion": false,
+   "first_adopter_free_policies": 0,
+   "second_adopter_free_policies": 0,
+   "art_id": "rationalism",
+   "provenance": "unciv: Policies.json, Rationalism",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:policy/freedom",
+   "name": "Freedom",
+   "kind": "ideology",
+   "era_prerequisite": "core:era/industrial",
+   "opener": null,
+   "finisher": null,
+   "mutually_exclusive_with": [],
+   "locked_without_religion": false,
+   "first_adopter_free_policies": 3,
+   "second_adopter_free_policies": 1,
+   "art_id": "freedom",
+   "provenance": "unciv: Policies.json, Freedom",
+   "unciv_fields": [],
+   "effects": []
+  },
+  {
+   "id": "core:policy/order",
+   "name": "Order",
+   "kind": "ideology",
+   "era_prerequisite": "core:era/industrial",
+   "opener": null,
+   "finisher": null,
+   "mutually_exclusive_with": [],
+   "locked_without_religion": false,
+   "first_adopter_free_policies": 3,
+   "second_adopter_free_policies": 1,
+   "art_id": "order",
+   "provenance": "unciv: Policies.json, Order",
+   "unciv_fields": [],
+   "effects": []
+  },
+  {
+   "id": "core:policy/autocracy",
+   "name": "Autocracy",
+   "kind": "ideology",
+   "era_prerequisite": "core:era/industrial",
+   "opener": null,
+   "finisher": null,
+   "mutually_exclusive_with": [],
+   "locked_without_religion": false,
+   "first_adopter_free_policies": 3,
+   "second_adopter_free_policies": 1,
+   "art_id": "autocracy",
+   "provenance": "unciv: Policies.json, Autocracy",
+   "unciv_fields": [],
+   "effects": []
+  }
+ ],
+ "items": [
+  {
+   "id": "core:policy/liberty/opener",
+   "name": "Liberty",
+   "branch": "core:policy/liberty",
+   "role": "opener",
+   "tier": null,
+   "prerequisites": [],
+   "grid": null,
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "all_cities"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "yield.culture.flat",
+     "amount": 1,
+     "source": "unciv: Policies.json, Liberty"
+    }
+   ],
+   "provenance": "unciv: Policies.json, Liberty",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:policy/liberty/collective-rule",
+   "name": "Collective Rule",
+   "branch": "core:policy/liberty",
+   "role": "policy",
+   "tier": null,
+   "prerequisites": [
+    "core:policy/liberty/republic"
+   ],
+   "grid": [
+    1,
+    2
+   ],
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "capital",
+      "filter": {
+       "unit": "core:unit/settler"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "production.units.pct",
+     "amount": 50,
+     "source": "unciv: Policies.json, Collective Rule"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "capital",
+      "filter": {
+       "unit": "core:unit/settler"
+      }
+     },
+     "condition": null,
+     "trigger": "on_adopt",
+     "modifier": "grant.unit",
+     "amount": 1,
+     "source": "unciv: Policies.json, Collective Rule"
+    }
+   ],
+   "art_id": "liberty/collective-rule",
+   "provenance": "unciv: Policies.json, Collective Rule",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:policy/liberty/citizenship",
+   "name": "Citizenship",
+   "branch": "core:policy/liberty",
+   "role": "policy",
+   "tier": null,
+   "prerequisites": [],
+   "grid": [
+    4,
+    1
+   ],
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "player"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "worker.speed.pct",
+     "amount": 25,
+     "source": "unciv: Policies.json, Citizenship"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "capital",
+      "filter": {
+       "unit": "core:unit/worker"
+      }
+     },
+     "condition": null,
+     "trigger": "on_adopt",
+     "modifier": "grant.unit",
+     "amount": 1,
+     "source": "unciv: Policies.json, Citizenship"
+    }
+   ],
+   "art_id": "liberty/citizenship",
+   "provenance": "unciv: Policies.json, Citizenship",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:policy/liberty/republic",
+   "name": "Republic",
+   "branch": "core:policy/liberty",
+   "role": "policy",
+   "tier": null,
+   "prerequisites": [],
+   "grid": [
+    1,
+    1
+   ],
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "all_cities"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "production.buildings.pct",
+     "amount": 5,
+     "source": "unciv: Policies.json, Republic"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "all_cities"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "yield.production.flat",
+     "amount": 1,
+     "source": "unciv: Policies.json, Republic"
+    }
+   ],
+   "art_id": "liberty/republic",
+   "provenance": "unciv: Policies.json, Republic",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:policy/liberty/representation",
+   "name": "Representation",
+   "branch": "core:policy/liberty",
+   "role": "policy",
+   "tier": null,
+   "prerequisites": [
+    "core:policy/liberty/citizenship"
+   ],
+   "grid": [
+    3,
+    2
+   ],
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "player"
+     },
+     "condition": null,
+     "trigger": "on_adopt",
+     "modifier": "golden_age.start_turns",
+     "amount": 10,
+     "source": "own value, unverified"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "player"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "policy.cost_per_city.pct",
+     "amount": -33,
+     "source": "unciv: Policies.json, Representation"
+    }
+   ],
+   "art_id": "liberty/representation",
+   "provenance": "unciv: Policies.json, Representation",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:policy/liberty/meritocracy",
+   "name": "Meritocracy",
+   "branch": "core:policy/liberty",
+   "role": "policy",
+   "tier": null,
+   "prerequisites": [
+    "core:policy/liberty/citizenship"
+   ],
+   "grid": [
+    5,
+    2
+   ],
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "player"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "happiness.per_city_connection",
+     "amount": 1.0,
+     "source": "unciv: Policies.json, Meritocracy"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "all_cities"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "unhappiness.pct",
+     "amount": -5,
+     "source": "unciv: Policies.json, Meritocracy"
+    }
+   ],
+   "art_id": "liberty/meritocracy",
+   "provenance": "unciv: Policies.json, Meritocracy",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:policy/tradition/opener",
+   "name": "Tradition",
+   "branch": "core:policy/tradition",
+   "role": "opener",
+   "tier": null,
+   "prerequisites": [],
+   "grid": null,
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "all_cities"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "border.culture_cost.pct",
+     "amount": -25,
+     "source": "unciv: Policies.json, Tradition"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "buildings_of_player",
+      "filter": {
+       "building": "core:building/palace"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "building.yield.culture.flat",
+     "amount": 3,
+     "source": "own value, unverified"
+    }
+   ],
+   "provenance": "unciv: Policies.json, Tradition",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:policy/tradition/aristocracy",
+   "name": "Aristocracy",
+   "branch": "core:policy/tradition",
+   "role": "policy",
+   "tier": null,
+   "prerequisites": [],
+   "grid": [
+    1,
+    1
+   ],
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "all_cities"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "production.wonders.pct",
+     "amount": 15,
+     "source": "unciv: Policies.json, Aristocracy"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "all_cities"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "happiness.per_x_pop_in_city",
+     "amount": 10,
+     "source": "unciv: Policies.json, Aristocracy"
+    }
+   ],
+   "art_id": "tradition/aristocracy",
+   "provenance": "unciv: Policies.json, Aristocracy",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:policy/tradition/oligarchy",
+   "name": "Oligarchy",
+   "branch": "core:policy/tradition",
+   "role": "policy",
+   "tier": null,
+   "prerequisites": [],
+   "grid": [
+    3,
+    1
+   ],
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "all_cities"
+     },
+     "condition": {
+      "city_garrisoned": true
+     },
+     "trigger": "passive",
+     "modifier": "city.ranged_strike.pct",
+     "amount": 50,
+     "source": "unciv: Policies.json, Oligarchy"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "player"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "policy.garrison_free_maintenance",
+     "amount": true,
+     "needs_mechanic": "garrison_free_maintenance",
+     "source": "unciv: Policies.json, Oligarchy"
+    }
+   ],
+   "art_id": "tradition/oligarchy",
+   "provenance": "unciv: Policies.json, Oligarchy",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:policy/tradition/legalism",
+   "name": "Legalism",
+   "branch": "core:policy/tradition",
+   "role": "policy",
+   "tier": null,
+   "prerequisites": [
+    "core:policy/tradition/oligarchy"
+   ],
+   "grid": [
+    3,
+    2
+   ],
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "player"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "policy.num_cities_free_culture_building",
+     "amount": 4,
+     "needs_mechanic": "num_cities_free_culture_building",
+     "source": "unciv: Policies.json, Legalism"
+    }
+   ],
+   "art_id": "tradition/legalism",
+   "provenance": "unciv: Policies.json, Legalism",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:policy/tradition/landed-elite",
+   "name": "Landed Elite",
+   "branch": "core:policy/tradition",
+   "role": "policy",
+   "tier": null,
+   "prerequisites": [
+    "core:policy/tradition/legalism"
+   ],
+   "grid": [
+    2,
+    3
+   ],
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "capital"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "growth.rate.pct",
+     "amount": 10,
+     "source": "unciv: Policies.json, Landed Elite"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "capital"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "yield.food.flat",
+     "amount": 2,
+     "source": "unciv: Policies.json, Landed Elite"
+    }
+   ],
+   "art_id": "tradition/landed-elite",
+   "provenance": "unciv: Policies.json, Landed Elite",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:policy/tradition/monarchy",
+   "name": "Monarchy",
+   "branch": "core:policy/tradition",
+   "role": "policy",
+   "tier": null,
+   "prerequisites": [
+    "core:policy/tradition/legalism"
+   ],
+   "grid": [
+    4,
+    3
+   ],
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "capital"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "unhappiness.pct",
+     "amount": -50,
+     "source": "own value, unverified"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "capital"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "yield.gold.per_pop",
+     "amount": 0.5,
+     "source": "unciv: Policies.json, Monarchy"
+    }
+   ],
+   "art_id": "tradition/monarchy",
+   "provenance": "unciv: Policies.json, Monarchy",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:policy/honor/opener",
+   "name": "Honor",
+   "branch": "core:policy/honor",
+   "role": "opener",
+   "tier": null,
+   "prerequisites": [],
+   "grid": null,
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "all_units"
+     },
+     "condition": {
+      "opponent": "barbarian"
+     },
+     "trigger": "passive",
+     "modifier": "combat.strength.pct",
+     "amount": 33,
+     "source": "unciv: Policies.json, Honor"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "player"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "policy.always_see_barb_camps",
+     "amount": true,
+     "needs_mechanic": "always_see_barb_camps",
+     "source": "unciv: Policies.json, Honor"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "player"
+     },
+     "condition": {
+      "victim": "barbarian"
+     },
+     "trigger": "on_kill",
+     "modifier": "culture.on_kill.pct_of_strength",
+     "amount": 100,
+     "source": "unciv: Policies.json, Honor"
+    }
+   ],
+   "provenance": "unciv: Policies.json, Honor",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:policy/honor/warrior-code",
+   "name": "Warrior Code",
+   "branch": "core:policy/honor",
+   "role": "policy",
+   "tier": null,
+   "prerequisites": [],
+   "grid": [
+    2,
+    1
+   ],
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "player",
+      "filter": {
+       "great_person": "core:unit/great-general"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "great_people.rate.pct",
+     "amount": 50,
+     "source": "own value, unverified"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "capital",
+      "filter": {
+       "unit": "core:unit/great-general"
+      }
+     },
+     "condition": null,
+     "trigger": "on_adopt",
+     "modifier": "grant.unit",
+     "amount": 1,
+     "source": "unciv: Policies.json, Warrior Code"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "all_cities",
+      "filter": {
+       "unit_combat": "core:unit-combat/melee"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "production.units.pct",
+     "amount": 15,
+     "source": "unciv: Policies.json, Warrior Code"
+    }
+   ],
+   "art_id": "honor/warrior-code",
+   "provenance": "unciv: Policies.json, Warrior Code",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:policy/honor/discipline",
+   "name": "Discipline",
+   "branch": "core:policy/honor",
+   "role": "policy",
+   "tier": null,
+   "prerequisites": [],
+   "grid": [
+    4,
+    1
+   ],
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "all_units",
+      "filter": {
+       "promotion": "core:promotion/adjacent-bonus"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "grant.promotion",
+     "amount": 1,
+     "source": "own value, unverified"
+    }
+   ],
+   "art_id": "honor/discipline",
+   "provenance": "unciv: Policies.json, Discipline",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:policy/honor/military-tradition",
+   "name": "Military Tradition",
+   "branch": "core:policy/honor",
+   "role": "policy",
+   "tier": null,
+   "prerequisites": [
+    "core:policy/honor/warrior-code"
+   ],
+   "grid": [
+    2,
+    2
+   ],
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "all_units"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "unit.xp_gain.pct",
+     "amount": 50,
+     "source": "unciv: Policies.json, Military Tradition"
+    }
+   ],
+   "art_id": "honor/military-tradition",
+   "provenance": "unciv: Policies.json, Military Tradition",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:policy/honor/military-caste",
+   "name": "Military Caste",
+   "branch": "core:policy/honor",
+   "role": "policy",
+   "tier": null,
+   "prerequisites": [
+    "core:policy/honor/discipline"
+   ],
+   "grid": [
+    4,
+    2
+   ],
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "all_cities"
+     },
+     "condition": {
+      "city_garrisoned": true
+     },
+     "trigger": "passive",
+     "modifier": "happiness.local",
+     "amount": 1,
+     "source": "unciv: Policies.json, Military Caste"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "all_cities"
+     },
+     "condition": {
+      "city_garrisoned": true
+     },
+     "trigger": "passive",
+     "modifier": "yield.culture.flat",
+     "amount": 2,
+     "source": "unciv: Policies.json, Military Caste"
+    }
+   ],
+   "art_id": "honor/military-caste",
+   "provenance": "unciv: Policies.json, Military Caste",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:policy/honor/professional-army",
+   "name": "Professional Army",
+   "branch": "core:policy/honor",
+   "role": "policy",
+   "tier": null,
+   "prerequisites": [
+    "core:policy/honor/military-caste"
+   ],
+   "grid": [
+    4,
+    3
+   ],
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "player"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "unit.upgrade_cost.pct",
+     "amount": -33,
+     "source": "unciv: Policies.json, Professional Army"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "all_cities",
+      "filter": {
+       "building": "core:building/barracks"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "production.building_class.pct",
+     "amount": 50,
+     "source": "own value, unverified"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "all_cities",
+      "filter": {
+       "building": "core:building/armory"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "production.building_class.pct",
+     "amount": 50,
+     "source": "own value, unverified"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "all_cities",
+      "filter": {
+       "building": "core:building/military_academy"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "production.building_class.pct",
+     "amount": 50,
+     "source": "own value, unverified"
+    }
+   ],
+   "art_id": "honor/professional-army",
+   "provenance": "unciv: Policies.json, Professional Army",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:policy/piety/opener",
+   "name": "Piety",
+   "branch": "core:policy/piety",
+   "role": "opener",
+   "tier": null,
+   "prerequisites": [],
+   "grid": null,
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "all_cities",
+      "filter": {
+       "building": "core:building/shrine"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "production.building_class.pct",
+     "amount": 100,
+     "source": "unciv: Policies.json, Piety"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "all_cities",
+      "filter": {
+       "building": "core:building/temple"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "production.building_class.pct",
+     "amount": 100,
+     "source": "unciv: Policies.json, Piety"
+    }
+   ],
+   "provenance": "unciv: Policies.json, Piety",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:policy/piety/organized-religion",
+   "name": "Organized Religion",
+   "branch": "core:policy/piety",
+   "role": "policy",
+   "tier": null,
+   "prerequisites": [],
+   "grid": [
+    2,
+    1
+   ],
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "buildings_of_player",
+      "filter": {
+       "building": "core:building/shrine"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "building.yield.faith.flat",
+     "amount": 1,
+     "source": "unciv: Policies.json, Organized Religion"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "buildings_of_player",
+      "filter": {
+       "building": "core:building/temple"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "building.yield.faith.flat",
+     "amount": 1,
+     "source": "unciv: Policies.json, Organized Religion"
+    }
+   ],
+   "art_id": "piety/organized-religion",
+   "provenance": "unciv: Policies.json, Organized Religion",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:policy/piety/mandate-of-heaven",
+   "name": "Mandate of Heaven",
+   "branch": "core:policy/piety",
+   "role": "policy",
+   "tier": null,
+   "prerequisites": [],
+   "grid": [
+    5,
+    1
+   ],
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "player"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "faith_purchase.cost.pct",
+     "amount": -20,
+     "source": "own value, unverified"
+    }
+   ],
+   "art_id": "piety/mandate-of-heaven",
+   "provenance": "unciv: Policies.json, Mandate Of Heaven",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:policy/piety/theocracy",
+   "name": "Theocracy",
+   "branch": "core:policy/piety",
+   "role": "policy",
+   "tier": null,
+   "prerequisites": [
+    "core:policy/piety/organized-religion"
+   ],
+   "grid": [
+    1,
+    2
+   ],
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "cities_with_building",
+      "filter": {
+       "building": "core:building/temple"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "yield.gold.pct",
+     "amount": 10,
+     "source": "unciv: Policies.json, Theocracy"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "tiles_of_player",
+      "filter": {
+       "improvement": "core:improvement/holy-site"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "tile.yield.gold.flat",
+     "amount": 3,
+     "source": "own value, unverified"
+    }
+   ],
+   "art_id": "piety/theocracy",
+   "provenance": "unciv: Policies.json, Theocracy",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:policy/piety/reformation",
+   "name": "Reformation",
+   "branch": "core:policy/piety",
+   "role": "policy",
+   "tier": null,
+   "prerequisites": [
+    "core:policy/piety/religious-tolerance"
+   ],
+   "grid": [
+    3,
+    3
+   ],
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "player"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "policy.add_reformation_belief",
+     "amount": true,
+     "needs_mechanic": "add_reformation_belief",
+     "source": "own value, unverified"
+    }
+   ],
+   "art_id": "piety/reformation",
+   "provenance": "unciv: Policies.json, Reformation",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:policy/piety/religious-tolerance",
+   "name": "Religious Tolerance",
+   "branch": "core:policy/piety",
+   "role": "policy",
+   "tier": null,
+   "prerequisites": [
+    "core:policy/piety/organized-religion"
+   ],
+   "grid": [
+    3,
+    2
+   ],
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "player"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "policy.second_religion_pantheon",
+     "amount": true,
+     "needs_mechanic": "second_religion_pantheon",
+     "source": "own value"
+    }
+   ],
+   "art_id": "piety/religious-tolerance",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:policy/patronage/opener",
+   "name": "Patronage",
+   "branch": "core:policy/patronage",
+   "role": "opener",
+   "tier": null,
+   "prerequisites": [],
+   "grid": null,
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "city_states"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "city_state.influence_decay.pct",
+     "amount": -25,
+     "source": "unciv: Policies.json, Patronage"
+    }
+   ],
+   "provenance": "unciv: Policies.json, Patronage",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:policy/patronage/philanthropy",
+   "name": "Philanthropy",
+   "branch": "core:policy/patronage",
+   "role": "policy",
+   "tier": null,
+   "prerequisites": [],
+   "grid": [
+    2,
+    1
+   ],
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "city_states"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "city_state.gold_gift_influence.pct",
+     "amount": 25,
+     "source": "own value"
+    }
+   ],
+   "art_id": "patronage/philanthropy",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:policy/patronage/consulates",
+   "name": "Consulates",
+   "branch": "core:policy/patronage",
+   "role": "policy",
+   "tier": null,
+   "prerequisites": [],
+   "grid": [
+    4,
+    1
+   ],
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "city_states"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "city_state.influence_resting_point.flat",
+     "amount": 20,
+     "source": "own value"
+    }
+   ],
+   "art_id": "patronage/consulates",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:policy/patronage/scholasticism",
+   "name": "Scholasticism",
+   "branch": "core:policy/patronage",
+   "role": "policy",
+   "tier": null,
+   "prerequisites": [
+    "core:policy/patronage/philanthropy"
+   ],
+   "grid": [
+    2,
+    2
+   ],
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "player"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "policy.minor_science_allies",
+     "amount": true,
+     "needs_mechanic": "minor_science_allies",
+     "source": "own value, unverified"
+    }
+   ],
+   "art_id": "patronage/scholasticism",
+   "provenance": "unciv: Policies.json, Scholasticism",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:policy/patronage/cultural-diplomacy",
+   "name": "Cultural Diplomacy",
+   "branch": "core:policy/patronage",
+   "role": "policy",
+   "tier": null,
+   "prerequisites": [
+    "core:policy/patronage/scholasticism"
+   ],
+   "grid": [
+    2,
+    3
+   ],
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "player"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "policy.minor_resource_bonus",
+     "amount": true,
+     "needs_mechanic": "minor_resource_bonus",
+     "source": "own value, unverified"
+    }
+   ],
+   "art_id": "patronage/cultural-diplomacy",
+   "provenance": "unciv: Policies.json, Cultural Diplomacy",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:policy/patronage/merchant-confederacy",
+   "name": "Merchant Confederacy",
+   "branch": "core:policy/patronage",
+   "role": "policy",
+   "tier": null,
+   "prerequisites": [
+    "core:policy/patronage/scholasticism",
+    "core:policy/patronage/consulates"
+   ],
+   "grid": [
+    4,
+    3
+   ],
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "player"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "trade.city_state_route.gold.flat",
+     "amount": 1.0,
+     "source": "own design: trade routes"
+    }
+   ],
+   "art_id": "patronage/merchant-confederacy",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:policy/commerce/opener",
+   "name": "Commerce",
+   "branch": "core:policy/commerce",
+   "role": "opener",
+   "tier": null,
+   "prerequisites": [],
+   "grid": null,
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "capital"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "yield.gold.pct",
+     "amount": 25,
+     "source": "unciv: Policies.json, Commerce"
+    }
+   ],
+   "provenance": "unciv: Policies.json, Commerce",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:policy/commerce/mercenary-army",
+   "name": "Mercenary Army",
+   "branch": "core:policy/commerce",
+   "role": "policy",
+   "tier": null,
+   "prerequisites": [],
+   "grid": [
+    4,
+    1
+   ],
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "all_cities"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "unlock.unit",
+     "amount": 1,
+     "target": "core:unit/landsknecht",
+     "source": "own value",
+     "tag": "unit_policy_gate"
+    }
+   ],
+   "art_id": "commerce/mercenary-army",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:policy/commerce/entrepreneurship",
+   "name": "Entrepreneurship",
+   "branch": "core:policy/commerce",
+   "role": "policy",
+   "tier": null,
+   "prerequisites": [
+    "core:policy/commerce/wagon-trains"
+   ],
+   "grid": [
+    2,
+    2
+   ],
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "all_units"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "unit.embarked_moves.flat",
+     "amount": 1,
+     "source": "own value, unverified"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "all_cities",
+      "filter": {
+       "great_person": "core:unit/great-merchant"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "great_people.rate.pct",
+     "amount": 25,
+     "source": "own value"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "player"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "trade_mission.gold.pct",
+     "amount": 100,
+     "source": "own value"
+    }
+   ],
+   "art_id": "commerce/entrepreneurship",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:policy/commerce/mercantilism",
+   "name": "Mercantilism",
+   "branch": "core:policy/commerce",
+   "role": "policy",
+   "tier": null,
+   "prerequisites": [
+    "core:policy/commerce/mercenary-army"
+   ],
+   "grid": [
+    4,
+    2
+   ],
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "buildings_of_player",
+      "filter": {
+       "building": "core:building/mint"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "building.yield.science.flat",
+     "amount": 1,
+     "source": "unciv: Policies.json, Mercantilism"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "buildings_of_player",
+      "filter": {
+       "building": "core:building/market"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "building.yield.science.flat",
+     "amount": 1,
+     "source": "unciv: Policies.json, Mercantilism"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "buildings_of_player",
+      "filter": {
+       "building": "core:building/bank"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "building.yield.science.flat",
+     "amount": 1,
+     "source": "unciv: Policies.json, Mercantilism"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "buildings_of_player",
+      "filter": {
+       "building": "core:building/stock_exchange"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "building.yield.science.flat",
+     "amount": 1,
+     "source": "unciv: Policies.json, Mercantilism"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "all_cities",
+      "filter": {
+       "hurry": "gold"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "purchase.cost.pct",
+     "amount": -25,
+     "source": "unciv: Policies.json, Mercantilism"
+    }
+   ],
+   "art_id": "commerce/mercantilism",
+   "provenance": "unciv: Policies.json, Mercantilism",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:policy/commerce/wagon-trains",
+   "name": "Wagon Trains",
+   "branch": "core:policy/commerce",
+   "role": "policy",
+   "tier": null,
+   "prerequisites": [],
+   "grid": [
+    2,
+    1
+   ],
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "player"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "trade.land_route.gold.flat",
+     "amount": 1.0,
+     "source": "own design: trade routes"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "player"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "route.maintenance.pct",
+     "amount": -50,
+     "source": "own value"
+    }
+   ],
+   "art_id": "commerce/wagon-trains",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:policy/commerce/protectionism",
+   "name": "Protectionism",
+   "branch": "core:policy/commerce",
+   "role": "policy",
+   "tier": null,
+   "prerequisites": [
+    "core:policy/commerce/mercantilism",
+    "core:policy/commerce/entrepreneurship"
+   ],
+   "grid": [
+    4,
+    3
+   ],
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "player"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "happiness.per_luxury.flat",
+     "amount": 2,
+     "source": "unciv: Policies.json, Protectionism"
+    }
+   ],
+   "art_id": "commerce/protectionism",
+   "provenance": "unciv: Policies.json, Protectionism",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:policy/rationalism/opener",
+   "name": "Rationalism",
+   "branch": "core:policy/rationalism",
+   "role": "opener",
+   "tier": null,
+   "prerequisites": [],
+   "grid": null,
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "player"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "policy.happiness_to_science",
+     "amount": 10,
+     "needs_mechanic": "happiness_to_science",
+     "source": "own value, unverified"
+    }
+   ],
+   "provenance": "unciv: Policies.json, Rationalism",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:policy/rationalism/secularism",
+   "name": "Secularism",
+   "branch": "core:policy/rationalism",
+   "role": "policy",
+   "tier": null,
+   "prerequisites": [],
+   "grid": [
+    2,
+    1
+   ],
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "specialists_of_player"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "specialist.yield.science.flat",
+     "amount": 2,
+     "source": "unciv: Policies.json, Secularism"
+    }
+   ],
+   "art_id": "rationalism/secularism",
+   "provenance": "unciv: Policies.json, Secularism",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:policy/rationalism/humanism",
+   "name": "Humanism",
+   "branch": "core:policy/rationalism",
+   "role": "policy",
+   "tier": null,
+   "prerequisites": [],
+   "grid": [
+    4,
+    1
+   ],
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "all_cities",
+      "filter": {
+       "great_person": "core:unit/great-scientist"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "great_people.rate.pct",
+     "amount": 25,
+     "source": "own value, unverified"
+    }
+   ],
+   "art_id": "rationalism/humanism",
+   "provenance": "unciv: Policies.json, Humanism",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:policy/rationalism/free-thought",
+   "name": "Free Thought",
+   "branch": "core:policy/rationalism",
+   "role": "policy",
+   "tier": null,
+   "prerequisites": [
+    "core:policy/rationalism/humanism"
+   ],
+   "grid": [
+    4,
+    2
+   ],
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "cities_with_building",
+      "filter": {
+       "building": "core:building/university"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "yield.science.pct",
+     "amount": 17,
+     "source": "unciv: Policies.json, Free Thought"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "tiles_of_player",
+      "filter": {
+       "improvement": "core:improvement/trading-post"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "tile.yield.science.flat",
+     "amount": 1,
+     "source": "unciv: Policies.json, Free Thought"
+    }
+   ],
+   "art_id": "rationalism/free-thought",
+   "provenance": "unciv: Policies.json, Free Thought",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:policy/rationalism/sovereignty",
+   "name": "Sovereignty",
+   "branch": "core:policy/rationalism",
+   "role": "policy",
+   "tier": null,
+   "prerequisites": [
+    "core:policy/rationalism/secularism"
+   ],
+   "grid": [
+    2,
+    2
+   ],
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "buildings_of_player",
+      "filter": {
+       "building": "core:building/library"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "building.yield.gold.flat",
+     "amount": 1,
+     "source": "unciv: Policies.json, Sovereignty"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "buildings_of_player",
+      "filter": {
+       "building": "core:building/university"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "building.yield.gold.flat",
+     "amount": 1,
+     "source": "unciv: Policies.json, Sovereignty"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "buildings_of_player",
+      "filter": {
+       "building": "core:building/observatory"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "building.yield.gold.flat",
+     "amount": 1,
+     "source": "unciv: Policies.json, Sovereignty"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "buildings_of_player",
+      "filter": {
+       "building": "core:building/research_lab"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "building.yield.gold.flat",
+     "amount": 1,
+     "source": "unciv: Policies.json, Sovereignty"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "buildings_of_player",
+      "filter": {
+       "building": "core:building/public_school"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "building.yield.gold.flat",
+     "amount": 1,
+     "source": "unciv: Policies.json, Sovereignty"
+    }
+   ],
+   "art_id": "rationalism/sovereignty",
+   "provenance": "unciv: Policies.json, Sovereignty",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:policy/rationalism/scientific-revolution",
+   "name": "Scientific Revolution",
+   "branch": "core:policy/rationalism",
+   "role": "policy",
+   "tier": null,
+   "prerequisites": [
+    "core:policy/rationalism/sovereignty"
+   ],
+   "grid": [
+    2,
+    3
+   ],
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "player"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "research_agreement.science.pct",
+     "amount": 50,
+     "source": "unciv: Policies.json, Scientific Revolution"
+    }
+   ],
+   "art_id": "rationalism/scientific-revolution",
+   "provenance": "unciv: Policies.json, Scientific Revolution",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:policy/tradition/finisher",
+   "name": "Tradition",
+   "branch": "core:policy/tradition",
+   "role": "finisher",
+   "tier": null,
+   "prerequisites": [],
+   "grid": null,
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "all_cities"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "growth.rate.pct",
+     "amount": 15,
+     "source": "unciv: Policies.json, Tradition Complete"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "player"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "policy.num_cities_free_food_building",
+     "amount": 4,
+     "needs_mechanic": "num_cities_free_food_building",
+     "source": "unciv: Policies.json, Tradition Complete"
+    }
+   ],
+   "provenance": "unciv: Policies.json, Tradition Complete",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:policy/liberty/finisher",
+   "name": "Liberty",
+   "branch": "core:policy/liberty",
+   "role": "finisher",
+   "tier": null,
+   "prerequisites": [],
+   "grid": null,
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "player"
+     },
+     "condition": null,
+     "trigger": "on_adopt",
+     "modifier": "grant.great_person_choice",
+     "amount": 1,
+     "source": "unciv: Policies.json, Liberty Complete"
+    }
+   ],
+   "provenance": "unciv: Policies.json, Liberty Complete",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:policy/honor/finisher",
+   "name": "Honor",
+   "branch": "core:policy/honor",
+   "role": "finisher",
+   "tier": null,
+   "prerequisites": [],
+   "grid": null,
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "player"
+     },
+     "condition": null,
+     "trigger": "on_kill",
+     "modifier": "gold.on_kill.pct_of_strength",
+     "amount": 100,
+     "source": "own value, unverified"
+    }
+   ],
+   "provenance": "unciv: Policies.json, Honor Complete",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:policy/piety/finisher",
+   "name": "Piety",
+   "branch": "core:policy/piety",
+   "role": "finisher",
+   "tier": null,
+   "prerequisites": [],
+   "grid": null,
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "capital",
+      "filter": {
+       "unit": "core:unit/great-prophet"
+      }
+     },
+     "condition": null,
+     "trigger": "on_adopt",
+     "modifier": "grant.unit",
+     "amount": 1,
+     "source": "own value, unverified"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "tiles_of_player",
+      "filter": {
+       "improvement": "core:improvement/holy-site"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "tile.yield.culture.flat",
+     "amount": 3,
+     "source": "unciv: Policies.json, Piety Complete"
+    }
+   ],
+   "provenance": "unciv: Policies.json, Piety Complete",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:policy/patronage/finisher",
+   "name": "Patronage",
+   "branch": "core:policy/patronage",
+   "role": "finisher",
+   "tier": null,
+   "prerequisites": [],
+   "grid": null,
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "player"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "policy.minor_great_people_allies",
+     "amount": true,
+     "needs_mechanic": "minor_great_people_allies",
+     "source": "own value, unverified"
+    }
+   ],
+   "provenance": "unciv: Policies.json, Patronage Complete",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:policy/commerce/finisher",
+   "name": "Commerce",
+   "branch": "core:policy/commerce",
+   "role": "finisher",
+   "tier": null,
+   "prerequisites": [],
+   "grid": null,
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "tiles_of_player",
+      "filter": {
+       "improvement": "core:improvement/trading-post"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "tile.yield.gold.flat",
+     "amount": 1,
+     "source": "unciv: Policies.json, Commerce Complete"
+    }
+   ],
+   "provenance": "unciv: Policies.json, Commerce Complete",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:policy/rationalism/finisher",
+   "name": "Rationalism",
+   "branch": "core:policy/rationalism",
+   "role": "finisher",
+   "tier": null,
+   "prerequisites": [],
+   "grid": null,
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "player"
+     },
+     "condition": null,
+     "trigger": "on_adopt",
+     "modifier": "grant.tech",
+     "amount": 2,
+     "source": "unciv: Policies.json, Rationalism Complete"
+    }
+   ],
+   "provenance": "unciv: Policies.json, Rationalism Complete",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:policy/aesthetics/opener",
+   "name": "Aesthetics",
+   "branch": "core:policy/aesthetics",
+   "role": "opener",
+   "tier": null,
+   "prerequisites": [],
+   "grid": null,
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "all_cities",
+      "filter": {
+       "great_person": "core:unit/great-writer"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "great_people.rate.pct",
+     "amount": 25,
+     "source": "own value"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "all_cities",
+      "filter": {
+       "great_person": "core:unit/great-artist"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "great_people.rate.pct",
+     "amount": 25,
+     "source": "own value"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "all_cities",
+      "filter": {
+       "great_person": "core:unit/great-musician"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "great_people.rate.pct",
+     "amount": 25,
+     "source": "own value"
+    }
+   ],
+   "provenance": "own value"
+  },
+  {
+   "id": "core:policy/aesthetics/cultural-centers",
+   "name": "Cultural Centers",
+   "branch": "core:policy/aesthetics",
+   "role": "policy",
+   "tier": null,
+   "prerequisites": [],
+   "grid": [
+    2,
+    1
+   ],
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "all_cities",
+      "filter": {
+       "building": "core:building/monument"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "production.building_class.pct",
+     "amount": 50,
+     "source": "own value"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "all_cities",
+      "filter": {
+       "building": "core:building/amphitheater"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "production.building_class.pct",
+     "amount": 50,
+     "source": "own value"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "all_cities",
+      "filter": {
+       "building": "core:building/opera_house"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "production.building_class.pct",
+     "amount": 50,
+     "source": "own value"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "all_cities",
+      "filter": {
+       "building": "core:building/museum"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "production.building_class.pct",
+     "amount": 50,
+     "source": "own value"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "all_cities",
+      "filter": {
+       "building": "core:building/broadcast_tower"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "production.building_class.pct",
+     "amount": 50,
+     "source": "own value"
+    }
+   ],
+   "art_id": "aesthetics/cultural-centers",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:policy/aesthetics/fine-arts",
+   "name": "Fine Arts",
+   "branch": "core:policy/aesthetics",
+   "role": "policy",
+   "tier": null,
+   "prerequisites": [],
+   "grid": [
+    4,
+    1
+   ],
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "player"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "policy.happiness_to_culture",
+     "amount": 50,
+     "needs_mechanic": "happiness_to_culture",
+     "source": "own value"
+    }
+   ],
+   "art_id": "aesthetics/fine-arts",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:policy/aesthetics/flourishing-of-the-arts",
+   "name": "Flourishing of the Arts",
+   "branch": "core:policy/aesthetics",
+   "role": "policy",
+   "tier": null,
+   "prerequisites": [
+    "core:policy/aesthetics/cultural-centers",
+    "core:policy/aesthetics/fine-arts"
+   ],
+   "grid": [
+    2,
+    2
+   ],
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "player"
+     },
+     "condition": null,
+     "trigger": "on_adopt",
+     "modifier": "golden_age.start_turns",
+     "amount": 10,
+     "source": "own value, unverified"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "player"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "wonder.culture.pct",
+     "amount": 33,
+     "source": "own value"
+    }
+   ],
+   "art_id": "aesthetics/flourishing-of-the-arts",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:policy/aesthetics/artistic-genius",
+   "name": "Artistic Genius",
+   "branch": "core:policy/aesthetics",
+   "role": "policy",
+   "tier": null,
+   "prerequisites": [
+    "core:policy/aesthetics/fine-arts"
+   ],
+   "grid": [
+    4,
+    2
+   ],
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "capital",
+      "filter": {
+       "unit": "core:unit/great-artist"
+      }
+     },
+     "condition": null,
+     "trigger": "on_adopt",
+     "modifier": "grant.unit",
+     "amount": 1,
+     "source": "own value"
+    }
+   ],
+   "art_id": "aesthetics/artistic-genius",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:policy/aesthetics/cultural-exchange",
+   "name": "Cultural Exchange",
+   "branch": "core:policy/aesthetics",
+   "role": "policy",
+   "tier": null,
+   "prerequisites": [
+    "core:policy/aesthetics/flourishing-of-the-arts"
+   ],
+   "grid": [
+    2,
+    3
+   ],
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "player"
+     },
+     "condition": {
+      "target": "shares_majority_religion"
+     },
+     "trigger": "passive",
+     "modifier": "tourism.pct",
+     "amount": 12,
+     "source": "own design: tourism, influence and great works"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "player"
+     },
+     "condition": {
+      "target": "has_trade_route"
+     },
+     "trigger": "passive",
+     "modifier": "tourism.pct",
+     "amount": 12,
+     "source": "own design: tourism, influence and great works"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "player"
+     },
+     "condition": {
+      "target": "open_borders"
+     },
+     "trigger": "passive",
+     "modifier": "tourism.pct",
+     "amount": 12,
+     "source": "own design: tourism, influence and great works"
+    }
+   ],
+   "art_id": "aesthetics/cultural-exchange",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:policy/aesthetics/finisher",
+   "name": "Aesthetics",
+   "branch": "core:policy/aesthetics",
+   "role": "finisher",
+   "tier": null,
+   "prerequisites": [],
+   "grid": null,
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "player"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "theming.bonus.pct",
+     "amount": 60,
+     "source": "own design: tourism, influence and great works"
+    }
+   ],
+   "provenance": "own value"
+  },
+  {
+   "id": "core:policy/exploration/opener",
+   "name": "Exploration",
+   "branch": "core:policy/exploration",
+   "role": "opener",
+   "tier": null,
+   "prerequisites": [],
+   "grid": null,
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "all_units",
+      "filter": {
+       "promotion": "core:promotion/naval-tradition"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "grant.promotion",
+     "amount": 1,
+     "source": "own value"
+    }
+   ],
+   "provenance": "own value"
+  },
+  {
+   "id": "core:policy/exploration/maritime-infrastructure",
+   "name": "Maritime Infrastructure",
+   "branch": "core:policy/exploration",
+   "role": "policy",
+   "tier": null,
+   "prerequisites": [],
+   "grid": [
+    2,
+    1
+   ],
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "coastal_cities"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "yield.production.flat",
+     "amount": 3,
+     "source": "own value"
+    }
+   ],
+   "art_id": "exploration/maritime-infrastructure",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:policy/exploration/naval-tradition",
+   "name": "Naval Tradition",
+   "branch": "core:policy/exploration",
+   "role": "policy",
+   "tier": null,
+   "prerequisites": [],
+   "grid": [
+    4,
+    1
+   ],
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "buildings_of_player",
+      "filter": {
+       "building": "core:building/harbor"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "building.happiness.flat",
+     "amount": 1,
+     "source": "own value, unverified"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "buildings_of_player",
+      "filter": {
+       "building": "core:building/seaport"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "building.happiness.flat",
+     "amount": 1,
+     "source": "own value, unverified"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "buildings_of_player",
+      "filter": {
+       "building": "core:building/lighthouse"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "building.happiness.flat",
+     "amount": 1,
+     "source": "own value, unverified"
+    }
+   ],
+   "art_id": "exploration/naval-tradition",
+   "provenance": "unciv: Policies.json, Naval Tradition",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:policy/exploration/merchant-navy",
+   "name": "Merchant Navy",
+   "branch": "core:policy/exploration",
+   "role": "policy",
+   "tier": null,
+   "prerequisites": [
+    "core:policy/exploration/naval-tradition",
+    "core:policy/exploration/maritime-infrastructure"
+   ],
+   "grid": [
+    2,
+    2
+   ],
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "buildings_of_player",
+      "filter": {
+       "building": "core:building/east_india_company"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "building.yield.culture.flat",
+     "amount": 4,
+     "source": "own value, unverified"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "buildings_of_player",
+      "filter": {
+       "building": "core:building/harbor"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "building.yield.gold.flat",
+     "amount": 1,
+     "source": "own value, unverified"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "buildings_of_player",
+      "filter": {
+       "building": "core:building/seaport"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "building.yield.gold.flat",
+     "amount": 1,
+     "source": "own value, unverified"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "buildings_of_player",
+      "filter": {
+       "building": "core:building/lighthouse"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "building.yield.gold.flat",
+     "amount": 1,
+     "source": "own value, unverified"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "buildings_of_player",
+      "filter": {
+       "building": "core:building/east_india_company"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "building.yield.production.flat",
+     "amount": 4,
+     "source": "own value, unverified"
+    }
+   ],
+   "art_id": "exploration/merchant-navy",
+   "provenance": "unciv: Policies.json, Merchant Navy",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:policy/exploration/navigation-school",
+   "name": "Navigation School",
+   "branch": "core:policy/exploration",
+   "role": "policy",
+   "tier": null,
+   "prerequisites": [
+    "core:policy/exploration/naval-tradition"
+   ],
+   "grid": [
+    4,
+    2
+   ],
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "player",
+      "filter": {
+       "great_person": "core:unit/great-admiral"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "great_people.rate.pct",
+     "amount": 50,
+     "source": "own value"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "all_units",
+      "filter": {
+       "promotion": "core:promotion/fast-admiral"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "grant.promotion",
+     "amount": 1,
+     "source": "own value"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "capital",
+      "filter": {
+       "unit": "core:unit/great-admiral"
+      }
+     },
+     "condition": null,
+     "trigger": "on_adopt",
+     "modifier": "grant.unit",
+     "amount": 1,
+     "source": "own value"
+    }
+   ],
+   "art_id": "exploration/navigation-school",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:policy/exploration/treasure-fleets",
+   "name": "Treasure Fleets",
+   "branch": "core:policy/exploration",
+   "role": "policy",
+   "tier": null,
+   "prerequisites": [
+    "core:policy/exploration/merchant-navy"
+   ],
+   "grid": [
+    2,
+    3
+   ],
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "player"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "trade.sea_route.gold.flat",
+     "amount": 2.0,
+     "source": "own design: trade routes"
+    }
+   ],
+   "art_id": "exploration/treasure-fleets",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:policy/exploration/finisher",
+   "name": "Exploration",
+   "branch": "core:policy/exploration",
+   "role": "finisher",
+   "tier": null,
+   "prerequisites": [],
+   "grid": null,
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "player"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "text_only",
+     "amount": null,
+     "needs_mechanic": "hardcoded_policy_exploration_finisher",
+     "source": "own value, unverified"
+    }
+   ],
+   "provenance": "own value"
+  },
+  {
+   "id": "core:policy/freedom/avant-garde",
+   "name": "Avant Garde",
+   "branch": "core:policy/freedom",
+   "role": "tenet",
+   "tier": 1,
+   "prerequisites": [],
+   "grid": null,
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "all_cities"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "great_people.rate.pct",
+     "amount": 20,
+     "source": "own design: ideologies"
+    }
+   ],
+   "art_id": "freedom/avant-garde",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:policy/freedom/creative-expression",
+   "name": "Creative Expression",
+   "branch": "core:policy/freedom",
+   "role": "tenet",
+   "tier": 1,
+   "prerequisites": [],
+   "grid": null,
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "great_works_of_player"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "great_work.yield.culture.flat",
+     "amount": 1,
+     "source": "own value"
+    }
+   ],
+   "art_id": "freedom/creative-expression",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:policy/freedom/civil-society",
+   "name": "Civil Society",
+   "branch": "core:policy/freedom",
+   "role": "tenet",
+   "tier": 1,
+   "prerequisites": [],
+   "grid": null,
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "player"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "policy.half_specialist_food",
+     "amount": true,
+     "needs_mechanic": "half_specialist_food",
+     "source": "unciv: Policies.json, Civil Society"
+    }
+   ],
+   "art_id": "freedom/civil-society",
+   "provenance": "unciv: Policies.json, Civil Society",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:policy/freedom/volunteer-army",
+   "name": "Volunteer Army",
+   "branch": "core:policy/freedom",
+   "role": "tenet",
+   "tier": 2,
+   "prerequisites": [],
+   "grid": null,
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "player"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "unit.free_maintenance_slots.flat",
+     "amount": 5,
+     "source": "own design: ideologies"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "capital",
+      "filter": {
+       "unit": "core:unit/foreign-legion"
+      }
+     },
+     "condition": null,
+     "trigger": "on_adopt",
+     "modifier": "grant.unit",
+     "amount": 4,
+     "source": "own design: ideologies"
+    }
+   ],
+   "art_id": "freedom/volunteer-army",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:policy/freedom/covert-action",
+   "name": "Covert Action",
+   "branch": "core:policy/freedom",
+   "role": "tenet",
+   "tier": 1,
+   "prerequisites": [],
+   "grid": null,
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "player"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "espionage.rig_election.pct",
+     "amount": 75,
+     "source": "own design: ideologies"
+    }
+   ],
+   "art_id": "freedom/covert-action",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:policy/freedom/urbanization",
+   "name": "Urbanization",
+   "branch": "core:policy/freedom",
+   "role": "tenet",
+   "tier": 2,
+   "prerequisites": [],
+   "grid": null,
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "buildings_of_player",
+      "filter": {
+       "building": "core:building/water_mill"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "building.happiness.flat",
+     "amount": 2,
+     "source": "own design: ideologies"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "buildings_of_player",
+      "filter": {
+       "building": "core:building/hospital"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "building.happiness.flat",
+     "amount": 2,
+     "source": "own design: ideologies"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "buildings_of_player",
+      "filter": {
+       "building": "core:building/medical_lab"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "building.happiness.flat",
+     "amount": 2,
+     "source": "own design: ideologies"
+    }
+   ],
+   "art_id": "freedom/urbanization",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:policy/freedom/capitalism",
+   "name": "Capitalism",
+   "branch": "core:policy/freedom",
+   "role": "tenet",
+   "tier": 1,
+   "prerequisites": [],
+   "grid": null,
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "buildings_of_player",
+      "filter": {
+       "building": "core:building/mint"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "building.happiness.flat",
+     "amount": 1,
+     "source": "own value"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "buildings_of_player",
+      "filter": {
+       "building": "core:building/bank"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "building.happiness.flat",
+     "amount": 1,
+     "source": "own value"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "buildings_of_player",
+      "filter": {
+       "building": "core:building/stock_exchange"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "building.happiness.flat",
+     "amount": 1,
+     "source": "own value"
+    }
+   ],
+   "art_id": "freedom/capitalism",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:policy/freedom/economic-union",
+   "name": "Economic Union",
+   "branch": "core:policy/freedom",
+   "role": "tenet",
+   "tier": 1,
+   "prerequisites": [],
+   "grid": null,
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "player"
+     },
+     "condition": {
+      "target": "same_ideology"
+     },
+     "trigger": "passive",
+     "modifier": "trade.route.gold.flat",
+     "amount": 2.0,
+     "source": "own design: ideologies"
+    }
+   ],
+   "art_id": "freedom/economic-union",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:policy/freedom/their-finest-hour",
+   "name": "Their Finest Hour",
+   "branch": "core:policy/freedom",
+   "role": "tenet",
+   "tier": 2,
+   "prerequisites": [],
+   "grid": null,
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "all_cities"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "city.defense.pct",
+     "amount": 25,
+     "source": "own design: ideologies"
+    }
+   ],
+   "art_id": "freedom/their-finest-hour",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:policy/freedom/universal-suffrage",
+   "name": "Universal Suffrage",
+   "branch": "core:policy/freedom",
+   "role": "tenet",
+   "tier": 2,
+   "prerequisites": [],
+   "grid": null,
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "player"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "policy.half_specialist_unhappiness",
+     "amount": true,
+     "needs_mechanic": "half_specialist_unhappiness",
+     "source": "own value, unverified"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "player"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "golden_age.duration.pct",
+     "amount": 35,
+     "source": "own design: ideologies"
+    }
+   ],
+   "art_id": "freedom/universal-suffrage",
+   "provenance": "unciv: Policies.json, Universal Suffrage",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:policy/freedom/new-deal",
+   "name": "New Deal",
+   "branch": "core:policy/freedom",
+   "role": "tenet",
+   "tier": 2,
+   "prerequisites": [],
+   "grid": null,
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "tiles_of_player",
+      "filter": {
+       "improvement": "core:improvement/landmark"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "tile.yield.culture.flat",
+     "amount": 3,
+     "source": "own design: ideologies"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "tiles_of_player",
+      "filter": {
+       "improvement": "core:improvement/academy"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "tile.yield.science.flat",
+     "amount": 3,
+     "source": "own design: ideologies"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "tiles_of_player",
+      "filter": {
+       "improvement": "core:improvement/customs-house"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "tile.yield.gold.flat",
+     "amount": 3,
+     "source": "own design: ideologies"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "tiles_of_player",
+      "filter": {
+       "improvement": "core:improvement/manufactory"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "tile.yield.production.flat",
+     "amount": 3,
+     "source": "own design: ideologies"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "tiles_of_player",
+      "filter": {
+       "improvement": "core:improvement/holy-site"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "tile.yield.faith.flat",
+     "amount": 3,
+     "source": "own design: ideologies"
+    }
+   ],
+   "art_id": "freedom/new-deal",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:policy/freedom/arsenal-of-democracy",
+   "name": "Arsenal of Democracy",
+   "branch": "core:policy/freedom",
+   "role": "tenet",
+   "tier": 2,
+   "prerequisites": [],
+   "grid": null,
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "all_cities"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "production.military_units.pct",
+     "amount": 15,
+     "source": "own design: ideologies"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "city_states"
+     },
+     "condition": null,
+     "trigger": "on_unit_gift",
+     "modifier": "city_state.unit_gift_influence.flat",
+     "amount": 12,
+     "source": "own design: ideologies"
+    }
+   ],
+   "art_id": "freedom/arsenal-of-democracy",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:policy/freedom/media-culture",
+   "name": "Media Culture",
+   "branch": "core:policy/freedom",
+   "role": "tenet",
+   "tier": 3,
+   "prerequisites": [],
+   "grid": null,
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "buildings_of_player",
+      "filter": {
+       "building": "core:building/broadcast_tower"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "building.tourism.pct",
+     "amount": 25,
+     "source": "own design: tourism, influence and great works"
+    }
+   ],
+   "art_id": "freedom/media-culture",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:policy/freedom/treaty-organization",
+   "name": "Treaty Organization",
+   "branch": "core:policy/freedom",
+   "role": "tenet",
+   "tier": 3,
+   "prerequisites": [],
+   "grid": null,
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "city_states"
+     },
+     "condition": {
+      "protected": true
+     },
+     "trigger": "passive",
+     "modifier": "city_state.influence_per_turn",
+     "amount": 3.0,
+     "source": "own design: ideologies"
+    }
+   ],
+   "art_id": "freedom/treaty-organization",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:policy/freedom/space-procurements",
+   "name": "Space Procurements",
+   "branch": "core:policy/freedom",
+   "role": "tenet",
+   "tier": 3,
+   "prerequisites": [],
+   "grid": null,
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "player"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "policy.enables_ss_part_purchase",
+     "amount": true,
+     "needs_mechanic": "enables_ss_part_purchase",
+     "source": "own value"
+    }
+   ],
+   "art_id": "freedom/space-procurements",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:policy/order/hero-of-the-people",
+   "name": "Hero of the People",
+   "branch": "core:policy/order",
+   "role": "tenet",
+   "tier": 1,
+   "prerequisites": [],
+   "grid": null,
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "all_cities"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "great_people.rate.pct",
+     "amount": 20,
+     "source": "own design: ideologies"
+    }
+   ],
+   "art_id": "order/hero-of-the-people",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:policy/order/socialist-realism",
+   "name": "Socialist Realism",
+   "branch": "core:policy/order",
+   "role": "tenet",
+   "tier": 1,
+   "prerequisites": [],
+   "grid": null,
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "buildings_of_player",
+      "filter": {
+       "building": "core:building/monument"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "building.happiness.flat",
+     "amount": 1,
+     "source": "own design: ideologies"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "all_cities",
+      "filter": {
+       "building": "core:building/monument"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "production.building_class.pct",
+     "amount": 60,
+     "source": "own design: ideologies"
+    }
+   ],
+   "art_id": "order/socialist-realism",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:policy/order/skyscrapers",
+   "name": "Skyscrapers",
+   "branch": "core:policy/order",
+   "role": "tenet",
+   "tier": 1,
+   "prerequisites": [],
+   "grid": null,
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "all_cities"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "purchase.buildings.cost.pct",
+     "amount": -25,
+     "source": "own design: ideologies"
+    }
+   ],
+   "art_id": "order/skyscrapers",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:policy/order/patriotic-war",
+   "name": "Patriotic War",
+   "branch": "core:policy/order",
+   "role": "tenet",
+   "tier": 1,
+   "prerequisites": [],
+   "grid": null,
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "all_units",
+      "filter": {
+       "promotion": "core:promotion/nationalism"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "grant.promotion",
+     "amount": 1,
+     "source": "own value"
+    }
+   ],
+   "art_id": "order/patriotic-war",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:policy/order/double-agents",
+   "name": "Double Agents",
+   "branch": "core:policy/order",
+   "role": "tenet",
+   "tier": 1,
+   "prerequisites": [],
+   "grid": null,
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "player"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "espionage.catch_chance.pct",
+     "amount": 75,
+     "source": "own design: ideologies"
+    }
+   ],
+   "art_id": "order/double-agents",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:policy/order/young-pioneers",
+   "name": "Young Pioneers",
+   "branch": "core:policy/order",
+   "role": "tenet",
+   "tier": 1,
+   "prerequisites": [],
+   "grid": null,
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "buildings_of_player",
+      "filter": {
+       "building": "core:building/workshop"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "building.happiness.flat",
+     "amount": 1,
+     "source": "own value"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "buildings_of_player",
+      "filter": {
+       "building": "core:building/factory"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "building.happiness.flat",
+     "amount": 1,
+     "source": "own value"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "buildings_of_player",
+      "filter": {
+       "building": "core:building/solar_plant"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "building.happiness.flat",
+     "amount": 1,
+     "source": "own value"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "buildings_of_player",
+      "filter": {
+       "building": "core:building/nuclear_plant"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "building.happiness.flat",
+     "amount": 1,
+     "source": "own value"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "buildings_of_player",
+      "filter": {
+       "building": "core:building/hydro_plant"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "building.happiness.flat",
+     "amount": 1,
+     "source": "own value"
+    }
+   ],
+   "art_id": "order/young-pioneers",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:policy/order/academy-of-sciences",
+   "name": "Academy of Sciences",
+   "branch": "core:policy/order",
+   "role": "tenet",
+   "tier": 2,
+   "prerequisites": [],
+   "grid": null,
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "buildings_of_player",
+      "filter": {
+       "building": "core:building/observatory"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "building.happiness.flat",
+     "amount": 2,
+     "source": "own design: ideologies"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "buildings_of_player",
+      "filter": {
+       "building": "core:building/public_school"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "building.happiness.flat",
+     "amount": 2,
+     "source": "own design: ideologies"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "buildings_of_player",
+      "filter": {
+       "building": "core:building/research_lab"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "building.happiness.flat",
+     "amount": 2,
+     "source": "own design: ideologies"
+    }
+   ],
+   "art_id": "order/academy-of-sciences",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:policy/order/party-leadership",
+   "name": "Party Leadership",
+   "branch": "core:policy/order",
+   "role": "tenet",
+   "tier": 2,
+   "prerequisites": [],
+   "grid": null,
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "all_cities"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "yield.production.flat",
+     "amount": 1,
+     "source": "own value"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "all_cities"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "yield.science.flat",
+     "amount": 1,
+     "source": "own value"
+    }
+   ],
+   "art_id": "order/party-leadership",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:policy/order/resettlement",
+   "name": "Resettlement",
+   "branch": "core:policy/order",
+   "role": "tenet",
+   "tier": 2,
+   "prerequisites": [],
+   "grid": null,
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "all_cities"
+     },
+     "condition": null,
+     "trigger": "on_city_founded",
+     "modifier": "city.population.flat",
+     "amount": 2,
+     "source": "own design: ideologies"
+    }
+   ],
+   "art_id": "order/resettlement",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:policy/order/cultural-revolution",
+   "name": "Cultural Revolution",
+   "branch": "core:policy/order",
+   "role": "tenet",
+   "tier": 2,
+   "prerequisites": [],
+   "grid": null,
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "player"
+     },
+     "condition": {
+      "target": "same_ideology"
+     },
+     "trigger": "passive",
+     "modifier": "tourism.pct",
+     "amount": 20,
+     "source": "own design: ideologies"
+    }
+   ],
+   "art_id": "order/cultural-revolution",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:policy/order/workers-faculties",
+   "name": "Workers' Faculties",
+   "branch": "core:policy/order",
+   "role": "tenet",
+   "tier": 2,
+   "prerequisites": [],
+   "grid": null,
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "all_cities",
+      "filter": {
+       "building": "core:building/factory"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "production.building_class.pct",
+     "amount": 75,
+     "source": "own design: ideologies"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "cities_with_building",
+      "filter": {
+       "building": "core:building/factory"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "yield.science.pct",
+     "amount": 20,
+     "source": "own design: ideologies"
+    }
+   ],
+   "art_id": "order/workers-faculties",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:policy/order/five-year-plan",
+   "name": "Five-Year Plan",
+   "branch": "core:policy/order",
+   "role": "tenet",
+   "tier": 2,
+   "prerequisites": [],
+   "grid": null,
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "all_cities"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "yield.production.flat",
+     "amount": 1,
+     "source": "own design: ideologies"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "tiles_of_player",
+      "filter": {
+       "improvement": "core:improvement/mine"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "tile.yield.production.flat",
+     "amount": 1,
+     "source": "own value"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "tiles_of_player",
+      "filter": {
+       "improvement": "core:improvement/quarry"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "tile.yield.production.flat",
+     "amount": 1,
+     "source": "own value"
+    }
+   ],
+   "art_id": "order/five-year-plan",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:policy/order/dictatorship-of-the-proletariat",
+   "name": "Dictatorship of the Proletariat",
+   "branch": "core:policy/order",
+   "role": "tenet",
+   "tier": 3,
+   "prerequisites": [],
+   "grid": null,
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "player"
+     },
+     "condition": {
+      "target": "less_happy"
+     },
+     "trigger": "passive",
+     "modifier": "tourism.pct",
+     "amount": 30,
+     "source": "own design: ideologies"
+    }
+   ],
+   "art_id": "order/dictatorship-of-the-proletariat",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:policy/order/iron-curtain",
+   "name": "Iron Curtain",
+   "branch": "core:policy/order",
+   "role": "tenet",
+   "tier": 3,
+   "prerequisites": [],
+   "grid": null,
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "player"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "policy.free_building_on_conquest",
+     "amount": 1,
+     "target": "core:building/courthouse",
+     "source": "own value"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "player"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "trade.internal_route.yield.pct",
+     "amount": 35,
+     "source": "own design: ideologies"
+    }
+   ],
+   "art_id": "order/iron-curtain",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:policy/order/spaceflight-pioneers",
+   "name": "Spaceflight Pioneers",
+   "branch": "core:policy/order",
+   "role": "tenet",
+   "tier": 3,
+   "prerequisites": [],
+   "grid": null,
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "player"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "policy.enables_ss_part_hurry",
+     "amount": true,
+     "needs_mechanic": "enables_ss_part_hurry",
+     "source": "own value"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "capital",
+      "filter": {
+       "unit": "core:unit/great-engineer"
+      }
+     },
+     "condition": null,
+     "trigger": "on_adopt",
+     "modifier": "grant.unit",
+     "amount": 1,
+     "source": "own value"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "capital",
+      "filter": {
+       "unit": "core:unit/great-scientist"
+      }
+     },
+     "condition": null,
+     "trigger": "on_adopt",
+     "modifier": "grant.unit",
+     "amount": 1,
+     "source": "own value"
+    }
+   ],
+   "art_id": "order/spaceflight-pioneers",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:policy/autocracy/elite-forces",
+   "name": "Elite Forces",
+   "branch": "core:policy/autocracy",
+   "role": "tenet",
+   "tier": 1,
+   "prerequisites": [],
+   "grid": null,
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "all_units"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "combat.wounded_penalty.pct",
+     "amount": -20,
+     "source": "own design: ideologies"
+    }
+   ],
+   "art_id": "autocracy/elite-forces",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:policy/autocracy/mobilization",
+   "name": "Mobilization",
+   "branch": "core:policy/autocracy",
+   "role": "tenet",
+   "tier": 1,
+   "prerequisites": [],
+   "grid": null,
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "all_cities"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "purchase.units.cost.pct",
+     "amount": -25,
+     "source": "own design: ideologies"
+    }
+   ],
+   "art_id": "autocracy/mobilization",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:policy/autocracy/united-front",
+   "name": "United Front",
+   "branch": "core:policy/autocracy",
+   "role": "tenet",
+   "tier": 1,
+   "prerequisites": [],
+   "grid": null,
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "player"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "city_state.unit_gift_rate.pct",
+     "amount": 75,
+     "source": "own design: ideologies"
+    }
+   ],
+   "art_id": "autocracy/united-front",
+   "provenance": "unciv: Policies.json, United Front",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:policy/autocracy/futurism",
+   "name": "Futurism",
+   "branch": "core:policy/autocracy",
+   "role": "tenet",
+   "tier": 1,
+   "prerequisites": [],
+   "grid": null,
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "player",
+      "filter": {
+       "unit": "core:unit/great-writer"
+      }
+     },
+     "condition": null,
+     "trigger": "on_unit_created",
+     "modifier": "tourism.on_unit_created.pct_of_recent",
+     "amount": 200,
+     "source": "own design: tourism, influence and great works"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "player",
+      "filter": {
+       "unit": "core:unit/great-artist"
+      }
+     },
+     "condition": null,
+     "trigger": "on_unit_created",
+     "modifier": "tourism.on_unit_created.pct_of_recent",
+     "amount": 200,
+     "source": "own design: tourism, influence and great works"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "player",
+      "filter": {
+       "unit": "core:unit/great-musician"
+      }
+     },
+     "condition": null,
+     "trigger": "on_unit_created",
+     "modifier": "tourism.on_unit_created.pct_of_recent",
+     "amount": 200,
+     "source": "own design: tourism, influence and great works"
+    }
+   ],
+   "art_id": "autocracy/futurism",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:policy/autocracy/industrial-espionage",
+   "name": "Industrial Espionage",
+   "branch": "core:policy/autocracy",
+   "role": "tenet",
+   "tier": 1,
+   "prerequisites": [],
+   "grid": null,
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "player"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "espionage.steal_rate.pct",
+     "amount": 75,
+     "source": "own design: ideologies"
+    }
+   ],
+   "art_id": "autocracy/industrial-espionage",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:policy/autocracy/militarism",
+   "name": "Militarism",
+   "branch": "core:policy/autocracy",
+   "role": "tenet",
+   "tier": 2,
+   "prerequisites": [],
+   "grid": null,
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "buildings_of_player",
+      "filter": {
+       "building": "core:building/barracks"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "building.happiness.flat",
+     "amount": 2,
+     "source": "own design: ideologies"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "buildings_of_player",
+      "filter": {
+       "building": "core:building/armory"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "building.happiness.flat",
+     "amount": 2,
+     "source": "own design: ideologies"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "buildings_of_player",
+      "filter": {
+       "building": "core:building/military_academy"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "building.happiness.flat",
+     "amount": 2,
+     "source": "own design: ideologies"
+    }
+   ],
+   "art_id": "autocracy/militarism",
+   "provenance": "unciv: Policies.json, Militarism",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:policy/autocracy/fortified-borders",
+   "name": "Fortified Borders",
+   "branch": "core:policy/autocracy",
+   "role": "tenet",
+   "tier": 1,
+   "prerequisites": [],
+   "grid": null,
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "buildings_of_player",
+      "filter": {
+       "building": "core:building/castle"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "building.happiness.flat",
+     "amount": 1,
+     "source": "own value"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "buildings_of_player",
+      "filter": {
+       "building": "core:building/arsenal"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "building.happiness.flat",
+     "amount": 1,
+     "source": "own value"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "buildings_of_player",
+      "filter": {
+       "building": "core:building/military_base"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "building.happiness.flat",
+     "amount": 1,
+     "source": "own value"
+    }
+   ],
+   "art_id": "autocracy/fortified-borders",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:policy/autocracy/lightning-warfare",
+   "name": "Lightning Warfare",
+   "branch": "core:policy/autocracy",
+   "role": "tenet",
+   "tier": 2,
+   "prerequisites": [],
+   "grid": null,
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "all_units",
+      "filter": {
+       "promotion": "core:promotion/fast-general"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "grant.promotion",
+     "amount": 1,
+     "source": "own design: ideologies"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "all_units",
+      "filter": {
+       "promotion": "core:promotion/lightning-warfare"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "grant.promotion",
+     "amount": 1,
+     "source": "own design: ideologies"
+    }
+   ],
+   "art_id": "autocracy/lightning-warfare",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:policy/autocracy/police-state",
+   "name": "Police State",
+   "branch": "core:policy/autocracy",
+   "role": "tenet",
+   "tier": 2,
+   "prerequisites": [],
+   "grid": null,
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "buildings_of_player",
+      "filter": {
+       "building": "core:building/courthouse"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "building.happiness.flat",
+     "amount": 2,
+     "source": "own design: ideologies"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "all_cities",
+      "filter": {
+       "building": "core:building/courthouse"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "production.building_class.pct",
+     "amount": 75,
+     "source": "own design: ideologies"
+    }
+   ],
+   "art_id": "autocracy/police-state",
+   "provenance": "unciv: Policies.json, Police State",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:policy/autocracy/nationalism",
+   "name": "Nationalism",
+   "branch": "core:policy/autocracy",
+   "role": "tenet",
+   "tier": 2,
+   "prerequisites": [],
+   "grid": null,
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "player"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "unit.maintenance.pct",
+     "amount": -25,
+     "source": "own design: ideologies"
+    }
+   ],
+   "art_id": "autocracy/nationalism",
+   "provenance": "unciv: Policies.json, Nationalism",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:policy/autocracy/third-alternative",
+   "name": "Third Alternative",
+   "branch": "core:policy/autocracy",
+   "role": "tenet",
+   "tier": 2,
+   "prerequisites": [],
+   "grid": null,
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "player"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "resource.strategic_quantity.pct",
+     "amount": 150,
+     "source": "own design: ideologies"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "capital"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "yield.food.flat",
+     "amount": 4,
+     "source": "own design: ideologies"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "capital"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "yield.science.flat",
+     "amount": 4,
+     "source": "own design: ideologies"
+    }
+   ],
+   "art_id": "autocracy/third-alternative",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:policy/autocracy/total-war",
+   "name": "Total War",
+   "branch": "core:policy/autocracy",
+   "role": "tenet",
+   "tier": 2,
+   "prerequisites": [],
+   "grid": null,
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "all_cities"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "production.military_units.pct",
+     "amount": 20,
+     "source": "own design: ideologies"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "all_units"
+     },
+     "condition": null,
+     "trigger": "on_unit_trained",
+     "modifier": "unit.free_xp",
+     "amount": 12,
+     "source": "own design: ideologies"
+    }
+   ],
+   "art_id": "autocracy/total-war",
+   "provenance": "unciv: Policies.json, Total War",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:policy/autocracy/cult-of-personality",
+   "name": "Cult of Personality",
+   "branch": "core:policy/autocracy",
+   "role": "tenet",
+   "tier": 3,
+   "prerequisites": [],
+   "grid": null,
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "player"
+     },
+     "condition": {
+      "target": "common_enemy"
+     },
+     "trigger": "passive",
+     "modifier": "tourism.pct",
+     "amount": 35,
+     "source": "own design: ideologies"
+    }
+   ],
+   "art_id": "autocracy/cult-of-personality",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:policy/autocracy/gunboat-diplomacy",
+   "name": "Gunboat Diplomacy",
+   "branch": "core:policy/autocracy",
+   "role": "tenet",
+   "tier": 3,
+   "prerequisites": [],
+   "grid": null,
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "city_states"
+     },
+     "condition": {
+      "afraid": true
+     },
+     "trigger": "passive",
+     "modifier": "city_state.influence_per_turn",
+     "amount": 4.0,
+     "source": "own design: ideologies"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "player"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "city_state.bully_score.pct",
+     "amount": 35,
+     "source": "own design: ideologies"
+    }
+   ],
+   "art_id": "autocracy/gunboat-diplomacy",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:policy/autocracy/clausewitz-s-legacy",
+   "name": "Clausewitz's Legacy",
+   "branch": "core:policy/autocracy",
+   "role": "tenet",
+   "tier": 3,
+   "prerequisites": [],
+   "grid": null,
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "all_units"
+     },
+     "condition": {
+      "turns": "value"
+     },
+     "trigger": "on_adopt",
+     "modifier": "combat.attack.pct",
+     "amount": 35,
+     "source": "own design: ideologies",
+     "tag": "attack_bonus_turns"
+    }
+   ],
+   "art_id": "autocracy/clausewitz-s-legacy",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:policy/freedom/universal-healthcare",
+   "name": "Universal Healthcare",
+   "branch": "core:policy/freedom",
+   "role": "tenet",
+   "tier": 1,
+   "prerequisites": [],
+   "grid": null,
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "buildings_of_player",
+      "filter": {
+       "building": "core:building/palace"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "building.happiness.flat",
+     "amount": 1,
+     "source": "own value"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "buildings_of_player",
+      "filter": {
+       "building": "core:building/heroic_epic"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "building.happiness.flat",
+     "amount": 1,
+     "source": "own value"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "buildings_of_player",
+      "filter": {
+       "building": "core:building/national_epic"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "building.happiness.flat",
+     "amount": 1,
+     "source": "own value"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "buildings_of_player",
+      "filter": {
+       "building": "core:building/circus_maximus"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "building.happiness.flat",
+     "amount": 1,
+     "source": "own value"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "buildings_of_player",
+      "filter": {
+       "building": "core:building/national_college"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "building.happiness.flat",
+     "amount": 1,
+     "source": "own value"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "buildings_of_player",
+      "filter": {
+       "building": "core:building/grand_temple"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "building.happiness.flat",
+     "amount": 1,
+     "source": "own value"
+    }
+   ],
+   "art_id": "freedom/universal-healthcare",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:policy/order/universal-healthcare",
+   "name": "Universal Healthcare",
+   "branch": "core:policy/order",
+   "role": "tenet",
+   "tier": 1,
+   "prerequisites": [],
+   "grid": null,
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "buildings_of_player",
+      "filter": {
+       "building": "core:building/palace"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "building.happiness.flat",
+     "amount": 1,
+     "source": "own value"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "buildings_of_player",
+      "filter": {
+       "building": "core:building/heroic_epic"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "building.happiness.flat",
+     "amount": 1,
+     "source": "own value"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "buildings_of_player",
+      "filter": {
+       "building": "core:building/national_epic"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "building.happiness.flat",
+     "amount": 1,
+     "source": "own value"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "buildings_of_player",
+      "filter": {
+       "building": "core:building/circus_maximus"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "building.happiness.flat",
+     "amount": 1,
+     "source": "own value"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "buildings_of_player",
+      "filter": {
+       "building": "core:building/national_college"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "building.happiness.flat",
+     "amount": 1,
+     "source": "own value"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "buildings_of_player",
+      "filter": {
+       "building": "core:building/grand_temple"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "building.happiness.flat",
+     "amount": 1,
+     "source": "own value"
+    }
+   ],
+   "art_id": "order/universal-healthcare",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:policy/autocracy/universal-healthcare",
+   "name": "Universal Healthcare",
+   "branch": "core:policy/autocracy",
+   "role": "tenet",
+   "tier": 1,
+   "prerequisites": [],
+   "grid": null,
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "buildings_of_player",
+      "filter": {
+       "building": "core:building/palace"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "building.happiness.flat",
+     "amount": 1,
+     "source": "own value"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "buildings_of_player",
+      "filter": {
+       "building": "core:building/heroic_epic"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "building.happiness.flat",
+     "amount": 1,
+     "source": "own value"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "buildings_of_player",
+      "filter": {
+       "building": "core:building/national_epic"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "building.happiness.flat",
+     "amount": 1,
+     "source": "own value"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "buildings_of_player",
+      "filter": {
+       "building": "core:building/circus_maximus"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "building.happiness.flat",
+     "amount": 1,
+     "source": "own value"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "buildings_of_player",
+      "filter": {
+       "building": "core:building/national_college"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "building.happiness.flat",
+     "amount": 1,
+     "source": "own value"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "buildings_of_player",
+      "filter": {
+       "building": "core:building/grand_temple"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "building.happiness.flat",
+     "amount": 1,
+     "source": "own value"
+    }
+   ],
+   "art_id": "autocracy/universal-healthcare",
+   "provenance": "own value"
+  }
+ ],
+ "notice": "Derived from Unciv (https://github.com/yairm210/Unciv), MPL-2.0: rule fields of the entries marked `unciv:` come from Unciv's `Civ V - Gods & Kings` JSON files at commit 18827b1f; entries marked `own value, unverified` have no Unciv counterpart. Listed per file in classic/docs/classic/UNCIV-ATTRIBUTION.md."
+}

@@ -1,0 +1,642 @@
+// Civ 5 inspired rule set (Unciv Gods & Kings ruleset plus own extensions); generated, do not edit.
+// Derived from Unciv (https://github.com/yairm210/Unciv), MPL-2.0, where the entry says `unciv:`
+// in classic/docs/classic/*.json (see classic/docs/classic/UNCIV-ATTRIBUTION.md); other values are own, unverified.
+// Source: classic/docs/classic/*.json (made by classic/tools/import-unciv.py). Regenerate:
+//   cargo run --release --offline -p classic-content --features importer --bin classic-import
+// Inert effects need a mechanic the engine does not have yet: classic/docs/classic/implemented.md.
+(
+    religions: [
+        (
+            id: "core:religion/buddhism",
+            name: "Buddhism",
+        ),
+        (
+            id: "core:religion/catholicism",
+            name: "Catholicism",
+        ),
+        (
+            id: "core:religion/confucianism",
+            name: "Confucianism",
+        ),
+        (
+            id: "core:religion/eastern-orthodoxy",
+            name: "Eastern Orthodoxy",
+        ),
+        (
+            id: "core:religion/hinduism",
+            name: "Hinduism",
+        ),
+        (
+            id: "core:religion/islam",
+            name: "Islam",
+        ),
+        (
+            id: "core:religion/judaism",
+            name: "Judaism",
+        ),
+        (
+            id: "core:religion/protestantism",
+            name: "Protestantism",
+        ),
+        (
+            id: "core:religion/shinto",
+            name: "Shinto",
+        ),
+        (
+            id: "core:religion/sikhism",
+            name: "Sikhism",
+        ),
+        (
+            id: "core:religion/taoism",
+            name: "Taoism",
+        ),
+        (
+            id: "core:religion/tengriism",
+            name: "Tengriism",
+        ),
+        (
+            id: "core:religion/zoroastrianism",
+            name: "Zoroastrianism",
+        ),
+    ],
+    beliefs: [
+        (
+            id: "core:belief/enhancer/defender-of-the-faith",
+            name: "Defender of the Faith",
+            category: Some(Enhancer),
+            effects: [
+                (scope: Unit, selector: OwnerUnits, condition: NearFollowingCity(Own), modifier: ModifyCombat(context: Any, percent: 20)),
+            ],
+        ),
+        (
+            id: "core:belief/enhancer/holy-order",
+            name: "Holy Order",
+            category: Some(Enhancer),
+            effects: [
+                (scope: Religion, selector: OwnReligion, modifier: ModifyReligion(stat: MissionaryCost, percent: -30)),
+            ],
+        ),
+        (
+            id: "core:belief/enhancer/itinerant-preachers",
+            name: "Itinerant Preachers",
+            category: Some(Enhancer),
+            effects: [
+                (scope: Religion, selector: OwnReligion, modifier: ModifyReligion(stat: SpreadDistance, percent: 30)),
+            ],
+        ),
+        (
+            id: "core:belief/enhancer/just-war",
+            name: "Just War",
+            category: Some(Enhancer),
+            effects: [
+                (scope: Unit, selector: OwnerUnits, condition: NearFollowingCity(Enemy), modifier: ModifyCombat(context: Any, percent: 20)),
+            ],
+        ),
+        (
+            id: "core:belief/enhancer/messiah",
+            name: "Messiah",
+            category: Some(Enhancer),
+            effects: [
+                (scope: Religion, selector: OwnReligion, modifier: ModifyReligion(stat: ProphetStrength, percent: 25)),
+                (scope: Religion, selector: OwnReligion, modifier: ModifyReligion(stat: ProphetCost, percent: -25)),
+            ],
+        ),
+        (
+            id: "core:belief/enhancer/missionary-zeal",
+            name: "Missionary Zeal",
+            category: Some(Enhancer),
+            effects: [
+                (scope: Religion, selector: OwnReligion, modifier: ModifyReligion(stat: MissionaryStrength, percent: 25)),
+            ],
+        ),
+        (
+            id: "core:belief/enhancer/religious-texts",
+            name: "Religious Texts",
+            category: Some(Enhancer),
+            effects: [
+                (scope: Religion, selector: OwnReligion, modifier: ModifyReligion(stat: PressureOut, percent: 25)), (scope: Religion, selector: OwnReligion, condition: HasTechnology("core:tech/printing-press"), modifier: ModifyReligion(stat: PressureOut, percent: 25)),
+            ],
+        ),
+        (
+            id: "core:belief/enhancer/religious-unity",
+            name: "Religious Unity",
+            category: Some(Enhancer),
+            effects: [
+                (scope: Religion, selector: OwnReligion, modifier: ModifyReligion(stat: FriendlyCityStatePressure, percent: 100)),
+            ],
+        ),
+        (
+            id: "core:belief/enhancer/reliquary",
+            name: "Reliquary",
+            category: Some(Enhancer),
+            effects: [
+                (scope: Player, selector: Owner, trigger: OnGreatPersonExpended, modifier: AddYield(yield_kind: Faith, amount: 50), duration: Once),
+            ],
+        ),
+        (
+            id: "core:belief/follower/asceticism",
+            name: "Asceticism",
+            category: Some(Follower),
+            effects: [
+                (scope: City, selector: FollowingCities, condition: HasBuilding("core:building/shrine"), second_condition: MinFollowers(3), modifier: AddHappiness(amount: 1)),
+            ],
+        ),
+        (
+            id: "core:belief/follower/cathedrals",
+            name: "Cathedrals",
+            category: Some(Follower),
+            effects: [
+                (scope: City, selector: FollowingCities, modifier: UnlockFaithBuilding("core:building/cathedral")),
+            ],
+        ),
+        (
+            id: "core:belief/follower/choral-music",
+            name: "Choral Music",
+            category: Some(Follower),
+            effects: [
+                (scope: City, selector: FollowingCities, condition: HasBuilding("core:building/temple"), second_condition: MinFollowers(5), modifier: AddYield(yield_kind: Culture, amount: 2)),
+            ],
+        ),
+        (
+            id: "core:belief/follower/divine-inspiration",
+            name: "Divine Inspiration",
+            category: Some(Follower),
+            effects: [
+                (scope: City, selector: FollowingCities, modifier: AddYieldPerCount(yield_kind: Faith, amount: 2, per: (count: WorldWonders))),
+            ],
+        ),
+        (
+            id: "core:belief/follower/feed-the-world",
+            name: "Feed the World",
+            category: Some(Follower),
+            effects: [
+                (scope: City, selector: FollowingCities, condition: HasBuilding("core:building/shrine"), modifier: AddYield(yield_kind: Food, amount: 1)),
+                (scope: City, selector: FollowingCities, condition: HasBuilding("core:building/temple"), modifier: AddYield(yield_kind: Food, amount: 1)),
+            ],
+        ),
+        (
+            id: "core:belief/follower/guruship",
+            name: "Guruship",
+            category: Some(Follower),
+            effects: [
+                (scope: City, selector: FollowingCities, modifier: AddStat(stat: AnySpecialistYield(Production), amount: 2)),
+            ],
+        ),
+        (
+            id: "core:belief/follower/holy-warriors",
+            name: "Holy Warriors",
+            category: Some(Follower),
+            effects: [
+                (scope: City, selector: FollowingCities, modifier: UnlockFaithUnits("core:era/ancient")),
+                (scope: City, selector: FollowingCities, modifier: UnlockFaithUnits("core:era/classical")),
+                (scope: City, selector: FollowingCities, modifier: UnlockFaithUnits("core:era/medieval")),
+                (scope: City, selector: FollowingCities, modifier: UnlockFaithUnits("core:era/renaissance")),
+            ],
+        ),
+        (
+            id: "core:belief/follower/liturgical-drama",
+            name: "Liturgical Drama",
+            category: Some(Follower),
+            effects: [
+                (scope: City, selector: FollowingCities, condition: HasBuilding("core:building/amphitheater"), second_condition: MinFollowers(3), modifier: AddYield(yield_kind: Faith, amount: 1)),
+            ],
+        ),
+        (
+            id: "core:belief/follower/monasteries",
+            name: "Monasteries",
+            category: Some(Follower),
+            effects: [
+                (scope: City, selector: FollowingCities, modifier: UnlockFaithBuilding("core:building/monastery")),
+            ],
+        ),
+        (
+            id: "core:belief/follower/mosques",
+            name: "Mosques",
+            category: Some(Follower),
+            effects: [
+                (scope: City, selector: FollowingCities, modifier: UnlockFaithBuilding("core:building/mosque")),
+            ],
+        ),
+        (
+            id: "core:belief/follower/pagodas",
+            name: "Pagodas",
+            category: Some(Follower),
+            effects: [
+                (scope: City, selector: FollowingCities, modifier: UnlockFaithBuilding("core:building/pagoda")),
+            ],
+        ),
+        (
+            id: "core:belief/follower/peace-gardens",
+            name: "Peace Gardens",
+            category: Some(Follower),
+            effects: [
+                (scope: City, selector: FollowingCities, condition: HasBuilding("core:building/garden"), modifier: AddHappiness(amount: 2)),
+            ],
+        ),
+        (
+            id: "core:belief/follower/religious-art",
+            name: "Religious Art",
+            category: Some(Follower),
+            effects: [
+                (scope: City, selector: FollowingCities, condition: HasBuilding("core:building/hermitage"), modifier: ModifyTourism(stat: Flat, amount: 4)),
+                (scope: City, selector: FollowingCities, condition: HasBuilding("core:building/hermitage"), modifier: AddYield(yield_kind: Culture, amount: 8)),
+            ],
+        ),
+        (
+            id: "core:belief/follower/religious-center",
+            name: "Religious Center",
+            category: Some(Follower),
+            effects: [
+                (scope: City, selector: FollowingCities, condition: HasBuilding("core:building/temple"), second_condition: MinFollowers(5), modifier: AddHappiness(amount: 2)),
+            ],
+        ),
+        (
+            id: "core:belief/follower/religious-community",
+            name: "Religious Community",
+            category: Some(Follower),
+            effects: [
+                (scope: City, selector: FollowingCities, modifier: AddYieldPercentPerCount(yield_kind: Production, percent: 1, per: (count: MajorityFollowers, max: Some(15)))),
+            ],
+        ),
+        (
+            id: "core:belief/follower/swords-into-plowshares",
+            name: "Swords into Plowshares",
+            category: Some(Follower),
+            effects: [
+                (scope: City, selector: FollowingCities, condition: AtPeace, modifier: ModifyGrowth(percent: 15)),
+            ],
+        ),
+        (
+            id: "core:belief/founder/ceremonial-burial",
+            name: "Ceremonial Burial",
+            category: Some(Founder),
+            effects: [
+                (scope: Player, selector: Founder, modifier: AddHappinessPerFollowingCity(hundredths: 50)),
+            ],
+        ),
+        (
+            id: "core:belief/founder/church-property",
+            name: "Church Property",
+            category: Some(Founder),
+            effects: [
+                (scope: Player, selector: Founder, modifier: AddYieldPerFollowingCity(yield_kind: Gold, amount: 2, foreign_only: false)),
+            ],
+        ),
+        (
+            id: "core:belief/founder/initiation-rites",
+            name: "Initiation Rites",
+            category: Some(Founder),
+            effects: [
+                (scope: Player, selector: Owner, trigger: OnCityConverted, modifier: AddYield(yield_kind: Gold, amount: 100), duration: Once),
+            ],
+        ),
+        (
+            id: "core:belief/founder/interfaith-dialogue",
+            name: "Interfaith Dialogue",
+            category: Some(Founder),
+            effects: [
+                (scope: Player, selector: Owner, trigger: OnReligionSpread, modifier: AddYieldPerCount(yield_kind: Science, amount: 10, per: (count: OtherReligionFollowers)), duration: Once),
+            ],
+        ),
+        (
+            id: "core:belief/founder/papal-primacy",
+            name: "Papal Primacy",
+            category: Some(Founder),
+            effects: [
+                (scope: Player, selector: Founder, modifier: ModifyCityState(stat: RestingPointSameReligion, amount: 15)),
+            ],
+        ),
+        (
+            id: "core:belief/founder/peace-loving",
+            name: "Peace Loving",
+            category: Some(Founder),
+            effects: [
+                (scope: Player, selector: Founder, modifier: AddHappinessPerCount(amount: 1, per: (count: PeacefulForeignFollowers, every: 8))),
+            ],
+        ),
+        (
+            id: "core:belief/founder/pilgrimage",
+            name: "Pilgrimage",
+            category: Some(Founder),
+            effects: [
+                (scope: City, selector: HolyCity, modifier: AddYieldPerFollowingCity(yield_kind: Faith, amount: 2, foreign_only: true)),
+            ],
+        ),
+        (
+            id: "core:belief/founder/tithe",
+            name: "Tithe",
+            category: Some(Founder),
+            effects: [
+                (scope: Player, selector: Founder, modifier: AddYieldPerFollowers(yield_kind: Gold, per: 4, foreign_only: false)),
+            ],
+        ),
+        (
+            id: "core:belief/founder/world-church",
+            name: "World Church",
+            category: Some(Founder),
+            effects: [
+                (scope: City, selector: HolyCity, modifier: AddYieldPerFollowers(yield_kind: Culture, per: 5, foreign_only: true)),
+            ],
+        ),
+        (
+            id: "core:belief/pantheon/ancestor-worship",
+            name: "Ancestor Worship",
+            category: Some(Pantheon),
+            effects: [
+                (scope: City, selector: FollowingCities, condition: HasBuilding("core:building/shrine"), modifier: AddYield(yield_kind: Culture, amount: 1)),
+            ],
+        ),
+        (
+            id: "core:belief/pantheon/dance-of-the-aurora",
+            name: "Dance of the Aurora",
+            category: Some(Pantheon),
+            effects: [
+                (scope: Tile, selector: FollowingCityTiles, condition: TileTerrain("core:terrain/tundra"), modifier: AddYield(yield_kind: Faith, amount: 1)),
+            ],
+        ),
+        (
+            id: "core:belief/pantheon/desert-folklore",
+            name: "Desert Folklore",
+            category: Some(Pantheon),
+            effects: [
+                (scope: Tile, selector: FollowingCityTiles, condition: TileTerrain("core:terrain/desert"), modifier: AddYield(yield_kind: Faith, amount: 1)),
+            ],
+        ),
+        (
+            id: "core:belief/pantheon/earth-mother",
+            name: "Earth Mother",
+            category: Some(Pantheon),
+            effects: [
+                (scope: Tile, selector: FollowingCityTiles, condition: TileResource("core:resource/copper"), modifier: AddYield(yield_kind: Faith, amount: 1)),
+                (scope: Tile, selector: FollowingCityTiles, condition: TileResource("core:resource/iron"), modifier: AddYield(yield_kind: Faith, amount: 1)),
+                (scope: Tile, selector: FollowingCityTiles, condition: TileResource("core:resource/salt"), modifier: AddYield(yield_kind: Faith, amount: 1)),
+            ],
+        ),
+        (
+            id: "core:belief/pantheon/faith-healers",
+            name: "Faith Healers",
+            category: Some(Pantheon),
+            effects: [
+                (scope: Unit, selector: OwnerUnits, condition: NearFollowingCity(Own), modifier: ModifyUnitStat(stat: HealFriendlyLand, amount: 30)),
+            ],
+        ),
+        (
+            id: "core:belief/pantheon/fertility-rites",
+            name: "Fertility Rites",
+            category: Some(Pantheon),
+            effects: [
+                (scope: City, selector: FollowingCities, modifier: ModifyGrowth(percent: 10)),
+            ],
+        ),
+        (
+            id: "core:belief/pantheon/god-king",
+            name: "God-King",
+            category: Some(Pantheon),
+            effects: [
+                (scope: City, selector: FollowingCities, condition: HasBuilding("core:building/palace"), modifier: AddYield(yield_kind: Culture, amount: 1)),
+                (scope: City, selector: FollowingCities, condition: HasBuilding("core:building/palace"), modifier: AddYield(yield_kind: Faith, amount: 1)),
+                (scope: City, selector: FollowingCities, condition: HasBuilding("core:building/palace"), modifier: AddYield(yield_kind: Gold, amount: 1)),
+                (scope: City, selector: FollowingCities, condition: HasBuilding("core:building/palace"), modifier: AddYield(yield_kind: Production, amount: 1)),
+                (scope: City, selector: FollowingCities, condition: HasBuilding("core:building/palace"), modifier: AddYield(yield_kind: Science, amount: 1)),
+            ],
+        ),
+        (
+            id: "core:belief/pantheon/god-of-craftsmen",
+            name: "God of Craftsmen",
+            category: Some(Pantheon),
+            effects: [
+                (scope: City, selector: FollowingCities, condition: MinPopulation(3), modifier: AddYield(yield_kind: Production, amount: 1)),
+            ],
+        ),
+        (
+            id: "core:belief/pantheon/god-of-the-open-sky",
+            name: "God of the Open Sky",
+            category: Some(Pantheon),
+            effects: [
+                (scope: Tile, selector: FollowingCityTiles, condition: TileImprovement("core:improvement/pasture"), modifier: AddYield(yield_kind: Culture, amount: 1)),
+            ],
+        ),
+        (
+            id: "core:belief/pantheon/god-of-the-sea",
+            name: "God of the Sea",
+            category: Some(Pantheon),
+            effects: [
+                (scope: Tile, selector: FollowingCityTiles, condition: TileImprovement("core:improvement/fishing-boats"), modifier: AddYield(yield_kind: Production, amount: 1)),
+            ],
+        ),
+        (
+            id: "core:belief/pantheon/god-of-war",
+            name: "God of War",
+            category: Some(Pantheon),
+            effects: [
+                (scope: Player, selector: Owner, condition: EventNearSourceCity(4), trigger: OnUnitKilled, modifier: YieldFromKill(yield_kind: Faith, percent: 50), duration: Once),
+            ],
+        ),
+        (
+            id: "core:belief/pantheon/goddess-of-festivals",
+            name: "Goddess of Festivals",
+            category: Some(Pantheon),
+            effects: [
+                (scope: Tile, selector: FollowingCityTiles, condition: TileResource("core:resource/wine"), modifier: AddYield(yield_kind: Faith, amount: 1)),
+                (scope: Tile, selector: FollowingCityTiles, condition: TileResource("core:resource/wine"), modifier: AddYield(yield_kind: Culture, amount: 1)),
+                (scope: Tile, selector: FollowingCityTiles, condition: TileResource("core:resource/incense"), modifier: AddYield(yield_kind: Faith, amount: 1)),
+                (scope: Tile, selector: FollowingCityTiles, condition: TileResource("core:resource/incense"), modifier: AddYield(yield_kind: Culture, amount: 1)),
+            ],
+        ),
+        (
+            id: "core:belief/pantheon/goddess-of-love",
+            name: "Goddess of Love",
+            category: Some(Pantheon),
+            effects: [
+                (scope: City, selector: FollowingCities, condition: MinPopulation(6), modifier: AddHappiness(amount: 1)),
+            ],
+        ),
+        (
+            id: "core:belief/pantheon/goddess-of-protection",
+            name: "Goddess of Protection",
+            category: Some(Pantheon),
+            effects: [
+                (scope: City, selector: FollowingCities, modifier: ModifyCityCombat(stat: RangedStrikePercent, amount: 30)),
+            ],
+        ),
+        (
+            id: "core:belief/pantheon/goddess-of-the-hunt",
+            name: "Goddess of the Hunt",
+            category: Some(Pantheon),
+            effects: [
+                (scope: Tile, selector: FollowingCityTiles, condition: TileImprovement("core:improvement/camp"), modifier: AddYield(yield_kind: Food, amount: 1)),
+            ],
+        ),
+        (
+            id: "core:belief/pantheon/messenger-of-the-gods",
+            name: "Messenger of the Gods",
+            category: Some(Pantheon),
+            effects: [
+                (scope: City, selector: FollowingCities, condition: ConnectedToCapital, modifier: AddYield(yield_kind: Science, amount: 2)),
+            ],
+        ),
+        (
+            id: "core:belief/pantheon/monument-to-the-gods",
+            name: "Monument to the Gods",
+            category: Some(Pantheon),
+            effects: [
+                (scope: City, selector: FollowingCities, condition: Producing(WorldWonders(before_era: Some("core:era/medieval"))), modifier: AddYieldPercent(yield_kind: Production, percent: 15)),
+            ],
+        ),
+        (
+            id: "core:belief/pantheon/one-with-nature",
+            name: "One with Nature",
+            category: Some(Pantheon),
+            effects: [
+                (scope: Tile, selector: FollowingCityTiles, condition: TilePlot(NaturalWonder), modifier: AddYield(yield_kind: Faith, amount: 4)),
+            ],
+        ),
+        (
+            id: "core:belief/pantheon/oral-tradition",
+            name: "Oral Tradition",
+            category: Some(Pantheon),
+            effects: [
+                (scope: Tile, selector: FollowingCityTiles, condition: TileImprovement("core:improvement/plantation"), modifier: AddYield(yield_kind: Culture, amount: 1)),
+            ],
+        ),
+        (
+            id: "core:belief/pantheon/religious-idols",
+            name: "Religious Idols",
+            category: Some(Pantheon),
+            effects: [
+                (scope: Tile, selector: FollowingCityTiles, condition: TileResource("core:resource/gold"), modifier: AddYield(yield_kind: Faith, amount: 1)),
+                (scope: Tile, selector: FollowingCityTiles, condition: TileResource("core:resource/gold"), modifier: AddYield(yield_kind: Culture, amount: 1)),
+                (scope: Tile, selector: FollowingCityTiles, condition: TileResource("core:resource/silver"), modifier: AddYield(yield_kind: Faith, amount: 1)),
+                (scope: Tile, selector: FollowingCityTiles, condition: TileResource("core:resource/silver"), modifier: AddYield(yield_kind: Culture, amount: 1)),
+            ],
+        ),
+        (
+            id: "core:belief/pantheon/religious-settlements",
+            name: "Religious Settlements",
+            category: Some(Pantheon),
+            effects: [
+                (scope: City, selector: FollowingCities, modifier: ModifyCost(target: BorderGrowth, percent: -15)),
+            ],
+        ),
+        (
+            id: "core:belief/pantheon/sacred-path",
+            name: "Sacred Path",
+            category: Some(Pantheon),
+            effects: [
+                (scope: Tile, selector: FollowingCityTiles, condition: TileFeature("core:feature/jungle"), modifier: AddYield(yield_kind: Culture, amount: 1)),
+            ],
+        ),
+        (
+            id: "core:belief/pantheon/sacred-waters",
+            name: "Sacred Waters",
+            category: Some(Pantheon),
+            effects: [
+                (scope: City, selector: FollowingCities, condition: CityOnRiver, modifier: AddHappiness(amount: 1)),
+            ],
+        ),
+        (
+            id: "core:belief/pantheon/stone-circles",
+            name: "Stone Circles",
+            category: Some(Pantheon),
+            effects: [
+                (scope: Tile, selector: FollowingCityTiles, condition: TileImprovement("core:improvement/quarry"), modifier: AddYield(yield_kind: Faith, amount: 2)),
+            ],
+        ),
+        (
+            id: "core:belief/pantheon/sun-god",
+            name: "Sun God",
+            category: Some(Pantheon),
+            effects: [
+                (scope: Tile, selector: FollowingCityTiles, condition: TileResource("core:resource/bananas"), modifier: AddYield(yield_kind: Food, amount: 1)),
+                (scope: Tile, selector: FollowingCityTiles, condition: TileResource("core:resource/citrus"), modifier: AddYield(yield_kind: Food, amount: 1)),
+                (scope: Tile, selector: FollowingCityTiles, condition: TileResource("core:resource/wheat"), modifier: AddYield(yield_kind: Food, amount: 1)),
+            ],
+        ),
+        (
+            id: "core:belief/pantheon/tears-of-the-gods",
+            name: "Tears of the Gods",
+            category: Some(Pantheon),
+            effects: [
+                (scope: Tile, selector: FollowingCityTiles, condition: TileResource("core:resource/pearls"), modifier: AddYield(yield_kind: Faith, amount: 2)),
+                (scope: Tile, selector: FollowingCityTiles, condition: TileResource("core:resource/gems"), modifier: AddYield(yield_kind: Faith, amount: 2)),
+            ],
+        ),
+        (
+            id: "core:belief/reformation/charitable-missions",
+            name: "Charitable Missions",
+            category: Some(Reformation),
+            effects: [
+                (scope: Player, selector: Founder, modifier: ModifyCityState(stat: GoldGiftPercent, amount: 30)),
+            ],
+        ),
+        (
+            id: "core:belief/reformation/evangelism",
+            name: "Evangelism",
+            category: Some(Reformation),
+            effects: [
+                (scope: Religion, selector: OwnReligion, modifier: ModifyReligion(stat: OtherReligionErosion, percent: 100)),
+            ],
+        ),
+        (
+            id: "core:belief/reformation/heathen-conversion",
+            name: "Heathen Conversion",
+            category: Some(Reformation),
+            effects: [
+                (scope: Religion, selector: OwnReligion, modifier: GrantReligionAbility(ConvertsBarbarians)),
+            ],
+        ),
+        (
+            id: "core:belief/reformation/jesuit-education",
+            name: "Jesuit Education",
+            category: Some(Reformation),
+            effects: [
+                (scope: City, selector: FollowingCities, modifier: UnlockFaithBuilding("core:building/university")),
+                (scope: City, selector: FollowingCities, modifier: UnlockFaithBuilding("core:building/public_school")),
+                (scope: City, selector: FollowingCities, modifier: UnlockFaithBuilding("core:building/research_lab")),
+            ],
+        ),
+        (
+            id: "core:belief/reformation/religious-fervor",
+            name: "Religious Fervor",
+            category: Some(Reformation),
+            effects: [
+                (scope: City, selector: FollowingCities, modifier: UnlockFaithUnits("core:era/industrial")),
+                (scope: City, selector: FollowingCities, modifier: UnlockFaithUnits("core:era/modern")),
+                (scope: City, selector: FollowingCities, modifier: UnlockFaithUnits("core:era/atomic")),
+                (scope: City, selector: FollowingCities, modifier: UnlockFaithUnits("core:era/information")),
+            ],
+        ),
+        (
+            id: "core:belief/reformation/sacred-sites",
+            name: "Sacred Sites",
+            category: Some(Reformation),
+            effects: [
+                (scope: City, selector: FollowingCities, modifier: ModifyTourism(stat: PerFaithBuilding, amount: 2)),
+            ],
+        ),
+        (
+            id: "core:belief/reformation/to-the-glory-of-god",
+            name: "To the Glory of God",
+            category: Some(Reformation),
+            effects: [
+                (scope: Religion, selector: OwnReligion, modifier: GrantReligionAbility(FaithPurchaseAllGreatPeople)),
+            ],
+        ),
+        (
+            id: "core:belief/reformation/underground-sect",
+            name: "Underground Sect",
+            category: Some(Reformation),
+            effects: [
+                (scope: Player, selector: Founder, modifier: AddStat(stat: Espionage(SpyPressure), amount: 5)),
+            ],
+        ),
+        (
+            id: "core:belief/reformation/unity-of-the-prophets",
+            name: "Unity of the Prophets",
+            category: Some(Reformation),
+            effects: [
+                (scope: Religion, selector: OwnReligion, modifier: ModifyReligion(stat: PressureRetention, percent: 50)),
+            ],
+        ),
+    ],
+)

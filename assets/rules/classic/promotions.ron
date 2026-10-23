@@ -1,0 +1,1974 @@
+// Civ 5 inspired rule set (Unciv Gods & Kings ruleset plus own extensions); generated, do not edit.
+// Derived from Unciv (https://github.com/yairm210/Unciv), MPL-2.0, where the entry says `unciv:`
+// in classic/docs/classic/*.json (see classic/docs/classic/UNCIV-ATTRIBUTION.md); other values are own, unverified.
+// Source: classic/docs/classic/*.json (made by classic/tools/import-unciv.py). Regenerate:
+//   cargo run --release --offline -p classic-content --features importer --bin classic-import
+// Inert effects need a mechanic the engine does not have yet: classic/docs/classic/implemented.md.
+(
+    promotions: [
+        (
+            id: "core:promotion/accuracy-1",
+            name: "Accuracy I",
+            choosable: true,
+            unit_roles: [Archer, Siege],
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyCombat(context: RangedAttackOpen, percent: 15)),
+            ],
+        ),
+        (
+            id: "core:promotion/accuracy-2",
+            name: "Accuracy II",
+            requires_any_of: ["core:promotion/accuracy-1"],
+            choosable: true,
+            unit_roles: [Archer, Siege],
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyCombat(context: RangedAttackOpen, percent: 15)),
+            ],
+        ),
+        (
+            id: "core:promotion/accuracy-3",
+            name: "Accuracy III",
+            requires_any_of: ["core:promotion/accuracy-2"],
+            choosable: true,
+            unit_roles: [Archer, Siege],
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyCombat(context: RangedAttackOpen, percent: 15)),
+            ],
+        ),
+        (
+            id: "core:promotion/adjacent-bonus",
+            name: "Discipline",
+            unit_roles: [Recon, Mounted, Melee, Gun, Armor, Helicopter, NavalMelee, Submarine],
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyCombat(context: AdjacentFriendly, percent: 15)),
+            ],
+        ),
+        (
+            id: "core:promotion/air-ambush-1",
+            name: "Air Ambush I",
+            requires_any_of: ["core:promotion/interception-1", "core:promotion/dogfighting-1", "core:promotion/air-siege-1", "core:promotion/bombardment-1"],
+            choosable: true,
+            unit_roles: [Fighter, Bomber],
+            effects: [
+                (scope: Unit, selector: SourceUnit, condition: OpponentRole(Armor), modifier: ModifyCombat(context: Any, percent: 33)),
+            ],
+        ),
+        (
+            id: "core:promotion/air-ambush-2",
+            name: "Air Ambush II",
+            requires_any_of: ["core:promotion/air-ambush-1"],
+            choosable: true,
+            unit_roles: [Fighter, Bomber],
+            effects: [
+                (scope: Unit, selector: SourceUnit, condition: OpponentRole(Armor), modifier: ModifyCombat(context: Any, percent: 33)),
+            ],
+        ),
+        (
+            id: "core:promotion/air-logistics",
+            name: "Logistics",
+            requires_any_of: ["core:promotion/air-siege-3", "core:promotion/bombardment-3", "core:promotion/heli-ambush-2", "core:promotion/heli-mobility-2"],
+            choosable: true,
+            unit_roles: [Bomber, Helicopter],
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: GrantAbility(MoveAfterAttacking)),
+                (scope: Unit, selector: SourceUnit, modifier: ModifyUnitStat(stat: AttacksPerTurn, amount: 1)),
+            ],
+        ),
+        (
+            id: "core:promotion/air-range",
+            name: "Range",
+            requires_any_of: ["core:promotion/interception-1", "core:promotion/dogfighting-1", "core:promotion/air-siege-1", "core:promotion/bombardment-1"],
+            choosable: true,
+            unit_roles: [Fighter, Bomber],
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyUnitStat(stat: Range, amount: 2)),
+            ],
+        ),
+        (
+            id: "core:promotion/air-recon",
+            name: "Air Recon",
+            choosable: true,
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyUnitStat(stat: Sight, amount: 4)),
+            ],
+        ),
+        (
+            id: "core:promotion/air-repair",
+            name: "Air Repair",
+            requires_any_of: ["core:promotion/interception-2", "core:promotion/dogfighting-2", "core:promotion/air-siege-2", "core:promotion/bombardment-2"],
+            choosable: true,
+            unit_roles: [Fighter, Bomber],
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: GrantAbility(AlwaysHeal)),
+            ],
+        ),
+        (
+            id: "core:promotion/air-siege-1",
+            name: "Siege I",
+            choosable: true,
+            unit_roles: [Bomber],
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyCombat(context: VsCity, percent: 33)),
+            ],
+        ),
+        (
+            id: "core:promotion/air-siege-2",
+            name: "Siege II",
+            requires_any_of: ["core:promotion/air-siege-1"],
+            choosable: true,
+            unit_roles: [Bomber],
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyCombat(context: VsCity, percent: 33)),
+            ],
+        ),
+        (
+            id: "core:promotion/air-siege-3",
+            name: "Siege III",
+            requires_any_of: ["core:promotion/air-siege-2"],
+            choosable: true,
+            unit_roles: [Bomber],
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyCombat(context: VsCity, percent: 34)),
+            ],
+        ),
+        (
+            id: "core:promotion/air-sweep",
+            name: "Air Sweep",
+            choosable: true,
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: GrantAbility(AirSweep)),
+            ],
+        ),
+        (
+            id: "core:promotion/air-targeting-1",
+            name: "Air Targetting I",
+            requires_any_of: ["core:promotion/interception-1", "core:promotion/dogfighting-1", "core:promotion/air-siege-1", "core:promotion/bombardment-1"],
+            choosable: true,
+            unit_roles: [Fighter, Bomber],
+            effects: [
+                (scope: Unit, selector: SourceUnit, condition: OpponentDomain(Sea), modifier: ModifyCombat(context: Any, percent: 33)),
+            ],
+        ),
+        (
+            id: "core:promotion/air-targeting-2",
+            name: "Air Targetting II",
+            requires_any_of: ["core:promotion/air-targeting-1"],
+            choosable: true,
+            unit_roles: [Fighter, Bomber],
+            effects: [
+                (scope: Unit, selector: SourceUnit, condition: OpponentDomain(Sea), modifier: ModifyCombat(context: Any, percent: 33)),
+            ],
+        ),
+        (
+            id: "core:promotion/allwater-embarkation",
+            name: "Embarkation with Ocean Movement",
+            unit_roles: [Recon, Archer, Mounted, Melee, Siege, Gun, Armor, Helicopter],
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: GrantAbility(Embarkation)),
+                (scope: Unit, selector: SourceUnit, modifier: GrantAbility(EmbarkedAllWater)),
+                (scope: Unit, selector: SourceUnit, modifier: ModifyUnitStat(stat: EmbarkedSight, amount: 2)),
+            ],
+        ),
+        (
+            id: "core:promotion/altitude-training",
+            name: "Altitude Training",
+            unit_roles: [Recon, Mounted, Melee, Gun, Armor, Archer, Siege],
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: GrantAbility(HillsDoubleMove)),
+                (scope: Unit, selector: SourceUnit, condition: TileTerrain("core:terrain/hill"), modifier: ModifyCombat(context: Attack, percent: 10)),
+                (scope: Unit, selector: SourceUnit, condition: TileTerrain("core:terrain/hill"), modifier: ModifyCombat(context: Defense, percent: 10)),
+            ],
+        ),
+        (
+            id: "core:promotion/ambition",
+            name: "Ambition",
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyCombat(context: AttackOpen, percent: 50)),
+                (scope: Unit, selector: SourceUnit, modifier: ModifyCombat(context: AttackRough, percent: 50)),
+                (scope: Unit, selector: SourceUnit, modifier: ModifyCombat(context: DefenseOpen, percent: -20)),
+                (scope: Unit, selector: SourceUnit, modifier: ModifyCombat(context: DefenseRough, percent: -20)),
+            ],
+        ),
+        (
+            id: "core:promotion/ambush-1",
+            name: "Ambush I",
+            requires_any_of: ["core:promotion/shock-2", "core:promotion/drill-2"],
+            choosable: true,
+            required_tech: Some("core:tech/combustion"),
+            unit_roles: [Melee, Gun],
+            effects: [
+                (scope: Unit, selector: SourceUnit, condition: OpponentRole(Armor), modifier: ModifyCombat(context: Any, percent: 33)),
+            ],
+        ),
+        (
+            id: "core:promotion/ambush-2",
+            name: "Ambush II",
+            requires_any_of: ["core:promotion/ambush-1"],
+            choosable: true,
+            required_tech: Some("core:tech/combustion"),
+            effects: [
+                (scope: Unit, selector: SourceUnit, condition: OpponentRole(Armor), modifier: ModifyCombat(context: Any, percent: 33)),
+            ],
+        ),
+        (
+            id: "core:promotion/amphibious",
+            name: "Amphibious",
+            requires_any_of: ["core:promotion/shock-1", "core:promotion/drill-1"],
+            choosable: true,
+            unit_roles: [Melee, Gun],
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: GrantAbility(Amphibious)),
+            ],
+        ),
+        (
+            id: "core:promotion/anti-air",
+            name: "Bonus vs Aircraft/Helicopters (150)",
+            choosable: true,
+            effects: [
+                (scope: Unit, selector: SourceUnit, condition: OpponentRole(Fighter), modifier: ModifyCombat(context: Any, percent: 150)),
+                (scope: Unit, selector: SourceUnit, condition: OpponentRole(Bomber), modifier: ModifyCombat(context: Any, percent: 150)),
+                (scope: Unit, selector: SourceUnit, condition: OpponentRole(Helicopter), modifier: ModifyCombat(context: Any, percent: 150)),
+            ],
+        ),
+        (
+            id: "core:promotion/anti-air-ii",
+            name: "Bonus vs Bombers/Helicopters (150)",
+            choosable: true,
+            effects: [
+                (scope: Unit, selector: SourceUnit, condition: OpponentRole(Bomber), modifier: ModifyCombat(context: Any, percent: 150)),
+                (scope: Unit, selector: SourceUnit, condition: OpponentRole(Helicopter), modifier: ModifyCombat(context: Any, percent: 150)),
+            ],
+        ),
+        (
+            id: "core:promotion/anti-fighter",
+            name: "Bonus vs Fighters (33)",
+            choosable: true,
+            effects: [
+                (scope: Unit, selector: SourceUnit, condition: OpponentClassOf("core:unit/triplane"), modifier: ModifyCombat(context: Any, percent: 33)),
+                (scope: Unit, selector: SourceUnit, condition: OpponentClassOf("core:unit/fighter"), modifier: ModifyCombat(context: Any, percent: 33)),
+            ],
+        ),
+        (
+            id: "core:promotion/anti-gunpowder",
+            name: "Spear Throw",
+            lost_with_upgrade: true,
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: GrantAbility(RangedSupportFire)),
+                (scope: Unit, selector: SourceUnit, condition: OpponentRole(Gun), modifier: ModifyCombat(context: Any, percent: 25)),
+            ],
+        ),
+        (
+            id: "core:promotion/anti-helicopter",
+            name: "Bonus vs Helicopters",
+            choosable: true,
+            effects: [
+                (scope: Unit, selector: SourceUnit, condition: OpponentRole(Helicopter), modifier: ModifyCombat(context: Any, percent: 100)),
+            ],
+        ),
+        (
+            id: "core:promotion/anti-mounted-i",
+            name: "Bonus vs Mounted (50)",
+            choosable: true,
+            lost_with_upgrade: true,
+            effects: [
+                (scope: Unit, selector: SourceUnit, condition: OpponentRole(Mounted), modifier: ModifyCombat(context: Any, percent: 50)),
+            ],
+        ),
+        (
+            id: "core:promotion/anti-mounted-ii",
+            name: "Bonus vs Mounted (100)",
+            choosable: true,
+            lost_with_upgrade: true,
+            effects: [
+                (scope: Unit, selector: SourceUnit, condition: OpponentRole(Mounted), modifier: ModifyCombat(context: Any, percent: 100)),
+            ],
+        ),
+        (
+            id: "core:promotion/anti-submarine-i",
+            name: "Attack vs Submarines (33)",
+            choosable: true,
+            effects: [
+                (scope: Unit, selector: SourceUnit, condition: OpponentClassOf("core:unit/submarine"), modifier: ModifyCombat(context: Attack, percent: 33)),
+                (scope: Unit, selector: SourceUnit, condition: OpponentClassOf("core:unit/nuclear-submarine"), modifier: ModifyCombat(context: Attack, percent: 33)),
+            ],
+        ),
+        (
+            id: "core:promotion/anti-submarine-ii",
+            name: "Attack vs Submarines (100)",
+            choosable: true,
+            effects: [
+                (scope: Unit, selector: SourceUnit, condition: OpponentClassOf("core:unit/submarine"), modifier: ModifyCombat(context: Attack, percent: 100)),
+                (scope: Unit, selector: SourceUnit, condition: OpponentClassOf("core:unit/nuclear-submarine"), modifier: ModifyCombat(context: Attack, percent: 100)),
+            ],
+        ),
+        (
+            id: "core:promotion/anti-tank",
+            name: "Bonus vs Tanks (100)",
+            choosable: true,
+            effects: [
+                (scope: Unit, selector: SourceUnit, condition: OpponentRole(Armor), modifier: ModifyCombat(context: Any, percent: 100)),
+            ],
+        ),
+        (
+            id: "core:promotion/armor-plating-1",
+            name: "Armor Plating I",
+            choosable: true,
+            unit_roles: [Carrier],
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyCombat(context: Defense, percent: 25)),
+            ],
+        ),
+        (
+            id: "core:promotion/armor-plating-2",
+            name: "Armor Plating II",
+            requires: ["core:promotion/armor-plating-1"],
+            choosable: true,
+            unit_roles: [Carrier],
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyCombat(context: Defense, percent: 25)),
+            ],
+        ),
+        (
+            id: "core:promotion/armor-plating-3",
+            name: "Armor Plating III",
+            requires: ["core:promotion/armor-plating-2"],
+            choosable: true,
+            unit_roles: [Carrier],
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyCombat(context: Defense, percent: 25)),
+            ],
+        ),
+        (
+            id: "core:promotion/attack-bonus",
+            name: "Combat Bonus When Attacking (25)",
+            choosable: true,
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyCombat(context: Attack, percent: 25)),
+            ],
+        ),
+        (
+            id: "core:promotion/barrage-1",
+            name: "Barrage I",
+            choosable: true,
+            unit_roles: [Archer, Siege],
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyCombat(context: RangedAttackRough, percent: 15)),
+            ],
+        ),
+        (
+            id: "core:promotion/barrage-2",
+            name: "Barrage II",
+            requires_any_of: ["core:promotion/barrage-1"],
+            choosable: true,
+            unit_roles: [Archer, Siege],
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyCombat(context: RangedAttackRough, percent: 15)),
+            ],
+        ),
+        (
+            id: "core:promotion/barrage-3",
+            name: "Barrage III",
+            requires_any_of: ["core:promotion/barrage-2"],
+            choosable: true,
+            unit_roles: [Archer, Siege],
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyCombat(context: RangedAttackRough, percent: 15)),
+            ],
+        ),
+        (
+            id: "core:promotion/blitz",
+            name: "Blitz",
+            requires_any_of: ["core:promotion/shock-3", "core:promotion/drill-3"],
+            choosable: true,
+            unit_roles: [Melee, Gun, Armor, Mounted],
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: GrantAbility(MoveAfterAttacking)),
+                (scope: Unit, selector: SourceUnit, modifier: ModifyUnitStat(stat: AttacksPerTurn, amount: 1)),
+            ],
+        ),
+        (
+            id: "core:promotion/boarding-party-1",
+            name: "Boarding Party I",
+            choosable: true,
+            unit_roles: [NavalMelee],
+            effects: [
+                (scope: Unit, selector: SourceUnit, condition: OpponentDomain(Sea), modifier: ModifyCombat(context: Any, percent: 15)),
+            ],
+        ),
+        (
+            id: "core:promotion/boarding-party-2",
+            name: "Boarding Party II",
+            requires_any_of: ["core:promotion/boarding-party-1"],
+            choosable: true,
+            unit_roles: [NavalMelee],
+            effects: [
+                (scope: Unit, selector: SourceUnit, condition: OpponentDomain(Sea), modifier: ModifyCombat(context: Any, percent: 15)),
+            ],
+        ),
+        (
+            id: "core:promotion/boarding-party-3",
+            name: "Boarding Party III",
+            requires_any_of: ["core:promotion/boarding-party-2"],
+            choosable: true,
+            unit_roles: [NavalMelee],
+            effects: [
+                (scope: Unit, selector: SourceUnit, condition: OpponentDomain(Sea), modifier: ModifyCombat(context: Any, percent: 15)),
+            ],
+        ),
+        (
+            id: "core:promotion/bombardment-1",
+            name: "Bombardment I",
+            choosable: true,
+            unit_roles: [NavalRanged, Bomber],
+            effects: [
+                (scope: Unit, selector: SourceUnit, condition: OpponentDomain(Land), modifier: ModifyCombat(context: Any, percent: 33)),
+            ],
+        ),
+        (
+            id: "core:promotion/bombardment-2",
+            name: "Bombardment II",
+            requires_any_of: ["core:promotion/bombardment-1"],
+            choosable: true,
+            unit_roles: [NavalRanged, Bomber],
+            effects: [
+                (scope: Unit, selector: SourceUnit, condition: OpponentDomain(Land), modifier: ModifyCombat(context: Any, percent: 33)),
+            ],
+        ),
+        (
+            id: "core:promotion/bombardment-3",
+            name: "Bombardment III",
+            requires_any_of: ["core:promotion/bombardment-2"],
+            choosable: true,
+            unit_roles: [NavalRanged, Bomber],
+            effects: [
+                (scope: Unit, selector: SourceUnit, condition: OpponentDomain(Land), modifier: ModifyCombat(context: Any, percent: 34)),
+            ],
+        ),
+        (
+            id: "core:promotion/buffalo-chest",
+            name: "Buffalo Chest",
+            requires: ["core:promotion/buffalo-horns"],
+            choosable: true,
+            unit_roles: [Melee],
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyCombat(context: AttackOpen, percent: 10)),
+                (scope: Unit, selector: SourceUnit, modifier: ModifyCombat(context: DefenseOpen, percent: 10)),
+                (scope: Unit, selector: SourceUnit, modifier: ModifyCombat(context: Flanking, percent: 25)),
+                (scope: Unit, selector: SourceUnit, modifier: ModifyCombat(context: DefenseVsRanged, percent: 10)),
+            ],
+        ),
+        (
+            id: "core:promotion/buffalo-horns",
+            name: "Buffalo Horns",
+            unit_roles: [Melee],
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyCombat(context: Flanking, percent: 25)),
+                (scope: Unit, selector: SourceUnit, modifier: ModifyMovement(amount: 1)),
+                (scope: Unit, selector: SourceUnit, modifier: ModifyCombat(context: DefenseVsRanged, percent: 10)),
+            ],
+        ),
+        (
+            id: "core:promotion/buffalo-loins",
+            name: "Buffalo Loins",
+            requires: ["core:promotion/buffalo-chest"],
+            choosable: true,
+            unit_roles: [Melee],
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyCombat(context: AttackOpen, percent: 10)),
+                (scope: Unit, selector: SourceUnit, modifier: ModifyCombat(context: DefenseOpen, percent: 10)),
+                (scope: Unit, selector: SourceUnit, modifier: ModifyCombat(context: DefenseRough, percent: 10)),
+                (scope: Unit, selector: SourceUnit, modifier: ModifyCombat(context: AttackRough, percent: 10)),
+                (scope: Unit, selector: SourceUnit, modifier: ModifyCombat(context: Flanking, percent: 25)),
+                (scope: Unit, selector: SourceUnit, modifier: ModifyCombat(context: DefenseVsRanged, percent: 10)),
+            ],
+        ),
+        (
+            id: "core:promotion/can-move-after-attacking",
+            name: "Can Move After Attacking",
+            choosable: true,
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: GrantAbility(MoveAfterAttacking)),
+            ],
+        ),
+        (
+            id: "core:promotion/can-move-impassable",
+            name: "May Enter Ice Tiles",
+            choosable: true,
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: GrantAbility(MoveImpassable)),
+            ],
+        ),
+        (
+            id: "core:promotion/cargo-i",
+            name: "Can Carry 1 Cargo",
+            choosable: true,
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyUnitStat(stat: Cargo, amount: 1)),
+            ],
+        ),
+        (
+            id: "core:promotion/cargo-ii",
+            name: "Can Carry 2 Cargo",
+            choosable: true,
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyUnitStat(stat: Cargo, amount: 2)),
+            ],
+        ),
+        (
+            id: "core:promotion/cargo-iii",
+            name: "Can Carry 3 Cargo",
+            choosable: true,
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyUnitStat(stat: Cargo, amount: 3)),
+            ],
+        ),
+        (
+            id: "core:promotion/cargo-iv",
+            name: "Can Carry 4 Cargo",
+            choosable: true,
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyUnitStat(stat: Cargo, amount: 4)),
+            ],
+        ),
+        (
+            id: "core:promotion/charge",
+            name: "Charge",
+            requires_any_of: ["core:promotion/shock-2", "core:promotion/drill-2"],
+            choosable: true,
+            unit_roles: [Mounted, Armor],
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyCombat(context: VsWounded, percent: 33)),
+            ],
+        ),
+        (
+            id: "core:promotion/city-assault",
+            name: "Bonus vs Cities (300)",
+            choosable: true,
+            lost_with_upgrade: true,
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyCombat(context: VsCity, percent: 300)),
+            ],
+        ),
+        (
+            id: "core:promotion/city-penalty",
+            name: "Penalty Attacking Cities (33)",
+            lost_with_upgrade: true,
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyCombat(context: VsCity, percent: -33)),
+            ],
+        ),
+        (
+            id: "core:promotion/city-siege",
+            name: "Bonus vs Cities (200)",
+            choosable: true,
+            lost_with_upgrade: true,
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyCombat(context: VsCity, percent: 200)),
+            ],
+        ),
+        (
+            id: "core:promotion/city-siege-ii",
+            name: "Bonus vs Cities (250)",
+            choosable: true,
+            lost_with_upgrade: true,
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyCombat(context: VsCity, percent: 250)),
+            ],
+        ),
+        (
+            id: "core:promotion/coastal-raider-1",
+            name: "Coastal Raider I",
+            choosable: true,
+            unit_roles: [NavalMelee],
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyCombat(context: VsCity, percent: 20)),
+                (scope: Unit, selector: SourceUnit, modifier: ModifyUnitStat(stat: CityAttackPlunderPercent, amount: 33)),
+            ],
+        ),
+        (
+            id: "core:promotion/coastal-raider-2",
+            name: "Coastal Raider II",
+            requires_any_of: ["core:promotion/coastal-raider-1"],
+            choosable: true,
+            unit_roles: [NavalMelee],
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyCombat(context: VsCity, percent: 20)),
+                (scope: Unit, selector: SourceUnit, modifier: ModifyUnitStat(stat: CityAttackPlunderPercent, amount: 33)),
+            ],
+        ),
+        (
+            id: "core:promotion/coastal-raider-3",
+            name: "Coastal Raider III",
+            requires_any_of: ["core:promotion/coastal-raider-2"],
+            choosable: true,
+            unit_roles: [NavalMelee],
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyCombat(context: VsCity, percent: 20)),
+                (scope: Unit, selector: SourceUnit, modifier: ModifyUnitStat(stat: CityAttackPlunderPercent, amount: 33)),
+            ],
+        ),
+        (
+            id: "core:promotion/cover-1",
+            name: "Cover I",
+            requires_any_of: ["core:promotion/shock-1", "core:promotion/drill-1", "core:promotion/accuracy-1", "core:promotion/barrage-1"],
+            choosable: true,
+            unit_roles: [Melee, Gun, Archer, Siege],
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyCombat(context: DefenseVsRanged, percent: 33)),
+            ],
+        ),
+        (
+            id: "core:promotion/cover-2",
+            name: "Cover II",
+            requires_any_of: ["core:promotion/cover-1"],
+            choosable: true,
+            unit_roles: [Melee, Gun, Archer, Siege],
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyCombat(context: DefenseVsRanged, percent: 33)),
+            ],
+        ),
+        (
+            id: "core:promotion/defend-near-capital",
+            name: "Near Capital Bonus",
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyCombat(context: NearCapital, percent: 30)),
+                (scope: Unit, selector: SourceUnit, modifier: ModifyUnitStat(stat: CapitalDefenseFalloff, amount: -3)),
+            ],
+        ),
+        (
+            id: "core:promotion/defense-penalty",
+            name: "Penalty on Defense (33)",
+            choosable: true,
+            lost_with_upgrade: true,
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyCombat(context: Defense, percent: -33)),
+            ],
+        ),
+        (
+            id: "core:promotion/defensive-embarkation",
+            name: "Embarkation with Defense",
+            required_tech: Some("core:tech/optics"),
+            unit_roles: [Recon, Archer, Mounted, Melee, Siege, Gun, Armor, Helicopter],
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: GrantAbility(Embarkation)),
+                (scope: Unit, selector: SourceUnit, modifier: ModifyCombat(context: EmbarkedDefense, percent: 100)),
+            ],
+        ),
+        (
+            id: "core:promotion/desert-warrior",
+            name: "Desert Warrior",
+            effects: [
+                (scope: Unit, selector: SourceUnit, condition: TileTerrain("core:terrain/desert"), modifier: ModifyCombat(context: Attack, percent: 50)),
+                (scope: Unit, selector: SourceUnit, condition: TileTerrain("core:terrain/desert"), modifier: ModifyCombat(context: Defense, percent: 50)),
+            ],
+        ),
+        (
+            id: "core:promotion/dogfighting-1",
+            name: "Dogfighting I",
+            choosable: true,
+            unit_roles: [Fighter],
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyCombat(context: AirSweep, percent: 33)),
+            ],
+        ),
+        (
+            id: "core:promotion/dogfighting-2",
+            name: "Dogfighting II",
+            requires_any_of: ["core:promotion/dogfighting-1"],
+            choosable: true,
+            unit_roles: [Fighter],
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyCombat(context: AirSweep, percent: 33)),
+            ],
+        ),
+        (
+            id: "core:promotion/dogfighting-3",
+            name: "Dogfighting III",
+            requires_any_of: ["core:promotion/dogfighting-2"],
+            choosable: true,
+            unit_roles: [Fighter],
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyCombat(context: AirSweep, percent: 34)),
+            ],
+        ),
+        (
+            id: "core:promotion/double-plunder",
+            name: "City Plunder",
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyUnitStat(stat: CityAttackPlunderPercent, amount: 100)),
+            ],
+        ),
+        (
+            id: "core:promotion/drill-1",
+            name: "Drill I",
+            choosable: true,
+            unit_roles: [Mounted, Melee, Gun, Armor],
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyCombat(context: AttackRough, percent: 15)),
+                (scope: Unit, selector: SourceUnit, modifier: ModifyCombat(context: DefenseRough, percent: 15)),
+            ],
+        ),
+        (
+            id: "core:promotion/drill-2",
+            name: "Drill II",
+            requires_any_of: ["core:promotion/drill-1"],
+            choosable: true,
+            unit_roles: [Mounted, Melee, Gun, Armor],
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyCombat(context: AttackRough, percent: 15)),
+                (scope: Unit, selector: SourceUnit, modifier: ModifyCombat(context: DefenseRough, percent: 15)),
+            ],
+        ),
+        (
+            id: "core:promotion/drill-3",
+            name: "Drill III",
+            requires_any_of: ["core:promotion/drill-2"],
+            choosable: true,
+            unit_roles: [Mounted, Melee, Gun, Armor],
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyCombat(context: AttackRough, percent: 15)),
+                (scope: Unit, selector: SourceUnit, modifier: ModifyCombat(context: DefenseRough, percent: 15)),
+            ],
+        ),
+        (
+            id: "core:promotion/embarkation",
+            name: "Embarkation",
+            required_tech: Some("core:tech/optics"),
+            unit_roles: [Recon, Archer, Mounted, Melee, Siege, Gun, Armor, Helicopter],
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: GrantAbility(Embarkation)),
+            ],
+        ),
+        (
+            id: "core:promotion/embarked-sight",
+            name: "Extra Sight While Embarked",
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyUnitStat(stat: EmbarkedSight, amount: 1)),
+            ],
+        ),
+        (
+            id: "core:promotion/enemy-blade",
+            name: "Enemy Blade",
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyUnitStat(stat: AdjacentDamageChance, amount: 100)),
+                (scope: Unit, selector: SourceUnit, modifier: ModifyUnitStat(stat: AdjacentDamageOnAttack, amount: 20)),
+            ],
+        ),
+        (
+            id: "core:promotion/evasion",
+            name: "Evasion",
+            requires_any_of: ["core:promotion/air-siege-2", "core:promotion/bombardment-2"],
+            choosable: true,
+            unit_roles: [Bomber],
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyUnitStat(stat: InterceptionDamageTakenPercent, amount: -50)),
+            ],
+        ),
+        (
+            id: "core:promotion/evasion-i",
+            name: "Evasion (50)",
+            choosable: true,
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyUnitStat(stat: EvasionPercent, amount: 50)),
+            ],
+        ),
+        (
+            id: "core:promotion/evasion-ii",
+            name: "Evasion (100)",
+            choosable: true,
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyUnitStat(stat: EvasionPercent, amount: 100)),
+            ],
+        ),
+        (
+            id: "core:promotion/evil-spirits",
+            name: "Evil Spirits",
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyCombat(context: AttackOpen, percent: -10)),
+                (scope: Unit, selector: SourceUnit, modifier: ModifyCombat(context: AttackRough, percent: -10)),
+                (scope: Unit, selector: SourceUnit, modifier: ModifyCombat(context: DefenseOpen, percent: -30)),
+                (scope: Unit, selector: SourceUnit, modifier: ModifyCombat(context: DefenseRough, percent: -30)),
+            ],
+        ),
+        (
+            id: "core:promotion/extended-paradrop",
+            name: "Skyranger",
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyUnitStat(stat: ParadropRange, amount: 40)),
+            ],
+        ),
+        (
+            id: "core:promotion/extra-moves-i",
+            name: "1 Extra Movement",
+            choosable: true,
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyMovement(amount: 1)),
+            ],
+        ),
+        (
+            id: "core:promotion/extra-sight-i",
+            name: "Extra Sight (1)",
+            choosable: true,
+            lost_with_upgrade: true,
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyUnitStat(stat: Sight, amount: 1)),
+            ],
+        ),
+        (
+            id: "core:promotion/extra-sight-ii",
+            name: "Extra Sight (2)",
+            choosable: true,
+            lost_with_upgrade: true,
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyUnitStat(stat: Sight, amount: 2)),
+            ],
+        ),
+        (
+            id: "core:promotion/extra-sight-iii",
+            name: "Extra Sight (3)",
+            choosable: true,
+            lost_with_upgrade: true,
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyUnitStat(stat: Sight, amount: 3)),
+            ],
+        ),
+        (
+            id: "core:promotion/extra-sight-iv",
+            name: "Extra Sight (4)",
+            choosable: true,
+            lost_with_upgrade: true,
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyUnitStat(stat: Sight, amount: 4)),
+            ],
+        ),
+        (
+            id: "core:promotion/fast-admiral",
+            name: "Mobile Admiral",
+            civilian_units: ["core:unit/great-admiral"],
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyMovement(amount: 2)),
+            ],
+        ),
+        (
+            id: "core:promotion/fast-general",
+            name: "Mobile General",
+            civilian_units: ["core:unit/great-general"],
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyMovement(amount: 3)),
+            ],
+        ),
+        (
+            id: "core:promotion/faster-heal",
+            name: "Heals at Double Rate",
+            unit_roles: [Recon, Mounted, Melee, Gun, Armor, Archer, Siege],
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyUnitStat(stat: HealEnemyLand, amount: 10)),
+                (scope: Unit, selector: SourceUnit, modifier: ModifyUnitStat(stat: HealNeutralLand, amount: 10)),
+                (scope: Unit, selector: SourceUnit, modifier: ModifyUnitStat(stat: HealFriendlyLand, amount: 10)),
+            ],
+        ),
+        (
+            id: "core:promotion/feared-elephant",
+            name: "Feared Elephant",
+            lost_with_upgrade: true,
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyUnitStat(stat: EnemyAuraPercent, amount: -10)),
+                (scope: Unit, selector: SourceUnit, modifier: ModifyUnitStat(stat: AuraRange, amount: 1)),
+            ],
+        ),
+        (
+            id: "core:promotion/fire-support",
+            name: "Bonus vs Cities (33)",
+            choosable: true,
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyCombat(context: VsCity, percent: 33)),
+            ],
+        ),
+        (
+            id: "core:promotion/flank-attack-bonus",
+            name: "Enhanced Flank Attack",
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyCombat(context: Flanking, percent: 50)),
+            ],
+        ),
+        (
+            id: "core:promotion/flat-movement-cost",
+            name: "All Tiles Cost 1 Move",
+            choosable: true,
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: GrantAbility(FlatMovementCost)),
+            ],
+        ),
+        (
+            id: "core:promotion/flight-deck-1",
+            name: "Flight Deck I",
+            choosable: true,
+            unit_roles: [Carrier],
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyUnitStat(stat: Cargo, amount: 1)),
+            ],
+        ),
+        (
+            id: "core:promotion/flight-deck-2",
+            name: "Flight Deck II",
+            requires: ["core:promotion/flight-deck-1"],
+            choosable: true,
+            unit_roles: [Carrier],
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyUnitStat(stat: Cargo, amount: 1)),
+            ],
+        ),
+        (
+            id: "core:promotion/flight-deck-3",
+            name: "Flight Deck III",
+            requires: ["core:promotion/flight-deck-2"],
+            choosable: true,
+            unit_roles: [Carrier],
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyUnitStat(stat: Cargo, amount: 1)),
+            ],
+        ),
+        (
+            id: "core:promotion/foliage-impassable",
+            name: "Cannot Enter Forest or Jungle",
+            choosable: true,
+            effects: [
+                (scope: Unit, selector: SourceUnit, condition: TileFeature("core:feature/jungle"), modifier: GrantAbility(Impassable)),
+                (scope: Unit, selector: SourceUnit, condition: TileFeature("core:feature/forest"), modifier: GrantAbility(Impassable)),
+            ],
+        ),
+        (
+            id: "core:promotion/foreign-lands",
+            name: "Foreign Lands Bonus",
+            choosable: true,
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyCombat(context: OutsideFriendlyLand, percent: 20)),
+            ],
+        ),
+        (
+            id: "core:promotion/formation-1",
+            name: "Formation I",
+            requires_any_of: ["core:promotion/shock-2", "core:promotion/drill-2", "core:promotion/accuracy-2", "core:promotion/barrage-2"],
+            choosable: true,
+            unit_roles: [Melee, Gun, Mounted, Armor],
+            effects: [
+                (scope: Unit, selector: SourceUnit, condition: OpponentRole(Mounted), modifier: ModifyCombat(context: Any, percent: 33)),
+            ],
+        ),
+        (
+            id: "core:promotion/formation-2",
+            name: "Formation II",
+            requires_any_of: ["core:promotion/formation-1"],
+            choosable: true,
+            effects: [
+                (scope: Unit, selector: SourceUnit, condition: OpponentRole(Mounted), modifier: ModifyCombat(context: Any, percent: 33)),
+            ],
+        ),
+        (
+            id: "core:promotion/free-pillage-moves",
+            name: "No Movement Cost to Pillage",
+            choosable: true,
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: GrantAbility(FreePillageMoves)),
+            ],
+        ),
+        (
+            id: "core:promotion/gain-experience",
+            name: "Quick Study",
+            choosable: true,
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyUnitStat(stat: ExperiencePercent, amount: 50)),
+            ],
+        ),
+        (
+            id: "core:promotion/general-stacking",
+            name: "Great General Combat Bonus",
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyUnitStat(stat: StackedGeneralPercent, amount: 15)),
+            ],
+        ),
+        (
+            id: "core:promotion/golden-age-points",
+            name: "Golden Age from Victories",
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyUnitStat(stat: GoldenAgePointsOnKillPercent, amount: 100)),
+            ],
+        ),
+        (
+            id: "core:promotion/goody-hut-picker",
+            name: "Native Tongue",
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: GrantAbility(ChoosesRuinsReward)),
+            ],
+        ),
+        (
+            id: "core:promotion/great-admiral",
+            name: "Naval Leadership",
+            choosable: true,
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: GrantAbility(GreatAdmiral)),
+            ],
+        ),
+        (
+            id: "core:promotion/great-general",
+            name: "Leadership",
+            choosable: true,
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: GrantAbility(GreatGeneral)),
+            ],
+        ),
+        (
+            id: "core:promotion/great-lighthouse",
+            name: "Great Lighthouse",
+            unit_roles: [NavalRanged, NavalMelee, Submarine, Carrier],
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyMovement(amount: 1)),
+                (scope: Unit, selector: SourceUnit, modifier: ModifyUnitStat(stat: Sight, amount: 1)),
+            ],
+        ),
+        (
+            id: "core:promotion/haka-war-dance",
+            name: "Haka War Dance",
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyUnitStat(stat: EnemyAuraPercent, amount: -10)),
+                (scope: Unit, selector: SourceUnit, modifier: ModifyUnitStat(stat: AuraRange, amount: 1)),
+            ],
+        ),
+        (
+            id: "core:promotion/heal-if-destroy-enemy",
+            name: "Heal 50 Damage If Kills a Unit",
+            choosable: true,
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyUnitStat(stat: HealOnKill, amount: 50)),
+                (scope: Unit, selector: SourceUnit, modifier: GrantAbility(HealOnKillNotBarbarians)),
+            ],
+        ),
+        (
+            id: "core:promotion/heavy-charge",
+            name: "Heavy Charge",
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: GrantAbility(HeavyCharge)),
+            ],
+        ),
+        (
+            id: "core:promotion/heavy-payload",
+            name: "Bonus vs Cities (50)",
+            choosable: true,
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyCombat(context: VsCity, percent: 50)),
+            ],
+        ),
+        (
+            id: "core:promotion/heli-ambush-1",
+            name: "Bonus vs Armored (25)",
+            choosable: true,
+            unit_roles: [Helicopter],
+            effects: [
+                (scope: Unit, selector: SourceUnit, condition: OpponentRole(Armor), modifier: ModifyCombat(context: Any, percent: 25)),
+            ],
+        ),
+        (
+            id: "core:promotion/heli-ambush-2",
+            name: "Bonus vs Armored (25)",
+            requires_any_of: ["core:promotion/heli-ambush-1"],
+            choosable: true,
+            unit_roles: [Helicopter],
+            effects: [
+                (scope: Unit, selector: SourceUnit, condition: OpponentRole(Armor), modifier: ModifyCombat(context: Any, percent: 25)),
+            ],
+        ),
+        (
+            id: "core:promotion/heli-mobility-1",
+            name: "Mobility I",
+            choosable: true,
+            unit_roles: [Helicopter],
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyMovement(amount: 1)),
+            ],
+        ),
+        (
+            id: "core:promotion/heli-mobility-2",
+            name: "Mobility II",
+            requires_any_of: ["core:promotion/heli-mobility-1"],
+            choosable: true,
+            unit_roles: [Helicopter],
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyMovement(amount: 1)),
+            ],
+        ),
+        (
+            id: "core:promotion/heli-repair",
+            name: "Repair",
+            requires_any_of: ["core:promotion/heli-ambush-2", "core:promotion/heli-mobility-2"],
+            choosable: true,
+            unit_roles: [Helicopter],
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: GrantAbility(AlwaysHeal)),
+            ],
+        ),
+        (
+            id: "core:promotion/heroism",
+            name: "Heroism",
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: GrantAbility(GreatGeneral)),
+            ],
+        ),
+        (
+            id: "core:promotion/himeji-castle",
+            name: "Himeji Castle",
+            unit_roles: [Recon, Archer, Mounted, Melee, Siege, Gun, Armor, Helicopter, NavalRanged, NavalMelee, Submarine],
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyCombat(context: FriendlyLand, percent: 15)),
+            ],
+        ),
+        (
+            id: "core:promotion/homeland-guardian",
+            name: "Homeland Guardian",
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyCombat(context: FriendlyLand, percent: 25)),
+            ],
+        ),
+        (
+            id: "core:promotion/homeland-guardian-boogaloo",
+            name: "Pride of the Ancestors",
+            unit_roles: [Recon, Archer, Mounted, Melee, Siege, Gun, Armor, Helicopter, NavalRanged, NavalMelee, Submarine],
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyCombat(context: FriendlyLand, percent: 15)),
+            ],
+        ),
+        (
+            id: "core:promotion/hovering-unit",
+            name: "Hovering Unit",
+            choosable: true,
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: GrantAbility(MoveImpassable)),
+                (scope: Unit, selector: SourceUnit, modifier: GrantAbility(Hovering)),
+            ],
+        ),
+        (
+            id: "core:promotion/ignore-terrain-cost",
+            name: "Ignores Terrain Cost",
+            choosable: true,
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: GrantAbility(IgnoreTerrainCost)),
+            ],
+        ),
+        (
+            id: "core:promotion/indirect-fire",
+            name: "Indirect Fire",
+            requires_any_of: ["core:promotion/targeting-2", "core:promotion/bombardment-2", "core:promotion/accuracy-3", "core:promotion/barrage-3"],
+            choosable: true,
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: GrantAbility(IndirectFire)),
+            ],
+        ),
+        (
+            id: "core:promotion/insta-heal",
+            name: "Heal Instantly",
+            choosable: true,
+            unit_roles: [Recon, Mounted, Melee, Gun, Armor, Archer, Siege, NavalRanged, NavalMelee, Submarine, Carrier, Fighter, Bomber, Helicopter],
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: GrantAbility(InstaHeal)),
+            ],
+        ),
+        (
+            id: "core:promotion/interception-1",
+            name: "Interception I",
+            choosable: true,
+            unit_roles: [Fighter],
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyCombat(context: Interception, percent: 33)),
+            ],
+        ),
+        (
+            id: "core:promotion/interception-2",
+            name: "Interception II",
+            requires_any_of: ["core:promotion/interception-1"],
+            choosable: true,
+            unit_roles: [Fighter],
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyCombat(context: Interception, percent: 33)),
+            ],
+        ),
+        (
+            id: "core:promotion/interception-3",
+            name: "Interception III",
+            requires_any_of: ["core:promotion/interception-2"],
+            choosable: true,
+            unit_roles: [Fighter],
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyCombat(context: Interception, percent: 34)),
+            ],
+        ),
+        (
+            id: "core:promotion/interception-i",
+            name: "Interception (20)",
+            choosable: true,
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyUnitStat(stat: InterceptChance, amount: 20)),
+            ],
+        ),
+        (
+            id: "core:promotion/interception-ii",
+            name: "Interception (40)",
+            choosable: true,
+            lost_with_upgrade: true,
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyUnitStat(stat: InterceptChance, amount: 40)),
+            ],
+        ),
+        (
+            id: "core:promotion/interception-iii",
+            name: "Interception (50)",
+            choosable: true,
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyUnitStat(stat: InterceptChance, amount: 50)),
+            ],
+        ),
+        (
+            id: "core:promotion/interception-iv",
+            name: "Interception (100)",
+            choosable: true,
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyUnitStat(stat: InterceptChance, amount: 100)),
+            ],
+        ),
+        (
+            id: "core:promotion/invisible-submarine",
+            name: "Is Invisible (Submarine)",
+            choosable: true,
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: GrantAbility(Invisible)),
+            ],
+        ),
+        (
+            id: "core:promotion/invulnerabiility",
+            name: "Invulnerability",
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyCombat(context: DefenseOpen, percent: 30)),
+                (scope: Unit, selector: SourceUnit, modifier: ModifyCombat(context: DefenseRough, percent: 30)),
+                (scope: Unit, selector: SourceUnit, modifier: ModifyUnitStat(stat: HealEnemyLand, amount: 20)),
+                (scope: Unit, selector: SourceUnit, modifier: ModifyUnitStat(stat: HealNeutralLand, amount: 20)),
+                (scope: Unit, selector: SourceUnit, modifier: ModifyUnitStat(stat: HealFriendlyLand, amount: 20)),
+            ],
+        ),
+        (
+            id: "core:promotion/jaguar",
+            name: "Combat Bonus in Forest/Jungle (33)",
+            choosable: true,
+            effects: [
+                (scope: Unit, selector: SourceUnit, condition: TileFeature("core:feature/forest"), modifier: ModifyCombat(context: Attack, percent: 33)),
+                (scope: Unit, selector: SourceUnit, condition: TileFeature("core:feature/forest"), modifier: ModifyCombat(context: Defense, percent: 33)),
+                (scope: Unit, selector: SourceUnit, condition: TileFeature("core:feature/jungle"), modifier: ModifyCombat(context: Attack, percent: 33)),
+                (scope: Unit, selector: SourceUnit, condition: TileFeature("core:feature/jungle"), modifier: ModifyCombat(context: Defense, percent: 33)),
+            ],
+        ),
+        (
+            id: "core:promotion/lightning-warfare",
+            name: "Lightning Warfare",
+            unit_roles: [Armor],
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyMovement(amount: 1)),
+                (scope: Unit, selector: SourceUnit, modifier: ModifyCombat(context: AttackOpen, percent: 15)),
+                (scope: Unit, selector: SourceUnit, modifier: ModifyCombat(context: AttackRough, percent: 15)),
+                (scope: Unit, selector: SourceUnit, modifier: GrantAbility(IgnoreZoneOfControl)),
+            ],
+        ),
+        (
+            id: "core:promotion/logistics",
+            name: "Logistics",
+            requires_any_of: ["core:promotion/accuracy-3", "core:promotion/barrage-3", "core:promotion/targeting-3", "core:promotion/bombardment-3", "core:promotion/coastal-raider-3", "core:promotion/boarding-party-3", "core:promotion/wolfpack-3"],
+            choosable: true,
+            unit_roles: [Archer, Siege, NavalRanged, NavalMelee, Submarine],
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: GrantAbility(MoveAfterAttacking)),
+                (scope: Unit, selector: SourceUnit, modifier: ModifyUnitStat(stat: AttacksPerTurn, amount: 1)),
+            ],
+        ),
+        (
+            id: "core:promotion/march",
+            name: "March",
+            requires_any_of: ["core:promotion/shock-3", "core:promotion/drill-3", "core:promotion/accuracy-2", "core:promotion/barrage-2"],
+            choosable: true,
+            unit_roles: [Melee, Gun, Archer, Siege, Mounted],
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: GrantAbility(AlwaysHeal)),
+            ],
+        ),
+        (
+            id: "core:promotion/medic",
+            name: "Medic",
+            requires_any_of: ["core:promotion/shock-1", "core:promotion/drill-1", "core:promotion/scouting-2", "core:promotion/survivalism-2"],
+            choosable: true,
+            unit_roles: [Recon, Mounted, Melee, Gun],
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyUnitStat(stat: HealAdjacent, amount: 5)),
+            ],
+        ),
+        (
+            id: "core:promotion/medic-general",
+            name: "Enhanced Medic",
+            choosable: true,
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyUnitStat(stat: HealEnemyLand, amount: 15)),
+                (scope: Unit, selector: SourceUnit, modifier: ModifyUnitStat(stat: HealNeutralLand, amount: 15)),
+                (scope: Unit, selector: SourceUnit, modifier: ModifyUnitStat(stat: HealFriendlyLand, amount: 15)),
+                (scope: Unit, selector: SourceUnit, modifier: ModifyUnitStat(stat: HealAdjacent, amount: 15)),
+            ],
+        ),
+        (
+            id: "core:promotion/medic-ii",
+            name: "Medic II",
+            requires_any_of: ["core:promotion/medic"],
+            choosable: true,
+            unit_roles: [Recon, Mounted, Melee, Gun],
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyUnitStat(stat: HealAdjacent, amount: 5)),
+                (scope: Unit, selector: SourceUnit, modifier: ModifyUnitStat(stat: HealEnemyLand, amount: 5)),
+                (scope: Unit, selector: SourceUnit, modifier: ModifyUnitStat(stat: HealNeutralLand, amount: 5)),
+            ],
+        ),
+        (
+            id: "core:promotion/mobility",
+            name: "Mobility",
+            requires_any_of: ["core:promotion/shock-3", "core:promotion/drill-3", "core:promotion/targeting-1", "core:promotion/bombardment-1", "core:promotion/coastal-raider-1", "core:promotion/boarding-party-1", "core:promotion/wolfpack-1", "core:promotion/flight-deck-1", "core:promotion/armor-plating-1"],
+            choosable: true,
+            unit_roles: [Armor, Mounted, NavalRanged, NavalMelee, Submarine, Carrier],
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyMovement(amount: 1)),
+            ],
+        ),
+        (
+            id: "core:promotion/mohawk",
+            name: "Combat Bonus in Forest/Jungle (33)",
+            choosable: true,
+            effects: [
+                (scope: Unit, selector: SourceUnit, condition: TileFeature("core:feature/forest"), modifier: ModifyCombat(context: Attack, percent: 33)),
+                (scope: Unit, selector: SourceUnit, condition: TileFeature("core:feature/forest"), modifier: ModifyCombat(context: Defense, percent: 33)),
+                (scope: Unit, selector: SourceUnit, condition: TileFeature("core:feature/jungle"), modifier: ModifyCombat(context: Attack, percent: 33)),
+                (scope: Unit, selector: SourceUnit, condition: TileFeature("core:feature/jungle"), modifier: ModifyCombat(context: Defense, percent: 33)),
+            ],
+        ),
+        (
+            id: "core:promotion/moon-striker",
+            name: "Full Moon Striker",
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyMovement(amount: 1)),
+            ],
+        ),
+        (
+            id: "core:promotion/morale",
+            name: "Morale",
+            unit_roles: [Recon, Archer, Mounted, Melee, Siege, Gun, Armor, Helicopter, NavalRanged, NavalMelee, Submarine],
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyCombat(context: Any, percent: 15)),
+            ],
+        ),
+        (
+            id: "core:promotion/mounted-penalty",
+            name: "Penalty vs Mounted (33)",
+            choosable: true,
+            lost_with_upgrade: true,
+            effects: [
+                (scope: Unit, selector: SourceUnit, condition: OpponentRole(Mounted), modifier: ModifyCombat(context: Any, percent: -33)),
+            ],
+        ),
+        (
+            id: "core:promotion/movement-to-general",
+            name: "Transfer Movement to General",
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: GrantAbility(LendsMovementToGeneral)),
+            ],
+        ),
+        (
+            id: "core:promotion/must-set-up",
+            name: "Must Set Up to Ranged Attack",
+            choosable: true,
+            lost_with_upgrade: true,
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: GrantAbility(MustSetUp)),
+            ],
+        ),
+        (
+            id: "core:promotion/mystic-blade",
+            name: "Mystic Blade",
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: GrantAbility(PostCombatPromotions)),
+                (scope: Unit, selector: SourceUnit, modifier: PostCombatPromotion("core:promotion/invulnerabiility")),
+                (scope: Unit, selector: SourceUnit, modifier: PostCombatPromotion("core:promotion/sneak-attack")),
+                (scope: Unit, selector: SourceUnit, modifier: PostCombatPromotion("core:promotion/heroism")),
+                (scope: Unit, selector: SourceUnit, modifier: PostCombatPromotion("core:promotion/ambition")),
+                (scope: Unit, selector: SourceUnit, modifier: PostCombatPromotion("core:promotion/restlessness")),
+                (scope: Unit, selector: SourceUnit, modifier: PostCombatPromotion("core:promotion/recruitment")),
+                (scope: Unit, selector: SourceUnit, modifier: PostCombatPromotion("core:promotion/enemy-blade")),
+                (scope: Unit, selector: SourceUnit, modifier: PostCombatPromotion("core:promotion/evil-spirits")),
+            ],
+        ),
+        (
+            id: "core:promotion/nationalism",
+            name: "Patriotic War",
+            unit_roles: [Recon, Archer, Mounted, Melee, Siege, Gun, Armor, Helicopter, NavalRanged, NavalMelee, Submarine],
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyCombat(context: AttackFriendlyLand, percent: 15)),
+            ],
+        ),
+        (
+            id: "core:promotion/naval-bonus",
+            name: "Bonus vs Naval",
+            choosable: true,
+            lost_with_upgrade: true,
+            effects: [
+                (scope: Unit, selector: SourceUnit, condition: OpponentRole(NavalRanged), modifier: ModifyCombat(context: Any, percent: 50)),
+                (scope: Unit, selector: SourceUnit, condition: OpponentRole(NavalMelee), modifier: ModifyCombat(context: Any, percent: 50)),
+            ],
+        ),
+        (
+            id: "core:promotion/naval-penalty",
+            name: "Penalty vs Naval (50)",
+            choosable: true,
+            effects: [
+                (scope: Unit, selector: SourceUnit, condition: OpponentRole(NavalRanged), modifier: ModifyCombat(context: Any, percent: -50)),
+                (scope: Unit, selector: SourceUnit, condition: OpponentRole(NavalMelee), modifier: ModifyCombat(context: Any, percent: -50)),
+                (scope: Unit, selector: SourceUnit, condition: OpponentRole(Submarine), modifier: ModifyCombat(context: Any, percent: -50)),
+                (scope: Unit, selector: SourceUnit, condition: OpponentRole(Carrier), modifier: ModifyCombat(context: Any, percent: -50)),
+            ],
+        ),
+        (
+            id: "core:promotion/naval-tradition",
+            name: "Exploration",
+            unit_roles: [NavalRanged, NavalMelee, Carrier, Submarine],
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyMovement(amount: 1)),
+                (scope: Unit, selector: SourceUnit, modifier: ModifyUnitStat(stat: Sight, amount: 1)),
+            ],
+        ),
+        (
+            id: "core:promotion/no-capture",
+            name: "Unable to Capture Cities",
+            choosable: true,
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: GrantAbility(NoCapture)),
+            ],
+        ),
+        (
+            id: "core:promotion/no-defensive-bonuses",
+            name: "No Defensive Terrain Bonuses",
+            choosable: true,
+            lost_with_upgrade: true,
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: GrantAbility(NoDefensiveBonus)),
+            ],
+        ),
+        (
+            id: "core:promotion/ocean-impassable",
+            name: "Cannot Enter Deep Ocean",
+            lost_with_upgrade: true,
+            effects: [
+                (scope: Unit, selector: SourceUnit, condition: TileTerrain("core:terrain/ocean"), modifier: GrantAbility(Impassable)),
+            ],
+        ),
+        (
+            id: "core:promotion/ocean-impassable-until-astronomy",
+            name: "Astronomy Needed",
+            lost_with_upgrade: true,
+            effects: [
+                (scope: Unit, selector: SourceUnit, condition: TileTerrainUntil("core:terrain/ocean", "core:tech/astronomy"), modifier: GrantAbility(Impassable)),
+            ],
+        ),
+        (
+            id: "core:promotion/ocean-movement",
+            name: "Naval Movement",
+            choosable: true,
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyUnitStat(stat: NavalMoves, amount: 2)),
+            ],
+        ),
+        (
+            id: "core:promotion/only-attacks-cities",
+            name: "City Attack Only",
+            lost_with_upgrade: true,
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: GrantAbility(CityAttackOnly)),
+            ],
+        ),
+        (
+            id: "core:promotion/only-defensive",
+            name: "May Not Melee Attack",
+            choosable: true,
+            lost_with_upgrade: true,
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: GrantAbility(OnlyDefensive)),
+            ],
+        ),
+        (
+            id: "core:promotion/open-terrain",
+            name: "Combat Bonus in Open Terrain",
+            choosable: true,
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyCombat(context: AttackOpen, percent: 30)),
+                (scope: Unit, selector: SourceUnit, modifier: ModifyCombat(context: DefenseOpen, percent: 30)),
+            ],
+        ),
+        (
+            id: "core:promotion/paradrop",
+            name: "May Paradrop",
+            choosable: true,
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyUnitStat(stat: ParadropRange, amount: 5)),
+            ],
+        ),
+        (
+            id: "core:promotion/partial-heal-if-destroy-enemy",
+            name: "Heals 25 Damage If Kills a Unit",
+            choosable: true,
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyUnitStat(stat: HealOnKill, amount: 25)),
+            ],
+        ),
+        (
+            id: "core:promotion/prize-ships",
+            name: "Prize Ships",
+            choosable: true,
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: GrantAbility(CaptureDefeatedEnemy)),
+            ],
+        ),
+        (
+            id: "core:promotion/range",
+            name: "Range",
+            requires_any_of: ["core:promotion/accuracy-3", "core:promotion/barrage-3", "core:promotion/targeting-2", "core:promotion/bombardment-2"],
+            choosable: true,
+            unit_roles: [Archer, Siege, NavalRanged],
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyUnitStat(stat: Range, amount: 1)),
+            ],
+        ),
+        (
+            id: "core:promotion/ranged-support-fire",
+            name: "Ranged Support Fire",
+            choosable: true,
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: GrantAbility(RangedSupportFire)),
+            ],
+        ),
+        (
+            id: "core:promotion/recruitment",
+            name: "Recruitment",
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyUnitStat(stat: HealOnKill, amount: 50)),
+                (scope: Unit, selector: SourceUnit, modifier: GrantAbility(HealOnKillNotBarbarians)),
+            ],
+        ),
+        (
+            id: "core:promotion/repair",
+            name: "Repair",
+            requires_any_of: ["core:promotion/shock-3", "core:promotion/drill-3"],
+            choosable: true,
+            unit_roles: [Armor],
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: GrantAbility(AlwaysHeal)),
+            ],
+        ),
+        (
+            id: "core:promotion/restlessness",
+            name: "Restlessness",
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyMovement(amount: 1)),
+                (scope: Unit, selector: SourceUnit, modifier: ModifyUnitStat(stat: AttacksPerTurn, amount: 1)),
+                (scope: Unit, selector: SourceUnit, modifier: GrantAbility(MoveAfterAttacking)),
+            ],
+        ),
+        (
+            id: "core:promotion/rival-territory",
+            name: "Can Enter Rival Territory",
+            choosable: true,
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: GrantAbility(RivalTerritory)),
+            ],
+        ),
+        (
+            id: "core:promotion/rough-terrain-ends-turn",
+            name: "Rough Terrain Penalty",
+            choosable: true,
+            lost_with_upgrade: true,
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: GrantAbility(RoughTerrainEndsTurn)),
+            ],
+        ),
+        (
+            id: "core:promotion/sapper",
+            name: "Sapper",
+            lost_with_upgrade: true,
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: GrantAbility(Sapper)),
+            ],
+        ),
+        (
+            id: "core:promotion/scouting-1",
+            name: "Scouting I",
+            choosable: true,
+            unit_roles: [Recon],
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyUnitStat(stat: Sight, amount: 1)),
+            ],
+        ),
+        (
+            id: "core:promotion/scouting-2",
+            name: "Scouting II",
+            requires_any_of: ["core:promotion/scouting-1"],
+            choosable: true,
+            unit_roles: [Recon],
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyUnitStat(stat: Sight, amount: 1)),
+            ],
+        ),
+        (
+            id: "core:promotion/scouting-3",
+            name: "Scouting III",
+            requires_any_of: ["core:promotion/scouting-2"],
+            choosable: true,
+            unit_roles: [Recon],
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyMovement(amount: 1)),
+            ],
+        ),
+        (
+            id: "core:promotion/second-attack",
+            name: "May Attack Twice",
+            choosable: true,
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: GrantAbility(MoveAfterAttacking)),
+                (scope: Unit, selector: SourceUnit, modifier: ModifyUnitStat(stat: AttacksPerTurn, amount: 1)),
+            ],
+        ),
+        (
+            id: "core:promotion/see-invisible-submarine",
+            name: "Can See Submarines",
+            choosable: true,
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: GrantAbility(SeeInvisible)),
+            ],
+        ),
+        (
+            id: "core:promotion/sell-exotic-goods",
+            name: "Exotic Cargo",
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: GrantAbility(ExoticCargo)),
+            ],
+        ),
+        (
+            id: "core:promotion/sentry",
+            name: "Sentry",
+            requires_any_of: ["core:promotion/shock-1", "core:promotion/drill-1", "core:promotion/targeting-1", "core:promotion/bombardment-1", "core:promotion/coastal-raider-1", "core:promotion/boarding-party-1", "core:promotion/wolfpack-1", "core:promotion/flight-deck-1", "core:promotion/armor-plating-1"],
+            choosable: true,
+            unit_roles: [Mounted, Armor, NavalRanged, NavalMelee, Submarine, Carrier],
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyUnitStat(stat: Sight, amount: 1)),
+            ],
+        ),
+        (
+            id: "core:promotion/shock-1",
+            name: "Shock I",
+            choosable: true,
+            unit_roles: [Mounted, Melee, Gun, Armor],
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyCombat(context: AttackOpen, percent: 15)),
+                (scope: Unit, selector: SourceUnit, modifier: ModifyCombat(context: DefenseOpen, percent: 15)),
+            ],
+        ),
+        (
+            id: "core:promotion/shock-2",
+            name: "Shock II",
+            requires_any_of: ["core:promotion/shock-1"],
+            choosable: true,
+            unit_roles: [Mounted, Melee, Gun, Armor],
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyCombat(context: AttackOpen, percent: 15)),
+                (scope: Unit, selector: SourceUnit, modifier: ModifyCombat(context: DefenseOpen, percent: 15)),
+            ],
+        ),
+        (
+            id: "core:promotion/shock-3",
+            name: "Shock III",
+            requires_any_of: ["core:promotion/shock-2"],
+            choosable: true,
+            unit_roles: [Mounted, Melee, Gun, Armor],
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyCombat(context: AttackOpen, percent: 15)),
+                (scope: Unit, selector: SourceUnit, modifier: ModifyCombat(context: DefenseOpen, percent: 15)),
+            ],
+        ),
+        (
+            id: "core:promotion/siege",
+            name: "Siege",
+            requires_any_of: ["core:promotion/shock-2", "core:promotion/drill-2", "core:promotion/accuracy-1", "core:promotion/barrage-1"],
+            choosable: true,
+            unit_roles: [Melee, Gun],
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyCombat(context: VsCity, percent: 50)),
+            ],
+        ),
+        (
+            id: "core:promotion/sight-penalty",
+            name: "Limited Visibility",
+            choosable: true,
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyUnitStat(stat: Sight, amount: -1)),
+            ],
+        ),
+        (
+            id: "core:promotion/silent-hunter",
+            name: "Bonus when Attacking (75)",
+            choosable: true,
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyCombat(context: Attack, percent: 75)),
+            ],
+        ),
+        (
+            id: "core:promotion/ski-infantry",
+            name: "Bonuses in Snow, Tundra, and Hills",
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: GrantAbility(HillsDoubleMove)),
+                (scope: Unit, selector: SourceUnit, condition: TileTerrain("core:terrain/snow"), modifier: ModifyCombat(context: Attack, percent: 25)),
+                (scope: Unit, selector: SourceUnit, condition: TileTerrain("core:terrain/snow"), modifier: ModifyCombat(context: Defense, percent: 25)),
+                (scope: Unit, selector: SourceUnit, condition: TileTerrain("core:terrain/snow"), modifier: GrantAbility(DoubleMove)),
+                (scope: Unit, selector: SourceUnit, condition: TileTerrain("core:terrain/tundra"), modifier: ModifyCombat(context: Attack, percent: 25)),
+                (scope: Unit, selector: SourceUnit, condition: TileTerrain("core:terrain/tundra"), modifier: ModifyCombat(context: Defense, percent: 25)),
+                (scope: Unit, selector: SourceUnit, condition: TileTerrain("core:terrain/tundra"), modifier: GrantAbility(DoubleMove)),
+                (scope: Unit, selector: SourceUnit, condition: TileTerrain("core:terrain/hill"), modifier: ModifyCombat(context: Attack, percent: 25)),
+                (scope: Unit, selector: SourceUnit, condition: TileTerrain("core:terrain/hill"), modifier: ModifyCombat(context: Defense, percent: 25)),
+            ],
+        ),
+        (
+            id: "core:promotion/small-city-penalty",
+            name: "Penalty Attacking Cities (25)",
+            lost_with_upgrade: true,
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyCombat(context: VsCity, percent: -25)),
+            ],
+        ),
+        (
+            id: "core:promotion/sneak-attack",
+            name: "Sneak Attack",
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyCombat(context: Flanking, percent: 50)),
+            ],
+        ),
+        (
+            id: "core:promotion/sortie",
+            name: "Sortie",
+            requires_any_of: ["core:promotion/interception-2", "core:promotion/dogfighting-2"],
+            choosable: true,
+            unit_roles: [Fighter],
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyUnitStat(stat: InterceptionsPerTurn, amount: 1)),
+            ],
+        ),
+        (
+            id: "core:promotion/spawn-generals-i",
+            name: "Great Generals I",
+            choosable: true,
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyUnitStat(stat: GreatGeneralPointsPercent, amount: 50)),
+            ],
+        ),
+        (
+            id: "core:promotion/spawn-generals-ii",
+            name: "Great Generals II",
+            choosable: true,
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyUnitStat(stat: GreatGeneralPointsPercent, amount: 100)),
+            ],
+        ),
+        (
+            id: "core:promotion/statue-zeus",
+            name: "Statue of Zeus",
+            unit_roles: [Recon, Archer, Mounted, Melee, Siege, Gun, Armor, Helicopter, NavalMelee, NavalRanged],
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyCombat(context: VsCity, percent: 15)),
+            ],
+        ),
+        (
+            id: "core:promotion/steam-powered",
+            name: "Double movement in Coast",
+            lost_with_upgrade: true,
+            effects: [
+                (scope: Unit, selector: SourceUnit, condition: TileTerrain("core:terrain/coast"), modifier: GrantAbility(DoubleMove)),
+            ],
+        ),
+        (
+            id: "core:promotion/stronger-vs-damaged",
+            name: "Damaged Enemy Bonus (33)",
+            choosable: true,
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyCombat(context: VsWounded, percent: 50)),
+            ],
+        ),
+        (
+            id: "core:promotion/supply",
+            name: "Supply",
+            requires_any_of: ["core:promotion/targeting-2", "core:promotion/bombardment-2", "core:promotion/coastal-raider-2", "core:promotion/boarding-party-2", "core:promotion/wolfpack-2", "core:promotion/flight-deck-2", "core:promotion/armor-plating-2"],
+            choosable: true,
+            unit_roles: [NavalRanged, NavalMelee, Submarine, Carrier],
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyUnitStat(stat: HealEnemyLand, amount: 15)),
+                (scope: Unit, selector: SourceUnit, modifier: ModifyUnitStat(stat: HealNeutralLand, amount: 15)),
+                (scope: Unit, selector: SourceUnit, modifier: GrantAbility(HealOutsideFriendly)),
+            ],
+        ),
+        (
+            id: "core:promotion/survivalism-1",
+            name: "Survivalism I",
+            choosable: true,
+            unit_roles: [Recon],
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyUnitStat(stat: HealEnemyLand, amount: 5)),
+                (scope: Unit, selector: SourceUnit, modifier: ModifyUnitStat(stat: HealNeutralLand, amount: 5)),
+                (scope: Unit, selector: SourceUnit, modifier: ModifyCombat(context: Defense, percent: 25)),
+            ],
+        ),
+        (
+            id: "core:promotion/survivalism-2",
+            name: "Survivalism II",
+            requires_any_of: ["core:promotion/survivalism-1"],
+            choosable: true,
+            unit_roles: [Recon],
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyUnitStat(stat: HealEnemyLand, amount: 5)),
+                (scope: Unit, selector: SourceUnit, modifier: ModifyUnitStat(stat: HealNeutralLand, amount: 5)),
+                (scope: Unit, selector: SourceUnit, modifier: ModifyCombat(context: Defense, percent: 25)),
+            ],
+        ),
+        (
+            id: "core:promotion/survivalism-3",
+            name: "Survivalism III",
+            requires_any_of: ["core:promotion/survivalism-2"],
+            choosable: true,
+            unit_roles: [Recon],
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: GrantAbility(AlwaysHeal)),
+                (scope: Unit, selector: SourceUnit, modifier: ModifyUnitStat(stat: WithdrawChance, amount: 75)),
+            ],
+        ),
+        (
+            id: "core:promotion/targeting-1",
+            name: "Targeting I",
+            choosable: true,
+            unit_roles: [NavalRanged, Submarine],
+            effects: [
+                (scope: Unit, selector: SourceUnit, condition: OpponentDomain(Sea), modifier: ModifyCombat(context: Any, percent: 15)),
+            ],
+        ),
+        (
+            id: "core:promotion/targeting-2",
+            name: "Targeting II",
+            requires_any_of: ["core:promotion/targeting-1"],
+            choosable: true,
+            unit_roles: [NavalRanged, Submarine],
+            effects: [
+                (scope: Unit, selector: SourceUnit, condition: OpponentDomain(Sea), modifier: ModifyCombat(context: Any, percent: 15)),
+            ],
+        ),
+        (
+            id: "core:promotion/targeting-3",
+            name: "Targeting III",
+            requires_any_of: ["core:promotion/targeting-2"],
+            choosable: true,
+            unit_roles: [NavalRanged, Submarine],
+            effects: [
+                (scope: Unit, selector: SourceUnit, condition: OpponentDomain(Sea), modifier: ModifyCombat(context: Any, percent: 15)),
+            ],
+        ),
+        (
+            id: "core:promotion/trade-mission-bonus",
+            name: "Trade Mission Bonus",
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyUnitStat(stat: TradeMissionInfluencePercent, amount: 100)),
+                (scope: Unit, selector: SourceUnit, modifier: ModifyUnitStat(stat: TradeMissionGoldPercent, amount: 100)),
+                (scope: Unit, selector: SourceUnit, modifier: ModifyUnitStat(stat: NavalMoves, amount: 2)),
+            ],
+        ),
+        (
+            id: "core:promotion/unwelcome-evangelist",
+            name: "Unwelcome Evangelist",
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyUnitStat(stat: RivalLandStrengthLossPercent, amount: 25)),
+            ],
+        ),
+        (
+            id: "core:promotion/volley",
+            name: "Volley",
+            requires_any_of: ["core:promotion/accuracy-1", "core:promotion/barrage-1"],
+            choosable: true,
+            unit_roles: [Siege],
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyCombat(context: VsFortified, percent: 50)),
+                (scope: Unit, selector: SourceUnit, modifier: ModifyCombat(context: VsCity, percent: 50)),
+            ],
+        ),
+        (
+            id: "core:promotion/war-canoes",
+            name: "War Canoes",
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyCombat(context: EmbarkedDefense, percent: 100)),
+                (scope: Unit, selector: SourceUnit, modifier: ModifyUnitStat(stat: EmbarkedSight, amount: 2)),
+            ],
+        ),
+        (
+            id: "core:promotion/weak-ranged",
+            name: "Weak Ranged Attack",
+            choosable: true,
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyCombat(context: RangedAttack, percent: -50)),
+            ],
+        ),
+        (
+            id: "core:promotion/withdraw-before-melee",
+            name: "Withdraw Before Melee",
+            choosable: true,
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyUnitStat(stat: WithdrawChance, amount: 80)),
+            ],
+        ),
+        (
+            id: "core:promotion/wolfpack-1",
+            name: "Wolfpack I",
+            choosable: true,
+            unit_roles: [Submarine],
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyCombat(context: Attack, percent: 25)),
+            ],
+        ),
+        (
+            id: "core:promotion/wolfpack-2",
+            name: "Wolfpack II",
+            requires: ["core:promotion/wolfpack-1"],
+            choosable: true,
+            unit_roles: [Submarine],
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyCombat(context: Attack, percent: 25)),
+            ],
+        ),
+        (
+            id: "core:promotion/wolfpack-3",
+            name: "Wolfpack III",
+            requires: ["core:promotion/wolfpack-2"],
+            choosable: true,
+            unit_roles: [Submarine],
+            effects: [
+                (scope: Unit, selector: SourceUnit, modifier: ModifyCombat(context: Attack, percent: 25)),
+            ],
+        ),
+        (
+            id: "core:promotion/woodsman",
+            name: "Woodsman",
+            requires_any_of: ["core:promotion/shock-3", "core:promotion/drill-3"],
+            choosable: true,
+            unit_roles: [Melee, Gun],
+            effects: [
+                (scope: Unit, selector: SourceUnit, condition: TileFeature("core:feature/jungle"), modifier: GrantAbility(DoubleMove)),
+                (scope: Unit, selector: SourceUnit, condition: TileFeature("core:feature/forest"), modifier: GrantAbility(DoubleMove)),
+            ],
+        ),
+    ],
+)

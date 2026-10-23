@@ -1,0 +1,42 @@
+# Translation of classic-ui-screen-diplomacy.ftl into ja. Keys are in the order of the English file.
+# Lines marked TODO still hold the English text: translate them and delete the marker.
+
+classic.ui.screen-diplomacy.title = 外交
+classic.ui.screen-diplomacy.banner-line = 遭遇した国家 { $met }  ·  国庫のゴールド { $gold }  ·  待機中の提案 { $offers }
+classic.ui.screen-diplomacy.none-met = まだ他の国家に出会っていません。世界を探索して見つけましょう。
+classic.ui.screen-diplomacy.nations-met = 遭遇した国家
+classic.ui.screen-diplomacy.score-gold = スコア { $score }  ·  ゴールド { $gold }
+classic.ui.screen-diplomacy.no-treaties = 条約なし
+classic.ui.screen-diplomacy.active-treaties = 有効な条約 { $n }件
+classic.ui.screen-diplomacy.more-treaties = ほか{ $n }件
+classic.ui.screen-diplomacy.make-peace = 講和する
+classic.ui.screen-diplomacy.declare-war = 宣戦布告
+classic.ui.screen-diplomacy.denounce = 非難する
+classic.ui.screen-diplomacy.open-borders = 国境開放
+classic.ui.screen-diplomacy.negotiate = 取引を交渉
+classic.ui.screen-diplomacy.you-give = あなたが渡すもの
+classic.ui.screen-diplomacy.you-receive = あなたが受け取るもの
+classic.ui.screen-diplomacy.agreements = 合意事項
+classic.ui.screen-diplomacy.select-items = 上の項目を選んで提案を組み立ててください。
+classic.ui.screen-diplomacy.side-both = 双方が合意
+classic.ui.screen-diplomacy.side-give = あなたが渡す
+classic.ui.screen-diplomacy.side-receive = あなたが受け取る
+classic.ui.screen-diplomacy.remove = 外す
+classic.ui.screen-diplomacy.term = { $side }：{ $label }
+classic.ui.screen-diplomacy.offer-sent = 提案を送りました。相手の返答をお待ちください。
+classic.ui.screen-diplomacy.select-one = 項目を1つ以上選択してください。
+classic.ui.screen-diplomacy.ready-to-propose = 提案の準備ができました。相手が受け入れる必要があります。
+classic.ui.screen-diplomacy.checking = この提案を確認中…
+classic.ui.screen-diplomacy.clear-offer = 提案をクリア
+classic.ui.screen-diplomacy.propose-deal = 取引を提案
+classic.ui.screen-diplomacy.gold-now = 即時ゴールド { $n }
+classic.ui.screen-diplomacy.gold-per-turn = ゴールド { $n } / ターン
+classic.ui.screen-diplomacy.resource = 資源
+classic.ui.screen-diplomacy.resource-amount = { $amount } × { $name }
+classic.ui.screen-diplomacy.agreement = 合意
+classic.ui.screen-diplomacy.of-max = / 最大 { $max }
+classic.ui.screen-diplomacy.offers-heading = あなたへの提案
+classic.ui.screen-diplomacy.no-offers = 返答待ちの提案はありません。
+classic.ui.screen-diplomacy.answer-by = ターン{ $turn }までに回答
+classic.ui.screen-diplomacy.accept = 受け入れる
+classic.ui.screen-diplomacy.refuse = 断る

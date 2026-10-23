@@ -1,0 +1,43 @@
+# Translation of classic-ui-screen-city.ftl into zh-Hans. Keys are in the order of the English file.
+# Lines marked TODO still hold the English text: translate them and delete the marker.
+
+classic.ui.screen-city.default-name = 河湖城
+classic.ui.screen-city.subtitle = 首都  ·  城市管理
+classic.ui.screen-city.overview = 城市概览
+classic.ui.screen-city.citizens = 市民
+classic.ui.screen-city.growing = 3回合后增长
+classic.ui.screen-city.food-stored = 食物储备  ·  28 / 45
+classic.ui.screen-city.food = 食物
+classic.ui.screen-city.production = 产能
+classic.ui.screen-city.science = 科研
+classic.ui.screen-city.gold = 金币
+classic.ui.screen-city.culture = 文化
+classic.ui.screen-city.defence = 防御
+classic.ui.screen-city.buildings = 建筑
+classic.ui.screen-city.citizen-focus = 市民侧重
+classic.ui.screen-city.focus-balanced = 均衡
+classic.ui.screen-city.focus-growth = 增长
+classic.ui.screen-city.focus-industry = 工业
+classic.ui.screen-city.assignments = 市民分配
+classic.ui.screen-city.fields = 农田
+classic.ui.screen-city.workshops = 作坊
+classic.ui.screen-city.scholars = 学者
+classic.ui.screen-city.established = 已建成的建筑
+classic.ui.screen-city.palace = 宫殿
+classic.ui.screen-city.palace-effect = +3 科研  ·  +3 金币
+classic.ui.screen-city.granary = 粮仓
+classic.ui.screen-city.granary-effect = +2 食物
+classic.ui.screen-city.monument = 纪念碑
+classic.ui.screen-city.monument-effect = +2 文化
+classic.ui.screen-city.choose-production = 选择生产项目
+classic.ui.screen-city.cost-turns = { $cost }产能  ·  { $n }回合
+classic.ui.screen-city.add-to-queue = 加入生产队列
+classic.ui.screen-city.queue = 生产队列  /  { $n }
+classic.ui.screen-city.kind-building = 建筑
+classic.ui.screen-city.kind-melee-unit = 近战单位
+classic.ui.screen-city.warrior = 战士
+classic.ui.screen-city.water-mill = 水磨
+classic.ui.screen-city.granary-desc = 储存收成。更多食物让河湖城有空间继续增长。
+classic.ui.screen-city.warrior-desc = 守卫山谷，并护送开拓者前往新的土地。
+classic.ui.screen-city.monument-desc = 纪念共同的历史，丰富城市的文化生活。
+classic.ui.screen-city.water-mill-desc = 将河流的水力转化为食物和生产劳动。

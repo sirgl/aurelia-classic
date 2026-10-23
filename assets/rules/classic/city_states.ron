@@ -1,0 +1,372 @@
+// Civ 5 inspired rule set (Unciv Gods & Kings ruleset plus own extensions); generated, do not edit.
+// Derived from Unciv (https://github.com/yairm210/Unciv), MPL-2.0, where the entry says `unciv:`
+// in classic/docs/classic/*.json (see classic/docs/classic/UNCIV-ATTRIBUTION.md); other values are own, unverified.
+// Source: classic/docs/classic/*.json (made by classic/tools/import-unciv.py). Regenerate:
+//   cargo run --release --offline -p classic-content --features importer --bin classic-import
+// Inert effects need a mechanic the engine does not have yet: classic/docs/classic/implemented.md.
+(
+    city_state_types: [
+        (
+            id: "core:city-state-type/cultured",
+            name: "Cultured City-States",
+            friends_threshold: 30,
+            allies_threshold: 60,
+            minor_trait: Some(Cultured),
+            bonuses: [
+                (level: Friends, kind: Culture, era: Some("core:era/ancient"), amount: 3),
+                (level: Friends, kind: Culture, era: Some("core:era/industrial"), amount: 13),
+                (level: Friends, kind: Culture, era: Some("core:era/medieval"), amount: 6),
+                (level: Allies, kind: Culture, era: Some("core:era/ancient"), amount: 3),
+                (level: Allies, kind: Culture, era: Some("core:era/industrial"), amount: 13),
+                (level: Allies, kind: Culture, era: Some("core:era/medieval"), amount: 6),
+            ],
+        ),
+        (
+            id: "core:city-state-type/maritime",
+            name: "Maritime City-States",
+            friends_threshold: 30,
+            allies_threshold: 60,
+            minor_trait: Some(Maritime),
+            bonuses: [
+                (level: Friends, kind: CapitalFood, era: Some("core:era/renaissance"), amount: 200),
+                (level: Friends, kind: CapitalFood, era: None, amount: 200),
+                (level: Allies, kind: CapitalFood, era: None, amount: 0),
+                (level: Allies, kind: AllCitiesFood, era: None, amount: 100),
+            ],
+        ),
+        (
+            id: "core:city-state-type/mercantile",
+            name: "Mercantile City-States",
+            friends_threshold: 30,
+            allies_threshold: 60,
+            minor_trait: Some(Mercantile),
+            bonuses: [
+                (level: Friends, kind: Happiness, era: Some("core:era/ancient"), amount: 2),
+                (level: Friends, kind: Happiness, era: Some("core:era/industrial"), amount: 3),
+                (level: Friends, kind: Happiness, era: Some("core:era/medieval"), amount: 3),
+                (level: Allies, kind: Happiness, era: Some("core:era/ancient"), amount: 0),
+                (level: Allies, kind: Happiness, era: Some("core:era/industrial"), amount: 0),
+                (level: Allies, kind: Happiness, era: Some("core:era/medieval"), amount: 0),
+            ],
+        ),
+        (
+            id: "core:city-state-type/militaristic",
+            name: "Militaristic City-States",
+            friends_threshold: 30,
+            allies_threshold: 60,
+            minor_trait: Some(Militaristic),
+            bonuses: [
+                (level: Friends, kind: UnitGiftTurns, era: None, amount: 19),
+                (level: Friends, kind: UnitGiftRandom, era: None, amount: 3),
+                (level: Allies, kind: UnitGiftTurns, era: None, amount: -3),
+            ],
+        ),
+        (
+            id: "core:city-state-type/religious",
+            name: "Religious City-States",
+            friends_threshold: 30,
+            allies_threshold: 60,
+            minor_trait: Some(Religious),
+            bonuses: [
+                (level: Friends, kind: Faith, era: Some("core:era/ancient"), amount: 3),
+                (level: Friends, kind: Faith, era: Some("core:era/industrial"), amount: 13),
+                (level: Friends, kind: Faith, era: Some("core:era/medieval"), amount: 6),
+                (level: Allies, kind: Faith, era: Some("core:era/ancient"), amount: 3),
+                (level: Allies, kind: Faith, era: Some("core:era/industrial"), amount: 13),
+                (level: Allies, kind: Faith, era: Some("core:era/medieval"), amount: 6),
+            ],
+        ),
+    ],
+    city_states: [
+        (
+            id: "core:city-state/almaty",
+            name: "Almaty",
+            city_state_type: "core:city-state-type/militaristic",
+        ),
+        (
+            id: "core:city-state/antananarivo",
+            name: "Antananarivo",
+            city_state_type: "core:city-state-type/mercantile",
+        ),
+        (
+            id: "core:city-state/antwerp",
+            name: "Antwerp",
+            city_state_type: "core:city-state-type/mercantile",
+        ),
+        (
+            id: "core:city-state/belgrade",
+            name: "Belgrade",
+            city_state_type: "core:city-state-type/militaristic",
+        ),
+        (
+            id: "core:city-state/bogota",
+            name: "Bogota",
+            city_state_type: "core:city-state-type/cultured",
+        ),
+        (
+            id: "core:city-state/bratislava",
+            name: "Bratislava",
+            city_state_type: "core:city-state-type/cultured",
+        ),
+        (
+            id: "core:city-state/brussels",
+            name: "Brussels",
+            city_state_type: "core:city-state-type/cultured",
+        ),
+        (
+            id: "core:city-state/bucharest",
+            name: "Bucharest",
+            city_state_type: "core:city-state-type/cultured",
+        ),
+        (
+            id: "core:city-state/budapest",
+            name: "Budapest",
+            city_state_type: "core:city-state-type/militaristic",
+        ),
+        (
+            id: "core:city-state/buenos-aires",
+            name: "Buenos Aires",
+            city_state_type: "core:city-state-type/cultured",
+        ),
+        (
+            id: "core:city-state/byblos",
+            name: "Byblos",
+            city_state_type: "core:city-state-type/maritime",
+        ),
+        (
+            id: "core:city-state/cahokia",
+            name: "Cahokia",
+            city_state_type: "core:city-state-type/mercantile",
+        ),
+        (
+            id: "core:city-state/cape-town",
+            name: "Cape Town",
+            city_state_type: "core:city-state-type/maritime",
+        ),
+        (
+            id: "core:city-state/colombo",
+            name: "Colombo",
+            city_state_type: "core:city-state-type/mercantile",
+        ),
+        (
+            id: "core:city-state/florence",
+            name: "Florence",
+            city_state_type: "core:city-state-type/cultured",
+        ),
+        (
+            id: "core:city-state/geneva",
+            name: "Geneva",
+            city_state_type: "core:city-state-type/religious",
+        ),
+        (
+            id: "core:city-state/genoa",
+            name: "Genoa",
+            city_state_type: "core:city-state-type/mercantile",
+        ),
+        (
+            id: "core:city-state/hanoi",
+            name: "Hanoi",
+            city_state_type: "core:city-state-type/militaristic",
+        ),
+        (
+            id: "core:city-state/hong-kong",
+            name: "Hong Kong",
+            city_state_type: "core:city-state-type/mercantile",
+        ),
+        (
+            id: "core:city-state/ife",
+            name: "Ife",
+            city_state_type: "core:city-state-type/religious",
+        ),
+        (
+            id: "core:city-state/jerusalem",
+            name: "Jerusalem",
+            city_state_type: "core:city-state-type/religious",
+        ),
+        (
+            id: "core:city-state/kabul",
+            name: "Kabul",
+            city_state_type: "core:city-state-type/cultured",
+        ),
+        (
+            id: "core:city-state/kathmandu",
+            name: "Kathmandu",
+            city_state_type: "core:city-state-type/religious",
+        ),
+        (
+            id: "core:city-state/kiev",
+            name: "Kiev",
+            city_state_type: "core:city-state-type/cultured",
+        ),
+        (
+            id: "core:city-state/kuala-lumpur",
+            name: "Kuala Lumpur",
+            city_state_type: "core:city-state-type/cultured",
+        ),
+        (
+            id: "core:city-state/kyzyl",
+            name: "Kyzyl",
+            city_state_type: "core:city-state-type/cultured",
+        ),
+        (
+            id: "core:city-state/la-venta",
+            name: "La Venta",
+            city_state_type: "core:city-state-type/religious",
+        ),
+        (
+            id: "core:city-state/lhasa",
+            name: "Lhasa",
+            city_state_type: "core:city-state-type/religious",
+        ),
+        (
+            id: "core:city-state/m-banza-kongo",
+            name: "M'banza-Kongo",
+            city_state_type: "core:city-state-type/militaristic",
+        ),
+        (
+            id: "core:city-state/malacca",
+            name: "Malacca",
+            city_state_type: "core:city-state-type/mercantile",
+        ),
+        (
+            id: "core:city-state/manila",
+            name: "Manila",
+            city_state_type: "core:city-state-type/maritime",
+        ),
+        (
+            id: "core:city-state/melbourne",
+            name: "Melbourne",
+            city_state_type: "core:city-state-type/mercantile",
+        ),
+        (
+            id: "core:city-state/milan",
+            name: "Milan",
+            city_state_type: "core:city-state-type/cultured",
+        ),
+        (
+            id: "core:city-state/mogadishu",
+            name: "Mogadishu",
+            city_state_type: "core:city-state-type/maritime",
+        ),
+        (
+            id: "core:city-state/mombasa",
+            name: "Mombasa",
+            city_state_type: "core:city-state-type/maritime",
+        ),
+        (
+            id: "core:city-state/monaco",
+            name: "Monaco",
+            city_state_type: "core:city-state-type/cultured",
+        ),
+        (
+            id: "core:city-state/ormus",
+            name: "Ormus",
+            city_state_type: "core:city-state-type/maritime",
+        ),
+        (
+            id: "core:city-state/panama-city",
+            name: "Panama City",
+            city_state_type: "core:city-state-type/maritime",
+        ),
+        (
+            id: "core:city-state/prague",
+            name: "Prague",
+            city_state_type: "core:city-state-type/cultured",
+        ),
+        (
+            id: "core:city-state/quebec-city",
+            name: "Quebec City",
+            city_state_type: "core:city-state-type/maritime",
+        ),
+        (
+            id: "core:city-state/ragusa",
+            name: "Ragusa",
+            city_state_type: "core:city-state-type/maritime",
+        ),
+        (
+            id: "core:city-state/riga",
+            name: "Riga",
+            city_state_type: "core:city-state-type/maritime",
+        ),
+        (
+            id: "core:city-state/samarkand",
+            name: "Samarkand",
+            city_state_type: "core:city-state-type/mercantile",
+        ),
+        (
+            id: "core:city-state/sidon",
+            name: "Sidon",
+            city_state_type: "core:city-state-type/militaristic",
+        ),
+        (
+            id: "core:city-state/singapore",
+            name: "Singapore",
+            city_state_type: "core:city-state-type/mercantile",
+        ),
+        (
+            id: "core:city-state/sofia",
+            name: "Sofia",
+            city_state_type: "core:city-state-type/militaristic",
+        ),
+        (
+            id: "core:city-state/sydney",
+            name: "Sydney",
+            city_state_type: "core:city-state-type/maritime",
+        ),
+        (
+            id: "core:city-state/tyre",
+            name: "Tyre",
+            city_state_type: "core:city-state-type/mercantile",
+        ),
+        (
+            id: "core:city-state/ur",
+            name: "Ur",
+            city_state_type: "core:city-state-type/maritime",
+        ),
+        (
+            id: "core:city-state/valletta",
+            name: "Valletta",
+            city_state_type: "core:city-state-type/militaristic",
+        ),
+        (
+            id: "core:city-state/vancouver",
+            name: "Vancouver",
+            city_state_type: "core:city-state-type/maritime",
+        ),
+        (
+            id: "core:city-state/vatican-city",
+            name: "Vatican City",
+            city_state_type: "core:city-state-type/religious",
+        ),
+        (
+            id: "core:city-state/vilnius",
+            name: "Vilnius",
+            city_state_type: "core:city-state-type/mercantile",
+        ),
+        (
+            id: "core:city-state/wellington",
+            name: "Wellington",
+            city_state_type: "core:city-state-type/maritime",
+        ),
+        (
+            id: "core:city-state/wittenberg",
+            name: "Wittenberg",
+            city_state_type: "core:city-state-type/religious",
+        ),
+        (
+            id: "core:city-state/yerevan",
+            name: "Yerevan",
+            city_state_type: "core:city-state-type/cultured",
+        ),
+        (
+            id: "core:city-state/zanzibar",
+            name: "Zanzibar",
+            city_state_type: "core:city-state-type/mercantile",
+        ),
+        (
+            id: "core:city-state/zurich",
+            name: "Zurich",
+            city_state_type: "core:city-state-type/mercantile",
+        ),
+    ],
+)

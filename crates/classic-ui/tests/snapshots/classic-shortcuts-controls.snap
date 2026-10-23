@@ -1,0 +1,261 @@
+screen Settings 1366x768
+widgets
+  click "AURELIA / Settings / Back / Navigate / Audio / Graphics / Game / Controls / Drag…" 0,0 1366x768
+  click "Back" 1208,15 132x36
+  click "Navigate" 1080,15 116x36
+  click "Audio" 178,100 247x36
+  click "Graphics" 433,100 246x36
+  click "Game" 687,100 247x36
+  click "Controls" 942,100 246x36
+  click "Show the list" 410,319 220x36
+  click "Change" 1092,406 88x28
+  click "Clear" 1012,406 72x28
+  click "Change" 1092,482 88x28
+  click "Clear" 1012,482 72x28
+  click "Change" 1092,519 88x28
+  click "Clear" 1012,519 72x28
+  click "Change" 1092,556 88x28
+  click "Clear" 1012,556 72x28
+  click "Change" 1092,593 88x28
+  click "Clear" 1012,593 72x28
+  click "Change" 1092,630 88x28
+  click "Clear" 1012,630 72x28
+  click "" 1092,706 88x28
+  click "" 1012,706 72x28
+  click "" 1092,743 88x28
+  click "" 1012,743 72x28
+  click "" 1092,780 88x28
+  click "" 1012,780 72x28
+  click "" 1092,817 88x28
+  click "" 1012,817 72x28
+  click "" 1092,854 88x28
+  click "" 1012,854 72x28
+  click "" 1092,891 88x28
+  click "" 1012,891 72x28
+  click "" 1092,928 88x28
+  click "" 1012,928 72x28
+  click "" 1092,965 88x28
+  click "" 1012,965 72x28
+  click "" 1092,1041 88x28
+  click "" 1012,1041 72x28
+  click "" 1092,1078 88x28
+  click "" 1012,1078 72x28
+  click "" 1092,1115 88x28
+  click "" 1012,1115 72x28
+  click "" 1092,1152 88x28
+  click "" 1012,1152 72x28
+  click "" 1092,1228 88x28
+  click "" 1012,1228 72x28
+  click "" 1092,1265 88x28
+  click "" 1012,1265 72x28
+  click "" 1092,1302 88x28
+  click "" 1012,1302 72x28
+  click "" 1092,1339 88x28
+  click "" 1012,1339 72x28
+  click "" 1092,1376 88x28
+  click "" 1012,1376 72x28
+  click "" 1092,1413 88x28
+  click "" 1012,1413 72x28
+  click "" 1092,1450 88x28
+  click "" 1012,1450 72x28
+  click "" 1092,1487 88x28
+  click "" 1012,1487 72x28
+  click "" 1092,1524 88x28
+  click "" 1012,1524 72x28
+  click "" 1092,1561 88x28
+  click "" 1012,1561 72x28
+  click "" 1092,1637 88x28
+  click "" 1012,1637 72x28
+  click "" 1092,1674 88x28
+  click "" 1012,1674 72x28
+  click "" 1092,1711 88x28
+  click "" 1012,1711 72x28
+  click "" 1092,1748 88x28
+  click "" 1012,1748 72x28
+  click "" 1092,1785 88x28
+  click "" 1012,1785 72x28
+  click "" 1092,1822 88x28
+  click "" 1012,1822 72x28
+  click "" 1092,1859 88x28
+  click "" 1012,1859 72x28
+  click "" 1092,1896 88x28
+  click "" 1012,1896 72x28
+  click "" 1092,1933 88x28
+  click "" 1012,1933 72x28
+  click "" 1092,1970 88x28
+  click "" 1012,1970 72x28
+  click "" 1092,2007 88x28
+  click "" 1012,2007 72x28
+  click "" 1092,2044 88x28
+  click "" 1012,2044 72x28
+  click "" 1092,2081 88x28
+  click "" 1012,2081 72x28
+  click "" 1092,2118 88x28
+  click "" 1012,2118 72x28
+  click "" 1092,2155 88x28
+  click "" 1012,2155 72x28
+  click "" 1092,2192 88x28
+  click "" 1012,2192 72x28
+  click "" 1092,2229 88x28
+  click "" 1012,2229 72x28
+  click "" 1092,2266 88x28
+  click "" 1012,2266 72x28
+  click "" 1092,2342 88x28
+  click "" 1012,2342 72x28
+  click "" 1092,2379 88x28
+  click "" 1012,2379 72x28
+  scrollbar "" 1178,148 10x531
+painted
+  clip 0,0 1366x768
+    rect 0,0 1366x768 fill #09161c
+    text "AURELIA" 26,19 89x26 #c1a263 23px
+    text "Settings" 166,22 73x23 #efe9d3 20px
+    rect 1208,15 132x36 fill #192f34 r4
+    rect 1208,15 132x36 stroke 1 #344849 r4
+    text "Back" 1259,25 30x16 #efe9d3 14px
+    rect 1080,15 116x36 fill #192f34 r4
+    rect 1080,15 116x36 stroke 1 #344849 r4
+    text "Navigate" 1110,25 56x16 #efe9d3 14px
+    line 24,65 -> 1342,65 stroke 1 #c1a36466
+    rect 158,80 1050x651 fill #11242b r7
+    rect 158,80 1050x651 stroke 1 #344849 r7
+    rect 178,100 247x36 fill #192f34 r4
+    rect 178,100 247x36 stroke 1 #344849 r4
+    text "Audio" 283,110 37x16 #efe9d3 14px
+    rect 433,100 246x36 fill #192f34 r4
+    rect 433,100 246x36 stroke 1 #344849 r4
+    text "Graphics" 529,110 53x16 #efe9d3 14px
+    rect 687,100 247x36 fill #192f34 r4
+    rect 687,100 247x36 stroke 1 #344849 r4
+    text "Game" 792,110 36x16 #efe9d3 14px
+    rect 942,100 246x36 fill #3f7d7c r4
+    rect 942,100 246x36 stroke 1 #c1a263 r4
+    text "Controls" 1038,110 53x16 #efe9d3 14px
+  clip 178,148 1010x531
+    text "Drag to pan · Scroll to zoom · Click a unit or city to select it" 178,148 410x18 #efe9d3 16px
+    rect 178,181 1010x42 fill #192f34 r4
+    text "Esc" 190,191 20x16 #c1a263 14px
+    text "Close the screen or open the menu" 368,191 232x17 #efe9d3 15px
+    rect 178,232 1010x42 fill #192f34 r4
+    text "Right-click or ?" 190,242 89x16 #c1a263 14px
+    text "Encyclopedia page of what is under the pointer" 368,242 313x17 #efe9d3 15px
+    text "Click Change and press the new key. Esc, the pointer and text fields are fixed. Your changes are kept in the settings file." 178,293 684x15 #92a8aa 13px
+    rect 178,319 220x36 fill #192f34 r4
+    rect 178,319 220x36 stroke 1 #344849 r4
+    text "Reset all to defaults" 226,329 124x16 #92a8aa 14px
+    rect 410,319 220x36 fill #192f34 r4
+    rect 410,319 220x36 stroke 1 #344849 r4
+    text "Show the list" 480,329 80x16 #efe9d3 14px
+    text "Turn" 182,378 31x17 #c1a263 15px
+    rect 178,403 1010x34 fill #192f34 r4
+  clip 178,403 424x34
+    text "End the turn" 190,412 84x17 #efe9d3 15px
+  clip 178,148 1010x531
+    rect 618,410 46x21 fill #11242b r4
+    rect 618,410 46x21 stroke 1 #344849 r4
+    text "Enter" 625,413 32x15 #c1a263 13px
+    rect 670,410 76x21 fill #11242b r4
+    rect 670,410 76x21 stroke 1 #344849 r4
+    text "Ctrl+Space" 677,413 62x15 #c1a263 13px
+    rect 1092,406 88x28 fill #192f34 r4
+    rect 1092,406 88x28 stroke 1 #344849 r4
+    text "Change" 1112,412 48x16 #efe9d3 14px
+    rect 1012,406 72x28 fill #192f34 r4
+    rect 1012,406 72x28 stroke 1 #344849 r4
+    text "Clear" 1032,412 32x16 #efe9d3 14px
+    rect 932,406 72x28 fill #192f34 r4
+    rect 932,406 72x28 stroke 1 #344849 r4
+    text "Reset" 950,412 36x16 #92a8aa 14px
+    text "Map" 182,454 29x17 #c1a263 15px
+    rect 178,479 1010x34 fill #192f34 r4
+  clip 178,479 424x34
+    text "Centre the map on the selection" 190,488 215x17 #efe9d3 15px
+  clip 178,148 1010x531
+    rect 618,486 49x21 fill #11242b r4
+    rect 618,486 49x21 stroke 1 #344849 r4
+    text "Home" 625,489 35x15 #c1a263 13px
+    rect 1092,482 88x28 fill #192f34 r4
+    rect 1092,482 88x28 stroke 1 #344849 r4
+    text "Change" 1112,488 48x16 #efe9d3 14px
+    rect 1012,482 72x28 fill #192f34 r4
+    rect 1012,482 72x28 stroke 1 #344849 r4
+    text "Clear" 1032,488 32x16 #efe9d3 14px
+    rect 932,482 72x28 fill #192f34 r4
+    rect 932,482 72x28 stroke 1 #344849 r4
+    text "Reset" 950,488 36x16 #92a8aa 14px
+    rect 178,516 1010x34 fill #192f34 r4
+  clip 178,516 424x34
+    text "Show or hide the hex grid" 190,525 170x17 #efe9d3 15px
+  clip 178,148 1010x531
+    rect 618,523 23x21 fill #11242b r4
+    rect 618,523 23x21 stroke 1 #344849 r4
+    text "G" 625,526 9x15 #c1a263 13px
+    rect 1092,519 88x28 fill #192f34 r4
+    rect 1092,519 88x28 stroke 1 #344849 r4
+    text "Change" 1112,525 48x16 #efe9d3 14px
+    rect 1012,519 72x28 fill #192f34 r4
+    rect 1012,519 72x28 stroke 1 #344849 r4
+    text "Clear" 1032,525 32x16 #efe9d3 14px
+    rect 932,519 72x28 fill #192f34 r4
+    rect 932,519 72x28 stroke 1 #344849 r4
+    text "Reset" 950,525 36x16 #92a8aa 14px
+    rect 178,553 1010x34 fill #192f34 r4
+  clip 178,553 424x34
+    text "Show or hide the tile yields" 190,562 179x17 #efe9d3 15px
+  clip 178,148 1010x531
+    rect 618,560 50x21 fill #11242b r4
+    rect 618,560 50x21 stroke 1 #344849 r4
+    text "Ctrl+Y" 625,563 36x15 #c1a263 13px
+    rect 1092,556 88x28 fill #192f34 r4
+    rect 1092,556 88x28 stroke 1 #344849 r4
+    text "Change" 1112,562 48x16 #efe9d3 14px
+    rect 1012,556 72x28 fill #192f34 r4
+    rect 1012,556 72x28 stroke 1 #344849 r4
+    text "Clear" 1032,562 32x16 #efe9d3 14px
+    rect 932,556 72x28 fill #192f34 r4
+    rect 932,556 72x28 stroke 1 #344849 r4
+    text "Reset" 950,562 36x16 #92a8aa 14px
+    rect 178,590 1010x34 fill #192f34 r4
+  clip 178,590 424x34
+    text "Zoom in" 190,599 54x17 #efe9d3 15px
+  clip 178,148 1010x531
+    rect 618,597 22x21 fill #11242b r4
+    rect 618,597 22x21 stroke 1 #344849 r4
+    text "+" 625,600 8x15 #c1a263 13px
+    rect 646,597 21x21 fill #11242b r4
+    rect 646,597 21x21 stroke 1 #344849 r4
+    text "=" 653,600 7x15 #c1a263 13px
+    rect 673,597 45x21 fill #11242b r4
+    rect 673,597 45x21 stroke 1 #344849 r4
+    text "PgUp" 680,600 31x15 #c1a263 13px
+    rect 1092,593 88x28 fill #192f34 r4
+    rect 1092,593 88x28 stroke 1 #344849 r4
+    text "Change" 1112,599 48x16 #efe9d3 14px
+    rect 1012,593 72x28 fill #192f34 r4
+    rect 1012,593 72x28 stroke 1 #344849 r4
+    text "Clear" 1032,599 32x16 #efe9d3 14px
+    rect 932,593 72x28 fill #192f34 r4
+    rect 932,593 72x28 stroke 1 #344849 r4
+    text "Reset" 950,599 36x16 #92a8aa 14px
+    rect 178,627 1010x34 fill #192f34 r4
+  clip 178,627 424x34
+    text "Zoom out" 190,636 65x17 #efe9d3 15px
+  clip 178,148 1010x531
+    rect 618,634 18x21 fill #11242b r4
+    rect 618,634 18x21 stroke 1 #344849 r4
+    text "-" 625,637 4x15 #c1a263 13px
+    rect 642,634 45x21 fill #11242b r4
+    rect 642,634 45x21 stroke 1 #344849 r4
+    text "PgDn" 649,637 31x15 #c1a263 13px
+    rect 1092,630 88x28 fill #192f34 r4
+    rect 1092,630 88x28 stroke 1 #344849 r4
+    text "Change" 1112,636 48x16 #efe9d3 14px
+    rect 1012,630 72x28 fill #192f34 r4
+    rect 1012,630 72x28 stroke 1 #344849 r4
+    text "Clear" 1032,636 32x16 #efe9d3 14px
+    rect 932,630 72x28 fill #192f34 r4
+    rect 932,630 72x28 stroke 1 #344849 r4
+    text "Reset" 950,636 36x16 #92a8aa 14px
+    mesh 2tri 178,659 1010x20
+  clip 0,0 1366x768
+    text "Changes apply immediately and are saved automatically." 178,695 299x14 #92a8aa 12px

@@ -1,0 +1,2010 @@
+{
+ "schema": "classic-spec/1",
+ "catalog": "beliefs",
+ "edition": "Civ 5 inspired rule set (Unciv Gods & Kings ruleset plus own extensions)",
+ "count": 69,
+ "religions": [
+  {
+   "id": "core:religion/buddhism",
+   "name": "Buddhism",
+   "art_id": "religion/buddhism",
+   "provenance": "unciv: Religions.json, Buddhism"
+  },
+  {
+   "id": "core:religion/catholicism",
+   "name": "Catholicism",
+   "art_id": "religion/catholicism",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:religion/confucianism",
+   "name": "Confucianism",
+   "art_id": "religion/confucianism",
+   "provenance": "unciv: Religions.json, Confucianism"
+  },
+  {
+   "id": "core:religion/hinduism",
+   "name": "Hinduism",
+   "art_id": "religion/hinduism",
+   "provenance": "unciv: Religions.json, Hinduism"
+  },
+  {
+   "id": "core:religion/islam",
+   "name": "Islam",
+   "art_id": "religion/islam",
+   "provenance": "unciv: Religions.json, Islam"
+  },
+  {
+   "id": "core:religion/judaism",
+   "name": "Judaism",
+   "art_id": "religion/judaism",
+   "provenance": "unciv: Religions.json, Judaism"
+  },
+  {
+   "id": "core:religion/shinto",
+   "name": "Shinto",
+   "art_id": "religion/shinto",
+   "provenance": "unciv: Religions.json, Shinto"
+  },
+  {
+   "id": "core:religion/sikhism",
+   "name": "Sikhism",
+   "art_id": "religion/sikhism",
+   "provenance": "unciv: Religions.json, Sikhism"
+  },
+  {
+   "id": "core:religion/taoism",
+   "name": "Taoism",
+   "art_id": "religion/taoism",
+   "provenance": "unciv: Religions.json, Taoism"
+  },
+  {
+   "id": "core:religion/tengriism",
+   "name": "Tengriism",
+   "art_id": "religion/tengriism",
+   "provenance": "unciv: Religions.json, Tengriism"
+  },
+  {
+   "id": "core:religion/zoroastrianism",
+   "name": "Zoroastrianism",
+   "art_id": "religion/zoroastrianism",
+   "provenance": "unciv: Religions.json, Zoroastrianism"
+  },
+  {
+   "id": "core:religion/eastern-orthodoxy",
+   "name": "Eastern Orthodoxy",
+   "art_id": "religion/eastern-orthodoxy",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:religion/protestantism",
+   "name": "Protestantism",
+   "art_id": "religion/protestantism",
+   "provenance": "own value"
+  }
+ ],
+ "items": [
+  {
+   "id": "core:belief/pantheon/goddess-of-the-hunt",
+   "name": "Goddess of the Hunt",
+   "category": "pantheon",
+   "effects": [
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "tiles_of_following_cities",
+      "filter": {
+       "improvement": "core:improvement/camp"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "tile.yield.food.flat",
+     "amount": 1,
+     "source": "unciv: Beliefs.json, Goddess of the Hunt"
+    }
+   ],
+   "art_id": "belief/pantheon/goddess-of-the-hunt",
+   "provenance": "unciv: Beliefs.json, Goddess of the Hunt",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:belief/pantheon/fertility-rites",
+   "name": "Fertility Rites",
+   "category": "pantheon",
+   "effects": [
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "following_cities"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "growth.rate.pct",
+     "amount": 10,
+     "source": "unciv: Beliefs.json, Fertility Rites"
+    }
+   ],
+   "art_id": "belief/pantheon/fertility-rites",
+   "provenance": "unciv: Beliefs.json, Fertility Rites",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:belief/pantheon/god-of-craftsmen",
+   "name": "God of Craftsmen",
+   "category": "pantheon",
+   "effects": [
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "following_cities"
+     },
+     "condition": {
+      "min_population": 3
+     },
+     "trigger": "passive",
+     "modifier": "yield.production.flat",
+     "amount": 1,
+     "source": "unciv: Beliefs.json, God of craftsmen"
+    }
+   ],
+   "art_id": "belief/pantheon/god-of-craftsmen",
+   "provenance": "unciv: Beliefs.json, God of craftsmen",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:belief/pantheon/god-of-the-sea",
+   "name": "God of the Sea",
+   "category": "pantheon",
+   "effects": [
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "tiles_of_following_cities",
+      "filter": {
+       "improvement": "core:improvement/fishing-boats"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "tile.yield.production.flat",
+     "amount": 1,
+     "source": "unciv: Beliefs.json, God of the Sea"
+    }
+   ],
+   "art_id": "belief/pantheon/god-of-the-sea",
+   "provenance": "unciv: Beliefs.json, God of the Sea",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:belief/pantheon/god-of-the-open-sky",
+   "name": "God of the Open Sky",
+   "category": "pantheon",
+   "effects": [
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "tiles_of_following_cities",
+      "filter": {
+       "improvement": "core:improvement/pasture"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "tile.yield.culture.flat",
+     "amount": 1,
+     "source": "unciv: Beliefs.json, God of the Open Sky"
+    }
+   ],
+   "art_id": "belief/pantheon/god-of-the-open-sky",
+   "provenance": "unciv: Beliefs.json, God of the Open Sky",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:belief/pantheon/messenger-of-the-gods",
+   "name": "Messenger of the Gods",
+   "category": "pantheon",
+   "effects": [
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "following_cities"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "trade.route.yield.science.flat",
+     "amount": 2,
+     "source": "unciv: Beliefs.json, Messenger of the Gods"
+    }
+   ],
+   "art_id": "belief/pantheon/messenger-of-the-gods",
+   "provenance": "unciv: Beliefs.json, Messenger of the Gods",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:belief/pantheon/one-with-nature",
+   "name": "One with Nature",
+   "category": "pantheon",
+   "effects": [
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "natural_wonder_tiles_of_following_cities"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "tile.yield.faith.flat",
+     "amount": 4,
+     "source": "unciv: Beliefs.json, One with Nature"
+    }
+   ],
+   "art_id": "belief/pantheon/one-with-nature",
+   "provenance": "unciv: Beliefs.json, One with Nature",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:belief/follower/feed-the-world",
+   "name": "Feed the World",
+   "category": "follower",
+   "effects": [
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "buildings_in_following_cities",
+      "filter": {
+       "building": "core:building/shrine"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "building.yield.food.flat",
+     "amount": 1,
+     "source": "unciv: Beliefs.json, Feed the World"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "buildings_in_following_cities",
+      "filter": {
+       "building": "core:building/temple"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "building.yield.food.flat",
+     "amount": 1,
+     "source": "unciv: Beliefs.json, Feed the World"
+    }
+   ],
+   "art_id": "belief/follower/feed-the-world",
+   "provenance": "unciv: Beliefs.json, Feed the World",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:belief/pantheon/religious-idols",
+   "name": "Religious Idols",
+   "category": "pantheon",
+   "effects": [
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "tiles_of_following_cities",
+      "filter": {
+       "resource": "core:resource/gold"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "tile.yield.faith.flat",
+     "amount": 1,
+     "source": "unciv: Beliefs.json, Religious Idols"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "tiles_of_following_cities",
+      "filter": {
+       "resource": "core:resource/gold"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "tile.yield.culture.flat",
+     "amount": 1,
+     "source": "unciv: Beliefs.json, Religious Idols"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "tiles_of_following_cities",
+      "filter": {
+       "resource": "core:resource/silver"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "tile.yield.faith.flat",
+     "amount": 1,
+     "source": "unciv: Beliefs.json, Religious Idols"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "tiles_of_following_cities",
+      "filter": {
+       "resource": "core:resource/silver"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "tile.yield.culture.flat",
+     "amount": 1,
+     "source": "unciv: Beliefs.json, Religious Idols"
+    }
+   ],
+   "art_id": "belief/pantheon/religious-idols",
+   "provenance": "unciv: Beliefs.json, Religious Idols",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:belief/pantheon/stone-circles",
+   "name": "Stone Circles",
+   "category": "pantheon",
+   "effects": [
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "tiles_of_following_cities",
+      "filter": {
+       "improvement": "core:improvement/quarry"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "tile.yield.faith.flat",
+     "amount": 2,
+     "source": "unciv: Beliefs.json, Stone Circles"
+    }
+   ],
+   "art_id": "belief/pantheon/stone-circles",
+   "provenance": "unciv: Beliefs.json, Stone Circles",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:belief/pantheon/god-of-war",
+   "name": "God of War",
+   "category": "pantheon",
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "player"
+     },
+     "condition": {
+      "max_distance": 4
+     },
+     "trigger": "on_kill",
+     "modifier": "faith.on_kill.pct_of_strength",
+     "amount": 50,
+     "source": "unciv: Beliefs.json, God of War"
+    }
+   ],
+   "art_id": "belief/pantheon/god-of-war",
+   "provenance": "unciv: Beliefs.json, God of War",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:belief/follower/swords-into-plowshares",
+   "name": "Swords into Plowshares",
+   "category": "follower",
+   "effects": [
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "following_cities"
+     },
+     "condition": {
+      "requires_peace": true
+     },
+     "trigger": "passive",
+     "modifier": "growth.rate.pct",
+     "amount": 15,
+     "source": "own value"
+    }
+   ],
+   "art_id": "belief/follower/swords-into-plowshares",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:belief/follower/guruship",
+   "name": "Guruship",
+   "category": "follower",
+   "effects": [
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "specialists_of_following_cities"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "specialist.yield.production.flat",
+     "amount": 2,
+     "source": "own value, unverified"
+    }
+   ],
+   "art_id": "belief/follower/guruship",
+   "provenance": "unciv: Beliefs.json, Guruship",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:belief/follower/holy-warriors",
+   "name": "Holy Warriors",
+   "category": "follower",
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "following_cities",
+      "filter": {
+       "era": "core:era/ancient"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "unlock.faith_purchase_units_from_era",
+     "amount": 1,
+     "source": "own value, unverified"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "following_cities",
+      "filter": {
+       "era": "core:era/classical"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "unlock.faith_purchase_units_from_era",
+     "amount": 1,
+     "source": "own value, unverified"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "following_cities",
+      "filter": {
+       "era": "core:era/medieval"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "unlock.faith_purchase_units_from_era",
+     "amount": 1,
+     "source": "own value, unverified"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "following_cities",
+      "filter": {
+       "era": "core:era/renaissance"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "unlock.faith_purchase_units_from_era",
+     "amount": 1,
+     "source": "own value, unverified"
+    }
+   ],
+   "art_id": "belief/follower/holy-warriors",
+   "provenance": "unciv: Beliefs.json, Holy Warriors",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:belief/pantheon/sacred-waters",
+   "name": "Sacred Waters",
+   "category": "pantheon",
+   "effects": [
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "following_cities"
+     },
+     "condition": {
+      "city_on_river": true
+     },
+     "trigger": "passive",
+     "modifier": "happiness.local",
+     "amount": 1,
+     "source": "unciv: Beliefs.json, Sacred Waters"
+    }
+   ],
+   "art_id": "belief/pantheon/sacred-waters",
+   "provenance": "unciv: Beliefs.json, Sacred Waters",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:belief/pantheon/goddess-of-love",
+   "name": "Goddess of Love",
+   "category": "pantheon",
+   "effects": [
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "following_cities"
+     },
+     "condition": {
+      "min_population": 6
+     },
+     "trigger": "passive",
+     "modifier": "happiness.local",
+     "amount": 1,
+     "source": "unciv: Beliefs.json, Goddess of Love"
+    }
+   ],
+   "art_id": "belief/pantheon/goddess-of-love",
+   "provenance": "unciv: Beliefs.json, Goddess of Love",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:belief/pantheon/religious-settlements",
+   "name": "Religious Settlements",
+   "category": "pantheon",
+   "effects": [
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "following_cities"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "border.culture_cost.pct",
+     "amount": -15,
+     "source": "unciv: Beliefs.json, Religious Settlements"
+    }
+   ],
+   "art_id": "belief/pantheon/religious-settlements",
+   "provenance": "unciv: Beliefs.json, Religious Settlements",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:belief/pantheon/goddess-of-festivals",
+   "name": "Goddess of Festivals",
+   "category": "pantheon",
+   "effects": [
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "tiles_of_following_cities",
+      "filter": {
+       "resource": "core:resource/wine"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "tile.yield.faith.flat",
+     "amount": 1,
+     "source": "unciv: Beliefs.json, Goddess of Festivals"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "tiles_of_following_cities",
+      "filter": {
+       "resource": "core:resource/wine"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "tile.yield.culture.flat",
+     "amount": 1,
+     "source": "unciv: Beliefs.json, Goddess of Festivals"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "tiles_of_following_cities",
+      "filter": {
+       "resource": "core:resource/incense"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "tile.yield.faith.flat",
+     "amount": 1,
+     "source": "unciv: Beliefs.json, Goddess of Festivals"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "tiles_of_following_cities",
+      "filter": {
+       "resource": "core:resource/incense"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "tile.yield.culture.flat",
+     "amount": 1,
+     "source": "unciv: Beliefs.json, Goddess of Festivals"
+    }
+   ],
+   "art_id": "belief/pantheon/goddess-of-festivals",
+   "provenance": "unciv: Beliefs.json, Goddess of Festivals",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:belief/pantheon/oral-tradition",
+   "name": "Oral Tradition",
+   "category": "pantheon",
+   "effects": [
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "tiles_of_following_cities",
+      "filter": {
+       "improvement": "core:improvement/plantation"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "tile.yield.culture.flat",
+     "amount": 1,
+     "source": "unciv: Beliefs.json, Oral Tradition"
+    }
+   ],
+   "art_id": "belief/pantheon/oral-tradition",
+   "provenance": "unciv: Beliefs.json, Oral Tradition",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:belief/pantheon/ancestor-worship",
+   "name": "Ancestor Worship",
+   "category": "pantheon",
+   "effects": [
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "buildings_in_following_cities",
+      "filter": {
+       "building": "core:building/shrine"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "building.yield.culture.flat",
+     "amount": 1,
+     "source": "unciv: Beliefs.json, Ancestor Worship"
+    }
+   ],
+   "art_id": "belief/pantheon/ancestor-worship",
+   "provenance": "unciv: Beliefs.json, Ancestor Worship",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:belief/pantheon/desert-folklore",
+   "name": "Desert Folklore",
+   "category": "pantheon",
+   "effects": [
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "tiles_of_following_cities",
+      "filter": {
+       "terrain": "core:terrain/desert"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "tile.yield.faith.flat",
+     "amount": 1,
+     "source": "unciv: Beliefs.json, Desert Folklore"
+    }
+   ],
+   "art_id": "belief/pantheon/desert-folklore",
+   "provenance": "unciv: Beliefs.json, Desert Folklore",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:belief/pantheon/sacred-path",
+   "name": "Sacred Path",
+   "category": "pantheon",
+   "effects": [
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "tiles_of_following_cities",
+      "filter": {
+       "feature": "core:feature/jungle"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "tile.yield.culture.flat",
+     "amount": 1,
+     "source": "unciv: Beliefs.json, Sacred Path"
+    }
+   ],
+   "art_id": "belief/pantheon/sacred-path",
+   "provenance": "unciv: Beliefs.json, Sacred Path",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:belief/pantheon/goddess-of-protection",
+   "name": "Goddess of Protection",
+   "category": "pantheon",
+   "effects": [
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "following_cities"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "city.ranged_strike.pct",
+     "amount": 30,
+     "source": "unciv: Beliefs.json, Goddess of Protection"
+    }
+   ],
+   "art_id": "belief/pantheon/goddess-of-protection",
+   "provenance": "unciv: Beliefs.json, Goddess of Protection",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:belief/pantheon/faith-healers",
+   "name": "Faith Healers",
+   "category": "pantheon",
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "all_units"
+     },
+     "condition": {
+      "adjacent_to_friendly_city": true
+     },
+     "trigger": "passive",
+     "modifier": "heal.flat",
+     "amount": 30,
+     "source": "unciv: Beliefs.json, Faith Healers"
+    }
+   ],
+   "art_id": "belief/pantheon/faith-healers",
+   "provenance": "unciv: Beliefs.json, Faith Healers",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:belief/pantheon/monument-to-the-gods",
+   "name": "Monument to the Gods",
+   "category": "pantheon",
+   "effects": [
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "following_cities"
+     },
+     "condition": {
+      "before_era": "core:era/medieval"
+     },
+     "trigger": "passive",
+     "modifier": "production.wonders.pct",
+     "amount": 15,
+     "source": "own value, unverified"
+    }
+   ],
+   "art_id": "belief/pantheon/monument-to-the-gods",
+   "provenance": "unciv: Beliefs.json, Monument to the Gods",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:belief/enhancer/religious-texts",
+   "name": "Religious Texts",
+   "category": "enhancer",
+   "effects": [
+    {
+     "scope": "religion",
+     "selector": {
+      "kind": "religion"
+     },
+     "condition": {
+      "doubles_with_tech": "core:tech/printing-press"
+     },
+     "trigger": "passive",
+     "modifier": "religion.pressure_out.pct",
+     "amount": 25,
+     "source": "own value, unverified"
+    }
+   ],
+   "art_id": "belief/enhancer/religious-texts",
+   "provenance": "unciv: Beliefs.json, Religious Texts",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:belief/enhancer/reliquary",
+   "name": "Reliquary",
+   "category": "enhancer",
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "player"
+     },
+     "condition": null,
+     "trigger": "on_great_person_expended",
+     "modifier": "faith.on_great_person_expended",
+     "amount": 50,
+     "source": "unciv: Beliefs.json, Reliquary"
+    }
+   ],
+   "art_id": "belief/enhancer/reliquary",
+   "provenance": "unciv: Beliefs.json, Reliquary",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:belief/founder/peace-loving",
+   "name": "Peace Loving",
+   "category": "founder",
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "religion_founder"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "happiness.per_x_peaceful_foreign_followers",
+     "amount": 8,
+     "source": "own value, unverified"
+    }
+   ],
+   "art_id": "belief/founder/peace-loving",
+   "provenance": "unciv: Beliefs.json, Peace Loving",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:belief/founder/interfaith-dialogue",
+   "name": "Interfaith Dialogue",
+   "category": "founder",
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "religion_founder"
+     },
+     "condition": null,
+     "trigger": "on_religion_spread",
+     "modifier": "science.on_spread_per_other_religion_follower",
+     "amount": 10,
+     "source": "unciv: Beliefs.json, Interfaith Dialogue"
+    }
+   ],
+   "art_id": "belief/founder/interfaith-dialogue",
+   "provenance": "unciv: Beliefs.json, Interfaith Dialogue",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:belief/founder/ceremonial-burial",
+   "name": "Ceremonial Burial",
+   "category": "founder",
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "religion_founder"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "happiness.per_following_city",
+     "amount": 0.5,
+     "source": "own value, unverified"
+    }
+   ],
+   "art_id": "belief/founder/ceremonial-burial",
+   "provenance": "unciv: Beliefs.json, Ceremonial Burial",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:belief/founder/church-property",
+   "name": "Church Property",
+   "category": "founder",
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "religion_founder"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "yield.gold.per_following_city",
+     "amount": 2,
+     "source": "unciv: Beliefs.json, Church Property"
+    }
+   ],
+   "art_id": "belief/founder/church-property",
+   "provenance": "unciv: Beliefs.json, Church Property",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:belief/founder/tithe",
+   "name": "Tithe",
+   "category": "founder",
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "religion_founder"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "yield.gold.per_x_followers",
+     "amount": 4,
+     "source": "unciv: Beliefs.json, Tithe"
+    }
+   ],
+   "art_id": "belief/founder/tithe",
+   "provenance": "unciv: Beliefs.json, Tithe",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:belief/founder/initiation-rites",
+   "name": "Initiation Rites",
+   "category": "founder",
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "religion_founder"
+     },
+     "condition": null,
+     "trigger": "on_city_converted",
+     "modifier": "gold.on_city_first_converted",
+     "amount": 100,
+     "source": "unciv: Beliefs.json, Initiation Rites"
+    }
+   ],
+   "art_id": "belief/founder/initiation-rites",
+   "provenance": "unciv: Beliefs.json, Initiation Rites",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:belief/enhancer/just-war",
+   "name": "Just War",
+   "category": "enhancer",
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "all_units"
+     },
+     "condition": {
+      "near_enemy_city_following_religion": true
+     },
+     "trigger": "passive",
+     "modifier": "combat.strength.pct",
+     "amount": 20,
+     "source": "own value, unverified"
+    }
+   ],
+   "art_id": "belief/enhancer/just-war",
+   "provenance": "unciv: Beliefs.json, Just War",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:belief/enhancer/defender-of-the-faith",
+   "name": "Defender of the Faith",
+   "category": "enhancer",
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "all_units"
+     },
+     "condition": {
+      "near_friendly_city_following_religion": true
+     },
+     "trigger": "passive",
+     "modifier": "combat.strength.pct",
+     "amount": 20,
+     "source": "own value, unverified"
+    }
+   ],
+   "art_id": "belief/enhancer/defender-of-the-faith",
+   "provenance": "unciv: Beliefs.json, Defender of the Faith",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:belief/enhancer/itinerant-preachers",
+   "name": "Itinerant Preachers",
+   "category": "enhancer",
+   "effects": [
+    {
+     "scope": "religion",
+     "selector": {
+      "kind": "religion"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "religion.spread_distance.pct",
+     "amount": 30,
+     "source": "own value, unverified"
+    }
+   ],
+   "art_id": "belief/enhancer/itinerant-preachers",
+   "provenance": "unciv: Beliefs.json, Itinerant Preachers",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:belief/enhancer/messiah",
+   "name": "Messiah",
+   "category": "enhancer",
+   "effects": [
+    {
+     "scope": "religion",
+     "selector": {
+      "kind": "religion"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "prophet.strength.pct",
+     "amount": 25,
+     "source": "unciv: Beliefs.json, Messiah"
+    },
+    {
+     "scope": "religion",
+     "selector": {
+      "kind": "religion"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "prophet.faith_threshold.pct",
+     "amount": -25,
+     "source": "unciv: Beliefs.json, Messiah"
+    }
+   ],
+   "art_id": "belief/enhancer/messiah",
+   "provenance": "unciv: Beliefs.json, Messiah",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:belief/enhancer/missionary-zeal",
+   "name": "Missionary Zeal",
+   "category": "enhancer",
+   "effects": [
+    {
+     "scope": "religion",
+     "selector": {
+      "kind": "religion"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "missionary.strength.pct",
+     "amount": 25,
+     "source": "unciv: Beliefs.json, Missionary Zeal"
+    }
+   ],
+   "art_id": "belief/enhancer/missionary-zeal",
+   "provenance": "unciv: Beliefs.json, Missionary Zeal",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:belief/enhancer/holy-order",
+   "name": "Holy Order",
+   "category": "enhancer",
+   "effects": [
+    {
+     "scope": "religion",
+     "selector": {
+      "kind": "religion"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "faith_purchase.missionary_inquisitor.cost.pct",
+     "amount": -30,
+     "source": "unciv: Beliefs.json, Holy Order"
+    }
+   ],
+   "art_id": "belief/enhancer/holy-order",
+   "provenance": "unciv: Beliefs.json, Holy Order",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:belief/enhancer/religious-unity",
+   "name": "Religious Unity",
+   "category": "enhancer",
+   "effects": [
+    {
+     "scope": "religion",
+     "selector": {
+      "kind": "religion"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "religion.pressure_to_friendly_city_states.pct",
+     "amount": 100,
+     "source": "unciv: Beliefs.json, Religious Unity"
+    }
+   ],
+   "art_id": "belief/enhancer/religious-unity",
+   "provenance": "unciv: Beliefs.json, Religious Unity",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:belief/follower/cathedrals",
+   "name": "Cathedrals",
+   "category": "follower",
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "following_cities",
+      "filter": {
+       "building": "core:building/cathedral"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "unlock.faith_purchase_building",
+     "amount": 1,
+     "source": "own value, unverified"
+    }
+   ],
+   "art_id": "belief/follower/cathedrals",
+   "provenance": "unciv: Beliefs.json, Cathedrals",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:belief/follower/mosques",
+   "name": "Mosques",
+   "category": "follower",
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "following_cities",
+      "filter": {
+       "building": "core:building/mosque"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "unlock.faith_purchase_building",
+     "amount": 1,
+     "source": "own value, unverified"
+    }
+   ],
+   "art_id": "belief/follower/mosques",
+   "provenance": "unciv: Beliefs.json, Mosques",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:belief/follower/pagodas",
+   "name": "Pagodas",
+   "category": "follower",
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "following_cities",
+      "filter": {
+       "building": "core:building/pagoda"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "unlock.faith_purchase_building",
+     "amount": 1,
+     "source": "own value, unverified"
+    }
+   ],
+   "art_id": "belief/follower/pagodas",
+   "provenance": "unciv: Beliefs.json, Pagodas",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:belief/follower/monasteries",
+   "name": "Monasteries",
+   "category": "follower",
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "following_cities",
+      "filter": {
+       "building": "core:building/monastery"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "unlock.faith_purchase_building",
+     "amount": 1,
+     "source": "own value, unverified"
+    }
+   ],
+   "art_id": "belief/follower/monasteries",
+   "provenance": "unciv: Beliefs.json, Monasteries",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:belief/follower/peace-gardens",
+   "name": "Peace Gardens",
+   "category": "follower",
+   "effects": [
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "buildings_in_following_cities",
+      "filter": {
+       "building": "core:building/garden"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "building.happiness.flat",
+     "amount": 2,
+     "source": "unciv: Beliefs.json, Peace Gardens"
+    }
+   ],
+   "art_id": "belief/follower/peace-gardens",
+   "provenance": "unciv: Beliefs.json, Peace Gardens",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:belief/follower/choral-music",
+   "name": "Choral Music",
+   "category": "follower",
+   "effects": [
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "buildings_in_following_cities",
+      "filter": {
+       "building": "core:building/temple"
+      }
+     },
+     "condition": {
+      "min_followers": 5
+     },
+     "trigger": "passive",
+     "modifier": "building.yield.culture.flat",
+     "amount": 2,
+     "source": "unciv: Beliefs.json, Choral Music"
+    }
+   ],
+   "art_id": "belief/follower/choral-music",
+   "provenance": "unciv: Beliefs.json, Choral Music",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:belief/follower/religious-art",
+   "name": "Religious Art",
+   "category": "follower",
+   "effects": [
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "buildings_in_following_cities",
+      "filter": {
+       "building": "core:building/hermitage"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "building.yield.tourism.flat",
+     "amount": 4,
+     "source": "own design: tourism, influence and great works"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "buildings_in_following_cities",
+      "filter": {
+       "building": "core:building/hermitage"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "building.yield.culture.flat",
+     "amount": 8,
+     "source": "unciv: Beliefs.json, Religious Art"
+    }
+   ],
+   "art_id": "belief/follower/religious-art",
+   "provenance": "unciv: Beliefs.json, Religious Art",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:belief/follower/liturgical-drama",
+   "name": "Liturgical Drama",
+   "category": "follower",
+   "effects": [
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "buildings_in_following_cities",
+      "filter": {
+       "building": "core:building/amphitheater"
+      }
+     },
+     "condition": {
+      "min_followers": 3
+     },
+     "trigger": "passive",
+     "modifier": "building.yield.faith.flat",
+     "amount": 1,
+     "source": "unciv: Beliefs.json, Liturgical Drama"
+    }
+   ],
+   "art_id": "belief/follower/liturgical-drama",
+   "provenance": "unciv: Beliefs.json, Liturgical Drama",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:belief/follower/asceticism",
+   "name": "Asceticism",
+   "category": "follower",
+   "effects": [
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "buildings_in_following_cities",
+      "filter": {
+       "building": "core:building/shrine"
+      }
+     },
+     "condition": {
+      "min_followers": 3
+     },
+     "trigger": "passive",
+     "modifier": "building.happiness.flat",
+     "amount": 1,
+     "source": "unciv: Beliefs.json, Asceticism"
+    }
+   ],
+   "art_id": "belief/follower/asceticism",
+   "provenance": "unciv: Beliefs.json, Asceticism",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:belief/follower/religious-center",
+   "name": "Religious Center",
+   "category": "follower",
+   "effects": [
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "buildings_in_following_cities",
+      "filter": {
+       "building": "core:building/temple"
+      }
+     },
+     "condition": {
+      "min_followers": 5
+     },
+     "trigger": "passive",
+     "modifier": "building.happiness.flat",
+     "amount": 2,
+     "source": "unciv: Beliefs.json, Religious Center"
+    }
+   ],
+   "art_id": "belief/follower/religious-center",
+   "provenance": "unciv: Beliefs.json, Religious Center",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:belief/founder/papal-primacy",
+   "name": "Papal Primacy",
+   "category": "founder",
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "city_states"
+     },
+     "condition": {
+      "city_state_follows_religion": true
+     },
+     "trigger": "passive",
+     "modifier": "city_state.influence_resting_point.flat",
+     "amount": 15,
+     "source": "unciv: Beliefs.json, Papal Primacy"
+    }
+   ],
+   "art_id": "belief/founder/papal-primacy",
+   "provenance": "unciv: Beliefs.json, Papal Primacy",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:belief/pantheon/dance-of-the-aurora",
+   "name": "Dance of the Aurora",
+   "category": "pantheon",
+   "effects": [
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "tiles_of_following_cities",
+      "filter": {
+       "terrain": "core:terrain/tundra"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "tile.yield.faith.flat",
+     "amount": 1,
+     "source": "unciv: Beliefs.json, Dance of the Aurora"
+    }
+   ],
+   "art_id": "belief/pantheon/dance-of-the-aurora",
+   "provenance": "unciv: Beliefs.json, Dance of the Aurora",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:belief/follower/religious-community",
+   "name": "Religious Community",
+   "category": "follower",
+   "effects": [
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "following_cities"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "yield.production.pct_per_follower_max",
+     "amount": 15,
+     "source": "unciv: Beliefs.json, Religious Community"
+    }
+   ],
+   "art_id": "belief/follower/religious-community",
+   "provenance": "unciv: Beliefs.json, Religious Community",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:belief/follower/divine-inspiration",
+   "name": "Divine Inspiration",
+   "category": "follower",
+   "effects": [
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "following_cities"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "world_wonder.yield.faith.flat",
+     "amount": 2,
+     "source": "unciv: Beliefs.json, Divine inspiration"
+    }
+   ],
+   "art_id": "belief/follower/divine-inspiration",
+   "provenance": "unciv: Beliefs.json, Divine inspiration",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:belief/founder/pilgrimage",
+   "name": "Pilgrimage",
+   "category": "founder",
+   "effects": [
+    {
+     "scope": "religion",
+     "selector": {
+      "kind": "holy_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "yield.faith.per_foreign_following_city",
+     "amount": 2,
+     "source": "unciv: Beliefs.json, Pilgrimage"
+    }
+   ],
+   "art_id": "belief/founder/pilgrimage",
+   "provenance": "unciv: Beliefs.json, Pilgrimage",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:belief/founder/world-church",
+   "name": "World Church",
+   "category": "founder",
+   "effects": [
+    {
+     "scope": "religion",
+     "selector": {
+      "kind": "holy_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "yield.culture.per_x_foreign_followers",
+     "amount": 5,
+     "source": "unciv: Beliefs.json, World Church"
+    }
+   ],
+   "art_id": "belief/founder/world-church",
+   "provenance": "unciv: Beliefs.json, World Church",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:belief/reformation/charitable-missions",
+   "name": "Charitable Missions",
+   "category": "reformation",
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "city_states"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "city_state.gold_gift_influence.pct",
+     "amount": 30,
+     "source": "own value"
+    }
+   ],
+   "art_id": "belief/reformation/charitable-missions",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:belief/reformation/evangelism",
+   "name": "Evangelism",
+   "category": "reformation",
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "religion_founder"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "belief.other_religion_pressure_erosion",
+     "amount": 100,
+     "needs_mechanic": "other_religion_pressure_erosion",
+     "source": "own value, unverified"
+    }
+   ],
+   "art_id": "belief/reformation/evangelism",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:belief/reformation/heathen-conversion",
+   "name": "Heathen Conversion",
+   "category": "reformation",
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "religion_founder"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "belief.converts_barbarians",
+     "amount": true,
+     "needs_mechanic": "converts_barbarians",
+     "source": "own value"
+    }
+   ],
+   "art_id": "belief/reformation/heathen-conversion",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:belief/reformation/jesuit-education",
+   "name": "Jesuit Education",
+   "category": "reformation",
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "following_cities",
+      "filter": {
+       "building": "core:building/university"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "unlock.faith_purchase_building",
+     "amount": 1,
+     "source": "own value"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "following_cities",
+      "filter": {
+       "building": "core:building/public_school"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "unlock.faith_purchase_building",
+     "amount": 1,
+     "source": "own value"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "following_cities",
+      "filter": {
+       "building": "core:building/research_lab"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "unlock.faith_purchase_building",
+     "amount": 1,
+     "source": "own value"
+    }
+   ],
+   "art_id": "belief/reformation/jesuit-education",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:belief/reformation/religious-fervor",
+   "name": "Religious Fervor",
+   "category": "reformation",
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "following_cities",
+      "filter": {
+       "era": "core:era/industrial"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "unlock.faith_purchase_units_from_era",
+     "amount": 1,
+     "source": "own value"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "following_cities",
+      "filter": {
+       "era": "core:era/modern"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "unlock.faith_purchase_units_from_era",
+     "amount": 1,
+     "source": "own value"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "following_cities",
+      "filter": {
+       "era": "core:era/atomic"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "unlock.faith_purchase_units_from_era",
+     "amount": 1,
+     "source": "own value"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "following_cities",
+      "filter": {
+       "era": "core:era/information"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "unlock.faith_purchase_units_from_era",
+     "amount": 1,
+     "source": "own value"
+    }
+   ],
+   "art_id": "belief/reformation/religious-fervor",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:belief/reformation/sacred-sites",
+   "name": "Sacred Sites",
+   "category": "reformation",
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "religion_founder",
+      "filter": {
+       "building": "purchased_with_faith"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "building.yield.tourism.flat",
+     "amount": 2,
+     "source": "own value"
+    }
+   ],
+   "art_id": "belief/reformation/sacred-sites",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:belief/reformation/to-the-glory-of-god",
+   "name": "To the Glory of God",
+   "category": "reformation",
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "religion_founder"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "belief.faith_purchase_all_great_people",
+     "amount": true,
+     "needs_mechanic": "faith_purchase_all_great_people",
+     "source": "own value"
+    }
+   ],
+   "art_id": "belief/reformation/to-the-glory-of-god",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:belief/reformation/underground-sect",
+   "name": "Underground Sect",
+   "category": "reformation",
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "religion_founder"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "belief.spy_pressure",
+     "amount": 5,
+     "needs_mechanic": "spy_pressure",
+     "source": "own value"
+    }
+   ],
+   "art_id": "belief/reformation/underground-sect",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:belief/reformation/unity-of-the-prophets",
+   "name": "Unity of the Prophets",
+   "category": "reformation",
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "religion_founder"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "belief.inquisitor_pressure_retention",
+     "amount": 50,
+     "needs_mechanic": "inquisitor_pressure_retention",
+     "source": "own value"
+    }
+   ],
+   "art_id": "belief/reformation/unity-of-the-prophets",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:belief/pantheon/tears-of-the-gods",
+   "name": "Tears of the Gods",
+   "category": "pantheon",
+   "effects": [
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "tiles_of_following_cities",
+      "filter": {
+       "resource": "core:resource/pearls"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "tile.yield.faith.flat",
+     "amount": 2,
+     "source": "own value"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "tiles_of_following_cities",
+      "filter": {
+       "resource": "core:resource/gems"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "tile.yield.faith.flat",
+     "amount": 2,
+     "source": "own value"
+    }
+   ],
+   "art_id": "belief/pantheon/tears-of-the-gods",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:belief/pantheon/earth-mother",
+   "name": "Earth Mother",
+   "category": "pantheon",
+   "effects": [
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "tiles_of_following_cities",
+      "filter": {
+       "resource": "core:resource/copper"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "tile.yield.faith.flat",
+     "amount": 1,
+     "source": "own value"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "tiles_of_following_cities",
+      "filter": {
+       "resource": "core:resource/iron"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "tile.yield.faith.flat",
+     "amount": 1,
+     "source": "own value"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "tiles_of_following_cities",
+      "filter": {
+       "resource": "core:resource/salt"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "tile.yield.faith.flat",
+     "amount": 1,
+     "source": "own value"
+    }
+   ],
+   "art_id": "belief/pantheon/earth-mother",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:belief/pantheon/god-king",
+   "name": "God-King",
+   "category": "pantheon",
+   "effects": [
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "buildings_in_following_cities",
+      "filter": {
+       "building": "core:building/palace"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "building.yield.culture.flat",
+     "amount": 1,
+     "source": "own value"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "buildings_in_following_cities",
+      "filter": {
+       "building": "core:building/palace"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "building.yield.faith.flat",
+     "amount": 1,
+     "source": "own value"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "buildings_in_following_cities",
+      "filter": {
+       "building": "core:building/palace"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "building.yield.gold.flat",
+     "amount": 1,
+     "source": "own value"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "buildings_in_following_cities",
+      "filter": {
+       "building": "core:building/palace"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "building.yield.production.flat",
+     "amount": 1,
+     "source": "own value"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "buildings_in_following_cities",
+      "filter": {
+       "building": "core:building/palace"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "building.yield.science.flat",
+     "amount": 1,
+     "source": "own value"
+    }
+   ],
+   "art_id": "belief/pantheon/god-king",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:belief/pantheon/sun-god",
+   "name": "Sun God",
+   "category": "pantheon",
+   "effects": [
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "tiles_of_following_cities",
+      "filter": {
+       "resource": "core:resource/bananas"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "tile.yield.food.flat",
+     "amount": 1,
+     "source": "own value"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "tiles_of_following_cities",
+      "filter": {
+       "resource": "core:resource/citrus"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "tile.yield.food.flat",
+     "amount": 1,
+     "source": "own value"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "tiles_of_following_cities",
+      "filter": {
+       "resource": "core:resource/wheat"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "tile.yield.food.flat",
+     "amount": 1,
+     "source": "own value"
+    }
+   ],
+   "art_id": "belief/pantheon/sun-god",
+   "provenance": "own value"
+  }
+ ],
+ "notice": "Derived from Unciv (https://github.com/yairm210/Unciv), MPL-2.0: rule fields of the entries marked `unciv:` come from Unciv's `Civ V - Gods & Kings` JSON files at commit 18827b1f; entries marked `own value, unverified` have no Unciv counterpart. Listed per file in classic/docs/classic/UNCIV-ATTRIBUTION.md."
+}

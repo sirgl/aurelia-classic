@@ -1,0 +1,36 @@
+[package]
+name = "classic-ui"
+version = "0.1.0"
+edition = "2021"
+description = "Screens and HUD of the classic module on the Aurelia shell."
+license = "MIT OR Apache-2.0"
+authors = ["The Aurelia contributors"]
+repository = "https://github.com/sirgl/aurelia-classic"
+keywords = ["egui", "gamedev", "ui"]
+categories = ["game-development", "gui"]
+rust-version = "1.98"
+publish = false
+
+# The classic module's user interface: its screens, view models and HUD panels, plugged
+# into the app shell (`client::shell`) through `client::shell::module::ModuleUi`.
+[dependencies]
+# std::time::Instant panics in a browser; web-time is std on native.
+web-time = "1.1.0"
+client = { package = "aurelia-client", path = "../../../platform/crates/client" }
+i18n = { package = "aurelia-i18n", path = "../../../platform/crates/i18n" }
+render = { package = "aurelia-render", path = "../../../platform/crates/render" }
+classic-rules = { path = "../classic-rules" }
+classic-content = { path = "../classic-content" }
+egui = "0.36.2"
+egui-wgpu = "0.36.2"
+image = { version = "0.25.10", default-features = false, features = ["png", "webp"] }
+wgpu = "30.0.1"
+
+[dev-dependencies]
+kernel = { package = "aurelia-kernel", path = "../../../platform/crates/kernel", features = ["harness"] }
+classic-rules = { path = "../classic-rules", features = ["harness"] }
+classic-ui = { path = ".", features = ["dev-tools"] }
+bytemuck = "1.25.2"
+
+[features]
+dev-tools = ["classic-rules/harness"]

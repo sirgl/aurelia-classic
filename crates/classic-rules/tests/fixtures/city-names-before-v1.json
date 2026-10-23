@@ -1,0 +1,17 @@
+{
+  "rules_hash": 2736398163960058391,
+  "world_hash": 16482646460580814796,
+  "schema": 44,
+  "simulation": 1,
+  "codec": 19,
+  "snapshot_sha256": "d3086d5d67331b819e69fd2d88872e13f7e3eeee60bd946496076ec69be016ee",
+  "capture_binary_sha256": "58c2d4d3578447595c05b2d9794d4afd86a64d3f4774e81bb7f8ca34ea1d9738",
+  "capture_recipe_sha256": "b72b57b358d7aedf5ff10c5c4542418a3df8743a09c88710051a4b687d7d6fc9",
+  "city_names": [
+    "My Custom Capital",
+    "City 2",
+    "City 1",
+    "City 2"
+  ],
+  "note": "Captured by pre-city_names compiled code before any schema or civilizations.ron edit. Old duplicate names intentionally preserved as migration evidence."
+}

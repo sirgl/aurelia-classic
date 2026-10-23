@@ -1,0 +1,37 @@
+screen Menu 1366x768
+widgets
+  click "EIN STRATEGIESPIEL / AURELIA / Eine Welt, die darauf wartet, geschrieben zu werd…" 0,0 1366x768
+  click "Neues Spiel" 89,342 320x44
+  click "Einstellungen" 89,454 320x38
+  click "Beenden" 89,502 320x38
+painted
+  clip 0,0 1366x768
+    rect 0,0 1366x768 fill #09161c
+    rect 0,0 1366x768 fill #182f35
+    circle 683,384 r169 stroke 1 #5c6859
+    mesh 2tri 0,0 1366x768
+    rect 0,0 533x768 fill #000000b0
+    text "EIN STRATEGIESPIEL" 89,99 99x13 #c1a263 11px
+    text "AURELIA" 89,131 207x61 #efe9d3 53.4px
+    text "Eine Welt, die darauf wartet, geschrieben zu werden" 89,209 418x21 #92a8aa 18px
+    line 89,253 -> 329,253 stroke 1 #c1a263
+    rect 89,286 320x44 fill #192f34 r4
+    rect 89,286 320x44 stroke 1 #c1a263 r4
+    text "Fortsetzen" 215,300 67x16 #92a8aa 14px
+    rect 89,342 320x44 fill #192f34 r4
+    rect 89,342 320x44 stroke 1 #344849 r4
+    text "Neues Spiel" 213,356 72x16 #efe9d3 14px
+    rect 89,398 156x44 fill #192f34 r4
+    rect 89,398 156x44 stroke 1 #344849 r4
+    text "Spiel speichern" 120,412 94x16 #92a8aa 14px
+    rect 253,398 156x44 fill #192f34 r4
+    rect 253,398 156x44 stroke 1 #344849 r4
+    text "Spiel laden" 297,412 68x16 #92a8aa 14px
+    rect 89,454 320x38 fill #192f34 r4
+    rect 89,454 320x38 stroke 1 #344849 r4
+    text "Einstellungen" 206,465 85x16 #efe9d3 14px
+    rect 89,502 320x38 fill #192f34 r4
+    rect 89,502 320x38 stroke 1 #344849 r4
+    text "Beenden" 221,513 56x16 #efe9d3 14px
+art
+  menu

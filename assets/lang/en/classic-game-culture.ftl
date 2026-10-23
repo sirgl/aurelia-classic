@@ -1,0 +1,33 @@
+# Civ V game layer: the culture screen data and notices (game/culture.rs).
+
+classic.game.culture.ideology = { $name } · { $opinion }
+classic.game.culture.no-ideology = No ideology
+classic.game.culture.trend-rising = rising
+classic.game.culture.trend-falling = falling
+classic.game.culture.trend-static = static
+classic.game.culture.class-art = Art
+classic.game.culture.class-artifact = Artifact
+classic.game.culture.class-writing = Writing
+classic.game.culture.class-music = Music
+classic.game.culture.provenance = { $nation } · { $era }
+classic.game.culture.ideology-switched = Ideology switched
+classic.game.culture.dig-chosen = Dig: { $choice }
+classic.game.culture.free-great-person = Free great person: { $name }
+classic.game.culture.opinion-content = content
+classic.game.culture.opinion-murmurs = murmurs ({ $n })
+classic.game.culture.opinion-unrest = unrest ({ $n })
+classic.game.culture.opinion-upheaval = upheaval ({ $n })
+classic.game.culture.slot-art-artifact = ART / ARTIFACT
+classic.game.culture.slot-writing = WRITING
+classic.game.culture.slot-music = MUSIC
+classic.game.culture.choice-landmark = Landmark
+classic.game.culture.choice-artifact-second = Artifact (second nation)
+classic.game.culture.choice-culture = Culture
+classic.game.culture.dig-at = Dig at ({ $q }, { $r })
+classic.game.culture.dig = Dig
+classic.game.culture.level-unknown = Unknown
+classic.game.culture.level-noticed = Noticed
+classic.game.culture.level-admired = Admired
+classic.game.culture.level-imitated = Imitated
+classic.game.culture.level-embraced = Embraced
+classic.game.culture.level-prevailing = Prevailing

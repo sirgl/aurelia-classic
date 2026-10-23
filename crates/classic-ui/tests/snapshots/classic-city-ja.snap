@@ -1,0 +1,191 @@
+screen 都市 1366x768
+widgets
+  click "AURELIA / 都市 / マップに戻る / ナビゲーション / Rome / 名前を変更 / マップ上のタイルを購入 / 概要 / 市民 / 建造物 / 市…" 0,0 1366x768
+  click "マップに戻る" 1208,15 132x36
+  click "ナビゲーション" 1080,15 116x36
+  click "" 338,148 658x517
+  click "名前を変更" 218,92 92x28
+  click "マップ上のタイルを購入" 38,130 272x36
+  click "概要" 38,180 88x31
+  click "市民" 129,180 87x31
+  click "建造物" 219,180 88x31
+  click "バランス" 38,520 112x30
+  click "食料" 158,520 112x30
+  click "生産力" 38,553 112x30
+  click "ゴールド" 158,553 112x30
+  click "科学力" 38,586 112x30
+  click "文化" 158,586 112x30
+  click "偉人" 38,619 112x30
+  click "信仰" 158,619 112x30
+  click "成長を避ける" 38,652 230x30
+  scrollbar "4" 300,225 10x492
+  textinput "ユニット、建造物、驚異を検索" 1022,119 308x32
+  click "利用可能" 1022,160 151x30
+  click "すべて" 1176,160 151x30
+  combobox "すべての種類" 1022,198 296x18
+  click "斥候 / 生産力 25 · 7ターン" 1022,236 308x70
+  click "戦士 / 生産力 40 · 10ターン" 1022,314 308x70
+  click "労働者 / 生産力 70 · 18ターン" 1022,392 308x70
+  click "キューに追加：斥候 / キュー · 命令 1件 / 戦士" 1022,470 308x70
+  scrollbar "" 1320,236 10x215
+  click "キューに追加：斥候" 1022,459 308x36
+  click "クリア" 1022,687 90x32
+  progressindicator "0 / 40 · 10ターン" 1022,541 308x18 value 0
+  click "Rome / ローマ  ·  都市管理" 338,80 658x68
+painted
+  clip 0,0 1366x768
+    rect 0,0 1366x70 fill #09161c
+    rect 0,739 1366x29 fill #09161c
+    text "AURELIA" 26,19 89x26 #c1a263 23px
+    text "都市" 166,22 40x23 #efe9d3 20px
+    rect 1208,15 132x36 fill #192f34 r4
+    rect 1208,15 132x36 stroke 1 #344849 r4
+    text "マップに戻る" 1232,25 84x16 #efe9d3 14px
+    rect 1080,15 116x36 fill #192f34 r4
+    rect 1080,15 116x36 stroke 1 #344849 r4
+    text "ナビゲーション" 1089,25 98x16 #efe9d3 14px
+    line 24,65 -> 1342,65 stroke 1 #c1a36466
+    rect 24,80 300x651 fill #11242b r7
+    rect 24,80 300x651 stroke 1 #344849 r7
+  clip 40,92 172x30
+    text "Rome" 40,92 60x26 #efe9d3 23px
+  clip 0,0 1366x768
+    rect 218,92 92x28 fill #192f34 r4
+    rect 218,92 92x28 stroke 1 #344849 r4
+    text "名前を変更" 229,98 70x16 #efe9d3 14px
+    rect 38,130 272x36 fill #192f34 r4
+    rect 38,130 272x36 stroke 1 #344849 r4
+    text "マップ上のタイルを購入" 97,140 154x16 #efe9d3 14px
+    rect 38,180 88x31 fill #192f34 r4
+    rect 38,180 88x31 stroke 1 #344849 r4
+    text "概要" 68,188 28x16 #efe9d3 14px
+    rect 129,180 87x31 fill #3f7d7c r4
+    rect 129,180 87x31 stroke 1 #c1a263 r4
+    text "市民" 158,188 28x16 #efe9d3 14px
+    rect 219,180 88x31 fill #192f34 r4
+    rect 219,180 88x31 stroke 1 #344849 r4
+    text "建造物" 242,188 42x16 #efe9d3 14px
+  clip 38,225 272x492
+    text "市民 1人" 38,225 83x25 #efe9d3 22px
+    text "タイル 1  ·  スペシャリスト 0  ·  無職 0" 38,253 199x14 #92a8aa 12px
+    text "ターンごとの産出量" 38,278 98x13 #92a8aa 11px
+    text "食料" 38,300 22x13 #92a8aa 11px
+    text "+2" 154,299 16x16 #efe9d3 14px
+    text "生産力" 178,300 33x13 #92a8aa 11px
+    text "4" 302,299 8x16 #efe9d3 14px
+    text "ゴールド" 38,328 44x13 #92a8aa 11px
+    text "+6" 154,327 16x16 #efe9d3 14px
+    text "科学力" 178,328 33x13 #92a8aa 11px
+    text "+4" 294,327 16x16 #efe9d3 14px
+    text "8ターン後に成長" 38,350 90x14 #efe9d3 12px
+    text "タイルで働く" 38,379 60x11 #c1a263 10px
+    text "作業中" 38,393 39x18 #68c5b0 13px
+    text "ロック中" 38,393 99x18 #c1a263 13px
+    text "利用可能" 38,393 159x18 #efe9d3 13px
+    text "空いているタイルを左クリックすると市民を配置してロックします。作業中のタイルをクリックすると作業をやめます。" 38,414 264x42 #efe9d3 12px
+    text "右クリックでロック/解除します。" 38,459 183x14 #efe9d3 12px
+    text "都市の中心は自動的に作業されます。" 38,476 186x13 #92a8aa 11px
+    text "総督の重点" 38,506 50x11 #c1a263 10px
+    rect 38,520 112x30 fill #3f7d7c r4
+    rect 38,520 112x30 stroke 1 #c1a263 r4
+    text "バランス" 66,527 56x16 #efe9d3 14px
+    rect 158,520 112x30 fill #192f34 r4
+    rect 158,520 112x30 stroke 1 #344849 r4
+    text "食料" 200,527 28x16 #efe9d3 14px
+    rect 38,553 112x30 fill #192f34 r4
+    rect 38,553 112x30 stroke 1 #344849 r4
+    text "生産力" 73,560 42x16 #efe9d3 14px
+    rect 158,553 112x30 fill #192f34 r4
+    rect 158,553 112x30 stroke 1 #344849 r4
+    text "ゴールド" 186,560 56x16 #efe9d3 14px
+    rect 38,586 112x30 fill #192f34 r4
+    rect 38,586 112x30 stroke 1 #344849 r4
+    text "科学力" 73,593 42x16 #efe9d3 14px
+    rect 158,586 112x30 fill #192f34 r4
+    rect 158,586 112x30 stroke 1 #344849 r4
+    text "文化" 200,593 28x16 #efe9d3 14px
+    rect 38,619 112x30 fill #192f34 r4
+    rect 38,619 112x30 stroke 1 #344849 r4
+    text "偉人" 80,626 28x16 #efe9d3 14px
+    rect 158,619 112x30 fill #192f34 r4
+    rect 158,619 112x30 stroke 1 #344849 r4
+    text "信仰" 200,626 28x16 #efe9d3 14px
+    rect 38,652 230x30 fill #192f34 r4
+    rect 38,652 230x30 stroke 1 #344849 r4
+    text "成長を避ける" 111,659 84x16 #efe9d3 14px
+    text "専門家" 38,699 30x11 #c1a263 10px
+    text "無職の市民" 38,713 65x15 #efe9d3 13px
+    mesh 2tri 38,697 272x20
+  clip 0,0 1366x768
+    rect 1010,80 332x651 fill #11242b r7
+    rect 1010,80 332x651 stroke 1 #344849 r7
+  clip 1024,92 304x28
+    text "生産" 1024,92 24x14 #c1a263 12px
+  clip 0,0 1366x768
+    rect 1022,119 308x32 fill #0a0a0a r2
+    text "ユニット、建造物、驚異を検索" 1026,121 182x15 #ebe8d599 13px
+    rect 1022,160 151x30 fill #3f7d7c r4
+    rect 1022,160 151x30 stroke 1 #c1a263 r4
+    text "利用可能" 1070,167 56x16 #efe9d3 14px
+    rect 1176,160 151x30 fill #192f34 r4
+    rect 1176,160 151x30 stroke 1 #344849 r4
+    text "すべて" 1231,167 41x16 #efe9d3 14px
+    rect 1022,198 296x18 fill #3c3c3c r2
+    path 3pt 1302,204 10x6 fill #b4b4b4
+    text "すべての種類" 1026,200 77x15 #ebe7d5 13px
+  clip 1022,236 308x215
+    rect 1022,236 308x70 fill #26444b r4
+    rect 1022,236 308x70 stroke 1 #c1a263 r4
+    rect 1027,243 54x54 fill #182f35
+    circle 1054,270 r11.9 stroke 1 #5c6859
+  clip 1090,244 232x57
+    text "斥候" 1090,244 30x17 #efe9d3 15px
+  clip 1090,268 232x33
+    text "生産力 25 · 7ターン" 1090,268 94x13 #92a8aa 11px
+  clip 1022,236 308x215
+    rect 1022,314 308x70 fill #192f34 r4
+    rect 1027,321 54x54 fill #182f35
+    circle 1054,348 r11.9 stroke 1 #5c6859
+  clip 1090,322 232x57
+    text "戦士" 1090,322 30x17 #efe9d3 15px
+  clip 1090,346 232x33
+    text "生産力 40 · 10ターン" 1090,346 101x13 #92a8aa 11px
+  clip 1022,236 308x215
+    rect 1022,392 308x70 fill #192f34 r4
+    rect 1027,399 54x54 fill #182f35
+    circle 1054,426 r11.9 stroke 1 #5c6859
+  clip 1090,400 232x51
+    text "労働者" 1090,400 45x17 #efe9d3 15px
+  clip 1090,424 232x27
+    text "生産力 70 · 18ターン" 1090,424 101x13 #92a8aa 11px
+  clip 1022,236 308x215
+    mesh 2tri 1022,431 308x20
+  clip 0,0 1366x768
+    rect 1022,459 308x36 fill #3f7d7c r4
+    rect 1022,459 308x36 stroke 1 #c1a263 r4
+    text "キューに追加：斥候" 1113,469 126x16 #efe9d3 14px
+    rect 1022,687 90x32 fill #192f34 r4
+    rect 1022,687 90x32 stroke 1 #344849 r4
+    text "クリア" 1046,695 42x16 #efe9d3 14px
+    rect 1119,687 211x32 fill #192f34 r4
+    rect 1119,687 211x32 stroke 1 #344849 r4
+    text "購入 · 200ゴールド" 1170,690 109x15 #92a8aa 13px
+    text "ゴールドが 200 必要です（所持 0）" 1138,704 173x13 #d66054 11px
+  clip 1022,507 308x172
+    text "キュー · 命令 1件" 1022,507 75x11 #c1a263 10px
+    text "戦士" 1022,521 30x17 #efe9d3 15px
+    rect 1022,541 308x18 fill #0a0a0a r9
+    rect 1022,541 18x18 fill #a47e3e r9
+  clip 1022,541 308x18
+    text "0 / 40 · 10ターン" 1030,543 95x15 #ebe7d5 13px
+  clip 0,0 1366x768
+    rect 338,80 658x68 fill #11242b r7
+    rect 338,80 658x68 stroke 1 #344849 r7
+  clip 350,87 634x54
+    text "Rome" 633,87 68x30 #efe9d3 26px
+  clip 0,0 1366x768
+    text "ローマ  ·  都市管理" 626,125 82x11 #c1a263 10px
+art
+  bnw:unit/scout
+  core:unit/worker
+  warrior

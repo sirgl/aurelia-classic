@@ -1,0 +1,45 @@
+# Translation of classic-game-overview.ftl into ja. Keys are in the order of the English file.
+# Lines marked TODO still hold the English text: translate them and delete the marker.
+
+classic.game.overview.producing-nothing = なし
+classic.game.overview.modifiers-empire = 帝国の補正
+classic.game.overview.maintenance-units = ユニット維持費
+classic.game.overview.maintenance-buildings = 建造物維持費
+classic.game.overview.maintenance-roads = 道路維持費
+classic.game.overview.city-connections = 都市間の接続
+classic.game.overview.food-surplus = 毎ターン余剰 { $value }
+classic.game.overview.per-turn = 毎ターン { $value }
+classic.game.overview.total-with-rate = { NUMBER($stock) }（毎ターン { $rate }）
+classic.game.overview.total-stored = 蓄え { NUMBER($stock) }（毎ターン { $rate }）
+classic.game.overview.tip-gold = ゴールド
+classic.game.overview.tip-food = 食料
+classic.game.overview.tip-production = 生産力
+classic.game.overview.tip-science = 科学力
+classic.game.overview.tip-culture = 文化
+classic.game.overview.tip-faith = 信仰
+classic.game.overview.note-food = 市民1人につき食料を2消費し、余剰分で都市が成長します。
+classic.game.overview.note-culture = 文化で社会政策を購入します。
+classic.game.overview.note-faith = 信仰で多神教や宗教を創始します。
+classic.game.overview.demo-population = 人口
+classic.game.overview.demo-population-unit = 市民
+classic.game.overview.demo-crop = 作物収穫量
+classic.game.overview.demo-crop-unit = 食料
+classic.game.overview.demo-goods = 工業製品
+classic.game.overview.demo-goods-unit = 生産力
+classic.game.overview.demo-gnp = 国民総生産
+classic.game.overview.demo-gnp-unit = 毎ターンのゴールド
+classic.game.overview.demo-literacy = 識字率
+classic.game.overview.demo-literacy-unit = テクノロジーの割合（%）
+classic.game.overview.demo-land = 国土
+classic.game.overview.demo-land-unit = タイル
+classic.game.overview.demo-soldiers = 兵士
+classic.game.overview.demo-soldiers-unit = 軍事ユニット
+classic.game.overview.more-cities = 他に都市が { $n } 件
+classic.game.overview.no-cities = まだ都市がありません
+classic.game.overview.status-working = 作業中 · { $n }ターン
+classic.game.overview.status-fortified = 要塞化
+classic.game.overview.status-intercepting = 迎撃待機
+classic.game.overview.status-ready = 待機
+classic.game.overview.status-done = 完了
+classic.game.overview.status-ready-embarked = 待機 · 乗船中
+classic.game.overview.status-done-embarked = 完了 · 乗船中

@@ -1,0 +1,97 @@
+// Civ 5 inspired rule set (Unciv Gods & Kings ruleset plus own extensions); generated, do not edit.
+// Derived from Unciv (https://github.com/yairm210/Unciv), MPL-2.0, where the entry says `unciv:`
+// in classic/docs/classic/*.json (see classic/docs/classic/UNCIV-ATTRIBUTION.md); other values are own, unverified.
+// Source: classic/docs/classic/*.json (made by classic/tools/import-unciv.py). Regenerate:
+//   cargo run --release --offline -p classic-content --features importer --bin classic-import
+// Inert effects need a mechanic the engine does not have yet: classic/docs/classic/implemented.md.
+(
+    projects: [
+        (
+            id: "core:project/apollo_program",
+            name: "Apollo Program",
+            kind: Project,
+            cost: 750,
+            required_tech: Some("core:tech/rocketry"),
+            max_team_instances: 1,
+            victory: Some("VICTORY_SPACE_RACE"),
+        ),
+        (
+            id: "core:project/international_games",
+            name: "International Games",
+            kind: LeagueProject,
+            cost: 0,
+            league: Some((cost_per_player: 600, tech_any_member: Some("core:tech/radio"), tiers: [[Happiness(2)], [Happiness(2), CityStateInfluence(25)], [FreePolicies(1), TourismBoostTurns(15)]])),
+        ),
+        (
+            id: "core:project/international_space_station",
+            name: "International Space Station",
+            kind: LeagueProject,
+            cost: 0,
+            league: Some((cost_per_player: 900, tech_any_member: Some("core:tech/satellites"), tiers: [[ResearchTurns(5)], [FreeUnit("core:unit/great-scientist")], [Building("core:building/international_space_station")]])),
+        ),
+        (
+            id: "core:project/manhattan_project",
+            name: "Manhattan Project",
+            kind: Project,
+            cost: 750,
+            required_tech: Some("core:tech/atomic-theory"),
+            max_team_instances: 1,
+            allows_nukes: true,
+        ),
+        (
+            id: "core:project/ss_booster",
+            name: "SS Booster",
+            kind: Project,
+            cost: 0,
+            unbuildable: true,
+            prerequisite_projects: [
+                ("core:project/apollo_program", 1),
+            ],
+            max_team_instances: 3,
+            victory: Some("VICTORY_SPACE_RACE"),
+        ),
+        (
+            id: "core:project/ss_cockpit",
+            name: "SS Cockpit",
+            kind: Project,
+            cost: 0,
+            unbuildable: true,
+            prerequisite_projects: [
+                ("core:project/apollo_program", 1),
+            ],
+            max_team_instances: 1,
+            victory: Some("VICTORY_SPACE_RACE"),
+        ),
+        (
+            id: "core:project/ss_engine",
+            name: "SS Engine",
+            kind: Project,
+            cost: 0,
+            unbuildable: true,
+            prerequisite_projects: [
+                ("core:project/apollo_program", 1),
+            ],
+            max_team_instances: 1,
+            victory: Some("VICTORY_SPACE_RACE"),
+        ),
+        (
+            id: "core:project/ss_stasis_chamber",
+            name: "SS Stasis Chamber",
+            kind: Project,
+            cost: 0,
+            unbuildable: true,
+            prerequisite_projects: [
+                ("core:project/apollo_program", 1),
+            ],
+            max_team_instances: 1,
+            victory: Some("VICTORY_SPACE_RACE"),
+        ),
+        (
+            id: "core:project/world_s_fair",
+            name: "World's Fair",
+            kind: LeagueProject,
+            cost: 0,
+            league: Some((cost_per_player: 300, tiers: [[GoldenAgePoints(360)], [FreePolicies(1)], [CultureBoostTurns(15)]])),
+        ),
+    ],
+)

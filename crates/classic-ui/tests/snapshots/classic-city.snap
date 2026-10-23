@@ -1,0 +1,191 @@
+screen City 1366x768
+widgets
+  click "AURELIA / City / Back to map / Navigate / Rome / Rename / Buy a tile on the map …" 0,0 1366x768
+  click "Back to map" 1208,15 132x36
+  click "Navigate" 1080,15 116x36
+  click "" 338,148 658x517
+  click "Rename" 218,92 92x28
+  click "Buy a tile on the map" 38,130 272x36
+  click "Overview" 38,180 88x31
+  click "Citizens" 129,180 87x31
+  click "Buildings" 219,180 88x31
+  click "Balanced" 38,506 112x30
+  click "Food" 158,506 112x30
+  click "Production" 38,539 112x30
+  click "Gold" 158,539 112x30
+  click "Science" 38,572 112x30
+  click "Culture" 158,572 112x30
+  click "Great people" 38,605 112x30
+  click "Faith" 158,605 112x30
+  click "Avoid growth" 38,638 230x30
+  scrollbar "4" 300,225 10x492
+  textinput "Search units, buildings, wonders" 1022,119 308x32
+  click "Available" 1022,160 151x30
+  click "All" 1176,160 151x30
+  combobox "All types" 1022,198 296x18
+  click "Scout / 25 production · 7 turns" 1022,236 308x70
+  click "Warrior / 40 production · 10 turns" 1022,314 308x70
+  click "Worker / 70 production · 18 turns" 1022,392 308x70
+  click "Queue: Scout / QUEUE · 1 ORDER / Warrior" 1022,470 308x70
+  scrollbar "" 1320,236 10x215
+  click "Queue: Scout" 1022,459 308x36
+  click "Clear" 1022,687 90x32
+  progressindicator "0 / 40 · 10 turns" 1022,541 308x18 value 0
+  click "Rome / ROME  ·  CITY MANAGEMENT" 338,80 658x68
+painted
+  clip 0,0 1366x768
+    rect 0,0 1366x70 fill #09161c
+    rect 0,739 1366x29 fill #09161c
+    text "AURELIA" 26,19 89x26 #c1a263 23px
+    text "City" 166,22 34x23 #efe9d3 20px
+    rect 1208,15 132x36 fill #192f34 r4
+    rect 1208,15 132x36 stroke 1 #344849 r4
+    text "Back to map" 1236,25 76x16 #efe9d3 14px
+    rect 1080,15 116x36 fill #192f34 r4
+    rect 1080,15 116x36 stroke 1 #344849 r4
+    text "Navigate" 1110,25 56x16 #efe9d3 14px
+    line 24,65 -> 1342,65 stroke 1 #c1a36466
+    rect 24,80 300x651 fill #11242b r7
+    rect 24,80 300x651 stroke 1 #344849 r7
+  clip 40,92 172x30
+    text "Rome" 40,92 60x26 #efe9d3 23px
+  clip 0,0 1366x768
+    rect 218,92 92x28 fill #192f34 r4
+    rect 218,92 92x28 stroke 1 #344849 r4
+    text "Rename" 238,98 52x16 #efe9d3 14px
+    rect 38,130 272x36 fill #192f34 r4
+    rect 38,130 272x36 stroke 1 #344849 r4
+    text "Buy a tile on the map" 108,140 132x16 #efe9d3 14px
+    rect 38,180 88x31 fill #192f34 r4
+    rect 38,180 88x31 stroke 1 #344849 r4
+    text "Overview" 52,188 59x16 #efe9d3 14px
+    rect 129,180 87x31 fill #3f7d7c r4
+    rect 129,180 87x31 stroke 1 #c1a263 r4
+    text "Citizens" 148,188 49x16 #efe9d3 14px
+    rect 219,180 88x31 fill #192f34 r4
+    rect 219,180 88x31 stroke 1 #344849 r4
+    text "Buildings" 235,188 57x16 #efe9d3 14px
+  clip 38,225 272x492
+    text "1 citizen" 38,225 81x25 #efe9d3 22px
+    text "1 on tiles  ·  0 specialists  ·  0 unemployed" 38,253 216x14 #92a8aa 12px
+    text "Output per turn" 38,278 78x13 #92a8aa 11px
+    text "Food" 38,300 25x13 #92a8aa 11px
+    text "+2" 154,299 16x16 #efe9d3 14px
+    text "Production" 178,300 54x13 #92a8aa 11px
+    text "4" 302,299 8x16 #efe9d3 14px
+    text "Gold" 38,328 23x13 #92a8aa 11px
+    text "+6" 154,327 16x16 #efe9d3 14px
+    text "Science" 178,328 37x13 #92a8aa 11px
+    text "+4" 294,327 16x16 #efe9d3 14px
+    text "Grows in 8 turns" 38,350 86x14 #efe9d3 12px
+    text "WORK THE MAP" 38,379 73x11 #c1a263 10px
+    text "Working" 38,393 49x18 #68c5b0 13px
+    text "Locked" 38,393 98x18 #c1a263 13px
+    text "Available" 38,393 158x18 #efe9d3 13px
+    text "Left-click an empty tile to assign and lock a citizen. Click a worked tile to stop working it." 38,414 269x28 #efe9d3 12px
+    text "Right-click to lock or unlock." 38,445 148x14 #efe9d3 12px
+    text "The city center is worked automatically." 38,462 192x13 #92a8aa 11px
+    text "GOVERNOR FOCUS" 38,492 87x11 #c1a263 10px
+    rect 38,506 112x30 fill #3f7d7c r4
+    rect 38,506 112x30 stroke 1 #c1a263 r4
+    text "Balanced" 66,513 56x16 #efe9d3 14px
+    rect 158,506 112x30 fill #192f34 r4
+    rect 158,506 112x30 stroke 1 #344849 r4
+    text "Food" 198,513 32x16 #efe9d3 14px
+    rect 38,539 112x30 fill #192f34 r4
+    rect 38,539 112x30 stroke 1 #344849 r4
+    text "Production" 59,546 70x16 #efe9d3 14px
+    rect 158,539 112x30 fill #192f34 r4
+    rect 158,539 112x30 stroke 1 #344849 r4
+    text "Gold" 199,546 30x16 #efe9d3 14px
+    rect 38,572 112x30 fill #192f34 r4
+    rect 38,572 112x30 stroke 1 #344849 r4
+    text "Science" 71,579 46x16 #efe9d3 14px
+    rect 158,572 112x30 fill #192f34 r4
+    rect 158,572 112x30 stroke 1 #344849 r4
+    text "Culture" 191,579 46x16 #efe9d3 14px
+    rect 38,605 112x30 fill #192f34 r4
+    rect 38,605 112x30 stroke 1 #344849 r4
+    text "Great people" 53,612 82x16 #efe9d3 14px
+    rect 158,605 112x30 fill #192f34 r4
+    rect 158,605 112x30 stroke 1 #344849 r4
+    text "Faith" 199,612 30x16 #efe9d3 14px
+    rect 38,638 230x30 fill #192f34 r4
+    rect 38,638 230x30 stroke 1 #344849 r4
+    text "Avoid growth" 111,645 84x16 #efe9d3 14px
+    text "SPECIALISTS" 38,685 55x11 #c1a263 10px
+    text "Unemployed Citizen" 38,699 116x15 #efe9d3 13px
+    mesh 2tri 38,697 272x20
+  clip 0,0 1366x768
+    rect 1010,80 332x651 fill #11242b r7
+    rect 1010,80 332x651 stroke 1 #344849 r7
+  clip 1024,92 304x28
+    text "PRODUCTION" 1024,92 75x14 #c1a263 12px
+  clip 0,0 1366x768
+    rect 1022,119 308x32 fill #0a0a0a r2
+    text "Search units, buildings, wonders" 1026,121 185x15 #ebe8d599 13px
+    rect 1022,160 151x30 fill #3f7d7c r4
+    rect 1022,160 151x30 stroke 1 #c1a263 r4
+    text "Available" 1069,167 57x16 #efe9d3 14px
+    rect 1176,160 151x30 fill #192f34 r4
+    rect 1176,160 151x30 stroke 1 #344849 r4
+    text "All" 1243,167 17x16 #efe9d3 14px
+    rect 1022,198 296x18 fill #3c3c3c r2
+    path 3pt 1302,204 10x6 fill #b4b4b4
+    text "All types" 1026,200 49x15 #ebe7d5 13px
+  clip 1022,236 308x215
+    rect 1022,236 308x70 fill #26444b r4
+    rect 1022,236 308x70 stroke 1 #c1a263 r4
+    rect 1027,243 54x54 fill #182f35
+    circle 1054,270 r11.9 stroke 1 #5c6859
+  clip 1090,244 232x57
+    text "Scout" 1090,244 38x17 #efe9d3 15px
+  clip 1090,268 232x33
+    text "25 production · 7 turns" 1090,268 111x13 #92a8aa 11px
+  clip 1022,236 308x215
+    rect 1022,314 308x70 fill #192f34 r4
+    rect 1027,321 54x54 fill #182f35
+    circle 1054,348 r11.9 stroke 1 #5c6859
+  clip 1090,322 232x57
+    text "Warrior" 1090,322 50x17 #efe9d3 15px
+  clip 1090,346 232x33
+    text "40 production · 10 turns" 1090,346 117x13 #92a8aa 11px
+  clip 1022,236 308x215
+    rect 1022,392 308x70 fill #192f34 r4
+    rect 1027,399 54x54 fill #182f35
+    circle 1054,426 r11.9 stroke 1 #5c6859
+  clip 1090,400 232x51
+    text "Worker" 1090,400 49x17 #efe9d3 15px
+  clip 1090,424 232x27
+    text "70 production · 18 turns" 1090,424 117x13 #92a8aa 11px
+  clip 1022,236 308x215
+    mesh 2tri 1022,431 308x20
+  clip 0,0 1366x768
+    rect 1022,459 308x36 fill #3f7d7c r4
+    rect 1022,459 308x36 stroke 1 #c1a263 r4
+    text "Queue: Scout" 1134,469 84x16 #efe9d3 14px
+    rect 1022,687 90x32 fill #192f34 r4
+    rect 1022,687 90x32 stroke 1 #344849 r4
+    text "Clear" 1051,695 32x16 #efe9d3 14px
+    rect 1119,687 211x32 fill #192f34 r4
+    rect 1119,687 211x32 stroke 1 #344849 r4
+    text "Buy · 200 gold" 1184,690 81x15 #92a8aa 13px
+    text "Need 200 gold, have 0" 1170,704 109x13 #d66054 11px
+  clip 1022,507 308x172
+    text "QUEUE · 1 ORDER" 1022,507 80x11 #c1a263 10px
+    text "Warrior" 1022,521 50x17 #efe9d3 15px
+    rect 1022,541 308x18 fill #0a0a0a r9
+    rect 1022,541 18x18 fill #a47e3e r9
+  clip 1022,541 308x18
+    text "0 / 40 · 10 turns" 1030,543 90x15 #ebe7d5 13px
+  clip 0,0 1366x768
+    rect 338,80 658x68 fill #11242b r7
+    rect 338,80 658x68 stroke 1 #344849 r7
+  clip 350,87 634x54
+    text "Rome" 633,87 68x30 #efe9d3 26px
+  clip 0,0 1366x768
+    text "ROME  ·  CITY MANAGEMENT" 602,125 130x11 #c1a263 10px
+art
+  bnw:unit/scout
+  core:unit/worker
+  warrior

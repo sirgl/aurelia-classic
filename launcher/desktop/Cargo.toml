@@ -1,0 +1,46 @@
+[package]
+name = "classic-desktop"
+version = "0.1.0"
+description = "Aurelia, the desktop launcher: an Unciv / Civ 5 inspired game with a similar rule set"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+authors = ["The Aurelia contributors"]
+repository = "https://github.com/sirgl/aurelia-classic"
+keywords = ["launcher", "desktop", "gamedev"]
+categories = ["game-development"]
+rust-version = "1.98"
+publish = false
+
+# The launcher of the classic game: the platform's launcher-core plus ONE module, classic-ui. It
+# depends on nothing else (no lands, no sandbox). The game binary is `aurelia-classic`; the second
+# binary, `visual-sandbox`, is the showcase bench of the classic UI.
+[dependencies]
+launcher-core = { package = "aurelia-launcher-core", path = "../../../platform/crates/launcher-core" }
+classic-ui = { path = "../../crates/classic-ui" }
+classic-rules = { path = "../../crates/classic-rules" }
+kernel = { package = "aurelia-kernel", path = "../../../platform/crates/kernel" }
+render = { package = "aurelia-render", version = "0.1.0", path = "../../../platform/crates/render" }
+client = { package = "aurelia-client", path = "../../../platform/crates/client" }
+egui = "0.36.2"
+egui-wgpu = "0.36.2"
+ui-input = { package = "aurelia-ui-input", path = "../../../platform/crates/ui-input" }
+wgpu = "30.0.1"
+winit = "0.30.13"
+
+[features]
+# The developer tools: offscreen captures and benches (`--screenshot`, `--bench*`), the scripted
+# scenes and the visual sandbox. On by default for developer builds; OFF in packages
+# (`--no-default-features`).
+default = ["dev-tools"]
+dev-tools = ["classic-ui/dev-tools"]
+# Counts heap bytes (live, peak) for the memory lines of the headless benches.
+heap-stats = []
+
+[[bin]]
+name = "aurelia-classic"
+path = "src/main.rs"
+
+[[bin]]
+name = "visual-sandbox"
+path = "src/visual_sandbox.rs"
+required-features = ["dev-tools"]

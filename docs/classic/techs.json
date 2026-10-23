@@ -1,0 +1,3975 @@
+{
+ "schema": "classic-spec/1",
+ "catalog": "techs",
+ "edition": "Civ 5 inspired rule set (Unciv Gods & Kings ruleset plus own extensions)",
+ "count": 81,
+ "items": [
+  {
+   "id": "core:tech/agriculture",
+   "name": "Agriculture",
+   "era": "core:era/ancient",
+   "cost": 20,
+   "grid": [
+    0,
+    5
+   ],
+   "prerequisites": [],
+   "unlocks": {
+    "units": [
+     "core:unit/atlatlist"
+    ],
+    "buildings": [],
+    "projects": [],
+    "improvements": [
+     "core:improvement/farm"
+    ],
+    "routes": [],
+    "worker_actions": [],
+    "reveals_resources": [],
+    "enables_resource_trade": [],
+    "processes": []
+   },
+   "obsoletes": {
+    "units": [],
+    "buildings": []
+   },
+   "repeatable": false,
+   "effects": [],
+   "art_id": "core:tech/agriculture",
+   "provenance": "unciv: Techs.json, Agriculture",
+   "unciv_fields": [
+    "cost",
+    "era",
+    "prerequisites"
+   ]
+  },
+  {
+   "id": "core:tech/pottery",
+   "name": "Pottery",
+   "era": "core:era/ancient",
+   "cost": 35,
+   "grid": [
+    1,
+    1
+   ],
+   "prerequisites": [
+    "core:tech/agriculture"
+   ],
+   "unlocks": {
+    "units": [],
+    "buildings": [
+     "core:building/granary",
+     "core:building/shrine",
+     "core:building/pyramid"
+    ],
+    "projects": [],
+    "improvements": [],
+    "routes": [],
+    "worker_actions": [],
+    "reveals_resources": [],
+    "enables_resource_trade": [],
+    "processes": []
+   },
+   "obsoletes": {
+    "units": [],
+    "buildings": []
+   },
+   "repeatable": false,
+   "effects": [],
+   "art_id": "core:tech/pottery",
+   "provenance": "unciv: Techs.json, Pottery",
+   "unciv_fields": [
+    "cost",
+    "era",
+    "prerequisites"
+   ]
+  },
+  {
+   "id": "core:tech/animal-husbandry",
+   "name": "Animal Husbandry",
+   "era": "core:era/ancient",
+   "cost": 35,
+   "grid": [
+    1,
+    4
+   ],
+   "prerequisites": [
+    "core:tech/agriculture"
+   ],
+   "unlocks": {
+    "units": [
+     "core:unit/caravan"
+    ],
+    "buildings": [],
+    "projects": [],
+    "improvements": [
+     "core:improvement/pasture"
+    ],
+    "routes": [],
+    "worker_actions": [],
+    "reveals_resources": [
+     "core:resource/horses"
+    ],
+    "enables_resource_trade": [
+     "core:resource/horses",
+     "core:resource/cattle",
+     "core:resource/sheep"
+    ],
+    "processes": []
+   },
+   "obsoletes": {
+    "units": [],
+    "buildings": []
+   },
+   "repeatable": false,
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "player"
+     },
+     "condition": null,
+     "trigger": "on_research",
+     "modifier": "trade.routes.flat",
+     "amount": 1,
+     "source": "own value"
+    }
+   ],
+   "art_id": "core:tech/animal-husbandry",
+   "provenance": "unciv: Techs.json, Animal Husbandry",
+   "unciv_fields": [
+    "cost",
+    "era",
+    "prerequisites"
+   ]
+  },
+  {
+   "id": "core:tech/archery",
+   "name": "Archery",
+   "era": "core:era/ancient",
+   "cost": 35,
+   "grid": [
+    1,
+    6
+   ],
+   "prerequisites": [
+    "core:tech/agriculture"
+   ],
+   "unlocks": {
+    "units": [
+     "core:unit/archer",
+     "core:unit/bowman",
+     "core:unit/slinger"
+    ],
+    "buildings": [
+     "core:building/temple_of_artemis"
+    ],
+    "projects": [],
+    "improvements": [],
+    "routes": [],
+    "worker_actions": [],
+    "reveals_resources": [],
+    "enables_resource_trade": [],
+    "processes": []
+   },
+   "obsoletes": {
+    "units": [],
+    "buildings": []
+   },
+   "repeatable": false,
+   "effects": [],
+   "art_id": "core:tech/archery",
+   "provenance": "unciv: Techs.json, Archery",
+   "unciv_fields": [
+    "cost",
+    "era",
+    "prerequisites"
+   ]
+  },
+  {
+   "id": "core:tech/mining",
+   "name": "Mining",
+   "era": "core:era/ancient",
+   "cost": 35,
+   "grid": [
+    1,
+    8
+   ],
+   "prerequisites": [
+    "core:tech/agriculture"
+   ],
+   "unlocks": {
+    "units": [],
+    "buildings": [],
+    "projects": [],
+    "improvements": [
+     "core:improvement/mine"
+    ],
+    "routes": [],
+    "worker_actions": [
+     "core:build/remove-forest"
+    ],
+    "reveals_resources": [],
+    "enables_resource_trade": [
+     "core:resource/gold",
+     "core:resource/silver",
+     "core:resource/gems",
+     "core:resource/copper",
+     "core:resource/salt"
+    ],
+    "processes": []
+   },
+   "obsoletes": {
+    "units": [],
+    "buildings": []
+   },
+   "repeatable": false,
+   "effects": [],
+   "art_id": "core:tech/mining",
+   "provenance": "unciv: Techs.json, Mining",
+   "unciv_fields": [
+    "cost",
+    "era",
+    "prerequisites"
+   ]
+  },
+  {
+   "id": "core:tech/sailing",
+   "name": "Sailing",
+   "era": "core:era/ancient",
+   "cost": 55,
+   "grid": [
+    2,
+    0
+   ],
+   "prerequisites": [
+    "core:tech/pottery"
+   ],
+   "unlocks": {
+    "units": [
+     "core:unit/work-boat",
+     "core:unit/trireme",
+     "core:unit/cargo-ship",
+     "core:unit/dromon",
+     "core:unit/quinquereme"
+    ],
+    "buildings": [],
+    "projects": [],
+    "improvements": [
+     "core:improvement/fishing-boats",
+     "core:improvement/fishing-boats"
+    ],
+    "routes": [],
+    "worker_actions": [],
+    "reveals_resources": [],
+    "enables_resource_trade": [
+     "core:resource/fish",
+     "core:resource/whales",
+     "core:resource/pearls",
+     "core:resource/crab"
+    ],
+    "processes": []
+   },
+   "obsoletes": {
+    "units": [],
+    "buildings": []
+   },
+   "repeatable": false,
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "player"
+     },
+     "condition": null,
+     "trigger": "on_research",
+     "modifier": "trade.routes.flat",
+     "amount": 1,
+     "source": "own value"
+    }
+   ],
+   "art_id": "core:tech/sailing",
+   "provenance": "unciv: Techs.json, Sailing",
+   "unciv_fields": [
+    "cost",
+    "era",
+    "prerequisites"
+   ]
+  },
+  {
+   "id": "core:tech/calendar",
+   "name": "Calendar",
+   "era": "core:era/ancient",
+   "cost": 55,
+   "grid": [
+    2,
+    1
+   ],
+   "prerequisites": [
+    "core:tech/pottery"
+   ],
+   "unlocks": {
+    "units": [],
+    "buildings": [
+     "core:building/stonehenge",
+     "core:building/stone_works"
+    ],
+    "projects": [],
+    "improvements": [
+     "core:improvement/plantation"
+    ],
+    "routes": [],
+    "worker_actions": [],
+    "reveals_resources": [],
+    "enables_resource_trade": [
+     "core:resource/bananas",
+     "core:resource/dyes",
+     "core:resource/spices",
+     "core:resource/silk",
+     "core:resource/sugar",
+     "core:resource/cotton",
+     "core:resource/wine",
+     "core:resource/incense",
+     "core:resource/citrus",
+     "core:resource/cocoa"
+    ],
+    "processes": []
+   },
+   "obsoletes": {
+    "units": [],
+    "buildings": []
+   },
+   "repeatable": false,
+   "effects": [],
+   "art_id": "core:tech/calendar",
+   "provenance": "unciv: Techs.json, Calendar",
+   "unciv_fields": [
+    "cost",
+    "era",
+    "prerequisites"
+   ]
+  },
+  {
+   "id": "core:tech/writing",
+   "name": "Writing",
+   "era": "core:era/ancient",
+   "cost": 55,
+   "grid": [
+    2,
+    2
+   ],
+   "prerequisites": [
+    "core:tech/pottery"
+   ],
+   "unlocks": {
+    "units": [],
+    "buildings": [
+     "core:building/paper_maker",
+     "core:building/library",
+     "core:building/great_library",
+     "core:building/royal_library"
+    ],
+    "projects": [],
+    "improvements": [],
+    "routes": [],
+    "worker_actions": [],
+    "reveals_resources": [],
+    "enables_resource_trade": [],
+    "processes": []
+   },
+   "obsoletes": {
+    "units": [],
+    "buildings": []
+   },
+   "repeatable": false,
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "player"
+     },
+     "condition": null,
+     "trigger": "on_research",
+     "modifier": "tech.allow_embassy_trading_allowed",
+     "amount": true,
+     "needs_mechanic": "allow_embassy_trading_allowed",
+     "source": "own value, unverified"
+    }
+   ],
+   "art_id": "core:tech/writing",
+   "provenance": "unciv: Techs.json, Writing",
+   "unciv_fields": [
+    "cost",
+    "era",
+    "prerequisites"
+   ]
+  },
+  {
+   "id": "core:tech/trapping",
+   "name": "Trapping",
+   "era": "core:era/ancient",
+   "cost": 55,
+   "grid": [
+    2,
+    4
+   ],
+   "prerequisites": [
+    "core:tech/animal-husbandry"
+   ],
+   "unlocks": {
+    "units": [],
+    "buildings": [
+     "core:building/circus"
+    ],
+    "projects": [],
+    "improvements": [
+     "core:improvement/camp"
+    ],
+    "routes": [],
+    "worker_actions": [],
+    "reveals_resources": [],
+    "enables_resource_trade": [
+     "core:resource/deer",
+     "core:resource/ivory",
+     "core:resource/furs",
+     "core:resource/truffles",
+     "core:resource/bison"
+    ],
+    "processes": []
+   },
+   "obsoletes": {
+    "units": [],
+    "buildings": []
+   },
+   "repeatable": false,
+   "effects": [],
+   "art_id": "core:tech/trapping",
+   "provenance": "unciv: Techs.json, Trapping",
+   "unciv_fields": [
+    "cost",
+    "era",
+    "prerequisites"
+   ]
+  },
+  {
+   "id": "core:tech/the-wheel",
+   "name": "The Wheel",
+   "era": "core:era/ancient",
+   "cost": 55,
+   "grid": [
+    2,
+    6
+   ],
+   "prerequisites": [
+    "core:tech/animal-husbandry",
+    "core:tech/archery"
+   ],
+   "unlocks": {
+    "units": [
+     "core:unit/chariot-archer",
+     "core:unit/war-chariot",
+     "core:unit/war-elephant",
+     "core:unit/horse-archer"
+    ],
+    "buildings": [
+     "core:building/floating_gardens",
+     "core:building/water_mill"
+    ],
+    "projects": [],
+    "improvements": [],
+    "routes": [
+     "core:route/road"
+    ],
+    "worker_actions": [],
+    "reveals_resources": [],
+    "enables_resource_trade": [],
+    "processes": []
+   },
+   "obsoletes": {
+    "units": [],
+    "buildings": []
+   },
+   "repeatable": false,
+   "effects": [],
+   "art_id": "core:tech/the-wheel",
+   "provenance": "unciv: Techs.json, The Wheel",
+   "unciv_fields": [
+    "cost",
+    "era",
+    "prerequisites"
+   ]
+  },
+  {
+   "id": "core:tech/masonry",
+   "name": "Masonry",
+   "era": "core:era/ancient",
+   "cost": 55,
+   "grid": [
+    2,
+    8
+   ],
+   "prerequisites": [
+    "core:tech/mining"
+   ],
+   "unlocks": {
+    "units": [],
+    "buildings": [
+     "core:building/walls",
+     "core:building/pyramids",
+     "core:building/walls_of_babylon",
+     "core:building/mausoleum_of_halicarnassus"
+    ],
+    "projects": [],
+    "improvements": [
+     "core:improvement/quarry"
+    ],
+    "routes": [],
+    "worker_actions": [
+     "core:build/remove-marsh"
+    ],
+    "reveals_resources": [],
+    "enables_resource_trade": [
+     "core:resource/stone",
+     "core:resource/marble"
+    ],
+    "processes": []
+   },
+   "obsoletes": {
+    "units": [],
+    "buildings": []
+   },
+   "repeatable": false,
+   "effects": [],
+   "art_id": "core:tech/masonry",
+   "provenance": "unciv: Techs.json, Masonry",
+   "unciv_fields": [
+    "cost",
+    "era",
+    "prerequisites"
+   ]
+  },
+  {
+   "id": "core:tech/bronze-working",
+   "name": "Bronze Working",
+   "era": "core:era/ancient",
+   "cost": 55,
+   "grid": [
+    2,
+    9
+   ],
+   "prerequisites": [
+    "core:tech/mining"
+   ],
+   "unlocks": {
+    "units": [
+     "core:unit/spearman",
+     "core:unit/hoplite",
+     "core:unit/immortal",
+     "core:unit/pictish-warrior",
+     "core:unit/battering-ram"
+    ],
+    "buildings": [
+     "core:building/krepost",
+     "core:building/barracks",
+     "core:building/statue_of_zeus",
+     "core:building/ikanda"
+    ],
+    "projects": [],
+    "improvements": [],
+    "routes": [],
+    "worker_actions": [
+     "core:build/remove-jungle"
+    ],
+    "reveals_resources": [],
+    "enables_resource_trade": [
+     "core:resource/iron"
+    ],
+    "processes": []
+   },
+   "obsoletes": {
+    "units": [],
+    "buildings": []
+   },
+   "repeatable": false,
+   "effects": [],
+   "art_id": "core:tech/bronze-working",
+   "provenance": "unciv: Techs.json, Bronze Working",
+   "unciv_fields": [
+    "cost",
+    "era",
+    "prerequisites"
+   ]
+  },
+  {
+   "id": "core:tech/optics",
+   "name": "Optics",
+   "era": "core:era/classical",
+   "cost": 85,
+   "grid": [
+    3,
+    0
+   ],
+   "prerequisites": [
+    "core:tech/sailing"
+   ],
+   "unlocks": {
+    "units": [],
+    "buildings": [
+     "core:building/lighthouse",
+     "core:building/great_lighthouse"
+    ],
+    "projects": [],
+    "improvements": [],
+    "routes": [],
+    "worker_actions": [],
+    "reveals_resources": [],
+    "enables_resource_trade": [],
+    "processes": []
+   },
+   "obsoletes": {
+    "units": [],
+    "buildings": []
+   },
+   "repeatable": false,
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "player"
+     },
+     "condition": null,
+     "trigger": "on_research",
+     "modifier": "tech.allows_embarking",
+     "amount": true,
+     "needs_mechanic": "allows_embarking",
+     "source": "own value, unverified"
+    }
+   ],
+   "art_id": "core:tech/optics",
+   "provenance": "unciv: Techs.json, Optics",
+   "unciv_fields": [
+    "cost",
+    "era",
+    "prerequisites"
+   ]
+  },
+  {
+   "id": "core:tech/horseback-riding",
+   "name": "Horseback Riding",
+   "era": "core:era/classical",
+   "cost": 105,
+   "grid": [
+    3,
+    4
+   ],
+   "prerequisites": [
+    "core:tech/the-wheel",
+    "core:tech/trapping"
+   ],
+   "unlocks": {
+    "units": [
+     "core:unit/horseman",
+     "core:unit/companion-cavalry",
+     "core:unit/cataphract",
+     "core:unit/african-forest-elephant"
+    ],
+    "buildings": [
+     "core:building/stable",
+     "core:building/circus_maximus",
+     "core:building/ducal_stable",
+     "core:building/caravansary"
+    ],
+    "projects": [],
+    "improvements": [],
+    "routes": [],
+    "worker_actions": [],
+    "reveals_resources": [],
+    "enables_resource_trade": [],
+    "processes": []
+   },
+   "obsoletes": {
+    "units": [],
+    "buildings": []
+   },
+   "repeatable": false,
+   "effects": [],
+   "art_id": "core:tech/horseback-riding",
+   "provenance": "unciv: Techs.json, Horseback Riding",
+   "unciv_fields": [
+    "cost",
+    "era",
+    "prerequisites"
+   ]
+  },
+  {
+   "id": "core:tech/mathematics",
+   "name": "Mathematics",
+   "era": "core:era/classical",
+   "cost": 105,
+   "grid": [
+    3,
+    6
+   ],
+   "prerequisites": [
+    "core:tech/the-wheel"
+   ],
+   "unlocks": {
+    "units": [
+     "core:unit/catapult",
+     "core:unit/ballista",
+     "core:unit/siege-tower"
+    ],
+    "buildings": [
+     "core:building/courthouse",
+     "core:building/hanging_gardens"
+    ],
+    "projects": [],
+    "improvements": [],
+    "routes": [],
+    "worker_actions": [],
+    "reveals_resources": [],
+    "enables_resource_trade": [],
+    "processes": []
+   },
+   "obsoletes": {
+    "units": [],
+    "buildings": []
+   },
+   "repeatable": false,
+   "effects": [],
+   "art_id": "core:tech/mathematics",
+   "provenance": "unciv: Techs.json, Mathematics",
+   "unciv_fields": [
+    "cost",
+    "era",
+    "prerequisites"
+   ]
+  },
+  {
+   "id": "core:tech/construction",
+   "name": "Construction",
+   "era": "core:era/classical",
+   "cost": 105,
+   "grid": [
+    3,
+    8
+   ],
+   "prerequisites": [
+    "core:tech/masonry",
+    "core:tech/the-wheel"
+   ],
+   "unlocks": {
+    "units": [
+     "core:unit/composite-bowman"
+    ],
+    "buildings": [
+     "core:building/colosseum",
+     "core:building/terracotta_army"
+    ],
+    "projects": [],
+    "improvements": [
+     "core:improvement/lumber-mill",
+     "core:improvement/terrace-farm",
+     "core:improvement/moai"
+    ],
+    "routes": [],
+    "worker_actions": [],
+    "reveals_resources": [],
+    "enables_resource_trade": [],
+    "processes": []
+   },
+   "obsoletes": {
+    "units": [
+     "core:unit/archer",
+     "core:unit/bowman",
+     "core:unit/slinger",
+     "core:unit/atlatlist"
+    ],
+    "buildings": []
+   },
+   "repeatable": false,
+   "effects": [],
+   "art_id": "core:tech/construction",
+   "provenance": "unciv: Techs.json, Construction",
+   "unciv_fields": [
+    "cost",
+    "era",
+    "prerequisites"
+   ]
+  },
+  {
+   "id": "core:tech/philosophy",
+   "name": "Philosophy",
+   "era": "core:era/classical",
+   "cost": 175,
+   "grid": [
+    4,
+    1
+   ],
+   "prerequisites": [
+    "core:tech/calendar",
+    "core:tech/writing"
+   ],
+   "unlocks": {
+    "units": [],
+    "buildings": [
+     "core:building/mud_pyramid_mosque",
+     "core:building/burial_tomb",
+     "core:building/temple",
+     "core:building/national_college",
+     "core:building/oracle"
+    ],
+    "projects": [],
+    "improvements": [],
+    "routes": [],
+    "worker_actions": [],
+    "reveals_resources": [],
+    "enables_resource_trade": [],
+    "processes": []
+   },
+   "obsoletes": {
+    "units": [],
+    "buildings": []
+   },
+   "repeatable": false,
+   "effects": [],
+   "art_id": "core:tech/philosophy",
+   "provenance": "unciv: Techs.json, Philosophy",
+   "unciv_fields": [
+    "cost",
+    "era",
+    "prerequisites"
+   ]
+  },
+  {
+   "id": "core:tech/drama-and-poetry",
+   "name": "Drama and Poetry",
+   "era": "core:era/classical",
+   "cost": 175,
+   "grid": [
+    4,
+    2
+   ],
+   "prerequisites": [
+    "core:tech/writing"
+   ],
+   "unlocks": {
+    "units": [],
+    "buildings": [
+     "core:building/national_epic",
+     "core:building/amphitheater",
+     "core:building/writers_guild",
+     "core:building/parthenon"
+    ],
+    "projects": [],
+    "improvements": [],
+    "routes": [],
+    "worker_actions": [],
+    "reveals_resources": [],
+    "enables_resource_trade": [],
+    "processes": []
+   },
+   "obsoletes": {
+    "units": [],
+    "buildings": []
+   },
+   "repeatable": false,
+   "effects": [],
+   "art_id": "core:tech/drama-and-poetry",
+   "provenance": "unciv: Techs.json, Drama and Poetry",
+   "unciv_fields": [
+    "cost",
+    "era",
+    "prerequisites"
+   ]
+  },
+  {
+   "id": "core:tech/currency",
+   "name": "Currency",
+   "era": "core:era/classical",
+   "cost": 175,
+   "grid": [
+    4,
+    6
+   ],
+   "prerequisites": [
+    "core:tech/mathematics"
+   ],
+   "unlocks": {
+    "units": [],
+    "buildings": [
+     "core:building/bazaar",
+     "core:building/mint",
+     "core:building/market",
+     "core:building/petra"
+    ],
+    "projects": [],
+    "improvements": [],
+    "routes": [],
+    "worker_actions": [],
+    "reveals_resources": [],
+    "enables_resource_trade": [],
+    "processes": []
+   },
+   "obsoletes": {
+    "units": [],
+    "buildings": []
+   },
+   "repeatable": false,
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "player"
+     },
+     "condition": null,
+     "trigger": "on_research",
+     "modifier": "trade.routes.flat",
+     "amount": 1,
+     "source": "own design: trade routes"
+    }
+   ],
+   "art_id": "core:tech/currency",
+   "provenance": "unciv: Techs.json, Currency",
+   "unciv_fields": [
+    "cost",
+    "era",
+    "prerequisites"
+   ]
+  },
+  {
+   "id": "core:tech/engineering",
+   "name": "Engineering",
+   "era": "core:era/classical",
+   "cost": 175,
+   "grid": [
+    4,
+    7
+   ],
+   "prerequisites": [
+    "core:tech/mathematics",
+    "core:tech/construction"
+   ],
+   "unlocks": {
+    "units": [],
+    "buildings": [
+     "core:building/great_wall",
+     "core:building/aqueduct"
+    ],
+    "projects": [],
+    "improvements": [
+     "core:improvement/fort"
+    ],
+    "routes": [],
+    "worker_actions": [],
+    "reveals_resources": [],
+    "enables_resource_trade": [],
+    "processes": []
+   },
+   "obsoletes": {
+    "units": [],
+    "buildings": []
+   },
+   "repeatable": false,
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "player"
+     },
+     "condition": null,
+     "trigger": "on_research",
+     "modifier": "tech.bridge_building",
+     "amount": true,
+     "needs_mechanic": "bridge_building",
+     "source": "own value, unverified"
+    }
+   ],
+   "art_id": "core:tech/engineering",
+   "provenance": "unciv: Techs.json, Engineering",
+   "unciv_fields": [
+    "cost",
+    "era",
+    "prerequisites"
+   ]
+  },
+  {
+   "id": "core:tech/iron-working",
+   "name": "Iron Working",
+   "era": "core:era/classical",
+   "cost": 175,
+   "grid": [
+    4,
+    9
+   ],
+   "prerequisites": [
+    "core:tech/bronze-working"
+   ],
+   "unlocks": {
+    "units": [
+     "core:unit/swordsman",
+     "core:unit/mohawk-warrior",
+     "core:unit/legion",
+     "core:unit/kris-swordsman"
+    ],
+    "buildings": [
+     "core:building/heroic_epic",
+     "core:building/colossus"
+    ],
+    "projects": [],
+    "improvements": [],
+    "routes": [],
+    "worker_actions": [],
+    "reveals_resources": [
+     "core:resource/iron"
+    ],
+    "enables_resource_trade": [],
+    "processes": []
+   },
+   "obsoletes": {
+    "units": [],
+    "buildings": []
+   },
+   "repeatable": false,
+   "effects": [],
+   "art_id": "core:tech/iron-working",
+   "provenance": "unciv: Techs.json, Iron Working",
+   "unciv_fields": [
+    "cost",
+    "era",
+    "prerequisites"
+   ]
+  },
+  {
+   "id": "core:tech/theology",
+   "name": "Theology",
+   "era": "core:era/medieval",
+   "cost": 275,
+   "grid": [
+    5,
+    1
+   ],
+   "prerequisites": [
+    "core:tech/philosophy",
+    "core:tech/drama-and-poetry"
+   ],
+   "unlocks": {
+    "units": [],
+    "buildings": [
+     "core:building/garden",
+     "core:building/hagia_sophia",
+     "core:building/great_mosque_of_djenne",
+     "core:building/grand_temple",
+     "core:building/candi",
+     "core:building/borobudur"
+    ],
+    "projects": [],
+    "improvements": [],
+    "routes": [],
+    "worker_actions": [],
+    "reveals_resources": [],
+    "enables_resource_trade": [],
+    "processes": []
+   },
+   "obsoletes": {
+    "units": [],
+    "buildings": []
+   },
+   "repeatable": false,
+   "effects": [],
+   "art_id": "core:tech/theology",
+   "provenance": "unciv: Techs.json, Theology",
+   "unciv_fields": [
+    "cost",
+    "era",
+    "prerequisites"
+   ]
+  },
+  {
+   "id": "core:tech/civil-service",
+   "name": "Civil Service",
+   "era": "core:era/medieval",
+   "cost": 275,
+   "grid": [
+    5,
+    4
+   ],
+   "prerequisites": [
+    "core:tech/drama-and-poetry",
+    "core:tech/horseback-riding",
+    "core:tech/currency"
+   ],
+   "unlocks": {
+    "units": [
+     "core:unit/pikeman",
+     "core:unit/landsknecht",
+     "core:unit/impi"
+    ],
+    "buildings": [
+     "core:building/chichen_itza"
+    ],
+    "projects": [],
+    "improvements": [],
+    "routes": [],
+    "worker_actions": [],
+    "reveals_resources": [],
+    "enables_resource_trade": [],
+    "processes": []
+   },
+   "obsoletes": {
+    "units": [
+     "core:unit/spearman",
+     "core:unit/hoplite",
+     "core:unit/immortal",
+     "core:unit/pictish-warrior"
+    ],
+    "buildings": []
+   },
+   "repeatable": false,
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "player"
+     },
+     "condition": null,
+     "trigger": "on_research",
+     "modifier": "tech.open_borders_trading_allowed",
+     "amount": true,
+     "needs_mechanic": "open_borders_trading_allowed",
+     "source": "own value, unverified"
+    }
+   ],
+   "art_id": "core:tech/civil-service",
+   "provenance": "unciv: Techs.json, Civil Service",
+   "unciv_fields": [
+    "cost",
+    "era",
+    "prerequisites"
+   ]
+  },
+  {
+   "id": "core:tech/guilds",
+   "name": "Guilds",
+   "era": "core:era/medieval",
+   "cost": 275,
+   "grid": [
+    5,
+    6
+   ],
+   "prerequisites": [
+    "core:tech/currency"
+   ],
+   "unlocks": {
+    "units": [],
+    "buildings": [
+     "core:building/east_india_company",
+     "core:building/machu_picchu",
+     "core:building/artists_guild"
+    ],
+    "projects": [],
+    "improvements": [
+     "core:improvement/trading-post",
+     "core:improvement/polder"
+    ],
+    "routes": [],
+    "worker_actions": [],
+    "reveals_resources": [],
+    "enables_resource_trade": [],
+    "processes": [
+     "wealth"
+    ]
+   },
+   "obsoletes": {
+    "units": [],
+    "buildings": []
+   },
+   "repeatable": false,
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "player"
+     },
+     "condition": null,
+     "trigger": "on_research",
+     "modifier": "trade.routes.flat",
+     "amount": 1,
+     "source": "own design: trade routes"
+    }
+   ],
+   "art_id": "core:tech/guilds",
+   "provenance": "unciv: Techs.json, Guilds",
+   "unciv_fields": [
+    "cost",
+    "era",
+    "prerequisites"
+   ]
+  },
+  {
+   "id": "core:tech/metal-casting",
+   "name": "Metal Casting",
+   "era": "core:era/medieval",
+   "cost": 275,
+   "grid": [
+    5,
+    8
+   ],
+   "prerequisites": [
+    "core:tech/engineering",
+    "core:tech/iron-working"
+   ],
+   "unlocks": {
+    "units": [
+     "core:unit/berserker"
+    ],
+    "buildings": [
+     "core:building/longhouse",
+     "core:building/forge",
+     "core:building/workshop"
+    ],
+    "projects": [],
+    "improvements": [],
+    "routes": [],
+    "worker_actions": [],
+    "reveals_resources": [],
+    "enables_resource_trade": [],
+    "processes": []
+   },
+   "obsoletes": {
+    "units": [
+     "core:unit/warrior",
+     "core:unit/jaguar",
+     "core:unit/maori-warrior"
+    ],
+    "buildings": []
+   },
+   "repeatable": false,
+   "effects": [],
+   "art_id": "core:tech/metal-casting",
+   "provenance": "unciv: Techs.json, Metal Casting",
+   "unciv_fields": [
+    "cost",
+    "era",
+    "prerequisites"
+   ]
+  },
+  {
+   "id": "core:tech/compass",
+   "name": "Compass",
+   "era": "core:era/medieval",
+   "cost": 375,
+   "grid": [
+    6,
+    0
+   ],
+   "prerequisites": [
+    "core:tech/optics",
+    "core:tech/theology"
+   ],
+   "unlocks": {
+    "units": [
+     "core:unit/galleass",
+     "core:unit/great-galleass"
+    ],
+    "buildings": [
+     "core:building/harbor"
+    ],
+    "projects": [],
+    "improvements": [],
+    "routes": [],
+    "worker_actions": [],
+    "reveals_resources": [],
+    "enables_resource_trade": [],
+    "processes": []
+   },
+   "obsoletes": {
+    "units": [],
+    "buildings": []
+   },
+   "repeatable": false,
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "player",
+      "filter": {
+       "domain": "core:domain/sea"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "trade.range.pct",
+     "amount": 15,
+     "source": "own design: trade routes"
+    }
+   ],
+   "art_id": "core:tech/compass",
+   "provenance": "unciv: Techs.json, Compass",
+   "unciv_fields": [
+    "cost",
+    "era",
+    "prerequisites"
+   ]
+  },
+  {
+   "id": "core:tech/education",
+   "name": "Education",
+   "era": "core:era/medieval",
+   "cost": 485,
+   "grid": [
+    6,
+    2
+   ],
+   "prerequisites": [
+    "core:tech/theology",
+    "core:tech/civil-service"
+   ],
+   "unlocks": {
+    "units": [],
+    "buildings": [
+     "core:building/wat",
+     "core:building/university",
+     "core:building/oxford_university",
+     "core:building/angkor_wat"
+    ],
+    "projects": [],
+    "improvements": [],
+    "routes": [],
+    "worker_actions": [],
+    "reveals_resources": [],
+    "enables_resource_trade": [],
+    "processes": [
+     "research"
+    ]
+   },
+   "obsoletes": {
+    "units": [],
+    "buildings": []
+   },
+   "repeatable": false,
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "player"
+     },
+     "condition": null,
+     "trigger": "on_research",
+     "modifier": "tech.research_agreement_trading_allowed",
+     "amount": true,
+     "needs_mechanic": "research_agreement_trading_allowed",
+     "source": "own value, unverified"
+    }
+   ],
+   "art_id": "core:tech/education",
+   "provenance": "unciv: Techs.json, Education",
+   "unciv_fields": [
+    "cost",
+    "era",
+    "prerequisites"
+   ]
+  },
+  {
+   "id": "core:tech/chivalry",
+   "name": "Chivalry",
+   "era": "core:era/medieval",
+   "cost": 485,
+   "grid": [
+    6,
+    5
+   ],
+   "prerequisites": [
+    "core:tech/civil-service",
+    "core:tech/guilds"
+   ],
+   "unlocks": {
+    "units": [
+     "core:unit/knight",
+     "core:unit/camel-archer",
+     "core:unit/naresuan-s-elephant",
+     "core:unit/mandekalu-cavalry",
+     "core:unit/keshik",
+     "core:unit/conquistador"
+    ],
+    "buildings": [
+     "core:building/mughal_fort",
+     "core:building/castle",
+     "core:building/alhambra"
+    ],
+    "projects": [],
+    "improvements": [
+     "core:improvement/kasbah",
+     "core:improvement/chateau"
+    ],
+    "routes": [],
+    "worker_actions": [],
+    "reveals_resources": [],
+    "enables_resource_trade": [],
+    "processes": []
+   },
+   "obsoletes": {
+    "units": [
+     "core:unit/horseman",
+     "core:unit/companion-cavalry",
+     "core:unit/chariot-archer",
+     "core:unit/war-chariot",
+     "core:unit/war-elephant",
+     "core:unit/cataphract",
+     "core:unit/african-forest-elephant",
+     "core:unit/horse-archer"
+    ],
+    "buildings": []
+   },
+   "repeatable": false,
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "player"
+     },
+     "condition": null,
+     "trigger": "on_research",
+     "modifier": "tech.defensive_pact_trading_allowed",
+     "amount": true,
+     "needs_mechanic": "defensive_pact_trading_allowed",
+     "source": "own value, unverified"
+    }
+   ],
+   "art_id": "core:tech/chivalry",
+   "provenance": "unciv: Techs.json, Chivalry",
+   "unciv_fields": [
+    "cost",
+    "era",
+    "prerequisites"
+   ]
+  },
+  {
+   "id": "core:tech/machinery",
+   "name": "Machinery",
+   "era": "core:era/medieval",
+   "cost": 485,
+   "grid": [
+    6,
+    7
+   ],
+   "prerequisites": [
+    "core:tech/engineering",
+    "core:tech/guilds"
+   ],
+   "unlocks": {
+    "units": [
+     "core:unit/crossbowman",
+     "core:unit/chu-ko-nu",
+     "core:unit/longbowman"
+    ],
+    "buildings": [
+     "core:building/ironworks"
+    ],
+    "projects": [],
+    "improvements": [
+     "core:improvement/brazilwood-camp"
+    ],
+    "routes": [],
+    "worker_actions": [],
+    "reveals_resources": [],
+    "enables_resource_trade": [],
+    "processes": []
+   },
+   "obsoletes": {
+    "units": [
+     "core:unit/composite-bowman"
+    ],
+    "buildings": []
+   },
+   "repeatable": false,
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "routes",
+      "filter": {
+       "route": "core:route/road"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "route.movement_cost.flat",
+     "amount": -10,
+     "source": "own value, unverified"
+    }
+   ],
+   "art_id": "core:tech/machinery",
+   "provenance": "unciv: Techs.json, Machinery",
+   "unciv_fields": [
+    "cost",
+    "era",
+    "prerequisites"
+   ]
+  },
+  {
+   "id": "core:tech/physics",
+   "name": "Physics",
+   "era": "core:era/medieval",
+   "cost": 485,
+   "grid": [
+    6,
+    8
+   ],
+   "prerequisites": [
+    "core:tech/metal-casting"
+   ],
+   "unlocks": {
+    "units": [
+     "core:unit/trebuchet",
+     "core:unit/hwach-a"
+    ],
+    "buildings": [
+     "core:building/notre_dame"
+    ],
+    "projects": [],
+    "improvements": [],
+    "routes": [],
+    "worker_actions": [],
+    "reveals_resources": [],
+    "enables_resource_trade": [],
+    "processes": []
+   },
+   "obsoletes": {
+    "units": [
+     "core:unit/catapult",
+     "core:unit/ballista",
+     "core:unit/siege-tower",
+     "core:unit/battering-ram"
+    ],
+    "buildings": []
+   },
+   "repeatable": false,
+   "effects": [],
+   "art_id": "core:tech/physics",
+   "provenance": "unciv: Techs.json, Physics",
+   "unciv_fields": [
+    "cost",
+    "era",
+    "prerequisites"
+   ]
+  },
+  {
+   "id": "core:tech/steel",
+   "name": "Steel",
+   "era": "core:era/medieval",
+   "cost": 485,
+   "grid": [
+    6,
+    9
+   ],
+   "prerequisites": [
+    "core:tech/metal-casting"
+   ],
+   "unlocks": {
+    "units": [
+     "core:unit/longswordsman",
+     "core:unit/samurai"
+    ],
+    "buildings": [
+     "core:building/armory"
+    ],
+    "projects": [],
+    "improvements": [],
+    "routes": [],
+    "worker_actions": [],
+    "reveals_resources": [],
+    "enables_resource_trade": [],
+    "processes": []
+   },
+   "obsoletes": {
+    "units": [
+     "core:unit/swordsman",
+     "core:unit/kris-swordsman"
+    ],
+    "buildings": []
+   },
+   "repeatable": false,
+   "effects": [],
+   "art_id": "core:tech/steel",
+   "provenance": "unciv: Techs.json, Steel",
+   "unciv_fields": [
+    "cost",
+    "era",
+    "prerequisites"
+   ]
+  },
+  {
+   "id": "core:tech/astronomy",
+   "name": "Astronomy",
+   "era": "core:era/renaissance",
+   "cost": 780,
+   "grid": [
+    7,
+    1
+   ],
+   "prerequisites": [
+    "core:tech/compass",
+    "core:tech/education"
+   ],
+   "unlocks": {
+    "units": [
+     "core:unit/caravel",
+     "core:unit/nau",
+     "core:unit/turtle-ship"
+    ],
+    "buildings": [
+     "core:building/observatory"
+    ],
+    "projects": [],
+    "improvements": [],
+    "routes": [],
+    "worker_actions": [],
+    "reveals_resources": [],
+    "enables_resource_trade": [],
+    "processes": []
+   },
+   "obsoletes": {
+    "units": [
+     "core:unit/trireme",
+     "core:unit/dromon",
+     "core:unit/quinquereme"
+    ],
+    "buildings": []
+   },
+   "repeatable": false,
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "player"
+     },
+     "condition": null,
+     "trigger": "on_research",
+     "modifier": "tech.embarked_all_water_passage",
+     "amount": true,
+     "needs_mechanic": "embarked_all_water_passage",
+     "source": "own value, unverified"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "all_units"
+     },
+     "condition": null,
+     "trigger": "on_research",
+     "modifier": "unit.embarked_moves.flat",
+     "amount": 1,
+     "source": "unciv: Techs.json, Astronomy"
+    }
+   ],
+   "art_id": "core:tech/astronomy",
+   "provenance": "unciv: Techs.json, Astronomy",
+   "unciv_fields": [
+    "cost",
+    "era",
+    "prerequisites"
+   ]
+  },
+  {
+   "id": "core:tech/acoustics",
+   "name": "Acoustics",
+   "era": "core:era/renaissance",
+   "cost": 780,
+   "grid": [
+    7,
+    3
+   ],
+   "prerequisites": [
+    "core:tech/education"
+   ],
+   "unlocks": {
+    "units": [],
+    "buildings": [
+     "core:building/opera_house",
+     "core:building/sistine_chapel",
+     "core:building/musicians_guild",
+     "core:building/ceilidh_hall"
+    ],
+    "projects": [],
+    "improvements": [],
+    "routes": [],
+    "worker_actions": [],
+    "reveals_resources": [],
+    "enables_resource_trade": [],
+    "processes": []
+   },
+   "obsoletes": {
+    "units": [],
+    "buildings": []
+   },
+   "repeatable": false,
+   "effects": [],
+   "art_id": "core:tech/acoustics",
+   "provenance": "unciv: Techs.json, Acoustics",
+   "unciv_fields": [
+    "cost",
+    "era",
+    "prerequisites"
+   ]
+  },
+  {
+   "id": "core:tech/banking",
+   "name": "Banking",
+   "era": "core:era/renaissance",
+   "cost": 780,
+   "grid": [
+    7,
+    5
+   ],
+   "prerequisites": [
+    "core:tech/education",
+    "core:tech/chivalry"
+   ],
+   "unlocks": {
+    "units": [],
+    "buildings": [
+     "core:building/satrap_s_court",
+     "core:building/bank",
+     "core:building/forbidden_palace",
+     "core:building/constabulary",
+     "core:building/hanse"
+    ],
+    "projects": [],
+    "improvements": [],
+    "routes": [],
+    "worker_actions": [],
+    "reveals_resources": [],
+    "enables_resource_trade": [],
+    "processes": []
+   },
+   "obsoletes": {
+    "units": [],
+    "buildings": []
+   },
+   "repeatable": false,
+   "effects": [],
+   "art_id": "core:tech/banking",
+   "provenance": "unciv: Techs.json, Banking",
+   "unciv_fields": [
+    "cost",
+    "era",
+    "prerequisites"
+   ]
+  },
+  {
+   "id": "core:tech/printing-press",
+   "name": "Printing Press",
+   "era": "core:era/renaissance",
+   "cost": 780,
+   "grid": [
+    7,
+    7
+   ],
+   "prerequisites": [
+    "core:tech/machinery",
+    "core:tech/physics",
+    "core:tech/chivalry"
+   ],
+   "unlocks": {
+    "units": [],
+    "buildings": [
+     "core:building/zoo",
+     "core:building/leaning_tower_of_pisa",
+     "core:building/globe_theatre"
+    ],
+    "projects": [],
+    "improvements": [],
+    "routes": [],
+    "worker_actions": [],
+    "reveals_resources": [],
+    "enables_resource_trade": [],
+    "processes": []
+   },
+   "obsoletes": {
+    "units": [],
+    "buildings": []
+   },
+   "repeatable": false,
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "player"
+     },
+     "condition": null,
+     "trigger": "on_research",
+     "modifier": "tech.allows_world_congress",
+     "amount": true,
+     "needs_mechanic": "allows_world_congress",
+     "source": "own value, unverified"
+    }
+   ],
+   "art_id": "core:tech/printing-press",
+   "provenance": "unciv: Techs.json, Printing Press",
+   "unciv_fields": [
+    "cost",
+    "era",
+    "prerequisites"
+   ]
+  },
+  {
+   "id": "core:tech/gunpowder",
+   "name": "Gunpowder",
+   "era": "core:era/renaissance",
+   "cost": 780,
+   "grid": [
+    7,
+    9
+   ],
+   "prerequisites": [
+    "core:tech/physics",
+    "core:tech/steel"
+   ],
+   "unlocks": {
+    "units": [
+     "core:unit/musketman",
+     "core:unit/minuteman",
+     "core:unit/musketeer",
+     "core:unit/janissary",
+     "core:unit/tercio"
+    ],
+    "buildings": [
+     "core:building/himeji_castle"
+    ],
+    "projects": [],
+    "improvements": [],
+    "routes": [],
+    "worker_actions": [],
+    "reveals_resources": [],
+    "enables_resource_trade": [],
+    "processes": []
+   },
+   "obsoletes": {
+    "units": [
+     "core:unit/longswordsman",
+     "core:unit/mohawk-warrior",
+     "core:unit/legion",
+     "core:unit/samurai"
+    ],
+    "buildings": []
+   },
+   "repeatable": false,
+   "effects": [],
+   "art_id": "core:tech/gunpowder",
+   "provenance": "unciv: Techs.json, Gunpowder",
+   "unciv_fields": [
+    "cost",
+    "era",
+    "prerequisites"
+   ]
+  },
+  {
+   "id": "core:tech/navigation",
+   "name": "Navigation",
+   "era": "core:era/renaissance",
+   "cost": 1150,
+   "grid": [
+    8,
+    1
+   ],
+   "prerequisites": [
+    "core:tech/astronomy"
+   ],
+   "unlocks": {
+    "units": [
+     "core:unit/frigate",
+     "core:unit/ship-of-the-line",
+     "core:unit/privateer",
+     "core:unit/sea-beggar"
+    ],
+    "buildings": [
+     "core:building/seaport"
+    ],
+    "projects": [],
+    "improvements": [
+     "core:improvement/feitoria"
+    ],
+    "routes": [],
+    "worker_actions": [],
+    "reveals_resources": [],
+    "enables_resource_trade": [],
+    "processes": []
+   },
+   "obsoletes": {
+    "units": [
+     "core:unit/galleass",
+     "core:unit/great-galleass"
+    ],
+    "buildings": []
+   },
+   "repeatable": false,
+   "effects": [],
+   "art_id": "core:tech/navigation",
+   "provenance": "unciv: Techs.json, Navigation",
+   "unciv_fields": [
+    "cost",
+    "era",
+    "prerequisites"
+   ]
+  },
+  {
+   "id": "core:tech/architecture",
+   "name": "Architecture",
+   "era": "core:era/renaissance",
+   "cost": 1150,
+   "grid": [
+    8,
+    3
+   ],
+   "prerequisites": [
+    "core:tech/acoustics",
+    "core:tech/banking"
+   ],
+   "unlocks": {
+    "units": [],
+    "buildings": [
+     "core:building/hermitage",
+     "core:building/porcelain_tower",
+     "core:building/taj_mahal",
+     "core:building/uffizi"
+    ],
+    "projects": [],
+    "improvements": [],
+    "routes": [],
+    "worker_actions": [],
+    "reveals_resources": [],
+    "enables_resource_trade": [],
+    "processes": []
+   },
+   "obsoletes": {
+    "units": [],
+    "buildings": []
+   },
+   "repeatable": false,
+   "effects": [],
+   "art_id": "core:tech/architecture",
+   "provenance": "unciv: Techs.json, Architecture",
+   "unciv_fields": [
+    "cost",
+    "era",
+    "prerequisites"
+   ]
+  },
+  {
+   "id": "core:tech/economics",
+   "name": "Economics",
+   "era": "core:era/renaissance",
+   "cost": 1150,
+   "grid": [
+    8,
+    5
+   ],
+   "prerequisites": [
+    "core:tech/banking",
+    "core:tech/printing-press"
+   ],
+   "unlocks": {
+    "units": [],
+    "buildings": [
+     "core:building/windmill",
+     "core:building/coffee_house"
+    ],
+    "projects": [],
+    "improvements": [],
+    "routes": [],
+    "worker_actions": [],
+    "reveals_resources": [],
+    "enables_resource_trade": [],
+    "processes": []
+   },
+   "obsoletes": {
+    "units": [],
+    "buildings": []
+   },
+   "repeatable": false,
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "player"
+     },
+     "condition": null,
+     "trigger": "on_research",
+     "modifier": "trade.routes.flat",
+     "amount": 1,
+     "source": "own design: trade routes"
+    }
+   ],
+   "art_id": "core:tech/economics",
+   "provenance": "unciv: Techs.json, Economics",
+   "unciv_fields": [
+    "cost",
+    "era",
+    "prerequisites"
+   ]
+  },
+  {
+   "id": "core:tech/metallurgy",
+   "name": "Metallurgy",
+   "era": "core:era/renaissance",
+   "cost": 1150,
+   "grid": [
+    8,
+    8
+   ],
+   "prerequisites": [
+    "core:tech/gunpowder",
+    "core:tech/printing-press"
+   ],
+   "unlocks": {
+    "units": [
+     "core:unit/lancer",
+     "core:unit/sipahi",
+     "core:unit/winged-hussar",
+     "core:unit/hakkapeliitta"
+    ],
+    "buildings": [
+     "core:building/arsenal",
+     "core:building/red_fort",
+     "core:building/kremlin"
+    ],
+    "projects": [],
+    "improvements": [],
+    "routes": [],
+    "worker_actions": [],
+    "reveals_resources": [],
+    "enables_resource_trade": [],
+    "processes": []
+   },
+   "obsoletes": {
+    "units": [
+     "core:unit/pikeman",
+     "core:unit/berserker",
+     "core:unit/landsknecht"
+    ],
+    "buildings": []
+   },
+   "repeatable": false,
+   "effects": [],
+   "art_id": "core:tech/metallurgy",
+   "provenance": "unciv: Techs.json, Metallurgy",
+   "unciv_fields": [
+    "cost",
+    "era",
+    "prerequisites"
+   ]
+  },
+  {
+   "id": "core:tech/chemistry",
+   "name": "Chemistry",
+   "era": "core:era/renaissance",
+   "cost": 1150,
+   "grid": [
+    8,
+    9
+   ],
+   "prerequisites": [
+    "core:tech/gunpowder"
+   ],
+   "unlocks": {
+    "units": [
+     "core:unit/cannon"
+    ],
+    "buildings": [],
+    "projects": [],
+    "improvements": [],
+    "routes": [],
+    "worker_actions": [],
+    "reveals_resources": [],
+    "enables_resource_trade": [],
+    "processes": []
+   },
+   "obsoletes": {
+    "units": [
+     "core:unit/trebuchet",
+     "core:unit/hwach-a"
+    ],
+    "buildings": []
+   },
+   "repeatable": false,
+   "effects": [],
+   "art_id": "core:tech/chemistry",
+   "provenance": "unciv: Techs.json, Chemistry",
+   "unciv_fields": [
+    "cost",
+    "era",
+    "prerequisites"
+   ]
+  },
+  {
+   "id": "core:tech/archaeology",
+   "name": "Archaeology",
+   "era": "core:era/industrial",
+   "cost": 1600,
+   "grid": [
+    9,
+    1
+   ],
+   "prerequisites": [
+    "core:tech/navigation",
+    "core:tech/architecture"
+   ],
+   "unlocks": {
+    "units": [
+     "core:unit/archaeologist"
+    ],
+    "buildings": [
+     "core:building/museum",
+     "core:building/louvre"
+    ],
+    "projects": [],
+    "improvements": [
+     "core:improvement/archaeological-dig"
+    ],
+    "routes": [],
+    "worker_actions": [],
+    "reveals_resources": [
+     "core:resource/antiquity_site"
+    ],
+    "enables_resource_trade": [],
+    "processes": []
+   },
+   "obsoletes": {
+    "units": [],
+    "buildings": []
+   },
+   "repeatable": false,
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "player"
+     },
+     "condition": null,
+     "trigger": "on_research",
+     "modifier": "tech.triggers_archaeological_sites",
+     "amount": true,
+     "needs_mechanic": "triggers_archaeological_sites",
+     "source": "own value, unverified"
+    }
+   ],
+   "art_id": "core:tech/archaeology",
+   "provenance": "unciv: Techs.json, Archaeology",
+   "unciv_fields": [
+    "cost",
+    "era",
+    "prerequisites"
+   ]
+  },
+  {
+   "id": "core:tech/scientific-theory",
+   "name": "Scientific Theory",
+   "era": "core:era/industrial",
+   "cost": 1600,
+   "grid": [
+    9,
+    3
+   ],
+   "prerequisites": [
+    "core:tech/economics",
+    "core:tech/architecture"
+   ],
+   "unlocks": {
+    "units": [],
+    "buildings": [
+     "core:building/public_school"
+    ],
+    "projects": [],
+    "improvements": [],
+    "routes": [],
+    "worker_actions": [],
+    "reveals_resources": [],
+    "enables_resource_trade": [],
+    "processes": []
+   },
+   "obsoletes": {
+    "units": [
+     "core:unit/scout",
+     "core:unit/pathfinder"
+    ],
+    "buildings": []
+   },
+   "repeatable": false,
+   "effects": [],
+   "art_id": "core:tech/scientific-theory",
+   "provenance": "unciv: Techs.json, Scientific Theory",
+   "unciv_fields": [
+    "cost",
+    "era",
+    "prerequisites"
+   ]
+  },
+  {
+   "id": "core:tech/industrialization",
+   "name": "Industrialization",
+   "era": "core:era/industrial",
+   "cost": 1600,
+   "grid": [
+    9,
+    5
+   ],
+   "prerequisites": [
+    "core:tech/economics"
+   ],
+   "unlocks": {
+    "units": [
+     "core:unit/gatling-gun"
+    ],
+    "buildings": [
+     "core:building/factory",
+     "core:building/big_ben"
+    ],
+    "projects": [],
+    "improvements": [],
+    "routes": [],
+    "worker_actions": [],
+    "reveals_resources": [
+     "core:resource/coal"
+    ],
+    "enables_resource_trade": [
+     "core:resource/coal"
+    ],
+    "processes": []
+   },
+   "obsoletes": {
+    "units": [
+     "core:unit/crossbowman",
+     "core:unit/chu-ko-nu",
+     "core:unit/longbowman"
+    ],
+    "buildings": []
+   },
+   "repeatable": false,
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "player"
+     },
+     "condition": null,
+     "trigger": "on_research",
+     "modifier": "trade.routes.flat",
+     "amount": 1,
+     "source": "own design: trade routes"
+    }
+   ],
+   "art_id": "core:tech/industrialization",
+   "provenance": "unciv: Techs.json, Industrialization",
+   "unciv_fields": [
+    "cost",
+    "era",
+    "prerequisites"
+   ]
+  },
+  {
+   "id": "core:tech/rifling",
+   "name": "Rifling",
+   "era": "core:era/industrial",
+   "cost": 1600,
+   "grid": [
+    9,
+    6
+   ],
+   "prerequisites": [
+    "core:tech/economics",
+    "core:tech/metallurgy"
+   ],
+   "unlocks": {
+    "units": [
+     "core:unit/rifleman",
+     "core:unit/mehal-sefari",
+     "core:unit/norwegian-ski-infantry",
+     "core:unit/carolean"
+    ],
+    "buildings": [],
+    "projects": [],
+    "improvements": [],
+    "routes": [],
+    "worker_actions": [],
+    "reveals_resources": [],
+    "enables_resource_trade": [],
+    "processes": []
+   },
+   "obsoletes": {
+    "units": [
+     "core:unit/musketman",
+     "core:unit/minuteman",
+     "core:unit/musketeer",
+     "core:unit/janissary",
+     "core:unit/impi",
+     "core:unit/tercio"
+    ],
+    "buildings": []
+   },
+   "repeatable": false,
+   "effects": [],
+   "art_id": "core:tech/rifling",
+   "provenance": "unciv: Techs.json, Rifling",
+   "unciv_fields": [
+    "cost",
+    "era",
+    "prerequisites"
+   ]
+  },
+  {
+   "id": "core:tech/military-science",
+   "name": "Military Science",
+   "era": "core:era/industrial",
+   "cost": 1600,
+   "grid": [
+    9,
+    8
+   ],
+   "prerequisites": [
+    "core:tech/chemistry",
+    "core:tech/metallurgy"
+   ],
+   "unlocks": {
+    "units": [
+     "core:unit/cavalry",
+     "core:unit/cossack",
+     "core:unit/berber-cavalry",
+     "core:unit/comanche-riders",
+     "core:unit/hussar"
+    ],
+    "buildings": [
+     "core:building/military_academy",
+     "core:building/brandenburg_gate"
+    ],
+    "projects": [],
+    "improvements": [],
+    "routes": [],
+    "worker_actions": [],
+    "reveals_resources": [],
+    "enables_resource_trade": [],
+    "processes": []
+   },
+   "obsoletes": {
+    "units": [
+     "core:unit/knight",
+     "core:unit/camel-archer",
+     "core:unit/naresuan-s-elephant",
+     "core:unit/mandekalu-cavalry",
+     "core:unit/keshik",
+     "core:unit/conquistador"
+    ],
+    "buildings": []
+   },
+   "repeatable": false,
+   "effects": [],
+   "art_id": "core:tech/military-science",
+   "provenance": "unciv: Techs.json, Military Science",
+   "unciv_fields": [
+    "cost",
+    "era",
+    "prerequisites"
+   ]
+  },
+  {
+   "id": "core:tech/fertilizer",
+   "name": "Fertilizer",
+   "era": "core:era/industrial",
+   "cost": 1600,
+   "grid": [
+    9,
+    9
+   ],
+   "prerequisites": [
+    "core:tech/chemistry"
+   ],
+   "unlocks": {
+    "units": [],
+    "buildings": [],
+    "projects": [],
+    "improvements": [],
+    "routes": [],
+    "worker_actions": [],
+    "reveals_resources": [],
+    "enables_resource_trade": [],
+    "processes": []
+   },
+   "obsoletes": {
+    "units": [],
+    "buildings": []
+   },
+   "repeatable": false,
+   "effects": [],
+   "art_id": "core:tech/fertilizer",
+   "provenance": "unciv: Techs.json, Fertilizer",
+   "unciv_fields": [
+    "cost",
+    "era",
+    "prerequisites"
+   ]
+  },
+  {
+   "id": "core:tech/biology",
+   "name": "Biology",
+   "era": "core:era/industrial",
+   "cost": 2350,
+   "grid": [
+    10,
+    1
+   ],
+   "prerequisites": [
+    "core:tech/archaeology",
+    "core:tech/scientific-theory"
+   ],
+   "unlocks": {
+    "units": [],
+    "buildings": [
+     "core:building/hospital"
+    ],
+    "projects": [],
+    "improvements": [
+     "core:improvement/oil-well"
+    ],
+    "routes": [],
+    "worker_actions": [],
+    "reveals_resources": [
+     "core:resource/oil"
+    ],
+    "enables_resource_trade": [
+     "core:resource/oil"
+    ],
+    "processes": []
+   },
+   "obsoletes": {
+    "units": [],
+    "buildings": []
+   },
+   "repeatable": false,
+   "effects": [],
+   "art_id": "core:tech/biology",
+   "provenance": "unciv: Techs.json, Biology",
+   "unciv_fields": [
+    "cost",
+    "era",
+    "prerequisites"
+   ]
+  },
+  {
+   "id": "core:tech/electricity",
+   "name": "Electricity",
+   "era": "core:era/industrial",
+   "cost": 2350,
+   "grid": [
+    10,
+    2
+   ],
+   "prerequisites": [
+    "core:tech/scientific-theory"
+   ],
+   "unlocks": {
+    "units": [],
+    "buildings": [
+     "core:building/hydro_plant",
+     "core:building/stock_exchange",
+     "core:building/police_station"
+    ],
+    "projects": [],
+    "improvements": [],
+    "routes": [],
+    "worker_actions": [],
+    "reveals_resources": [
+     "core:resource/aluminum"
+    ],
+    "enables_resource_trade": [
+     "core:resource/aluminum"
+    ],
+    "processes": []
+   },
+   "obsoletes": {
+    "units": [],
+    "buildings": []
+   },
+   "repeatable": false,
+   "effects": [],
+   "art_id": "core:tech/electricity",
+   "provenance": "unciv: Techs.json, Electricity",
+   "unciv_fields": [
+    "cost",
+    "era",
+    "prerequisites"
+   ]
+  },
+  {
+   "id": "core:tech/steam-power",
+   "name": "Steam Power",
+   "era": "core:era/industrial",
+   "cost": 2350,
+   "grid": [
+    10,
+    5
+   ],
+   "prerequisites": [
+    "core:tech/rifling",
+    "core:tech/industrialization",
+    "core:tech/scientific-theory"
+   ],
+   "unlocks": {
+    "units": [
+     "core:unit/ironclad"
+    ],
+    "buildings": [],
+    "projects": [],
+    "improvements": [],
+    "routes": [],
+    "worker_actions": [],
+    "reveals_resources": [],
+    "enables_resource_trade": [],
+    "processes": []
+   },
+   "obsoletes": {
+    "units": [
+     "core:unit/nau"
+    ],
+    "buildings": []
+   },
+   "repeatable": false,
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "all_units"
+     },
+     "condition": null,
+     "trigger": "on_research",
+     "modifier": "unit.embarked_moves.flat",
+     "amount": 1,
+     "source": "unciv: Techs.json, Steam Power"
+    }
+   ],
+   "art_id": "core:tech/steam-power",
+   "provenance": "unciv: Techs.json, Steam Power",
+   "unciv_fields": [
+    "cost",
+    "era",
+    "prerequisites"
+   ]
+  },
+  {
+   "id": "core:tech/dynamite",
+   "name": "Dynamite",
+   "era": "core:era/industrial",
+   "cost": 2350,
+   "grid": [
+    10,
+    8
+   ],
+   "prerequisites": [
+    "core:tech/fertilizer",
+    "core:tech/military-science"
+   ],
+   "unlocks": {
+    "units": [
+     "core:unit/artillery"
+    ],
+    "buildings": [],
+    "projects": [],
+    "improvements": [],
+    "routes": [],
+    "worker_actions": [],
+    "reveals_resources": [],
+    "enables_resource_trade": [],
+    "processes": []
+   },
+   "obsoletes": {
+    "units": [
+     "core:unit/cannon"
+    ],
+    "buildings": [
+     "core:building/great_wall"
+    ]
+   },
+   "repeatable": false,
+   "effects": [],
+   "art_id": "core:tech/dynamite",
+   "provenance": "unciv: Techs.json, Dynamite",
+   "unciv_fields": [
+    "cost",
+    "era",
+    "prerequisites"
+   ]
+  },
+  {
+   "id": "core:tech/refrigeration",
+   "name": "Refrigeration",
+   "era": "core:era/modern",
+   "cost": 3100,
+   "grid": [
+    11,
+    1
+   ],
+   "prerequisites": [
+    "core:tech/electricity",
+    "core:tech/biology"
+   ],
+   "unlocks": {
+    "units": [
+     "core:unit/submarine"
+    ],
+    "buildings": [
+     "core:building/stadium",
+     "core:building/hotel"
+    ],
+    "projects": [],
+    "improvements": [
+     "core:improvement/offshore-platform"
+    ],
+    "routes": [],
+    "worker_actions": [],
+    "reveals_resources": [],
+    "enables_resource_trade": [],
+    "processes": []
+   },
+   "obsoletes": {
+    "units": [],
+    "buildings": []
+   },
+   "repeatable": false,
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "player",
+      "filter": {
+       "domain": "core:domain/sea"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "trade.range.pct",
+     "amount": 15,
+     "source": "own design: trade routes"
+    }
+   ],
+   "art_id": "core:tech/refrigeration",
+   "provenance": "unciv: Techs.json, Refrigeration",
+   "unciv_fields": [
+    "cost",
+    "era",
+    "prerequisites"
+   ]
+  },
+  {
+   "id": "core:tech/radio",
+   "name": "Radio",
+   "era": "core:era/modern",
+   "cost": 3100,
+   "grid": [
+    11,
+    2
+   ],
+   "prerequisites": [
+    "core:tech/electricity"
+   ],
+   "unlocks": {
+    "units": [],
+    "buildings": [
+     "core:building/broadcast_tower",
+     "core:building/eiffel_tower",
+     "core:building/national_intelligence_agency",
+     "core:building/broadway"
+    ],
+    "projects": [],
+    "improvements": [],
+    "routes": [],
+    "worker_actions": [],
+    "reveals_resources": [],
+    "enables_resource_trade": [],
+    "processes": []
+   },
+   "obsoletes": {
+    "units": [],
+    "buildings": []
+   },
+   "repeatable": false,
+   "effects": [],
+   "art_id": "core:tech/radio",
+   "provenance": "unciv: Techs.json, Radio",
+   "unciv_fields": [
+    "cost",
+    "era",
+    "prerequisites"
+   ]
+  },
+  {
+   "id": "core:tech/replaceable-parts",
+   "name": "Replaceable Parts",
+   "era": "core:era/modern",
+   "cost": 3100,
+   "grid": [
+    11,
+    3
+   ],
+   "prerequisites": [
+    "core:tech/steam-power",
+    "core:tech/electricity"
+   ],
+   "unlocks": {
+    "units": [
+     "core:unit/foreign-legion",
+     "core:unit/great-war-infantry"
+    ],
+    "buildings": [
+     "core:building/military_base",
+     "core:building/statue_of_liberty"
+    ],
+    "projects": [],
+    "improvements": [],
+    "routes": [],
+    "worker_actions": [],
+    "reveals_resources": [],
+    "enables_resource_trade": [],
+    "processes": []
+   },
+   "obsoletes": {
+    "units": [
+     "core:unit/rifleman",
+     "core:unit/mehal-sefari",
+     "core:unit/norwegian-ski-infantry",
+     "core:unit/carolean"
+    ],
+    "buildings": []
+   },
+   "repeatable": false,
+   "effects": [],
+   "art_id": "core:tech/replaceable-parts",
+   "provenance": "unciv: Techs.json, Replaceable Parts",
+   "unciv_fields": [
+    "cost",
+    "era",
+    "prerequisites"
+   ]
+  },
+  {
+   "id": "core:tech/flight",
+   "name": "Flight",
+   "era": "core:era/modern",
+   "cost": 3100,
+   "grid": [
+    11,
+    5
+   ],
+   "prerequisites": [
+    "core:tech/steam-power"
+   ],
+   "unlocks": {
+    "units": [
+     "core:unit/triplane",
+     "core:unit/great-war-bomber"
+    ],
+    "buildings": [
+     "core:building/prora"
+    ],
+    "projects": [],
+    "improvements": [],
+    "routes": [],
+    "worker_actions": [],
+    "reveals_resources": [],
+    "enables_resource_trade": [],
+    "processes": []
+   },
+   "obsoletes": {
+    "units": [],
+    "buildings": []
+   },
+   "repeatable": false,
+   "effects": [],
+   "art_id": "core:tech/flight",
+   "provenance": "unciv: Techs.json, Flight",
+   "unciv_fields": [
+    "cost",
+    "era",
+    "prerequisites"
+   ]
+  },
+  {
+   "id": "core:tech/railroad",
+   "name": "Railroad",
+   "era": "core:era/modern",
+   "cost": 3100,
+   "grid": [
+    11,
+    7
+   ],
+   "prerequisites": [
+    "core:tech/steam-power",
+    "core:tech/dynamite"
+   ],
+   "unlocks": {
+    "units": [],
+    "buildings": [
+     "core:building/neuschwanstein"
+    ],
+    "projects": [],
+    "improvements": [],
+    "routes": [
+     "core:route/railroad"
+    ],
+    "worker_actions": [],
+    "reveals_resources": [],
+    "enables_resource_trade": [],
+    "processes": []
+   },
+   "obsoletes": {
+    "units": [],
+    "buildings": []
+   },
+   "repeatable": false,
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "player"
+     },
+     "condition": null,
+     "trigger": "on_research",
+     "modifier": "trade.routes.flat",
+     "amount": 1,
+     "source": "own value"
+    }
+   ],
+   "art_id": "core:tech/railroad",
+   "provenance": "unciv: Techs.json, Railroads",
+   "unciv_fields": [
+    "cost",
+    "era",
+    "prerequisites"
+   ]
+  },
+  {
+   "id": "core:tech/plastics",
+   "name": "Plastics",
+   "era": "core:era/modern",
+   "cost": 4100,
+   "grid": [
+    12,
+    2
+   ],
+   "prerequisites": [
+    "core:tech/radio",
+    "core:tech/replaceable-parts"
+   ],
+   "unlocks": {
+    "units": [
+     "core:unit/infantry",
+     "core:unit/pracinha"
+    ],
+    "buildings": [
+     "core:building/research_lab",
+     "core:building/cristo_redentor"
+    ],
+    "projects": [],
+    "improvements": [],
+    "routes": [],
+    "worker_actions": [],
+    "reveals_resources": [],
+    "enables_resource_trade": [],
+    "processes": []
+   },
+   "obsoletes": {
+    "units": [
+     "core:unit/foreign-legion",
+     "core:unit/great-war-infantry"
+    ],
+    "buildings": []
+   },
+   "repeatable": false,
+   "effects": [],
+   "art_id": "core:tech/plastics",
+   "provenance": "unciv: Techs.json, Plastics",
+   "unciv_fields": [
+    "cost",
+    "era",
+    "prerequisites"
+   ]
+  },
+  {
+   "id": "core:tech/electronics",
+   "name": "Electronics",
+   "era": "core:era/modern",
+   "cost": 4100,
+   "grid": [
+    12,
+    4
+   ],
+   "prerequisites": [
+    "core:tech/replaceable-parts",
+    "core:tech/flight"
+   ],
+   "unlocks": {
+    "units": [
+     "core:unit/carrier",
+     "core:unit/battleship"
+    ],
+    "buildings": [],
+    "projects": [],
+    "improvements": [],
+    "routes": [],
+    "worker_actions": [],
+    "reveals_resources": [],
+    "enables_resource_trade": [],
+    "processes": []
+   },
+   "obsoletes": {
+    "units": [
+     "core:unit/frigate",
+     "core:unit/ship-of-the-line"
+    ],
+    "buildings": []
+   },
+   "repeatable": false,
+   "effects": [],
+   "art_id": "core:tech/electronics",
+   "provenance": "unciv: Techs.json, Electronics",
+   "unciv_fields": [
+    "cost",
+    "era",
+    "prerequisites"
+   ]
+  },
+  {
+   "id": "core:tech/ballistics",
+   "name": "Ballistics",
+   "era": "core:era/modern",
+   "cost": 4100,
+   "grid": [
+    12,
+    5
+   ],
+   "prerequisites": [
+    "core:tech/flight"
+   ],
+   "unlocks": {
+    "units": [
+     "core:unit/anti-aircraft-gun",
+     "core:unit/machine-gun"
+    ],
+    "buildings": [],
+    "projects": [],
+    "improvements": [],
+    "routes": [],
+    "worker_actions": [],
+    "reveals_resources": [],
+    "enables_resource_trade": [],
+    "processes": []
+   },
+   "obsoletes": {
+    "units": [
+     "core:unit/gatling-gun"
+    ],
+    "buildings": []
+   },
+   "repeatable": false,
+   "effects": [],
+   "art_id": "core:tech/ballistics",
+   "provenance": "unciv: Techs.json, Ballistics",
+   "unciv_fields": [
+    "cost",
+    "era",
+    "prerequisites"
+   ]
+  },
+  {
+   "id": "core:tech/combustion",
+   "name": "Combustion",
+   "era": "core:era/modern",
+   "cost": 4100,
+   "grid": [
+    12,
+    7
+   ],
+   "prerequisites": [
+    "core:tech/railroad"
+   ],
+   "unlocks": {
+    "units": [
+     "core:unit/destroyer",
+     "core:unit/landship"
+    ],
+    "buildings": [],
+    "projects": [],
+    "improvements": [],
+    "routes": [],
+    "worker_actions": [],
+    "reveals_resources": [],
+    "enables_resource_trade": [],
+    "processes": []
+   },
+   "obsoletes": {
+    "units": [
+     "core:unit/ironclad",
+     "core:unit/cavalry",
+     "core:unit/cossack",
+     "core:unit/berber-cavalry",
+     "core:unit/comanche-riders",
+     "core:unit/hussar",
+     "core:unit/caravel",
+     "core:unit/turtle-ship"
+    ],
+    "buildings": []
+   },
+   "repeatable": false,
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "player",
+      "filter": {
+       "domain": "core:domain/land"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "trade.range.pct",
+     "amount": 15,
+     "source": "own design: trade routes"
+    }
+   ],
+   "art_id": "core:tech/combustion",
+   "provenance": "unciv: Techs.json, Combustion",
+   "unciv_fields": [
+    "cost",
+    "era",
+    "prerequisites"
+   ]
+  },
+  {
+   "id": "core:tech/penicillin",
+   "name": "Penicillin",
+   "era": "core:era/atomic",
+   "cost": 5100,
+   "grid": [
+    13,
+    1
+   ],
+   "prerequisites": [
+    "core:tech/refrigeration",
+    "core:tech/plastics"
+   ],
+   "unlocks": {
+    "units": [
+     "core:unit/marine"
+    ],
+    "buildings": [
+     "core:building/medical_lab"
+    ],
+    "projects": [],
+    "improvements": [],
+    "routes": [],
+    "worker_actions": [],
+    "reveals_resources": [],
+    "enables_resource_trade": [],
+    "processes": []
+   },
+   "obsoletes": {
+    "units": [],
+    "buildings": []
+   },
+   "repeatable": false,
+   "effects": [],
+   "art_id": "core:tech/penicillin",
+   "provenance": "unciv: Techs.json, Pharmaceuticals",
+   "unciv_fields": [
+    "cost",
+    "era",
+    "prerequisites"
+   ]
+  },
+  {
+   "id": "core:tech/atomic-theory",
+   "name": "Atomic Theory",
+   "era": "core:era/atomic",
+   "cost": 5100,
+   "grid": [
+    13,
+    3
+   ],
+   "prerequisites": [
+    "core:tech/plastics",
+    "core:tech/electronics"
+   ],
+   "unlocks": {
+    "units": [],
+    "buildings": [],
+    "projects": [
+     "core:project/manhattan_project"
+    ],
+    "improvements": [],
+    "routes": [],
+    "worker_actions": [],
+    "reveals_resources": [
+     "core:resource/uranium"
+    ],
+    "enables_resource_trade": [
+     "core:resource/uranium"
+    ],
+    "processes": []
+   },
+   "obsoletes": {
+    "units": [],
+    "buildings": []
+   },
+   "repeatable": false,
+   "effects": [],
+   "art_id": "core:tech/atomic-theory",
+   "provenance": "unciv: Techs.json, Atomic Theory",
+   "unciv_fields": [
+    "cost",
+    "era",
+    "prerequisites"
+   ]
+  },
+  {
+   "id": "core:tech/radar",
+   "name": "Radar",
+   "era": "core:era/atomic",
+   "cost": 5100,
+   "grid": [
+    13,
+    5
+   ],
+   "prerequisites": [
+    "core:tech/electronics",
+    "core:tech/ballistics"
+   ],
+   "unlocks": {
+    "units": [
+     "core:unit/bomber",
+     "core:unit/b17",
+     "core:unit/fighter",
+     "core:unit/zero",
+     "core:unit/paratrooper"
+    ],
+    "buildings": [
+     "core:building/airport"
+    ],
+    "projects": [],
+    "improvements": [],
+    "routes": [],
+    "worker_actions": [],
+    "reveals_resources": [],
+    "enables_resource_trade": [],
+    "processes": []
+   },
+   "obsoletes": {
+    "units": [
+     "core:unit/triplane",
+     "core:unit/great-war-bomber"
+    ],
+    "buildings": []
+   },
+   "repeatable": false,
+   "effects": [],
+   "art_id": "core:tech/radar",
+   "provenance": "unciv: Techs.json, Radar",
+   "unciv_fields": [
+    "cost",
+    "era",
+    "prerequisites"
+   ]
+  },
+  {
+   "id": "core:tech/combined-arms",
+   "name": "Combined Arms",
+   "era": "core:era/atomic",
+   "cost": 5100,
+   "grid": [
+    13,
+    7
+   ],
+   "prerequisites": [
+    "core:tech/ballistics",
+    "core:tech/combustion"
+   ],
+   "unlocks": {
+    "units": [
+     "core:unit/tank",
+     "core:unit/panzer",
+     "core:unit/anti-tank-gun"
+    ],
+    "buildings": [
+     "core:building/pentagon"
+    ],
+    "projects": [],
+    "improvements": [],
+    "routes": [],
+    "worker_actions": [],
+    "reveals_resources": [],
+    "enables_resource_trade": [],
+    "processes": []
+   },
+   "obsoletes": {
+    "units": [
+     "core:unit/lancer",
+     "core:unit/sipahi",
+     "core:unit/landship",
+     "core:unit/winged-hussar",
+     "core:unit/hakkapeliitta"
+    ],
+    "buildings": []
+   },
+   "repeatable": false,
+   "effects": [],
+   "art_id": "core:tech/combined-arms",
+   "provenance": "unciv: Techs.json, Combined Arms",
+   "unciv_fields": [
+    "cost",
+    "era",
+    "prerequisites"
+   ]
+  },
+  {
+   "id": "core:tech/ecology",
+   "name": "Ecology",
+   "era": "core:era/atomic",
+   "cost": 6400,
+   "grid": [
+    14,
+    1
+   ],
+   "prerequisites": [
+    "core:tech/atomic-theory",
+    "core:tech/penicillin"
+   ],
+   "unlocks": {
+    "units": [],
+    "buildings": [
+     "core:building/solar_plant",
+     "core:building/sydney_opera_house",
+     "core:building/recycling_center"
+    ],
+    "projects": [],
+    "improvements": [],
+    "routes": [],
+    "worker_actions": [],
+    "reveals_resources": [],
+    "enables_resource_trade": [],
+    "processes": []
+   },
+   "obsoletes": {
+    "units": [],
+    "buildings": []
+   },
+   "repeatable": false,
+   "effects": [],
+   "art_id": "core:tech/ecology",
+   "provenance": "unciv: Techs.json, Ecology",
+   "unciv_fields": [
+    "cost",
+    "era",
+    "prerequisites"
+   ]
+  },
+  {
+   "id": "core:tech/nuclear-fission",
+   "name": "Nuclear Fission",
+   "era": "core:era/atomic",
+   "cost": 6400,
+   "grid": [
+    14,
+    3
+   ],
+   "prerequisites": [
+    "core:tech/atomic-theory",
+    "core:tech/radar"
+   ],
+   "unlocks": {
+    "units": [
+     "core:unit/atomic-bomb",
+     "core:unit/bazooka"
+    ],
+    "buildings": [
+     "core:building/nuclear_plant"
+    ],
+    "projects": [],
+    "improvements": [],
+    "routes": [],
+    "worker_actions": [],
+    "reveals_resources": [],
+    "enables_resource_trade": [],
+    "processes": []
+   },
+   "obsoletes": {
+    "units": [],
+    "buildings": []
+   },
+   "repeatable": false,
+   "effects": [],
+   "art_id": "core:tech/nuclear-fission",
+   "provenance": "unciv: Techs.json, Nuclear Fission",
+   "unciv_fields": [
+    "cost",
+    "era",
+    "prerequisites"
+   ]
+  },
+  {
+   "id": "core:tech/rocketry",
+   "name": "Rocketry",
+   "era": "core:era/atomic",
+   "cost": 6400,
+   "grid": [
+    14,
+    5
+   ],
+   "prerequisites": [
+    "core:tech/radar"
+   ],
+   "unlocks": {
+    "units": [
+     "core:unit/mobile-sam",
+     "core:unit/rocket-artillery"
+    ],
+    "buildings": [],
+    "projects": [
+     "core:project/apollo_program"
+    ],
+    "improvements": [],
+    "routes": [],
+    "worker_actions": [],
+    "reveals_resources": [],
+    "enables_resource_trade": [],
+    "processes": []
+   },
+   "obsoletes": {
+    "units": [
+     "core:unit/anti-aircraft-gun"
+    ],
+    "buildings": []
+   },
+   "repeatable": false,
+   "effects": [],
+   "art_id": "core:tech/rocketry",
+   "provenance": "unciv: Techs.json, Rocketry",
+   "unciv_fields": [
+    "cost",
+    "era",
+    "prerequisites"
+   ]
+  },
+  {
+   "id": "core:tech/computers",
+   "name": "Computers",
+   "era": "core:era/atomic",
+   "cost": 6400,
+   "grid": [
+    14,
+    7
+   ],
+   "prerequisites": [
+    "core:tech/radar",
+    "core:tech/combined-arms"
+   ],
+   "unlocks": {
+    "units": [
+     "core:unit/helicopter-gunship"
+    ],
+    "buildings": [
+     "core:building/great_firewall"
+    ],
+    "projects": [],
+    "improvements": [],
+    "routes": [],
+    "worker_actions": [],
+    "reveals_resources": [],
+    "enables_resource_trade": [],
+    "processes": []
+   },
+   "obsoletes": {
+    "units": [],
+    "buildings": []
+   },
+   "repeatable": false,
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "player"
+     },
+     "condition": null,
+     "trigger": "on_research",
+     "modifier": "trade.routes.flat",
+     "amount": 1,
+     "source": "own design: trade routes"
+    }
+   ],
+   "art_id": "core:tech/computers",
+   "provenance": "unciv: Techs.json, Computers",
+   "unciv_fields": [
+    "cost",
+    "era",
+    "prerequisites"
+   ]
+  },
+  {
+   "id": "core:tech/telecommunications",
+   "name": "Telecommunications",
+   "era": "core:era/information",
+   "cost": 7700,
+   "grid": [
+    15,
+    1
+   ],
+   "prerequisites": [
+    "core:tech/ecology"
+   ],
+   "unlocks": {
+    "units": [
+     "core:unit/nuclear-submarine"
+    ],
+    "buildings": [
+     "core:building/bomb_shelter",
+     "core:building/cn_tower",
+     "core:building/national_visitor_center"
+    ],
+    "projects": [],
+    "improvements": [],
+    "routes": [],
+    "worker_actions": [],
+    "reveals_resources": [],
+    "enables_resource_trade": [],
+    "processes": []
+   },
+   "obsoletes": {
+    "units": [],
+    "buildings": []
+   },
+   "repeatable": false,
+   "effects": [],
+   "art_id": "core:tech/telecommunications",
+   "provenance": "unciv: Techs.json, Telecommunications",
+   "unciv_fields": [
+    "cost",
+    "era",
+    "prerequisites"
+   ]
+  },
+  {
+   "id": "core:tech/mobile-tactics",
+   "name": "Mobile Tactics",
+   "era": "core:era/information",
+   "cost": 7700,
+   "grid": [
+    15,
+    2
+   ],
+   "prerequisites": [
+    "core:tech/ecology",
+    "core:tech/nuclear-fission"
+   ],
+   "unlocks": {
+    "units": [
+     "core:unit/mechanized-infantry"
+    ],
+    "buildings": [],
+    "projects": [],
+    "improvements": [],
+    "routes": [],
+    "worker_actions": [],
+    "reveals_resources": [],
+    "enables_resource_trade": [],
+    "processes": []
+   },
+   "obsoletes": {
+    "units": [
+     "core:unit/infantry",
+     "core:unit/pracinha"
+    ],
+    "buildings": []
+   },
+   "repeatable": false,
+   "effects": [],
+   "art_id": "core:tech/mobile-tactics",
+   "provenance": "unciv: Techs.json, Mobile Tactics",
+   "unciv_fields": [
+    "cost",
+    "era",
+    "prerequisites"
+   ]
+  },
+  {
+   "id": "core:tech/advanced-ballistics",
+   "name": "Advanced Ballistics",
+   "era": "core:era/information",
+   "cost": 7700,
+   "grid": [
+    15,
+    4
+   ],
+   "prerequisites": [
+    "core:tech/nuclear-fission",
+    "core:tech/rocketry"
+   ],
+   "unlocks": {
+    "units": [
+     "core:unit/ss-booster",
+     "core:unit/nuclear-missile",
+     "core:unit/guided-missile"
+    ],
+    "buildings": [],
+    "projects": [],
+    "improvements": [],
+    "routes": [],
+    "worker_actions": [],
+    "reveals_resources": [],
+    "enables_resource_trade": [],
+    "processes": []
+   },
+   "obsoletes": {
+    "units": [],
+    "buildings": []
+   },
+   "repeatable": false,
+   "effects": [],
+   "art_id": "core:tech/advanced-ballistics",
+   "provenance": "unciv: Techs.json, Advanced Ballistics",
+   "unciv_fields": [
+    "cost",
+    "era",
+    "prerequisites"
+   ]
+  },
+  {
+   "id": "core:tech/satellites",
+   "name": "Satellites",
+   "era": "core:era/information",
+   "cost": 7700,
+   "grid": [
+    15,
+    5
+   ],
+   "prerequisites": [
+    "core:tech/rocketry"
+   ],
+   "unlocks": {
+    "units": [
+     "core:unit/ss-cockpit"
+    ],
+    "buildings": [
+     "core:building/hubble_space_telescope"
+    ],
+    "projects": [],
+    "improvements": [],
+    "routes": [],
+    "worker_actions": [],
+    "reveals_resources": [],
+    "enables_resource_trade": [],
+    "processes": []
+   },
+   "obsoletes": {
+    "units": [],
+    "buildings": []
+   },
+   "repeatable": false,
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "player"
+     },
+     "condition": null,
+     "trigger": "on_research",
+     "modifier": "tech.map_visible",
+     "amount": true,
+     "needs_mechanic": "map_visible",
+     "source": "own value, unverified"
+    }
+   ],
+   "art_id": "core:tech/satellites",
+   "provenance": "unciv: Techs.json, Satellites",
+   "unciv_fields": [
+    "cost",
+    "era",
+    "prerequisites"
+   ]
+  },
+  {
+   "id": "core:tech/robotics",
+   "name": "Robotics",
+   "era": "core:era/information",
+   "cost": 7700,
+   "grid": [
+    15,
+    6
+   ],
+   "prerequisites": [
+    "core:tech/rocketry",
+    "core:tech/computers"
+   ],
+   "unlocks": {
+    "units": [
+     "core:unit/missile-cruiser"
+    ],
+    "buildings": [
+     "core:building/spaceship_factory"
+    ],
+    "projects": [],
+    "improvements": [],
+    "routes": [],
+    "worker_actions": [],
+    "reveals_resources": [],
+    "enables_resource_trade": [],
+    "processes": []
+   },
+   "obsoletes": {
+    "units": [],
+    "buildings": []
+   },
+   "repeatable": false,
+   "effects": [],
+   "art_id": "core:tech/robotics",
+   "provenance": "unciv: Techs.json, Robotics",
+   "unciv_fields": [
+    "cost",
+    "era",
+    "prerequisites"
+   ]
+  },
+  {
+   "id": "core:tech/lasers",
+   "name": "Lasers",
+   "era": "core:era/information",
+   "cost": 7700,
+   "grid": [
+    15,
+    7
+   ],
+   "prerequisites": [
+    "core:tech/computers"
+   ],
+   "unlocks": {
+    "units": [
+     "core:unit/jet-fighter",
+     "core:unit/modern-armor"
+    ],
+    "buildings": [],
+    "projects": [],
+    "improvements": [],
+    "routes": [],
+    "worker_actions": [],
+    "reveals_resources": [],
+    "enables_resource_trade": [],
+    "processes": []
+   },
+   "obsoletes": {
+    "units": [],
+    "buildings": []
+   },
+   "repeatable": false,
+   "effects": [],
+   "art_id": "core:tech/lasers",
+   "provenance": "unciv: Techs.json, Lasers",
+   "unciv_fields": [
+    "cost",
+    "era",
+    "prerequisites"
+   ]
+  },
+  {
+   "id": "core:tech/the-internet",
+   "name": "The Internet",
+   "era": "core:era/information",
+   "cost": 8800,
+   "grid": [
+    16,
+    0
+   ],
+   "prerequisites": [
+    "core:tech/telecommunications"
+   ],
+   "unlocks": {
+    "units": [],
+    "buildings": [],
+    "projects": [],
+    "improvements": [],
+    "routes": [],
+    "worker_actions": [],
+    "reveals_resources": [],
+    "enables_resource_trade": [],
+    "processes": []
+   },
+   "obsoletes": {
+    "units": [],
+    "buildings": []
+   },
+   "repeatable": false,
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "player"
+     },
+     "condition": null,
+     "trigger": "on_research",
+     "modifier": "tourism.pct",
+     "amount": 80,
+     "source": "own design: tourism, influence and great works"
+    }
+   ],
+   "art_id": "core:tech/the-internet",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:tech/globalization",
+   "name": "Globalization",
+   "era": "core:era/information",
+   "cost": 8800,
+   "grid": [
+    16,
+    1
+   ],
+   "prerequisites": [
+    "core:tech/telecommunications"
+   ],
+   "unlocks": {
+    "units": [],
+    "buildings": [],
+    "projects": [],
+    "improvements": [],
+    "routes": [],
+    "worker_actions": [],
+    "reveals_resources": [],
+    "enables_resource_trade": [],
+    "processes": []
+   },
+   "obsoletes": {
+    "units": [],
+    "buildings": []
+   },
+   "repeatable": false,
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "player"
+     },
+     "condition": null,
+     "trigger": "on_research",
+     "modifier": "league.delegates_per_diplomat.flat",
+     "amount": 1,
+     "source": "own value, unverified"
+    }
+   ],
+   "art_id": "core:tech/globalization",
+   "provenance": "unciv: Techs.json, Globalization",
+   "unciv_fields": [
+    "cost",
+    "era",
+    "prerequisites"
+   ]
+  },
+  {
+   "id": "core:tech/particle-physics",
+   "name": "Particle Physics",
+   "era": "core:era/information",
+   "cost": 8800,
+   "grid": [
+    16,
+    2
+   ],
+   "prerequisites": [
+    "core:tech/telecommunications",
+    "core:tech/mobile-tactics",
+    "core:tech/advanced-ballistics"
+   ],
+   "unlocks": {
+    "units": [
+     "core:unit/ss-engine"
+    ],
+    "buildings": [],
+    "projects": [],
+    "improvements": [],
+    "routes": [],
+    "worker_actions": [],
+    "reveals_resources": [],
+    "enables_resource_trade": [],
+    "processes": []
+   },
+   "obsoletes": {
+    "units": [],
+    "buildings": []
+   },
+   "repeatable": false,
+   "effects": [],
+   "art_id": "core:tech/particle-physics",
+   "provenance": "unciv: Techs.json, Particle Physics",
+   "unciv_fields": [
+    "cost",
+    "era",
+    "prerequisites"
+   ]
+  },
+  {
+   "id": "core:tech/nuclear-fusion",
+   "name": "Nuclear Fusion",
+   "era": "core:era/information",
+   "cost": 8800,
+   "grid": [
+    16,
+    5
+   ],
+   "prerequisites": [
+    "core:tech/advanced-ballistics",
+    "core:tech/satellites",
+    "core:tech/robotics"
+   ],
+   "unlocks": {
+    "units": [
+     "core:unit/giant-death-robot"
+    ],
+    "buildings": [],
+    "projects": [],
+    "improvements": [],
+    "routes": [],
+    "worker_actions": [],
+    "reveals_resources": [],
+    "enables_resource_trade": [],
+    "processes": []
+   },
+   "obsoletes": {
+    "units": [],
+    "buildings": []
+   },
+   "repeatable": false,
+   "effects": [],
+   "art_id": "core:tech/nuclear-fusion",
+   "provenance": "unciv: Techs.json, Nuclear Fusion",
+   "unciv_fields": [
+    "cost",
+    "era",
+    "prerequisites"
+   ]
+  },
+  {
+   "id": "core:tech/nanotechnology",
+   "name": "Nanotechnology",
+   "era": "core:era/information",
+   "cost": 8800,
+   "grid": [
+    16,
+    6
+   ],
+   "prerequisites": [
+    "core:tech/robotics"
+   ],
+   "unlocks": {
+    "units": [
+     "core:unit/ss-stasis-chamber",
+     "core:unit/xcom-squad"
+    ],
+    "buildings": [],
+    "projects": [],
+    "improvements": [],
+    "routes": [],
+    "worker_actions": [],
+    "reveals_resources": [],
+    "enables_resource_trade": [],
+    "processes": []
+   },
+   "obsoletes": {
+    "units": [],
+    "buildings": []
+   },
+   "repeatable": false,
+   "effects": [],
+   "art_id": "core:tech/nanotechnology",
+   "provenance": "unciv: Techs.json, Nanotechnology",
+   "unciv_fields": [
+    "cost",
+    "era",
+    "prerequisites"
+   ]
+  },
+  {
+   "id": "core:tech/stealth",
+   "name": "Stealth",
+   "era": "core:era/information",
+   "cost": 8800,
+   "grid": [
+    16,
+    7
+   ],
+   "prerequisites": [
+    "core:tech/robotics",
+    "core:tech/lasers"
+   ],
+   "unlocks": {
+    "units": [
+     "core:unit/stealth-bomber"
+    ],
+    "buildings": [],
+    "projects": [],
+    "improvements": [],
+    "routes": [],
+    "worker_actions": [],
+    "reveals_resources": [],
+    "enables_resource_trade": [],
+    "processes": []
+   },
+   "obsoletes": {
+    "units": [],
+    "buildings": []
+   },
+   "repeatable": false,
+   "effects": [],
+   "art_id": "core:tech/stealth",
+   "provenance": "unciv: Techs.json, Stealth",
+   "unciv_fields": [
+    "cost",
+    "era",
+    "prerequisites"
+   ]
+  },
+  {
+   "id": "core:tech/future-tech",
+   "name": "Future Tech",
+   "era": "core:era/information",
+   "cost": 9500,
+   "grid": [
+    17,
+    4
+   ],
+   "prerequisites": [
+    "core:tech/the-internet",
+    "core:tech/globalization",
+    "core:tech/particle-physics",
+    "core:tech/nuclear-fusion",
+    "core:tech/nanotechnology",
+    "core:tech/stealth"
+   ],
+   "unlocks": {
+    "units": [],
+    "buildings": [],
+    "projects": [],
+    "improvements": [],
+    "routes": [],
+    "worker_actions": [],
+    "reveals_resources": [],
+    "enables_resource_trade": [],
+    "processes": []
+   },
+   "obsoletes": {
+    "units": [],
+    "buildings": []
+   },
+   "repeatable": true,
+   "effects": [],
+   "art_id": "core:tech/future-tech",
+   "provenance": "unciv: Techs.json, Future Tech",
+   "unciv_fields": [
+    "cost",
+    "prerequisites"
+   ]
+  }
+ ],
+ "notice": "Derived from Unciv (https://github.com/yairm210/Unciv), MPL-2.0: rule fields of the entries marked `unciv:` come from Unciv's `Civ V - Gods & Kings` JSON files at commit 18827b1f; entries marked `own value, unverified` have no Unciv counterpart. Listed per file in classic/docs/classic/UNCIV-ATTRIBUTION.md."
+}

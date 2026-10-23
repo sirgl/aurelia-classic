@@ -1,0 +1,40 @@
+# Translation of classic-game-diplomacy.ftl into ja. Keys are in the order of the English file.
+# Lines marked TODO still hold the English text: translate them and delete the marker.
+
+classic.game.diplomacy.offer-both = 双方：{ $what }
+classic.game.diplomacy.offer-give = あなたが渡す：{ $what }
+classic.game.diplomacy.offer-receive = あなたが受け取る：{ $what }
+classic.game.diplomacy.item-gold = ゴールド
+classic.game.diplomacy.item-gold-amount = { NUMBER($n) }ゴールド
+classic.game.diplomacy.item-gold-per-turn = ターンごとのゴールド
+classic.game.diplomacy.item-gold-per-turn-amount = 毎ターン{ NUMBER($n) }ゴールド
+classic.game.diplomacy.item-resource-amount = { NUMBER($n) } { $name }
+classic.game.diplomacy.item-embassy = 大使館
+classic.game.diplomacy.item-open-borders = 国境開放
+classic.game.diplomacy.item-defensive-pact = 防衛協定
+classic.game.diplomacy.item-research-agreement = 研究協定
+classic.game.diplomacy.item-friendship = 友好宣言
+classic.game.diplomacy.item-peace = 平和条約
+classic.game.diplomacy.item-war-on = { $name }への宣戦
+classic.game.diplomacy.item-peace-with = { $name }との和平
+classic.game.diplomacy.resource = 資源
+classic.game.diplomacy.notice-peace = { $name }と和平しました
+classic.game.diplomacy.notice-borders = { $name }に国境を開放しました
+classic.game.diplomacy.notice-war = { $name }に宣戦布告しました
+classic.game.diplomacy.notice-denounce = { $name }を非難しました
+classic.game.diplomacy.notice-offered = { $name }に取引を提案しました
+classic.game.diplomacy.notice-accepted = 取引が成立しました
+classic.game.diplomacy.notice-refused = 取引は拒否されました
+classic.game.diplomacy.state-war = ターン{ $turn }から交戦中
+classic.game.diplomacy.state-treaty = ターン{ $turn }まで平和条約
+classic.game.diplomacy.state-peace = 平和
+classic.game.diplomacy.fact-our-embassy = 相手国にあなたの大使館があります
+classic.game.diplomacy.fact-their-embassy = あなたの国に相手の大使館があります
+classic.game.diplomacy.fact-we-grant-entry = あなたの国境は相手に開放されています
+classic.game.diplomacy.fact-they-grant-entry = 相手の国境はあなたに開放されています
+classic.game.diplomacy.fact-we-denounced = あなたは相手を非難しました
+classic.game.diplomacy.fact-they-denounced = 相手はあなたを非難しました
+classic.game.diplomacy.fact-warmonger = 相手の好戦的な行いを覚えています（{ $n }）
+classic.game.diplomacy.quantity-gold-now = 即時{ NUMBER($n) }ゴールド
+classic.game.diplomacy.quantity-gold-per-turn = 毎ターン{ NUMBER($n) }ゴールド
+classic.game.diplomacy.quantity-resource = { $n } × { $name }

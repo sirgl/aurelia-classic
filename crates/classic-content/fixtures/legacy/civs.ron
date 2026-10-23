@@ -1,0 +1,18 @@
+// Civilizations (a separate file from core.ron): identity for the selection menu
+// and HUD labels. start_bias: "none" | "coastal" affects the choice of the start
+// tile (naval civs prefer the coast; our v1 approximation).
+// Colour is a team RGB (shown in the menu as a swatch).
+(
+    civs: [
+        (id: "core:nation/rome", name: "Rome", leader: "Trajan", color: (r: 197, g: 44, b: 42), start_bias: "none"),
+        (id: "core:nation/america", name: "America", leader: "George Washington", color: (r: 46, g: 78, b: 156), start_bias: "none"),
+        (id: "core:nation/greece", name: "Greece", leader: "Alexander", color: (r: 140, g: 190, b: 220), start_bias: "none"),
+        (id: "core:nation/egypt", name: "Egypt", leader: "Ramesses II", color: (r: 222, g: 178, b: 66), start_bias: "none"),
+        (id: "core:nation/china", name: "China", leader: "Wu Zetian", color: (r: 160, g: 35, b: 70), start_bias: "none"),
+        (id: "core:nation/england", name: "England", leader: "Elizabeth", color: (r: 235, g: 235, b: 230), start_bias: "coastal"),
+        (id: "core:nation/france", name: "France", leader: "Napoleon", color: (r: 80, g: 60, b: 140), start_bias: "none"),
+        (id: "core:nation/japan", name: "Japan", leader: "Oda Nobunaga", color: (r: 52, g: 52, b: 60), start_bias: "coastal"),
+        (id: "core:nation/arabia", name: "Arabia", leader: "Harun al-Rashid", color: (r: 46, g: 140, b: 90), start_bias: "none"),
+        (id: "core:nation/russia", name: "Russia", leader: "Catherine", color: (r: 140, g: 80, b: 50), start_bias: "none"),
+    ],
+)

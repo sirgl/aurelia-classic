@@ -1,0 +1,60 @@
+[package]
+name = "classic-android"
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+authors = ["The Aurelia contributors"]
+repository = "https://github.com/sirgl/aurelia-classic"
+keywords = ["launcher", "android", "gamedev"]
+categories = ["game-development"]
+rust-version = "1.98"
+publish = false
+description = "Aurelia for Android: the shell of `client` on a NativeActivity window (lands/docs/android.md)."
+
+# `cargo apk build -p classic-android` (platform/tools/launcher/android-build.sh) makes the APK from it. On any other
+# target the crate is empty, so the workspace still builds and tests natively.
+[lib]
+name = "aurelia_classic"
+crate-type = ["cdylib", "rlib"]
+
+[target.'cfg(target_os = "android")'.dependencies]
+launcher-core = { package = "aurelia-launcher-core", path = "../../../platform/crates/launcher-core" }
+classic-ui = { path = "../../crates/classic-ui" }
+
+# cargo-apk 0.10 reads this table. Version names are in docs/android.md.
+[package.metadata.android]
+package = "org.aurelia.classic"
+apk_name = "aurelia-classic"
+build_targets = ["aarch64-linux-android"]
+# Staged by platform/tools/launcher/android-build.sh: fonts, audio and the art pack, with FILES.txt (the NDK
+# cannot list sub-folders, so the app extracts what the list names on first run).
+assets = "assets"
+
+[package.metadata.android.sdk]
+min_sdk_version = 26
+target_sdk_version = 34
+
+[package.metadata.android.application]
+label = "Aurelia"
+theme = "@android:style/Theme.DeviceDefault.NoActionBar.Fullscreen"
+# `debuggable` is set by the dev profile; the release APK is signed with the debug key too
+# until a real key exists (docs/android.md).
+
+[package.metadata.android.application.activity]
+config_changes = "orientation|keyboardHidden|screenSize|smallestScreenSize|screenLayout|uiMode|density"
+launch_mode = "singleTask"
+orientation = "sensorLandscape"
+
+# Vulkan 1.0 (the wgpu Vulkan backend); phones without it cannot run the renderer.
+[[package.metadata.android.uses_feature]]
+name = "android.hardware.vulkan.version"
+required = true
+version = 0x400003
+
+[[package.metadata.android.uses_feature]]
+name = "android.hardware.touchscreen"
+required = true
+
+# The release APK is signed with the key named by CARGO_APK_RELEASE_KEYSTORE and
+# CARGO_APK_RELEASE_KEYSTORE_PASSWORD (platform/tools/launcher/android-build.sh uses the Android debug key
+# when they are unset; Play needs a real upload key, docs/android.md "Signing").

@@ -1,0 +1,31 @@
+[package]
+name = "classic-rules"
+version = "0.1.0"
+edition = "2021"
+description = "Rules module of Aurelia, an Unciv / Civ 5 inspired game with a similar rule set."
+license = "MIT OR Apache-2.0"
+authors = ["The Aurelia contributors"]
+repository = "https://github.com/sirgl/aurelia-classic"
+keywords = ["strategy", "rules", "gamedev"]
+categories = ["game-development", "simulation"]
+rust-version = "1.98"
+publish = false
+
+[dependencies]
+kernel = { package = "aurelia-kernel", path = "../../../platform/crates/kernel" }
+prof = { package = "aurelia-prof", path = "../../../platform/crates/prof" }
+
+# Test content fixtures as RON strings (dogfooding, no hardcoding).
+# Unit tests: their own minimal schema through generic ron/serde (the LIB is clean and
+# has no content dependency: the dev cycle core<->content makes cargo build two
+# instances of the crate; verified). Integration/examples: a dev-dep on classic-content
+# (as in civ-render: there is a single instance, no cycle).
+[dev-dependencies]
+kernel = { package = "aurelia-kernel", path = "../../../platform/crates/kernel", features = ["harness", "test-fixtures"] }
+classic-content = { path = "../classic-content" }
+ron = "0.12.2"
+serde = { version = "1.0.229", features = ["derive"] }
+classic-rules = { path = ".", features = ["harness"] }
+
+[features]
+harness = ["kernel/harness"]

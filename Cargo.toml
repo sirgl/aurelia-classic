@@ -1,0 +1,13 @@
+# classic: the Civ V-style rule module (rules, content, UI) and its launcher (desktop, web, android).
+# Needs only ../platform beside it:
+# `cd classic && cargo check --workspace`.
+[workspace]
+members = [
+    "crates/classic-rules",
+    "crates/classic-content",
+    "crates/classic-ui",
+    "launcher/desktop",
+    "launcher/web",
+    "launcher/android",
+]
+resolver = "2"

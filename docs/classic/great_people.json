@@ -1,0 +1,272 @@
+{
+ "schema": "classic-spec/1",
+ "catalog": "great_people",
+ "edition": "Civ 5 inspired rule set (Unciv Gods & Kings ruleset plus own extensions)",
+ "count": 9,
+ "specialists": [
+  {
+   "id": "core:specialist/citizen",
+   "name": "Unemployed Citizen|Unemployed Citizens",
+   "yields": {
+    "production": 1
+   },
+   "great_person": null,
+   "great_person_points_per_turn": 0,
+   "culture_per_turn": null,
+   "provenance": "own value, unverified"
+  },
+  {
+   "id": "core:specialist/writer",
+   "name": "Writer|Writers",
+   "yields": {},
+   "great_person": "core:unit/great-writer",
+   "great_person_points_per_turn": 3,
+   "culture_per_turn": 2,
+   "provenance": "own value, unverified"
+  },
+  {
+   "id": "core:specialist/artist",
+   "name": "Artist|Artists",
+   "yields": {},
+   "great_person": "core:unit/great-artist",
+   "great_person_points_per_turn": 3,
+   "culture_per_turn": 2,
+   "provenance": "unciv: Specialists.json, Artist"
+  },
+  {
+   "id": "core:specialist/musician",
+   "name": "Musician|Musicians",
+   "yields": {},
+   "great_person": "core:unit/great-musician",
+   "great_person_points_per_turn": 3,
+   "culture_per_turn": 2,
+   "provenance": "own value, unverified"
+  },
+  {
+   "id": "core:specialist/scientist",
+   "name": "Scientist|Scientists",
+   "yields": {
+    "science": 3
+   },
+   "great_person": "core:unit/great-scientist",
+   "great_person_points_per_turn": 3,
+   "culture_per_turn": null,
+   "provenance": "unciv: Specialists.json, Scientist"
+  },
+  {
+   "id": "core:specialist/merchant",
+   "name": "Merchant|Merchants",
+   "yields": {
+    "gold": 3
+   },
+   "great_person": "core:unit/great-merchant",
+   "great_person_points_per_turn": 3,
+   "culture_per_turn": null,
+   "provenance": "unciv: Specialists.json, Merchant"
+  },
+  {
+   "id": "core:specialist/engineer",
+   "name": "Engineer|Engineers",
+   "yields": {
+    "production": 2
+   },
+   "great_person": "core:unit/great-engineer",
+   "great_person_points_per_turn": 3,
+   "culture_per_turn": null,
+   "provenance": "unciv: Specialists.json, Engineer"
+  }
+ ],
+ "thresholds": {},
+ "items": [
+  {
+   "id": "core:unit/great-writer",
+   "name": "Great Writer",
+   "specialist": "core:specialist/writer",
+   "points_source": "specialists",
+   "tile_improvement": null,
+   "abilities": {
+    "work_rate": 1,
+    "base_culture_turns_to_count": 8,
+    "special": "people",
+    "civilian_attack_priority": "high"
+   },
+   "free_promotions": [],
+   "unique_variants": [],
+   "art_id": "bnw:unit/great-writer",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:unit/great-artist",
+   "name": "Great Artist",
+   "specialist": "core:specialist/artist",
+   "points_source": "specialists",
+   "tile_improvement": null,
+   "abilities": {
+    "work_rate": 1,
+    "golden_age_turns": 8,
+    "special": "people",
+    "civilian_attack_priority": "high"
+   },
+   "free_promotions": [],
+   "unique_variants": [],
+   "art_id": "bnw:unit/great-artist",
+   "provenance": "unciv: Units.json, Great Artist",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:unit/great-musician",
+   "name": "Great Musician",
+   "specialist": "core:specialist/musician",
+   "points_source": "specialists",
+   "tile_improvement": null,
+   "abilities": {
+    "work_rate": 1,
+    "one_shot_tourism": 10,
+    "one_shot_tourism_percent_others": 20,
+    "special": "people",
+    "civilian_attack_priority": "high"
+   },
+   "free_promotions": [],
+   "unique_variants": [],
+   "art_id": "bnw:unit/great-musician",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:unit/great-scientist",
+   "name": "Great Scientist",
+   "specialist": "core:specialist/scientist",
+   "points_source": "specialists",
+   "tile_improvement": [
+    "core:improvement/academy"
+   ],
+   "abilities": {
+    "work_rate": 1,
+    "base_beakers_turns_to_count": 8,
+    "special": "people",
+    "civilian_attack_priority": "high"
+   },
+   "free_promotions": [],
+   "unique_variants": [],
+   "art_id": "bnw:unit/great-scientist",
+   "tile_improvement_source": "unciv: Civ V - Gods & Kings/Units.json, Great Scientist (can instantly construct a [Academy] improvement; checked 2026-10-20)",
+   "provenance": "unciv: Units.json, Great Scientist",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:unit/great-engineer",
+   "name": "Great Engineer",
+   "specialist": "core:specialist/engineer",
+   "points_source": "specialists",
+   "tile_improvement": [
+    "core:improvement/manufactory"
+   ],
+   "abilities": {
+    "work_rate": 1,
+    "base_hurry": 300,
+    "hurry_multiplier": 30,
+    "special": "people",
+    "civilian_attack_priority": "high"
+   },
+   "free_promotions": [],
+   "unique_variants": [],
+   "art_id": "bnw:unit/great-engineer",
+   "tile_improvement_source": "unciv: Civ V - Gods & Kings/Units.json, Great Engineer (can instantly construct a [Manufactory] improvement; checked 2026-10-20)",
+   "provenance": "unciv: Units.json, Great Engineer",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:unit/great-merchant",
+   "name": "Great Merchant",
+   "specialist": "core:specialist/merchant",
+   "points_source": "specialists",
+   "tile_improvement": [
+    "core:improvement/customs-house"
+   ],
+   "abilities": {
+    "work_rate": 1,
+    "base_gold": 350,
+    "num_gold_per_era": 50,
+    "special": "people",
+    "civilian_attack_priority": "high"
+   },
+   "free_promotions": [],
+   "unique_variants": [
+    "core:unit/merchant-of-venice"
+   ],
+   "art_id": "bnw:unit/great-merchant",
+   "tile_improvement_source": "unciv: Civ V - Gods & Kings/Units.json, Great Merchant (can instantly construct a [Customs house] improvement; checked 2026-10-20)",
+   "provenance": "unciv: Units.json, Great Merchant",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:unit/great-general",
+   "name": "Great General",
+   "specialist": null,
+   "points_source": "combat_experience",
+   "tile_improvement": [
+    "core:improvement/citadel"
+   ],
+   "abilities": {
+    "work_rate": 1,
+    "special": "people",
+    "civilian_attack_priority": "high"
+   },
+   "free_promotions": [
+    "core:promotion/great-general"
+   ],
+   "unique_variants": [
+    "core:unit/khan"
+   ],
+   "art_id": "bnw:unit/great-general",
+   "tile_improvement_source": "unciv: Civ V - Gods & Kings/Units.json, Great General (can instantly construct a [Citadel] improvement; checked 2026-10-20)",
+   "provenance": "unciv: Units.json, Great General",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:unit/great-admiral",
+   "name": "Great Admiral",
+   "specialist": null,
+   "points_source": "combat_experience",
+   "tile_improvement": null,
+   "abilities": {
+    "special": "people",
+    "civilian_attack_priority": "high"
+   },
+   "free_promotions": [
+    "core:promotion/great-admiral"
+   ],
+   "unique_variants": [],
+   "art_id": "bnw:unit/great-admiral",
+   "provenance": "unciv: Units.json, Great Admiral",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:unit/great-prophet",
+   "name": "Great Prophet",
+   "specialist": null,
+   "points_source": "faith",
+   "tile_improvement": [
+    "core:improvement/holy-site"
+   ],
+   "abilities": {
+    "work_rate": 1,
+    "capture": "core:unit/great-prophet",
+    "religious_strength": 1000,
+    "spread_religion": true,
+    "religion_spreads": 4,
+    "found_religion": true,
+    "special": "people",
+    "civilian_attack_priority": "high"
+   },
+   "free_promotions": [
+    "core:promotion/rival-territory",
+    "core:promotion/sight-penalty"
+   ],
+   "unique_variants": [],
+   "art_id": "bnw:unit/great-prophet",
+   "provenance": "unciv: Units.json, Great Prophet",
+   "unciv_fields": []
+  }
+ ],
+ "notice": "Derived from Unciv (https://github.com/yairm210/Unciv), MPL-2.0: rule fields of the entries marked `unciv:` come from Unciv's `Civ V - Gods & Kings` JSON files at commit 18827b1f; entries marked `own value, unverified` have no Unciv counterpart. Listed per file in classic/docs/classic/UNCIV-ATTRIBUTION.md."
+}

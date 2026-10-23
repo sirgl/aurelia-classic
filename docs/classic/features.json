@@ -1,0 +1,248 @@
+{
+ "schema": "classic-spec/1",
+ "catalog": "features",
+ "edition": "Civ 5 inspired rule set (Unciv Gods & Kings ruleset plus own extensions)",
+ "count": 8,
+ "items": [
+  {
+   "id": "core:feature/ice",
+   "name": "Ice",
+   "yields": {},
+   "yield_not_additive": false,
+   "movement_cost": 1,
+   "defense_pct": 0,
+   "impassable": true,
+   "rough": false,
+   "no_improvement": false,
+   "adds_fresh_water": false,
+   "see_through": 0,
+   "valid_terrains": [
+    "core:terrain/coast",
+    "core:terrain/ocean"
+   ],
+   "requires_river": false,
+   "requires_flatlands": false,
+   "happiness_in_borders": null,
+   "first_finder_gold": null,
+   "adjacent_unit_free_promotion": null,
+   "provenance": "unciv: Terrains.json, Ice",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:feature/jungle",
+   "name": "Jungle",
+   "yields": {
+    "food": 1,
+    "production": -1
+   },
+   "yield_not_additive": false,
+   "movement_cost": 2,
+   "defense_pct": 25,
+   "impassable": false,
+   "rough": true,
+   "no_improvement": false,
+   "adds_fresh_water": false,
+   "see_through": 1,
+   "valid_terrains": [
+    "core:terrain/grassland"
+   ],
+   "requires_river": false,
+   "requires_flatlands": false,
+   "happiness_in_borders": null,
+   "first_finder_gold": null,
+   "adjacent_unit_free_promotion": null,
+   "removal": {
+    "build": "core:build/remove-jungle",
+    "tech": "core:tech/bronze-working",
+    "work_time": 700,
+    "production": 0,
+    "source": "unciv: Civ V - Gods & Kings/TileImprovements.json, Remove Jungle (turnsToBuild 7, techRequired Bronze Working; checked 2026-10-20)"
+   },
+   "provenance": "unciv: Terrains.json, Jungle",
+   "unciv_fields": [
+    "defense_pct"
+   ]
+  },
+  {
+   "id": "core:feature/marsh",
+   "name": "Marsh",
+   "yields": {
+    "food": -1
+   },
+   "yield_not_additive": false,
+   "movement_cost": 3,
+   "defense_pct": -15,
+   "impassable": false,
+   "rough": false,
+   "no_improvement": false,
+   "adds_fresh_water": false,
+   "see_through": 0,
+   "valid_terrains": [
+    "core:terrain/grassland"
+   ],
+   "requires_river": false,
+   "requires_flatlands": true,
+   "happiness_in_borders": null,
+   "first_finder_gold": null,
+   "adjacent_unit_free_promotion": null,
+   "removal": {
+    "build": "core:build/remove-marsh",
+    "tech": "core:tech/masonry",
+    "work_time": 600,
+    "production": 0,
+    "source": "unciv: Civ V - Gods & Kings/TileImprovements.json, Remove Marsh (turnsToBuild 6, techRequired Masonry; checked 2026-10-20)"
+   },
+   "provenance": "unciv: Terrains.json, Marsh",
+   "unciv_fields": [
+    "defense_pct"
+   ]
+  },
+  {
+   "id": "core:feature/oasis",
+   "name": "Oasis",
+   "yields": {
+    "food": 3,
+    "gold": 1
+   },
+   "yield_not_additive": false,
+   "movement_cost": 1,
+   "defense_pct": -10,
+   "impassable": false,
+   "rough": false,
+   "no_improvement": true,
+   "adds_fresh_water": true,
+   "see_through": 0,
+   "valid_terrains": [
+    "core:terrain/desert"
+   ],
+   "requires_river": false,
+   "requires_flatlands": true,
+   "happiness_in_borders": null,
+   "first_finder_gold": null,
+   "adjacent_unit_free_promotion": null,
+   "provenance": "unciv: Terrains.json, Oasis",
+   "unciv_fields": [
+    "defense_pct"
+   ]
+  },
+  {
+   "id": "core:feature/flood-plains",
+   "name": "Flood Plains",
+   "yields": {
+    "food": 2
+   },
+   "yield_not_additive": false,
+   "movement_cost": 1,
+   "defense_pct": -10,
+   "impassable": false,
+   "rough": false,
+   "no_improvement": false,
+   "adds_fresh_water": false,
+   "see_through": 0,
+   "valid_terrains": [
+    "core:terrain/desert"
+   ],
+   "requires_river": true,
+   "requires_flatlands": true,
+   "happiness_in_borders": null,
+   "first_finder_gold": null,
+   "adjacent_unit_free_promotion": null,
+   "provenance": "unciv: Terrains.json, Flood plains",
+   "unciv_fields": [
+    "defense_pct"
+   ]
+  },
+  {
+   "id": "core:feature/forest",
+   "name": "Forest",
+   "yields": {
+    "food": 1,
+    "production": 1
+   },
+   "yield_not_additive": true,
+   "movement_cost": 2,
+   "defense_pct": 25,
+   "impassable": false,
+   "rough": true,
+   "no_improvement": false,
+   "adds_fresh_water": false,
+   "see_through": 1,
+   "valid_terrains": [
+    "core:terrain/grassland",
+    "core:terrain/plains",
+    "core:terrain/tundra"
+   ],
+   "requires_river": false,
+   "requires_flatlands": false,
+   "happiness_in_borders": null,
+   "first_finder_gold": null,
+   "adjacent_unit_free_promotion": null,
+   "removal": {
+    "build": "core:build/remove-forest",
+    "tech": "core:tech/mining",
+    "work_time": 400,
+    "production": 20,
+    "source": "unciv: Civ V - Gods & Kings/TileImprovements.json, Remove Forest (turnsToBuild 4, techRequired Mining; checked 2026-10-20)"
+   },
+   "provenance": "unciv: Terrains.json, Forest",
+   "unciv_fields": [
+    "defense_pct"
+   ]
+  },
+  {
+   "id": "core:feature/fallout",
+   "name": "Fallout",
+   "yields": {
+    "food": -3,
+    "production": -3,
+    "gold": -3
+   },
+   "yield_not_additive": false,
+   "movement_cost": 2,
+   "defense_pct": -15,
+   "impassable": false,
+   "rough": false,
+   "no_improvement": true,
+   "adds_fresh_water": false,
+   "see_through": 0,
+   "valid_terrains": [],
+   "requires_river": false,
+   "requires_flatlands": false,
+   "happiness_in_borders": null,
+   "first_finder_gold": null,
+   "adjacent_unit_free_promotion": null,
+   "provenance": "unciv: Terrains.json, Fallout",
+   "unciv_fields": [
+    "defense_pct"
+   ]
+  },
+  {
+   "id": "core:feature/atoll",
+   "name": "Atoll",
+   "yields": {
+    "food": 1,
+    "production": 1
+   },
+   "yield_not_additive": false,
+   "movement_cost": 1,
+   "defense_pct": 0,
+   "impassable": false,
+   "rough": false,
+   "no_improvement": true,
+   "adds_fresh_water": false,
+   "see_through": 0,
+   "valid_terrains": [
+    "core:terrain/coast",
+    "core:terrain/ocean"
+   ],
+   "requires_river": false,
+   "requires_flatlands": false,
+   "happiness_in_borders": null,
+   "first_finder_gold": null,
+   "adjacent_unit_free_promotion": null,
+   "provenance": "unciv: Terrains.json, Atoll",
+   "unciv_fields": []
+  }
+ ],
+ "notice": "Derived from Unciv (https://github.com/yairm210/Unciv), MPL-2.0: rule fields of the entries marked `unciv:` come from Unciv's `Civ V - Gods & Kings` JSON files at commit 18827b1f; entries marked `own value, unverified` have no Unciv counterpart. Listed per file in classic/docs/classic/UNCIV-ATTRIBUTION.md."
+}
