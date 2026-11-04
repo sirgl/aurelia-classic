@@ -25,6 +25,7 @@ classic.game.reasons.queued-elsewhere = Already being built in another city
 classic.game.reasons.wonder-built = The wonder is already built
 classic.game.reasons.other-nation = Another nation's unique
 classic.game.reasons.not-producible = Cannot be produced
+classic.game.reasons.replaced-by-unique-unit = Replaced by your unique unit
 classic.game.reasons.site-unsettleable = Cannot settle here
 classic.game.reasons.site-foreign-territory = Foreign territory
 classic.game.reasons.site-too-close = Too close to a city

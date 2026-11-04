@@ -179,6 +179,53 @@ fn unique_units_mirror_their_nation_and_class() {
 }
 
 #[test]
+fn a_start_unit_is_a_unique_unit_of_its_nation_and_one_per_slot() {
+    use crate::rules::roles::StartingUnit;
+    let nation = |name: &str, unique: &[&str]| SourceNation {
+        id: Some(k(&format!("core:nation/{name}"))),
+        name: name.into(),
+        leader: "L".into(),
+        unique_units: unique.iter().map(|u| k(u)).collect(),
+        ..Default::default()
+    };
+    let mut uu = classic_unit("core:unit/uu", None);
+    uu.nation = Some(k("core:nation/c"));
+    uu.replaces = Some(k("core:unit/x"));
+    uu.class = Some(k("core:unit-class/x"));
+    let mut regular = classic_unit("core:unit/x", None);
+    regular.class = Some(k("core:unit-class/x"));
+    let source = SourceRules {
+        nations: vec![nation("c", &["core:unit/uu"]), nation("d", &[])],
+        units: vec![regular, uu],
+        ..Default::default()
+    };
+    let with = |c: Vec<(StartingUnit, &str)>, d: Vec<(StartingUnit, &str)>| {
+        let mut source = source.clone();
+        source.nations[0].start_units = c.into_iter().map(|(slot, unit)| (slot, k(unit))).collect();
+        source.nations[1].start_units = d.into_iter().map(|(slot, unit)| (slot, k(unit))).collect();
+        compile_rules(source)
+    };
+    // Its own unique unit, in any slot.
+    let rules = with(vec![(StartingUnit::Defense, "core:unit/uu")], vec![]).unwrap();
+    let kind = rules.units.iter().position(|u| u.key == "core:unit/uu").unwrap();
+    assert_eq!(rules.nations[0].start_units, vec![(StartingUnit::Defense, crate::ids::UnitKindId(kind as u16))]);
+    assert!(with(vec![(StartingUnit::Explore, "core:unit/uu")], vec![]).is_ok());
+    // A regular unit, another nation's unit, an unknown unit and a slot named twice are errors.
+    for bad in [
+        with(vec![(StartingUnit::Defense, "core:unit/x")], vec![]),
+        with(vec![], vec![(StartingUnit::Defense, "core:unit/uu")]),
+        with(vec![(StartingUnit::Defense, "core:unit/nowhere")], vec![]),
+        with(vec![(StartingUnit::Defense, "core:unit/uu"), (StartingUnit::Defense, "core:unit/uu")], vec![]),
+    ] {
+        assert!(bad.is_err());
+    }
+    // The rule is part of the fingerprint; a nation without one hashes as it did.
+    let plain = with(vec![], vec![]).unwrap().hash();
+    let ruled = with(vec![(StartingUnit::Defense, "core:unit/uu")], vec![]).unwrap().hash();
+    assert_ne!(plain, ruled);
+}
+
+#[test]
 fn policy_prerequisite_cycle_is_rejected() {
     let policy = |id: &str, pre: &str| SourcePolicy {
         id: Some(k(id)),

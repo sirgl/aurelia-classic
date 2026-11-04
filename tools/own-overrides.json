@@ -165,6 +165,12 @@
    "ability_effects": "all"
   },
   "core:nation/shoshone": {
+   "set": {
+    "start_units": {
+     "defense": "core:unit/pathfinder"
+    },
+    "start_units_origin": "own design: the Shoshone start with their Pathfinder, a scout that sees 3 tiles, as the first escort of the settler in place of the Warrior. A nation's start_units name one of its own unique units for a start slot (defense, worker or explore), whatever class the unit replaces."
+   },
    "ability_effects": [
     "0.1",
     "0.2",
@@ -555,6 +561,11 @@
    "set": {
     "upgrades_to": [
      "core:unit/composite-bowman"
+    ],
+    "free_promotions": [
+     "core:promotion/goody-hut-picker",
+     "core:promotion/ignore-terrain-cost",
+     "core:promotion/extra-sight-i"
     ]
    },
    "effects": "all"

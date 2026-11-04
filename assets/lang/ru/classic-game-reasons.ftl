@@ -25,6 +25,7 @@ classic.game.reasons.queued-elsewhere = Уже строится в другом 
 classic.game.reasons.wonder-built = Чудо уже построено
 classic.game.reasons.other-nation = Чужое уникальное
 classic.game.reasons.not-producible = Не производится
+classic.game.reasons.replaced-by-unique-unit = Заменено вашим уникальным юнитом
 classic.game.reasons.site-unsettleable = Здесь нельзя селиться
 classic.game.reasons.site-foreign-territory = Чужая территория
 classic.game.reasons.site-too-close = Слишком близко к городу

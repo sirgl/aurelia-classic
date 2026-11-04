@@ -1346,6 +1346,9 @@
             free_units: [
                 ("core:unit/settler", 1),
             ],
+            start_units: [
+                (Defense, "core:unit/pathfinder"),
+            ],
             preferred_religions: ["core:religion/protestantism"],
             effects: [
                 (scope: Player, selector: Owner, modifier: AddStat(stat: Society(FoundingTerritoryTiles), amount: 8)),

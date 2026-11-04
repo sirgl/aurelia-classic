@@ -26,6 +26,7 @@ classic.game.reasons.queued-elsewhere = 已在另一座城市建造中
 classic.game.reasons.wonder-built = 该奇观已被建成
 classic.game.reasons.other-nation = 其他国家的专属项目
 classic.game.reasons.not-producible = 无法生产
+classic.game.reasons.replaced-by-unique-unit = 已被你的专属单位取代
 classic.game.reasons.site-unsettleable = 无法在此定居
 classic.game.reasons.site-foreign-territory = 外国领土
 classic.game.reasons.site-too-close = 离城市太近

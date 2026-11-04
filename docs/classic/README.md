@@ -54,7 +54,7 @@ Open (the full list with sizes and owners is in ru/PLAN.en.md, "Next steps" and 
 | [terrain.json](terrain.json) | Terrain types, yield rules (`Yields`), rivers and hills | 9 |
 | [features.json](features.json) | Forests, jungles, marshes, etc.: yield, movement, defense | 8 |
 | [natural_wonders.json](natural_wonders.json) | Natural wonders: yield, happiness, placement rules | 17 |
-| [nations.json](nations.json) | 43 nations: leader, ability (text + effects), unique units, buildings, improvements, start preferences | 43 |
+| [nations.json](nations.json) | 43 nations: leader, ability (text + effects), unique units, buildings, improvements, start preferences, `start_units` (a unique unit that takes a start slot, own design: Shoshone, Pathfinder) | 43 |
 | [city_states.json](city_states.json) | 58 city-states, 5 types with friend and ally bonuses by era, common influence constants | 58 |
 | [promotions.json](promotions.json) | Promotions: prerequisites, unit classes, effects | 214 |
 | [great_people.json](great_people.json) | 9 types of great people, specialists, thresholds | 9 |

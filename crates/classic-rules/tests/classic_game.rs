@@ -162,10 +162,14 @@ use classic_rules::{compile_rules, Command, CompiledRuleset, GameState};
 //   tests/baseline_hashes.rs): 0xc634056b89b0656e -> 0xfddd23c9bab27d14 (rounds
 //   0x9e7bdac3e5693d86 -> 0x90d8bd975657d687), 784 commands.
 
+// - 4 November, a regular unit that a nation's unique unit replaces is no longer built by that
+//   nation: the script's Warrior orders of the Polynesian player (Maori Warrior replaces the
+//   Warrior) are refused, so its cities build other things: 0x1f920735c9735b24 ->
+//   0x60fd2fa148c59a53 (rounds 0x07d888bdc2e8e01d -> 0x5df7d92c18e33fc7), 787 commands.
 /// Hash of the final state of the classic game.
-const CLASSIC_GAME_FINAL_HASH: u64 = 0x1f920735c9735b24;
+const CLASSIC_GAME_FINAL_HASH: u64 = 0x60fd2fa148c59a53;
 /// Fold of the per-round hashes of the classic game.
-const CLASSIC_GAME_ROUNDS_HASH: u64 = 0x7d888bdc2e8e01d;
+const CLASSIC_GAME_ROUNDS_HASH: u64 = 0x5df7d92c18e33fc7;
 
 const ROUNDS: usize = 100;
 

@@ -26,6 +26,7 @@ classic.game.reasons.queued-elsewhere = Déjà en construction dans une autre vi
 classic.game.reasons.wonder-built = La merveille est déjà construite
 classic.game.reasons.other-nation = Spécificité d'une autre nation
 classic.game.reasons.not-producible = Ne peut pas être produit
+classic.game.reasons.replaced-by-unique-unit = Remplacé par votre unité unique
 classic.game.reasons.site-unsettleable = Impossible de s'installer ici
 classic.game.reasons.site-foreign-territory = Territoire étranger
 classic.game.reasons.site-too-close = Trop près d'une ville

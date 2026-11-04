@@ -1086,7 +1086,7 @@
             faith_cost: Some(50),
             obsolete_tech: Some("core:tech/scientific-theory"),
             upgrades_to: ["core:unit/composite-bowman"],
-            free_promotions: ["core:promotion/goody-hut-picker", "core:promotion/ignore-terrain-cost"],
+            free_promotions: ["core:promotion/goody-hut-picker", "core:promotion/ignore-terrain-cost", "core:promotion/extra-sight-i"],
             era: Some("core:era/ancient"),
             nation: Some("core:nation/shoshone"),
             replaces: Some("core:unit/scout"),

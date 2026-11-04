@@ -54,7 +54,7 @@ use crate::world::state::{AuthWorld, GameView};
 pub struct Classic;
 
 /// The fingerprint of the current content (`CompiledRuleset::hash`).
-pub const CLASSIC_FINGERPRINT: u64 = 3662418266917708599;
+pub const CLASSIC_FINGERPRINT: u64 = 835780351697724273;
 
 impl RulesModule for Classic {
     type World = ClassicWorld;
@@ -103,6 +103,10 @@ impl RulesModule for Classic {
         // Before the game speeds (`speeds.ron`): the same rows, the speeds table added; a save
         // of before plays at Standard (`tests/game_speeds.rs`).
         (14820141147641077048, CLASSIC_FINGERPRINT),
+        // Before the Shoshone start unit (`start_units` of nations.ron) and the Pathfinder's Extra
+        // Sight: a save of before loads under the new content, its units as they were
+        // (`tests/rules_fingerprint.rs`).
+        (3662418266917708599, CLASSIC_FINGERPRINT),
 ];
 
     fn execute(

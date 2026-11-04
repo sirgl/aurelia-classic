@@ -2168,7 +2168,11 @@
     "core:religion/protestantism"
    ],
    "art_slug": "shoshone",
-   "provenance": "own value"
+   "provenance": "own value",
+   "start_units": {
+    "defense": "core:unit/pathfinder"
+   },
+   "start_units_origin": "own design: the Shoshone start with their Pathfinder, a scout that sees 3 tiles, as the first escort of the settler in place of the Warrior. A nation's start_units name one of its own unique units for a start slot (defense, worker or explore), whatever class the unit replaces."
   },
   {
    "id": "core:nation/venice",

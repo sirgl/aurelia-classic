@@ -1572,7 +1572,8 @@
    ],
    "free_promotions": [
     "core:promotion/goody-hut-picker",
-    "core:promotion/ignore-terrain-cost"
+    "core:promotion/ignore-terrain-cost",
+    "core:promotion/extra-sight-i"
    ],
    "worker_actions": [],
    "requires_buildings_in_city": [],

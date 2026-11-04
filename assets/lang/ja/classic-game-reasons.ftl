@@ -26,6 +26,7 @@ classic.game.reasons.queued-elsewhere = すでに別の都市で建設中です
 classic.game.reasons.wonder-built = その驚異はすでに建設されています
 classic.game.reasons.other-nation = 他国の固有のものです
 classic.game.reasons.not-producible = 生産できません
+classic.game.reasons.replaced-by-unique-unit = 固有ユニットに置き換えられています
 classic.game.reasons.site-unsettleable = ここには入植できません
 classic.game.reasons.site-foreign-territory = 他国の領土です
 classic.game.reasons.site-too-close = 都市に近すぎます

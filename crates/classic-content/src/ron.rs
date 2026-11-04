@@ -480,6 +480,10 @@ struct RonNation {
     free_techs: Vec<String>,
     #[serde(default)]
     free_units: Vec<(String, u16)>,
+    /// The nation's own unit for a starting slot (the Shoshone's Pathfinder
+    /// in the defense slot), `(Defense, "core:unit/pathfinder")`.
+    #[serde(default)]
+    start_units: Vec<(crate::ron_roles::RonStartingUnit, String)>,
     #[serde(default)]
     preferred_religions: Vec<String>,
     #[serde(default)]
@@ -1288,6 +1292,7 @@ fn nation(c: RonNation) -> Result<SourceNation, crate::error::ContentError> {
         start_regions: c.start_regions.into(),
         free_techs: keys(c.free_techs),
         free_units: key_counts(c.free_units),
+        start_units: c.start_units.into_iter().map(|(slot, unit)| (slot.into(), key(unit))).collect(),
         module: classic_rules::classic::rows::SourceNationFields {
             preferred_religions: keys(c.preferred_religions),
             spy_names: c.spy_names,

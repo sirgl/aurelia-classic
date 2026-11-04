@@ -76,6 +76,7 @@ pub fn refusal(rules: &CompiledRuleset, refusal: Refusal) -> String {
         Refusal::WonderBuilt => t!("classic.game.reasons.wonder-built").into(),
         Refusal::OtherNation => t!("classic.game.reasons.other-nation").into(),
         Refusal::NotProducible => t!("classic.game.reasons.not-producible").into(),
+        Refusal::ReplacedByUniqueUnit => t!("classic.game.reasons.replaced-by-unique-unit").into(),
     }
 }
 
@@ -311,6 +312,7 @@ mod tests {
             Refusal::WonderBuilt,
             Refusal::OtherNation,
             Refusal::NotProducible,
+            Refusal::ReplacedByUniqueUnit,
         ];
         for item in all {
             let text = refusal(&rules, item);

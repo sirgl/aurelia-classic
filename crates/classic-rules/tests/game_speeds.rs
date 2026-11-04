@@ -152,12 +152,19 @@ fn quick_and_marathon_ai_games_run_100_rounds_without_refusals() {
 }
 
 /// The speeds table is the only change of the content's fingerprint since
-/// the edition before speeds (`Classic::EARLIER_EDITIONS`): without it the
-/// rules hash as they did.
+/// the edition before speeds (`Classic::EARLIER_EDITIONS`) but the Shoshone start unit and the
+/// Pathfinder's Extra Sight: without them the rules hash as they did.
 #[test]
 fn without_speeds_the_rules_hash_as_before_speeds() {
     let mut rules = rules();
     rules.speeds.clear();
+    // The Shoshone start unit and the Pathfinder's Extra Sight came after the speeds: take them out.
+    for nation in &mut rules.nations {
+        nation.start_units.clear();
+    }
+    let extra = rules.promotions.iter().position(|p| p.key == "core:promotion/extra-sight-i").unwrap();
+    let pathfinder = rules.units.iter_mut().find(|u| u.key == "core:unit/pathfinder").unwrap();
+    pathfinder.free_promotions.retain(|p| p.0 as usize != extra);
     assert_eq!(rules.hash(), BEFORE_SPEEDS_FINGERPRINT);
 }
 

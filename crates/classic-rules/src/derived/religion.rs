@@ -1045,6 +1045,10 @@ fn unit_faith_cost(
         .units
         .get(kind.0 as usize)
         .ok_or(FaithPurchaseBlock::UnknownItem)?;
+    // A regular unit the nation's unique unit replaces (the buildings' rule).
+    if rules.replaced_for(auth.players().nation_of(player), kind) {
+        return Err(FaithPurchaseBlock::OtherNation);
+    }
     if let Some(gp) = great_person_kind(rules, kind) {
         return great_person_faith_cost(auth, rules, player, gp);
     }

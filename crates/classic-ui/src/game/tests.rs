@@ -205,8 +205,11 @@ fn blocked_orders_explain_why() {
     assert_eq!(blocked, Availability::Ready);
     found_capital(&mut session);
     let city = session.city_view().unwrap();
-    let locked = city.options.iter().find(|o| o.name == "Swordsman").unwrap();
+    let locked = city.options.iter().find(|o| o.name == "Pikeman").unwrap();
     assert!(matches!(&locked.availability, Availability::Blocked(r) if r.starts_with("Needs technology: ")));
+    // Rome's Legion replaces the Swordsman: the regular unit is on the list, refused with its reason.
+    let replaced = city.options.iter().find(|o| o.name == "Swordsman").unwrap();
+    assert_eq!(replaced.availability, Availability::Blocked("Replaced by your unique unit".into()));
     assert_eq!(city.hurry.1, Availability::Blocked("The queue is empty".into()));
     let research = session.research_view();
     let locked = research.techs.iter().find(|t| t.name == "Writing").unwrap();

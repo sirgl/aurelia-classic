@@ -1867,6 +1867,25 @@ fn start_regions(bias: &Value) -> Option<String> {
     Some(format!("({})", parts.join(", ")))
 }
 
+/// `[(Defense, "core:unit/pathfinder")]` from `{"defense": "core:unit/pathfinder"}`: the nation's own
+/// unit for a starting slot. The slots come out in the order of `StartingUnit`.
+fn start_units(v: &Value) -> Vec<String> {
+    let mut out = Vec::new();
+    let Some(map) = v.as_object() else {
+        return out;
+    };
+    for (slot, role) in [("defense", "Defense"), ("worker", "Worker"), ("explore", "Explore")] {
+        if let Some(unit) = map.get(slot) {
+            let unit = unit.as_str().unwrap_or_else(|| panic!("start unit {slot}: {unit} is not a key"));
+            out.push(format!("({role}, {})", quote(unit)));
+        }
+    }
+    if let Some(unknown) = map.keys().find(|k| !["defense", "worker", "explore"].contains(&k.as_str())) {
+        panic!("unknown start unit slot {unknown:?} (expected defense|worker|explore)");
+    }
+    out
+}
+
 pub fn nations(cat: &Catalogs, legacy: &[(String, (u8, u8, u8))], curated: &CuratedNames) -> Vec<Record> {
     items(&cat.nations, "items")
         .into_iter()
@@ -1904,6 +1923,7 @@ pub fn nations(cat: &Catalogs, legacy: &[(String, (u8, u8, u8))], curated: &Cura
                 .strs("unique_improvements", &strings(c, "unique_improvements"))
                 .strs("free_techs", &strings(c, "free_techs"))
                 .lines("free_units", key_counts(&c["free_units"], "unit", "count"))
+                .lines("start_units", start_units(&c["start_units"]))
                 .strs("preferred_religions", &strings(c, "preferred_religion"));
             fx.write(r, true)
         })

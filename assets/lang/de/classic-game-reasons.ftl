@@ -26,6 +26,7 @@ classic.game.reasons.queued-elsewhere = Wird bereits in einer anderen Stadt geba
 classic.game.reasons.wonder-built = Das Wunder ist schon gebaut
 classic.game.reasons.other-nation = Eigenes einer anderen Nation
 classic.game.reasons.not-producible = Kann nicht produziert werden
+classic.game.reasons.replaced-by-unique-unit = Durch Ihre Spezialeinheit ersetzt
 classic.game.reasons.site-unsettleable = Hier kann man nicht siedeln
 classic.game.reasons.site-foreign-territory = Fremdes Gebiet
 classic.game.reasons.site-too-close = Zu nah an einer Stadt
