@@ -1,0 +1,109 @@
+[package]
+name = "aurelia-qa"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.98"
+publish = false
+
+# The AI bench (platform/docs/ai-bench.md): versions of the classic AI play a suite of
+# games against each other, and the report says which is stronger and by how much.
+# Test infrastructure only: nothing in the game depends on this crate.
+
+[dependencies]
+# The AI bench plays the experimental AI (the nets): the one crate that turns it on.
+classic-rules = { path = "../classic-rules", features = ["harness", "experimental-ai"] }
+classic-content = { path = "../classic-content" }
+kernel = { package = "aurelia-kernel", path = "../../../platform/crates/kernel", features = ["harness"] }
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.151"
+
+[lib]
+name = "aurelia_qa"
+path = "src/lib.rs"
+
+[[bin]]
+name = "ai-tournament"
+path = "src/bin/ai-tournament.rs"
+
+[[bin]]
+name = "ai-march"
+path = "src/bin/ai-march.rs"
+
+[[bin]]
+name = "ai-record"
+path = "src/bin/ai-record.rs"
+
+[[bin]]
+name = "ai-battle"
+path = "src/bin/ai-battle.rs"
+
+[[bin]]
+name = "ai-danger"
+path = "src/bin/ai-danger.rs"
+
+[[bin]]
+name = "ai-train-danger"
+path = "src/bin/ai-train-danger.rs"
+
+[[bin]]
+name = "ai-site"
+path = "src/bin/ai-site.rs"
+
+[[bin]]
+name = "ai-train-site"
+path = "src/bin/ai-train-site.rs"
+
+[[bin]]
+name = "ai-choice"
+path = "src/bin/ai-choice.rs"
+
+[[bin]]
+name = "ai-train-choice"
+path = "src/bin/ai-train-choice.rs"
+
+[[bin]]
+name = "ai-finish"
+path = "src/bin/ai-finish.rs"
+
+[[bin]]
+name = "ai-science-pace"
+path = "src/bin/ai-science-pace.rs"
+
+[[bin]]
+name = "ai-play"
+path = "src/bin/ai-play.rs"
+
+[[bin]]
+name = "ai-abilities"
+path = "src/bin/ai-abilities.rs"
+
+[[bin]]
+name = "ai-features"
+path = "src/bin/ai-features.rs"
+
+[[bin]]
+name = "ai-selfplay"
+path = "src/bin/ai-selfplay.rs"
+
+[[bin]]
+name = "ai-science-audit"
+path = "src/bin/ai-science-audit.rs"
+
+[[bin]]
+name = "ai-opening"
+path = "src/bin/ai-opening.rs"
+
+[[bin]]
+name = "ai-trade"
+path = "src/bin/ai-trade.rs"
+
+# v2 in process on the GPU (classic-rules `gpu`, wgpu; docs/ai-net-model.md, «v2 in-process (GPU)»):
+# `net:v2:W.v2` runs its trunk on the GPU. `--no-default-features` builds the bench without wgpu
+# (v2's trunk then runs on the CPU).
+[features]
+default = ["gpu"]
+gpu = ["classic-rules/gpu"]
+
+[[bin]]
+name = "ai-strategy-trace"
+path = "src/bin/ai-strategy-trace.rs"

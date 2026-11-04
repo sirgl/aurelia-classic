@@ -1,0 +1,25 @@
+# classic: the classic rule module (rules, content, UI) and its launcher (desktop, web, android).
+# Needs only ../platform beside it:
+# `cd classic && cargo check --workspace`.
+[workspace]
+members = [
+    "crates/classic-rules",
+    "crates/classic-content",
+    "crates/classic-ui",
+    "crates/qa",
+    "launcher/desktop",
+    "launcher/web",
+    "launcher/android",
+]
+resolver = "2"
+
+# The test build (docs/testing.md): `cargo nextest run --cargo-profile fasttest`. Release semantics
+# (no debug assertions, no overflow checks, the same pinned hashes), but opt-level 1, which shares
+# generic instances between crates, so an edit rebuilds the ~150 test binaries in ~2-4 min instead
+# of ~25 (opt-level 2 or 3 re-instantiate the generics in every test binary). Games run ~3-4x
+# slower than release; the slow ones are left out of the fast run (.config/nextest.toml).
+[profile.fasttest]
+inherits = "release"
+opt-level = 1
+codegen-units = 256
+incremental = true

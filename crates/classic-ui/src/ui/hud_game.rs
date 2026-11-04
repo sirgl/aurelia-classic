@@ -1,0 +1,686 @@
+//! HUD widgets that exist only with a running game: economy, research, notices, end
+//! turn and the end-of-game panel (the route is map feedback: `map_feedback`). All of them read `HudModel` and return clicks.
+//! The research strip, the notices and the end-of-game modal are the shell's widgets.
+use super::layout::{self, place, Anchor, Panel};
+use crate::ui::screens::{OverviewTab, Screen};
+use super::{panel, text, Icon, GOLD, INK, LIGHT, MUTED};
+use crate::ui::model::{Availability, Economy, GameRequest, Goal, HudModel, NoticeKind, Outcome, Rival, Saving};
+use client::shell::widgets::cards::{Bar, CardLine, ImageCard, Picture};
+use i18n::{t, tf};
+use client::shell::art::ArtPen;
+use client::shell::widgets::research_strip;
+use client::shell::widgets::game_end::{self, Announcement};
+use client::shell::widgets::notices::{self, Action, Marker, Notice};
+use egui::{pos2, vec2, Align2, Color32, Rect, Sense, Stroke};
+
+const FOOD: Color32 = Color32::from_rgb(137, 188, 83);
+const SCIENCE: Color32 = Color32::from_rgb(100, 198, 239);
+const CULTURE: Color32 = Color32::from_rgb(214, 124, 196);
+const FAITH: Color32 = Color32::from_rgb(236, 226, 170);
+const HAPPY: Color32 = Color32::from_rgb(232, 196, 92);
+const UNHAPPY: Color32 = Color32::from_rgb(214, 96, 78);
+
+/// One value of the top bar: the full text (icon label included), the compact text (numbers
+/// only; the full text stays on hover), and which of the breakdown tips belongs to it
+/// (`HudExtras::top_bar` lists them in the order gold, food, production, science, culture,
+/// faith).
+pub(super) struct EconomyValue {
+    pub icon: Icon,
+    pub text: String,
+    pub compact: String,
+    pub tint: Color32,
+    pub tip: Option<usize>,
+    /// The screen a click opens (None: the value stays a plain label: happiness and the
+    /// golden age have no screen of their own).
+    pub target: Option<Target>,
+    /// The step this pool is saved for can be taken now: the cell is lit.
+    pub ready: bool,
+    /// "N more culture for the next policy (about T turns at +R per turn)" for the tooltip.
+    pub progress: Option<String>,
+}
+
+/// What a click on a top-bar value opens (`TopBarValue::click` carries the id; the module's
+/// `top_bar_clicked` opens it the way the matching shortcut does).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Target {
+    /// The economy overview (the cities table with the treasury): gold, food, production.
+    Economy,
+    /// The technology screen: science.
+    Research,
+    /// The policies screen: culture.
+    Policies,
+    /// The religion screen: faith.
+    Religion,
+    /// The overview's resources tab: strategic resources.
+    Resources,
+}
+
+impl Target {
+    pub const ALL: [Target; 5] = [Target::Economy, Target::Research, Target::Policies, Target::Religion, Target::Resources];
+
+    pub fn id(self) -> &'static str {
+        match self {
+            Target::Economy => "economy",
+            Target::Research => "research",
+            Target::Policies => "policies",
+            Target::Religion => "religion",
+            Target::Resources => "resources",
+        }
+    }
+
+    pub fn of(id: &str) -> Option<Target> {
+        Self::ALL.into_iter().find(|t| t.id() == id)
+    }
+
+    /// The name of what it opens, as the Empire menu and the tabs show it.
+    fn label(self) -> &'static str {
+        match self {
+            Target::Economy => OverviewTab::Cities.label(),
+            Target::Research => Screen::Research.label(),
+            Target::Policies => Screen::Civics.label(),
+            Target::Religion => Screen::Religion.label(),
+            Target::Resources => OverviewTab::Resources.label(),
+        }
+    }
+
+    /// The tooltip line that says a click opens it.
+    pub fn hint(self) -> String {
+        tf!("classic.ui.hud-game.click-to-open", screen = self.label())
+    }
+}
+
+fn signed(n: i32) -> String {
+    format!("{n:+}")
+}
+
+pub(super) fn economy_values(economy: &Economy) -> Vec<EconomyValue> {
+    let value = |icon, text: String, compact: String, tint, tip, target| EconomyValue {
+        icon,
+        text,
+        compact,
+        tint,
+        tip,
+        target,
+        ready: false,
+        progress: None,
+    };
+    let gold_delta = signed(economy.gold_per_turn);
+    let science_delta = signed(economy.science_per_turn as i32);
+    let culture_delta = signed(economy.culture_per_turn as i32);
+    let faith_delta = signed(economy.faith_per_turn as i32);
+    let happiness = signed(economy.happiness);
+    let mut culture = value(
+        Icon::Note,
+        tf!("classic.ui.hud-game.top-culture", culture = economy.culture, delta = culture_delta.as_str()),
+        format!("{} ({culture_delta})", economy.culture),
+        CULTURE,
+        Some(4),
+        Some(Target::Policies),
+    );
+    saving(&mut culture, economy.culture_saving, economy.culture_per_turn);
+    let mut faith = value(
+        Icon::Faith,
+        tf!("classic.ui.hud-game.top-faith", faith = economy.faith, delta = faith_delta.as_str()),
+        format!("{} ({faith_delta})", economy.faith),
+        FAITH,
+        Some(5),
+        Some(Target::Religion),
+    );
+    saving(&mut faith, economy.faith_saving, economy.faith_per_turn);
+    let mut science = value(
+        Icon::Flask,
+        tf!("classic.ui.hud-game.top-science", science = economy.science, delta = science_delta.as_str()),
+        format!("{} ({science_delta})", economy.science),
+        SCIENCE,
+        Some(3),
+        Some(Target::Research),
+    );
+    if economy.research_pending {
+        // The research gate: lit like a policy that can be adopted.
+        science.ready = true;
+        science.progress = Some(t!("classic.ui.hud-game.goal-research-ready").to_string());
+    }
+    let mut values = vec![
+        value(
+            Icon::Coin,
+            tf!("classic.ui.hud-game.top-gold", gold = economy.gold, delta = gold_delta.as_str()),
+            format!("{} ({gold_delta})", economy.gold),
+            GOLD,
+            Some(0),
+            Some(Target::Economy),
+        ),
+        value(
+            Icon::Apple,
+            tf!("classic.ui.hud-game.top-food", food = economy.food),
+            economy.food.to_string(),
+            FOOD,
+            Some(1),
+            Some(Target::Economy),
+        ),
+        value(
+            Icon::Hammer,
+            tf!("classic.ui.hud-game.top-production", production = economy.production),
+            economy.production.to_string(),
+            GOLD,
+            Some(2),
+            Some(Target::Economy),
+        ),
+        science,
+        value(
+            Icon::Note,
+            tf!("classic.ui.hud-game.top-happiness", happiness = happiness.as_str()),
+            happiness.clone(),
+            if economy.happiness < 0 { UNHAPPY } else { HAPPY },
+            None,
+            None,
+        ),
+        value(Icon::Sun, economy.golden_age.clone(), compact_golden_age(&economy.golden_age), GOLD, None, None),
+        culture,
+        faith,
+    ];
+    if !economy.resources.is_empty() {
+        values.push(value(Icon::Shield, economy.resources.clone(), economy.resources.clone(), LIGHT, None, Some(Target::Resources)));
+    }
+    values
+}
+
+/// A pool saved for a step shows "have/price" in place of the pool and its income (the income and
+/// the turns to go stay in the tooltip), lit when the step can be taken now.
+fn saving(value: &mut EconomyValue, saving: Option<Saving>, per_turn: u32) {
+    let Some(saving) = saving else { return };
+    value.ready = saving.ready;
+    let culture = saving.goal == Goal::Policy;
+    if saving.cost > 0 {
+        let numbers = format!("{}/{}", saving.have, saving.cost);
+        value.text = match culture {
+            true => tf!("classic.ui.hud-game.top-culture-goal", have = saving.have, cost = saving.cost),
+            false => tf!("classic.ui.hud-game.top-faith-goal", have = saving.have, cost = saving.cost),
+        };
+        value.compact = numbers;
+    }
+    value.progress = Some(progress_line(saving, per_turn));
+}
+
+/// The tooltip sentence of a saving: what is missing and how long it takes, or that it can be done now.
+pub(super) fn progress_line(saving: Saving, per_turn: u32) -> String {
+    let missing = saving.missing();
+    if saving.ready {
+        return match saving.goal {
+            Goal::Policy => t!("classic.ui.hud-game.goal-policy-ready"),
+            Goal::Pantheon => t!("classic.ui.hud-game.goal-pantheon-ready"),
+            Goal::Reformation => t!("classic.ui.hud-game.goal-reformation-ready"),
+            // The Great Prophet comes by itself: never "ready".
+            Goal::Prophet => "",
+        }
+        .to_string();
+    }
+    let turns = saving.turns(per_turn);
+    match (saving.goal, turns) {
+        (Goal::Policy, Some(turns)) => tf!("classic.ui.hud-game.goal-policy-turns", missing = missing, turns = turns, rate = per_turn),
+        (Goal::Policy, None) => tf!("classic.ui.hud-game.goal-policy-stalled", missing = missing),
+        (Goal::Pantheon, Some(turns)) => tf!("classic.ui.hud-game.goal-pantheon-turns", missing = missing, turns = turns, rate = per_turn),
+        (Goal::Pantheon, None) => tf!("classic.ui.hud-game.goal-pantheon-stalled", missing = missing),
+        (_, Some(turns)) => tf!("classic.ui.hud-game.goal-prophet-turns", missing = missing, turns = turns, rate = per_turn),
+        (_, None) => tf!("classic.ui.hud-game.goal-prophet-stalled", missing = missing),
+    }
+}
+
+/// The golden-age text without its label: from the first digit on ("Golden age 3/10" ->
+/// "3/10"), whatever the language puts before the numbers.
+fn compact_golden_age(text: &str) -> String {
+    match text.find(|c: char| c.is_ascii_digit()) {
+        Some(at) => text[at..].to_owned(),
+        None => text.to_owned(),
+    }
+}
+
+/// Current research under the top bar; a click opens the research screen.
+pub(super) fn research(ctx: &egui::Context, game: &HudModel, pen: &mut ArtPen) -> bool {
+    let mut clicked = false;
+    let home = Rect::from_min_size(pos2(0.0, 59.0), vec2(249.0, 87.0));
+    let Some(bounds) = place(ctx, Panel::at("game_research", Anchor::TopLeft, home).priority(60).collapsible()) else { return false };
+    egui::Area::new("game_research".into())
+        .fixed_pos(bounds.min)
+        .show(ctx, |ui| {
+            clicked = research_strip::research_strip(ui, bounds, &research_card(game), t!("classic.ui.hud-game.open-research"), false, Some(pen));
+        });
+    clicked
+}
+
+fn research_card(game: &HudModel) -> ImageCard {
+    let (name, detail, share) = research_lines(game);
+    ImageCard {
+        // The technology in progress shows its own picture; the flask stands for "nothing chosen".
+        picture: match &game.research {
+            Some(research) if !research.art.is_empty() => Picture::Art(research.art.clone()),
+            _ => Picture::Icon(Icon::Flask, SCIENCE),
+        },
+        lines: vec![CardLine::new(t!("classic.ui.hud-game.research-kicker"), MUTED), CardLine::new(name, LIGHT), CardLine::new(detail, MUTED)],
+        bar: Some(Bar { share, color: SCIENCE }),
+    }
+}
+
+fn research_lines(game: &HudModel) -> (String, String, f32) {
+    let Some(research) = &game.research else {
+        return (
+            t!("classic.ui.hud-game.research-choose").into(),
+            t!("classic.ui.hud-game.research-idle").into(),
+            0.0,
+        );
+    };
+    let share = research.stored as f32 / research.cost.max(1) as f32;
+    let detail = match research.turns {
+        Some(n) => tf!("classic.ui.hud-game.research-detail", stored = research.stored, cost = research.cost, n = n),
+        None => tf!("classic.ui.hud-game.research-detail-stalled", stored = research.stored, cost = research.cost),
+    };
+    (research.name.clone(), detail, share.min(1.0))
+}
+
+/// Known nations with peace and open-borders buttons (under the notices).
+pub(super) fn diplomacy(ctx: &egui::Context, screen: Rect, game: &HudModel) -> Vec<GameRequest> {
+    let mut requests = Vec::new();
+    if game.rivals.is_empty() || screen.width() < 800. {
+        return requests;
+    }
+    // The frame sizes itself to the rivals: its size is the last frame's.
+    let size = layout::last_size(ctx, "game_diplomacy").unwrap_or(vec2(302.0, 22.0 + game.rivals.len() as f32 * 22.0));
+    let home = Rect::from_min_size(pos2(screen.right() - 316.0, 96.0), size);
+    let Some(r) = place(ctx, Panel::at("game_diplomacy", Anchor::TopRight, home).priority(50).collapsible()) else { return requests };
+    egui::Area::new("game_diplomacy".into())
+        .fixed_pos(r.min)
+        .show(ctx, |ui| {
+            egui::Frame::new()
+                .fill(INK)
+                .stroke(Stroke::new(1.0, GOLD.gamma_multiply(0.8)))
+                .inner_margin(egui::Margin::same(10))
+                .show(ui, |ui| {
+                    ui.set_width(280.0);
+                    for rival in &game.rivals {
+                        rival_row(ui, rival, &mut requests);
+                    }
+                });
+        });
+    requests
+}
+
+fn rival_row(ui: &mut egui::Ui, rival: &Rival, requests: &mut Vec<GameRequest>) {
+    let mut reasons = Vec::new();
+    ui.horizontal(|ui| {
+        let color = if rival.at_war {
+            Color32::from_rgb(214, 96, 84)
+        } else {
+            LIGHT
+        };
+        let line = if rival.at_war {
+            tf!("classic.ui.hud-game.rival-war", name = rival.name.as_str())
+        } else {
+            tf!("classic.ui.hud-game.rival-peace", name = rival.name.as_str())
+        };
+        ui.label(egui::RichText::new(line).color(color).size(12.0));
+        if rival.at_war && small_button(ui, t!("classic.ui.hud-game.make-peace"), &rival.peace, &mut reasons) {
+            requests.push(GameRequest::MakePeace(rival.player));
+        }
+        if !rival.borders_open && small_button(ui, t!("classic.ui.hud-game.open-borders"), &rival.open_borders, &mut reasons) {
+            requests.push(GameRequest::OpenBorders(rival.player));
+        }
+    });
+    for reason in reasons {
+        ui.label(egui::RichText::new(reason).color(Color32::from_rgb(225, 151, 128)).size(10.0));
+    }
+}
+
+/// A small button; when the rules block it, its reason is collected to stand under the row.
+fn small_button(ui: &mut egui::Ui, label: &str, availability: &Availability, reasons: &mut Vec<String>) -> bool {
+    let response = ui.add_enabled(availability.is_ready(), egui::Button::new(label).small());
+    match availability {
+        Availability::Blocked(reason) => {
+            reasons.push(tf!("classic.ui.hud-game.blocked-reason", action = label, reason = reason.as_str()));
+            response.on_disabled_hover_text(reason).clicked()
+        }
+        Availability::Ready => response.clicked(),
+    }
+}
+
+/// Notices of the last turns; returns the map tile of a clicked notice.
+pub(super) fn notices(ctx: &egui::Context, screen: Rect, game: &HudModel) -> Option<u32> {
+    if let Some(message) = &game.message {
+        let size = layout::last_size(ctx, "game_message").unwrap_or(vec2(300.0, 34.0));
+        let home = Rect::from_min_size(pos2(screen.center().x - size.x / 2.0, screen.top() + 52.0), size);
+        let r = place(ctx, Panel::at("game_message", Anchor::Top, home).priority(95));
+        egui::Area::new("game_message".into())
+            .order(egui::Order::Foreground)
+            .fixed_pos(r.map_or(home.min, |r| r.min))
+            .show(ctx, |ui| {
+                egui::Frame::new()
+                    .fill(INK)
+                    .stroke(Stroke::new(1.0, GOLD))
+                    .inner_margin(egui::Margin::symmetric(14, 8))
+                    .show(ui, |ui| ui.label(egui::RichText::new(message).color(LIGHT)));
+            });
+    }
+    if game.notices.is_empty() || screen.width() < 800. {
+        return None;
+    }
+    let rows: Vec<Notice> = game.notices.iter().take(6).map(|notice| Notice {
+        marker: Marker::Dot(notice_color(notice.kind)),
+        text: tf!("classic.ui.hud-game.notice-line", turn = notice.turn, text = notice.text.as_str()),
+        action: match notice.tile {
+            Some(_) => Action::Row { hint: t!("classic.ui.hud-game.notice-hint").into() },
+            None => Action::None,
+        },
+    }).collect();
+    let mut clicked = None;
+    let home = Rect::from_min_size(pos2(screen.right() - 316.0, 96.0), vec2(300.0, notices::height(rows.len())));
+    let r = place(ctx, Panel::at("game_notices", Anchor::TopRight, home).priority(70).collapsible())?;
+    egui::Area::new("game_notices".into())
+        .fixed_pos(r.min)
+        .show(ctx, |ui| clicked = notices::show(ui, 300.0, &rows).and_then(|i| game.notices[i].tile));
+    clicked
+}
+
+fn notice_color(kind: NoticeKind) -> Color32 {
+    match kind {
+        NoticeKind::Growth => FOOD,
+        NoticeKind::Production => GOLD,
+        NoticeKind::Research => SCIENCE,
+        NoticeKind::Combat => Color32::from_rgb(214, 96, 84),
+        NoticeKind::Diplomacy => Color32::from_rgb(186, 136, 216),
+        NoticeKind::Culture => CULTURE,
+        NoticeKind::Faith => FAITH,
+    }
+}
+
+/// The captured city's fate: a modal with Annex, Puppet, Raze and Liberate.
+pub(super) fn capture(ctx: &egui::Context, screen: Rect, game: &HudModel) -> Vec<GameRequest> {
+    let mut requests = Vec::new();
+    let Some(choice) = &game.capture else {
+        return requests;
+    };
+    game_end::backdrop(ctx, screen, "capture_backdrop");
+    let size = vec2(520.0_f32.min(screen.width() - 24.), 104.0 + choice.options.len() as f32 * 52.0);
+    // Above the city labels and unit badges (foreground layers).
+    egui::Area::new("game_capture".into())
+        .order(egui::Order::Tooltip)
+        .fixed_pos(screen.center() - size / 2.0)
+        .show(ctx, |ui| {
+            let (r, _) = ui.allocate_exact_size(size, Sense::hover());
+            ui.painter().rect_filled(r, 8., Color32::from_rgb(10, 20, 29));
+            panel(ui.painter(), r, 8.0);
+            let title = tf!("classic.ui.hud-game.capture-title", city = choice.city.as_str());
+            text(ui.painter(), r.min + vec2(22.0, 18.0), Align2::LEFT_TOP, title, 24.0, GOLD);
+            let line = tf!("classic.ui.hud-game.capture-line", founder = choice.founder.as_str());
+            text(ui.painter(), r.min + vec2(22.0, 56.0), Align2::LEFT_TOP, line, 13.0, LIGHT);
+            for (i, option) in choice.options.iter().enumerate() {
+                let row = Rect::from_min_size(
+                    r.min + vec2(18.0, 90.0 + i as f32 * 52.0),
+                    vec2(r.width() - 36.0, 44.0),
+                );
+                if capture_row(ui, row, option) {
+                    requests.push(GameRequest::DecideCity {
+                        tile: choice.tile,
+                        decision: option.decision,
+                    });
+                }
+            }
+        });
+    requests
+}
+
+fn capture_row(ui: &mut egui::Ui, r: Rect, option: &crate::ui::model::CaptureOption) -> bool {
+    choice_row(ui, r, option.label, option.hint, &option.availability, t!("classic.ui.hud-game.unavailable"))
+}
+
+/// A button on the left, its explanation (or why it is unavailable) on the right; true on a click.
+fn choice_row(ui: &mut egui::Ui, r: Rect, label: &'static str, hint: &str, availability: &Availability, unavailable: &str) -> bool {
+    let ready = availability.is_ready();
+    let button = Rect::from_min_size(r.min, vec2(118.0, r.height()));
+    let sense = if ready { Sense::click() } else { Sense::hover() };
+    let response = ui.interact(button, egui::Id::new(("capture", label)), sense);
+    let fill = if ready && response.hovered() {
+        Color32::from_rgb(40, 77, 97)
+    } else {
+        Color32::from_rgb(18, 34, 44)
+    };
+    ui.painter().rect_filled(button, 4.0, fill);
+    let stroke = Stroke::new(1.0, if ready { GOLD } else { MUTED.gamma_multiply(0.4) });
+    ui.painter().rect_stroke(button, 4.0, stroke, egui::StrokeKind::Inside);
+    let ink = if ready { LIGHT } else { MUTED.gamma_multiply(0.6) };
+    text(ui.painter(), button.center(), Align2::CENTER_CENTER, label, 15.0, ink);
+    let hint = match availability {
+        Availability::Ready => hint.to_string(),
+        Availability::Blocked(reason) => format!("{unavailable}: {reason}"),
+    };
+    let galley = ui.painter().layout(
+        hint,
+        egui::FontId::proportional(12.0),
+        MUTED,
+        r.width() - button.width() - 16.0,
+    );
+    let at = pos2(button.right() + 14.0, r.center().y - galley.size().y / 2.0);
+    ui.painter().galley(at, galley, MUTED);
+    response.clicked() && ready
+}
+
+/// Ancient Ruins under the player's unit: the three rewards and "later". No backdrop: the
+/// player may keep playing with the card open.
+pub(super) fn ruins(ctx: &egui::Context, screen: Rect, game: &HudModel) -> Vec<GameRequest> {
+    let mut requests = Vec::new();
+    let Some(choice) = &game.ruins else {
+        return requests;
+    };
+    let rows = choice.options.len() as f32;
+    let size = vec2(520.0_f32.min(screen.width() - 24.), 128.0 + rows * 52.0);
+    egui::Area::new("game_ruins".into())
+        .order(egui::Order::Tooltip)
+        // Left of the centre, where the camera puts the unit: the player sees it while choosing.
+        .fixed_pos(pos2(screen.left() + 24.0, screen.top() + 170.0))
+        .show(ctx, |ui| {
+            let (r, _) = ui.allocate_exact_size(size, Sense::hover());
+            ui.painter().rect_filled(r, 8., Color32::from_rgb(10, 20, 29));
+            panel(ui.painter(), r, 8.0);
+            text(ui.painter(), r.min + vec2(22.0, 18.0), Align2::LEFT_TOP, t!("classic.ui.hud-game.ruins-title"), 24.0, GOLD);
+            let line = t!("classic.ui.hud-game.ruins-line");
+            text(ui.painter(), r.min + vec2(22.0, 56.0), Align2::LEFT_TOP, line, 13.0, LIGHT);
+            for (i, option) in choice.options.iter().enumerate() {
+                let row = Rect::from_min_size(r.min + vec2(18.0, 90.0 + i as f32 * 52.0), vec2(r.width() - 36.0, 44.0));
+                if choice_row(ui, row, option.label, &option.hint, &option.availability, t!("classic.ui.hud-game.unavailable")) {
+                    requests.push(GameRequest::ClaimRuins(option.reward));
+                }
+            }
+            let later = Rect::from_min_size(
+                r.min + vec2(18.0, 98.0 + rows * 52.0),
+                vec2(r.width() - 36.0, 22.0),
+            );
+            let (later_label, later_hint) = (t!("classic.ui.hud-game.ruins-later"), t!("classic.ui.hud-game.ruins-later-hint"));
+            if choice_row(ui, later, later_label, later_hint, &Availability::Ready, t!("classic.ui.hud-game.unavailable")) {
+                requests.push(GameRequest::PostponeRuins);
+            }
+        });
+    requests
+}
+
+/// The card of the city-state whose city the player clicked, over the dimmed map: the City-States
+/// screen's card (`screens::city_state_card`) under a header with the treasury and a close button.
+/// A click outside the window and the close button shut it (Esc does through `ModuleUi::cancel`).
+pub(super) fn city_state(ctx: &egui::Context, screen: Rect, game: &HudModel) -> Vec<GameRequest> {
+    let mut requests = Vec::new();
+    let Some(window) = &game.city_state else {
+        return requests;
+    };
+    let mut close = false;
+    egui::Area::new("city_state_backdrop".into()).order(egui::Order::Foreground).fixed_pos(screen.min).show(ctx, |ui| {
+        let (rect, response) = ui.allocate_exact_size(screen.size(), Sense::click_and_drag());
+        ui.painter().rect_filled(rect, 0., Color32::from_black_alpha(90));
+        close |= response.clicked();
+    });
+    let width = 560.0_f32.min(screen.width() - 24.);
+    let size = vec2(width, 48.0 + crate::ui::screens::CITY_STATE_CARD_H + 12.0);
+    let top = (screen.center().y - size.y / 2.0).max(screen.top() + 80.0);
+    egui::Area::new("game_city_state".into())
+        .order(egui::Order::Tooltip)
+        .fixed_pos(pos2(screen.center().x - size.x / 2.0, top))
+        .show(ctx, |ui| {
+            let (r, _) = ui.allocate_exact_size(size, Sense::hover());
+            ui.painter().rect_filled(r, 8., Color32::from_rgb(10, 20, 29));
+            panel(ui.painter(), r, 8.0);
+            let gold = tf!("classic.ui.hud-game.city-state-gold", gold = window.gold);
+            text(ui.painter(), r.min + vec2(14.0, 20.0), Align2::LEFT_CENTER, gold, 13.0, LIGHT);
+            let button = Rect::from_min_size(pos2(r.right() - 12.0 - 28.0, r.top() + 6.0), vec2(28.0, 28.0));
+            let response = ui.interact(button, egui::Id::new("city_state_close"), Sense::click());
+            let fill = if response.hovered() { Color32::from_rgb(40, 77, 97) } else { Color32::from_rgb(18, 34, 44) };
+            ui.painter().rect_filled(button, 4.0, fill);
+            ui.painter().rect_stroke(button, 4.0, Stroke::new(1.0, GOLD), egui::StrokeKind::Inside);
+            text(ui.painter(), button.center(), Align2::CENTER_CENTER, "\u{d7}", 18.0, LIGHT);
+            close |= response.on_hover_text(t!("classic.ui.hud-game.city-state-close")).clicked();
+            let card = Rect::from_min_size(r.min + vec2(12.0, 48.0), vec2(width - 24.0, crate::ui::screens::CITY_STATE_CARD_H));
+            crate::ui::screens::city_state_card(ui, card, &mut requests, &window.card, false);
+        });
+    if close {
+        requests.push(GameRequest::CloseCityState);
+    }
+    requests
+}
+
+/// Victory or defeat panel; returns true when the player asks for the results.
+pub(super) fn outcome(ctx: &egui::Context, screen: Rect, game: &HudModel) -> bool {
+    let (title, line) = match game.outcome {
+        Outcome::Playing => return false,
+        Outcome::Victory => (t!("classic.ui.hud-game.victory"), t!("classic.ui.hud-game.victory-line")),
+        Outcome::Defeat => (t!("classic.ui.hud-game.defeat"), t!("classic.ui.hud-game.defeat-line")),
+    };
+    let announcement = Announcement { title: title.into(), line: line.into(), button: t!("classic.ui.hud-game.see-results").into() };
+    game_end::announce(ctx, screen, &announcement)
+}
+
+#[cfg(test)]
+mod city_state_tests {
+    use super::*;
+    use crate::game::city_states::fixtures::world;
+
+    const SCREEN: Rect = Rect { min: egui::Pos2::ZERO, max: egui::Pos2 { x: 1280., y: 720. } };
+
+    /// Draws the window for `frames` pointer events (a click at `at` after one settled frame) and
+    /// returns the requests of every frame.
+    fn click(game: &HudModel, at: egui::Pos2) -> Vec<GameRequest> {
+        let ctx = egui::Context::default();
+        let mut requests = Vec::new();
+        let mut frame = |events: Vec<egui::Event>| {
+            let raw = egui::RawInput { screen_rect: Some(SCREEN), events, ..Default::default() };
+            let mut output = ctx.run_ui(raw, |ui| requests.extend(city_state(ui.ctx(), SCREEN, game)));
+            output.textures_delta.clear();
+        };
+        frame(vec![]);
+        frame(vec![egui::Event::PointerMoved(at)]);
+        for pressed in [true, false] {
+            frame(vec![egui::Event::PointerButton { pos: at, button: egui::PointerButton::Primary, pressed, modifiers: egui::Modifiers::NONE }]);
+        }
+        requests
+    }
+
+    fn open_model() -> (crate::game::Session, HudModel) {
+        let mut w = world();
+        assert!(w.session.open_city_state_at(w.met_city));
+        let model = w.session.hud_model(None);
+        (w.session, model)
+    }
+
+    #[test]
+    fn no_card_no_window() {
+        let mut w = world();
+        let model = w.session.hud_model(None);
+        assert!(click(&model, pos2(640., 360.)).is_empty());
+    }
+
+    #[test]
+    fn a_click_outside_the_window_or_on_the_close_button_closes_it() {
+        let (_, model) = open_model();
+        assert_eq!(click(&model, pos2(40., 400.)), vec![GameRequest::CloseCityState], "outside");
+        assert_eq!(click(&model, pos2(894., 236.)), vec![GameRequest::CloseCityState], "the close button");
+    }
+
+    #[test]
+    fn a_click_inside_the_window_does_not_close_it_and_a_gift_button_asks_for_the_gift() {
+        let (_, model) = open_model();
+        assert!(click(&model, pos2(640., 300.)).is_empty(), "on the card, not on a button");
+        let gift = click(&model, pos2(466., 431.));
+        let city_state = model.city_state.as_ref().unwrap().card.player;
+        assert_eq!(gift, vec![GameRequest::GiftGold { city_state, gold: 250 }]);
+    }
+
+    #[test]
+    fn a_gift_the_core_refuses_is_greyed_and_asks_for_nothing() {
+        let (_, model) = open_model();
+        // 300 gold: the 500 gift (second button) is greyed by the core's verdict.
+        assert!(!model.city_state.as_ref().unwrap().card.gifts[1].availability.is_ready());
+        assert!(click(&model, pos2(466. + 173., 431.)).is_empty());
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn saving(goal: Goal, have: u32, cost: u32, ready: bool) -> Saving {
+        Saving { goal, have, cost, ready }
+    }
+
+    #[test]
+    fn only_the_values_with_a_screen_are_buttons() {
+        let economy = Economy { resources: "2 Iron".into(), golden_age: "Golden age 3/10".into(), ..Economy::default() };
+        let targets: Vec<Option<Target>> = economy_values(&economy).iter().map(|v| v.target).collect();
+        assert_eq!(
+            targets,
+            [
+                Some(Target::Economy),
+                Some(Target::Economy),
+                Some(Target::Economy),
+                Some(Target::Research),
+                None, // happiness: no screen shows it
+                None, // golden age: no screen of its own
+                Some(Target::Policies),
+                Some(Target::Religion),
+                Some(Target::Resources),
+            ]
+        );
+        for target in Target::ALL {
+            assert_eq!(Target::of(target.id()), Some(target));
+        }
+    }
+
+    #[test]
+    fn a_saving_replaces_the_value_with_the_pool_over_the_price() {
+        let economy = Economy {
+            culture: 24,
+            culture_per_turn: 3,
+            culture_saving: Some(saving(Goal::Policy, 24, 45, false)),
+            faith: 12,
+            faith_saving: Some(saving(Goal::Pantheon, 12, 25, true)),
+            ..Economy::default()
+        };
+        let values = economy_values(&economy);
+        let (culture, faith) = (&values[6], &values[7]);
+        assert_eq!(culture.compact, "24/45");
+        assert_eq!(culture.text, "24/45 Culture");
+        assert!(!culture.ready);
+        assert!(culture.progress.as_deref().unwrap().contains("21 more culture for the next policy: 7 turns at +3 per turn"), "{:?}", culture.progress);
+        assert_eq!(faith.compact, "12/25");
+        assert!(faith.ready, "a pantheon that can be founded lights the number");
+    }
+
+    #[test]
+    fn without_a_saving_the_old_text_stays() {
+        let economy = Economy { culture: 24, culture_per_turn: 3, ..Economy::default() };
+        let culture = &economy_values(&economy)[6];
+        assert_eq!(culture.compact, "24 (+3)");
+        assert!(culture.progress.is_none() && !culture.ready);
+    }
+
+    #[test]
+    fn the_sentence_rounds_up_and_shows_a_dash_without_income() {
+        assert!(progress_line(saving(Goal::Policy, 23, 45, false), 3).contains("22 more culture for the next policy: 8 turns at +3 per turn"));
+        assert!(progress_line(saving(Goal::Policy, 44, 45, false), 5).contains("1 more culture for the next policy: 1 turn at +5"));
+        let stalled = progress_line(saving(Goal::Pantheon, 12, 25, false), 0);
+        assert!(stalled.contains("13 more faith for the pantheon: —"), "{stalled}");
+        assert!(progress_line(saving(Goal::Reformation, 0, 0, true), 0).contains("Reformation"));
+    }
+}

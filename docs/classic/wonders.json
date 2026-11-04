@@ -1,0 +1,4649 @@
+{
+ "schema": "classic-spec/1",
+ "catalog": "wonders",
+ "edition": "Classic rule set (Unciv Gods & Kings ruleset plus own extensions)",
+ "count": 67,
+ "items": [
+  {
+   "id": "core:building/heroic_epic",
+   "name": "Heroic Epic",
+   "kind": "national_wonder",
+   "class": "core:building-class/heroic_epic",
+   "cost": 125,
+   "faith_cost": null,
+   "maintenance": 0,
+   "required_tech": "core:tech/iron-working",
+   "obsolete_tech": null,
+   "era": "core:era/classical",
+   "hurry_cost_modifier": -1,
+   "conquest_survival_pct": 0,
+   "never_capture": true,
+   "specialists": null,
+   "great_person_points": null,
+   "great_work_slots": {
+    "type": "core:great-work-slot/literature",
+    "count": 1
+   },
+   "theming_bonuses": null,
+   "consumes_resources": [],
+   "requirements": {
+    "buildings_in_city": [
+     "core:building/barracks"
+    ],
+    "buildings_in_empire": [
+     {
+      "building": "core:building/barracks",
+      "count_in_all_cities": -1
+     }
+    ],
+    "note_count": "count_in_all_cities -1 means: in every city (whether puppets count is not decided)"
+   },
+   "cost_per_city_pct": 30,
+   "max_start_era": null,
+   "free_start_era": null,
+   "effects": [
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "units_trained_here"
+     },
+     "condition": null,
+     "trigger": "on_unit_trained",
+     "modifier": "grant.promotion",
+     "amount": 1,
+     "target": "core:promotion/morale",
+     "source": "own value, unverified"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "yield.culture.flat",
+     "amount": 1,
+     "source": "unciv: Buildings.json, Heroic Epic"
+    }
+   ],
+   "art_id": "bnw:national_wonder/heroic_epic",
+   "provenance": "unciv: Buildings.json, Heroic Epic",
+   "unciv_fields": [
+    "cost",
+    "required_tech"
+   ]
+  },
+  {
+   "id": "core:building/national_college",
+   "name": "National College",
+   "kind": "national_wonder",
+   "class": "core:building-class/national_college",
+   "cost": 125,
+   "faith_cost": null,
+   "maintenance": 0,
+   "required_tech": "core:tech/philosophy",
+   "obsolete_tech": null,
+   "era": "core:era/classical",
+   "hurry_cost_modifier": -1,
+   "conquest_survival_pct": 0,
+   "never_capture": true,
+   "specialists": null,
+   "great_person_points": null,
+   "great_work_slots": null,
+   "theming_bonuses": null,
+   "consumes_resources": [],
+   "requirements": {
+    "buildings_in_city": [
+     "core:building/library"
+    ],
+    "buildings_in_empire": [
+     {
+      "building": "core:building/library",
+      "count_in_all_cities": -1
+     }
+    ],
+    "note_count": "count_in_all_cities -1 means: in every city (whether puppets count is not decided)"
+   },
+   "cost_per_city_pct": 30,
+   "max_start_era": null,
+   "free_start_era": null,
+   "effects": [
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "yield.science.flat",
+     "amount": 3,
+     "source": "unciv: Buildings.json, National College"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "yield.culture.flat",
+     "amount": 1,
+     "source": "unciv: Buildings.json, National College"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "yield.science.pct",
+     "amount": 50,
+     "source": "unciv: Buildings.json, National College"
+    }
+   ],
+   "art_id": "bnw:national_wonder/national_college",
+   "provenance": "unciv: Buildings.json, National College",
+   "unciv_fields": [
+    "cost",
+    "required_tech"
+   ]
+  },
+  {
+   "id": "core:building/national_epic",
+   "name": "National Epic",
+   "kind": "national_wonder",
+   "class": "core:building-class/national_epic",
+   "cost": 125,
+   "faith_cost": null,
+   "maintenance": 0,
+   "required_tech": "core:tech/drama-and-poetry",
+   "obsolete_tech": null,
+   "era": "core:era/classical",
+   "hurry_cost_modifier": -1,
+   "conquest_survival_pct": 0,
+   "never_capture": true,
+   "specialists": null,
+   "great_person_points": null,
+   "great_work_slots": {
+    "type": "core:great-work-slot/literature",
+    "count": 1
+   },
+   "theming_bonuses": null,
+   "consumes_resources": [],
+   "requirements": {
+    "buildings_in_city": [
+     "core:building/monument"
+    ],
+    "buildings_in_empire": [
+     {
+      "building": "core:building/monument",
+      "count_in_all_cities": -1
+     }
+    ],
+    "note_count": "count_in_all_cities -1 means: in every city (whether puppets count is not decided)"
+   },
+   "cost_per_city_pct": 30,
+   "max_start_era": null,
+   "free_start_era": null,
+   "effects": [
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "great_people.rate.pct",
+     "amount": 25,
+     "source": "unciv: Buildings.json, National Epic"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "yield.culture.flat",
+     "amount": 1,
+     "source": "unciv: Buildings.json, National Epic"
+    }
+   ],
+   "art_id": "bnw:national_wonder/national_epic",
+   "provenance": "unciv: Buildings.json, National Epic",
+   "unciv_fields": [
+    "cost",
+    "required_tech"
+   ]
+  },
+  {
+   "id": "core:building/circus_maximus",
+   "name": "Circus Maximus",
+   "kind": "national_wonder",
+   "class": "core:building-class/circus_maximus",
+   "cost": 125,
+   "faith_cost": null,
+   "maintenance": 0,
+   "required_tech": "core:tech/horseback-riding",
+   "obsolete_tech": null,
+   "era": "core:era/classical",
+   "hurry_cost_modifier": -1,
+   "conquest_survival_pct": 0,
+   "never_capture": true,
+   "specialists": null,
+   "great_person_points": null,
+   "great_work_slots": null,
+   "theming_bonuses": null,
+   "consumes_resources": [],
+   "requirements": {
+    "buildings_in_city": [
+     "core:building/colosseum"
+    ],
+    "buildings_in_empire": [
+     {
+      "building": "core:building/colosseum",
+      "count_in_all_cities": -1
+     }
+    ],
+    "note_count": "count_in_all_cities -1 means: in every city (whether puppets count is not decided)"
+   },
+   "cost_per_city_pct": 30,
+   "max_start_era": null,
+   "free_start_era": null,
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "player"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "happiness.global",
+     "amount": 5,
+     "source": "own value, unverified"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "yield.culture.flat",
+     "amount": 1,
+     "source": "unciv: Buildings.json, Circus Maximus"
+    }
+   ],
+   "art_id": "bnw:national_wonder/circus_maximus",
+   "provenance": "unciv: Buildings.json, Circus Maximus",
+   "unciv_fields": [
+    "cost",
+    "required_tech"
+   ]
+  },
+  {
+   "id": "core:building/east_india_company",
+   "name": "East India Company",
+   "kind": "national_wonder",
+   "class": "core:building-class/national_treasury",
+   "cost": 125,
+   "faith_cost": null,
+   "maintenance": 0,
+   "required_tech": "core:tech/guilds",
+   "obsolete_tech": null,
+   "era": "core:era/medieval",
+   "hurry_cost_modifier": -1,
+   "conquest_survival_pct": 0,
+   "never_capture": true,
+   "specialists": null,
+   "great_person_points": null,
+   "great_work_slots": null,
+   "theming_bonuses": null,
+   "consumes_resources": [],
+   "requirements": {
+    "buildings_in_city": [
+     "core:building/market"
+    ],
+    "buildings_in_empire": [
+     {
+      "building": "core:building/market",
+      "count_in_all_cities": -1
+     }
+    ],
+    "note_count": "count_in_all_cities -1 means: in every city (whether puppets count is not decided)"
+   },
+   "cost_per_city_pct": 30,
+   "max_start_era": null,
+   "free_start_era": null,
+   "effects": [
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "trade.route_recipient.gold.flat",
+     "amount": 4,
+     "source": "own value"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "trade.route_target.gold.flat",
+     "amount": 2,
+     "source": "own value"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "yield.gold.flat",
+     "amount": 4,
+     "source": "own value"
+    }
+   ],
+   "art_id": "bnw:national_wonder/east_india_company",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:building/ironworks",
+   "name": "Ironworks",
+   "kind": "national_wonder",
+   "class": "core:building-class/ironworks",
+   "cost": 125,
+   "faith_cost": null,
+   "maintenance": 0,
+   "required_tech": "core:tech/machinery",
+   "obsolete_tech": null,
+   "era": "core:era/medieval",
+   "hurry_cost_modifier": -1,
+   "conquest_survival_pct": 0,
+   "never_capture": true,
+   "specialists": null,
+   "great_person_points": null,
+   "great_work_slots": null,
+   "theming_bonuses": null,
+   "consumes_resources": [],
+   "requirements": {
+    "buildings_in_city": [
+     "core:building/workshop"
+    ],
+    "buildings_in_empire": [
+     {
+      "building": "core:building/workshop",
+      "count_in_all_cities": -1
+     }
+    ],
+    "note_count": "count_in_all_cities -1 means: in every city (whether puppets count is not decided)"
+   },
+   "cost_per_city_pct": 30,
+   "max_start_era": null,
+   "free_start_era": null,
+   "effects": [
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "yield.production.flat",
+     "amount": 8,
+     "source": "unciv: Buildings.json, Ironworks"
+    }
+   ],
+   "art_id": "bnw:national_wonder/ironworks",
+   "provenance": "unciv: Buildings.json, Ironworks",
+   "unciv_fields": [
+    "cost",
+    "required_tech"
+   ]
+  },
+  {
+   "id": "core:building/oxford_university",
+   "name": "Oxford University",
+   "kind": "national_wonder",
+   "class": "core:building-class/oxford_university",
+   "cost": 125,
+   "faith_cost": null,
+   "maintenance": 0,
+   "required_tech": "core:tech/education",
+   "obsolete_tech": null,
+   "era": "core:era/medieval",
+   "hurry_cost_modifier": -1,
+   "conquest_survival_pct": 0,
+   "never_capture": true,
+   "specialists": null,
+   "great_person_points": null,
+   "great_work_slots": {
+    "type": "core:great-work-slot/literature",
+    "count": 2
+   },
+   "theming_bonuses": [
+    {
+     "bonus": 3,
+     "description": "Diverse collection",
+     "unique_eras": true,
+     "requires_unique_players": true
+    },
+    {
+     "bonus": 2,
+     "description": "Collection of one age",
+     "same_era": true
+    },
+    {
+     "bonus": 1,
+     "description": "Collection of one hand",
+     "requires_same_player": true
+    }
+   ],
+   "consumes_resources": [],
+   "requirements": {
+    "buildings_in_city": [
+     "core:building/university"
+    ],
+    "buildings_in_empire": [
+     {
+      "building": "core:building/university",
+      "count_in_all_cities": -1
+     }
+    ],
+    "note_count": "count_in_all_cities -1 means: in every city (whether puppets count is not decided)"
+   },
+   "cost_per_city_pct": 30,
+   "max_start_era": null,
+   "free_start_era": null,
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "player"
+     },
+     "condition": null,
+     "trigger": "on_complete",
+     "modifier": "grant.tech",
+     "amount": 1,
+     "source": "unciv: Buildings.json, Oxford University"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "yield.science.flat",
+     "amount": 3,
+     "source": "unciv: Buildings.json, Oxford University"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "yield.culture.flat",
+     "amount": 1,
+     "source": "unciv: Buildings.json, Oxford University"
+    }
+   ],
+   "art_id": "bnw:national_wonder/oxford_university",
+   "provenance": "unciv: Buildings.json, Oxford University",
+   "unciv_fields": [
+    "cost",
+    "required_tech"
+   ]
+  },
+  {
+   "id": "core:building/hermitage",
+   "name": "Hermitage",
+   "kind": "national_wonder",
+   "class": "core:building-class/hermitage",
+   "cost": 125,
+   "faith_cost": null,
+   "maintenance": 0,
+   "required_tech": "core:tech/architecture",
+   "obsolete_tech": null,
+   "era": "core:era/renaissance",
+   "hurry_cost_modifier": -1,
+   "conquest_survival_pct": 0,
+   "never_capture": true,
+   "specialists": null,
+   "great_person_points": null,
+   "great_work_slots": {
+    "type": "core:great-work-slot/art-artifact",
+    "count": 2
+   },
+   "theming_bonuses": [
+    {
+     "bonus": 3,
+     "description": "Diverse collection",
+     "unique_eras": true,
+     "requires_unique_players": true,
+     "must_be_art": true
+    },
+    {
+     "bonus": 2,
+     "description": "Collection of one age",
+     "same_era": true,
+     "must_be_art": true
+    },
+    {
+     "bonus": 1,
+     "description": "Collection of one hand",
+     "requires_same_player": true,
+     "must_be_art": true
+    }
+   ],
+   "consumes_resources": [],
+   "requirements": {
+    "buildings_in_city": [
+     "core:building/opera_house"
+    ],
+    "buildings_in_empire": [
+     {
+      "building": "core:building/opera_house",
+      "count_in_all_cities": -1
+     }
+    ],
+    "note_count": "count_in_all_cities -1 means: in every city (whether puppets count is not decided)"
+   },
+   "cost_per_city_pct": 30,
+   "max_start_era": null,
+   "free_start_era": null,
+   "effects": [
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "yield.culture.pct",
+     "amount": 50,
+     "source": "unciv: Buildings.json, Hermitage"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "yield.culture.flat",
+     "amount": 5,
+     "source": "unciv: Buildings.json, Hermitage"
+    }
+   ],
+   "art_id": "bnw:national_wonder/hermitage",
+   "provenance": "unciv: Buildings.json, Hermitage",
+   "unciv_fields": [
+    "cost",
+    "required_tech"
+   ]
+  },
+  {
+   "id": "core:building/great_lighthouse",
+   "name": "Great Lighthouse",
+   "kind": "world_wonder",
+   "class": "core:building-class/great_lighthouse",
+   "cost": 185,
+   "faith_cost": null,
+   "maintenance": 0,
+   "required_tech": "core:tech/optics",
+   "obsolete_tech": null,
+   "era": "core:era/classical",
+   "hurry_cost_modifier": -1,
+   "conquest_survival_pct": 100,
+   "never_capture": false,
+   "specialists": null,
+   "great_person_points": {
+    "specialist": "core:specialist/merchant",
+    "per_turn": 1
+   },
+   "great_work_slots": null,
+   "theming_bonuses": null,
+   "consumes_resources": [],
+   "requirements": {
+    "water": true
+   },
+   "cost_per_city_pct": null,
+   "max_start_era": "core:era/medieval",
+   "free_start_era": null,
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "all_units"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "grant.promotion",
+     "amount": 1,
+     "target": "core:promotion/great-lighthouse",
+     "source": "own value, unverified"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "on_complete",
+     "modifier": "grant.building",
+     "amount": 1,
+     "target": "core:building/lighthouse",
+     "source": "unciv: Buildings.json, The Great Lighthouse"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "yield.culture.flat",
+     "amount": 1,
+     "source": "unciv: Buildings.json, The Great Lighthouse"
+    }
+   ],
+   "art_id": "bnw:world_wonder/great_lighthouse",
+   "provenance": "unciv: Buildings.json, The Great Lighthouse",
+   "unciv_fields": [
+    "cost",
+    "required_tech"
+   ]
+  },
+  {
+   "id": "core:building/stonehenge",
+   "name": "Stonehenge",
+   "kind": "world_wonder",
+   "class": "core:building-class/stonehenge",
+   "cost": 185,
+   "faith_cost": null,
+   "maintenance": 0,
+   "required_tech": "core:tech/calendar",
+   "obsolete_tech": null,
+   "era": "core:era/ancient",
+   "hurry_cost_modifier": -1,
+   "conquest_survival_pct": 100,
+   "never_capture": false,
+   "specialists": null,
+   "great_person_points": {
+    "specialist": "core:specialist/engineer",
+    "per_turn": 1
+   },
+   "great_work_slots": null,
+   "theming_bonuses": null,
+   "consumes_resources": [],
+   "requirements": {},
+   "cost_per_city_pct": null,
+   "max_start_era": "core:era/classical",
+   "free_start_era": null,
+   "effects": [
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "yield.faith.flat",
+     "amount": 5,
+     "source": "unciv: Buildings.json, Stonehenge"
+    }
+   ],
+   "art_id": "bnw:world_wonder/stonehenge",
+   "provenance": "unciv: Buildings.json, Stonehenge",
+   "unciv_fields": [
+    "cost",
+    "required_tech"
+   ]
+  },
+  {
+   "id": "core:building/great_library",
+   "name": "Great Library",
+   "kind": "world_wonder",
+   "class": "core:building-class/great_library",
+   "cost": 185,
+   "faith_cost": null,
+   "maintenance": 0,
+   "required_tech": "core:tech/writing",
+   "obsolete_tech": null,
+   "era": "core:era/ancient",
+   "hurry_cost_modifier": -1,
+   "conquest_survival_pct": 100,
+   "never_capture": false,
+   "specialists": null,
+   "great_person_points": {
+    "specialist": "core:specialist/scientist",
+    "per_turn": 1
+   },
+   "great_work_slots": {
+    "type": "core:great-work-slot/literature",
+    "count": 1
+   },
+   "theming_bonuses": [],
+   "consumes_resources": [],
+   "requirements": {},
+   "cost_per_city_pct": null,
+   "max_start_era": "core:era/classical",
+   "free_start_era": null,
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "player"
+     },
+     "condition": null,
+     "trigger": "on_complete",
+     "modifier": "grant.tech",
+     "amount": 1,
+     "source": "unciv: Buildings.json, The Great Library"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "on_complete",
+     "modifier": "grant.building",
+     "amount": 1,
+     "target": "core:building/library",
+     "source": "unciv: Buildings.json, The Great Library"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "yield.science.flat",
+     "amount": 3,
+     "source": "unciv: Buildings.json, The Great Library"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "yield.culture.flat",
+     "amount": 1,
+     "source": "unciv: Buildings.json, The Great Library"
+    }
+   ],
+   "art_id": "bnw:world_wonder/great_library",
+   "provenance": "unciv: Buildings.json, The Great Library",
+   "unciv_fields": [
+    "cost",
+    "required_tech"
+   ]
+  },
+  {
+   "id": "core:building/pyramids",
+   "name": "Pyramids",
+   "kind": "world_wonder",
+   "class": "core:building-class/pyramid",
+   "cost": 185,
+   "faith_cost": null,
+   "maintenance": 0,
+   "required_tech": "core:tech/masonry",
+   "obsolete_tech": null,
+   "era": "core:era/ancient",
+   "hurry_cost_modifier": -1,
+   "conquest_survival_pct": 100,
+   "never_capture": false,
+   "specialists": null,
+   "great_person_points": {
+    "specialist": "core:specialist/engineer",
+    "per_turn": 1
+   },
+   "great_work_slots": null,
+   "theming_bonuses": null,
+   "consumes_resources": [],
+   "requirements": {
+    "policy_branch": "core:policy/liberty"
+   },
+   "cost_per_city_pct": null,
+   "max_start_era": "core:era/classical",
+   "free_start_era": null,
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "player"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "worker.speed.pct",
+     "amount": 25,
+     "source": "unciv: Buildings.json, The Pyramids"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city",
+      "filter": {
+       "unit": "core:unit/worker"
+      }
+     },
+     "condition": null,
+     "trigger": "on_complete",
+     "modifier": "grant.unit",
+     "amount": 2,
+     "source": "unciv: Buildings.json, The Pyramids"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "yield.culture.flat",
+     "amount": 1,
+     "source": "unciv: Buildings.json, The Pyramids"
+    }
+   ],
+   "art_id": "bnw:world_wonder/pyramids",
+   "provenance": "unciv: Buildings.json, The Pyramids",
+   "unciv_fields": [
+    "cost",
+    "required_tech"
+   ]
+  },
+  {
+   "id": "core:building/colossus",
+   "name": "Colossus",
+   "kind": "world_wonder",
+   "class": "core:building-class/colossus",
+   "cost": 185,
+   "faith_cost": null,
+   "maintenance": 0,
+   "required_tech": "core:tech/iron-working",
+   "obsolete_tech": null,
+   "era": "core:era/classical",
+   "hurry_cost_modifier": -1,
+   "conquest_survival_pct": 100,
+   "never_capture": false,
+   "specialists": null,
+   "great_person_points": {
+    "specialist": "core:specialist/merchant",
+    "per_turn": 1
+   },
+   "great_work_slots": null,
+   "theming_bonuses": null,
+   "consumes_resources": [],
+   "requirements": {
+    "water": true
+   },
+   "cost_per_city_pct": null,
+   "max_start_era": "core:era/medieval",
+   "free_start_era": null,
+   "effects": [
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "trade.route_recipient.gold.flat",
+     "amount": 2,
+     "source": "own value, unverified"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "trade.route_target.gold.flat",
+     "amount": 1,
+     "source": "own value, unverified"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "player"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "trade.routes.flat",
+     "amount": 1,
+     "source": "own value"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city",
+      "filter": {
+       "unit": "core:unit/cargo-ship"
+      }
+     },
+     "condition": null,
+     "trigger": "on_complete",
+     "modifier": "grant.unit",
+     "amount": 1,
+     "source": "own value"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "yield.gold.flat",
+     "amount": 5,
+     "source": "unciv: Buildings.json, Colossus"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "yield.culture.flat",
+     "amount": 1,
+     "source": "unciv: Buildings.json, Colossus"
+    }
+   ],
+   "art_id": "bnw:world_wonder/colossus",
+   "provenance": "unciv: Buildings.json, Colossus",
+   "unciv_fields": [
+    "cost",
+    "required_tech"
+   ]
+  },
+  {
+   "id": "core:building/oracle",
+   "name": "Oracle",
+   "kind": "world_wonder",
+   "class": "core:building-class/oracle",
+   "cost": 250,
+   "faith_cost": null,
+   "maintenance": 0,
+   "required_tech": "core:tech/philosophy",
+   "obsolete_tech": null,
+   "era": "core:era/classical",
+   "hurry_cost_modifier": -1,
+   "conquest_survival_pct": 100,
+   "never_capture": false,
+   "specialists": null,
+   "great_person_points": {
+    "specialist": "core:specialist/scientist",
+    "per_turn": 1
+   },
+   "great_work_slots": null,
+   "theming_bonuses": null,
+   "consumes_resources": [],
+   "requirements": {},
+   "cost_per_city_pct": null,
+   "max_start_era": "core:era/medieval",
+   "free_start_era": null,
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "player"
+     },
+     "condition": null,
+     "trigger": "on_complete",
+     "modifier": "grant.policy",
+     "amount": 1,
+     "source": "unciv: Buildings.json, The Oracle"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "yield.culture.flat",
+     "amount": 3,
+     "source": "unciv: Buildings.json, The Oracle"
+    }
+   ],
+   "art_id": "bnw:world_wonder/oracle",
+   "provenance": "unciv: Buildings.json, The Oracle",
+   "unciv_fields": [
+    "cost",
+    "required_tech"
+   ]
+  },
+  {
+   "id": "core:building/hanging_gardens",
+   "name": "Hanging Gardens",
+   "kind": "world_wonder",
+   "class": "core:building-class/hanging_garden",
+   "cost": 250,
+   "faith_cost": null,
+   "maintenance": 0,
+   "required_tech": "core:tech/mathematics",
+   "obsolete_tech": null,
+   "era": "core:era/classical",
+   "hurry_cost_modifier": -1,
+   "conquest_survival_pct": 100,
+   "never_capture": false,
+   "specialists": null,
+   "great_person_points": null,
+   "great_work_slots": null,
+   "theming_bonuses": null,
+   "consumes_resources": [],
+   "requirements": {
+    "policy_branch": "core:policy/tradition"
+   },
+   "cost_per_city_pct": null,
+   "max_start_era": "core:era/medieval",
+   "free_start_era": null,
+   "effects": [
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "on_complete",
+     "modifier": "grant.building",
+     "amount": 1,
+     "target": "core:building/garden",
+     "source": "unciv: Buildings.json, Hanging Gardens"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "yield.food.flat",
+     "amount": 6,
+     "source": "unciv: Buildings.json, Hanging Gardens"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "yield.culture.flat",
+     "amount": 1,
+     "source": "unciv: Buildings.json, Hanging Gardens"
+    }
+   ],
+   "art_id": "bnw:world_wonder/hanging_gardens",
+   "provenance": "unciv: Buildings.json, Hanging Gardens",
+   "unciv_fields": [
+    "cost",
+    "required_tech"
+   ]
+  },
+  {
+   "id": "core:building/great_wall",
+   "name": "Great Wall",
+   "kind": "world_wonder",
+   "class": "core:building-class/great_wall",
+   "cost": 250,
+   "faith_cost": null,
+   "maintenance": 0,
+   "required_tech": "core:tech/engineering",
+   "obsolete_tech": "core:tech/dynamite",
+   "era": "core:era/classical",
+   "hurry_cost_modifier": -1,
+   "conquest_survival_pct": 100,
+   "never_capture": false,
+   "specialists": null,
+   "great_person_points": {
+    "specialist": "core:specialist/engineer",
+    "per_turn": 1
+   },
+   "great_work_slots": null,
+   "theming_bonuses": null,
+   "consumes_resources": [],
+   "requirements": {},
+   "cost_per_city_pct": null,
+   "max_start_era": "core:era/medieval",
+   "free_start_era": null,
+   "effects": [
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "building.border_obstacle",
+     "amount": true,
+     "needs_mechanic": "border_obstacle",
+     "source": "own value, unverified"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "on_complete",
+     "modifier": "grant.building",
+     "amount": 1,
+     "target": "core:building/walls",
+     "source": "unciv: Buildings.json, Great Wall"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "yield.culture.flat",
+     "amount": 3,
+     "source": "unciv: Buildings.json, Great Wall"
+    }
+   ],
+   "art_id": "bnw:world_wonder/great_wall",
+   "provenance": "unciv: Buildings.json, Great Wall",
+   "unciv_fields": [
+    "cost",
+    "required_tech"
+   ]
+  },
+  {
+   "id": "core:building/angkor_wat",
+   "name": "Angkor Wat",
+   "kind": "world_wonder",
+   "class": "core:building-class/angkor_wat",
+   "cost": 400,
+   "faith_cost": null,
+   "maintenance": 0,
+   "required_tech": "core:tech/education",
+   "obsolete_tech": null,
+   "era": "core:era/medieval",
+   "hurry_cost_modifier": -1,
+   "conquest_survival_pct": 100,
+   "never_capture": false,
+   "specialists": null,
+   "great_person_points": {
+    "specialist": "core:specialist/engineer",
+    "per_turn": 1
+   },
+   "great_work_slots": null,
+   "theming_bonuses": null,
+   "consumes_resources": [],
+   "requirements": {},
+   "cost_per_city_pct": null,
+   "max_start_era": "core:era/renaissance",
+   "free_start_era": null,
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "all_cities"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "border.culture_cost.pct",
+     "amount": -25,
+     "source": "unciv: Buildings.json, Angkor Wat"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "all_cities"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "tile_purchase.cost.pct",
+     "amount": -25,
+     "source": "unciv: Buildings.json, Angkor Wat"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "yield.culture.flat",
+     "amount": 1,
+     "source": "unciv: Buildings.json, Angkor Wat"
+    }
+   ],
+   "art_id": "bnw:world_wonder/angkor_wat",
+   "provenance": "unciv: Buildings.json, Angkor Wat",
+   "unciv_fields": [
+    "cost",
+    "required_tech"
+   ]
+  },
+  {
+   "id": "core:building/hagia_sophia",
+   "name": "Hagia Sophia",
+   "kind": "world_wonder",
+   "class": "core:building-class/hagia_sophia",
+   "cost": 300,
+   "faith_cost": null,
+   "maintenance": 0,
+   "required_tech": "core:tech/theology",
+   "obsolete_tech": null,
+   "era": "core:era/medieval",
+   "hurry_cost_modifier": -1,
+   "conquest_survival_pct": 100,
+   "never_capture": false,
+   "specialists": null,
+   "great_person_points": null,
+   "great_work_slots": null,
+   "theming_bonuses": null,
+   "consumes_resources": [],
+   "requirements": {},
+   "cost_per_city_pct": null,
+   "max_start_era": "core:era/renaissance",
+   "free_start_era": null,
+   "effects": [
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "on_complete",
+     "modifier": "grant.building",
+     "amount": 1,
+     "target": "core:building/temple",
+     "source": "unciv: Buildings.json, Hagia Sophia"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city",
+      "filter": {
+       "unit": "core:unit/great-prophet"
+      }
+     },
+     "condition": null,
+     "trigger": "on_complete",
+     "modifier": "grant.unit",
+     "amount": 1,
+     "source": "unciv: Buildings.json, Hagia Sophia"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "yield.faith.flat",
+     "amount": 3,
+     "source": "unciv: Buildings.json, Hagia Sophia"
+    }
+   ],
+   "art_id": "bnw:world_wonder/hagia_sophia",
+   "provenance": "unciv: Buildings.json, Hagia Sophia",
+   "unciv_fields": [
+    "cost",
+    "required_tech"
+   ]
+  },
+  {
+   "id": "core:building/chichen_itza",
+   "name": "Chichen Itza",
+   "kind": "world_wonder",
+   "class": "core:building-class/chichen_itza",
+   "cost": 300,
+   "faith_cost": null,
+   "maintenance": 0,
+   "required_tech": "core:tech/civil-service",
+   "obsolete_tech": null,
+   "era": "core:era/medieval",
+   "hurry_cost_modifier": -1,
+   "conquest_survival_pct": 100,
+   "never_capture": false,
+   "specialists": null,
+   "great_person_points": {
+    "specialist": "core:specialist/engineer",
+    "per_turn": 1
+   },
+   "great_work_slots": null,
+   "theming_bonuses": null,
+   "consumes_resources": [],
+   "requirements": {},
+   "cost_per_city_pct": null,
+   "max_start_era": "core:era/renaissance",
+   "free_start_era": null,
+   "effects": [
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "happiness.local",
+     "amount": 4,
+     "source": "unciv: Buildings.json, Chichen Itza"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "player"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "golden_age.duration.pct",
+     "amount": 50,
+     "source": "unciv: Buildings.json, Chichen Itza"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "yield.culture.flat",
+     "amount": 1,
+     "source": "unciv: Buildings.json, Chichen Itza"
+    }
+   ],
+   "art_id": "bnw:world_wonder/chichen_itza",
+   "provenance": "unciv: Buildings.json, Chichen Itza",
+   "unciv_fields": [
+    "cost",
+    "required_tech"
+   ]
+  },
+  {
+   "id": "core:building/machu_picchu",
+   "name": "Machu Picchu",
+   "kind": "world_wonder",
+   "class": "core:building-class/machu_pichu",
+   "cost": 300,
+   "faith_cost": null,
+   "maintenance": 0,
+   "required_tech": "core:tech/guilds",
+   "obsolete_tech": null,
+   "era": "core:era/medieval",
+   "hurry_cost_modifier": -1,
+   "conquest_survival_pct": 100,
+   "never_capture": false,
+   "specialists": null,
+   "great_person_points": {
+    "specialist": "core:specialist/merchant",
+    "per_turn": 1
+   },
+   "great_work_slots": null,
+   "theming_bonuses": null,
+   "consumes_resources": [],
+   "requirements": {
+    "nearby_mountain_required": true
+   },
+   "cost_per_city_pct": null,
+   "max_start_era": "core:era/renaissance",
+   "free_start_era": null,
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "player"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "city_connection.gold.pct",
+     "amount": 25,
+     "source": "unciv: Buildings.json, Machu Picchu"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "yield.gold.flat",
+     "amount": 5,
+     "source": "unciv: Buildings.json, Machu Picchu"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "yield.faith.flat",
+     "amount": 2,
+     "source": "unciv: Buildings.json, Machu Picchu"
+    }
+   ],
+   "art_id": "bnw:world_wonder/machu_picchu",
+   "provenance": "unciv: Buildings.json, Machu Picchu",
+   "unciv_fields": [
+    "cost",
+    "required_tech"
+   ]
+  },
+  {
+   "id": "core:building/notre_dame",
+   "name": "Notre Dame",
+   "kind": "world_wonder",
+   "class": "core:building-class/notre_dame",
+   "cost": 400,
+   "faith_cost": null,
+   "maintenance": 0,
+   "required_tech": "core:tech/physics",
+   "obsolete_tech": null,
+   "era": "core:era/medieval",
+   "hurry_cost_modifier": -1,
+   "conquest_survival_pct": 100,
+   "never_capture": false,
+   "specialists": null,
+   "great_person_points": {
+    "specialist": "core:specialist/merchant",
+    "per_turn": 1
+   },
+   "great_work_slots": null,
+   "theming_bonuses": null,
+   "consumes_resources": [],
+   "requirements": {},
+   "cost_per_city_pct": null,
+   "max_start_era": "core:era/renaissance",
+   "free_start_era": null,
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "player"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "happiness.global",
+     "amount": 10,
+     "source": "own value, unverified"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "yield.faith.flat",
+     "amount": 4,
+     "source": "unciv: Buildings.json, Notre Dame"
+    }
+   ],
+   "art_id": "bnw:world_wonder/notre_dame",
+   "provenance": "unciv: Buildings.json, Notre Dame",
+   "unciv_fields": [
+    "cost",
+    "required_tech"
+   ]
+  },
+  {
+   "id": "core:building/porcelain_tower",
+   "name": "Porcelain Tower",
+   "kind": "world_wonder",
+   "class": "core:building-class/porcelain_tower",
+   "cost": 625,
+   "faith_cost": null,
+   "maintenance": 0,
+   "required_tech": "core:tech/architecture",
+   "obsolete_tech": null,
+   "era": "core:era/renaissance",
+   "hurry_cost_modifier": -1,
+   "conquest_survival_pct": 100,
+   "never_capture": false,
+   "specialists": null,
+   "great_person_points": {
+    "specialist": "core:specialist/scientist",
+    "per_turn": 2
+   },
+   "great_work_slots": null,
+   "theming_bonuses": null,
+   "consumes_resources": [],
+   "requirements": {
+    "policy_branch": "core:policy/rationalism"
+   },
+   "cost_per_city_pct": null,
+   "max_start_era": "core:era/industrial",
+   "free_start_era": null,
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "player"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "research_agreement.science.pct",
+     "amount": 50,
+     "source": "unciv: Buildings.json, Porcelain Tower"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city",
+      "filter": {
+       "unit": "core:unit/great-scientist"
+      }
+     },
+     "condition": null,
+     "trigger": "on_complete",
+     "modifier": "grant.unit",
+     "amount": 1,
+     "source": "unciv: Buildings.json, Porcelain Tower"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "yield.culture.flat",
+     "amount": 1,
+     "source": "unciv: Buildings.json, Porcelain Tower"
+    }
+   ],
+   "art_id": "bnw:world_wonder/porcelain_tower",
+   "provenance": "unciv: Buildings.json, Porcelain Tower",
+   "unciv_fields": [
+    "cost",
+    "required_tech"
+   ]
+  },
+  {
+   "id": "core:building/himeji_castle",
+   "name": "Himeji Castle",
+   "kind": "world_wonder",
+   "class": "core:building-class/himeji_castle",
+   "cost": 500,
+   "faith_cost": null,
+   "maintenance": 0,
+   "required_tech": "core:tech/gunpowder",
+   "obsolete_tech": null,
+   "era": "core:era/renaissance",
+   "hurry_cost_modifier": -1,
+   "conquest_survival_pct": 100,
+   "never_capture": false,
+   "specialists": null,
+   "great_person_points": {
+    "specialist": "core:specialist/engineer",
+    "per_turn": 2
+   },
+   "great_work_slots": null,
+   "theming_bonuses": null,
+   "consumes_resources": [],
+   "requirements": {},
+   "cost_per_city_pct": null,
+   "max_start_era": "core:era/industrial",
+   "free_start_era": null,
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "all_units"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "grant.promotion",
+     "amount": 1,
+     "target": "core:promotion/himeji-castle",
+     "source": "own value, unverified"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "on_complete",
+     "modifier": "grant.building",
+     "amount": 1,
+     "target": "core:building/castle",
+     "source": "unciv: Buildings.json, Himeji Castle"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "yield.culture.flat",
+     "amount": 3,
+     "source": "unciv: Buildings.json, Himeji Castle"
+    }
+   ],
+   "art_id": "bnw:world_wonder/himeji_castle",
+   "provenance": "unciv: Buildings.json, Himeji Castle",
+   "unciv_fields": [
+    "cost",
+    "required_tech"
+   ]
+  },
+  {
+   "id": "core:building/sistine_chapel",
+   "name": "Sistine Chapel",
+   "kind": "world_wonder",
+   "class": "core:building-class/sistine_chapel",
+   "cost": 500,
+   "faith_cost": null,
+   "maintenance": 0,
+   "required_tech": "core:tech/acoustics",
+   "obsolete_tech": null,
+   "era": "core:era/renaissance",
+   "hurry_cost_modifier": -1,
+   "conquest_survival_pct": 100,
+   "never_capture": false,
+   "specialists": null,
+   "great_person_points": null,
+   "great_work_slots": {
+    "type": "core:great-work-slot/art-artifact",
+    "count": 2
+   },
+   "theming_bonuses": [
+    {
+     "bonus": 3,
+     "description": "Diverse collection",
+     "unique_eras": true,
+     "requires_unique_players": true
+    },
+    {
+     "bonus": 2,
+     "description": "Collection of one age",
+     "same_era": true
+    },
+    {
+     "bonus": 1,
+     "description": "Collection of one hand",
+     "requires_same_player": true
+    }
+   ],
+   "consumes_resources": [],
+   "requirements": {},
+   "cost_per_city_pct": null,
+   "max_start_era": "core:era/industrial",
+   "free_start_era": null,
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "all_cities"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "yield.culture.pct",
+     "amount": 25,
+     "source": "unciv: Buildings.json, Sistine Chapel"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "yield.culture.flat",
+     "amount": 1,
+     "source": "unciv: Buildings.json, Sistine Chapel"
+    }
+   ],
+   "art_id": "bnw:world_wonder/sistine_chapel",
+   "provenance": "unciv: Buildings.json, Sistine Chapel",
+   "unciv_fields": [
+    "cost",
+    "required_tech"
+   ]
+  },
+  {
+   "id": "core:building/kremlin",
+   "name": "Kremlin",
+   "kind": "world_wonder",
+   "class": "core:building-class/kremlin",
+   "cost": 625,
+   "faith_cost": null,
+   "maintenance": 0,
+   "required_tech": "core:tech/metallurgy",
+   "obsolete_tech": null,
+   "era": "core:era/modern",
+   "hurry_cost_modifier": -1,
+   "conquest_survival_pct": 100,
+   "never_capture": false,
+   "specialists": null,
+   "great_person_points": null,
+   "great_work_slots": null,
+   "theming_bonuses": null,
+   "consumes_resources": [],
+   "requirements": {
+    "policy_branch": "core:policy/order"
+   },
+   "cost_per_city_pct": null,
+   "max_start_era": null,
+   "free_start_era": null,
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "player"
+     },
+     "condition": null,
+     "trigger": "on_complete",
+     "modifier": "grant.policy",
+     "amount": 1,
+     "source": "own value, unverified"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city",
+      "filter": {
+       "unit_combat": "core:unit-combat/armor"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "production.units.pct",
+     "amount": 50,
+     "source": "own value, unverified"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "yield.culture.flat",
+     "amount": 3,
+     "source": "unciv: Buildings.json, Kremlin"
+    }
+   ],
+   "art_id": "bnw:world_wonder/kremlin",
+   "provenance": "unciv: Buildings.json, Kremlin",
+   "unciv_fields": [
+    "cost",
+    "required_tech"
+   ]
+  },
+  {
+   "id": "core:building/forbidden_palace",
+   "name": "Forbidden Palace",
+   "kind": "world_wonder",
+   "class": "core:building-class/forbidden_palace",
+   "cost": 500,
+   "faith_cost": null,
+   "maintenance": 0,
+   "required_tech": "core:tech/banking",
+   "obsolete_tech": null,
+   "era": "core:era/renaissance",
+   "hurry_cost_modifier": -1,
+   "conquest_survival_pct": 100,
+   "never_capture": false,
+   "specialists": null,
+   "great_person_points": null,
+   "great_work_slots": null,
+   "theming_bonuses": null,
+   "consumes_resources": [],
+   "requirements": {
+    "policy_branch": "core:policy/patronage"
+   },
+   "cost_per_city_pct": null,
+   "max_start_era": "core:era/industrial",
+   "free_start_era": null,
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "player"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "unhappiness.pct",
+     "amount": -10,
+     "source": "unciv: Buildings.json, Forbidden Palace"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "player"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "league.delegates.flat",
+     "amount": 2,
+     "source": "own value, unverified"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "yield.culture.flat",
+     "amount": 1,
+     "source": "unciv: Buildings.json, Forbidden Palace"
+    }
+   ],
+   "art_id": "bnw:world_wonder/forbidden_palace",
+   "provenance": "unciv: Buildings.json, Forbidden Palace",
+   "unciv_fields": [
+    "cost",
+    "required_tech"
+   ]
+  },
+  {
+   "id": "core:building/taj_mahal",
+   "name": "Taj Mahal",
+   "kind": "world_wonder",
+   "class": "core:building-class/taj_mahal",
+   "cost": 625,
+   "faith_cost": null,
+   "maintenance": 0,
+   "required_tech": "core:tech/architecture",
+   "obsolete_tech": null,
+   "era": "core:era/renaissance",
+   "hurry_cost_modifier": -1,
+   "conquest_survival_pct": 100,
+   "never_capture": false,
+   "specialists": null,
+   "great_person_points": null,
+   "great_work_slots": null,
+   "theming_bonuses": null,
+   "consumes_resources": [],
+   "requirements": {},
+   "cost_per_city_pct": null,
+   "max_start_era": "core:era/industrial",
+   "free_start_era": null,
+   "effects": [
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "happiness.local",
+     "amount": 4,
+     "source": "unciv: Buildings.json, Taj Mahal"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "player"
+     },
+     "condition": null,
+     "trigger": "on_complete",
+     "modifier": "golden_age.start",
+     "amount": true,
+     "source": "unciv: Buildings.json, Taj Mahal"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "yield.culture.flat",
+     "amount": 1,
+     "source": "unciv: Buildings.json, Taj Mahal"
+    }
+   ],
+   "art_id": "bnw:world_wonder/taj_mahal",
+   "provenance": "unciv: Buildings.json, Taj Mahal",
+   "unciv_fields": [
+    "cost",
+    "required_tech"
+   ]
+  },
+  {
+   "id": "core:building/big_ben",
+   "name": "Big Ben",
+   "kind": "world_wonder",
+   "class": "core:building-class/big_ben",
+   "cost": 750,
+   "faith_cost": null,
+   "maintenance": 0,
+   "required_tech": "core:tech/industrialization",
+   "obsolete_tech": null,
+   "era": "core:era/industrial",
+   "hurry_cost_modifier": -1,
+   "conquest_survival_pct": 100,
+   "never_capture": false,
+   "specialists": null,
+   "great_person_points": {
+    "specialist": "core:specialist/merchant",
+    "per_turn": 2
+   },
+   "great_work_slots": null,
+   "theming_bonuses": null,
+   "consumes_resources": [],
+   "requirements": {
+    "policy_branch": "core:policy/commerce"
+   },
+   "cost_per_city_pct": null,
+   "max_start_era": "core:era/modern",
+   "free_start_era": null,
+   "effects": [
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city",
+      "filter": {
+       "hurry": "gold"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "purchase.cost.pct",
+     "amount": -15,
+     "source": "unciv: Buildings.json, Big Ben"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "yield.gold.flat",
+     "amount": 4,
+     "source": "unciv: Buildings.json, Big Ben"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "yield.culture.flat",
+     "amount": 1,
+     "source": "unciv: Buildings.json, Big Ben"
+    }
+   ],
+   "art_id": "bnw:world_wonder/big_ben",
+   "provenance": "unciv: Buildings.json, Big Ben",
+   "unciv_fields": [
+    "cost",
+    "required_tech"
+   ]
+  },
+  {
+   "id": "core:building/louvre",
+   "name": "Louvre",
+   "kind": "world_wonder",
+   "class": "core:building-class/louvre",
+   "cost": 750,
+   "faith_cost": null,
+   "maintenance": 0,
+   "required_tech": "core:tech/archaeology",
+   "obsolete_tech": null,
+   "era": "core:era/industrial",
+   "hurry_cost_modifier": -1,
+   "conquest_survival_pct": 100,
+   "never_capture": false,
+   "specialists": null,
+   "great_person_points": null,
+   "great_work_slots": {
+    "type": "core:great-work-slot/art-artifact",
+    "count": 3
+   },
+   "theming_bonuses": [
+    {
+     "bonus": 4,
+     "description": "Diverse collection",
+     "unique_eras": true,
+     "requires_unique_players": true
+    },
+    {
+     "bonus": 3,
+     "description": "Collection of one age",
+     "same_era": true
+    },
+    {
+     "bonus": 2,
+     "description": "Collection of one hand",
+     "requires_same_player": true
+    }
+   ],
+   "consumes_resources": [],
+   "requirements": {
+    "policy_branch": "core:policy/exploration"
+   },
+   "cost_per_city_pct": null,
+   "max_start_era": null,
+   "free_start_era": null,
+   "effects": [
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city",
+      "filter": {
+       "unit": "core:unit/great-artist"
+      }
+     },
+     "condition": null,
+     "trigger": "on_complete",
+     "modifier": "grant.unit",
+     "amount": 2,
+     "source": "unciv: Buildings.json, The Louvre"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "yield.culture.flat",
+     "amount": 4,
+     "source": "unciv: Buildings.json, The Louvre"
+    }
+   ],
+   "art_id": "bnw:world_wonder/louvre",
+   "provenance": "unciv: Buildings.json, The Louvre",
+   "unciv_fields": [
+    "cost",
+    "required_tech"
+   ]
+  },
+  {
+   "id": "core:building/brandenburg_gate",
+   "name": "Brandenburg Gate",
+   "kind": "world_wonder",
+   "class": "core:building-class/brandenburg_gate",
+   "cost": 750,
+   "faith_cost": null,
+   "maintenance": 0,
+   "required_tech": "core:tech/military-science",
+   "obsolete_tech": null,
+   "era": "core:era/industrial",
+   "hurry_cost_modifier": -1,
+   "conquest_survival_pct": 100,
+   "never_capture": false,
+   "specialists": null,
+   "great_person_points": {
+    "specialist": "core:specialist/scientist",
+    "per_turn": 2
+   },
+   "great_work_slots": null,
+   "theming_bonuses": null,
+   "consumes_resources": [],
+   "requirements": {},
+   "cost_per_city_pct": null,
+   "max_start_era": "core:era/modern",
+   "free_start_era": null,
+   "effects": [
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "units_trained_here",
+      "filter": {
+       "domain": "core:domain/land"
+      }
+     },
+     "condition": null,
+     "trigger": "on_unit_trained",
+     "modifier": "unit.free_xp",
+     "amount": 15,
+     "source": "unciv: Buildings.json, Brandenburg Gate"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "units_trained_here",
+      "filter": {
+       "domain": "core:domain/sea"
+      }
+     },
+     "condition": null,
+     "trigger": "on_unit_trained",
+     "modifier": "unit.free_xp",
+     "amount": 15,
+     "source": "unciv: Buildings.json, Brandenburg Gate"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "units_trained_here",
+      "filter": {
+       "domain": "core:domain/air"
+      }
+     },
+     "condition": null,
+     "trigger": "on_unit_trained",
+     "modifier": "unit.free_xp",
+     "amount": 15,
+     "source": "unciv: Buildings.json, Brandenburg Gate"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city",
+      "filter": {
+       "unit": "core:unit/great-general"
+      }
+     },
+     "condition": null,
+     "trigger": "on_complete",
+     "modifier": "grant.unit",
+     "amount": 1,
+     "source": "unciv: Buildings.json, Brandenburg Gate"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "yield.culture.flat",
+     "amount": 3,
+     "source": "unciv: Buildings.json, Brandenburg Gate"
+    }
+   ],
+   "art_id": "bnw:world_wonder/brandenburg_gate",
+   "provenance": "unciv: Buildings.json, Brandenburg Gate",
+   "unciv_fields": [
+    "cost",
+    "required_tech"
+   ]
+  },
+  {
+   "id": "core:building/statue_of_liberty",
+   "name": "Statue of Liberty",
+   "kind": "world_wonder",
+   "class": "core:building-class/statue_of_liberty",
+   "cost": 1060,
+   "faith_cost": null,
+   "maintenance": 0,
+   "required_tech": "core:tech/replaceable-parts",
+   "obsolete_tech": null,
+   "era": "core:era/modern",
+   "hurry_cost_modifier": -1,
+   "conquest_survival_pct": 100,
+   "never_capture": false,
+   "specialists": null,
+   "great_person_points": null,
+   "great_work_slots": null,
+   "theming_bonuses": null,
+   "consumes_resources": [],
+   "requirements": {
+    "policy_branch": "core:policy/freedom"
+   },
+   "cost_per_city_pct": null,
+   "max_start_era": null,
+   "free_start_era": null,
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "player"
+     },
+     "condition": null,
+     "trigger": "on_complete",
+     "modifier": "grant.policy",
+     "amount": 1,
+     "source": "own value, unverified"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "specialists_of_city",
+      "filter": {
+       "specialist": "core:specialist/citizen"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "specialist.yield.production.flat",
+     "amount": 1,
+     "source": "own value, unverified"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "specialists_of_city",
+      "filter": {
+       "specialist": "core:specialist/artist"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "specialist.yield.production.flat",
+     "amount": 1,
+     "source": "own value, unverified"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "specialists_of_city",
+      "filter": {
+       "specialist": "core:specialist/scientist"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "specialist.yield.production.flat",
+     "amount": 1,
+     "source": "own value, unverified"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "specialists_of_city",
+      "filter": {
+       "specialist": "core:specialist/merchant"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "specialist.yield.production.flat",
+     "amount": 1,
+     "source": "own value, unverified"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "specialists_of_city",
+      "filter": {
+       "specialist": "core:specialist/engineer"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "specialist.yield.production.flat",
+     "amount": 1,
+     "source": "own value, unverified"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "specialists_of_city",
+      "filter": {
+       "specialist": "core:specialist/writer"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "specialist.yield.production.flat",
+     "amount": 1,
+     "source": "own value, unverified"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "specialists_of_city",
+      "filter": {
+       "specialist": "core:specialist/musician"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "specialist.yield.production.flat",
+     "amount": 1,
+     "source": "own value, unverified"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "yield.culture.flat",
+     "amount": 1,
+     "source": "unciv: Buildings.json, Statue of Liberty"
+    }
+   ],
+   "art_id": "bnw:world_wonder/statue_of_liberty",
+   "provenance": "unciv: Buildings.json, Statue of Liberty",
+   "unciv_fields": [
+    "cost",
+    "required_tech"
+   ]
+  },
+  {
+   "id": "core:building/cristo_redentor",
+   "name": "Cristo Redentor",
+   "kind": "world_wonder",
+   "class": "core:building-class/cristo_redentor",
+   "cost": 1250,
+   "faith_cost": null,
+   "maintenance": 0,
+   "required_tech": "core:tech/plastics",
+   "obsolete_tech": null,
+   "era": "core:era/modern",
+   "hurry_cost_modifier": -1,
+   "conquest_survival_pct": 100,
+   "never_capture": false,
+   "specialists": null,
+   "great_person_points": null,
+   "great_work_slots": null,
+   "theming_bonuses": null,
+   "consumes_resources": [],
+   "requirements": {},
+   "cost_per_city_pct": null,
+   "max_start_era": null,
+   "free_start_era": null,
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "player"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "policy.cost.pct",
+     "amount": -10,
+     "source": "unciv: Buildings.json, Cristo Redentor"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "yield.culture.flat",
+     "amount": 5,
+     "source": "unciv: Buildings.json, Cristo Redentor"
+    }
+   ],
+   "art_id": "bnw:world_wonder/cristo_redentor",
+   "provenance": "unciv: Buildings.json, Cristo Redentor",
+   "unciv_fields": [
+    "cost",
+    "required_tech"
+   ]
+  },
+  {
+   "id": "core:building/eiffel_tower",
+   "name": "Eiffel Tower",
+   "kind": "world_wonder",
+   "class": "core:building-class/eiffel_tower",
+   "cost": 1060,
+   "faith_cost": null,
+   "maintenance": 0,
+   "required_tech": "core:tech/radio",
+   "obsolete_tech": null,
+   "era": "core:era/modern",
+   "hurry_cost_modifier": -1,
+   "conquest_survival_pct": 100,
+   "never_capture": false,
+   "specialists": null,
+   "great_person_points": {
+    "specialist": "core:specialist/merchant",
+    "per_turn": 2
+   },
+   "great_work_slots": null,
+   "theming_bonuses": null,
+   "consumes_resources": [],
+   "requirements": {},
+   "cost_per_city_pct": null,
+   "max_start_era": null,
+   "free_start_era": null,
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "player"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "happiness.global",
+     "amount": 5,
+     "source": "own value, unverified"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": {
+      "tech_known": "core:tech/radio"
+     },
+     "trigger": "passive",
+     "modifier": "yield.tourism.flat",
+     "amount": 10,
+     "source": "own design: tourism, influence and great works"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "yield.culture.flat",
+     "amount": 1,
+     "source": "unciv: Buildings.json, Eiffel Tower"
+    }
+   ],
+   "art_id": "bnw:world_wonder/eiffel_tower",
+   "provenance": "unciv: Buildings.json, Eiffel Tower",
+   "unciv_fields": [
+    "cost",
+    "required_tech"
+   ]
+  },
+  {
+   "id": "core:building/pentagon",
+   "name": "Pentagon",
+   "kind": "world_wonder",
+   "class": "core:building-class/pentagon",
+   "cost": 1250,
+   "faith_cost": null,
+   "maintenance": 0,
+   "required_tech": "core:tech/combined-arms",
+   "obsolete_tech": null,
+   "era": "core:era/atomic",
+   "hurry_cost_modifier": -1,
+   "conquest_survival_pct": 100,
+   "never_capture": false,
+   "specialists": null,
+   "great_person_points": {
+    "specialist": "core:specialist/merchant",
+    "per_turn": 2
+   },
+   "great_work_slots": null,
+   "theming_bonuses": null,
+   "consumes_resources": [],
+   "requirements": {},
+   "cost_per_city_pct": null,
+   "max_start_era": null,
+   "free_start_era": null,
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "player"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "unit.upgrade_cost.pct",
+     "amount": -33,
+     "source": "unciv: Buildings.json, Pentagon"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "yield.culture.flat",
+     "amount": 3,
+     "source": "unciv: Buildings.json, Pentagon"
+    }
+   ],
+   "art_id": "bnw:world_wonder/pentagon",
+   "provenance": "unciv: Buildings.json, Pentagon",
+   "unciv_fields": [
+    "cost",
+    "required_tech"
+   ]
+  },
+  {
+   "id": "core:building/sydney_opera_house",
+   "name": "Sydney Opera House",
+   "kind": "world_wonder",
+   "class": "core:building-class/sydney_opera_house",
+   "cost": 1250,
+   "faith_cost": null,
+   "maintenance": 0,
+   "required_tech": "core:tech/ecology",
+   "obsolete_tech": null,
+   "era": "core:era/atomic",
+   "hurry_cost_modifier": -1,
+   "conquest_survival_pct": 100,
+   "never_capture": false,
+   "specialists": null,
+   "great_person_points": null,
+   "great_work_slots": {
+    "type": "core:great-work-slot/music",
+    "count": 4
+   },
+   "theming_bonuses": [
+    {
+     "bonus": 5,
+     "description": "Diverse collection",
+     "unique_eras": true,
+     "requires_unique_players": true
+    },
+    {
+     "bonus": 4,
+     "description": "Collection of one age",
+     "same_era": true
+    },
+    {
+     "bonus": 3,
+     "description": "Collection of one hand",
+     "requires_same_player": true
+    }
+   ],
+   "consumes_resources": [],
+   "requirements": {
+    "water": true
+   },
+   "cost_per_city_pct": null,
+   "max_start_era": null,
+   "free_start_era": null,
+   "effects": [
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "yield.culture.pct",
+     "amount": 50,
+     "source": "unciv: Buildings.json, Sydney Opera House"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "player"
+     },
+     "condition": null,
+     "trigger": "on_complete",
+     "modifier": "grant.policy",
+     "amount": 1,
+     "source": "unciv: Buildings.json, Sydney Opera House"
+    }
+   ],
+   "art_id": "bnw:world_wonder/sydney_opera_house",
+   "provenance": "unciv: Buildings.json, Sydney Opera House",
+   "unciv_fields": [
+    "cost",
+    "required_tech"
+   ]
+  },
+  {
+   "id": "core:building/statue_of_zeus",
+   "name": "Statue of Zeus",
+   "kind": "world_wonder",
+   "class": "core:building-class/statue_zeus",
+   "cost": 185,
+   "faith_cost": null,
+   "maintenance": 0,
+   "required_tech": "core:tech/bronze-working",
+   "obsolete_tech": null,
+   "era": "core:era/ancient",
+   "hurry_cost_modifier": -1,
+   "conquest_survival_pct": 100,
+   "never_capture": false,
+   "specialists": null,
+   "great_person_points": null,
+   "great_work_slots": null,
+   "theming_bonuses": null,
+   "consumes_resources": [],
+   "requirements": {
+    "policy_branch": "core:policy/honor"
+   },
+   "cost_per_city_pct": null,
+   "max_start_era": "core:era/classical",
+   "free_start_era": null,
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "all_units"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "grant.promotion",
+     "amount": 1,
+     "target": "core:promotion/statue-zeus",
+     "source": "own value, unverified"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "yield.culture.flat",
+     "amount": 1,
+     "source": "unciv: Buildings.json, Statue of Zeus"
+    }
+   ],
+   "art_id": "bnw:world_wonder/statue_of_zeus",
+   "provenance": "unciv: Buildings.json, Statue of Zeus",
+   "unciv_fields": [
+    "cost",
+    "required_tech"
+   ]
+  },
+  {
+   "id": "core:building/national_intelligence_agency",
+   "name": "National Intelligence Agency",
+   "kind": "national_wonder",
+   "class": "core:building-class/intelligence_agency",
+   "cost": 120,
+   "faith_cost": null,
+   "maintenance": 0,
+   "required_tech": "core:tech/radio",
+   "obsolete_tech": null,
+   "era": "core:era/modern",
+   "hurry_cost_modifier": -1,
+   "conquest_survival_pct": 0,
+   "never_capture": true,
+   "specialists": null,
+   "great_person_points": null,
+   "great_work_slots": null,
+   "theming_bonuses": null,
+   "consumes_resources": [],
+   "requirements": {
+    "buildings_in_city": [
+     "core:building/police_station"
+    ],
+    "buildings_in_empire": [
+     {
+      "building": "core:building/police_station",
+      "count_in_all_cities": -1
+     }
+    ],
+    "note_count": "count_in_all_cities -1 means: in every city (whether puppets count is not decided)"
+   },
+   "cost_per_city_pct": 30,
+   "max_start_era": null,
+   "free_start_era": null,
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "all_cities"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "espionage.enemy_steal_rate.pct",
+     "amount": -15,
+     "source": "own value, unverified"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "player"
+     },
+     "condition": null,
+     "trigger": "on_complete",
+     "modifier": "espionage.spies.flat",
+     "amount": 1,
+     "source": "unciv: Buildings.json, National Intelligence Agency"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "building.espionage",
+     "amount": true,
+     "needs_mechanic": "espionage_building",
+     "source": "own value, unverified"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "player"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "espionage.new_spy_rank.flat",
+     "amount": 1,
+     "source": "unciv: Buildings.json, National Intelligence Agency"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "player"
+     },
+     "condition": null,
+     "trigger": "on_complete",
+     "modifier": "espionage.spy_rank.flat",
+     "amount": 1,
+     "source": "unciv: Buildings.json, National Intelligence Agency"
+    }
+   ],
+   "art_id": "bnw:national_wonder/national_intelligence_agency",
+   "provenance": "unciv: Buildings.json, National Intelligence Agency",
+   "unciv_fields": [
+    "cost",
+    "required_tech"
+   ]
+  },
+  {
+   "id": "core:building/alhambra",
+   "name": "Alhambra",
+   "kind": "world_wonder",
+   "class": "core:building-class/alhambra",
+   "cost": 400,
+   "faith_cost": null,
+   "maintenance": 0,
+   "required_tech": "core:tech/chivalry",
+   "obsolete_tech": null,
+   "era": "core:era/medieval",
+   "hurry_cost_modifier": -1,
+   "conquest_survival_pct": 100,
+   "never_capture": false,
+   "specialists": null,
+   "great_person_points": null,
+   "great_work_slots": null,
+   "theming_bonuses": null,
+   "consumes_resources": [],
+   "requirements": {},
+   "cost_per_city_pct": null,
+   "max_start_era": "core:era/renaissance",
+   "free_start_era": null,
+   "effects": [
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "on_complete",
+     "modifier": "grant.building",
+     "amount": 1,
+     "target": "core:building/castle",
+     "source": "unciv: Buildings.json, Alhambra"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "units_trained_here"
+     },
+     "condition": null,
+     "trigger": "on_unit_trained",
+     "modifier": "grant.promotion",
+     "amount": 1,
+     "target": "core:promotion/drill-1",
+     "source": "unciv: Buildings.json, Alhambra"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "yield.culture.pct",
+     "amount": 20,
+     "source": "unciv: Buildings.json, Alhambra"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "yield.culture.flat",
+     "amount": 1,
+     "source": "unciv: Buildings.json, Alhambra"
+    }
+   ],
+   "art_id": "bnw:world_wonder/alhambra",
+   "provenance": "unciv: Buildings.json, Alhambra",
+   "unciv_fields": [
+    "cost",
+    "required_tech"
+   ]
+  },
+  {
+   "id": "core:building/cn_tower",
+   "name": "CN Tower",
+   "kind": "world_wonder",
+   "class": "core:building-class/cn_tower",
+   "cost": 1250,
+   "faith_cost": null,
+   "maintenance": 0,
+   "required_tech": "core:tech/telecommunications",
+   "obsolete_tech": null,
+   "era": "core:era/information",
+   "hurry_cost_modifier": -1,
+   "conquest_survival_pct": 100,
+   "never_capture": false,
+   "specialists": null,
+   "great_person_points": {
+    "specialist": "core:specialist/merchant",
+    "per_turn": 1
+   },
+   "great_work_slots": null,
+   "theming_bonuses": null,
+   "consumes_resources": [],
+   "requirements": {},
+   "cost_per_city_pct": null,
+   "max_start_era": null,
+   "free_start_era": null,
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "all_cities"
+     },
+     "condition": null,
+     "trigger": "on_complete_and_new_cities",
+     "modifier": "grant.building",
+     "amount": 1,
+     "target": "core:building/broadcast_tower",
+     "source": "unciv: Buildings.json, CN Tower"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "player"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "happiness.per_city",
+     "amount": 1,
+     "source": "unciv: Buildings.json, CN Tower"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "all_cities"
+     },
+     "condition": null,
+     "trigger": "on_complete",
+     "modifier": "city.population.flat",
+     "amount": 1,
+     "source": "unciv: Buildings.json, CN Tower"
+    }
+   ],
+   "art_id": "bnw:world_wonder/cn_tower",
+   "provenance": "unciv: Buildings.json, CN Tower",
+   "unciv_fields": [
+    "cost",
+    "required_tech"
+   ]
+  },
+  {
+   "id": "core:building/hubble_space_telescope",
+   "name": "Hubble Space Telescope",
+   "kind": "world_wonder",
+   "class": "core:building-class/hubble",
+   "cost": 1250,
+   "faith_cost": null,
+   "maintenance": 0,
+   "required_tech": "core:tech/satellites",
+   "obsolete_tech": null,
+   "era": "core:era/information",
+   "hurry_cost_modifier": -1,
+   "conquest_survival_pct": 100,
+   "never_capture": false,
+   "specialists": null,
+   "great_person_points": {
+    "specialist": "core:specialist/scientist",
+    "per_turn": 1
+   },
+   "great_work_slots": null,
+   "theming_bonuses": null,
+   "consumes_resources": [],
+   "requirements": {},
+   "cost_per_city_pct": null,
+   "max_start_era": null,
+   "free_start_era": null,
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "all_cities"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "production.spaceship.pct",
+     "amount": 25,
+     "source": "own value, unverified"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "on_complete",
+     "modifier": "grant.building",
+     "amount": 1,
+     "target": "core:building/spaceship_factory",
+     "source": "unciv: Buildings.json, Hubble Space Telescope"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city",
+      "filter": {
+       "unit": "core:unit/great-scientist"
+      }
+     },
+     "condition": null,
+     "trigger": "on_complete",
+     "modifier": "grant.unit",
+     "amount": 2,
+     "source": "unciv: Buildings.json, Hubble Space Telescope"
+    }
+   ],
+   "art_id": "bnw:world_wonder/hubble_space_telescope",
+   "provenance": "unciv: Buildings.json, Hubble Space Telescope",
+   "unciv_fields": [
+    "cost",
+    "required_tech"
+   ]
+  },
+  {
+   "id": "core:building/leaning_tower_of_pisa",
+   "name": "Leaning Tower of Pisa",
+   "kind": "world_wonder",
+   "class": "core:building-class/leaning_tower",
+   "cost": 500,
+   "faith_cost": null,
+   "maintenance": 0,
+   "required_tech": "core:tech/printing-press",
+   "obsolete_tech": null,
+   "era": "core:era/renaissance",
+   "hurry_cost_modifier": -1,
+   "conquest_survival_pct": 100,
+   "never_capture": false,
+   "specialists": null,
+   "great_person_points": null,
+   "great_work_slots": null,
+   "theming_bonuses": null,
+   "consumes_resources": [],
+   "requirements": {},
+   "cost_per_city_pct": null,
+   "max_start_era": "core:era/industrial",
+   "free_start_era": null,
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "all_cities"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "great_people.rate.pct",
+     "amount": 25,
+     "source": "unciv: Buildings.json, Leaning Tower of Pisa"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "player"
+     },
+     "condition": null,
+     "trigger": "on_complete",
+     "modifier": "grant.great_person_choice",
+     "amount": 1,
+     "source": "unciv: Buildings.json, Leaning Tower of Pisa"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "yield.culture.flat",
+     "amount": 1,
+     "source": "unciv: Buildings.json, Leaning Tower of Pisa"
+    }
+   ],
+   "art_id": "bnw:world_wonder/leaning_tower_of_pisa",
+   "provenance": "unciv: Buildings.json, Leaning Tower of Pisa",
+   "unciv_fields": [
+    "cost",
+    "required_tech"
+   ]
+  },
+  {
+   "id": "core:building/great_mosque_of_djenne",
+   "name": "Great Mosque of Djenne",
+   "kind": "world_wonder",
+   "class": "core:building-class/mosque_of_djenne",
+   "cost": 300,
+   "faith_cost": null,
+   "maintenance": 0,
+   "required_tech": "core:tech/theology",
+   "obsolete_tech": null,
+   "era": "core:era/medieval",
+   "hurry_cost_modifier": -1,
+   "conquest_survival_pct": 100,
+   "never_capture": false,
+   "specialists": null,
+   "great_person_points": {
+    "specialist": "core:specialist/engineer",
+    "per_turn": 1
+   },
+   "great_work_slots": null,
+   "theming_bonuses": null,
+   "consumes_resources": [],
+   "requirements": {
+    "policy_branch": "core:policy/piety"
+   },
+   "cost_per_city_pct": null,
+   "max_start_era": "core:era/renaissance",
+   "free_start_era": null,
+   "effects": [
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "units_trained_here"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "missionary.spreads.flat",
+     "amount": 1,
+     "source": "own value, unverified"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "on_complete",
+     "modifier": "grant.building",
+     "amount": 1,
+     "target": "core:building/mosque",
+     "source": "unciv: Buildings.json, Great Mosque of Djenne"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "yield.culture.flat",
+     "amount": 1,
+     "source": "unciv: Buildings.json, Great Mosque of Djenne"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "yield.faith.flat",
+     "amount": 3,
+     "source": "unciv: Buildings.json, Great Mosque of Djenne"
+    }
+   ],
+   "art_id": "bnw:world_wonder/great_mosque_of_djenne",
+   "provenance": "unciv: Buildings.json, Great Mosque of Djenne",
+   "unciv_fields": [
+    "cost",
+    "required_tech"
+   ]
+  },
+  {
+   "id": "core:building/neuschwanstein",
+   "name": "Neuschwanstein",
+   "kind": "world_wonder",
+   "class": "core:building-class/neuschwanstein",
+   "cost": 1060,
+   "faith_cost": null,
+   "maintenance": 0,
+   "required_tech": "core:tech/railroad",
+   "obsolete_tech": null,
+   "era": "core:era/modern",
+   "hurry_cost_modifier": -1,
+   "conquest_survival_pct": 100,
+   "never_capture": false,
+   "specialists": null,
+   "great_person_points": {
+    "specialist": "core:specialist/merchant",
+    "per_turn": 1
+   },
+   "great_work_slots": null,
+   "theming_bonuses": null,
+   "consumes_resources": [],
+   "requirements": {
+    "nearby_mountain_required": true
+   },
+   "cost_per_city_pct": null,
+   "max_start_era": null,
+   "free_start_era": null,
+   "effects": [
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "happiness.local",
+     "amount": 2,
+     "source": "unciv: Buildings.json, Neuschwanstein"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "buildings_of_player",
+      "filter": {
+       "building": "core:building/castle"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "building.happiness.flat",
+     "amount": 1,
+     "source": "unciv: Buildings.json, Neuschwanstein"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "buildings_of_player",
+      "filter": {
+       "building": "core:building/castle"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "building.yield.gold.flat",
+     "amount": 3,
+     "source": "unciv: Buildings.json, Neuschwanstein"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "buildings_of_player",
+      "filter": {
+       "building": "core:building/castle"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "building.yield.culture.flat",
+     "amount": 2,
+     "source": "unciv: Buildings.json, Neuschwanstein"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "yield.gold.flat",
+     "amount": 6,
+     "source": "unciv: Buildings.json, Neuschwanstein"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "yield.culture.flat",
+     "amount": 4,
+     "source": "unciv: Buildings.json, Neuschwanstein"
+    }
+   ],
+   "art_id": "bnw:world_wonder/neuschwanstein",
+   "provenance": "unciv: Buildings.json, Neuschwanstein",
+   "unciv_fields": [
+    "cost",
+    "required_tech"
+   ]
+  },
+  {
+   "id": "core:building/petra",
+   "name": "Petra",
+   "kind": "world_wonder",
+   "class": "core:building-class/petra",
+   "cost": 250,
+   "faith_cost": null,
+   "maintenance": 0,
+   "required_tech": "core:tech/currency",
+   "obsolete_tech": null,
+   "era": "core:era/classical",
+   "hurry_cost_modifier": -1,
+   "conquest_survival_pct": 100,
+   "never_capture": false,
+   "specialists": null,
+   "great_person_points": {
+    "specialist": "core:specialist/engineer",
+    "per_turn": 1
+   },
+   "great_work_slots": null,
+   "theming_bonuses": null,
+   "consumes_resources": [],
+   "requirements": {
+    "nearby_terrain": "core:terrain/desert"
+   },
+   "cost_per_city_pct": null,
+   "max_start_era": "core:era/medieval",
+   "free_start_era": null,
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "player"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "trade.routes.flat",
+     "amount": 1,
+     "source": "own value"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "tiles_of_city",
+      "filter": {
+       "feature": "core:feature/flood-plains"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "tile.yield.food.flat",
+     "amount": -1,
+     "source": "own value, unverified"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "tiles_of_city",
+      "filter": {
+       "feature": "core:feature/flood-plains"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "tile.yield.production.flat",
+     "amount": -1,
+     "source": "own value, unverified"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city",
+      "filter": {
+       "unit": "core:unit/caravan"
+      }
+     },
+     "condition": null,
+     "trigger": "on_complete",
+     "modifier": "grant.unit",
+     "amount": 1,
+     "source": "own value"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": {
+      "tech_known": "core:tech/archaeology"
+     },
+     "trigger": "passive",
+     "modifier": "yield.culture.flat",
+     "amount": 6,
+     "source": "own value, unverified"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "tiles_of_city",
+      "filter": {
+       "terrain": "core:terrain/desert"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "tile.yield.food.flat",
+     "amount": 1,
+     "source": "unciv: Buildings.json, Petra"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "tiles_of_city",
+      "filter": {
+       "terrain": "core:terrain/desert"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "tile.yield.production.flat",
+     "amount": 1,
+     "source": "unciv: Buildings.json, Petra"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "yield.culture.flat",
+     "amount": 1,
+     "source": "unciv: Buildings.json, Petra"
+    }
+   ],
+   "art_id": "bnw:world_wonder/petra",
+   "provenance": "unciv: Buildings.json, Petra",
+   "unciv_fields": [
+    "cost",
+    "required_tech"
+   ]
+  },
+  {
+   "id": "core:building/terracotta_army",
+   "name": "Terracotta Army",
+   "kind": "world_wonder",
+   "class": "core:building-class/terracotta_army",
+   "cost": 250,
+   "faith_cost": null,
+   "maintenance": 0,
+   "required_tech": "core:tech/construction",
+   "obsolete_tech": null,
+   "era": "core:era/classical",
+   "hurry_cost_modifier": -1,
+   "conquest_survival_pct": 100,
+   "never_capture": false,
+   "specialists": null,
+   "great_person_points": null,
+   "great_work_slots": null,
+   "theming_bonuses": null,
+   "consumes_resources": [],
+   "requirements": {},
+   "cost_per_city_pct": null,
+   "max_start_era": "core:era/medieval",
+   "free_start_era": null,
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "player"
+     },
+     "condition": null,
+     "trigger": "on_complete",
+     "modifier": "grant.unit_per_military_unit",
+     "amount": 1,
+     "source": "own value, unverified"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "yield.culture.flat",
+     "amount": 6,
+     "source": "unciv: Buildings.json, Terracotta Army"
+    }
+   ],
+   "art_id": "bnw:world_wonder/terracotta_army",
+   "provenance": "unciv: Buildings.json, Terracotta Army",
+   "unciv_fields": [
+    "cost",
+    "required_tech"
+   ]
+  },
+  {
+   "id": "core:building/great_firewall",
+   "name": "Great Firewall",
+   "kind": "world_wonder",
+   "class": "core:building-class/great_firewall",
+   "cost": 1250,
+   "faith_cost": null,
+   "maintenance": 0,
+   "required_tech": "core:tech/computers",
+   "obsolete_tech": null,
+   "era": "core:era/atomic",
+   "hurry_cost_modifier": -1,
+   "conquest_survival_pct": 100,
+   "never_capture": false,
+   "specialists": null,
+   "great_person_points": null,
+   "great_work_slots": null,
+   "theming_bonuses": null,
+   "consumes_resources": [],
+   "requirements": {},
+   "cost_per_city_pct": null,
+   "max_start_era": null,
+   "free_start_era": null,
+   "effects": [
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "building.espionage",
+     "amount": true,
+     "needs_mechanic": "espionage_building",
+     "source": "own value, unverified"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "building.nullify_influence_modifier",
+     "amount": true,
+     "needs_mechanic": "nullify_tourism_tech_bonus",
+     "source": "own value, unverified"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "espionage.enemy_steal_rate.pct",
+     "amount": -99,
+     "source": "unciv: Buildings.json, Great Firewall"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "all_cities"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "espionage.enemy_steal_rate.pct",
+     "amount": -25,
+     "source": "unciv: Buildings.json, Great Firewall"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "building.affect_spies_now",
+     "amount": true,
+     "needs_mechanic": "espionage_rank_now",
+     "source": "own value, unverified"
+    }
+   ],
+   "art_id": "bnw:world_wonder/great_firewall",
+   "provenance": "unciv: Buildings.json, Great Firewall",
+   "unciv_fields": [
+    "cost",
+    "required_tech"
+   ]
+  },
+  {
+   "id": "core:building/grand_temple",
+   "name": "Grand Temple",
+   "kind": "national_wonder",
+   "class": "core:building-class/grand_temple",
+   "cost": 125,
+   "faith_cost": null,
+   "maintenance": 0,
+   "required_tech": "core:tech/theology",
+   "obsolete_tech": null,
+   "era": "core:era/medieval",
+   "hurry_cost_modifier": -1,
+   "conquest_survival_pct": 0,
+   "never_capture": true,
+   "specialists": null,
+   "great_person_points": null,
+   "great_work_slots": null,
+   "theming_bonuses": null,
+   "consumes_resources": [],
+   "requirements": {
+    "holy_city": true,
+    "buildings_in_city": [
+     "core:building/temple"
+    ],
+    "buildings_in_empire": [
+     {
+      "building": "core:building/temple",
+      "count_in_all_cities": -1
+     }
+    ],
+    "note_count": "count_in_all_cities -1 means: in every city (whether puppets count is not decided)"
+   },
+   "cost_per_city_pct": 30,
+   "max_start_era": null,
+   "free_start_era": null,
+   "effects": [
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "religion.pressure_out.pct",
+     "amount": 100,
+     "source": "unciv: Buildings.json, Grand Temple"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "yield.faith.flat",
+     "amount": 8,
+     "source": "unciv: Buildings.json, Grand Temple"
+    }
+   ],
+   "art_id": "bnw:national_wonder/grand_temple",
+   "provenance": "unciv: Buildings.json, Grand Temple",
+   "unciv_fields": [
+    "cost",
+    "required_tech"
+   ]
+  },
+  {
+   "id": "core:building/national_visitor_center",
+   "name": "National Visitor Center",
+   "kind": "national_wonder",
+   "class": "core:building-class/tourist_center",
+   "cost": 400,
+   "faith_cost": null,
+   "maintenance": 2,
+   "required_tech": "core:tech/telecommunications",
+   "obsolete_tech": null,
+   "era": "core:era/information",
+   "hurry_cost_modifier": -1,
+   "conquest_survival_pct": 0,
+   "never_capture": true,
+   "specialists": null,
+   "great_person_points": null,
+   "great_work_slots": null,
+   "theming_bonuses": null,
+   "consumes_resources": [],
+   "requirements": {
+    "buildings_in_empire": [
+     {
+      "building": "core:building/hotel",
+      "count_in_all_cities": -1
+     }
+    ],
+    "note_count": "count_in_all_cities -1 means: in every city (whether puppets count is not decided)"
+   },
+   "cost_per_city_pct": 30,
+   "max_start_era": null,
+   "free_start_era": null,
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "player"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "tourism.landmarks.pct_of_culture",
+     "amount": 80,
+     "source": "own design: tourism, influence and great works"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "player"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "tourism.great_works.pct",
+     "amount": 80,
+     "source": "own design: tourism, influence and great works"
+    }
+   ],
+   "art_id": "bnw:national_wonder/national_visitor_center",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:building/uffizi",
+   "name": "Uffizi",
+   "kind": "world_wonder",
+   "class": "core:building-class/uffizi",
+   "cost": 625,
+   "faith_cost": null,
+   "maintenance": 0,
+   "required_tech": "core:tech/architecture",
+   "obsolete_tech": null,
+   "era": "core:era/renaissance",
+   "hurry_cost_modifier": -1,
+   "conquest_survival_pct": 100,
+   "never_capture": false,
+   "specialists": null,
+   "great_person_points": null,
+   "great_work_slots": {
+    "type": "core:great-work-slot/art-artifact",
+    "count": 2
+   },
+   "theming_bonuses": [
+    {
+     "bonus": 3,
+     "description": "Diverse collection",
+     "unique_eras": true,
+     "requires_unique_players": true
+    },
+    {
+     "bonus": 2,
+     "description": "Collection of one age",
+     "same_era": true
+    },
+    {
+     "bonus": 1,
+     "description": "Collection of one hand",
+     "requires_same_player": true
+    }
+   ],
+   "consumes_resources": [],
+   "requirements": {
+    "policy_branch": "core:policy/aesthetics"
+   },
+   "cost_per_city_pct": null,
+   "max_start_era": null,
+   "free_start_era": null,
+   "effects": [
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city",
+      "filter": {
+       "unit": "core:unit/great-artist"
+      }
+     },
+     "condition": null,
+     "trigger": "on_complete",
+     "modifier": "grant.unit",
+     "amount": 1,
+     "source": "own value"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "yield.culture.flat",
+     "amount": 2,
+     "source": "own value"
+    }
+   ],
+   "art_id": "bnw:world_wonder/uffizi",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:building/globe_theatre",
+   "name": "Globe Theatre",
+   "kind": "world_wonder",
+   "class": "core:building-class/globe_theater",
+   "cost": 500,
+   "faith_cost": null,
+   "maintenance": 0,
+   "required_tech": "core:tech/printing-press",
+   "obsolete_tech": null,
+   "era": "core:era/renaissance",
+   "hurry_cost_modifier": -1,
+   "conquest_survival_pct": 100,
+   "never_capture": false,
+   "specialists": null,
+   "great_person_points": null,
+   "great_work_slots": {
+    "type": "core:great-work-slot/literature",
+    "count": 2
+   },
+   "theming_bonuses": [
+    {
+     "bonus": 3,
+     "description": "Diverse collection",
+     "unique_eras": true,
+     "requires_unique_players": true
+    },
+    {
+     "bonus": 2,
+     "description": "Collection of one age",
+     "same_era": true
+    },
+    {
+     "bonus": 1,
+     "description": "Collection of one hand",
+     "requires_same_player": true
+    }
+   ],
+   "consumes_resources": [],
+   "requirements": {},
+   "cost_per_city_pct": null,
+   "max_start_era": "core:era/industrial",
+   "free_start_era": null,
+   "effects": [
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city",
+      "filter": {
+       "unit": "core:unit/great-writer"
+      }
+     },
+     "condition": null,
+     "trigger": "on_complete",
+     "modifier": "grant.unit",
+     "amount": 1,
+     "source": "own value"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "yield.culture.flat",
+     "amount": 2,
+     "source": "own value"
+    }
+   ],
+   "art_id": "bnw:world_wonder/globe_theatre",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:building/broadway",
+   "name": "Broadway",
+   "kind": "world_wonder",
+   "class": "core:building-class/broadway",
+   "cost": 1060,
+   "faith_cost": null,
+   "maintenance": 0,
+   "required_tech": "core:tech/radio",
+   "obsolete_tech": null,
+   "era": "core:era/modern",
+   "hurry_cost_modifier": -1,
+   "conquest_survival_pct": 100,
+   "never_capture": false,
+   "specialists": null,
+   "great_person_points": null,
+   "great_work_slots": {
+    "type": "core:great-work-slot/music",
+    "count": 3
+   },
+   "theming_bonuses": [
+    {
+     "bonus": 4,
+     "description": "Diverse collection",
+     "unique_eras": true,
+     "requires_unique_players": true
+    },
+    {
+     "bonus": 3,
+     "description": "Collection of one age",
+     "same_era": true
+    },
+    {
+     "bonus": 2,
+     "description": "Collection of one hand",
+     "requires_same_player": true
+    }
+   ],
+   "consumes_resources": [],
+   "requirements": {},
+   "cost_per_city_pct": null,
+   "max_start_era": null,
+   "free_start_era": null,
+   "effects": [
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city",
+      "filter": {
+       "unit": "core:unit/great-musician"
+      }
+     },
+     "condition": null,
+     "trigger": "on_complete",
+     "modifier": "grant.unit",
+     "amount": 1,
+     "source": "own value"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "yield.culture.flat",
+     "amount": 2,
+     "source": "own value"
+    }
+   ],
+   "art_id": "bnw:world_wonder/broadway",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:building/red_fort",
+   "name": "Red Fort",
+   "kind": "world_wonder",
+   "class": "core:building-class/red_fort",
+   "cost": 625,
+   "faith_cost": null,
+   "maintenance": 0,
+   "required_tech": "core:tech/metallurgy",
+   "obsolete_tech": null,
+   "era": "core:era/renaissance",
+   "hurry_cost_modifier": -1,
+   "conquest_survival_pct": 100,
+   "never_capture": false,
+   "specialists": null,
+   "great_person_points": {
+    "specialist": "core:specialist/scientist",
+    "per_turn": 1
+   },
+   "great_work_slots": null,
+   "theming_bonuses": null,
+   "consumes_resources": [],
+   "requirements": {},
+   "cost_per_city_pct": null,
+   "max_start_era": "core:era/renaissance",
+   "free_start_era": null,
+   "effects": [
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "city.defense.flat",
+     "amount": 12.0,
+     "source": "own value, unverified"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "all_cities"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "city.defense.pct",
+     "amount": 25,
+     "source": "own value"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "yield.culture.flat",
+     "amount": 1,
+     "source": "own value"
+    }
+   ],
+   "art_id": "bnw:world_wonder/red_fort",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:building/prora",
+   "name": "Prora",
+   "kind": "world_wonder",
+   "class": "core:building-class/prora_resort",
+   "cost": 1060,
+   "faith_cost": null,
+   "maintenance": 0,
+   "required_tech": "core:tech/flight",
+   "obsolete_tech": null,
+   "era": "core:era/modern",
+   "hurry_cost_modifier": -1,
+   "conquest_survival_pct": 100,
+   "never_capture": false,
+   "specialists": null,
+   "great_person_points": null,
+   "great_work_slots": null,
+   "theming_bonuses": null,
+   "consumes_resources": [],
+   "requirements": {
+    "water": true,
+    "policy_branch": "core:policy/autocracy"
+   },
+   "cost_per_city_pct": null,
+   "max_start_era": null,
+   "free_start_era": null,
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "player"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "happiness.per_x_policies",
+     "amount": 2,
+     "source": "own value"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "player"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "happiness.global",
+     "amount": 2,
+     "source": "own value"
+    },
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "player"
+     },
+     "condition": null,
+     "trigger": "on_complete",
+     "modifier": "grant.policy",
+     "amount": 1,
+     "source": "own value"
+    }
+   ],
+   "art_id": "bnw:world_wonder/prora",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:building/borobudur",
+   "name": "Borobudur",
+   "kind": "world_wonder",
+   "class": "core:building-class/borobudur",
+   "cost": 300,
+   "faith_cost": null,
+   "maintenance": 0,
+   "required_tech": "core:tech/theology",
+   "obsolete_tech": null,
+   "era": "core:era/medieval",
+   "hurry_cost_modifier": -1,
+   "conquest_survival_pct": 100,
+   "never_capture": false,
+   "specialists": null,
+   "great_person_points": null,
+   "great_work_slots": null,
+   "theming_bonuses": null,
+   "consumes_resources": [],
+   "requirements": {
+    "holy_city": true
+   },
+   "cost_per_city_pct": null,
+   "max_start_era": "core:era/industrial",
+   "free_start_era": null,
+   "effects": [
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city",
+      "filter": {
+       "unit": "core:unit/missionary"
+      }
+     },
+     "condition": null,
+     "trigger": "on_complete",
+     "modifier": "grant.unit",
+     "amount": 3,
+     "source": "own value"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "yield.faith.flat",
+     "amount": 5,
+     "source": "own value"
+    }
+   ],
+   "art_id": "bnw:world_wonder/borobudur",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:building/parthenon",
+   "name": "Parthenon",
+   "kind": "world_wonder",
+   "class": "core:building-class/parthenon",
+   "cost": 250,
+   "faith_cost": null,
+   "maintenance": 0,
+   "required_tech": "core:tech/drama-and-poetry",
+   "obsolete_tech": null,
+   "era": "core:era/classical",
+   "hurry_cost_modifier": -1,
+   "conquest_survival_pct": 100,
+   "never_capture": false,
+   "specialists": null,
+   "great_person_points": null,
+   "great_work_slots": {
+    "type": "core:great-work-slot/art-artifact",
+    "count": 1
+   },
+   "theming_bonuses": null,
+   "consumes_resources": [],
+   "requirements": {},
+   "cost_per_city_pct": null,
+   "max_start_era": "core:era/medieval",
+   "free_start_era": null,
+   "effects": [
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "on_complete",
+     "modifier": "grant.great_work",
+     "amount": 1,
+     "target": "parthenon_frieze",
+     "source": "own value"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "yield.culture.flat",
+     "amount": 4,
+     "source": "own value"
+    }
+   ],
+   "art_id": "bnw:world_wonder/parthenon",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:building/international_space_station",
+   "name": "International Space Station",
+   "kind": "world_wonder",
+   "class": "core:building-class/international_space_station",
+   "cost": -1,
+   "faith_cost": null,
+   "maintenance": 0,
+   "required_tech": null,
+   "obsolete_tech": null,
+   "era": "core:era/ancient",
+   "hurry_cost_modifier": -1,
+   "conquest_survival_pct": 100,
+   "never_capture": false,
+   "specialists": null,
+   "great_person_points": null,
+   "great_work_slots": null,
+   "theming_bonuses": null,
+   "consumes_resources": [],
+   "requirements": {
+    "unlocked_by_league_project": true
+   },
+   "cost_per_city_pct": null,
+   "max_start_era": null,
+   "free_start_era": null,
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "player"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "great_scientist.science.pct",
+     "amount": 33,
+     "source": "own value"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "specialists_of_city",
+      "filter": {
+       "specialist": "core:specialist/scientist"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "specialist.yield.production.flat",
+     "amount": 1,
+     "source": "own value"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "specialists_of_city",
+      "filter": {
+       "specialist": "core:specialist/engineer"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "specialist.yield.science.flat",
+     "amount": 1,
+     "source": "own value"
+    }
+   ],
+   "art_id": "bnw:world_wonder/international_space_station",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:building/temple_of_artemis",
+   "name": "Temple of Artemis",
+   "kind": "world_wonder",
+   "class": "core:building-class/temple_artemis",
+   "cost": 185,
+   "faith_cost": null,
+   "maintenance": 0,
+   "required_tech": "core:tech/archery",
+   "obsolete_tech": null,
+   "era": "core:era/ancient",
+   "hurry_cost_modifier": -1,
+   "conquest_survival_pct": 100,
+   "never_capture": false,
+   "specialists": null,
+   "great_person_points": {
+    "specialist": "core:specialist/engineer",
+    "per_turn": 1
+   },
+   "great_work_slots": null,
+   "theming_bonuses": null,
+   "consumes_resources": [],
+   "requirements": {},
+   "cost_per_city_pct": null,
+   "max_start_era": "core:era/classical",
+   "free_start_era": null,
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "all_cities"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "yield.food.pct",
+     "amount": 10,
+     "source": "unciv: Buildings.json, Temple of Artemis"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city",
+      "filter": {
+       "unit_combat": "core:unit-combat/archer"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "production.units.pct",
+     "amount": 15,
+     "source": "unciv: Buildings.json, Temple of Artemis"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "yield.culture.flat",
+     "amount": 1,
+     "source": "unciv: Buildings.json, Temple of Artemis"
+    }
+   ],
+   "art_id": "bnw:world_wonder/temple_of_artemis",
+   "provenance": "unciv: Buildings.json, Temple of Artemis",
+   "unciv_fields": [
+    "cost",
+    "required_tech"
+   ]
+  },
+  {
+   "id": "core:building/mausoleum_of_halicarnassus",
+   "name": "Mausoleum of Halicarnassus",
+   "kind": "world_wonder",
+   "class": "core:building-class/mausoleum_halicarnassus",
+   "cost": 185,
+   "faith_cost": null,
+   "maintenance": 0,
+   "required_tech": "core:tech/masonry",
+   "obsolete_tech": null,
+   "era": "core:era/ancient",
+   "hurry_cost_modifier": -1,
+   "conquest_survival_pct": 100,
+   "never_capture": false,
+   "specialists": null,
+   "great_person_points": {
+    "specialist": "core:specialist/merchant",
+    "per_turn": 1
+   },
+   "great_work_slots": null,
+   "theming_bonuses": null,
+   "consumes_resources": [],
+   "requirements": {},
+   "cost_per_city_pct": null,
+   "max_start_era": "core:era/classical",
+   "free_start_era": null,
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "player"
+     },
+     "condition": null,
+     "trigger": "on_great_person_expended",
+     "modifier": "great_person_expended.gold.flat",
+     "amount": 100,
+     "source": "unciv: Buildings.json, Mausoleum of Halicarnassus"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "tiles_of_city",
+      "filter": {
+       "resource": "core:resource/marble"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "tile.yield.gold.flat",
+     "amount": 2,
+     "source": "unciv: Buildings.json, Mausoleum of Halicarnassus"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "tiles_of_city",
+      "filter": {
+       "resource": "core:resource/stone"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "tile.yield.gold.flat",
+     "amount": 2,
+     "source": "unciv: Buildings.json, Mausoleum of Halicarnassus"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "yield.culture.flat",
+     "amount": 1,
+     "source": "unciv: Buildings.json, Mausoleum of Halicarnassus"
+    }
+   ],
+   "art_id": "bnw:world_wonder/mausoleum_of_halicarnassus",
+   "provenance": "unciv: Buildings.json, Mausoleum of Halicarnassus",
+   "unciv_fields": [
+    "cost",
+    "required_tech"
+   ]
+  },
+  {
+   "id": "core:project/manhattan_project",
+   "name": "Manhattan Project",
+   "kind": "project",
+   "cost": 750,
+   "required_tech": "core:tech/atomic-theory",
+   "max_global_instances": -1,
+   "max_team_instances": 1,
+   "victory": null,
+   "prerequisite_projects": [],
+   "resources": [],
+   "effects": [
+    {
+     "scope": "player",
+     "selector": {
+      "kind": "player"
+     },
+     "condition": null,
+     "trigger": "on_complete",
+     "modifier": "project.allows_nukes",
+     "amount": true,
+     "needs_mechanic": "allows_nukes",
+     "source": "unciv: Buildings.json, Manhattan Project"
+    }
+   ],
+   "art_id": "bnw:project/manhattan_project",
+   "provenance": "unciv: Buildings.json, Manhattan Project",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:project/apollo_program",
+   "name": "Apollo Program",
+   "kind": "project",
+   "cost": 750,
+   "required_tech": "core:tech/rocketry",
+   "max_global_instances": -1,
+   "max_team_instances": 1,
+   "victory": "VICTORY_SPACE_RACE",
+   "prerequisite_projects": [],
+   "resources": [],
+   "effects": [],
+   "art_id": "bnw:project/apollo_program",
+   "provenance": "unciv: Buildings.json, Apollo Program",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:project/ss_cockpit",
+   "name": "SS Cockpit",
+   "kind": "project",
+   "cost": -1,
+   "required_tech": null,
+   "max_global_instances": -1,
+   "max_team_instances": 1,
+   "victory": "VICTORY_SPACE_RACE",
+   "prerequisite_projects": [
+    {
+     "project": "core:project/apollo_program",
+     "amount": 1
+    }
+   ],
+   "resources": [],
+   "effects": [],
+   "provenance": "own value"
+  },
+  {
+   "id": "core:project/ss_stasis_chamber",
+   "name": "SS Stasis Chamber",
+   "kind": "project",
+   "cost": -1,
+   "required_tech": null,
+   "max_global_instances": -1,
+   "max_team_instances": 1,
+   "victory": "VICTORY_SPACE_RACE",
+   "prerequisite_projects": [
+    {
+     "project": "core:project/apollo_program",
+     "amount": 1
+    }
+   ],
+   "resources": [],
+   "effects": [],
+   "provenance": "own value"
+  },
+  {
+   "id": "core:project/ss_engine",
+   "name": "SS Engine",
+   "kind": "project",
+   "cost": -1,
+   "required_tech": null,
+   "max_global_instances": -1,
+   "max_team_instances": 1,
+   "victory": "VICTORY_SPACE_RACE",
+   "prerequisite_projects": [
+    {
+     "project": "core:project/apollo_program",
+     "amount": 1
+    }
+   ],
+   "resources": [],
+   "effects": [],
+   "provenance": "own value"
+  },
+  {
+   "id": "core:project/ss_booster",
+   "name": "SS Booster",
+   "kind": "project",
+   "cost": -1,
+   "required_tech": null,
+   "max_global_instances": -1,
+   "max_team_instances": 3,
+   "victory": "VICTORY_SPACE_RACE",
+   "prerequisite_projects": [
+    {
+     "project": "core:project/apollo_program",
+     "amount": 1
+    }
+   ],
+   "resources": [],
+   "effects": [],
+   "provenance": "own value"
+  },
+  {
+   "id": "core:project/international_space_station",
+   "name": "International Space Station",
+   "kind": "league_project",
+   "cost_per_player": 900,
+   "process": "international_space_station",
+   "reward_tiers": [
+    {
+     "tier": 1,
+     "reward": "iss_1",
+     "effects": [
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "player"
+       },
+       "condition": null,
+       "trigger": "on_project_complete",
+       "modifier": "league_reward.base_beakers_turns_to_count",
+       "amount": 5,
+       "source": "own design: World Congress"
+      }
+     ]
+    },
+    {
+     "tier": 2,
+     "reward": "iss_2",
+     "effects": [
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "player"
+       },
+       "condition": null,
+       "trigger": "on_project_complete",
+       "modifier": "league_reward.free_unit_class",
+       "amount": 1,
+       "target": "core:unit/great-scientist",
+       "source": "own value"
+      }
+     ]
+    },
+    {
+     "tier": 3,
+     "reward": "iss_3",
+     "effects": [
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "player"
+       },
+       "condition": null,
+       "trigger": "on_project_complete",
+       "modifier": "league_reward.building",
+       "amount": 1,
+       "target": "core:building/international_space_station",
+       "source": "own value"
+      }
+     ]
+    }
+   ],
+   "art_id": "bnw:project/international_space_station",
+   "provenance": "own value",
+   "effects": []
+  },
+  {
+   "id": "core:project/world_s_fair",
+   "name": "World's Fair",
+   "kind": "league_project",
+   "cost_per_player": 300,
+   "process": "world_fair",
+   "reward_tiers": [
+    {
+     "tier": 1,
+     "reward": "world_fair_1",
+     "effects": [
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "player"
+       },
+       "condition": null,
+       "trigger": "on_project_complete",
+       "modifier": "league_reward.golden_age_points",
+       "amount": 360,
+       "source": "own design: World Congress"
+      }
+     ]
+    },
+    {
+     "tier": 2,
+     "reward": "world_fair_2",
+     "effects": [
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "player"
+       },
+       "condition": null,
+       "trigger": "on_project_complete",
+       "modifier": "league_reward.free_social_policies",
+       "amount": 1,
+       "source": "own value"
+      }
+     ]
+    },
+    {
+     "tier": 3,
+     "reward": "world_fair_3",
+     "effects": [
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "player"
+       },
+       "condition": null,
+       "trigger": "on_project_complete",
+       "modifier": "league_reward.culture_bonus_turns",
+       "amount": 15,
+       "source": "own design: World Congress"
+      }
+     ]
+    }
+   ],
+   "art_id": "bnw:project/world_s_fair",
+   "provenance": "own value",
+   "effects": []
+  },
+  {
+   "id": "core:project/international_games",
+   "name": "International Games",
+   "kind": "league_project",
+   "cost_per_player": 600,
+   "process": "world_games",
+   "reward_tiers": [
+    {
+     "tier": 1,
+     "reward": "world_games_1",
+     "effects": [
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "player"
+       },
+       "condition": null,
+       "trigger": "on_project_complete",
+       "modifier": "league_reward.happiness",
+       "amount": 2,
+       "source": "own design: World Congress"
+      }
+     ]
+    },
+    {
+     "tier": 2,
+     "reward": "world_games_2",
+     "effects": [
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "player"
+       },
+       "condition": null,
+       "trigger": "on_project_complete",
+       "modifier": "league_reward.happiness",
+       "amount": 2,
+       "source": "own design: World Congress"
+      },
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "player"
+       },
+       "condition": null,
+       "trigger": "on_project_complete",
+       "modifier": "league_reward.city_state_influence_boost",
+       "amount": 25,
+       "source": "own design: World Congress"
+      }
+     ]
+    },
+    {
+     "tier": 3,
+     "reward": "world_games_3",
+     "effects": [
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "player"
+       },
+       "condition": null,
+       "trigger": "on_project_complete",
+       "modifier": "league_reward.free_social_policies",
+       "amount": 1,
+       "source": "own value"
+      },
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "player"
+       },
+       "condition": null,
+       "trigger": "on_project_complete",
+       "modifier": "league_reward.tourism_bonus_turns",
+       "amount": 15,
+       "source": "own design: World Congress"
+      }
+     ]
+    }
+   ],
+   "art_id": "bnw:project/international_games",
+   "provenance": "own value",
+   "effects": []
+  }
+ ],
+ "notice": "Derived from Unciv (https://github.com/yairm210/Unciv), MPL-2.0: rule fields of the entries marked `unciv:` come from Unciv's `Gods & Kings` JSON files at commit 18827b1f; entries marked `own value, unverified` have no Unciv counterpart. Listed per file in classic/docs/classic/UNCIV-ATTRIBUTION.md."
+}

@@ -1,0 +1,33 @@
+# Game layer: the culture screen data and notices (game/culture.rs).
+
+classic.game.culture.ideology = { $name } · { $opinion }
+classic.game.culture.no-ideology = Нет идеологии
+classic.game.culture.trend-rising = растёт
+classic.game.culture.trend-falling = падает
+classic.game.culture.trend-static = не меняется
+classic.game.culture.class-art = Искусство
+classic.game.culture.class-artifact = Артефакт
+classic.game.culture.class-writing = Сочинение
+classic.game.culture.class-music = Музыка
+classic.game.culture.provenance = { $nation } · { $era }
+classic.game.culture.ideology-switched = Идеология сменена
+classic.game.culture.dig-chosen = Раскопки: { $choice }
+classic.game.culture.free-great-person = Бесплатный великий человек: { $name }
+classic.game.culture.opinion-content = довольны
+classic.game.culture.opinion-murmurs = ропот ({ $n })
+classic.game.culture.opinion-unrest = волнения ({ $n })
+classic.game.culture.opinion-upheaval = потрясение ({ $n })
+classic.game.culture.slot-art-artifact = ИСКУССТВО / АРТЕФАКТ
+classic.game.culture.slot-writing = СОЧИНЕНИЯ
+classic.game.culture.slot-music = МУЗЫКА
+classic.game.culture.choice-landmark = Памятник
+classic.game.culture.choice-artifact-second = Артефакт (вторая нация)
+classic.game.culture.choice-culture = Культура
+classic.game.culture.dig-at = Раскопки в ({ $q }, { $r })
+classic.game.culture.dig = Раскопки
+classic.game.culture.level-unknown = Неизвестна
+classic.game.culture.level-noticed = Замеченная
+classic.game.culture.level-admired = Восхищающая
+classic.game.culture.level-imitated = Подражаемая
+classic.game.culture.level-embraced = Принятая
+classic.game.culture.level-prevailing = Господствующая

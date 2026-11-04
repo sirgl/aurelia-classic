@@ -1,0 +1,70 @@
+# Test profiles for cargo-nextest (docs/testing.md).
+#
+#   fast:     cargo +1.98.1 nextest run --cargo-profile fasttest --build-jobs 4 --test-threads 4 --workspace
+#   full:     the same with `--profile full`
+#   changed:  tools/test-changed.sh
+#
+# `default` (fast) leaves out the slow AI games and the tests that open the GPU; `full` runs every test
+# that `cargo test --workspace` runs. Nothing here changes what a test checks; a test is never removed
+# from `full`. The `pins` group is the set of cheap pinned games that `tools/test-changed.sh` always
+# runs, whatever changed.
+
+[test-groups]
+# Cheap pins (each under 3 s in release, 12 s at the fasttest opt-level): any change of the rules,
+# the AI, the kernel, the encodings or the save format moves at least one of these hashes.
+pins = { max-threads = "num-cpus" }
+
+[profile.default]
+# Left out of the fast run: the GPU tests (first line) and the slow set, the 18 tests of 3 s and more
+# in release (about 10 s and more at the fasttest opt-level; measured 1 November 2026, `--test-threads 4`):
+# long AI games over many seeds or 200-500 rounds, two art-catalogue scans. They are 60% of the
+# test time of the suite. The pins below still play an AI game (the smoke suite), a scripted core
+# game and a scripted classic game in the fast run.
+default-filter = """
+not (
+    (package(=classic-ui) & (binary(=render_scale) | binary(=render_headless) | binary(=new_match_frame) | binary(=hud_overlap)))
+  | (binary_id(=classic-rules::ai_acceptance) & test(=war_and_peace_do_not_flip_over_several_seeds))
+  | (binary_id(=classic-rules::ai_acceptance) & test(=six_ai_nations_play_300_classic_rounds))
+  | (binary_id(=aurelia-qa::ai_selfplay) & test(=given_space_techs_reach_the_science_victory))
+  | (binary_id(=classic-rules::ai_science) & test(=the_cities_order_only_what_the_rules_accept))
+  | (binary_id(=classic-rules::ai_track_b) & test(=ai_adopts_policies_and_founds_a_religion_in_a_classic_game))
+  | (binary_id(=classic-rules::ai_economy) & test(=the_ai_runs_trade_routes))
+  | (binary_id(=aurelia-qa::ai_grounds) & test(=battles_replay_and_export_aligned))
+  | (binary_id(=aurelia-qa::ai_export) & test(=religious_commands_split_into_slots_and_assemble_again))
+  | (binary_id(=aurelia-qa::ai_export) & test(=hindsight_labels_a_founders_moves_with_the_site_it_founds_on))
+  | (binary_id(=classic-rules) & test(=kernel_tests::astar::early_exit_for_unenterable_goals_changes_no_answer))
+  | (binary_id(=classic-rules::classic_ai_minors) & test(=ai_nations_city_states_and_barbarians_play_200_rounds))
+  | (binary_id(=classic-rules::ai_effects_checked) & test(=a_game_of_the_variant_repeats_few_walks))
+  | (binary_id(=aurelia-qa::ai_record) & test(=the_recording_changes_nothing_and_writes_every_kind_of_line))
+  | (binary_id(=aurelia-qa::ai_choice) & test(=recording_changes_no_game_and_exploration_is_seeded))
+  | (binary_id(=classic-rules::ai_sea_work) & test(=a_game_on_a_watery_map_has_work_boats_only_with_the_work))
+  | (binary_id(=classic-rules::net_e2e_speed) & test(=optimized_paths_equal_the_plain_path_on_random_weights))
+  | (binary_id(=classic-ui) & test(=ui::screens::nations::catalog::tests::complete_art_catalog_has_valid_unique_regions_and_keeps_augustus_distinct))
+  | (binary_id(=classic-ui) & test(=ui::hud::unit_actions::tests::all_generated_actions_have_alpha_and_bounded_cached_textures))
+)
+"""
+fail-fast = false
+failure-output = "final"
+status-level = "fail"
+final-status-level = "slow"
+slow-timeout = { period = "30s" }
+
+[[profile.default.overrides]]
+filter = """
+    (binary_id(=aurelia-qa::ai_bench) & test(=the_smoke_suite_gives_the_same_result_on_any_number_of_threads))
+  | (binary_id(=classic-rules::net_e2e_mind) & (test(=the_encoding_of_a_fixed_state_is_pinned) | test(=a_game_of_nets_with_pinned_weights_is_pinned)))
+  | (binary_id(=classic-rules::baseline_hashes) & test(=core_game_hash_baseline))
+  | (binary_id(=classic-rules::classic_game) & test(=classic_game_runs_100_rounds_and_replays_to_the_pinned_hash))
+  | (binary_id(=classic-rules::fuzz_sim) & test(=fuzz_world_hash_baseline))
+  | (binary_id(=classic-rules::rules_fingerprint) & test(=the_classic_fingerprint_is_pinned))
+  | (binary_id(=classic-rules::save_codec) & test(=the_codec_reads_classic_saves_byte_for_byte))
+  | (binary_id(=classic-rules::main_snapshot) & test(=the_frozen_main_game_still_opens_validates_and_hashes_the_same))
+  | (binary_id(=aurelia-qa::ai_export) & test(=the_layout_is_pinned))
+"""
+test-group = "pins"
+
+[profile.full]
+# Everything `cargo test --workspace` runs: the slow games and the GPU tests too (they open the
+# machine's GPU). `--run-ignored all` adds the `#[ignore]`d measurements on top.
+default-filter = "all()"
+slow-timeout = { period = "120s" }

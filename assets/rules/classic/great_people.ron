@@ -1,0 +1,118 @@
+// Classic rule set (Unciv Gods & Kings ruleset plus own extensions); generated, do not edit.
+// Derived from Unciv (https://github.com/yairm210/Unciv), MPL-2.0, where the entry says `unciv:`
+// in classic/docs/classic/*.json (see classic/docs/classic/UNCIV-ATTRIBUTION.md); other values are own, unverified.
+// Source: classic/docs/classic/*.json (made by classic/tools/import-unciv.py). Regenerate:
+//   cargo run --release --offline -p classic-content --features importer --bin classic-import
+// Inert effects need a mechanic the engine does not have yet: classic/docs/classic/implemented.md.
+(
+    specialists: [
+        (
+            id: "core:specialist/artist",
+            name: "Artist",
+            yields: (culture: 2),
+            great_person_points: 3,
+            great_person: Some("core:unit/great-artist"),
+        ),
+        (
+            id: "core:specialist/citizen",
+            name: "Unemployed Citizen",
+            yields: (production: 1),
+        ),
+        (
+            id: "core:specialist/engineer",
+            name: "Engineer",
+            yields: (production: 2),
+            great_person_points: 3,
+            great_person: Some("core:unit/great-engineer"),
+        ),
+        (
+            id: "core:specialist/merchant",
+            name: "Merchant",
+            yields: (gold: 3),
+            great_person_points: 3,
+            great_person: Some("core:unit/great-merchant"),
+        ),
+        (
+            id: "core:specialist/musician",
+            name: "Musician",
+            yields: (culture: 2),
+            great_person_points: 3,
+            great_person: Some("core:unit/great-musician"),
+        ),
+        (
+            id: "core:specialist/scientist",
+            name: "Scientist",
+            yields: (science: 3),
+            great_person_points: 3,
+            great_person: Some("core:unit/great-scientist"),
+        ),
+        (
+            id: "core:specialist/writer",
+            name: "Writer",
+            yields: (culture: 2),
+            great_person_points: 3,
+            great_person: Some("core:unit/great-writer"),
+        ),
+    ],
+    great_people: [
+        (
+            id: "core:great-person/admiral",
+            kind: Admiral,
+            unit: "core:unit/great-admiral",
+            points_source: CombatExperience,
+        ),
+        (
+            id: "core:great-person/artist",
+            kind: Artist,
+            unit: "core:unit/great-artist",
+            specialist: Some("core:specialist/artist"),
+        ),
+        (
+            id: "core:great-person/engineer",
+            kind: Engineer,
+            unit: "core:unit/great-engineer",
+            specialist: Some("core:specialist/engineer"),
+            improvements: ["core:improvement/manufactory"],
+        ),
+        (
+            id: "core:great-person/general",
+            kind: General,
+            unit: "core:unit/great-general",
+            points_source: CombatExperience,
+            improvements: ["core:improvement/citadel"],
+        ),
+        (
+            id: "core:great-person/merchant",
+            kind: Merchant,
+            unit: "core:unit/great-merchant",
+            specialist: Some("core:specialist/merchant"),
+            improvements: ["core:improvement/customs-house"],
+        ),
+        (
+            id: "core:great-person/musician",
+            kind: Musician,
+            unit: "core:unit/great-musician",
+            specialist: Some("core:specialist/musician"),
+        ),
+        (
+            id: "core:great-person/prophet",
+            kind: Prophet,
+            unit: "core:unit/great-prophet",
+            points_source: Faith,
+            improvements: ["core:improvement/holy-site"],
+        ),
+        (
+            id: "core:great-person/scientist",
+            kind: Scientist,
+            unit: "core:unit/great-scientist",
+            specialist: Some("core:specialist/scientist"),
+            improvements: ["core:improvement/academy"],
+        ),
+        (
+            id: "core:great-person/writer",
+            kind: Writer,
+            unit: "core:unit/great-writer",
+            specialist: Some("core:specialist/writer"),
+        ),
+    ],
+)

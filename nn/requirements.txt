@@ -1,0 +1,4 @@
+# The trainer of the end-to-end net (classic/docs/ai-net-model.md).
+torch>=2.5
+numpy>=2.0
+pytest>=8

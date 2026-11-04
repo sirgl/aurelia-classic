@@ -1,0 +1,611 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Запись партии</title>
+<!-- The replay player of a recorded Aurelia game (crates/qa/src/frames.rs, ai-replay-frames):
+     the frames are embedded below in place of the slot, so the page opens from file:// with no
+     server and no external script. -->
+<style>
+:root{--bg:#fbfaf7;--fg:#1f1d1a;--muted:#6b665e;--line:#e3ded5;--card:#fff;--accent:#2c5d8a;--ok:#2f7d4f;--bad:#b4442f;--gold:#c99a1c;--ink:#1f1d1a;--paper:#fff;--hit:#d23c2a}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#16161a;--fg:#e8e6e1;--muted:#a09a90;--line:#33322f;--card:#1e1e23;--accent:#7fb2e0;--ok:#6cc28f;--bad:#e58a76;--gold:#e6c25a;--ink:#0d0d10;--paper:#f2f0ea;--hit:#ff6b57}}
+:root[data-theme="dark"]{--bg:#16161a;--fg:#e8e6e1;--muted:#a09a90;--line:#33322f;--card:#1e1e23;--accent:#7fb2e0;--ok:#6cc28f;--bad:#e58a76;--gold:#e6c25a;--ink:#0d0d10;--paper:#f2f0ea;--hit:#ff6b57}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font:15px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;margin:0;padding:14px 16px 40px}
+main{max-width:1180px;margin:0 auto}
+h1{font-size:20px;margin:0 0 2px;line-height:1.25}
+.sub{color:var(--muted);font-size:13px;margin:0 0 8px}
+.outcome{background:var(--card);border:1px solid var(--line);border-radius:6px;padding:8px 12px;margin:0 0 10px;font-size:16px}
+.outcome b.ok{color:var(--ok)}.outcome b.bad{color:var(--bad)}
+.grid{display:grid;grid-template-columns:minmax(0,1fr) 330px;gap:14px;align-items:start}
+@media (max-width:860px){.grid{grid-template-columns:minmax(0,1fr)}}
+.mapbox{position:relative;background:var(--card);border:1px solid var(--line);border-radius:6px;overflow:hidden;touch-action:none}
+canvas{display:block;width:100%;cursor:grab}
+.zoom{position:absolute;right:8px;top:8px;display:flex;flex-direction:column;gap:4px}
+.zoom button{width:34px;height:34px;font-size:18px;padding:0}
+button,select{font:inherit;color:var(--fg);background:var(--card);border:1px solid var(--line);border-radius:6px;padding:5px 10px;cursor:pointer;min-height:34px}
+button:hover{border-color:var(--accent)}
+.bar{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:10px 0 4px}
+.bar input[type=range]{flex:1 1 160px;min-width:120px;accent-color:var(--accent)}
+.now{font-size:15px;margin:2px 0 8px}
+.now b{font-variant-numeric:tabular-nums}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:6px;padding:10px 12px;margin-bottom:12px}
+.panel h2{font-size:14px;margin:0 0 6px;color:var(--muted);font-weight:600}
+.players div{display:flex;flex-wrap:wrap;align-items:center;gap:2px 8px;padding:3px 0;font-size:14px}
+.sw{display:inline-block;width:12px;height:12px;border-radius:3px;flex:0 0 12px;border:1px solid rgba(0,0,0,.25)}
+.players .stat{flex:1 0 100%;padding-left:20px;color:var(--muted);font-size:13px;font-variant-numeric:tabular-nums}
+.dead{opacity:.5;text-decoration:line-through}
+ol.events{list-style:none;margin:0;padding:0;max-height:420px;overflow:auto;font-size:14px}
+ol.events li{padding:4px 0;border-bottom:1px solid var(--line);cursor:pointer}
+ol.events li:last-child{border-bottom:0}
+ol.events li.scene{color:var(--muted)}
+ol.events li.big{font-weight:600}
+ol.events li:hover{color:var(--accent)}
+.panel h2 select{font-size:13px;min-height:28px;padding:2px 6px;margin-left:6px;font-weight:normal;max-width:190px}
+.emp{font-size:14px}.emp p{margin:2px 0}.emp .k{color:var(--muted)}
+.emp table{border-collapse:collapse;width:100%;font-size:13px;margin-top:6px}.emp td{border-top:1px solid var(--line);padding:2px 4px;vertical-align:top}
+.emp td:nth-child(2){text-align:right;font-variant-numeric:tabular-nums;color:var(--muted)}
+.chips{display:flex;flex-wrap:wrap;gap:5px;margin:4px 0 8px}.chips button{font-size:13px;min-height:28px;padding:2px 10px;border-radius:14px}
+.chips button.on{border-color:var(--accent);color:var(--accent);font-weight:600}
+ol.timeline{list-style:none;margin:0;padding:0;max-height:360px;overflow:auto;font-size:14px;columns:2 300px;column-gap:24px}
+ol.timeline li{padding:2px 0;cursor:pointer;break-inside:avoid}ol.timeline li:hover{color:var(--accent)}
+ol.timeline li.now{background:color-mix(in srgb,var(--accent) 14%,transparent);border-radius:4px}
+ol.timeline .r{display:inline-block;min-width:44px;color:var(--muted);font-variant-numeric:tabular-nums}
+.muted{color:var(--muted)}
+.info{font-size:14px;min-height:20px}
+details{margin-top:14px;font-size:13px;color:var(--muted)}
+details pre{white-space:pre-wrap;word-break:break-all}
+.theme{float:right;margin-left:8px}
+.legend{font-size:12px;color:var(--muted);display:flex;flex-wrap:wrap;gap:4px 12px;margin-top:6px}
+</style>
+</head>
+<body>
+<main>
+<button class="theme" id="theme" title="Тема">◐</button>
+<h1 id="title">Запись партии</h1>
+<p class="sub" id="sub"></p>
+<div class="outcome" id="outcome"></div>
+<div class="grid">
+  <div>
+    <div class="mapbox" id="mapbox">
+      <canvas id="map" aria-label="Карта"></canvas>
+      <div class="zoom"><button id="zin" title="Приблизить">+</button><button id="zout" title="Отдалить">−</button><button id="zfit" title="Вся карта">⤢</button></div>
+    </div>
+    <div class="bar">
+      <button id="first" title="К началу">⏮</button>
+      <button id="prev" title="Кадр назад (←)">◀</button>
+      <button id="play" title="Пуск/пауза (пробел)">▶</button>
+      <button id="next" title="Кадр вперёд (→)">▶︎|</button>
+      <button id="last" title="К концу">⏭</button>
+      <input type="range" id="seek" min="0" value="0" aria-label="Кадр">
+      <select id="speed" title="Скорость"><option value="0.5">0,5×</option><option value="1" selected>1×</option><option value="2">2×</option><option value="4">4×</option><option value="8">8×</option></select>
+    </div>
+    <div class="now" id="now"></div>
+    <div class="info" id="info"><span class="muted">Нажмите на клетку, чтобы увидеть, что на ней.</span></div>
+    <div class="legend" id="legend"></div>
+  </div>
+  <div>
+    <div class="panel"><h2>Стороны</h2><div class="players" id="players"></div></div>
+    <div class="panel"><h2>Империя<select id="emp" aria-label="Игрок"></select></h2><div class="emp" id="empire"></div></div>
+    <div class="panel"><h2 id="evhead">События кадра</h2><ol class="events" id="events"></ol></div>
+  </div>
+</div>
+<div class="panel" id="tlbox"><h2 id="tlhead">Решения за партию</h2><div class="chips" id="tlchips"></div><ol class="timeline" id="timeline"></ol></div>
+<details><summary>Технические подробности</summary><pre id="tech"></pre></details>
+</main>
+<script>
+const DATA = /*FRAMES*/null;
+(function () {
+  "use strict";
+  if (!DATA) { document.getElementById("title").textContent = "Нет данных записи"; return; }
+  const $ = (id) => document.getElementById(id);
+  const map = DATA.map, legend = DATA.legend, players = DATA.players, frames = DATA.frames, scene = DATA.scene;
+  const N = map.coords.length;
+  const battle = scene.battle && typeof scene.battle === "object" ? scene.battle : null;
+  const learnerSide = battle ? battle.learner : null, enemySide = battle ? battle.enemy : null;
+
+  // ---------- theme ----------
+  const root = document.documentElement;
+  try { const t = localStorage.getItem("aurelia-replay-theme"); if (t) root.dataset.theme = t; } catch (e) {}
+  $("theme").onclick = () => {
+    const dark = root.dataset.theme ? root.dataset.theme === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+    root.dataset.theme = dark ? "light" : "dark";
+    try { localStorage.setItem("aurelia-replay-theme", root.dataset.theme); } catch (e) {}
+    draw();
+  };
+  const css = (v) => getComputedStyle(root).getPropertyValue(v).trim();
+
+  // ---------- colours: the nations' own, pulled apart where two are alike ----------
+  function hexRgb(h) { const n = parseInt(h.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; }
+  function rgbHex(c) { return "#" + c.map((x) => Math.max(0, Math.min(255, Math.round(x))).toString(16).padStart(2, "0")).join(""); }
+  function rgbHsl([r, g, b]) { r /= 255; g /= 255; b /= 255; const mx = Math.max(r, g, b), mn = Math.min(r, g, b); let h = 0, s = 0; const l = (mx + mn) / 2;
+    if (mx !== mn) { const d = mx - mn; s = l > .5 ? d / (2 - mx - mn) : d / (mx + mn);
+      h = mx === r ? (g - b) / d + (g < b ? 6 : 0) : mx === g ? (b - r) / d + 2 : (r - g) / d + 4; h /= 6; }
+    return [h * 360, s, l]; }
+  function hslHex(h, s, l) { h = ((h % 360) + 360) % 360 / 360; const f = (p, q, t) => { t = (t + 1) % 1; return t < 1 / 6 ? p + (q - p) * 6 * t : t < .5 ? q : t < 2 / 3 ? p + (q - p) * (2 / 3 - t) * 6 : p; };
+    const q = l < .5 ? l * (1 + s) : l + s - l * s, p = 2 * l - q; return rgbHex([f(p, q, h + 1 / 3), f(p, q, h), f(p, q, h - 1 / 3)].map((x) => x * 255)); }
+  const colour = [];
+  const usedHues = [];
+  players.forEach((p, i) => {
+    let c;
+    if (p.kind === "barbarian") c = "#6b1a10";
+    else if (p.kind === "city-state") c = hslHex(i * 47, .12, .62);
+    else {
+      let [h, s, l] = rgbHsl(hexRgb(p.color || "#888888"));
+      for (let k = 0; k < 12 && usedHues.some((u) => Math.min(Math.abs(u - h), 360 - Math.abs(u - h)) < 22); k++) h = (h + 37) % 360;
+      usedHues.push(h);
+      c = hslHex(h, Math.max(s, .45), Math.min(Math.max(l, .38), .58));
+    }
+    colour[i] = c;
+  });
+  function textOn(c) { const [r, g, b] = hexRgb(c); return (0.299 * r + 0.587 * g + 0.114 * b) > 150 ? "#111" : "#fff"; }
+
+  // ---------- names ----------
+  const MIND = { learner: "сеть", standard: "standard" };
+  function pname(p) { const x = players[p]; if (!x) return "игрок " + p;
+    if (x.kind === "barbarian") return "Варвары";
+    if (x.kind === "city-state") return (x.name || "Город-государство") + " (город-государство)";
+    return x.name || ("игрок " + p); }
+  function pshort(p) { const x = players[p]; if (!x) return "игрок " + p; if (x.kind === "barbarian") return "Варвары"; return x.name || ("игрок " + p); }
+  // A seat's mind: the learner is «сеть»; a frozen net (`net:<path>/iter_0004.bin`) is «сеть iter_0004».
+  function pmind(p) { const x = players[p]; if (!x || x.kind !== "major") return ""; if (x.learner && (!x.mind || x.mind === "learner")) return "сеть";
+    const m = x.mind || ""; if (m.startsWith("net:")) return "сеть " + m.split("/").pop().replace(/\.bin$/, ""); return MIND[m] || m; }
+  function uname(k) { return (legend.units[k] && legend.units[k].name) || ("отряд " + k); }
+  function esc(s) { return String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]); }
+  function sw(p) { return '<i class="sw" style="background:' + colour[p] + '"></i>'; }
+  const KIND = { siege: "Осада", defence: "Оборона", field: "Полевое сражение", opening: "Дебют", economy: "Экономическое окно" };
+
+  // ---------- geometry: pointy-top axial hexes, as the game's renderer lays them ----------
+  const SQ3 = Math.sqrt(3);
+  const cx = new Float64Array(N), cy = new Float64Array(N);
+  const byCoord = new Map();
+  for (let i = 0; i < N; i++) { const [q, r] = map.coords[i]; cx[i] = SQ3 * (q + r / 2); cy[i] = 1.5 * r; byCoord.set(q + "," + r, i); }
+  const DIRS = [[1, 0], [1, -1], [0, -1], [-1, 0], [-1, 1], [0, 1]];
+  const nbr = [];
+  for (let i = 0; i < N; i++) { const [q, r] = map.coords[i]; nbr.push(DIRS.map(([dq, dr]) => byCoord.has((q + dq) + "," + (r + dr)) ? byCoord.get((q + dq) + "," + (r + dr)) : -1)); }
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  for (let i = 0; i < N; i++) { minX = Math.min(minX, cx[i]); maxX = Math.max(maxX, cx[i]); minY = Math.min(minY, cy[i]); maxY = Math.max(maxY, cy[i]); }
+  minX -= 1; maxX += 1; minY -= 1.2; maxY += 1.2;
+  // Camps and ruins among the improvements (`legend.improvement_kinds`), and the barbarian player.
+  const siteKind = (imp) => imp === NONE ? null : ((legend.improvement_kinds || [])[imp & 0x7fff] || null);
+  const barbarian = players.findIndex((p) => p.kind === "barbarian");
+  // A tile id of the whole map (row-major q + r * width) as an index of the window (-1: outside).
+  const tileIndex = (t) => { const k = byCoord.get((t % map.width) + "," + Math.floor(t / map.width)); return k === undefined ? -1 : k; };
+  const terr = (i) => legend.terrain[map.terrain[i]] || { color: "#999", water: false };
+  const shore = new Uint8Array(N);
+  for (let i = 0; i < N; i++) if (terr(i).water) shore[i] = nbr[i].some((j) => j >= 0 && !terr(j).water) ? 1 : 0;
+
+  // ---------- frame state: tiles rebuilt from the changes, units and cities as given ----------
+  const T_OWNER = 0, T_IMP = 1, T_ROUTE = 2, T_FEAT = 3, NONE = 65535;
+  let tiles = new Uint16Array(N * 4).fill(NONE);
+  let built = -1;
+  function stateAt(k) {
+    if (k < built) { tiles = new Uint16Array(N * 4).fill(NONE); built = -1; }
+    for (let f = built + 1; f <= k; f++) for (const c of frames[f].tiles) { const i = c[0]; for (let j = 0; j < 4; j++) tiles[i * 4 + j] = c[1 + j]; }
+    built = k;
+  }
+
+  // ---------- view ----------
+  const canvas = $("map"), ctx = canvas.getContext("2d");
+  let view = { s: 10, ox: 0, oy: 0 };
+  function fit() {
+    const w = canvas.clientWidth || 600;
+    const aspect = (maxY - minY) / (maxX - minX);
+    const h = Math.max(260, Math.min(window.innerHeight * 0.72, w * aspect));
+    canvas.style.height = h + "px";
+    const s = Math.min(w / (maxX - minX), h / (maxY - minY));
+    view = { s, ox: (w - (maxX - minX) * s) / 2 - minX * s, oy: (h - (maxY - minY) * s) / 2 - minY * s };
+  }
+  const X = (i) => cx[i] * view.s + view.ox, Y = (i) => cy[i] * view.s + view.oy;
+  function hexPath(x, y, r) { ctx.beginPath(); for (let k = 0; k < 6; k++) { const a = Math.PI / 180 * (60 * k - 30); ctx.lineTo(x + r * Math.cos(a), y + r * Math.sin(a)); } ctx.closePath(); }
+  // The corner pair of the edge toward neighbour direction d (pointy-top).
+  const EDGE = [[0, 1], [5, 0], [4, 5], [3, 4], [2, 3], [1, 2]];
+  function corner(x, y, r, k) { const a = Math.PI / 180 * (60 * k - 30); return [x + r * Math.cos(a), y + r * Math.sin(a)]; }
+
+  let cur = 0, playing = false, timer = null, selected = -1, flash = [];
+
+  function shade(hex, f) { const c = hexRgb(hex); return rgbHex(c.map((x) => f < 0 ? x * (1 + f) : x + (255 - x) * f)); }
+
+  function draw() {
+    const dpr = window.devicePixelRatio || 1;
+    const w = canvas.clientWidth, h = canvas.clientHeight;
+    if (canvas.width !== Math.round(w * dpr) || canvas.height !== Math.round(h * dpr)) { canvas.width = Math.round(w * dpr); canvas.height = Math.round(h * dpr); }
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, w, h);
+    stateAt(cur);
+    const f = frames[cur], s = view.s, r = s * 1.0;
+    const ink = css("--ink");
+    // terrain
+    for (let i = 0; i < N; i++) {
+      const x = X(i), y = Y(i);
+      if (x < -s * 2 || y < -s * 2 || x > w + s * 2 || y > h + s * 2) continue;
+      const t = terr(i);
+      let c = t.color;
+      if (t.water) c = shore[i] ? shade(c, 0.25) : shade(c, -0.18);
+      hexPath(x, y, r + 0.4); ctx.fillStyle = c; ctx.fill();
+      if (s >= 9) {
+        if (t.mountains) { ctx.fillStyle = shade(t.color, -0.35); ctx.beginPath(); ctx.moveTo(x - r * .5, y + r * .35); ctx.lineTo(x, y - r * .5); ctx.lineTo(x + r * .5, y + r * .35); ctx.closePath(); ctx.fill(); }
+        else if (t.hills) { ctx.strokeStyle = shade(t.color, -0.3); ctx.lineWidth = Math.max(1, s * .08); ctx.beginPath(); ctx.arc(x - r * .25, y + r * .25, r * .28, Math.PI * 1.1, Math.PI * 1.9); ctx.stroke(); ctx.beginPath(); ctx.arc(x + r * .25, y + r * .1, r * .28, Math.PI * 1.1, Math.PI * 1.9); ctx.stroke(); }
+        const feat = tiles[i * 4 + T_FEAT];
+        if (feat !== NONE) { ctx.fillStyle = "rgba(20,50,20,.35)"; for (const [dx, dy] of [[-.35, -.15], [.3, -.3], [0, .3], [.35, .25], [-.3, .35]]) { ctx.beginPath(); ctx.arc(x + dx * r, y + dy * r, r * .1, 0, 7); ctx.fill(); } }
+      }
+    }
+    // territory tint and borders
+    for (let i = 0; i < N; i++) {
+      const o = tiles[i * 4 + T_OWNER]; if (o === NONE) continue;
+      const x = X(i), y = Y(i);
+      hexPath(x, y, r); ctx.fillStyle = colour[o] + "33"; ctx.fill();
+      ctx.strokeStyle = colour[o]; ctx.lineWidth = Math.max(1.5, s * .14);
+      for (let d = 0; d < 6; d++) { const j = nbr[i][d]; if (j >= 0 && tiles[j * 4 + T_OWNER] === o) continue;
+        const [a, b] = EDGE[d]; const p = corner(x, y, r * .9, a), q = corner(x, y, r * .9, b); ctx.beginPath(); ctx.moveTo(p[0], p[1]); ctx.lineTo(q[0], q[1]); ctx.stroke(); }
+    }
+    // rivers
+    ctx.strokeStyle = "#2d7fc1"; ctx.lineWidth = Math.max(1.5, s * .16); ctx.lineCap = "round";
+    for (const [a, b] of map.rivers) { const d = nbr[a].indexOf(b); if (d < 0) continue; const [k1, k2] = EDGE[d]; const p = corner(X(a), Y(a), r, k1), q = corner(X(a), Y(a), r, k2); ctx.beginPath(); ctx.moveTo(p[0], p[1]); ctx.lineTo(q[0], q[1]); ctx.stroke(); }
+    // roads
+    ctx.strokeStyle = "rgba(110,80,50,.75)"; ctx.lineWidth = Math.max(1, s * .1);
+    for (let i = 0; i < N; i++) { if (!tiles[i * 4 + T_ROUTE]) continue; let any = false;
+      for (let d = 0; d < 3; d++) { const j = nbr[i][d]; if (j >= 0 && tiles[j * 4 + T_ROUTE]) { ctx.beginPath(); ctx.moveTo(X(i), Y(i)); ctx.lineTo(X(j), Y(j)); ctx.stroke(); any = true; } }
+      if (!any) { ctx.beginPath(); ctx.arc(X(i), Y(i), s * .1, 0, 7); ctx.stroke(); } }
+    // improvements and resources
+    if (s >= 11) for (let i = 0; i < N; i++) {
+      const imp = tiles[i * 4 + T_IMP], x = X(i), y = Y(i);
+      if (imp !== NONE && siteKind(imp)) { /* camps and ruins: drawn below at every zoom */ }
+      else if (imp !== NONE) { ctx.fillStyle = (imp & 0x8000) ? "rgba(180,68,47,.8)" : "rgba(255,250,235,.55)"; ctx.strokeStyle = "rgba(0,0,0,.3)"; ctx.lineWidth = 1; ctx.fillRect(x + r * .3, y + r * .4, r * .22, r * .22); ctx.strokeRect(x + r * .3, y + r * .4, r * .22, r * .22); }
+      const res = map.resource[i];
+      if (res >= 0) { ctx.fillStyle = "rgba(255,255,255,.85)"; ctx.beginPath(); ctx.arc(x - r * .45, y - r * .3, r * .2, 0, 7); ctx.fill(); ctx.strokeStyle = "rgba(0,0,0,.45)"; ctx.stroke();
+        if (s >= 18) { ctx.fillStyle = "#333"; ctx.font = "600 " + Math.round(r * .26) + "px sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText((legend.resources[res] || "?").slice(0, 1), x - r * .45, y - r * .29); } }
+    }
+    // barbarian camps (a tent with a flag) and ancient ruins (two columns under a lintel), at every zoom
+    for (let i = 0; i < N; i++) {
+      const imp = tiles[i * 4 + T_IMP]; if (imp === NONE) continue;
+      const k = siteKind(imp); if (!k) continue;
+      const x = X(i), y = Y(i), q = Math.max(4, r * .5);
+      ctx.lineWidth = Math.max(1.2, q * .12); ctx.strokeStyle = "#111";
+      if (k === "camp") {
+        ctx.fillStyle = colour[barbarian] || "#6b1a10";
+        ctx.beginPath(); ctx.moveTo(x - q, y + q * .7); ctx.lineTo(x, y - q * .7); ctx.lineTo(x + q, y + q * .7); ctx.closePath(); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = "#f0d060"; ctx.beginPath(); ctx.moveTo(x - q * .25, y + q * .7); ctx.lineTo(x, y + q * .05); ctx.lineTo(x + q * .25, y + q * .7); ctx.closePath(); ctx.fill();
+        ctx.beginPath(); ctx.moveTo(x, y - q * .7); ctx.lineTo(x, y - q * 1.25); ctx.stroke();
+        ctx.fillStyle = "#d8432f"; ctx.beginPath(); ctx.moveTo(x, y - q * 1.25); ctx.lineTo(x + q * .55, y - q * 1.08); ctx.lineTo(x, y - q * .9); ctx.closePath(); ctx.fill();
+      } else {
+        ctx.fillStyle = "#e9dfc4";
+        ctx.fillRect(x - q * .8, y - q * .55, q * 1.6, q * .3); ctx.strokeRect(x - q * .8, y - q * .55, q * 1.6, q * .3);
+        ctx.fillRect(x - q * .65, y - q * .25, q * .35, q * .95); ctx.strokeRect(x - q * .65, y - q * .25, q * .35, q * .95);
+        ctx.fillRect(x + q * .3, y - q * .25, q * .35, q * .95); ctx.strokeRect(x + q * .3, y - q * .25, q * .35, q * .95);
+      }
+    }
+    // target city ring
+    if (scene.target_i !== null && scene.target_i !== undefined) { const t = scene.target_i; hexPath(X(t), Y(t), r * 1.02); ctx.strokeStyle = css("--gold"); ctx.lineWidth = Math.max(2, s * .2); ctx.setLineDash([s * .35, s * .2]); ctx.stroke(); ctx.setLineDash([]); }
+    // movement trails from the frame before
+    const prev = cur > 0 ? frames[cur - 1] : null;
+    if (prev) {
+      const was = new Map(prev.units.map((u) => [u[0], u[4]]));
+      ctx.lineWidth = Math.max(1.2, s * .1); ctx.setLineDash([s * .25, s * .15]);
+      for (const u of f.units) { const a = was.get(u[0]); if (a === undefined || a === u[4]) continue; ctx.strokeStyle = colour[u[1]]; ctx.beginPath(); ctx.moveTo(X(a), Y(a)); ctx.lineTo(X(u[4]), Y(u[4])); ctx.stroke(); }
+      ctx.setLineDash([]);
+    }
+    // cities
+    for (const c of f.cities) {
+      const [id, o, i, pop, hp, max, name] = c; const x = X(i), y = Y(i), q = r * .62;
+      ctx.fillStyle = colour[o]; ctx.strokeStyle = ink; ctx.lineWidth = Math.max(1.5, s * .1);
+      ctx.beginPath(); ctx.roundRect ? ctx.roundRect(x - q, y - q * .8, q * 2, q * 1.6, q * .3) : ctx.rect(x - q, y - q * .8, q * 2, q * 1.6); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = textOn(colour[o]); ctx.font = "700 " + Math.max(8, Math.round(q * .9)) + "px sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(pop, x, y + q * .05);
+      bar(x - q, y + q * .95, q * 2, Math.max(3, s * .16), hp / Math.max(1, max));
+      if (s >= 7) { ctx.font = "600 " + Math.max(10, Math.round(s * .55)) + "px sans-serif"; ctx.textBaseline = "bottom"; ctx.lineWidth = 3; ctx.strokeStyle = css("--bg"); ctx.strokeText(name, x, y - q * .9); ctx.fillStyle = css("--fg"); ctx.fillText(name, x, y - q * .9); }
+    }
+    // units: stacked on a tile, a glyph of the kind's role, health under it
+    const onTile = new Map();
+    for (const u of f.units) { if (!onTile.has(u[4])) onTile.set(u[4], []); onTile.get(u[4]).push(u); }
+    const hasCity = new Set(f.cities.map((c) => c[2]));
+    for (const [i, list] of onTile) {
+      list.sort((a, b) => (legend.units[a[2]].civilian ? 1 : 0) - (legend.units[b[2]].civilian ? 1 : 0));
+      const n = Math.min(list.length, 3);
+      for (let k = 0; k < n; k++) {
+        const u = list[k];
+        const off = n === 1 ? [0, 0] : [[-.32, -.05], [.32, -.05], [0, .38]][k];
+        const city = hasCity.has(i);
+        const x = X(i) + off[0] * r + (city ? r * .42 : 0), y = Y(i) + off[1] * r + (city ? r * .42 : 0);
+        glyph(x, y, (n === 1 && !city ? .48 : .36) * r, u);
+      }
+      if (list.length > 3) { ctx.fillStyle = css("--fg"); ctx.font = "700 " + Math.round(r * .35) + "px sans-serif"; ctx.textAlign = "center"; ctx.fillText("+" + (list.length - 3), X(i), Y(i) - r * .55); }
+    }
+    // this frame's attacks and losses
+    for (const e of f.events) {
+      if (e.t === "attack" && e.at_i && e.at_i.length) {
+        const to = e.at_i[0], from = e.at_i.length > 1 ? e.at_i[1] : -1;
+        if (from >= 0 && from !== to) arrow(X(from), Y(from), X(to), Y(to), css("--hit"), s);
+        for (const hh of e.hits || []) if (hh.dead) { const j = tileIndex(hh.unit.tile); if (j >= 0) cross(X(j), Y(j), r * .45); }
+      }
+      if (e.t === "captured" && e.at_i.length) { const i = e.at_i[0]; hexPath(X(i), Y(i), r * 1.08); ctx.strokeStyle = css("--gold"); ctx.lineWidth = Math.max(3, s * .28); ctx.stroke(); }
+    }
+    for (const i of flash) { hexPath(X(i), Y(i), r * .98); ctx.strokeStyle = css("--accent"); ctx.lineWidth = Math.max(2, s * .2); ctx.stroke(); }
+    if (selected >= 0) { hexPath(X(selected), Y(selected), r * .95); ctx.strokeStyle = css("--fg"); ctx.lineWidth = 2; ctx.stroke(); }
+  }
+  function bar(x, y, w, h, frac) {
+    frac = Math.max(0, Math.min(1, frac));
+    ctx.fillStyle = "rgba(0,0,0,.55)"; ctx.fillRect(x, y, w, h);
+    ctx.fillStyle = frac > .6 ? "#3fae5a" : frac > .3 ? "#e0b030" : "#d8432f"; ctx.fillRect(x + .5, y + .5, Math.max(0, (w - 1) * frac), h - 1);
+  }
+  function glyph(x, y, q, u) {
+    const [id, o, k, hp] = u; const def = legend.units[k] || {};
+    ctx.fillStyle = colour[o]; ctx.strokeStyle = css("--ink"); ctx.lineWidth = Math.max(1.2, q * .12);
+    ctx.beginPath();
+    if (def.civilian) ctx.rect(x - q * .8, y - q * .8, q * 1.6, q * 1.6);
+    else if (def.domain === "Sea") { ctx.moveTo(x - q, y - q * .4); ctx.lineTo(x + q, y - q * .4); ctx.lineTo(x + q * .6, y + q * .7); ctx.lineTo(x - q * .6, y + q * .7); ctx.closePath(); }
+    else if (def.domain === "Air") { ctx.moveTo(x, y - q); ctx.lineTo(x + q, y + q * .7); ctx.lineTo(x, y + q * .3); ctx.lineTo(x - q, y + q * .7); ctx.closePath(); }
+    else if (def.ranged > 0) { ctx.moveTo(x, y - q); ctx.lineTo(x + q, y); ctx.lineTo(x, y + q); ctx.lineTo(x - q, y); ctx.closePath(); }
+    else ctx.arc(x, y, q * .9, 0, 7);
+    ctx.fill(); ctx.stroke();
+    if (q >= 5) { ctx.fillStyle = textOn(colour[o]); ctx.font = "700 " + Math.max(7, Math.round(q * .78)) + "px sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(abbr(def.name || "?"), x, y + q * .04); }
+    bar(x - q * .9, y + q * 1.0, q * 1.8, Math.max(2.5, q * .24), hp / legend.unit_max_hp);
+  }
+  function abbr(name) { const w = name.split(/[\s-]+/).filter(Boolean); return w.length > 1 ? (w[0][0] + w[1][0]).toUpperCase() : name.slice(0, 2); }
+  function arrow(x1, y1, x2, y2, c, s) {
+    const dx = x2 - x1, dy = y2 - y1, L = Math.hypot(dx, dy) || 1, ux = dx / L, uy = dy / L;
+    const ex = x2 - ux * s * .45, ey = y2 - uy * s * .45;
+    ctx.strokeStyle = c; ctx.fillStyle = c; ctx.lineWidth = Math.max(2, s * .16);
+    ctx.beginPath(); ctx.moveTo(x1 + ux * s * .3, y1 + uy * s * .3); ctx.lineTo(ex, ey); ctx.stroke();
+    const a = s * .35; ctx.beginPath(); ctx.moveTo(ex + ux * a * .6, ey + uy * a * .6); ctx.lineTo(ex - ux * a * .6 - uy * a * .5, ey - uy * a * .6 + ux * a * .5); ctx.lineTo(ex - ux * a * .6 + uy * a * .5, ey - uy * a * .6 - ux * a * .5); ctx.closePath(); ctx.fill();
+  }
+  function cross(x, y, q) { ctx.strokeStyle = css("--hit"); ctx.lineWidth = Math.max(2, q * .25); ctx.beginPath(); ctx.moveTo(x - q, y - q); ctx.lineTo(x + q, y + q); ctx.moveTo(x + q, y - q); ctx.lineTo(x - q, y + q); ctx.stroke(); }
+
+  // ---------- text: header, outcome, sides, events ----------
+  const firstFrame = frames[0];
+  const targetCity = (scene.target_i !== null && scene.target_i !== undefined) ? (firstFrame.cities.find((c) => c[2] === scene.target_i) || null) : null;
+  const targetName = targetCity ? targetCity[6] : "цель";
+  function header() {
+    const spec = scene.spec || {};
+    if (battle) {
+      const kind = KIND[scene.kind] || scene.kind;
+      const rung = battle.rung !== undefined && battle.rung !== null ? ", ступень " + battle.rung : "";
+      const L = pshort(learnerSide) + " (" + pmind(learnerSide) + ")", E = pshort(enemySide) + " (" + pmind(enemySide) + ")";
+      $("title").textContent = kind + rung + ": " + (scene.kind === "siege" ? "нападает " + L + ", обороняется " + E : scene.kind === "defence" ? "обороняется " + L + ", нападает " + E : L + " и " + E);
+      document.title = kind + rung + " — " + scene.stem;
+      // Rounds as the frames name them: the round a turn is played in (the battle record counts the
+      // round begun after it, so its captured_round is one more).
+      $("sub").textContent = (scene.era && scene.era.name ? scene.era.name + " · " : "") + "ходы " + frames[0].round + "–" + frames[frames.length - 1].round + " · карта " + spec.script + ", " + spec.size + " · " + scene.stem;
+      let out;
+      if (scene.kind === "siege") {
+        out = battle.captured_round !== null && battle.captured_round !== undefined
+          ? '<b class="ok">Город ' + esc(targetName) + " взят</b> на ходу " + captureRound() + "."
+          : '<b class="bad">Город ' + esc(targetName) + " устоял.</b> Наибольший урон — " + Math.round((battle.target_damage || 0) * 100) + " % его здоровья.";
+      } else if (scene.kind === "defence") {
+        out = battle.held ? '<b class="ok">Город ' + esc(targetName) + " удержан.</b>" : '<b class="bad">Город ' + esc(targetName) + " потерян.</b>";
+      } else out = battle.held || battle.captured_round != null ? '<b class="ok">Задача выполнена.</b>' : '<b class="bad">Задача не выполнена.</b>';
+      const la = battle.learner_army || {}, ea = battle.enemy_army || {};
+      out += ' <span class="muted">Потери: ' + esc(pshort(learnerSide)) + " — " + (la.lost_units || 0) + ", " + esc(pshort(enemySide)) + " — " + (ea.lost_units || 0) + ". Награда " + (battle.reward !== undefined ? Number(battle.reward).toFixed(2) : "—") + ".</span>";
+      $("outcome").innerHTML = out;
+    } else {
+      const majors = players.filter((p) => p.kind === "major").length;
+      $("title").textContent = "Партия: " + spec.script + ", " + spec.size + ", " + majors + " наций";
+      document.title = "Партия — " + scene.stem;
+      $("sub").textContent = "Ходов сыграно: " + scene.final_round + " · " + scene.stem;
+      const st = (scene.standings || []).slice().sort((a, b) => a.rank - b.rank);
+      const best = st[0];
+      if (best) {
+        const how = best.victory ? ({ time: "победа по времени", science: "научная победа", domination: "победа завоеванием", culture: "культурная победа", diplomatic: "дипломатическая победа" }[best.victory] || "победа: " + best.victory) : "больше всех очков";
+        $("outcome").innerHTML = "Первое место — " + sw(best.player) + " <b>" + esc(pname(best.player)) + "</b> (" + esc(pmind(best.player)) + "): " + how + ", " + best.score + " очков.";
+        // The learner's seat (a book, the net): its own place first.
+        const seat = players.find((p) => p.learner);
+        const mine = seat ? st.find((x) => x.player === seat.id) : null;
+        if (mine && mine !== best) $("outcome").innerHTML = sw(seat.id) + " <b>" + esc(pname(seat.id)) + "</b> (" + esc(pmind(seat.id)) + "): место " + mine.rank + " из " + st.length + ", " + mine.score + " очков. " + $("outcome").innerHTML;
+      }
+    }
+    $("tech").textContent = JSON.stringify({ stem: scene.stem, kind: scene.kind, spec: scene.spec, net: scene.net, commands: scene.commands, round_hashes_checked: scene.checked, battle_from_command: scene.from_position, frames: frames.length, tiles: N }, null, 1);
+    $("legend").innerHTML = "● ближний бой · ◆ стрелки · ■ мирные · ▼ флот; полоса под знаком — здоровье. " + (battle ? "Пунктирный шестиугольник — цель. " : "") + "Красная стрелка — атака кадра, крестик — гибель. Шатёр с флажком — лагерь варваров, колонны — древние руины.";
+  }
+  function captureRound() {
+    for (const f of frames) for (const e of f.events) if (e.t === "captured" && e.at_i && e.at_i[0] === scene.target_i) return e.r;
+    return battle.captured_round - 1;
+  }
+  function frameLabel(k) {
+    const f = frames[k];
+    if (k === 0) return battle ? "Начало сцены, ход " + f.round : "Начало партии";
+    if (f.done !== null && f.done !== undefined) return "Ход " + f.round + " · после хода: " + pshort(f.done);
+    return DATA.per_turn ? "Ход " + f.round + " · ходы остальных игроков" : "Конец хода " + f.round;
+  }
+  function sides() {
+    const f = frames[cur];
+    const majorIds = players.filter((p) => p.kind === "major").map((p) => p.id);
+    const ids = battle ? [learnerSide, enemySide] : majorIds;
+    const st = new Map((f.standings || []).map((s) => [s.p, s]));
+    let html = "";
+    for (const p of ids) {
+      const units = f.units.filter((u) => u[1] === p && !legend.units[u[2]].civilian);
+      const hp = units.reduce((a, u) => a + u[3], 0);
+      const alive = f.alive ? f.alive[p] : true;
+      let stat;
+      if (battle) stat = units.length + " " + plural(units.length, "боевой отряд", "боевых отряда", "боевых отрядов") + ", здоровье " + hp;
+      else { const s = st.get(p) || {}; stat = (s.score ?? "—") + " очк. · " + (s.cities ?? 0) + " гор. · " + (s.techs ?? 0) + " техн."; }
+      html += '<div class="' + (alive ? "" : "dead") + '">' + sw(p) + "<span>" + esc(pname(p)) + ' <span class="muted">' + esc(pmind(p)) + "</span></span><span class=\"stat\">" + stat + "</span></div>";
+    }
+    $("players").innerHTML = html;
+  }
+  function plural(n, one, few, many) { const a = n % 10, b = n % 100; return a === 1 && b !== 11 ? one : a >= 2 && a <= 4 && (b < 12 || b > 14) ? few : many; }
+  function uref(u) { return esc(pshort(u.p)) + " · " + esc(uname(u.k)); }
+  function cname(c) { return "город " + esc(c.name); }
+  function eventText(e) {
+    switch (e.t) {
+      case "attack": {
+        const by = e.by && e.by.unit ? uref(e.by.unit) : e.by && e.by.city ? cname(e.by.city) + " (" + esc(pshort(e.by.city.p)) + ")" : esc(pshort(e.p));
+        const parts = [];
+        for (const h of e.hits || []) {
+          if (e.by && e.by.unit && h.unit.id === e.by.unit.id) continue;
+          parts.push(h.seized ? uref(h.unit) + " захвачен" : uref(h.unit) + " " + h.hp0 + " → " + h.hp1 + (h.dead ? ", уничтожен" : ""));
+        }
+        if (e.city && e.city.city) parts.push(cname(e.city.city) + " " + e.city.hp0 + " → " + e.city.hp1 + " из " + e.city.max);
+        const self = e.by && e.by.unit ? (e.hits || []).find((h) => h.unit.id === e.by.unit.id) : null;
+        let t = by + (e.by && e.by.city ? " стреляет" : " атакует") + (parts.length ? ": " + parts.join("; ") : ", без урона");
+        if (self) t += self.dead ? "; атакующий погиб" : "; атакующий " + self.hp0 + " → " + self.hp1;
+        return t;
+      }
+      case "captured": return "<b>" + cname(e.city).replace(/^г/, "Г") + " взят</b>: " + esc(pshort(e.from)) + " → " + esc(pshort(e.to)) + ", население " + e.pop;
+      case "razed": return "<b>" + cname(e.city).replace(/^г/, "Г") + " разрушен</b>";
+      case "founded": return "Основан " + cname(e.city) + " (" + esc(pshort(e.city.p)) + ")";
+      case "lost": return esc(pshort(e.unit.p)) + " теряет отряд: " + esc(uname(e.unit.k));
+      case "seized": return uref(e.unit) + " захвачен: теперь " + esc(pshort(e.to));
+      case "new": {
+        const j = tileIndex(e.unit.tile);
+        if (players[e.unit.p] && players[e.unit.p].kind === "barbarian" && j >= 0 && siteKind(tiles[j * 4 + T_IMP]) === "camp") return "Лагерь варваров выпустил отряд: " + esc(uname(e.unit.k));
+        return "Новый отряд: " + uref(e.unit);
+      }
+      case "camp": return "Появился лагерь варваров";
+      case "camp_gone": return "Лагерь варваров исчез";
+      case "camp_cleared": return "<b>Лагерь варваров зачищен</b>: " + esc(pshort(e.p)) + (e.gold ? ", награда " + e.gold + " золота" : "");
+      case "ruins": {
+        const n = e.amount, what = { citizen: "+" + n + " житель в городе " + esc(e.city || "?"), culture: "+" + n + " культуры", faith: "+" + n + " веры",
+          gold: "+" + n + " золота", experience: "+" + n + " опыта отряду", map: "карта окрестностей" }[e.reward] || esc(e.reward);
+        return "<b>Руины исследованы</b>: " + esc(pshort(e.p)) + ", награда: " + what;
+      }
+      case "war": return "<b>Война</b>: " + esc(pshort(e.a)) + " и " + esc(pshort(e.b)) + " (объявил " + esc(pshort(e.by)) + ")";
+      case "peace": return "<b>Мир</b>: " + esc(pshort(e.a)) + " и " + esc(pshort(e.b));
+      case "scene": {
+        const o = e.op || {};
+        const say = { meet: () => esc(pshort(o.a)) + " и " + esc(pshort(o.b)) + " знакомы", war: () => "война между " + esc(pshort(o.a)) + " и " + esc(pshort(o.b)),
+          spawn: () => "на поле " + esc(pshort(o.player)) + " · " + esc(uname(o.kind)) + (o.hp ? ", здоровье " + o.hp : ""),
+          damage: () => "городу нанесён урон: " + o.damage, earn: () => esc(pshort(o.player)) + " получает " + o.gold + " золота",
+          reveal: () => esc(pshort(o.player)) + " видит " + o.count + " клеток" };
+        return "Сцена: " + (say[o.op] ? say[o.op]() : esc(o.op));
+      }
+    }
+    return esc(e.t);
+  }
+  const ORDER = { captured: 0, razed: 0, war: 1, peace: 1, camp_cleared: 2, ruins: 2, camp: 2, camp_gone: 2, attack: 3, lost: 4, seized: 4, founded: 5, new: 6, scene: 7 };
+  function eventsList() {
+    const f = frames[cur];
+    const list = f.events.slice();
+    if (!battle) list.sort((a, b) => (ORDER[a.t] ?? 9) - (ORDER[b.t] ?? 9));
+    $("evhead").textContent = "События кадра" + (list.length ? " (" + list.length + ")" : "");
+    const shown = list.slice(0, 400);
+    $("events").innerHTML = shown.length ? shown.map((e, k) => '<li data-k="' + k + '" class="' + (e.t === "scene" ? "scene" : e.t === "captured" || e.t === "razed" || e.t === "war" ? "big" : "") + '">' + eventText(e) + "</li>").join("") + (list.length > shown.length ? '<li class="muted">ещё ' + (list.length - shown.length) + "…</li>" : "") : '<li class="muted">Ничего не произошло.</li>';
+    $("events").querySelectorAll("li[data-k]").forEach((li) => li.onclick = () => { flash = shown[+li.dataset.k].at_i || []; draw(); });
+  }
+  function update() {
+    $("seek").value = cur;
+    try { history.replaceState(null, "", "#f=" + (cur + 1)); } catch (e) {}
+    $("now").innerHTML = "<b>" + esc(frameLabel(cur)) + '</b> <span class="muted">· кадр ' + (cur + 1) + " из " + frames.length + "</span>";
+    flash = [];
+    draw(); sides(); eventsList(); empire(); timelineMark(); if (selected >= 0) info(selected);
+  }
+  function info(i) {
+    stateAt(cur);
+    const t = terr(i), f = frames[cur];
+    const parts = [esc(t.name || "?")];
+    const feat = tiles[i * 4 + T_FEAT]; if (feat !== NONE) parts.push(esc(legend.features[feat] || "?"));
+    if (map.resource[i] >= 0) parts.push("ресурс: " + esc(legend.resources[map.resource[i]] || "?"));
+    const imp = tiles[i * 4 + T_IMP]; if (imp !== NONE) parts.push("улучшение: " + esc(legend.improvements[imp & 0x7fff] || "?") + ((imp & 0x8000) ? " (разграблено)" : ""));
+    if (tiles[i * 4 + T_ROUTE]) parts.push("дорога");
+    const o = tiles[i * 4 + T_OWNER]; if (o !== NONE) parts.push("владелец: " + sw(o) + esc(pname(o)));
+    let html = parts.join(" · ");
+    const c = f.cities.find((c) => c[2] === i);
+    if (c) html += "<br><b>" + esc(c[6]) + "</b> (" + esc(pshort(c[1])) + "): население " + c[3] + ", здоровье " + c[4] + " из " + c[5];
+    const us = f.units.filter((u) => u[4] === i);
+    if (us.length) html += "<br>" + us.map((u) => sw(u[1]) + esc(pshort(u[1])) + " · " + esc(uname(u[2])) + ", здоровье " + u[3]).join("<br>");
+    const [q, r] = map.coords[i];
+    html += ' <span class="muted">(клетка ' + q + ", " + r + ")</span>";
+    $("info").innerHTML = html;
+  }
+
+  // ---------- controls ----------
+  function go(k) { cur = Math.max(0, Math.min(frames.length - 1, k)); update(); }
+  function stop() { playing = false; clearTimeout(timer); $("play").textContent = "▶"; }
+  function tick() { if (!playing) return; if (cur >= frames.length - 1) { stop(); return; } go(cur + 1); timer = setTimeout(tick, 1100 / +$("speed").value); }
+  $("play").onclick = () => { if (playing) { stop(); return; } if (cur >= frames.length - 1) go(0); playing = true; $("play").textContent = "❚❚"; timer = setTimeout(tick, 400 / +$("speed").value); };
+  $("prev").onclick = () => { stop(); go(cur - 1); };
+  $("next").onclick = () => { stop(); go(cur + 1); };
+  $("first").onclick = () => { stop(); go(0); };
+  $("last").onclick = () => { stop(); go(frames.length - 1); };
+  $("seek").max = frames.length - 1;
+  $("seek").oninput = (e) => { stop(); go(+e.target.value); };
+  document.addEventListener("keydown", (e) => {
+    if (e.target.tagName === "SELECT" || e.target.tagName === "INPUT" && e.target.type !== "range") return;
+    if (e.key === "ArrowLeft") { stop(); go(cur - 1); e.preventDefault(); }
+    else if (e.key === "ArrowRight") { stop(); go(cur + 1); e.preventDefault(); }
+    else if (e.key === " ") { $("play").click(); e.preventDefault(); }
+  });
+  function zoom(f, px, py) { const w = canvas.clientWidth, h = canvas.clientHeight; px = px ?? w / 2; py = py ?? h / 2;
+    const ns = Math.max(2, Math.min(80, view.s * f)); const k = ns / view.s; view.ox = px - (px - view.ox) * k; view.oy = py - (py - view.oy) * k; view.s = ns; draw(); }
+  $("zin").onclick = () => zoom(1.4); $("zout").onclick = () => zoom(1 / 1.4); $("zfit").onclick = () => { fit(); draw(); };
+  canvas.addEventListener("wheel", (e) => { e.preventDefault(); const b = canvas.getBoundingClientRect(); zoom(e.deltaY < 0 ? 1.15 : 1 / 1.15, e.clientX - b.left, e.clientY - b.top); }, { passive: false });
+  let drag = null;
+  canvas.addEventListener("pointerdown", (e) => { drag = { x: e.clientX, y: e.clientY, ox: view.ox, oy: view.oy, moved: false }; canvas.setPointerCapture(e.pointerId); });
+  canvas.addEventListener("pointermove", (e) => { if (!drag) return; const dx = e.clientX - drag.x, dy = e.clientY - drag.y; if (Math.abs(dx) + Math.abs(dy) > 4) drag.moved = true; if (drag.moved) { view.ox = drag.ox + dx; view.oy = drag.oy + dy; draw(); } });
+  canvas.addEventListener("pointerup", (e) => {
+    if (drag && !drag.moved) { const b = canvas.getBoundingClientRect(); const px = e.clientX - b.left, py = e.clientY - b.top; let best = -1, bd = Infinity;
+      for (let i = 0; i < N; i++) { const d = (X(i) - px) ** 2 + (Y(i) - py) ** 2; if (d < bd) { bd = d; best = i; } }
+      if (best >= 0 && bd < (view.s * 1.1) ** 2) { selected = best; info(best); draw(); } }
+    drag = null; });
+  window.addEventListener("resize", () => { fit(); draw(); });
+  matchMedia("(prefers-color-scheme: dark)").addEventListener("change", draw);
+
+  // ---------- the empire of one player: this frame, and its decisions over the game ----------
+  const DEC = DATA.decisions || {};
+  const KINDS = [["tech", "технологии"], ["policy", "политики"], ["branch", "ветви"], ["ideology", "идеология"], ["building", "здания"], ["wonder", "чудеса"],
+    ["unit", "отряды"], ["great", "великие люди"], ["pantheon", "пантеон"], ["religion", "религия"], ["belief", "верования"],
+    ["founded", "города"], ["captured", "захваты"], ["lost", "потери"], ["trade", "торговые пути"], ["camp", "лагеря"], ["ruins", "руины"]];
+  const majors = players.filter((p) => p.kind === "major");
+  let empP = learnerSide ?? (majors.find((p) => p.learner) || {}).id;
+  if (empP === undefined) { const best = (scene.standings || []).find((x) => x.rank === 1); empP = best ? best.player : (majors[0] || {}).id; }
+  $("emp").innerHTML = majors.map((p) => '<option value="' + p.id + '">' + esc(pname(p.id)) + (pmind(p.id) ? " · " + esc(pmind(p.id)) : "") + "</option>").join("");
+  $("emp").value = empP;
+  $("emp").onchange = (e) => { empP = +e.target.value; tlKinds = null; timeline(); empire(); timelineMark(); };
+  const sign = (n) => (n > 0 ? "+" : n < 0 ? "−" : "") + Math.abs(n);
+  function decText(d) {
+    switch (d.k) {
+      case "building": case "wonder": return esc(d.n) + ' <span class="k">— ' + esc(d.c) + "</span>";
+      case "unit": return esc(d.n) + ' <span class="k">— ' + esc(d.c) + "</span>";
+      case "founded": return "основан город " + esc(d.n);
+      case "captured": return "захвачен город " + esc(d.n);
+      case "lost": return "потерян город " + esc(d.n);
+      case "branch": return "ветвь: " + esc(d.n);
+      case "ideology": return "идеология: " + esc(d.n);
+      case "pantheon": return "пантеон: " + esc(d.n);
+      case "religion": return "основана религия: " + esc(d.n);
+      case "belief": return "верование: " + esc(d.n);
+      case "great": return "великий человек: " + esc(d.n);
+      case "trade": return "торговый путь " + esc(d.n);
+      case "wonder_": return esc(d.n);
+    }
+    return esc(d.n);
+  }
+  function empire() {
+    const st = (frames[cur].empire || {})[empP];
+    if (!st) { $("empire").innerHTML = '<p class="k">Нет данных об этом игроке.</p>'; return; }
+    const y = st.yields || {};
+    const mine = (DEC[empP] || []).filter((d) => d.f === cur);
+    let h = "<p><span class=\"k\">Исследует:</span> " + esc(st.research || "—") + "</p>";
+    h += "<p>" + sign(y.gold) + " золота · " + sign(y.science) + " науки · " + sign(y.culture) + " культуры · " + sign(y.faith) + " веры · " + y.production + " производства <span class=\"k\">за ход</span></p>";
+    h += "<p>" + y.cities + " " + plural(y.cities, "город", "города", "городов") + ", население " + y.pop + " · казна " + y.treasury + " · счастье " + sign(y.happiness) + " · технологий " + y.techs + "</p>";
+    h += "<p><span class=\"k\">Политики:</span> " + st.policies + (st.branches.length ? " · ветви: " + st.branches.map(esc).join(", ") : "") + (st.ideology ? " · идеология: " + esc(st.ideology) : "") + "</p>";
+    if (st.pantheon || st.religion) h += "<p><span class=\"k\">Вера:</span> " + (st.pantheon ? "пантеон «" + esc(st.pantheon) + "»" : "") + (st.religion ? (st.pantheon ? ", " : "") + "религия «" + esc(st.religion) + "»" : "") + "</p>";
+    h += "<p><span class=\"k\">Торговые пути:</span> " + st.routes + "</p>";
+    if (st.build.length) h += "<table>" + st.build.map((b) => "<tr><td>" + esc(b[0]) + "</td><td>" + b[1] + "</td><td>" + (b[2] ? esc(b[2]) : '<span class="k">ничего</span>') + "</td></tr>").join("") + "</table>";
+    if (mine.length) h += '<p style="margin-top:8px"><span class="k">В этом кадре:</span></p>' + mine.map((d) => "<p>" + decText(d) + "</p>").join("");
+    $("empire").innerHTML = h;
+  }
+  let tlKinds = null;
+  function timeline() {
+    const list = DEC[empP] || [];
+    const counts = new Map(); for (const d of list) counts.set(d.k, (counts.get(d.k) || 0) + 1);
+    if (!tlKinds) tlKinds = new Set(KINDS.map((k) => k[0]).filter((k) => k !== "unit"));
+    $("tlhead").innerHTML = "Решения за " + (battle ? "запись" : "партию") + ": " + sw(empP) + esc(pname(empP)) + ' <span class="k" style="font-weight:normal">' + esc(pmind(empP)) + "</span>";
+    $("tlchips").innerHTML = KINDS.filter((k) => counts.has(k[0])).map((k) => '<button data-k="' + k[0] + '" class="' + (tlKinds.has(k[0]) ? "on" : "") + '">' + k[1] + " · " + counts.get(k[0]) + "</button>").join("");
+    $("tlchips").querySelectorAll("button").forEach((b) => b.onclick = () => { const k = b.dataset.k; tlKinds.has(k) ? tlKinds.delete(k) : tlKinds.add(k); timeline(); timelineMark(); });
+    const shown = list.filter((d) => tlKinds.has(d.k));
+    $("timeline").innerHTML = shown.length ? shown.map((d) => '<li data-f="' + d.f + '"><span class="r">Х' + d.r + "</span> " + decText(d) + "</li>").join("") : '<li class="k">Нет решений выбранных видов.</li>';
+    $("timeline").querySelectorAll("li[data-f]").forEach((li) => li.onclick = () => { stop(); go(+li.dataset.f); });
+  }
+  function timelineMark() { $("timeline").querySelectorAll("li[data-f]").forEach((li) => li.classList.toggle("now", +li.dataset.f === cur)); }
+  timeline();
+
+  header(); fit();
+  // A battle opens zoomed so a hex is readable on a phone; a whole map opens whole.
+  if (battle && view.s < 22 && scene.target_i != null) { const t = scene.target_i; const w = canvas.clientWidth, h = canvas.clientHeight; view.s = Math.min(26, Math.max(view.s, 22)); view.ox = w / 2 - cx[t] * view.s; view.oy = h / 2 - cy[t] * view.s; }
+  const m = /f=(\d+)/.exec(location.hash); if (m) cur = Math.max(0, Math.min(frames.length - 1, +m[1] - 1));
+  update();
+})();
+</script>
+</body>
+</html>

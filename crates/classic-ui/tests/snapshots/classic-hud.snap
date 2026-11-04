@@ -1,0 +1,101 @@
+screen Map 1366x768
+widgets
+  click "0 (+6) Gold" 10,4 96x30
+  click "4 Food" 124,4 71x30
+  click "4 Production" 213,4 108x30
+  click "0 (+4) Science" 339,4 113x30
+  click "0/25 Culture" 756,4 106x30
+  click "0/10 Faith" 880,4 91x30
+  click "" 1323,6 29x29
+  click "" 1282,6 29x29
+  click "RESEARCH / Animal Husbandry / 0/35  ·  9 turns" 0,59 249x87
+  click "1 / Rome / 12 / Grows 8 / Warrior 10" 578,318 210x52
+  click "" 20,694 53x53
+  click "" 87,694 53x53
+  click "" 154,694 53x53
+  click "" 221,694 53x53
+  click "" 1070,580 270x159
+  click "End turn" 1105,523 245x37
+  click "Empire" 1214,51 136x34
+painted
+  clip 0,0 1366x768
+    rect 794,324 29x27 fill #0000005a r4
+    rect 794,322 29x27 fill #0c1821 r4
+    rect 794,322 29x27 stroke 2 #bb9c5c r4
+    rect 796,324 25x23 fill #f23f3f r3
+    path 5pt 802,329 13x14 fill #ebe7d5
+    image "atlas kraken" 515,31 191x80 tint #ffffff5b
+    rect 0,0 1366x40 fill #0b151ff0
+    line 0,40 -> 1366,40 stroke 1 #bb9b5ca6
+  clip 10,4 961x32
+    figure 3 shapes 11,10 18x18 #bb9c5c #0b151ff0
+    text "0 (+6) Gold" 35,11 68x16 #ebe7d5 14px
+    figure 9 shapes 125,9 18x19 #182d0d #89bc53 #2f3910 #4d8a1e #def89d
+    text "4 Food" 149,11 43x16 #ebe7d5 14px
+    figure 2 shapes 216,9 16x20 #bb9c5c
+    text "4 Production" 238,11 80x16 #ebe7d5 14px
+    figure 3 shapes 340,9 17x18 #64c6eeb3 #64c6ef
+    text "0 (+4) Science" 364,11 85x16 #ebe7d5 14px
+    figure 5 shapes 472,9 15x18 #e8c45c
+    text "+9 Happiness" 495,11 83x16 #ebe7d5 14px
+    figure 9 shapes 600,9 19x20 #bb9c5c
+    text "Golden age 0/505" 624,11 111x16 #ebe7d5 14px
+    figure 5 shapes 758,9 15x18 #d67cc4
+    text "0/25 Culture" 781,11 78x16 #ebe7d5 14px
+    figure 10 shapes 880,12 20x14 #171c14c8 #ece2aa
+    text "0/10 Faith" 905,11 63x16 #ebe7d5 14px
+  clip 1092,5 180x30
+    text "Rome · Ancient Era   |   Turn 1" 1092,12 180x16 #ebe7d5 14px
+  clip 0,0 1366x768
+    figure 17 shapes 1280,5 74x34 #0000005a #0b151ff0 #bb9c5c #3f545d #ebe7d5
+    rect 1290,15 6x11 stroke 1.6 #ebe7d5 r1
+    rect 1296,15 6x11 stroke 1.6 #ebe7d5 r1
+    figure 4 shapes 1291,17 10x4 #ebe7d5
+    rect 0,59 249x87 fill #10212dcc
+    rect 9,74 52x52 fill #182f35
+    circle 35,100 r11.4 stroke 1 #5c6859
+    text "RESEARCH" 76,71 48x11 #a6b7be 10px
+    text "Animal Husbandry" 76,89 146x21 #ebe7d5 18px
+    text "0/35  ·  9 turns" 76,112 76x14 #a6b7be 12px
+    rect 76,132 156x3 fill #30434d r1
+    rect 76,132 0x3 fill #64c6ef r1
+    rect 578,321 210x52 fill #0000003c r3
+    rect 578,318 210x52 fill #0b151ff0 r3
+    rect 578,318 210x52 stroke 2 #bb9c5c r3
+    figure 2 shapes 580,320 30x30 #f23f3f #bb9c5c
+    text "1" 591,327 8x16 #ebe7d5 14px
+    text "Rome" 616,327 39x17 #ebe7d5 15px
+    text "12" 765,328 15x15 #ebe7d5 13px
+    path 5pt 750,329 12x13 fill #a6b7be
+    rect 586,362 93x3 fill #30434d r1
+    rect 586,362 0x3 fill #89bc53 r1
+    text "Grows 8" 586,351 36x11 #a6b7be 10px
+    rect 687,362 93x3 fill #30434d r1
+    rect 687,362 0x3 fill #d69646 r1
+    text "Warrior 10" 687,351 47x11 #a6b7be 10px
+    figure 21 shapes 18,693 191x58 #0000005a #0b151ff0 #bb9c5c #3f545d #ebe7d5 #193a52
+    rect 169,713 5x19 fill #ebe7d5
+    rect 170,725 2x5 fill #0b151ff0
+    rect 178,708 5x24 fill #ebe7d5
+    rect 180,725 1x5 fill #0b151ff0
+    rect 187,714 5x18 fill #ebe7d5
+    rect 189,725 2x5 fill #0b151ff0
+    figure 7 shapes 167,693 109x58 #ebe7d5 #0000005a #193a52 #bb9c5c #3f545d
+    rect 1060,571 290x183 fill #0000003c r5
+    rect 1060,568 290x183 fill #0b151ff0 r5
+    rect 1060,568 290x183 stroke 1 #bc9c5dcc r5
+    rect 1070,580 270x159 fill #0a1620 r2
+  clip 1070,580 270x159
+    image "minimap" 1070,580 270x159
+    circle 1247,707 r2.6 fill #ebe7d5
+    rect 1204,673 87x69 stroke 1 #ebe7d5
+  clip 0,0 1366x768
+    figure 8 shapes 1064,572 282x175 #bb9c5c
+    rect 1105,523 245x37 fill #0b151ff0 r3
+    rect 1105,523 245x37 stroke 1.5 #bb9c5c r3
+    text "End turn" 1197,533 61x18 #ebe7d5 16px
+    rect 1214,51 136x34 fill #192f34 r4
+    rect 1214,51 136x34 stroke 1 #344849 r4
+    text "Empire" 1260,60 44x16 #efe9d3 14px
+art
+  husbandry

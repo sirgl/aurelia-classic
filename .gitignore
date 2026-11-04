@@ -1,0 +1,21 @@
+/target
+**/*.rs.bk
+*.log
+.DS_Store
+__pycache__/
+/saves/
+/out/
+/dist/
+/output/
+/launcher/android/assets/
+# the run-time art pack (fetched, not in git); the catalogs listed below are tracked
+/assets/visual/*
+!/assets/visual/generated/
+/assets/visual/generated/*
+!/assets/visual/generated/policies/
+/assets/visual/generated/policies/*
+!/assets/visual/generated/policies/catalog.tsv
+!/assets/visual/generated/civilizations/
+/assets/visual/generated/civilizations/*
+!/assets/visual/generated/civilizations/artwork-catalog.tsv
+!/assets/visual/generated/civilizations/artwork-index.tsv

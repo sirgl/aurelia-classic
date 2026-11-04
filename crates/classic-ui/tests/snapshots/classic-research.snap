@@ -1,0 +1,302 @@
+screen Research 1366x768
+widgets
+  click "AURELIA / Research / Back to map / Navigate / The pursuit of knowledge / 0 scien…" 0,0 1366x768
+  click "Back to map" 1208,15 132x36
+  click "Navigate" 1080,15 116x36
+  button "Ancient" 36,144 52x15
+  button "Classical" 96,144 56x15
+  button "Medieval" 160,144 61x15
+  button "Renaissance" 229,144 78x15
+  button "Industrial" 315,144 62x15
+  button "Modern" 385,144 54x15
+  button "Atomic" 447,144 49x15
+  button "Information" 504,144 77x15
+  click "Agriculture / DISCOVERED / +1" 50,430 218x62
+  click "Animal Husbandry / 0/35 science / +2 / 1" 332,286 218x62
+  click "Archery / 35 science / +3" 332,358 218x62
+  click "Bronze Working / 55 science / +8" 614,358 218x62
+  click "Calendar / 55 science / +2" 614,502 218x62
+  click "Construction / 105 science / +5" 896,358 218x62
+  click "Currency / 175 science" 1178,358 218x62
+  click "Drama and Poetry / 175 science / +3" 896,646 218x62
+  click "Engineering / 175 science" 1178,430 218x62
+  click "Horseback Riding / 105 science / +7" 896,214 218x62
+  click "Iron Working / 175 science / +6" 896,430 218x62
+  click "Masonry / 55 science / +4" 614,430 218x62
+  click "Mathematics / 105 science / +4" 896,286 218x62
+  click "Mining / 35 science" 332,430 218x62
+  click "Optics / 85 science / +1" 896,502 218x62
+  click "Philosophy / 175 science / +4" 896,574 218x62
+  click "Pottery / 35 science / +2" 332,502 218x62
+  click "Sailing / 55 science / +5" 614,574 218x62
+  click "The Wheel / 55 science / +5" 614,286 218x62
+  click "Trapping / 55 science / +1" 614,214 218x62
+  click "Writing / 55 science / +3" 614,646 218x62
+  scrollbar "" 32,713 1302x10
+painted
+  clip 0,0 1366x768
+    rect 0,0 1366x768 fill #09161c
+    text "AURELIA" 26,19 89x26 #c1a263 23px
+    text "Research" 166,22 81x23 #efe9d3 20px
+    rect 1208,15 132x36 fill #192f34 r4
+    rect 1208,15 132x36 stroke 1 #344849 r4
+    text "Back to map" 1236,25 76x16 #efe9d3 14px
+    rect 1080,15 116x36 fill #192f34 r4
+    rect 1080,15 116x36 stroke 1 #344849 r4
+    text "Navigate" 1110,25 56x16 #efe9d3 14px
+    line 24,65 -> 1342,65 stroke 1 #c1a36466
+    rect 24,80 1318x651 fill #11242b r7
+    rect 24,80 1318x651 stroke 1 #344849 r7
+    text "The pursuit of knowledge" 40,90 250x25 #efe9d3 22px
+    text "0 science stored · +4 per turn · Choose any technology to plan its prerequisites" 41,119 415x14 #92a8aa 12px
+    rect 36,144 52x15 fill #3c3c3c r2
+    text "Ancient" 40,144 44x15 #ebe7d5 13px
+    rect 96,144 56x15 fill #3c3c3c r2
+    text "Classical" 100,144 48x15 #ebe7d5 13px
+    rect 160,144 61x15 fill #3c3c3c r2
+    text "Medieval" 164,144 53x15 #ebe7d5 13px
+    rect 229,144 78x15 fill #3c3c3c r2
+    text "Renaissance" 233,144 70x15 #ebe7d5 13px
+    rect 315,144 62x15 fill #3c3c3c r2
+    text "Industrial" 319,144 54x15 #ebe7d5 13px
+    rect 385,144 54x15 fill #3c3c3c r2
+    text "Modern" 389,144 46x15 #ebe7d5 13px
+    rect 447,144 49x15 fill #3c3c3c r2
+    text "Atomic" 451,144 41x15 #ebe7d5 13px
+    rect 504,144 77x15 fill #3c3c3c r2
+    text "Information" 508,144 69x15 #ebe7d5 13px
+  clip 32,176 1302x547
+    rect 32,176 846x546 fill #0e2127
+    text "ANCIENT" 50,186 48x14 #c1a263 12px
+    line 32,176 -> 32,722 stroke 1 #2b3e42
+    rect 878,176 564x546 fill #13272d
+    text "CLASSICAL" 896,186 58x14 #c1a263 12px
+    figure 57 shapes 267,176 1476x547 #2b3e42 #c1a263 #3f7d7c #586d70
+    rect 50,430 218x62 fill #1a352d r5
+    rect 50,430 218x62 stroke 1 #455d60 r5
+    rect 57,439 44x44 fill #182f35
+    circle 79,461 r9.7 stroke 1 #5c6859
+    text "Agriculture" 109,438 65x15 #efe9d3 13px
+    text "DISCOVERED" 109,461 65x13 #92a8aa 11px
+    rect 219,465 19x19 fill #182f35
+    circle 229,475 r4.2 stroke 1 #5c6859
+    text "+1" 242,468 11x11 #92a8aa 10px
+    rect 332,286 218x62 fill #393623 r5
+    rect 332,286 218x62 stroke 1 #c1a263 r5
+    rect 339,295 44x44 fill #182f35
+    circle 361,317 r9.7 stroke 1 #5c6859
+    text "Animal Husbandry" 391,294 105x15 #efe9d3 13px
+    text "0/35 science" 391,317 61x13 #c1a263 11px
+    rect 501,321 19x19 fill #182f35
+    circle 511,331 r4.2 stroke 1 #5c6859
+    text "+2" 524,324 11x11 #92a8aa 10px
+    circle 537,300 r9 fill #c1a263
+    text "1" 534,295 6x11 #09161c 10px
+    rect 332,358 218x62 fill #192f34 r5
+    rect 332,358 218x62 stroke 1 #455d60 r5
+    rect 339,367 44x44 fill #182f35
+    circle 361,389 r9.7 stroke 1 #5c6859
+    text "Archery" 391,366 45x15 #efe9d3 13px
+    text "35 science" 391,389 51x13 #92a8aa 11px
+    rect 501,393 19x19 fill #182f35
+    circle 511,403 r4.2 stroke 1 #5c6859
+    text "+3" 524,396 11x11 #92a8aa 10px
+    rect 614,358 218x62 fill #192f34 r5
+    rect 614,358 218x62 stroke 1 #455d60 r5
+    rect 621,367 44x44 fill #182f35
+    circle 643,389 r9.7 stroke 1 #5c6859
+    text "Bronze Working" 673,366 93x15 #efe9d3 13px
+    text "55 science" 673,389 51x13 #92a8aa 11px
+    rect 783,393 19x19 fill #182f35
+    circle 793,403 r4.2 stroke 1 #5c6859
+    text "+8" 806,396 11x11 #92a8aa 10px
+    rect 614,502 218x62 fill #192f34 r5
+    rect 614,502 218x62 stroke 1 #455d60 r5
+    rect 621,511 44x44 fill #182f35
+    circle 643,533 r9.7 stroke 1 #5c6859
+    text "Calendar" 673,510 51x15 #efe9d3 13px
+    text "55 science" 673,533 51x13 #92a8aa 11px
+    rect 783,537 19x19 fill #182f35
+    circle 793,547 r4.2 stroke 1 #5c6859
+    text "+2" 806,540 11x11 #92a8aa 10px
+    rect 896,358 218x62 fill #192f34 r5
+    rect 896,358 218x62 stroke 1 #455d60 r5
+    rect 903,367 44x44 fill #182f35
+    circle 925,389 r9.7 stroke 1 #5c6859
+    text "Construction" 955,366 75x15 #efe9d3 13px
+    text "105 science" 955,389 57x13 #92a8aa 11px
+    rect 1065,393 19x19 fill #182f35
+    circle 1075,403 r4.2 stroke 1 #5c6859
+    text "+5" 1088,396 11x11 #92a8aa 10px
+    rect 1178,358 218x62 fill #192f34 r5
+    rect 1178,358 218x62 stroke 1 #455d60 r5
+    rect 1185,367 44x44 fill #182f35
+    circle 1207,389 r9.7 stroke 1 #5c6859
+    text "Currency" 1237,366 52x15 #efe9d3 13px
+    text "175 science" 1237,389 57x13 #92a8aa 11px
+    rect 896,646 218x62 fill #192f34 r5
+    rect 896,646 218x62 stroke 1 #455d60 r5
+    rect 903,655 44x44 fill #182f35
+    circle 925,677 r9.7 stroke 1 #5c6859
+    text "Drama and Poetry" 955,654 105x15 #efe9d3 13px
+    text "175 science" 955,677 57x13 #92a8aa 11px
+    rect 1065,681 19x19 fill #182f35
+    circle 1075,691 r4.2 stroke 1 #5c6859
+    text "+3" 1088,684 11x11 #92a8aa 10px
+    rect 1178,430 218x62 fill #192f34 r5
+    rect 1178,430 218x62 stroke 1 #455d60 r5
+    rect 1185,439 44x44 fill #182f35
+    circle 1207,461 r9.7 stroke 1 #5c6859
+    text "Engineering" 1237,438 70x15 #efe9d3 13px
+    text "175 science" 1237,461 57x13 #92a8aa 11px
+    rect 896,214 218x62 fill #192f34 r5
+    rect 896,214 218x62 stroke 1 #455d60 r5
+    rect 903,223 44x44 fill #182f35
+    circle 925,245 r9.7 stroke 1 #5c6859
+    text "Horseback Riding" 955,222 100x15 #efe9d3 13px
+    text "105 science" 955,245 57x13 #92a8aa 11px
+    rect 1065,249 19x19 fill #182f35
+    circle 1075,259 r4.2 stroke 1 #5c6859
+    text "+7" 1088,252 11x11 #92a8aa 10px
+    rect 896,430 218x62 fill #192f34 r5
+    rect 896,430 218x62 stroke 1 #455d60 r5
+    rect 903,439 44x44 fill #182f35
+    circle 925,461 r9.7 stroke 1 #5c6859
+    text "Iron Working" 955,438 75x15 #efe9d3 13px
+    text "175 science" 955,461 57x13 #92a8aa 11px
+    rect 1065,465 19x19 fill #182f35
+    circle 1075,475 r4.2 stroke 1 #5c6859
+    text "+6" 1088,468 11x11 #92a8aa 10px
+    rect 614,430 218x62 fill #192f34 r5
+    rect 614,430 218x62 stroke 1 #455d60 r5
+    rect 621,439 44x44 fill #182f35
+    circle 643,461 r9.7 stroke 1 #5c6859
+    text "Masonry" 673,438 50x15 #efe9d3 13px
+    text "55 science" 673,461 51x13 #92a8aa 11px
+    rect 783,465 19x19 fill #182f35
+    circle 793,475 r4.2 stroke 1 #5c6859
+    text "+4" 806,468 11x11 #92a8aa 10px
+    rect 896,286 218x62 fill #192f34 r5
+    rect 896,286 218x62 stroke 1 #455d60 r5
+    rect 903,295 44x44 fill #182f35
+    circle 925,317 r9.7 stroke 1 #5c6859
+    text "Mathematics" 955,294 75x15 #efe9d3 13px
+    text "105 science" 955,317 57x13 #92a8aa 11px
+    rect 1065,321 19x19 fill #182f35
+    circle 1075,331 r4.2 stroke 1 #5c6859
+    text "+4" 1088,324 11x11 #92a8aa 10px
+    rect 332,430 218x62 fill #192f34 r5
+    rect 332,430 218x62 stroke 1 #455d60 r5
+    rect 339,439 44x44 fill #182f35
+    circle 361,461 r9.7 stroke 1 #5c6859
+    text "Mining" 391,438 40x15 #efe9d3 13px
+    text "35 science" 391,461 51x13 #92a8aa 11px
+    rect 501,465 19x19 fill #182f35
+    circle 511,475 r4.2 stroke 1 #5c6859
+    rect 896,502 218x62 fill #192f34 r5
+    rect 896,502 218x62 stroke 1 #455d60 r5
+    rect 903,511 44x44 fill #182f35
+    circle 925,533 r9.7 stroke 1 #5c6859
+    text "Optics" 955,510 37x15 #efe9d3 13px
+    text "85 science" 955,533 51x13 #92a8aa 11px
+    rect 1065,537 19x19 fill #182f35
+    circle 1075,547 r4.2 stroke 1 #5c6859
+    text "+1" 1088,540 11x11 #92a8aa 10px
+    rect 896,574 218x62 fill #192f34 r5
+    rect 896,574 218x62 stroke 1 #455d60 r5
+    rect 903,583 44x44 fill #182f35
+    circle 925,605 r9.7 stroke 1 #5c6859
+    text "Philosophy" 955,582 63x15 #efe9d3 13px
+    text "175 science" 955,605 57x13 #92a8aa 11px
+    rect 1065,609 19x19 fill #182f35
+    circle 1075,619 r4.2 stroke 1 #5c6859
+    text "+4" 1088,612 11x11 #92a8aa 10px
+    rect 332,502 218x62 fill #192f34 r5
+    rect 332,502 218x62 stroke 1 #455d60 r5
+    rect 339,511 44x44 fill #182f35
+    circle 361,533 r9.7 stroke 1 #5c6859
+    text "Pottery" 391,510 44x15 #efe9d3 13px
+    text "35 science" 391,533 51x13 #92a8aa 11px
+    rect 501,537 19x19 fill #182f35
+    circle 511,547 r4.2 stroke 1 #5c6859
+    text "+2" 524,540 11x11 #92a8aa 10px
+    rect 614,574 218x62 fill #192f34 r5
+    rect 614,574 218x62 stroke 1 #455d60 r5
+    rect 621,583 44x44 fill #182f35
+    circle 643,605 r9.7 stroke 1 #5c6859
+    text "Sailing" 673,582 38x15 #efe9d3 13px
+    text "55 science" 673,605 51x13 #92a8aa 11px
+    rect 783,609 19x19 fill #182f35
+    circle 793,619 r4.2 stroke 1 #5c6859
+    text "+5" 806,612 11x11 #92a8aa 10px
+    rect 614,286 218x62 fill #192f34 r5
+    rect 614,286 218x62 stroke 1 #455d60 r5
+    rect 621,295 44x44 fill #182f35
+    circle 643,317 r9.7 stroke 1 #5c6859
+    text "The Wheel" 673,294 62x15 #efe9d3 13px
+    text "55 science" 673,317 51x13 #92a8aa 11px
+    rect 783,321 19x19 fill #182f35
+    circle 793,331 r4.2 stroke 1 #5c6859
+    text "+5" 806,324 11x11 #92a8aa 10px
+    rect 614,214 218x62 fill #192f34 r5
+    rect 614,214 218x62 stroke 1 #455d60 r5
+    rect 621,223 44x44 fill #182f35
+    circle 643,245 r9.7 stroke 1 #5c6859
+    text "Trapping" 673,222 51x15 #efe9d3 13px
+    text "55 science" 673,245 51x13 #92a8aa 11px
+    rect 783,249 19x19 fill #182f35
+    circle 793,259 r4.2 stroke 1 #5c6859
+    text "+1" 806,252 11x11 #92a8aa 10px
+    rect 614,646 218x62 fill #192f34 r5
+    rect 614,646 218x62 stroke 1 #455d60 r5
+    rect 621,655 44x44 fill #182f35
+    circle 643,677 r9.7 stroke 1 #5c6859
+    text "Writing" 673,654 43x15 #efe9d3 13px
+    text "55 science" 673,677 51x13 #92a8aa 11px
+    rect 783,681 19x19 fill #182f35
+    circle 793,691 r4.2 stroke 1 #5c6859
+    text "+3" 806,684 11x11 #92a8aa 10px
+    mesh 2tri 1314,176 20x547
+art
+  agriculture
+  art:improvement/mine
+  art:unit/african-forest-elephant
+  art:unit/atlatlist
+  art:unit/ballista
+  art:unit/battering-ram
+  art:unit/kris-swordsman
+  bnw:building/amphitheater
+  bnw:building/aqueduct
+  bnw:building/bazaar
+  bnw:building/burial_tomb
+  bnw:building/circus
+  bnw:building/stone_works
+  bnw:unit/caravan
+  bnw:unit/cargo-ship
+  bnw:unit/chariot-archer
+  bnw:unit/composite-bowman
+  bnw:world_wonder/great_library
+  bnw:world_wonder/great_lighthouse
+  bnw:world_wonder/mausoleum_of_halicarnassus
+  core:tech/archery
+  core:tech/bronze-working
+  core:tech/calendar
+  core:tech/construction
+  core:tech/currency
+  core:tech/drama-and-poetry
+  core:tech/engineering
+  core:tech/horseback-riding
+  core:tech/iron-working
+  core:tech/masonry
+  core:tech/mathematics
+  core:tech/optics
+  core:tech/philosophy
+  core:tech/sailing
+  core:tech/the-wheel
+  core:tech/trapping
+  core:unit/archer
+  granary
+  husbandry
+  mining
+  pottery
+  writing

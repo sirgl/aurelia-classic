@@ -1,0 +1,82 @@
+// Classic rule set (Unciv Gods & Kings ruleset plus own extensions); generated, do not edit.
+// Derived from Unciv (https://github.com/yairm210/Unciv), MPL-2.0, where the entry says `unciv:`
+// in classic/docs/classic/*.json (see classic/docs/classic/UNCIV-ATTRIBUTION.md); other values are own, unverified.
+// Source: classic/docs/classic/*.json (made by classic/tools/import-unciv.py). Regenerate:
+//   cargo run --release --offline -p classic-content --features importer --bin classic-import
+// Inert effects need a mechanic the engine does not have yet: classic/docs/classic/implemented.md.
+(
+    terrains: [
+        (
+            id: "core:terrain/coast",
+            name: "Coast",
+            yields: (food: 1, gold: 1),
+            movement_cost: 1,
+            water: true,
+            map_code: Some(4),
+        ),
+        (
+            id: "core:terrain/desert",
+            name: "Desert",
+            hills_yields: (production: 2),
+            movement_cost: 1,
+            can_found_city: true,
+            map_code: Some(3),
+        ),
+        (
+            id: "core:terrain/grassland",
+            name: "Grassland",
+            yields: (food: 2),
+            hills_yields: (food: -2, production: 2),
+            movement_cost: 1,
+            can_found_city: true,
+            map_code: Some(1),
+        ),
+        (
+            id: "core:terrain/hill",
+            name: "Hill",
+            yields: (production: 2),
+            movement_cost: 1,
+            can_found_city: true,
+            map_code: Some(2),
+        ),
+        (
+            id: "core:terrain/mountain",
+            name: "Mountain",
+            movement_cost: 1,
+            impassable: true,
+            map_code: Some(6),
+        ),
+        (
+            id: "core:terrain/ocean",
+            name: "Ocean",
+            yields: (food: 1, gold: 1),
+            movement_cost: 1,
+            water: true,
+        ),
+        (
+            id: "core:terrain/plains",
+            name: "Plains",
+            yields: (food: 1, production: 1),
+            hills_yields: (food: -1, production: 1),
+            movement_cost: 1,
+            can_found_city: true,
+            map_code: Some(0),
+        ),
+        (
+            id: "core:terrain/snow",
+            name: "Snow",
+            movement_cost: 1,
+            can_found_city: true,
+            map_code: Some(5),
+        ),
+        (
+            id: "core:terrain/tundra",
+            name: "Tundra",
+            yields: (food: 1),
+            hills_yields: (food: -1, production: 2),
+            movement_cost: 1,
+            can_found_city: true,
+            map_code: Some(7),
+        ),
+    ],
+)

@@ -1,0 +1,191 @@
+screen Stadt 1366x768
+widgets
+  click "AURELIA / Stadt / Zur Karte / Navigation / Rome / Umbenen… / Feld auf der Karte …" 0,0 1366x768
+  click "Zur Karte" 1208,15 132x36
+  click "Navigation" 1080,15 116x36
+  click "" 338,148 658x517
+  click "Umbenen…" 218,92 92x28
+  click "Feld auf der Karte kaufen" 38,130 272x36
+  click "Übersicht" 38,180 88x31
+  click "Bürger" 129,180 87x31
+  click "Gebäude" 219,180 88x31
+  click "Ausgewogen" 38,520 112x30
+  click "Nahrung" 158,520 112x30
+  click "Produktion" 38,553 112x30
+  click "Gold" 158,553 112x30
+  click "Wissenschaft" 38,586 112x30
+  click "Kultur" 158,586 112x30
+  click "Große Persönlichkeiten" 38,619 112x30
+  click "Glaube" 158,619 112x30
+  click "Wachstum vermeiden" 38,652 230x30
+  scrollbar "4" 300,225 10x492
+  textinput "Einheiten, Gebäude, Wunder suchen" 1022,119 308x32
+  click "Verfügbar" 1022,160 151x30
+  click "Alle" 1176,160 151x30
+  combobox "Alle Arten" 1022,198 296x18
+  click "Späher / 25 Produktion · 7 Züge" 1022,236 308x70
+  click "Krieger / 40 Produktion · 10 Züge" 1022,314 308x70
+  click "Arbeiter / 70 Produktion · 18 Züge" 1022,392 308x70
+  click "In Warteschlange: Späher / WARTESCHLANGE · 1 AUFTRAG / Krieger" 1022,470 308x70
+  scrollbar "" 1320,236 10x215
+  click "In Warteschlange: Späher" 1022,459 308x36
+  click "Leeren" 1022,687 90x32
+  progressindicator "0 / 40 · 10 Züge" 1022,541 308x18 value 0
+  click "Rome / ROM  ·  STADTVERWALTUNG" 338,80 658x68
+painted
+  clip 0,0 1366x768
+    rect 0,0 1366x70 fill #09161c
+    rect 0,739 1366x29 fill #09161c
+    text "AURELIA" 26,19 89x26 #c1a263 23px
+    text "Stadt" 166,22 48x23 #efe9d3 20px
+    rect 1208,15 132x36 fill #192f34 r4
+    rect 1208,15 132x36 stroke 1 #344849 r4
+    text "Zur Karte" 1245,25 58x16 #efe9d3 14px
+    rect 1080,15 116x36 fill #192f34 r4
+    rect 1080,15 116x36 stroke 1 #344849 r4
+    text "Navigation" 1104,25 68x16 #efe9d3 14px
+    line 24,65 -> 1342,65 stroke 1 #c1a36466
+    rect 24,80 300x651 fill #11242b r7
+    rect 24,80 300x651 stroke 1 #344849 r7
+  clip 40,92 172x30
+    text "Rome" 40,92 60x26 #efe9d3 23px
+  clip 0,0 1366x768
+    rect 218,92 92x28 fill #192f34 r4
+    rect 218,92 92x28 stroke 1 #344849 r4
+    text "Umbenen…" 227,98 74x16 #efe9d3 14px
+    rect 38,130 272x36 fill #192f34 r4
+    rect 38,130 272x36 stroke 1 #344849 r4
+    text "Feld auf der Karte kaufen" 95,140 158x16 #efe9d3 14px
+    rect 38,180 88x31 fill #192f34 r4
+    rect 38,180 88x31 stroke 1 #344849 r4
+    text "Übersicht" 52,188 60x16 #efe9d3 14px
+    rect 129,180 87x31 fill #3f7d7c r4
+    rect 129,180 87x31 stroke 1 #c1a263 r4
+    text "Bürger" 151,188 43x16 #efe9d3 14px
+    rect 219,180 88x31 fill #192f34 r4
+    rect 219,180 88x31 stroke 1 #344849 r4
+    text "Gebäude" 235,188 56x16 #efe9d3 14px
+  clip 38,225 272x492
+    text "1 Bürger" 38,225 85x25 #efe9d3 22px
+    text "1 auf Feldern  ·  0 Spezialisten  ·  0 ohne Arbeit" 38,253 244x14 #92a8aa 12px
+    text "Ertrag pro Zug" 38,278 71x13 #92a8aa 11px
+    text "Nahrung" 38,300 43x13 #92a8aa 11px
+    text "+2" 154,299 16x16 #efe9d3 14px
+    text "Produktion" 178,300 55x13 #92a8aa 11px
+    text "4" 302,299 8x16 #efe9d3 14px
+    text "Gold" 38,328 23x13 #92a8aa 11px
+    text "+6" 154,327 16x16 #efe9d3 14px
+    text "Wissenschaft" 178,328 64x13 #92a8aa 11px
+    text "+4" 294,327 16x16 #efe9d3 14px
+    text "Wächst in 8 Zügen" 38,350 97x14 #efe9d3 12px
+    text "FELDER BEARBEITEN" 38,379 94x11 #c1a263 10px
+    text "Bearbeitet" 38,393 62x18 #68c5b0 13px
+    text "Fixiert" 38,393 106x18 #c1a263 13px
+    text "Verfügbar" 38,393 173x18 #efe9d3 13px
+    text "Linksklick auf ein leeres Feld setzt dort einen Bürger ein und fixiert ihn. Klick auf ein bearbeitetes Feld beendet die Arbeit dort." 38,414 240x42 #efe9d3 12px
+    text "Rechtsklick fixiert oder löst die Fixierung." 38,459 219x14 #efe9d3 12px
+    text "Das Stadtzentrum wird automatisch bearbeitet." 38,476 232x13 #92a8aa 11px
+    text "SCHWERPUNKT DES STATTHALTERS" 38,506 160x11 #c1a263 10px
+    rect 38,520 112x30 fill #3f7d7c r4
+    rect 38,520 112x30 stroke 1 #c1a263 r4
+    text "Ausgewogen" 53,527 82x16 #efe9d3 14px
+    rect 158,520 112x30 fill #192f34 r4
+    rect 158,520 112x30 stroke 1 #344849 r4
+    text "Nahrung" 187,527 54x16 #efe9d3 14px
+    rect 38,553 112x30 fill #192f34 r4
+    rect 38,553 112x30 stroke 1 #344849 r4
+    text "Produktion" 59,560 70x16 #efe9d3 14px
+    rect 158,553 112x30 fill #192f34 r4
+    rect 158,553 112x30 stroke 1 #344849 r4
+    text "Gold" 199,560 30x16 #efe9d3 14px
+    rect 38,586 112x30 fill #192f34 r4
+    rect 38,586 112x30 stroke 1 #344849 r4
+    text "Wissenschaft" 53,593 82x16 #efe9d3 14px
+    rect 158,586 112x30 fill #192f34 r4
+    rect 158,586 112x30 stroke 1 #344849 r4
+    text "Kultur" 195,593 38x16 #efe9d3 14px
+    rect 38,619 112x30 fill #192f34 r4
+    rect 38,619 112x30 stroke 1 #344849 r4
+    text "Große Persönlichkeiten" 42,629 104x11 #efe9d3 10px
+    rect 158,619 112x30 fill #192f34 r4
+    rect 158,619 112x30 stroke 1 #344849 r4
+    text "Glaube" 192,626 44x16 #efe9d3 14px
+    rect 38,652 230x30 fill #192f34 r4
+    rect 38,652 230x30 stroke 1 #344849 r4
+    text "Wachstum vermeiden" 85,659 136x16 #efe9d3 14px
+    text "SPEZIALISTEN" 38,699 62x11 #c1a263 10px
+    text "Arbeitsloser Bürger" 38,713 113x15 #efe9d3 13px
+    mesh 2tri 38,697 272x20
+  clip 0,0 1366x768
+    rect 1010,80 332x651 fill #11242b r7
+    rect 1010,80 332x651 stroke 1 #344849 r7
+  clip 1024,92 304x28
+    text "PRODUKTION" 1024,92 75x14 #c1a263 12px
+  clip 0,0 1366x768
+    rect 1022,119 308x32 fill #0a0a0a r2
+    text "Einheiten, Gebäude, Wunder suchen" 1026,121 209x15 #ebe8d599 13px
+    rect 1022,160 151x30 fill #3f7d7c r4
+    rect 1022,160 151x30 stroke 1 #c1a263 r4
+    text "Verfügbar" 1066,167 63x16 #efe9d3 14px
+    rect 1176,160 151x30 fill #192f34 r4
+    rect 1176,160 151x30 stroke 1 #344849 r4
+    text "Alle" 1240,167 23x16 #efe9d3 14px
+    rect 1022,198 296x18 fill #3c3c3c r2
+    path 3pt 1302,204 10x6 fill #b4b4b4
+    text "Alle Arten" 1026,200 58x15 #ebe7d5 13px
+  clip 1022,236 308x215
+    rect 1022,236 308x70 fill #26444b r4
+    rect 1022,236 308x70 stroke 1 #c1a263 r4
+    rect 1027,243 54x54 fill #182f35
+    circle 1054,270 r11.9 stroke 1 #5c6859
+  clip 1090,244 232x57
+    text "Späher" 1090,244 47x17 #efe9d3 15px
+  clip 1090,268 232x33
+    text "25 Produktion · 7 Züge" 1090,268 111x13 #92a8aa 11px
+  clip 1022,236 308x215
+    rect 1022,314 308x70 fill #192f34 r4
+    rect 1027,321 54x54 fill #182f35
+    circle 1054,348 r11.9 stroke 1 #5c6859
+  clip 1090,322 232x57
+    text "Krieger" 1090,322 49x17 #efe9d3 15px
+  clip 1090,346 232x33
+    text "40 Produktion · 10 Züge" 1090,346 117x13 #92a8aa 11px
+  clip 1022,236 308x215
+    rect 1022,392 308x70 fill #192f34 r4
+    rect 1027,399 54x54 fill #182f35
+    circle 1054,426 r11.9 stroke 1 #5c6859
+  clip 1090,400 232x51
+    text "Arbeiter" 1090,400 55x17 #efe9d3 15px
+  clip 1090,424 232x27
+    text "70 Produktion · 18 Züge" 1090,424 117x13 #92a8aa 11px
+  clip 1022,236 308x215
+    mesh 2tri 1022,431 308x20
+  clip 0,0 1366x768
+    rect 1022,459 308x36 fill #3f7d7c r4
+    rect 1022,459 308x36 stroke 1 #c1a263 r4
+    text "In Warteschlange: Späher" 1097,469 158x16 #efe9d3 14px
+    rect 1022,687 90x32 fill #192f34 r4
+    rect 1022,687 90x32 stroke 1 #344849 r4
+    text "Leeren" 1045,695 44x16 #efe9d3 14px
+    rect 1119,687 211x32 fill #192f34 r4
+    rect 1119,687 211x32 stroke 1 #344849 r4
+    text "Kaufen · 200 Gold" 1173,690 103x15 #92a8aa 13px
+    text "Benötigt 200 Gold, vorhanden 0" 1146,704 157x13 #d66054 11px
+  clip 1022,507 308x172
+    text "WARTESCHLANGE · 1 AUFTRAG" 1022,507 140x11 #c1a263 10px
+    text "Krieger" 1022,521 49x17 #efe9d3 15px
+    rect 1022,541 308x18 fill #0a0a0a r9
+    rect 1022,541 18x18 fill #a47e3e r9
+  clip 1022,541 308x18
+    text "0 / 40 · 10 Züge" 1030,543 89x15 #ebe7d5 13px
+  clip 0,0 1366x768
+    rect 338,80 658x68 fill #11242b r7
+    rect 338,80 658x68 stroke 1 #344849 r7
+  clip 350,87 634x54
+    text "Rome" 633,87 68x30 #efe9d3 26px
+  clip 0,0 1366x768
+    text "ROM  ·  STADTVERWALTUNG" 604,125 126x11 #c1a263 10px
+art
+  bnw:unit/scout
+  core:unit/worker
+  warrior

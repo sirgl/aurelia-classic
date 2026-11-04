@@ -1,0 +1,42 @@
+# Translation of classic-ui-screen-diplomacy.ftl into zh-Hans. Keys are in the order of the English file.
+# Lines marked TODO still hold the English text: translate them and delete the marker.
+
+classic.ui.screen-diplomacy.title = 外交
+classic.ui.screen-diplomacy.banner-line = 已结识 { $met } 个国家  ·  国库金币 { $gold }  ·  待处理提议 { $offers }
+classic.ui.screen-diplomacy.none-met = 你尚未结识其他国家。去探索世界，找到它们吧。
+classic.ui.screen-diplomacy.nations-met = 已结识的国家
+classic.ui.screen-diplomacy.score-gold = 得分 { $score }  ·  金币 { $gold }
+classic.ui.screen-diplomacy.no-treaties = 无条约
+classic.ui.screen-diplomacy.active-treaties = 生效条约 { $n } 项
+classic.ui.screen-diplomacy.more-treaties = 另有 { $n } 项
+classic.ui.screen-diplomacy.make-peace = 缔结和平
+classic.ui.screen-diplomacy.declare-war = 宣战
+classic.ui.screen-diplomacy.denounce = 谴责
+classic.ui.screen-diplomacy.open-borders = 开放边境
+classic.ui.screen-diplomacy.negotiate = 洽谈交易
+classic.ui.screen-diplomacy.you-give = 你给出
+classic.ui.screen-diplomacy.you-receive = 你获得
+classic.ui.screen-diplomacy.agreements = 协议
+classic.ui.screen-diplomacy.select-items = 在上方选择项目来组成你的提议。
+classic.ui.screen-diplomacy.side-both = 双方同意
+classic.ui.screen-diplomacy.side-give = 你给出
+classic.ui.screen-diplomacy.side-receive = 你获得
+classic.ui.screen-diplomacy.remove = 移除
+classic.ui.screen-diplomacy.term = { $side }：{ $label }
+classic.ui.screen-diplomacy.offer-sent = 提议已发出，等待对方答复。
+classic.ui.screen-diplomacy.select-one = 请至少选择一个项目。
+classic.ui.screen-diplomacy.ready-to-propose = 可以提出了。对方必须接受该提议。
+classic.ui.screen-diplomacy.checking = 正在检查此提议…
+classic.ui.screen-diplomacy.clear-offer = 清除提议
+classic.ui.screen-diplomacy.propose-deal = 提出交易
+classic.ui.screen-diplomacy.gold-now = 立即支付 { $n } 金币
+classic.ui.screen-diplomacy.gold-per-turn = 每回合 { $n } 金币
+classic.ui.screen-diplomacy.resource = 资源
+classic.ui.screen-diplomacy.resource-amount = { $amount } × { $name }
+classic.ui.screen-diplomacy.agreement = 协议
+classic.ui.screen-diplomacy.of-max = 最多 { $max }
+classic.ui.screen-diplomacy.offers-heading = 对你的提议
+classic.ui.screen-diplomacy.no-offers = 没有等待你答复的提议。
+classic.ui.screen-diplomacy.answer-by = 请在第 { $turn } 回合前答复
+classic.ui.screen-diplomacy.accept = 接受
+classic.ui.screen-diplomacy.refuse = 拒绝

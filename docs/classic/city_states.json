@@ -1,0 +1,525 @@
+{
+ "schema": "classic-spec/1",
+ "catalog": "city_states",
+ "edition": "Classic rule set (Unciv Gods & Kings ruleset plus own extensions)",
+ "count": 58,
+ "types": [
+  {
+   "id": "core:city-state-type/cultured",
+   "name": "Cultured City-States",
+   "friends": {
+    "culture_per_turn_by_era": {
+     "ancient": 3,
+     "medieval": 6,
+     "industrial": 13
+    }
+   },
+   "allies": {
+    "culture_per_turn_by_era_additional": {
+     "ancient": 3,
+     "medieval": 6,
+     "industrial": 13
+    }
+   },
+   "thresholds": {
+    "friends": 30,
+    "allies": 60
+   },
+   "provenance": "unciv: CityStateTypes.json, Cultured"
+  },
+  {
+   "id": "core:city-state-type/militaristic",
+   "name": "Militaristic City-States",
+   "friends": {
+    "unit_gift_every_turns_base": 19,
+    "unit_gift_every_turns_random": 3
+   },
+   "allies": {
+    "unit_gift_turns_change": -3
+   },
+   "thresholds": {
+    "friends": 30,
+    "allies": 60
+   },
+   "provenance": "unciv: CityStateTypes.json, Militaristic"
+  },
+  {
+   "id": "core:city-state-type/maritime",
+   "name": "Maritime City-States",
+   "friends": {
+    "capital_food_times100_pre_renaissance": 200,
+    "capital_food_times100_post_renaissance": 200
+   },
+   "allies": {
+    "other_cities_food_times100": 100,
+    "capital_food_times100_additional": 0
+   },
+   "thresholds": {
+    "friends": 30,
+    "allies": 60
+   },
+   "provenance": "unciv: CityStateTypes.json, Maritime"
+  },
+  {
+   "id": "core:city-state-type/mercantile",
+   "name": "Mercantile City-States",
+   "friends": {
+    "happiness_by_era": {
+     "ancient": 2,
+     "medieval": 3,
+     "industrial": 3
+    }
+   },
+   "allies": {
+    "happiness_by_era_additional": {
+     "ancient": 0,
+     "medieval": 0,
+     "industrial": 0
+    }
+   },
+   "thresholds": {
+    "friends": 30,
+    "allies": 60
+   },
+   "provenance": "unciv: CityStateTypes.json, Mercantile"
+  },
+  {
+   "id": "core:city-state-type/religious",
+   "name": "Religious City-States",
+   "friends": {
+    "faith_per_turn_by_era": {
+     "ancient": 3,
+     "medieval": 6,
+     "industrial": 13
+    }
+   },
+   "allies": {
+    "faith_per_turn_by_era_additional": {
+     "ancient": 3,
+     "medieval": 6,
+     "industrial": 13
+    }
+   },
+   "thresholds": {
+    "friends": 30,
+    "allies": 60
+   },
+   "provenance": "unciv: CityStateTypes.json, Religious"
+  }
+ ],
+ "common": {
+  "personalities": [
+   "friendly",
+   "neutral",
+   "hostile",
+   "irrational"
+  ],
+  "influence": {
+   "friendship_threshold_friends": 30,
+   "friendship_threshold_allies": 60,
+   "friendship_threshold_neutral": 0,
+   "minor_friendship_drop_per_turn": -100,
+   "minor_friendship_drop_per_turn_hostile": -150,
+   "minor_friendship_drop_per_turn_aggressor": -200,
+   "minor_friendship_at_war": -60,
+   "minor_friendship_anchor_default": 0,
+   "minor_friendship_negative_increase_per_turn": 100,
+   "minor_friendship_rate_mod_shared_religion": 50,
+   "friendship_per_unit_gifted": 5,
+   "minor_friendship_from_trade_mission": 30
+  }
+ },
+ "items": [
+  {
+   "id": "core:city-state/bratislava",
+   "name": "Bratislava",
+   "type": "core:city-state-type/cultured",
+   "provenance": "unciv: Nations.json, Bratislava",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:city-state/budapest",
+   "name": "Budapest",
+   "type": "core:city-state-type/militaristic",
+   "provenance": "unciv: Nations.json, Budapest",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:city-state/geneva",
+   "name": "Geneva",
+   "type": "core:city-state-type/religious",
+   "provenance": "unciv: Nations.json, Geneva",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:city-state/riga",
+   "name": "Riga",
+   "type": "core:city-state-type/maritime",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:city-state/genoa",
+   "name": "Genoa",
+   "type": "core:city-state-type/mercantile",
+   "provenance": "unciv: Nations.json, Genoa",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:city-state/florence",
+   "name": "Florence",
+   "type": "core:city-state-type/cultured",
+   "provenance": "unciv: Nations.json, Florence",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:city-state/ragusa",
+   "name": "Ragusa",
+   "type": "core:city-state-type/maritime",
+   "provenance": "unciv: Nations.json, Ragusa",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:city-state/sydney",
+   "name": "Sydney",
+   "type": "core:city-state-type/maritime",
+   "provenance": "unciv: Nations.json, Sydney",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:city-state/quebec-city",
+   "name": "Quebec City",
+   "type": "core:city-state-type/maritime",
+   "provenance": "unciv: Nations.json, Quebec City",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:city-state/bucharest",
+   "name": "Bucharest",
+   "type": "core:city-state-type/cultured",
+   "provenance": "unciv: Nations.json, Bucharest",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:city-state/belgrade",
+   "name": "Belgrade",
+   "type": "core:city-state-type/militaristic",
+   "provenance": "unciv: Nations.json, Belgrade",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:city-state/brussels",
+   "name": "Brussels",
+   "type": "core:city-state-type/cultured",
+   "provenance": "unciv: Nations.json, Brussels",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:city-state/monaco",
+   "name": "Monaco",
+   "type": "core:city-state-type/cultured",
+   "provenance": "unciv: Nations.json, Monaco",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:city-state/kathmandu",
+   "name": "Kathmandu",
+   "type": "core:city-state-type/religious",
+   "provenance": "unciv: Nations.json, Kathmandu",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:city-state/hanoi",
+   "name": "Hanoi",
+   "type": "core:city-state-type/militaristic",
+   "provenance": "unciv: Nations.json, Hanoi",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:city-state/lhasa",
+   "name": "Lhasa",
+   "type": "core:city-state-type/religious",
+   "provenance": "unciv: Nations.json, Lhasa",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:city-state/almaty",
+   "name": "Almaty",
+   "type": "core:city-state-type/militaristic",
+   "provenance": "unciv: Nations.json, Almaty",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:city-state/kuala-lumpur",
+   "name": "Kuala Lumpur",
+   "type": "core:city-state-type/cultured",
+   "provenance": "unciv: Nations.json, Kuala Lumpur",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:city-state/singapore",
+   "name": "Singapore",
+   "type": "core:city-state-type/mercantile",
+   "provenance": "unciv: Nations.json, Singapore",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:city-state/panama-city",
+   "name": "Panama City",
+   "type": "core:city-state-type/maritime",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:city-state/cape-town",
+   "name": "Cape Town",
+   "type": "core:city-state-type/maritime",
+   "provenance": "unciv: Nations.json, Cape Town",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:city-state/sidon",
+   "name": "Sidon",
+   "type": "core:city-state-type/militaristic",
+   "provenance": "unciv: Nations.json, Sidon",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:city-state/tyre",
+   "name": "Tyre",
+   "type": "core:city-state-type/mercantile",
+   "provenance": "unciv: Nations.json, Tyre",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:city-state/antwerp",
+   "name": "Antwerp",
+   "type": "core:city-state-type/mercantile",
+   "provenance": "unciv: Nations.json, Antwerp",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:city-state/cahokia",
+   "name": "Cahokia",
+   "type": "core:city-state-type/mercantile",
+   "provenance": "unciv: Nations.json, Cahokia",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:city-state/colombo",
+   "name": "Colombo",
+   "type": "core:city-state-type/mercantile",
+   "provenance": "unciv: Nations.json, Colombo",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:city-state/hong-kong",
+   "name": "Hong Kong",
+   "type": "core:city-state-type/mercantile",
+   "provenance": "unciv: Nations.json, Hong Kong",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:city-state/ormus",
+   "name": "Ormus",
+   "type": "core:city-state-type/maritime",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:city-state/jerusalem",
+   "name": "Jerusalem",
+   "type": "core:city-state-type/religious",
+   "provenance": "unciv: Nations.json, Jerusalem",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:city-state/la-venta",
+   "name": "La Venta",
+   "type": "core:city-state-type/religious",
+   "provenance": "unciv: Nations.json, La Venta",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:city-state/vancouver",
+   "name": "Vancouver",
+   "type": "core:city-state-type/maritime",
+   "provenance": "unciv: Nations.json, Vancouver",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:city-state/manila",
+   "name": "Manila",
+   "type": "core:city-state-type/maritime",
+   "provenance": "unciv: Nations.json, Manila",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:city-state/antananarivo",
+   "name": "Antananarivo",
+   "type": "core:city-state-type/mercantile",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:city-state/milan",
+   "name": "Milan",
+   "type": "core:city-state-type/cultured",
+   "provenance": "unciv: Nations.json, Milan",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:city-state/mombasa",
+   "name": "Mombasa",
+   "type": "core:city-state-type/maritime",
+   "provenance": "unciv: Nations.json, Mombasa",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:city-state/prague",
+   "name": "Prague",
+   "type": "core:city-state-type/cultured",
+   "provenance": "unciv: Nations.json, Prague",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:city-state/valletta",
+   "name": "Valletta",
+   "type": "core:city-state-type/militaristic",
+   "provenance": "unciv: Nations.json, Valletta",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:city-state/vatican-city",
+   "name": "Vatican City",
+   "type": "core:city-state-type/religious",
+   "provenance": "unciv: Nations.json, Vatican City",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:city-state/wittenberg",
+   "name": "Wittenberg",
+   "type": "core:city-state-type/religious",
+   "provenance": "unciv: Nations.json, Wittenberg",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:city-state/yerevan",
+   "name": "Yerevan",
+   "type": "core:city-state-type/cultured",
+   "provenance": "unciv: Nations.json, Yerevan",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:city-state/zanzibar",
+   "name": "Zanzibar",
+   "type": "core:city-state-type/mercantile",
+   "provenance": "unciv: Nations.json, Zanzibar",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:city-state/zurich",
+   "name": "Zurich",
+   "type": "core:city-state-type/mercantile",
+   "provenance": "unciv: Nations.json, Zurich",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:city-state/samarkand",
+   "name": "Samarkand",
+   "type": "core:city-state-type/mercantile",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:city-state/malacca",
+   "name": "Malacca",
+   "type": "core:city-state-type/mercantile",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:city-state/mogadishu",
+   "name": "Mogadishu",
+   "type": "core:city-state-type/maritime",
+   "provenance": "unciv: Nations.json, Mogadishu",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:city-state/byblos",
+   "name": "Byblos",
+   "type": "core:city-state-type/maritime",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:city-state/kyzyl",
+   "name": "Kyzyl",
+   "type": "core:city-state-type/cultured",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:city-state/ife",
+   "name": "Ife",
+   "type": "core:city-state-type/religious",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:city-state/kiev",
+   "name": "Kiev",
+   "type": "core:city-state-type/cultured",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:city-state/buenos-aires",
+   "name": "Buenos Aires",
+   "type": "core:city-state-type/cultured",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:city-state/m-banza-kongo",
+   "name": "M'banza-Kongo",
+   "type": "core:city-state-type/militaristic",
+   "provenance": "unciv: Nations.json, M'Banza-Kongo",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:city-state/kabul",
+   "name": "Kabul",
+   "type": "core:city-state-type/cultured",
+   "provenance": "unciv: Nations.json, Kabul",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:city-state/sofia",
+   "name": "Sofia",
+   "type": "core:city-state-type/militaristic",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:city-state/ur",
+   "name": "Ur",
+   "type": "core:city-state-type/maritime",
+   "provenance": "unciv: Nations.json, Ur",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:city-state/melbourne",
+   "name": "Melbourne",
+   "type": "core:city-state-type/mercantile",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:city-state/bogota",
+   "name": "Bogota",
+   "type": "core:city-state-type/cultured",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:city-state/vilnius",
+   "name": "Vilnius",
+   "type": "core:city-state-type/mercantile",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:city-state/wellington",
+   "name": "Wellington",
+   "type": "core:city-state-type/maritime",
+   "provenance": "own value"
+  }
+ ],
+ "notice": "Derived from Unciv (https://github.com/yairm210/Unciv), MPL-2.0: rule fields of the entries marked `unciv:` come from Unciv's `Gods & Kings` JSON files at commit 18827b1f; entries marked `own value, unverified` have no Unciv counterpart. Listed per file in classic/docs/classic/UNCIV-ATTRIBUTION.md."
+}

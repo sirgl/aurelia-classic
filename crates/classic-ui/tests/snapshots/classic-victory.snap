@@ -1,0 +1,62 @@
+screen Victory 1366x768
+widgets
+  click "AURELIA / Victory / Back to map / Navigate / Victory / Turn 1 of 501  ·  5 ways …" 0,0 1366x768
+  click "Back to map" 1208,15 132x36
+  click "Navigate" 1080,15 116x36
+  scrollbar "" 988,222 10x499
+painted
+  clip 0,0 1366x768
+    rect 0,0 1366x768 fill #09161c
+    text "AURELIA" 26,19 89x26 #c1a263 23px
+    text "Victory" 166,22 63x23 #efe9d3 20px
+    rect 1208,15 132x36 fill #192f34 r4
+    rect 1208,15 132x36 stroke 1 #344849 r4
+    text "Back to map" 1236,25 76x16 #efe9d3 14px
+    rect 1080,15 116x36 fill #192f34 r4
+    rect 1080,15 116x36 stroke 1 #344849 r4
+    text "Navigate" 1110,25 56x16 #efe9d3 14px
+    line 24,65 -> 1342,65 stroke 1 #c1a36466
+    rect 24,80 1318x92 fill #11242b r7
+    rect 24,80 1318x92 stroke 1 #344849 r7
+    text "Victory" 48,92 98x36 #efe9d3 31px
+    text "Turn 1 of 501  ·  5 ways to win this game" 50,138 247x16 #c1a263 14px
+    rect 24,186 984x545 fill #11242b r7
+    rect 24,186 984x545 stroke 1 #344849 r7
+    text "PROGRESS" 40,200 49x11 #c1a263 10px
+  clip 34,222 964x499
+    rect 34,222 964x92 fill #192f34 r5
+    text "Domination" 46,230 105x23 #c1a263 20px
+    text "1 of 1 founded capital held · No foreign capital captured" 46,256 347x16 #efe9d3 14px
+    text "Hold every original capital, including a foreign capital" 46,276 281x14 #92a8aa 12px
+    rect 46,300 940x5 fill #09161c r2
+    rect 34,325 964x92 fill #192f34 r5
+    text "Science" 46,333 67x23 #c1a263 20px
+    text "Apollo Program not built  ·  0 of 6 spaceship parts" 46,359 305x16 #efe9d3 14px
+    text "Build the Apollo Program and install every spaceship part" 46,379 304x14 #92a8aa 12px
+    rect 46,403 940x5 fill #09161c r2
+    rect 46,403 0x5 fill #64c6ef r2
+    rect 34,428 964x92 fill #192f34 r5
+    text "Culture" 46,436 66x23 #c1a263 20px
+    text "Influential on 0 of 2 nations" 46,462 171x16 #efe9d3 14px
+    text "Be influential on every other nation" 46,482 189x14 #92a8aa 12px
+    rect 46,506 940x5 fill #09161c r2
+    rect 46,506 0x5 fill #64c6ef r2
+    rect 34,531 964x92 fill #192f34 r5
+    text "Diplomacy" 46,539 94x23 #c1a263 20px
+    text "The World Congress is not founded yet" 46,565 242x16 #efe9d3 14px
+    text "Win the World Leader vote of the United Nations" 46,585 260x14 #92a8aa 12px
+    rect 46,609 940x5 fill #09161c r2
+    rect 34,634 964x92 fill #192f34 r5
+    text "Time" 46,642 44x23 #c1a263 20px
+    text "Turn 1 of 501" 46,668 83x16 #efe9d3 14px
+    text "Have the highest score on turn 501 · Standard" 46,688 243x14 #92a8aa 12px
+    rect 46,712 940x5 fill #09161c r2
+    rect 46,712 2x5 fill #64c6ef r2
+    mesh 2tri 34,701 964x20
+  clip 0,0 1366x768
+    rect 1022,186 320x545 fill #11242b r7
+    rect 1022,186 320x545 stroke 1 #344849 r7
+    text "SCORES OF THE NATIONS MET" 1038,200 136x11 #c1a263 10px
+  clip 1038,224 288x495
+    text "1.  Rome" 1038,224 54x16 #c1a263 14px
+    text "70" 1310,224 16x16 #c1a263 14px

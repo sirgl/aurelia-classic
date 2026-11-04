@@ -1,0 +1,41 @@
+screen Menu 1366x768
+widgets
+  click "СТРАТЕГИЧЕСКАЯ ИГРА / AURELIA / Мир, который ещё предстоит написать / Продолжить…" 0,0 1366x768
+  click "Новая партия" 89,342 320x44
+  click "Настройки" 89,454 320x38
+  click "Выйти" 89,502 320x38
+  click "Сообщить об ошибке" 89,550 320x34
+painted
+  clip 0,0 1366x768
+    rect 0,0 1366x768 fill #09161c
+    rect 0,0 1366x768 fill #182f35
+    circle 683,384 r169 stroke 1 #5c6859
+    mesh 2tri 0,0 1366x768
+    rect 0,0 533x768 fill #000000b0
+    text "СТРАТЕГИЧЕСКАЯ ИГРА" 89,99 120x13 #c1a263 11px
+    text "AURELIA" 89,131 207x61 #efe9d3 53.4px
+    text "Мир, который ещё предстоит написать" 89,209 324x21 #92a8aa 18px
+    line 89,253 -> 329,253 stroke 1 #c1a263
+    rect 89,286 320x44 fill #192f34 r4
+    rect 89,286 320x44 stroke 1 #c1a263 r4
+    text "Продолжить" 208,300 82x16 #92a8aa 14px
+    rect 89,342 320x44 fill #192f34 r4
+    rect 89,342 320x44 stroke 1 #344849 r4
+    text "Новая партия" 205,356 88x16 #efe9d3 14px
+    rect 89,398 156x44 fill #192f34 r4
+    rect 89,398 156x44 stroke 1 #344849 r4
+    text "Сохранить" 133,412 68x16 #92a8aa 14px
+    rect 253,398 156x44 fill #192f34 r4
+    rect 253,398 156x44 stroke 1 #344849 r4
+    text "Загрузить" 299,412 63x16 #92a8aa 14px
+    rect 89,454 320x38 fill #192f34 r4
+    rect 89,454 320x38 stroke 1 #344849 r4
+    text "Настройки" 214,465 69x16 #efe9d3 14px
+    rect 89,502 320x38 fill #192f34 r4
+    rect 89,502 320x38 stroke 1 #344849 r4
+    text "Выйти" 228,513 42x16 #efe9d3 14px
+    rect 89,550 320x34 fill #192f34 r4
+    rect 89,550 320x34 stroke 1 #344849 r4
+    text "Сообщить об ошибке" 179,559 139x16 #efe9d3 14px
+art
+  menu

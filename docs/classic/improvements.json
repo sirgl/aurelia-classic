@@ -1,0 +1,1254 @@
+{
+ "schema": "classic-spec/1",
+ "catalog": "improvements",
+ "edition": "Classic rule set (Unciv Gods & Kings ruleset plus own extensions)",
+ "count": 29,
+ "items": [
+  {
+   "id": "core:improvement/city-ruins",
+   "name": "City Ruins",
+   "build": null,
+   "yields": {},
+   "tech_yield_changes": [],
+   "adjacent_mountain_yield": null,
+   "yield_per_era": null,
+   "resources": [],
+   "valid_terrains": [],
+   "valid_features": [],
+   "defense_pct": null,
+   "pillage_gold": null,
+   "nation_unique": null,
+   "created_by_great_person": false,
+   "placement": {},
+   "effects": [],
+   "kind": "regular",
+   "provenance": "unciv: TileImprovements.json, City ruins",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:improvement/encampment",
+   "name": "Encampment",
+   "build": null,
+   "yields": {},
+   "tech_yield_changes": [],
+   "adjacent_mountain_yield": null,
+   "yield_per_era": null,
+   "resources": [],
+   "valid_terrains": [
+    "core:terrain/grassland",
+    "core:terrain/plains",
+    "core:terrain/desert",
+    "core:terrain/tundra"
+   ],
+   "valid_features": [
+    "core:feature/jungle",
+    "core:feature/forest"
+   ],
+   "defense_pct": null,
+   "pillage_gold": null,
+   "nation_unique": null,
+   "created_by_great_person": false,
+   "placement": {},
+   "effects": [],
+   "kind": "barbarian_camp",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:improvement/ancient-ruins",
+   "name": "Ancient Ruins",
+   "build": null,
+   "yields": {},
+   "tech_yield_changes": [],
+   "adjacent_mountain_yield": null,
+   "yield_per_era": null,
+   "resources": [],
+   "valid_terrains": [
+    "core:terrain/grassland",
+    "core:terrain/plains",
+    "core:terrain/desert",
+    "core:terrain/tundra"
+   ],
+   "valid_features": [
+    "core:feature/jungle",
+    "core:feature/forest"
+   ],
+   "defense_pct": null,
+   "pillage_gold": null,
+   "nation_unique": null,
+   "created_by_great_person": false,
+   "placement": {},
+   "effects": [],
+   "kind": "ancient_ruins",
+   "provenance": "unciv: TileImprovements.json, Ancient ruins",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:improvement/farm",
+   "name": "Farm",
+   "build": {
+    "action": "core:build/farm",
+    "required_tech": "core:tech/agriculture",
+    "work_time": 700,
+    "kills_builder": false
+   },
+   "yields": {
+    "food": 1
+   },
+   "tech_yield_changes": [
+    {
+     "tech": "core:tech/civil-service",
+     "yield": "food",
+     "amount": 1,
+     "condition": "fresh_water"
+    },
+    {
+     "tech": "core:tech/fertilizer",
+     "yield": "food",
+     "amount": 1,
+     "condition": "no_fresh_water"
+    }
+   ],
+   "adjacent_mountain_yield": null,
+   "yield_per_era": null,
+   "resources": [
+    "core:resource/wheat"
+   ],
+   "valid_terrains": [
+    "core:terrain/grassland",
+    "core:terrain/plains",
+    "core:terrain/desert"
+   ],
+   "valid_features": [],
+   "defense_pct": null,
+   "pillage_gold": 18,
+   "nation_unique": null,
+   "created_by_great_person": false,
+   "placement": {
+    "fresh_water_makes_valid": true,
+    "requires_flatlands_or_fresh_water": true
+   },
+   "effects": [],
+   "kind": "regular",
+   "provenance": "unciv: TileImprovements.json, Farm",
+   "unciv_fields": [
+    "build.required_tech",
+    "build.work_time"
+   ]
+  },
+  {
+   "id": "core:improvement/mine",
+   "name": "Mine",
+   "build": {
+    "action": "core:build/mine",
+    "required_tech": "core:tech/mining",
+    "work_time": 700,
+    "kills_builder": false
+   },
+   "yields": {
+    "production": 1
+   },
+   "tech_yield_changes": [
+    {
+     "tech": "core:tech/chemistry",
+     "yield": "production",
+     "amount": 1
+    }
+   ],
+   "adjacent_mountain_yield": null,
+   "yield_per_era": null,
+   "resources": [
+    "core:resource/iron",
+    "core:resource/coal",
+    "core:resource/aluminum",
+    "core:resource/uranium",
+    "core:resource/gems",
+    "core:resource/gold",
+    "core:resource/silver",
+    "core:resource/copper",
+    "core:resource/salt"
+   ],
+   "valid_terrains": [
+    "core:terrain/hill"
+   ],
+   "valid_features": [],
+   "defense_pct": null,
+   "pillage_gold": 20,
+   "nation_unique": null,
+   "created_by_great_person": false,
+   "placement": {
+    "hills_makes_valid": true
+   },
+   "effects": [],
+   "kind": "regular",
+   "provenance": "unciv: TileImprovements.json, Mine",
+   "unciv_fields": [
+    "build.required_tech",
+    "build.work_time"
+   ]
+  },
+  {
+   "id": "core:improvement/quarry",
+   "name": "Quarry",
+   "build": {
+    "action": "core:build/quarry",
+    "required_tech": "core:tech/masonry",
+    "work_time": 800,
+    "kills_builder": false
+   },
+   "yields": {},
+   "tech_yield_changes": [
+    {
+     "tech": "core:tech/chemistry",
+     "yield": "production",
+     "amount": 1
+    }
+   ],
+   "adjacent_mountain_yield": null,
+   "yield_per_era": null,
+   "resources": [
+    "core:resource/marble",
+    "core:resource/stone"
+   ],
+   "valid_terrains": [],
+   "valid_features": [],
+   "defense_pct": null,
+   "pillage_gold": 20,
+   "nation_unique": null,
+   "created_by_great_person": false,
+   "placement": {},
+   "effects": [],
+   "kind": "regular",
+   "provenance": "unciv: TileImprovements.json, Quarry",
+   "unciv_fields": [
+    "build.required_tech",
+    "build.work_time"
+   ]
+  },
+  {
+   "id": "core:improvement/trading-post",
+   "name": "Trading Post",
+   "build": {
+    "action": "core:build/trading-post",
+    "required_tech": "core:tech/guilds",
+    "work_time": 700,
+    "kills_builder": false
+   },
+   "yields": {
+    "gold": 1
+   },
+   "tech_yield_changes": [
+    {
+     "tech": "core:tech/economics",
+     "yield": "gold",
+     "amount": 1
+    }
+   ],
+   "adjacent_mountain_yield": null,
+   "yield_per_era": null,
+   "resources": [],
+   "valid_terrains": [
+    "core:terrain/grassland",
+    "core:terrain/plains",
+    "core:terrain/desert",
+    "core:terrain/tundra"
+   ],
+   "valid_features": [],
+   "defense_pct": null,
+   "pillage_gold": 20,
+   "nation_unique": null,
+   "created_by_great_person": false,
+   "placement": {},
+   "effects": [],
+   "kind": "regular",
+   "provenance": "unciv: TileImprovements.json, Trading post",
+   "unciv_fields": [
+    "build.required_tech",
+    "build.work_time"
+   ]
+  },
+  {
+   "id": "core:improvement/lumber-mill",
+   "name": "Lumber Mill",
+   "build": {
+    "action": "core:build/lumbermill",
+    "required_tech": "core:tech/construction",
+    "work_time": 700,
+    "kills_builder": false
+   },
+   "yields": {
+    "production": 1
+   },
+   "tech_yield_changes": [
+    {
+     "tech": "core:tech/scientific-theory",
+     "yield": "production",
+     "amount": 1
+    }
+   ],
+   "adjacent_mountain_yield": null,
+   "yield_per_era": null,
+   "resources": [],
+   "valid_terrains": [],
+   "valid_features": [
+    "core:feature/forest"
+   ],
+   "defense_pct": null,
+   "pillage_gold": 10,
+   "nation_unique": null,
+   "created_by_great_person": false,
+   "placement": {
+    "requires_feature": true
+   },
+   "effects": [],
+   "kind": "regular",
+   "provenance": "unciv: TileImprovements.json, Lumber mill",
+   "unciv_fields": [
+    "build.required_tech",
+    "build.work_time"
+   ]
+  },
+  {
+   "id": "core:improvement/pasture",
+   "name": "Pasture",
+   "build": {
+    "action": "core:build/pasture",
+    "required_tech": "core:tech/animal-husbandry",
+    "work_time": 800,
+    "kills_builder": false
+   },
+   "yields": {},
+   "tech_yield_changes": [
+    {
+     "tech": "core:tech/fertilizer",
+     "yield": "food",
+     "amount": 1
+    }
+   ],
+   "adjacent_mountain_yield": null,
+   "yield_per_era": null,
+   "resources": [
+    "core:resource/horses",
+    "core:resource/cattle",
+    "core:resource/sheep"
+   ],
+   "valid_terrains": [],
+   "valid_features": [],
+   "defense_pct": null,
+   "pillage_gold": 10,
+   "nation_unique": null,
+   "created_by_great_person": false,
+   "placement": {},
+   "effects": [],
+   "kind": "regular",
+   "provenance": "unciv: TileImprovements.json, Pasture",
+   "unciv_fields": [
+    "build.required_tech",
+    "build.work_time"
+   ]
+  },
+  {
+   "id": "core:improvement/fishing-boats",
+   "name": "Fishing Boats",
+   "build": {
+    "action": "core:build/fishing-boats-no-kill",
+    "required_tech": "core:tech/sailing",
+    "work_time": 100,
+    "kills_builder": false
+   },
+   "yields": {},
+   "tech_yield_changes": [
+    {
+     "tech": "core:tech/compass",
+     "yield": "gold",
+     "amount": 1
+    }
+   ],
+   "adjacent_mountain_yield": null,
+   "yield_per_era": null,
+   "resources": [
+    "core:resource/fish",
+    "core:resource/whales",
+    "core:resource/pearls",
+    "core:resource/crab"
+   ],
+   "valid_terrains": [],
+   "valid_features": [],
+   "defense_pct": null,
+   "pillage_gold": 10,
+   "nation_unique": null,
+   "created_by_great_person": false,
+   "placement": {
+    "water": true,
+    "destroyed_when_pillaged": true
+   },
+   "effects": [],
+   "kind": "regular",
+   "provenance": "unciv: TileImprovements.json, Fishing Boats",
+   "unciv_fields": [
+    "build.required_tech",
+    "build.work_time"
+   ]
+  },
+  {
+   "id": "core:improvement/plantation",
+   "name": "Plantation",
+   "build": {
+    "action": "core:build/plantation",
+    "required_tech": "core:tech/calendar",
+    "work_time": 600,
+    "kills_builder": false
+   },
+   "yields": {},
+   "tech_yield_changes": [
+    {
+     "tech": "core:tech/fertilizer",
+     "yield": "food",
+     "amount": 1
+    }
+   ],
+   "adjacent_mountain_yield": null,
+   "yield_per_era": null,
+   "resources": [
+    "core:resource/bananas",
+    "core:resource/dyes",
+    "core:resource/silk",
+    "core:resource/spices",
+    "core:resource/sugar",
+    "core:resource/cotton",
+    "core:resource/wine",
+    "core:resource/incense",
+    "core:resource/citrus",
+    "core:resource/cocoa"
+   ],
+   "valid_terrains": [],
+   "valid_features": [],
+   "defense_pct": null,
+   "pillage_gold": 10,
+   "nation_unique": null,
+   "created_by_great_person": false,
+   "placement": {},
+   "effects": [],
+   "kind": "regular",
+   "provenance": "unciv: TileImprovements.json, Plantation",
+   "unciv_fields": [
+    "build.required_tech",
+    "build.work_time"
+   ]
+  },
+  {
+   "id": "core:improvement/camp",
+   "name": "Camp",
+   "build": {
+    "action": "core:build/camp",
+    "required_tech": "core:tech/trapping",
+    "work_time": 700,
+    "kills_builder": false
+   },
+   "yields": {},
+   "tech_yield_changes": [
+    {
+     "tech": "core:tech/economics",
+     "yield": "gold",
+     "amount": 1
+    }
+   ],
+   "adjacent_mountain_yield": null,
+   "yield_per_era": null,
+   "resources": [
+    "core:resource/ivory",
+    "core:resource/furs",
+    "core:resource/deer",
+    "core:resource/truffles",
+    "core:resource/bison"
+   ],
+   "valid_terrains": [],
+   "valid_features": [],
+   "defense_pct": null,
+   "pillage_gold": 10,
+   "nation_unique": null,
+   "created_by_great_person": false,
+   "placement": {},
+   "effects": [],
+   "kind": "regular",
+   "provenance": "unciv: TileImprovements.json, Camp",
+   "unciv_fields": [
+    "build.required_tech",
+    "build.work_time"
+   ]
+  },
+  {
+   "id": "core:improvement/oil-well",
+   "name": "Oil Well",
+   "build": {
+    "action": "core:build/well",
+    "required_tech": "core:tech/biology",
+    "work_time": 900,
+    "kills_builder": false
+   },
+   "yields": {},
+   "tech_yield_changes": [],
+   "adjacent_mountain_yield": null,
+   "yield_per_era": null,
+   "resources": [
+    "core:resource/oil"
+   ],
+   "valid_terrains": [],
+   "valid_features": [],
+   "defense_pct": null,
+   "pillage_gold": 20,
+   "nation_unique": null,
+   "created_by_great_person": false,
+   "placement": {},
+   "effects": [],
+   "kind": "regular",
+   "provenance": "unciv: TileImprovements.json, Oil well",
+   "unciv_fields": [
+    "build.required_tech",
+    "build.work_time"
+   ]
+  },
+  {
+   "id": "core:improvement/offshore-platform",
+   "name": "Offshore Platform",
+   "build": {
+    "action": "core:build/offshore-platform",
+    "required_tech": "core:tech/refrigeration",
+    "work_time": 100,
+    "kills_builder": false
+   },
+   "yields": {},
+   "tech_yield_changes": [],
+   "adjacent_mountain_yield": null,
+   "yield_per_era": null,
+   "resources": [
+    "core:resource/oil"
+   ],
+   "valid_terrains": [],
+   "valid_features": [],
+   "defense_pct": null,
+   "pillage_gold": 20,
+   "nation_unique": null,
+   "created_by_great_person": false,
+   "placement": {
+    "water": true,
+    "destroyed_when_pillaged": true
+   },
+   "effects": [],
+   "kind": "regular",
+   "provenance": "unciv: TileImprovements.json, Offshore Platform",
+   "unciv_fields": [
+    "build.required_tech",
+    "build.work_time"
+   ]
+  },
+  {
+   "id": "core:improvement/fort",
+   "name": "Fort",
+   "build": {
+    "action": "core:build/fort",
+    "required_tech": "core:tech/engineering",
+    "work_time": 600,
+    "kills_builder": false
+   },
+   "yields": {},
+   "tech_yield_changes": [],
+   "adjacent_mountain_yield": null,
+   "yield_per_era": null,
+   "resources": [],
+   "valid_terrains": [
+    "core:terrain/grassland",
+    "core:terrain/plains",
+    "core:terrain/desert",
+    "core:terrain/tundra",
+    "core:terrain/snow"
+   ],
+   "valid_features": [],
+   "defense_pct": 50,
+   "pillage_gold": null,
+   "nation_unique": null,
+   "created_by_great_person": false,
+   "placement": {
+    "buildable_on_resources": true,
+    "outside_borders": true,
+    "destroyed_when_pillaged": true
+   },
+   "effects": [],
+   "kind": "regular",
+   "provenance": "unciv: TileImprovements.json, Fort",
+   "unciv_fields": [
+    "build.required_tech",
+    "build.work_time"
+   ]
+  },
+  {
+   "id": "core:improvement/landmark",
+   "name": "Landmark",
+   "build": {
+    "action": "core:build/landmark",
+    "required_tech": null,
+    "work_time": null,
+    "kills_builder": false
+   },
+   "yields": {},
+   "tech_yield_changes": [],
+   "adjacent_mountain_yield": null,
+   "yield_per_era": {
+    "culture": 1
+   },
+   "resources": [],
+   "valid_terrains": [],
+   "valid_features": [],
+   "defense_pct": null,
+   "pillage_gold": 20,
+   "nation_unique": null,
+   "created_by_great_person": false,
+   "placement": {
+    "requires_improvement": true,
+    "ignore_ownership": true
+   },
+   "effects": [],
+   "kind": "regular",
+   "provenance": "unciv: TileImprovements.json, Landmark",
+   "unciv_fields": [
+    "build.required_tech"
+   ]
+  },
+  {
+   "id": "core:improvement/academy",
+   "name": "Academy",
+   "build": {
+    "action": "core:build/academy",
+    "required_tech": null,
+    "work_time": null,
+    "kills_builder": false
+   },
+   "yields": {
+    "science": 8
+   },
+   "tech_yield_changes": [
+    {
+     "tech": "core:tech/scientific-theory",
+     "yield": "science",
+     "amount": 2
+    },
+    {
+     "tech": "core:tech/atomic-theory",
+     "yield": "science",
+     "amount": 2
+    }
+   ],
+   "adjacent_mountain_yield": null,
+   "yield_per_era": null,
+   "resources": [
+    "core:resource/horses",
+    "core:resource/iron",
+    "core:resource/coal",
+    "core:resource/oil",
+    "core:resource/aluminum",
+    "core:resource/uranium"
+   ],
+   "valid_terrains": [
+    "core:terrain/grassland",
+    "core:terrain/plains",
+    "core:terrain/desert",
+    "core:terrain/tundra",
+    "core:terrain/snow"
+   ],
+   "valid_features": [],
+   "defense_pct": null,
+   "pillage_gold": 20,
+   "nation_unique": null,
+   "created_by_great_person": true,
+   "placement": {
+    "buildable_on_resources": true
+   },
+   "effects": [],
+   "kind": "great_person",
+   "provenance": "unciv: TileImprovements.json, Academy",
+   "unciv_fields": [
+    "build.required_tech"
+   ]
+  },
+  {
+   "id": "core:improvement/customs-house",
+   "name": "Customs House",
+   "build": {
+    "action": "core:build/customs-house",
+    "required_tech": null,
+    "work_time": null,
+    "kills_builder": false
+   },
+   "yields": {
+    "gold": 4
+   },
+   "tech_yield_changes": [
+    {
+     "tech": "core:tech/economics",
+     "yield": "gold",
+     "amount": 1
+    }
+   ],
+   "adjacent_mountain_yield": null,
+   "yield_per_era": null,
+   "resources": [
+    "core:resource/horses",
+    "core:resource/iron",
+    "core:resource/coal",
+    "core:resource/oil",
+    "core:resource/aluminum",
+    "core:resource/uranium"
+   ],
+   "valid_terrains": [
+    "core:terrain/grassland",
+    "core:terrain/plains",
+    "core:terrain/desert",
+    "core:terrain/tundra",
+    "core:terrain/snow"
+   ],
+   "valid_features": [],
+   "defense_pct": null,
+   "pillage_gold": 20,
+   "nation_unique": null,
+   "created_by_great_person": true,
+   "placement": {
+    "buildable_on_resources": true
+   },
+   "effects": [],
+   "kind": "great_person",
+   "provenance": "unciv: TileImprovements.json, Customs house",
+   "unciv_fields": [
+    "build.required_tech"
+   ]
+  },
+  {
+   "id": "core:improvement/manufactory",
+   "name": "Manufactory",
+   "build": {
+    "action": "core:build/manufactory",
+    "required_tech": null,
+    "work_time": null,
+    "kills_builder": false
+   },
+   "yields": {
+    "production": 4
+   },
+   "tech_yield_changes": [
+    {
+     "tech": "core:tech/chemistry",
+     "yield": "production",
+     "amount": 1
+    }
+   ],
+   "adjacent_mountain_yield": null,
+   "yield_per_era": null,
+   "resources": [
+    "core:resource/horses",
+    "core:resource/iron",
+    "core:resource/coal",
+    "core:resource/oil",
+    "core:resource/aluminum",
+    "core:resource/uranium"
+   ],
+   "valid_terrains": [
+    "core:terrain/grassland",
+    "core:terrain/plains",
+    "core:terrain/desert",
+    "core:terrain/tundra",
+    "core:terrain/snow"
+   ],
+   "valid_features": [],
+   "defense_pct": null,
+   "pillage_gold": 20,
+   "nation_unique": null,
+   "created_by_great_person": true,
+   "placement": {
+    "buildable_on_resources": true
+   },
+   "effects": [],
+   "kind": "great_person",
+   "provenance": "unciv: TileImprovements.json, Manufactory",
+   "unciv_fields": [
+    "build.required_tech"
+   ]
+  },
+  {
+   "id": "core:improvement/citadel",
+   "name": "Citadel",
+   "build": {
+    "action": "core:build/citadel",
+    "required_tech": null,
+    "work_time": null,
+    "kills_builder": false
+   },
+   "yields": {},
+   "tech_yield_changes": [],
+   "adjacent_mountain_yield": null,
+   "yield_per_era": null,
+   "resources": [
+    "core:resource/horses",
+    "core:resource/iron",
+    "core:resource/coal",
+    "core:resource/oil",
+    "core:resource/aluminum",
+    "core:resource/uranium"
+   ],
+   "valid_terrains": [
+    "core:terrain/grassland",
+    "core:terrain/plains",
+    "core:terrain/desert",
+    "core:terrain/tundra",
+    "core:terrain/snow"
+   ],
+   "valid_features": [],
+   "defense_pct": 100,
+   "pillage_gold": null,
+   "nation_unique": null,
+   "created_by_great_person": true,
+   "placement": {
+    "buildable_on_resources": true,
+    "in_adjacent_friendly": true
+   },
+   "effects": [
+    {
+     "scope": "tile",
+     "selector": {
+      "kind": "this_tile"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "improvement.culture_bomb_radius",
+     "amount": 1,
+     "needs_mechanic": "culture_bomb_radius",
+     "source": "own value, unverified"
+    },
+    {
+     "scope": "tile",
+     "selector": {
+      "kind": "this_tile"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "improvement.nearby_enemy_damage",
+     "amount": 30,
+     "needs_mechanic": "nearby_enemy_damage",
+     "source": "own value, unverified"
+    }
+   ],
+   "kind": "great_person",
+   "provenance": "unciv: TileImprovements.json, Citadel",
+   "unciv_fields": [
+    "build.required_tech"
+   ]
+  },
+  {
+   "id": "core:improvement/holy-site",
+   "name": "Holy Site",
+   "build": {
+    "action": "core:build/holy-site",
+    "required_tech": null,
+    "work_time": null,
+    "kills_builder": false
+   },
+   "yields": {
+    "faith": 6
+   },
+   "tech_yield_changes": [],
+   "adjacent_mountain_yield": null,
+   "yield_per_era": null,
+   "resources": [
+    "core:resource/horses",
+    "core:resource/iron",
+    "core:resource/coal",
+    "core:resource/oil",
+    "core:resource/aluminum",
+    "core:resource/uranium"
+   ],
+   "valid_terrains": [
+    "core:terrain/grassland",
+    "core:terrain/plains",
+    "core:terrain/desert",
+    "core:terrain/tundra",
+    "core:terrain/snow"
+   ],
+   "valid_features": [],
+   "defense_pct": null,
+   "pillage_gold": 20,
+   "nation_unique": null,
+   "created_by_great_person": true,
+   "placement": {
+    "buildable_on_resources": true
+   },
+   "effects": [],
+   "kind": "great_person",
+   "provenance": "unciv: TileImprovements.json, Holy site",
+   "unciv_fields": [
+    "build.required_tech"
+   ]
+  },
+  {
+   "id": "core:improvement/archaeological-dig",
+   "name": "Archaeological Dig",
+   "build": {
+    "action": "core:build/archaeology-dig",
+    "required_tech": "core:tech/archaeology",
+    "work_time": 600,
+    "kills_builder": false
+   },
+   "yields": {},
+   "tech_yield_changes": [],
+   "adjacent_mountain_yield": null,
+   "yield_per_era": null,
+   "resources": [
+    "core:resource/hidden_antiquity_site",
+    "core:resource/antiquity_site"
+   ],
+   "valid_terrains": [],
+   "valid_features": [],
+   "defense_pct": null,
+   "pillage_gold": null,
+   "nation_unique": null,
+   "created_by_great_person": false,
+   "placement": {
+    "ignore_ownership": true,
+    "prompt_when_complete": true
+   },
+   "effects": [
+    {
+     "scope": "tile",
+     "selector": {
+      "kind": "this_tile"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "improvement.removes_resource",
+     "amount": true,
+     "needs_mechanic": "removes_resource",
+     "source": "own value"
+    }
+   ],
+   "kind": "regular",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:improvement/brazilwood-camp",
+   "name": "Brazilwood Camp",
+   "build": {
+    "action": "core:build/brazilwood-camp",
+    "required_tech": "core:tech/machinery",
+    "work_time": 700,
+    "kills_builder": false
+   },
+   "yields": {
+    "gold": 2
+   },
+   "tech_yield_changes": [
+    {
+     "tech": "core:tech/acoustics",
+     "yield": "culture",
+     "amount": 2
+    }
+   ],
+   "adjacent_mountain_yield": null,
+   "yield_per_era": null,
+   "resources": [],
+   "valid_terrains": [],
+   "valid_features": [
+    "core:feature/jungle"
+   ],
+   "defense_pct": null,
+   "pillage_gold": 10,
+   "nation_unique": "core:nation/brazil",
+   "created_by_great_person": false,
+   "placement": {
+    "requires_feature": true
+   },
+   "effects": [],
+   "kind": "unique",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:improvement/kasbah",
+   "name": "Kasbah",
+   "build": {
+    "action": "core:build/kasbah",
+    "required_tech": "core:tech/chivalry",
+    "work_time": 800,
+    "kills_builder": false
+   },
+   "yields": {
+    "food": 1,
+    "production": 1,
+    "gold": 1
+   },
+   "tech_yield_changes": [],
+   "adjacent_mountain_yield": null,
+   "yield_per_era": null,
+   "resources": [],
+   "valid_terrains": [
+    "core:terrain/desert"
+   ],
+   "valid_features": [],
+   "defense_pct": 50,
+   "pillage_gold": 10,
+   "nation_unique": "core:nation/morocco",
+   "created_by_great_person": false,
+   "placement": {},
+   "effects": [],
+   "kind": "unique",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:improvement/feitoria",
+   "name": "Feitoria",
+   "build": {
+    "action": "core:build/feitoria",
+    "required_tech": "core:tech/navigation",
+    "work_time": 800,
+    "kills_builder": false
+   },
+   "yields": {},
+   "tech_yield_changes": [],
+   "adjacent_mountain_yield": null,
+   "yield_per_era": null,
+   "resources": [],
+   "valid_terrains": [
+    "core:terrain/grassland",
+    "core:terrain/plains",
+    "core:terrain/desert",
+    "core:terrain/tundra",
+    "core:terrain/snow"
+   ],
+   "valid_features": [],
+   "defense_pct": 50,
+   "pillage_gold": 20,
+   "nation_unique": "core:nation/portugal",
+   "created_by_great_person": false,
+   "placement": {
+    "coastal": true,
+    "only_city_state_territory": true
+   },
+   "effects": [
+    {
+     "scope": "tile",
+     "selector": {
+      "kind": "this_tile"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "improvement.luxury_copies_siphoned_from_minor",
+     "amount": 1,
+     "needs_mechanic": "luxury_copies_siphoned_from_minor",
+     "source": "own value"
+    }
+   ],
+   "kind": "unique",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:improvement/chateau",
+   "name": "Chateau",
+   "build": {
+    "action": "core:build/chateau",
+    "required_tech": "core:tech/chivalry",
+    "work_time": 800,
+    "kills_builder": false
+   },
+   "yields": {
+    "culture": 2,
+    "gold": 1
+   },
+   "tech_yield_changes": [
+    {
+     "tech": "core:tech/flight",
+     "yield": "culture",
+     "amount": 1
+    },
+    {
+     "tech": "core:tech/flight",
+     "yield": "gold",
+     "amount": 2
+    }
+   ],
+   "adjacent_mountain_yield": null,
+   "yield_per_era": null,
+   "resources": [],
+   "valid_terrains": [
+    "core:terrain/grassland",
+    "core:terrain/plains",
+    "core:terrain/desert",
+    "core:terrain/tundra",
+    "core:terrain/snow"
+   ],
+   "valid_features": [],
+   "defense_pct": 50,
+   "pillage_gold": 30,
+   "nation_unique": "core:nation/france",
+   "created_by_great_person": false,
+   "placement": {
+    "no_two_adjacent": true,
+    "adjacent_luxury": true
+   },
+   "effects": [],
+   "kind": "unique",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:improvement/terrace-farm",
+   "name": "Terrace Farm",
+   "build": {
+    "action": "core:build/terrace-farm",
+    "required_tech": "core:tech/construction",
+    "work_time": 700,
+    "kills_builder": false
+   },
+   "yields": {
+    "food": 1
+   },
+   "tech_yield_changes": [
+    {
+     "tech": "core:tech/civil-service",
+     "yield": "food",
+     "amount": 1,
+     "condition": "fresh_water"
+    },
+    {
+     "tech": "core:tech/fertilizer",
+     "yield": "food",
+     "amount": 1,
+     "condition": "no_fresh_water"
+    }
+   ],
+   "adjacent_mountain_yield": {
+    "food": 1
+   },
+   "yield_per_era": null,
+   "resources": [],
+   "valid_terrains": [
+    "core:terrain/hill"
+   ],
+   "valid_features": [],
+   "defense_pct": null,
+   "pillage_gold": 18,
+   "nation_unique": "core:nation/inca",
+   "created_by_great_person": false,
+   "placement": {
+    "hills_makes_valid": true
+   },
+   "effects": [],
+   "kind": "unique",
+   "provenance": "unciv: TileImprovements.json, Terrace farm",
+   "unciv_fields": [
+    "build.required_tech",
+    "build.work_time"
+   ]
+  },
+  {
+   "id": "core:improvement/moai",
+   "name": "Moai",
+   "build": {
+    "action": "core:build/moai",
+    "required_tech": "core:tech/construction",
+    "work_time": 400,
+    "kills_builder": false
+   },
+   "yields": {
+    "culture": 1
+   },
+   "tech_yield_changes": [
+    {
+     "tech": "core:tech/flight",
+     "yield": "gold",
+     "amount": 1
+    }
+   ],
+   "adjacent_mountain_yield": null,
+   "yield_per_era": null,
+   "resources": [],
+   "valid_terrains": [
+    "core:terrain/grassland",
+    "core:terrain/plains",
+    "core:terrain/desert",
+    "core:terrain/tundra",
+    "core:terrain/snow"
+   ],
+   "valid_features": [],
+   "defense_pct": null,
+   "pillage_gold": 10,
+   "nation_unique": "core:nation/polynesia",
+   "created_by_great_person": false,
+   "placement": {
+    "buildable_on_resources": true,
+    "coastal": true
+   },
+   "effects": [
+    {
+     "scope": "tile",
+     "selector": {
+      "kind": "this_tile"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "improvement.culture_adjacent_same_type",
+     "amount": 1,
+     "needs_mechanic": "culture_adjacent_same_type",
+     "source": "own value, unverified"
+    }
+   ],
+   "kind": "unique",
+   "provenance": "unciv: TileImprovements.json, Moai",
+   "unciv_fields": [
+    "build.required_tech",
+    "build.work_time"
+   ]
+  },
+  {
+   "id": "core:improvement/polder",
+   "name": "Polder",
+   "build": {
+    "action": "core:build/polder",
+    "required_tech": "core:tech/guilds",
+    "work_time": 700,
+    "kills_builder": false
+   },
+   "yields": {
+    "food": 3
+   },
+   "tech_yield_changes": [
+    {
+     "tech": "core:tech/economics",
+     "yield": "production",
+     "amount": 1
+    },
+    {
+     "tech": "core:tech/economics",
+     "yield": "gold",
+     "amount": 2
+    }
+   ],
+   "adjacent_mountain_yield": null,
+   "yield_per_era": null,
+   "resources": [],
+   "valid_terrains": [],
+   "valid_features": [
+    "core:feature/marsh",
+    "core:feature/flood-plains"
+   ],
+   "defense_pct": null,
+   "pillage_gold": 18,
+   "nation_unique": "core:nation/netherlands",
+   "created_by_great_person": false,
+   "placement": {
+    "requires_feature": true
+   },
+   "effects": [],
+   "kind": "unique",
+   "source": "unciv: Gods & Kings/TileImprovements.json, Polder (food, required technology, work time, bonuses after Economics, pillage gold, valid terrains; checked 2026-10-20)",
+   "provenance": "unciv: TileImprovements.json, Polder",
+   "unciv_fields": [
+    "build.required_tech",
+    "build.work_time"
+   ]
+  }
+ ],
+ "notice": "Derived from Unciv (https://github.com/yairm210/Unciv), MPL-2.0: rule fields of the entries marked `unciv:` come from Unciv's `Gods & Kings` JSON files at commit 18827b1f; entries marked `own value, unverified` have no Unciv counterpart. Listed per file in classic/docs/classic/UNCIV-ATTRIBUTION.md."
+}

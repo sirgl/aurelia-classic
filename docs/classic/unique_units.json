@@ -1,0 +1,2799 @@
+{
+ "schema": "classic-spec/1",
+ "catalog": "unique_units",
+ "edition": "Classic rule set (Unciv Gods & Kings ruleset plus own extensions)",
+ "count": 59,
+ "items": [
+  {
+   "id": "core:unit/ship-of-the-line",
+   "name": "Ship of the Line",
+   "class": "core:unit-class/frigate",
+   "role": "navalranged",
+   "domain": "core:domain/sea",
+   "era": "core:era/renaissance",
+   "combat": 30,
+   "ranged_combat": 35,
+   "range": 2,
+   "moves": 5,
+   "sight": 2,
+   "cost": 185,
+   "faith_cost": null,
+   "required_tech": "core:tech/navigation",
+   "obsolete_tech": "core:tech/electronics",
+   "required_resources": [
+    {
+     "resource": "core:resource/iron",
+     "amount": 1
+    }
+   ],
+   "upgrades_to": [
+    "core:unit/battleship"
+   ],
+   "free_promotions": [
+    "core:promotion/only-defensive",
+    "core:promotion/extra-sight-i"
+   ],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 3,
+   "xp_value_defense": 3,
+   "abilities": {
+    "pillage": true,
+    "mechanized": true
+   },
+   "nation": "core:nation/england",
+   "replaces": "core:unit/frigate",
+   "provenance": "unciv: Units.json, Ship of the Line",
+   "unciv_fields": [
+    "combat",
+    "cost",
+    "moves",
+    "obsolete_tech",
+    "ranged_combat",
+    "required_resources",
+    "required_tech",
+    "upgrades_to"
+   ]
+  },
+  {
+   "id": "core:unit/b17",
+   "name": "B17",
+   "class": "core:unit-class/bomber",
+   "role": "bomber",
+   "domain": "core:domain/air",
+   "era": "core:era/atomic",
+   "combat": 0,
+   "ranged_combat": 70,
+   "range": 10,
+   "moves": 2,
+   "sight": 2,
+   "cost": 375,
+   "faith_cost": null,
+   "required_tech": "core:tech/radar",
+   "obsolete_tech": null,
+   "required_resources": [
+    {
+     "resource": "core:resource/oil",
+     "amount": 1
+    }
+   ],
+   "upgrades_to": [
+    "core:unit/stealth-bomber"
+   ],
+   "free_promotions": [
+    "core:promotion/evasion",
+    "core:promotion/air-siege-1"
+   ],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 3,
+   "xp_value_defense": 2,
+   "abilities": {
+    "ignore_building_defense": true,
+    "mechanized": true,
+    "immobile": true,
+    "air_unit_cap": 1,
+    "special": "fighter"
+   },
+   "nation": "core:nation/america",
+   "replaces": "core:unit/bomber",
+   "provenance": "unciv: Units.json, B17",
+   "unciv_fields": [
+    "cost",
+    "obsolete_tech",
+    "required_tech",
+    "upgrades_to"
+   ]
+  },
+  {
+   "id": "core:unit/zero",
+   "name": "Zero",
+   "class": "core:unit-class/fighter",
+   "role": "fighter",
+   "domain": "core:domain/air",
+   "era": "core:era/atomic",
+   "combat": 0,
+   "ranged_combat": 45,
+   "range": 8,
+   "moves": 2,
+   "sight": 2,
+   "cost": 375,
+   "faith_cost": null,
+   "required_tech": "core:tech/radar",
+   "obsolete_tech": null,
+   "required_resources": [],
+   "upgrades_to": [
+    "core:unit/jet-fighter"
+   ],
+   "free_promotions": [
+    "core:promotion/interception-iv",
+    "core:promotion/anti-fighter",
+    "core:promotion/air-sweep",
+    "core:promotion/air-recon",
+    "core:promotion/anti-air-ii"
+   ],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 3,
+   "xp_value_defense": 2,
+   "abilities": {
+    "ignore_building_defense": true,
+    "mechanized": true,
+    "immobile": true,
+    "air_unit_cap": 1,
+    "air_intercept_range": 8,
+    "special": "fighter"
+   },
+   "nation": "core:nation/japan",
+   "replaces": "core:unit/fighter",
+   "provenance": "unciv: Units.json, Zero",
+   "unciv_fields": [
+    "cost",
+    "obsolete_tech",
+    "required_tech",
+    "upgrades_to"
+   ]
+  },
+  {
+   "id": "core:unit/panzer",
+   "name": "Panzer",
+   "class": "core:unit-class/tank",
+   "role": "armor",
+   "domain": "core:domain/land",
+   "era": "core:era/atomic",
+   "combat": 80,
+   "ranged_combat": 0,
+   "range": 0,
+   "moves": 6,
+   "sight": 2,
+   "cost": 375,
+   "faith_cost": 750,
+   "required_tech": "core:tech/combined-arms",
+   "obsolete_tech": null,
+   "required_resources": [
+    {
+     "resource": "core:resource/oil",
+     "amount": 1
+    }
+   ],
+   "upgrades_to": [
+    "core:unit/modern-armor"
+   ],
+   "free_promotions": [
+    "core:promotion/no-defensive-bonuses",
+    "core:promotion/can-move-after-attacking"
+   ],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 3,
+   "xp_value_defense": 3,
+   "abilities": {
+    "pillage": true,
+    "ignore_building_defense": true,
+    "mechanized": true,
+    "requires_faith_purchase_enabled": true
+   },
+   "nation": "core:nation/germany",
+   "replaces": "core:unit/tank",
+   "provenance": "unciv: Units.json, Panzer",
+   "unciv_fields": [
+    "combat",
+    "cost",
+    "moves",
+    "obsolete_tech",
+    "ranged_combat",
+    "required_resources",
+    "required_tech",
+    "upgrades_to"
+   ]
+  },
+  {
+   "id": "core:unit/cossack",
+   "name": "Cossack",
+   "class": "core:unit-class/cavalry",
+   "role": "mounted",
+   "domain": "core:domain/land",
+   "era": "core:era/industrial",
+   "combat": 34,
+   "ranged_combat": 0,
+   "range": 0,
+   "moves": 4,
+   "sight": 2,
+   "cost": 225,
+   "faith_cost": 450,
+   "required_tech": "core:tech/military-science",
+   "obsolete_tech": "core:tech/combustion",
+   "required_resources": [
+    {
+     "resource": "core:resource/horses",
+     "amount": 1
+    }
+   ],
+   "upgrades_to": [
+    "core:unit/landship"
+   ],
+   "free_promotions": [
+    "core:promotion/no-defensive-bonuses",
+    "core:promotion/can-move-after-attacking",
+    "core:promotion/stronger-vs-damaged",
+    "core:promotion/city-penalty"
+   ],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 3,
+   "xp_value_defense": 3,
+   "abilities": {
+    "pillage": true,
+    "ignore_building_defense": true,
+    "requires_faith_purchase_enabled": true
+   },
+   "nation": "core:nation/russia",
+   "replaces": "core:unit/cavalry",
+   "provenance": "unciv: Units.json, Cossack",
+   "unciv_fields": [
+    "combat",
+    "cost",
+    "moves",
+    "obsolete_tech",
+    "ranged_combat",
+    "required_resources",
+    "required_tech",
+    "upgrades_to"
+   ]
+  },
+  {
+   "id": "core:unit/sipahi",
+   "name": "Sipahi",
+   "class": "core:unit-class/lancer",
+   "role": "mounted",
+   "domain": "core:domain/land",
+   "era": "core:era/renaissance",
+   "combat": 25,
+   "ranged_combat": 0,
+   "range": 0,
+   "moves": 5,
+   "sight": 2,
+   "cost": 185,
+   "faith_cost": 370,
+   "required_tech": "core:tech/metallurgy",
+   "obsolete_tech": "core:tech/combined-arms",
+   "required_resources": [
+    {
+     "resource": "core:resource/horses",
+     "amount": 1
+    }
+   ],
+   "upgrades_to": [
+    "core:unit/anti-tank-gun"
+   ],
+   "free_promotions": [
+    "core:promotion/no-defensive-bonuses",
+    "core:promotion/free-pillage-moves",
+    "core:promotion/extra-sight-i",
+    "core:promotion/can-move-after-attacking",
+    "core:promotion/city-penalty",
+    "core:promotion/formation-1"
+   ],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 3,
+   "xp_value_defense": 3,
+   "abilities": {
+    "pillage": true,
+    "ignore_building_defense": true,
+    "requires_faith_purchase_enabled": true
+   },
+   "nation": "core:nation/ottomans",
+   "replaces": "core:unit/lancer",
+   "provenance": "unciv: Units.json, Sipahi",
+   "unciv_fields": [
+    "combat",
+    "cost",
+    "moves",
+    "obsolete_tech",
+    "ranged_combat",
+    "required_resources",
+    "required_tech",
+    "upgrades_to"
+   ]
+  },
+  {
+   "id": "core:unit/minuteman",
+   "name": "Minuteman",
+   "class": "core:unit-class/musketman",
+   "role": "gun",
+   "domain": "core:domain/land",
+   "era": "core:era/renaissance",
+   "combat": 24,
+   "ranged_combat": 0,
+   "range": 0,
+   "moves": 2,
+   "sight": 2,
+   "cost": 150,
+   "faith_cost": 300,
+   "required_tech": "core:tech/gunpowder",
+   "obsolete_tech": "core:tech/rifling",
+   "required_resources": [],
+   "upgrades_to": [
+    "core:unit/rifleman"
+   ],
+   "free_promotions": [
+    "core:promotion/ignore-terrain-cost",
+    "core:promotion/drill-1",
+    "core:promotion/golden-age-points"
+   ],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 3,
+   "xp_value_defense": 3,
+   "abilities": {
+    "pillage": true,
+    "ignore_building_defense": true,
+    "conscription": 4,
+    "requires_faith_purchase_enabled": true
+   },
+   "nation": "core:nation/america",
+   "replaces": "core:unit/musketman",
+   "provenance": "unciv: Units.json, Minuteman",
+   "unciv_fields": [
+    "combat",
+    "cost",
+    "moves",
+    "obsolete_tech",
+    "ranged_combat",
+    "required_resources",
+    "required_tech",
+    "upgrades_to"
+   ]
+  },
+  {
+   "id": "core:unit/musketeer",
+   "name": "Musketeer",
+   "class": "core:unit-class/musketman",
+   "role": "gun",
+   "domain": "core:domain/land",
+   "era": "core:era/renaissance",
+   "combat": 28,
+   "ranged_combat": 0,
+   "range": 0,
+   "moves": 2,
+   "sight": 2,
+   "cost": 150,
+   "faith_cost": 300,
+   "required_tech": "core:tech/gunpowder",
+   "obsolete_tech": "core:tech/rifling",
+   "required_resources": [],
+   "upgrades_to": [
+    "core:unit/rifleman"
+   ],
+   "free_promotions": [],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 3,
+   "xp_value_defense": 3,
+   "abilities": {
+    "pillage": true,
+    "ignore_building_defense": true,
+    "conscription": 4,
+    "requires_faith_purchase_enabled": true
+   },
+   "nation": "core:nation/france",
+   "replaces": "core:unit/musketman",
+   "provenance": "unciv: Units.json, Musketeer",
+   "unciv_fields": [
+    "combat",
+    "cost",
+    "moves",
+    "obsolete_tech",
+    "ranged_combat",
+    "required_resources",
+    "required_tech",
+    "upgrades_to"
+   ]
+  },
+  {
+   "id": "core:unit/janissary",
+   "name": "Janissary",
+   "class": "core:unit-class/musketman",
+   "role": "gun",
+   "domain": "core:domain/land",
+   "era": "core:era/renaissance",
+   "combat": 24,
+   "ranged_combat": 0,
+   "range": 0,
+   "moves": 2,
+   "sight": 2,
+   "cost": 150,
+   "faith_cost": 300,
+   "required_tech": "core:tech/gunpowder",
+   "obsolete_tech": "core:tech/rifling",
+   "required_resources": [],
+   "upgrades_to": [
+    "core:unit/rifleman"
+   ],
+   "free_promotions": [
+    "core:promotion/heal-if-destroy-enemy",
+    "core:promotion/attack-bonus"
+   ],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 3,
+   "xp_value_defense": 3,
+   "abilities": {
+    "pillage": true,
+    "ignore_building_defense": true,
+    "conscription": 4,
+    "requires_faith_purchase_enabled": true
+   },
+   "nation": "core:nation/ottomans",
+   "replaces": "core:unit/musketman",
+   "provenance": "unciv: Units.json, Janissary",
+   "unciv_fields": [
+    "combat",
+    "cost",
+    "moves",
+    "obsolete_tech",
+    "ranged_combat",
+    "required_resources",
+    "required_tech",
+    "upgrades_to"
+   ]
+  },
+  {
+   "id": "core:unit/samurai",
+   "name": "Samurai",
+   "class": "core:unit-class/longswordsman",
+   "role": "melee",
+   "domain": "core:domain/land",
+   "era": "core:era/medieval",
+   "combat": 21,
+   "ranged_combat": 0,
+   "range": 0,
+   "moves": 2,
+   "sight": 2,
+   "cost": 120,
+   "faith_cost": 240,
+   "required_tech": "core:tech/steel",
+   "obsolete_tech": "core:tech/gunpowder",
+   "required_resources": [
+    {
+     "resource": "core:resource/iron",
+     "amount": 1
+    }
+   ],
+   "upgrades_to": [
+    "core:unit/musketman"
+   ],
+   "free_promotions": [
+    "core:promotion/shock-1",
+    "core:promotion/spawn-generals-ii"
+   ],
+   "worker_actions": [
+    "core:build/fishing-boats-no-kill"
+   ],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 3,
+   "xp_value_defense": 3,
+   "abilities": {
+    "work_rate": 100,
+    "pillage": true,
+    "conscription": 3,
+    "requires_faith_purchase_enabled": true
+   },
+   "nation": "core:nation/japan",
+   "replaces": "core:unit/longswordsman",
+   "provenance": "unciv: Units.json, Samurai",
+   "unciv_fields": [
+    "combat",
+    "cost",
+    "moves",
+    "obsolete_tech",
+    "ranged_combat",
+    "required_resources",
+    "required_tech",
+    "upgrades_to"
+   ]
+  },
+  {
+   "id": "core:unit/camel-archer",
+   "name": "Camel Archer",
+   "class": "core:unit-class/knight",
+   "role": "archer",
+   "domain": "core:domain/land",
+   "era": "core:era/medieval",
+   "combat": 17,
+   "ranged_combat": 21,
+   "range": 2,
+   "moves": 4,
+   "sight": 2,
+   "cost": 120,
+   "faith_cost": 240,
+   "required_tech": "core:tech/chivalry",
+   "obsolete_tech": "core:tech/military-science",
+   "required_resources": [
+    {
+     "resource": "core:resource/horses",
+     "amount": 1
+    }
+   ],
+   "upgrades_to": [
+    "core:unit/cavalry"
+   ],
+   "free_promotions": [
+    "core:promotion/no-defensive-bonuses",
+    "core:promotion/can-move-after-attacking",
+    "core:promotion/only-defensive"
+   ],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 3,
+   "xp_value_defense": 3,
+   "abilities": {
+    "pillage": true,
+    "requires_faith_purchase_enabled": true
+   },
+   "nation": "core:nation/arabia",
+   "replaces": "core:unit/knight",
+   "provenance": "unciv: Units.json, Camel Archer",
+   "unciv_fields": [
+    "combat",
+    "cost",
+    "moves",
+    "obsolete_tech",
+    "ranged_combat",
+    "required_resources",
+    "required_tech",
+    "upgrades_to"
+   ]
+  },
+  {
+   "id": "core:unit/naresuan-s-elephant",
+   "name": "Naresuan's Elephant",
+   "class": "core:unit-class/knight",
+   "role": "mounted",
+   "domain": "core:domain/land",
+   "era": "core:era/medieval",
+   "combat": 25,
+   "ranged_combat": 0,
+   "range": 0,
+   "moves": 3,
+   "sight": 2,
+   "cost": 120,
+   "faith_cost": 240,
+   "required_tech": "core:tech/chivalry",
+   "obsolete_tech": "core:tech/military-science",
+   "required_resources": [],
+   "upgrades_to": [
+    "core:unit/cavalry"
+   ],
+   "free_promotions": [
+    "core:promotion/no-defensive-bonuses",
+    "core:promotion/anti-mounted-i",
+    "core:promotion/can-move-after-attacking",
+    "core:promotion/city-penalty"
+   ],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 3,
+   "xp_value_defense": 3,
+   "abilities": {
+    "pillage": true,
+    "requires_faith_purchase_enabled": true
+   },
+   "nation": "core:nation/siam",
+   "replaces": "core:unit/knight",
+   "provenance": "unciv: Units.json, Naresuan's Elephant",
+   "unciv_fields": [
+    "combat",
+    "cost",
+    "moves",
+    "obsolete_tech",
+    "ranged_combat",
+    "required_resources",
+    "required_tech",
+    "upgrades_to"
+   ]
+  },
+  {
+   "id": "core:unit/mandekalu-cavalry",
+   "name": "Mandekalu Cavalry",
+   "class": "core:unit-class/knight",
+   "role": "mounted",
+   "domain": "core:domain/land",
+   "era": "core:era/medieval",
+   "combat": 20,
+   "ranged_combat": 0,
+   "range": 0,
+   "moves": 4,
+   "sight": 2,
+   "cost": 110,
+   "faith_cost": 220,
+   "required_tech": "core:tech/chivalry",
+   "obsolete_tech": "core:tech/military-science",
+   "required_resources": [
+    {
+     "resource": "core:resource/horses",
+     "amount": 1
+    }
+   ],
+   "upgrades_to": [
+    "core:unit/cavalry"
+   ],
+   "free_promotions": [
+    "core:promotion/no-defensive-bonuses",
+    "core:promotion/can-move-after-attacking"
+   ],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 3,
+   "xp_value_defense": 3,
+   "abilities": {
+    "pillage": true,
+    "requires_faith_purchase_enabled": true
+   },
+   "nation": "core:nation/songhai",
+   "replaces": "core:unit/knight",
+   "provenance": "unciv: Units.json, Mandekalu Cavalry",
+   "unciv_fields": [
+    "combat",
+    "cost",
+    "moves",
+    "obsolete_tech",
+    "ranged_combat",
+    "required_resources",
+    "required_tech",
+    "upgrades_to"
+   ]
+  },
+  {
+   "id": "core:unit/chu-ko-nu",
+   "name": "Chu-Ko-Nu",
+   "class": "core:unit-class/crossbowman",
+   "role": "archer",
+   "domain": "core:domain/land",
+   "era": "core:era/medieval",
+   "combat": 13,
+   "ranged_combat": 14,
+   "range": 2,
+   "moves": 2,
+   "sight": 2,
+   "cost": 120,
+   "faith_cost": 240,
+   "required_tech": "core:tech/machinery",
+   "obsolete_tech": "core:tech/industrialization",
+   "required_resources": [],
+   "upgrades_to": [
+    "core:unit/gatling-gun"
+   ],
+   "free_promotions": [
+    "core:promotion/only-defensive",
+    "core:promotion/second-attack"
+   ],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 3,
+   "xp_value_defense": 3,
+   "abilities": {
+    "pillage": true,
+    "requires_faith_purchase_enabled": true
+   },
+   "nation": "core:nation/china",
+   "replaces": "core:unit/crossbowman",
+   "provenance": "unciv: Units.json, Chu-Ko-Nu",
+   "unciv_fields": [
+    "combat",
+    "cost",
+    "moves",
+    "obsolete_tech",
+    "ranged_combat",
+    "required_resources",
+    "required_tech",
+    "upgrades_to"
+   ]
+  },
+  {
+   "id": "core:unit/longbowman",
+   "name": "Longbowman",
+   "class": "core:unit-class/crossbowman",
+   "role": "archer",
+   "domain": "core:domain/land",
+   "era": "core:era/medieval",
+   "combat": 13,
+   "ranged_combat": 18,
+   "range": 2,
+   "moves": 2,
+   "sight": 2,
+   "cost": 120,
+   "faith_cost": 240,
+   "required_tech": "core:tech/machinery",
+   "obsolete_tech": "core:tech/industrialization",
+   "required_resources": [],
+   "upgrades_to": [
+    "core:unit/gatling-gun"
+   ],
+   "free_promotions": [
+    "core:promotion/only-defensive",
+    "core:promotion/range"
+   ],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 3,
+   "xp_value_defense": 3,
+   "abilities": {
+    "pillage": true,
+    "requires_faith_purchase_enabled": true
+   },
+   "nation": "core:nation/england",
+   "replaces": "core:unit/crossbowman",
+   "provenance": "unciv: Units.json, Longbowman",
+   "unciv_fields": [
+    "combat",
+    "cost",
+    "moves",
+    "obsolete_tech",
+    "ranged_combat",
+    "required_resources",
+    "required_tech",
+    "upgrades_to"
+   ]
+  },
+  {
+   "id": "core:unit/ballista",
+   "name": "Ballista",
+   "class": "core:unit-class/catapult",
+   "role": "siege",
+   "domain": "core:domain/land",
+   "era": "core:era/classical",
+   "combat": 8,
+   "ranged_combat": 10,
+   "range": 2,
+   "moves": 2,
+   "sight": 2,
+   "cost": 75,
+   "faith_cost": 150,
+   "required_tech": "core:tech/mathematics",
+   "obsolete_tech": "core:tech/physics",
+   "required_resources": [],
+   "upgrades_to": [
+    "core:unit/trebuchet"
+   ],
+   "free_promotions": [
+    "core:promotion/only-defensive",
+    "core:promotion/city-siege",
+    "core:promotion/no-defensive-bonuses",
+    "core:promotion/must-set-up",
+    "core:promotion/sight-penalty"
+   ],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 3,
+   "xp_value_defense": 3,
+   "abilities": {
+    "pillage": true,
+    "mechanized": true,
+    "requires_faith_purchase_enabled": true
+   },
+   "nation": "core:nation/rome",
+   "replaces": "core:unit/catapult",
+   "provenance": "unciv: Units.json, Ballista",
+   "unciv_fields": [
+    "combat",
+    "cost",
+    "moves",
+    "obsolete_tech",
+    "ranged_combat",
+    "required_resources",
+    "required_tech",
+    "upgrades_to"
+   ]
+  },
+  {
+   "id": "core:unit/companion-cavalry",
+   "name": "Companion Cavalry",
+   "class": "core:unit-class/horseman",
+   "role": "mounted",
+   "domain": "core:domain/land",
+   "era": "core:era/classical",
+   "combat": 14,
+   "ranged_combat": 0,
+   "range": 0,
+   "moves": 5,
+   "sight": 2,
+   "cost": 75,
+   "faith_cost": 150,
+   "required_tech": "core:tech/horseback-riding",
+   "obsolete_tech": "core:tech/chivalry",
+   "required_resources": [
+    {
+     "resource": "core:resource/horses",
+     "amount": 1
+    }
+   ],
+   "upgrades_to": [
+    "core:unit/knight"
+   ],
+   "free_promotions": [
+    "core:promotion/no-defensive-bonuses",
+    "core:promotion/can-move-after-attacking",
+    "core:promotion/spawn-generals-i",
+    "core:promotion/city-penalty"
+   ],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 3,
+   "xp_value_defense": 3,
+   "abilities": {
+    "pillage": true,
+    "requires_faith_purchase_enabled": true
+   },
+   "nation": "core:nation/greece",
+   "replaces": "core:unit/horseman",
+   "provenance": "unciv: Units.json, Companion Cavalry",
+   "unciv_fields": [
+    "combat",
+    "cost",
+    "moves",
+    "obsolete_tech",
+    "ranged_combat",
+    "required_resources",
+    "required_tech",
+    "upgrades_to"
+   ]
+  },
+  {
+   "id": "core:unit/mohawk-warrior",
+   "name": "Mohawk Warrior",
+   "class": "core:unit-class/swordsman",
+   "role": "melee",
+   "domain": "core:domain/land",
+   "era": "core:era/classical",
+   "combat": 14,
+   "ranged_combat": 0,
+   "range": 0,
+   "moves": 2,
+   "sight": 2,
+   "cost": 75,
+   "faith_cost": 150,
+   "required_tech": "core:tech/iron-working",
+   "obsolete_tech": "core:tech/gunpowder",
+   "required_resources": [],
+   "upgrades_to": [
+    "core:unit/longswordsman"
+   ],
+   "free_promotions": [
+    "core:promotion/mohawk"
+   ],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 3,
+   "xp_value_defense": 3,
+   "abilities": {
+    "pillage": true,
+    "conscription": 1,
+    "requires_faith_purchase_enabled": true
+   },
+   "nation": "core:nation/iroquois",
+   "replaces": "core:unit/swordsman",
+   "provenance": "unciv: Units.json, Mohawk Warrior",
+   "unciv_fields": [
+    "combat",
+    "cost",
+    "moves",
+    "obsolete_tech",
+    "ranged_combat",
+    "required_resources",
+    "required_tech",
+    "upgrades_to"
+   ]
+  },
+  {
+   "id": "core:unit/legion",
+   "name": "Legion",
+   "class": "core:unit-class/swordsman",
+   "role": "melee",
+   "domain": "core:domain/land",
+   "era": "core:era/classical",
+   "combat": 17,
+   "ranged_combat": 0,
+   "range": 0,
+   "moves": 2,
+   "sight": 2,
+   "cost": 75,
+   "faith_cost": 150,
+   "required_tech": "core:tech/iron-working",
+   "obsolete_tech": "core:tech/gunpowder",
+   "required_resources": [
+    {
+     "resource": "core:resource/iron",
+     "amount": 1
+    }
+   ],
+   "upgrades_to": [
+    "core:unit/longswordsman"
+   ],
+   "free_promotions": [],
+   "worker_actions": [
+    "core:build/road",
+    "core:build/fort"
+   ],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 3,
+   "xp_value_defense": 3,
+   "abilities": {
+    "work_rate": 100,
+    "pillage": true,
+    "conscription": 1,
+    "requires_faith_purchase_enabled": true
+   },
+   "nation": "core:nation/rome",
+   "replaces": "core:unit/swordsman",
+   "provenance": "unciv: Units.json, Legion",
+   "unciv_fields": [
+    "combat",
+    "cost",
+    "moves",
+    "obsolete_tech",
+    "ranged_combat",
+    "required_resources",
+    "required_tech",
+    "upgrades_to"
+   ]
+  },
+  {
+   "id": "core:unit/war-chariot",
+   "name": "War Chariot",
+   "class": "core:unit-class/chariot-archer",
+   "role": "archer",
+   "domain": "core:domain/land",
+   "era": "core:era/ancient",
+   "combat": 6,
+   "ranged_combat": 10,
+   "range": 2,
+   "moves": 5,
+   "sight": 2,
+   "cost": 56,
+   "faith_cost": 112,
+   "required_tech": "core:tech/the-wheel",
+   "obsolete_tech": "core:tech/chivalry",
+   "required_resources": [],
+   "upgrades_to": [
+    "core:unit/knight"
+   ],
+   "free_promotions": [
+    "core:promotion/rough-terrain-ends-turn",
+    "core:promotion/no-defensive-bonuses",
+    "core:promotion/only-defensive"
+   ],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 3,
+   "xp_value_defense": 3,
+   "abilities": {
+    "pillage": true,
+    "requires_faith_purchase_enabled": true
+   },
+   "nation": "core:nation/egypt",
+   "replaces": "core:unit/chariot-archer",
+   "provenance": "unciv: Units.json, War Chariot",
+   "unciv_fields": [
+    "combat",
+    "cost",
+    "moves",
+    "obsolete_tech",
+    "ranged_combat",
+    "required_resources",
+    "required_tech",
+    "upgrades_to"
+   ]
+  },
+  {
+   "id": "core:unit/war-elephant",
+   "name": "War Elephant",
+   "class": "core:unit-class/chariot-archer",
+   "role": "archer",
+   "domain": "core:domain/land",
+   "era": "core:era/ancient",
+   "combat": 9,
+   "ranged_combat": 11,
+   "range": 2,
+   "moves": 3,
+   "sight": 2,
+   "cost": 70,
+   "faith_cost": 140,
+   "required_tech": "core:tech/the-wheel",
+   "obsolete_tech": "core:tech/chivalry",
+   "required_resources": [],
+   "upgrades_to": [
+    "core:unit/knight"
+   ],
+   "free_promotions": [
+    "core:promotion/no-defensive-bonuses",
+    "core:promotion/only-defensive"
+   ],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 3,
+   "xp_value_defense": 3,
+   "abilities": {
+    "pillage": true,
+    "requires_faith_purchase_enabled": true
+   },
+   "nation": "core:nation/india",
+   "replaces": "core:unit/chariot-archer",
+   "provenance": "unciv: Units.json, War Elephant",
+   "unciv_fields": [
+    "combat",
+    "cost",
+    "moves",
+    "obsolete_tech",
+    "ranged_combat",
+    "required_resources",
+    "required_tech",
+    "upgrades_to"
+   ]
+  },
+  {
+   "id": "core:unit/hoplite",
+   "name": "Hoplite",
+   "class": "core:unit-class/spearman",
+   "role": "melee",
+   "domain": "core:domain/land",
+   "era": "core:era/ancient",
+   "combat": 13,
+   "ranged_combat": 0,
+   "range": 0,
+   "moves": 2,
+   "sight": 2,
+   "cost": 56,
+   "faith_cost": 112,
+   "required_tech": "core:tech/bronze-working",
+   "obsolete_tech": "core:tech/civil-service",
+   "required_resources": [],
+   "upgrades_to": [
+    "core:unit/pikeman"
+   ],
+   "free_promotions": [
+    "core:promotion/anti-mounted-i"
+   ],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 3,
+   "xp_value_defense": 3,
+   "abilities": {
+    "pillage": true,
+    "conscription": 2,
+    "requires_faith_purchase_enabled": true
+   },
+   "nation": "core:nation/greece",
+   "replaces": "core:unit/spearman",
+   "provenance": "unciv: Units.json, Hoplite",
+   "unciv_fields": [
+    "combat",
+    "cost",
+    "moves",
+    "obsolete_tech",
+    "ranged_combat",
+    "required_resources",
+    "required_tech",
+    "upgrades_to"
+   ]
+  },
+  {
+   "id": "core:unit/immortal",
+   "name": "Immortal",
+   "class": "core:unit-class/spearman",
+   "role": "melee",
+   "domain": "core:domain/land",
+   "era": "core:era/ancient",
+   "combat": 12,
+   "ranged_combat": 0,
+   "range": 0,
+   "moves": 2,
+   "sight": 2,
+   "cost": 56,
+   "faith_cost": 112,
+   "required_tech": "core:tech/bronze-working",
+   "obsolete_tech": "core:tech/civil-service",
+   "required_resources": [],
+   "upgrades_to": [
+    "core:unit/pikeman"
+   ],
+   "free_promotions": [
+    "core:promotion/anti-mounted-i",
+    "core:promotion/faster-heal"
+   ],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 3,
+   "xp_value_defense": 3,
+   "abilities": {
+    "pillage": true,
+    "conscription": 2,
+    "requires_faith_purchase_enabled": true
+   },
+   "nation": "core:nation/persia",
+   "replaces": "core:unit/spearman",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:unit/jaguar",
+   "name": "Jaguar",
+   "class": "core:unit-class/warrior",
+   "role": "melee",
+   "domain": "core:domain/land",
+   "era": "core:era/ancient",
+   "combat": 8,
+   "ranged_combat": 0,
+   "range": 0,
+   "moves": 2,
+   "sight": 2,
+   "cost": 40,
+   "faith_cost": 80,
+   "required_tech": null,
+   "obsolete_tech": "core:tech/metal-casting",
+   "required_resources": [],
+   "upgrades_to": [
+    "core:unit/swordsman"
+   ],
+   "free_promotions": [
+    "core:promotion/jaguar",
+    "core:promotion/woodsman",
+    "core:promotion/partial-heal-if-destroy-enemy"
+   ],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 3,
+   "xp_value_defense": 3,
+   "abilities": {
+    "pillage": true,
+    "conscription": 1,
+    "requires_faith_purchase_enabled": true
+   },
+   "nation": "core:nation/aztecs",
+   "replaces": "core:unit/warrior",
+   "provenance": "unciv: Units.json, Jaguar",
+   "unciv_fields": [
+    "combat",
+    "cost",
+    "moves",
+    "obsolete_tech",
+    "ranged_combat",
+    "required_resources",
+    "upgrades_to"
+   ]
+  },
+  {
+   "id": "core:unit/mehal-sefari",
+   "name": "Mehal Sefari",
+   "class": "core:unit-class/rifleman",
+   "role": "gun",
+   "domain": "core:domain/land",
+   "era": "core:era/industrial",
+   "combat": 34,
+   "ranged_combat": 0,
+   "range": 0,
+   "moves": 2,
+   "sight": 2,
+   "cost": 200,
+   "faith_cost": null,
+   "required_tech": "core:tech/rifling",
+   "obsolete_tech": "core:tech/replaceable-parts",
+   "required_resources": [],
+   "upgrades_to": [
+    "core:unit/great-war-infantry"
+   ],
+   "free_promotions": [
+    "core:promotion/drill-1",
+    "core:promotion/defend-near-capital"
+   ],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 3,
+   "xp_value_defense": 3,
+   "abilities": {
+    "pillage": true,
+    "ignore_building_defense": true,
+    "conscription": 5
+   },
+   "nation": "core:nation/ethiopia",
+   "replaces": "core:unit/rifleman",
+   "provenance": "unciv: Units.json, Mehal Sefari",
+   "unciv_fields": [
+    "combat",
+    "cost",
+    "moves",
+    "obsolete_tech",
+    "ranged_combat",
+    "required_resources",
+    "required_tech",
+    "upgrades_to"
+   ]
+  },
+  {
+   "id": "core:unit/impi",
+   "name": "Impi",
+   "class": "core:unit-class/pikeman",
+   "role": "melee",
+   "domain": "core:domain/land",
+   "era": "core:era/medieval",
+   "combat": 16,
+   "ranged_combat": 0,
+   "range": 0,
+   "moves": 2,
+   "sight": 2,
+   "cost": 90,
+   "faith_cost": 180,
+   "required_tech": "core:tech/civil-service",
+   "obsolete_tech": "core:tech/rifling",
+   "required_resources": [],
+   "upgrades_to": [
+    "core:unit/rifleman"
+   ],
+   "free_promotions": [
+    "core:promotion/anti-mounted-i",
+    "core:promotion/anti-gunpowder"
+   ],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 3,
+   "xp_value_defense": 3,
+   "abilities": {
+    "pillage": true,
+    "conscription": 3,
+    "requires_faith_purchase_enabled": true
+   },
+   "nation": "core:nation/zulu",
+   "replaces": "core:unit/pikeman",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:unit/merchant-of-venice",
+   "name": "Merchant of Venice",
+   "class": "core:unit-class/merchant",
+   "role": "great-person",
+   "domain": "core:domain/land",
+   "era": "core:era/ancient",
+   "combat": 0,
+   "ranged_combat": 0,
+   "range": 0,
+   "moves": 2,
+   "sight": 2,
+   "cost": -1,
+   "faith_cost": null,
+   "required_tech": null,
+   "obsolete_tech": null,
+   "required_resources": [],
+   "upgrades_to": [],
+   "free_promotions": [
+    "core:promotion/trade-mission-bonus"
+   ],
+   "worker_actions": [
+    "core:build/customs-house"
+   ],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 0,
+   "xp_value_defense": 0,
+   "abilities": {
+    "work_rate": 1,
+    "base_gold": 350,
+    "num_gold_per_era": 50,
+    "can_buy_city_state": true,
+    "special": "people",
+    "civilian_attack_priority": "high"
+   },
+   "nation": "core:nation/venice",
+   "replaces": "core:unit/great-merchant",
+   "art_id": "bnw:unit/merchant-of-venice",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:unit/winged-hussar",
+   "name": "Winged Hussar",
+   "class": "core:unit-class/lancer",
+   "role": "mounted",
+   "domain": "core:domain/land",
+   "era": "core:era/renaissance",
+   "combat": 28,
+   "ranged_combat": 0,
+   "range": 0,
+   "moves": 5,
+   "sight": 2,
+   "cost": 185,
+   "faith_cost": 370,
+   "required_tech": "core:tech/metallurgy",
+   "obsolete_tech": "core:tech/combined-arms",
+   "required_resources": [
+    {
+     "resource": "core:resource/horses",
+     "amount": 1
+    }
+   ],
+   "upgrades_to": [
+    "core:unit/anti-tank-gun"
+   ],
+   "free_promotions": [
+    "core:promotion/no-defensive-bonuses",
+    "core:promotion/can-move-after-attacking",
+    "core:promotion/city-penalty",
+    "core:promotion/heavy-charge",
+    "core:promotion/shock-1",
+    "core:promotion/formation-1"
+   ],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 3,
+   "xp_value_defense": 3,
+   "abilities": {
+    "pillage": true,
+    "ignore_building_defense": true,
+    "requires_faith_purchase_enabled": true
+   },
+   "nation": "core:nation/poland",
+   "replaces": "core:unit/lancer",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:unit/siege-tower",
+   "name": "Siege Tower",
+   "class": "core:unit-class/catapult",
+   "role": "melee",
+   "domain": "core:domain/land",
+   "era": "core:era/classical",
+   "combat": 12,
+   "ranged_combat": 0,
+   "range": 0,
+   "moves": 2,
+   "sight": 2,
+   "cost": 75,
+   "faith_cost": 150,
+   "required_tech": "core:tech/mathematics",
+   "obsolete_tech": "core:tech/physics",
+   "required_resources": [],
+   "upgrades_to": [
+    "core:unit/trebuchet"
+   ],
+   "free_promotions": [
+    "core:promotion/sapper",
+    "core:promotion/city-siege",
+    "core:promotion/cover-1",
+    "core:promotion/only-attacks-cities",
+    "core:promotion/extra-sight-i",
+    "core:promotion/no-defensive-bonuses"
+   ],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 3,
+   "xp_value_defense": 3,
+   "abilities": {
+    "pillage": true,
+    "mechanized": true,
+    "requires_faith_purchase_enabled": true
+   },
+   "nation": "core:nation/assyria",
+   "replaces": "core:unit/catapult",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:unit/pracinha",
+   "name": "Pracinha",
+   "class": "core:unit-class/infantry",
+   "role": "gun",
+   "domain": "core:domain/land",
+   "era": "core:era/modern",
+   "combat": 70,
+   "ranged_combat": 0,
+   "range": 0,
+   "moves": 2,
+   "sight": 2,
+   "cost": 375,
+   "faith_cost": 750,
+   "required_tech": "core:tech/plastics",
+   "obsolete_tech": "core:tech/mobile-tactics",
+   "required_resources": [],
+   "upgrades_to": [
+    "core:unit/mechanized-infantry"
+   ],
+   "free_promotions": [
+    "core:promotion/golden-age-points"
+   ],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 3,
+   "xp_value_defense": 3,
+   "abilities": {
+    "pillage": true,
+    "ignore_building_defense": true,
+    "conscription": 6,
+    "requires_faith_purchase_enabled": true
+   },
+   "nation": "core:nation/brazil",
+   "replaces": "core:unit/infantry",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:unit/nau",
+   "name": "Nau",
+   "class": "core:unit-class/caravel",
+   "role": "navalmelee",
+   "domain": "core:domain/sea",
+   "era": "core:era/renaissance",
+   "combat": 20,
+   "ranged_combat": 0,
+   "range": 0,
+   "moves": 5,
+   "sight": 2,
+   "cost": 120,
+   "faith_cost": null,
+   "required_tech": "core:tech/astronomy",
+   "obsolete_tech": "core:tech/steam-power",
+   "required_resources": [],
+   "upgrades_to": [
+    "core:unit/ironclad"
+   ],
+   "free_promotions": [
+    "core:promotion/sell-exotic-goods",
+    "core:promotion/extra-sight-i",
+    "core:promotion/withdraw-before-melee"
+   ],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 3,
+   "xp_value_defense": 3,
+   "abilities": {
+    "pillage": true,
+    "mechanized": true,
+    "num_exotic_goods": 1,
+    "requires_faith_purchase_enabled": true
+   },
+   "nation": "core:nation/portugal",
+   "replaces": "core:unit/caravel",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:unit/berber-cavalry",
+   "name": "Berber Cavalry",
+   "class": "core:unit-class/cavalry",
+   "role": "mounted",
+   "domain": "core:domain/land",
+   "era": "core:era/industrial",
+   "combat": 34,
+   "ranged_combat": 0,
+   "range": 0,
+   "moves": 4,
+   "sight": 2,
+   "cost": 225,
+   "faith_cost": 450,
+   "required_tech": "core:tech/military-science",
+   "obsolete_tech": "core:tech/combustion",
+   "required_resources": [
+    {
+     "resource": "core:resource/horses",
+     "amount": 1
+    }
+   ],
+   "upgrades_to": [
+    "core:unit/landship"
+   ],
+   "free_promotions": [
+    "core:promotion/no-defensive-bonuses",
+    "core:promotion/can-move-after-attacking",
+    "core:promotion/city-penalty",
+    "core:promotion/desert-warrior",
+    "core:promotion/homeland-guardian"
+   ],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 3,
+   "xp_value_defense": 3,
+   "abilities": {
+    "pillage": true,
+    "ignore_building_defense": true,
+    "requires_faith_purchase_enabled": true
+   },
+   "nation": "core:nation/morocco",
+   "replaces": "core:unit/cavalry",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:unit/great-galleass",
+   "name": "Great Galleass",
+   "class": "core:unit-class/galleass",
+   "role": "navalranged",
+   "domain": "core:domain/sea",
+   "era": "core:era/medieval",
+   "combat": 18,
+   "ranged_combat": 20,
+   "range": 2,
+   "moves": 3,
+   "sight": 2,
+   "cost": 110,
+   "faith_cost": null,
+   "required_tech": "core:tech/compass",
+   "obsolete_tech": "core:tech/navigation",
+   "required_resources": [],
+   "upgrades_to": [
+    "core:unit/frigate"
+   ],
+   "free_promotions": [
+    "core:promotion/only-defensive",
+    "core:promotion/ocean-impassable"
+   ],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 3,
+   "xp_value_defense": 3,
+   "abilities": {
+    "pillage": true,
+    "mechanized": true
+   },
+   "nation": "core:nation/venice",
+   "replaces": "core:unit/galleass",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:unit/pathfinder",
+   "name": "Pathfinder",
+   "class": "core:unit-class/scout",
+   "role": "recon",
+   "domain": "core:domain/land",
+   "era": "core:era/ancient",
+   "combat": 8,
+   "ranged_combat": 0,
+   "range": 0,
+   "moves": 2,
+   "sight": 2,
+   "cost": 45,
+   "faith_cost": 50,
+   "required_tech": null,
+   "obsolete_tech": "core:tech/scientific-theory",
+   "required_resources": [],
+   "upgrades_to": [
+    "core:unit/composite-bowman"
+   ],
+   "free_promotions": [
+    "core:promotion/goody-hut-picker",
+    "core:promotion/ignore-terrain-cost"
+   ],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 3,
+   "xp_value_defense": 3,
+   "abilities": {
+    "pillage": true,
+    "no_bad_goodies": true,
+    "requires_faith_purchase_enabled": true
+   },
+   "nation": "core:nation/shoshone",
+   "replaces": "core:unit/scout",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:unit/comanche-riders",
+   "name": "Comanche Riders",
+   "class": "core:unit-class/cavalry",
+   "role": "mounted",
+   "domain": "core:domain/land",
+   "era": "core:era/industrial",
+   "combat": 34,
+   "ranged_combat": 0,
+   "range": 0,
+   "moves": 5,
+   "sight": 2,
+   "cost": 200,
+   "faith_cost": 450,
+   "required_tech": "core:tech/military-science",
+   "obsolete_tech": "core:tech/combustion",
+   "required_resources": [
+    {
+     "resource": "core:resource/horses",
+     "amount": 1
+    }
+   ],
+   "upgrades_to": [
+    "core:unit/landship"
+   ],
+   "free_promotions": [
+    "core:promotion/no-defensive-bonuses",
+    "core:promotion/can-move-after-attacking",
+    "core:promotion/city-penalty",
+    "core:promotion/moon-striker"
+   ],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 3,
+   "xp_value_defense": 3,
+   "abilities": {
+    "pillage": true,
+    "ignore_building_defense": true,
+    "requires_faith_purchase_enabled": true
+   },
+   "nation": "core:nation/shoshone",
+   "replaces": "core:unit/cavalry",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:unit/kris-swordsman",
+   "name": "Kris Swordsman",
+   "class": "core:unit-class/swordsman",
+   "role": "melee",
+   "domain": "core:domain/land",
+   "era": "core:era/classical",
+   "combat": 14,
+   "ranged_combat": 0,
+   "range": 0,
+   "moves": 2,
+   "sight": 2,
+   "cost": 75,
+   "faith_cost": 150,
+   "required_tech": "core:tech/iron-working",
+   "obsolete_tech": "core:tech/steel",
+   "required_resources": [
+    {
+     "resource": "core:resource/iron",
+     "amount": 1
+    }
+   ],
+   "upgrades_to": [
+    "core:unit/longswordsman"
+   ],
+   "free_promotions": [
+    "core:promotion/mystic-blade"
+   ],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 3,
+   "xp_value_defense": 3,
+   "abilities": {
+    "pillage": true,
+    "conscription": 1,
+    "requires_faith_purchase_enabled": true
+   },
+   "nation": "core:nation/indonesia",
+   "replaces": "core:unit/swordsman",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:unit/bowman",
+   "name": "Bowman",
+   "class": "core:unit-class/archer",
+   "role": "archer",
+   "domain": "core:domain/land",
+   "era": "core:era/ancient",
+   "combat": 7,
+   "ranged_combat": 9,
+   "range": 2,
+   "moves": 2,
+   "sight": 2,
+   "cost": 40,
+   "faith_cost": 80,
+   "required_tech": "core:tech/archery",
+   "obsolete_tech": "core:tech/construction",
+   "required_resources": [],
+   "upgrades_to": [
+    "core:unit/composite-bowman"
+   ],
+   "free_promotions": [
+    "core:promotion/only-defensive"
+   ],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 3,
+   "xp_value_defense": 3,
+   "abilities": {
+    "pillage": true,
+    "requires_faith_purchase_enabled": true
+   },
+   "nation": "core:nation/babylon",
+   "replaces": "core:unit/archer",
+   "provenance": "unciv: Units.json, Bowman",
+   "unciv_fields": [
+    "combat",
+    "cost",
+    "moves",
+    "obsolete_tech",
+    "ranged_combat",
+    "required_resources",
+    "required_tech",
+    "upgrades_to"
+   ]
+  },
+  {
+   "id": "core:unit/keshik",
+   "name": "Keshik",
+   "class": "core:unit-class/knight",
+   "role": "archer",
+   "domain": "core:domain/land",
+   "era": "core:era/medieval",
+   "combat": 15,
+   "ranged_combat": 16,
+   "range": 2,
+   "moves": 5,
+   "sight": 2,
+   "cost": 120,
+   "faith_cost": 240,
+   "required_tech": "core:tech/chivalry",
+   "obsolete_tech": "core:tech/military-science",
+   "required_resources": [
+    {
+     "resource": "core:resource/horses",
+     "amount": 1
+    }
+   ],
+   "upgrades_to": [
+    "core:unit/cavalry"
+   ],
+   "free_promotions": [
+    "core:promotion/no-defensive-bonuses",
+    "core:promotion/can-move-after-attacking",
+    "core:promotion/only-defensive",
+    "core:promotion/spawn-generals-i",
+    "core:promotion/gain-experience"
+   ],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 3,
+   "xp_value_defense": 3,
+   "abilities": {
+    "pillage": true,
+    "requires_faith_purchase_enabled": true
+   },
+   "nation": "core:nation/mongolia",
+   "replaces": "core:unit/knight",
+   "provenance": "unciv: Units.json, Keshik",
+   "unciv_fields": [
+    "combat",
+    "cost",
+    "moves",
+    "obsolete_tech",
+    "ranged_combat",
+    "required_resources",
+    "required_tech",
+    "upgrades_to"
+   ]
+  },
+  {
+   "id": "core:unit/khan",
+   "name": "Khan",
+   "class": "core:unit-class/great-general",
+   "role": "great-person",
+   "domain": "core:domain/land",
+   "era": "core:era/ancient",
+   "combat": 0,
+   "ranged_combat": 0,
+   "range": 0,
+   "moves": 5,
+   "sight": 2,
+   "cost": -1,
+   "faith_cost": null,
+   "required_tech": null,
+   "obsolete_tech": null,
+   "required_resources": [],
+   "upgrades_to": [],
+   "free_promotions": [
+    "core:promotion/medic-general",
+    "core:promotion/great-general"
+   ],
+   "worker_actions": [
+    "core:build/citadel"
+   ],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 0,
+   "xp_value_defense": 0,
+   "abilities": {
+    "work_rate": 1,
+    "special": "people",
+    "civilian_attack_priority": "high"
+   },
+   "nation": "core:nation/mongolia",
+   "replaces": "core:unit/great-general",
+   "art_id": "bnw:unit/khan",
+   "provenance": "unciv: Units.json, Khan",
+   "unciv_fields": [
+    "combat",
+    "moves",
+    "obsolete_tech",
+    "ranged_combat",
+    "required_resources",
+    "required_tech"
+   ]
+  },
+  {
+   "id": "core:unit/slinger",
+   "name": "Slinger",
+   "class": "core:unit-class/archer",
+   "role": "archer",
+   "domain": "core:domain/land",
+   "era": "core:era/ancient",
+   "combat": 4,
+   "ranged_combat": 7,
+   "range": 2,
+   "moves": 2,
+   "sight": 2,
+   "cost": 40,
+   "faith_cost": 80,
+   "required_tech": "core:tech/archery",
+   "obsolete_tech": "core:tech/construction",
+   "required_resources": [],
+   "upgrades_to": [
+    "core:unit/composite-bowman"
+   ],
+   "free_promotions": [
+    "core:promotion/only-defensive",
+    "core:promotion/withdraw-before-melee"
+   ],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 3,
+   "xp_value_defense": 3,
+   "abilities": {
+    "pillage": true,
+    "requires_faith_purchase_enabled": true
+   },
+   "nation": "core:nation/inca",
+   "replaces": "core:unit/archer",
+   "provenance": "unciv: Units.json, Slinger",
+   "unciv_fields": [
+    "combat",
+    "cost",
+    "moves",
+    "obsolete_tech",
+    "ranged_combat",
+    "required_resources",
+    "required_tech",
+    "upgrades_to"
+   ]
+  },
+  {
+   "id": "core:unit/tercio",
+   "name": "Tercio",
+   "class": "core:unit-class/musketman",
+   "role": "melee",
+   "domain": "core:domain/land",
+   "era": "core:era/renaissance",
+   "combat": 26,
+   "ranged_combat": 0,
+   "range": 0,
+   "moves": 2,
+   "sight": 2,
+   "cost": 160,
+   "faith_cost": 320,
+   "required_tech": "core:tech/gunpowder",
+   "obsolete_tech": "core:tech/rifling",
+   "required_resources": [],
+   "upgrades_to": [
+    "core:unit/rifleman"
+   ],
+   "free_promotions": [
+    "core:promotion/anti-mounted-i"
+   ],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 3,
+   "xp_value_defense": 3,
+   "abilities": {
+    "pillage": true,
+    "conscription": 4,
+    "requires_faith_purchase_enabled": true
+   },
+   "nation": "core:nation/spain",
+   "replaces": "core:unit/musketman",
+   "provenance": "unciv: Units.json, Tercio",
+   "unciv_fields": [
+    "combat",
+    "cost",
+    "moves",
+    "obsolete_tech",
+    "ranged_combat",
+    "required_resources",
+    "required_tech",
+    "upgrades_to"
+   ]
+  },
+  {
+   "id": "core:unit/conquistador",
+   "name": "Conquistador",
+   "class": "core:unit-class/knight",
+   "role": "mounted",
+   "domain": "core:domain/land",
+   "era": "core:era/medieval",
+   "combat": 20,
+   "ranged_combat": 0,
+   "range": 0,
+   "moves": 4,
+   "sight": 2,
+   "cost": 135,
+   "faith_cost": 270,
+   "required_tech": "core:tech/chivalry",
+   "obsolete_tech": "core:tech/military-science",
+   "required_resources": [
+    {
+     "resource": "core:resource/horses",
+     "amount": 1
+    }
+   ],
+   "upgrades_to": [
+    "core:unit/cavalry"
+   ],
+   "free_promotions": [
+    "core:promotion/no-defensive-bonuses",
+    "core:promotion/can-move-after-attacking",
+    "core:promotion/extra-sight-ii",
+    "core:promotion/defensive-embarkation"
+   ],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 3,
+   "xp_value_defense": 3,
+   "abilities": {
+    "found_abroad": true,
+    "pillage": true,
+    "requires_faith_purchase_enabled": true
+   },
+   "nation": "core:nation/spain",
+   "replaces": "core:unit/knight",
+   "provenance": "unciv: Units.json, Conquistador",
+   "unciv_fields": [
+    "combat",
+    "cost",
+    "moves",
+    "obsolete_tech",
+    "ranged_combat",
+    "required_resources",
+    "required_tech",
+    "upgrades_to"
+   ]
+  },
+  {
+   "id": "core:unit/maori-warrior",
+   "name": "Maori Warrior",
+   "class": "core:unit-class/warrior",
+   "role": "melee",
+   "domain": "core:domain/land",
+   "era": "core:era/ancient",
+   "combat": 8,
+   "ranged_combat": 0,
+   "range": 0,
+   "moves": 2,
+   "sight": 2,
+   "cost": 40,
+   "faith_cost": 80,
+   "required_tech": null,
+   "obsolete_tech": "core:tech/metal-casting",
+   "required_resources": [],
+   "upgrades_to": [
+    "core:unit/swordsman"
+   ],
+   "free_promotions": [
+    "core:promotion/haka-war-dance"
+   ],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 3,
+   "xp_value_defense": 3,
+   "abilities": {
+    "pillage": true,
+    "conscription": 1,
+    "requires_faith_purchase_enabled": true
+   },
+   "nation": "core:nation/polynesia",
+   "replaces": "core:unit/warrior",
+   "provenance": "unciv: Units.json, Maori Warrior",
+   "unciv_fields": [
+    "combat",
+    "cost",
+    "moves",
+    "obsolete_tech",
+    "ranged_combat",
+    "required_resources",
+    "upgrades_to"
+   ]
+  },
+  {
+   "id": "core:unit/berserker",
+   "name": "Berserker",
+   "class": "core:unit-class/longswordsman",
+   "role": "melee",
+   "domain": "core:domain/land",
+   "era": "core:era/medieval",
+   "combat": 21,
+   "ranged_combat": 0,
+   "range": 0,
+   "moves": 3,
+   "sight": 2,
+   "cost": 120,
+   "faith_cost": 240,
+   "required_tech": "core:tech/metal-casting",
+   "obsolete_tech": "core:tech/metallurgy",
+   "required_resources": [
+    {
+     "resource": "core:resource/iron",
+     "amount": 1
+    }
+   ],
+   "upgrades_to": [
+    "core:unit/musketman"
+   ],
+   "free_promotions": [
+    "core:promotion/amphibious"
+   ],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 3,
+   "xp_value_defense": 3,
+   "abilities": {
+    "pillage": true,
+    "conscription": 3,
+    "requires_faith_purchase_enabled": true
+   },
+   "nation": "core:nation/denmark",
+   "replaces": "core:unit/longswordsman",
+   "provenance": "unciv: Units.json, Berserker",
+   "unciv_fields": [
+    "combat",
+    "cost",
+    "moves",
+    "obsolete_tech",
+    "ranged_combat",
+    "required_resources",
+    "required_tech",
+    "upgrades_to"
+   ]
+  },
+  {
+   "id": "core:unit/norwegian-ski-infantry",
+   "name": "Norwegian Ski Infantry",
+   "class": "core:unit-class/rifleman",
+   "role": "gun",
+   "domain": "core:domain/land",
+   "era": "core:era/industrial",
+   "combat": 34,
+   "ranged_combat": 0,
+   "range": 0,
+   "moves": 2,
+   "sight": 2,
+   "cost": 225,
+   "faith_cost": 450,
+   "required_tech": "core:tech/rifling",
+   "obsolete_tech": "core:tech/replaceable-parts",
+   "required_resources": [],
+   "upgrades_to": [
+    "core:unit/great-war-infantry"
+   ],
+   "free_promotions": [
+    "core:promotion/ski-infantry"
+   ],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 3,
+   "xp_value_defense": 3,
+   "abilities": {
+    "pillage": true,
+    "ignore_building_defense": true,
+    "conscription": 5,
+    "requires_faith_purchase_enabled": true
+   },
+   "nation": "core:nation/denmark",
+   "replaces": "core:unit/rifleman",
+   "provenance": "unciv: Units.json, Norwegian Ski Infantry",
+   "unciv_fields": [
+    "combat",
+    "cost",
+    "moves",
+    "obsolete_tech",
+    "ranged_combat",
+    "required_resources",
+    "required_tech",
+    "upgrades_to"
+   ]
+  },
+  {
+   "id": "core:unit/turtle-ship",
+   "name": "Turtle Ship",
+   "class": "core:unit-class/caravel",
+   "role": "navalmelee",
+   "domain": "core:domain/sea",
+   "era": "core:era/renaissance",
+   "combat": 36,
+   "ranged_combat": 0,
+   "range": 0,
+   "moves": 4,
+   "sight": 2,
+   "cost": 120,
+   "faith_cost": null,
+   "required_tech": "core:tech/astronomy",
+   "obsolete_tech": "core:tech/combustion",
+   "required_resources": [],
+   "upgrades_to": [
+    "core:unit/ironclad"
+   ],
+   "free_promotions": [
+    "core:promotion/ocean-impassable"
+   ],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 3,
+   "xp_value_defense": 3,
+   "abilities": {
+    "pillage": true,
+    "mechanized": true
+   },
+   "nation": "core:nation/korea",
+   "replaces": "core:unit/caravel",
+   "provenance": "unciv: Units.json, Turtle Ship",
+   "unciv_fields": [
+    "combat",
+    "cost",
+    "moves",
+    "obsolete_tech",
+    "ranged_combat",
+    "required_resources",
+    "required_tech",
+    "upgrades_to"
+   ]
+  },
+  {
+   "id": "core:unit/hwach-a",
+   "name": "Hwach'a",
+   "class": "core:unit-class/trebuchet",
+   "role": "siege",
+   "domain": "core:domain/land",
+   "era": "core:era/medieval",
+   "combat": 11,
+   "ranged_combat": 26,
+   "range": 2,
+   "moves": 2,
+   "sight": 2,
+   "cost": 120,
+   "faith_cost": 240,
+   "required_tech": "core:tech/physics",
+   "obsolete_tech": "core:tech/chemistry",
+   "required_resources": [],
+   "upgrades_to": [
+    "core:unit/cannon"
+   ],
+   "free_promotions": [
+    "core:promotion/only-defensive",
+    "core:promotion/no-defensive-bonuses",
+    "core:promotion/must-set-up"
+   ],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 3,
+   "xp_value_defense": 3,
+   "abilities": {
+    "pillage": true,
+    "mechanized": true,
+    "requires_faith_purchase_enabled": true
+   },
+   "nation": "core:nation/korea",
+   "replaces": "core:unit/trebuchet",
+   "provenance": "unciv: Units.json, Hwach'a",
+   "unciv_fields": [
+    "combat",
+    "cost",
+    "moves",
+    "obsolete_tech",
+    "ranged_combat",
+    "required_resources",
+    "required_tech",
+    "upgrades_to"
+   ]
+  },
+  {
+   "id": "core:unit/pictish-warrior",
+   "name": "Pictish Warrior",
+   "class": "core:unit-class/spearman",
+   "role": "melee",
+   "domain": "core:domain/land",
+   "era": "core:era/ancient",
+   "combat": 11,
+   "ranged_combat": 0,
+   "range": 0,
+   "moves": 2,
+   "sight": 2,
+   "cost": 56,
+   "faith_cost": 112,
+   "required_tech": "core:tech/bronze-working",
+   "obsolete_tech": "core:tech/civil-service",
+   "required_resources": [],
+   "upgrades_to": [
+    "core:unit/pikeman"
+   ],
+   "free_promotions": [
+    "core:promotion/foreign-lands",
+    "core:promotion/free-pillage-moves"
+   ],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 3,
+   "xp_value_defense": 3,
+   "abilities": {
+    "pillage": true,
+    "conscription": 2,
+    "requires_faith_purchase_enabled": true
+   },
+   "nation": "core:nation/celts",
+   "replaces": "core:unit/spearman",
+   "source": "unciv: Gods & Kings/Units.json, Pictish Warrior (strength, ranged strength, movement, cost, required and obsolete technology, upgrade, replaced unit; checked 2026-10-20)",
+   "provenance": "unciv: Units.json, Pictish Warrior",
+   "unciv_fields": [
+    "combat",
+    "cost",
+    "moves",
+    "obsolete_tech",
+    "ranged_combat",
+    "required_resources",
+    "required_tech",
+    "upgrades_to"
+   ]
+  },
+  {
+   "id": "core:unit/atlatlist",
+   "name": "Atlatlist",
+   "class": "core:unit-class/archer",
+   "role": "archer",
+   "domain": "core:domain/land",
+   "era": "core:era/ancient",
+   "combat": 5,
+   "ranged_combat": 7,
+   "range": 2,
+   "moves": 2,
+   "sight": 2,
+   "cost": 36,
+   "faith_cost": 72,
+   "required_tech": "core:tech/agriculture",
+   "obsolete_tech": "core:tech/construction",
+   "required_resources": [],
+   "upgrades_to": [
+    "core:unit/composite-bowman"
+   ],
+   "free_promotions": [
+    "core:promotion/only-defensive"
+   ],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 3,
+   "xp_value_defense": 3,
+   "abilities": {
+    "pillage": true,
+    "requires_faith_purchase_enabled": true
+   },
+   "nation": "core:nation/maya",
+   "replaces": "core:unit/archer",
+   "source": "unciv: Gods & Kings/Units.json, Atlatlist (strength, ranged strength, movement, cost, required and obsolete technology, upgrade, replaced unit; checked 2026-10-20)",
+   "provenance": "unciv: Units.json, Atlatlist",
+   "unciv_fields": [
+    "combat",
+    "cost",
+    "moves",
+    "obsolete_tech",
+    "ranged_combat",
+    "required_resources",
+    "upgrades_to"
+   ]
+  },
+  {
+   "id": "core:unit/dromon",
+   "name": "Dromon",
+   "class": "core:unit-class/trireme",
+   "role": "navalranged",
+   "domain": "core:domain/sea",
+   "era": "core:era/ancient",
+   "combat": 8,
+   "ranged_combat": 10,
+   "range": 2,
+   "moves": 4,
+   "sight": 2,
+   "cost": 56,
+   "faith_cost": null,
+   "required_tech": "core:tech/sailing",
+   "obsolete_tech": "core:tech/astronomy",
+   "required_resources": [],
+   "upgrades_to": [
+    "core:unit/galleass"
+   ],
+   "free_promotions": [
+    "core:promotion/ocean-impassable",
+    "core:promotion/only-defensive",
+    "core:promotion/naval-bonus"
+   ],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 3,
+   "xp_value_defense": 3,
+   "abilities": {
+    "pillage": true,
+    "mechanized": true
+   },
+   "nation": "core:nation/byzantium",
+   "replaces": "core:unit/trireme",
+   "source": "unciv: Gods & Kings/Units.json, Dromon (strength, ranged strength, movement, cost, required and obsolete technology, upgrade, replaced unit; checked 2026-10-20)",
+   "provenance": "unciv: Units.json, Dromon",
+   "unciv_fields": [
+    "combat",
+    "cost",
+    "moves",
+    "obsolete_tech",
+    "ranged_combat",
+    "required_resources",
+    "required_tech",
+    "upgrades_to"
+   ]
+  },
+  {
+   "id": "core:unit/cataphract",
+   "name": "Cataphract",
+   "class": "core:unit-class/horseman",
+   "role": "mounted",
+   "domain": "core:domain/land",
+   "era": "core:era/classical",
+   "combat": 15,
+   "ranged_combat": 0,
+   "range": 0,
+   "moves": 3,
+   "sight": 2,
+   "cost": 75,
+   "faith_cost": 150,
+   "required_tech": "core:tech/horseback-riding",
+   "obsolete_tech": "core:tech/chivalry",
+   "required_resources": [
+    {
+     "resource": "core:resource/horses",
+     "amount": 1
+    }
+   ],
+   "upgrades_to": [
+    "core:unit/knight"
+   ],
+   "free_promotions": [
+    "core:promotion/can-move-after-attacking",
+    "core:promotion/small-city-penalty"
+   ],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 3,
+   "xp_value_defense": 3,
+   "abilities": {
+    "pillage": true,
+    "requires_faith_purchase_enabled": true
+   },
+   "nation": "core:nation/byzantium",
+   "replaces": "core:unit/horseman",
+   "source": "unciv: Gods & Kings/Units.json, Cataphract (strength, ranged strength, movement, cost, required and obsolete technology, upgrade, replaced unit; checked 2026-10-20)",
+   "provenance": "unciv: Units.json, Cataphract",
+   "unciv_fields": [
+    "combat",
+    "cost",
+    "moves",
+    "obsolete_tech",
+    "ranged_combat",
+    "required_resources",
+    "required_tech",
+    "upgrades_to"
+   ]
+  },
+  {
+   "id": "core:unit/african-forest-elephant",
+   "name": "African Forest Elephant",
+   "class": "core:unit-class/horseman",
+   "role": "mounted",
+   "domain": "core:domain/land",
+   "era": "core:era/classical",
+   "combat": 14,
+   "ranged_combat": 0,
+   "range": 0,
+   "moves": 3,
+   "sight": 2,
+   "cost": 100,
+   "faith_cost": 200,
+   "required_tech": "core:tech/horseback-riding",
+   "obsolete_tech": "core:tech/chivalry",
+   "required_resources": [],
+   "upgrades_to": [
+    "core:unit/knight"
+   ],
+   "free_promotions": [
+    "core:promotion/no-defensive-bonuses",
+    "core:promotion/can-move-after-attacking",
+    "core:promotion/city-penalty",
+    "core:promotion/feared-elephant",
+    "core:promotion/spawn-generals-ii"
+   ],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 3,
+   "xp_value_defense": 3,
+   "abilities": {
+    "pillage": true,
+    "requires_faith_purchase_enabled": true
+   },
+   "nation": "core:nation/carthage",
+   "replaces": "core:unit/horseman",
+   "source": "unciv: Gods & Kings/Units.json, African Forest Elephant (strength, ranged strength, movement, cost, required and obsolete technology, upgrade, replaced unit; checked 2026-10-20)",
+   "provenance": "unciv: Units.json, African Forest Elephant",
+   "unciv_fields": [
+    "combat",
+    "cost",
+    "moves",
+    "obsolete_tech",
+    "ranged_combat",
+    "required_resources",
+    "required_tech",
+    "upgrades_to"
+   ]
+  },
+  {
+   "id": "core:unit/quinquereme",
+   "name": "Quinquereme",
+   "class": "core:unit-class/trireme",
+   "role": "navalmelee",
+   "domain": "core:domain/sea",
+   "era": "core:era/ancient",
+   "combat": 13,
+   "ranged_combat": 0,
+   "range": 0,
+   "moves": 4,
+   "sight": 2,
+   "cost": 45,
+   "faith_cost": null,
+   "required_tech": "core:tech/sailing",
+   "obsolete_tech": "core:tech/astronomy",
+   "required_resources": [],
+   "upgrades_to": [
+    "core:unit/caravel"
+   ],
+   "free_promotions": [
+    "core:promotion/ocean-impassable"
+   ],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 3,
+   "xp_value_defense": 3,
+   "abilities": {
+    "pillage": true,
+    "mechanized": true
+   },
+   "nation": "core:nation/carthage",
+   "replaces": "core:unit/trireme",
+   "source": "unciv: Gods & Kings/Units.json, Quinquereme (strength, ranged strength, movement, cost, required and obsolete technology, upgrade, replaced unit; checked 2026-10-20)",
+   "provenance": "unciv: Units.json, Quinquereme",
+   "unciv_fields": [
+    "combat",
+    "cost",
+    "moves",
+    "obsolete_tech",
+    "ranged_combat",
+    "required_resources",
+    "required_tech",
+    "upgrades_to"
+   ]
+  },
+  {
+   "id": "core:unit/horse-archer",
+   "name": "Horse Archer",
+   "class": "core:unit-class/chariot-archer",
+   "role": "archer",
+   "domain": "core:domain/land",
+   "era": "core:era/ancient",
+   "combat": 7,
+   "ranged_combat": 10,
+   "range": 2,
+   "moves": 4,
+   "sight": 2,
+   "cost": 56,
+   "faith_cost": 112,
+   "required_tech": "core:tech/the-wheel",
+   "obsolete_tech": "core:tech/chivalry",
+   "required_resources": [],
+   "upgrades_to": [
+    "core:unit/knight"
+   ],
+   "free_promotions": [
+    "core:promotion/no-defensive-bonuses",
+    "core:promotion/only-defensive",
+    "core:promotion/accuracy-1"
+   ],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 3,
+   "xp_value_defense": 3,
+   "abilities": {
+    "pillage": true,
+    "requires_faith_purchase_enabled": true
+   },
+   "nation": "core:nation/huns",
+   "replaces": "core:unit/chariot-archer",
+   "source": "unciv: Gods & Kings/Units.json, Horse Archer (strength, ranged strength, movement, cost, required and obsolete technology, upgrade, replaced unit; checked 2026-10-20)",
+   "provenance": "unciv: Units.json, Horse Archer",
+   "unciv_fields": [
+    "combat",
+    "cost",
+    "moves",
+    "obsolete_tech",
+    "ranged_combat",
+    "required_resources",
+    "required_tech",
+    "upgrades_to"
+   ]
+  },
+  {
+   "id": "core:unit/hussar",
+   "name": "Hussar",
+   "class": "core:unit-class/cavalry",
+   "role": "mounted",
+   "domain": "core:domain/land",
+   "era": "core:era/industrial",
+   "combat": 34,
+   "ranged_combat": 0,
+   "range": 0,
+   "moves": 5,
+   "sight": 2,
+   "cost": 225,
+   "faith_cost": null,
+   "required_tech": "core:tech/military-science",
+   "obsolete_tech": "core:tech/combustion",
+   "required_resources": [
+    {
+     "resource": "core:resource/horses",
+     "amount": 1
+    }
+   ],
+   "upgrades_to": [
+    "core:unit/landship"
+   ],
+   "free_promotions": [
+    "core:promotion/no-defensive-bonuses",
+    "core:promotion/can-move-after-attacking",
+    "core:promotion/city-penalty",
+    "core:promotion/extra-sight-i",
+    "core:promotion/flank-attack-bonus"
+   ],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 3,
+   "xp_value_defense": 3,
+   "abilities": {
+    "pillage": true,
+    "ignore_building_defense": true
+   },
+   "nation": "core:nation/austria",
+   "replaces": "core:unit/cavalry",
+   "source": "unciv: Gods & Kings/Units.json, Hussar (strength, ranged strength, movement, cost, required and obsolete technology, upgrade, replaced unit; checked 2026-10-20)",
+   "provenance": "unciv: Units.json, Hussar",
+   "unciv_fields": [
+    "combat",
+    "cost",
+    "moves",
+    "obsolete_tech",
+    "ranged_combat",
+    "required_resources",
+    "required_tech",
+    "upgrades_to"
+   ]
+  },
+  {
+   "id": "core:unit/carolean",
+   "name": "Carolean",
+   "class": "core:unit-class/rifleman",
+   "role": "gun",
+   "domain": "core:domain/land",
+   "era": "core:era/industrial",
+   "combat": 34,
+   "ranged_combat": 0,
+   "range": 0,
+   "moves": 2,
+   "sight": 2,
+   "cost": 225,
+   "faith_cost": null,
+   "required_tech": "core:tech/rifling",
+   "obsolete_tech": "core:tech/replaceable-parts",
+   "required_resources": [],
+   "upgrades_to": [
+    "core:unit/great-war-infantry"
+   ],
+   "free_promotions": [
+    "core:promotion/march"
+   ],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 3,
+   "xp_value_defense": 3,
+   "abilities": {
+    "pillage": true,
+    "ignore_building_defense": true,
+    "conscription": 5
+   },
+   "nation": "core:nation/sweden",
+   "replaces": "core:unit/rifleman",
+   "source": "unciv: Gods & Kings/Units.json, Carolean (strength, ranged strength, movement, cost, required and obsolete technology, upgrade, replaced unit; checked 2026-10-20)",
+   "provenance": "unciv: Units.json, Carolean",
+   "unciv_fields": [
+    "combat",
+    "cost",
+    "moves",
+    "obsolete_tech",
+    "ranged_combat",
+    "required_resources",
+    "required_tech",
+    "upgrades_to"
+   ]
+  },
+  {
+   "id": "core:unit/hakkapeliitta",
+   "name": "Hakkapeliitta",
+   "class": "core:unit-class/lancer",
+   "role": "mounted",
+   "domain": "core:domain/land",
+   "era": "core:era/renaissance",
+   "combat": 25,
+   "ranged_combat": 0,
+   "range": 0,
+   "moves": 4,
+   "sight": 2,
+   "cost": 185,
+   "faith_cost": 370,
+   "required_tech": "core:tech/metallurgy",
+   "obsolete_tech": "core:tech/combined-arms",
+   "required_resources": [
+    {
+     "resource": "core:resource/horses",
+     "amount": 1
+    }
+   ],
+   "upgrades_to": [
+    "core:unit/anti-tank-gun"
+   ],
+   "free_promotions": [
+    "core:promotion/movement-to-general",
+    "core:promotion/general-stacking",
+    "core:promotion/no-defensive-bonuses",
+    "core:promotion/can-move-after-attacking",
+    "core:promotion/city-penalty",
+    "core:promotion/formation-1"
+   ],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 3,
+   "xp_value_defense": 3,
+   "abilities": {
+    "pillage": true,
+    "requires_faith_purchase_enabled": true
+   },
+   "nation": "core:nation/sweden",
+   "replaces": "core:unit/lancer",
+   "source": "unciv: Gods & Kings/Units.json, Hakkapeliitta (strength, ranged strength, movement, cost, required and obsolete technology, upgrade, replaced unit; checked 2026-10-20)",
+   "provenance": "unciv: Units.json, Hakkapeliitta",
+   "unciv_fields": [
+    "combat",
+    "cost",
+    "moves",
+    "obsolete_tech",
+    "ranged_combat",
+    "required_resources",
+    "required_tech",
+    "upgrades_to"
+   ]
+  },
+  {
+   "id": "core:unit/battering-ram",
+   "name": "Battering Ram",
+   "class": "core:unit-class/spearman",
+   "role": "melee",
+   "domain": "core:domain/land",
+   "era": "core:era/ancient",
+   "combat": 10,
+   "ranged_combat": 0,
+   "range": 0,
+   "moves": 2,
+   "sight": 2,
+   "cost": 75,
+   "faith_cost": 150,
+   "required_tech": "core:tech/bronze-working",
+   "obsolete_tech": "core:tech/physics",
+   "required_resources": [],
+   "upgrades_to": [
+    "core:unit/trebuchet"
+   ],
+   "free_promotions": [
+    "core:promotion/city-assault",
+    "core:promotion/no-defensive-bonuses",
+    "core:promotion/defense-penalty",
+    "core:promotion/sight-penalty",
+    "core:promotion/cover-1",
+    "core:promotion/only-attacks-cities"
+   ],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 3,
+   "xp_value_defense": 3,
+   "abilities": {
+    "pillage": true,
+    "requires_faith_purchase_enabled": true
+   },
+   "nation": "core:nation/huns",
+   "replaces": "core:unit/spearman",
+   "source": "unciv: Gods & Kings/Units.json, Battering Ram (strength, ranged strength, movement, cost, required and obsolete technology, upgrade, replaced unit; checked 2026-10-20)",
+   "provenance": "unciv: Units.json, Battering Ram",
+   "unciv_fields": [
+    "combat",
+    "cost",
+    "moves",
+    "obsolete_tech",
+    "ranged_combat",
+    "required_resources",
+    "required_tech",
+    "upgrades_to"
+   ]
+  },
+  {
+   "id": "core:unit/sea-beggar",
+   "name": "Sea Beggar",
+   "class": "core:unit-class/privateer",
+   "role": "navalmelee",
+   "domain": "core:domain/sea",
+   "era": "core:era/renaissance",
+   "combat": 25,
+   "ranged_combat": 0,
+   "range": 0,
+   "moves": 5,
+   "sight": 2,
+   "cost": 150,
+   "faith_cost": null,
+   "required_tech": "core:tech/navigation",
+   "obsolete_tech": null,
+   "required_resources": [],
+   "upgrades_to": [
+    "core:unit/destroyer"
+   ],
+   "free_promotions": [
+    "core:promotion/coastal-raider-1",
+    "core:promotion/coastal-raider-2",
+    "core:promotion/prize-ships",
+    "core:promotion/supply"
+   ],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 3,
+   "xp_value_defense": 3,
+   "abilities": {
+    "pillage": true,
+    "mechanized": true
+   },
+   "nation": "core:nation/netherlands",
+   "replaces": "core:unit/privateer",
+   "source": "own value, unverified",
+   "provenance": "unciv: Units.json, Sea Beggar",
+   "unciv_fields": [
+    "combat",
+    "cost",
+    "moves",
+    "obsolete_tech",
+    "ranged_combat",
+    "required_resources",
+    "required_tech",
+    "upgrades_to"
+   ]
+  }
+ ],
+ "notice": "Derived from Unciv (https://github.com/yairm210/Unciv), MPL-2.0: rule fields of the entries marked `unciv:` come from Unciv's `Gods & Kings` JSON files at commit 18827b1f; entries marked `own value, unverified` have no Unciv counterpart. Listed per file in classic/docs/classic/UNCIV-ATTRIBUTION.md."
+}

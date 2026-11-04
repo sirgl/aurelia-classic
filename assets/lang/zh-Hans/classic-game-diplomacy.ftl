@@ -1,0 +1,40 @@
+# Translation of classic-game-diplomacy.ftl into zh-Hans. Keys are in the order of the English file.
+# Lines marked TODO still hold the English text: translate them and delete the marker.
+
+classic.game.diplomacy.offer-both = 双方：{ $what }
+classic.game.diplomacy.offer-give = 你给出：{ $what }
+classic.game.diplomacy.offer-receive = 你得到：{ $what }
+classic.game.diplomacy.item-gold = 金币
+classic.game.diplomacy.item-gold-amount = { NUMBER($n) }金币
+classic.game.diplomacy.item-gold-per-turn = 每回合金币
+classic.game.diplomacy.item-gold-per-turn-amount = 每回合 { NUMBER($n) } 金币
+classic.game.diplomacy.item-resource-amount = { NUMBER($n) } { $name }
+classic.game.diplomacy.item-embassy = 大使馆
+classic.game.diplomacy.item-open-borders = 开放边境
+classic.game.diplomacy.item-defensive-pact = 防御条约
+classic.game.diplomacy.item-research-agreement = 研究协定
+classic.game.diplomacy.item-friendship = 友好宣言
+classic.game.diplomacy.item-peace = 和平条约
+classic.game.diplomacy.item-war-on = 对{ $name }开战
+classic.game.diplomacy.item-peace-with = 与{ $name }媾和
+classic.game.diplomacy.resource = 资源
+classic.game.diplomacy.notice-peace = 与{ $name }缔结和平
+classic.game.diplomacy.notice-borders = 已向{ $name }开放边境
+classic.game.diplomacy.notice-war = 你向{ $name }宣战
+classic.game.diplomacy.notice-denounce = 你谴责了{ $name }
+classic.game.diplomacy.notice-offered = 已向{ $name }提出交易
+classic.game.diplomacy.notice-accepted = 交易已接受
+classic.game.diplomacy.notice-refused = 交易被拒绝
+classic.game.diplomacy.state-war = 自第{ $turn }回合起处于战争
+classic.game.diplomacy.state-treaty = 和平条约持续至第{ $turn }回合
+classic.game.diplomacy.state-peace = 和平
+classic.game.diplomacy.fact-our-embassy = 你在对方设有大使馆
+classic.game.diplomacy.fact-their-embassy = 对方在你这里设有大使馆
+classic.game.diplomacy.fact-we-grant-entry = 你的边境对其开放
+classic.game.diplomacy.fact-they-grant-entry = 其边境对你开放
+classic.game.diplomacy.fact-we-denounced = 你谴责了对方
+classic.game.diplomacy.fact-they-denounced = 对方谴责了你
+classic.game.diplomacy.fact-warmonger = 你记得其好战行为（{ $n }）
+classic.game.diplomacy.quantity-gold-now = 立即支付 { NUMBER($n) } 金币
+classic.game.diplomacy.quantity-gold-per-turn = 每回合 { NUMBER($n) } 金币
+classic.game.diplomacy.quantity-resource = { $n } × { $name }

@@ -1,0 +1,106 @@
+id	name	parent	kind
+tradition	Tradition		branch
+tradition/aristocracy	Aristocracy	tradition	policy
+tradition/oligarchy	Oligarchy	tradition	policy
+tradition/legalism	Legalism	tradition	policy
+tradition/landed-elite	Landed Elite	tradition	policy
+tradition/monarchy	Monarchy	tradition	policy
+liberty	Liberty		branch
+liberty/republic	Republic	liberty	policy
+liberty/citizenship	Citizenship	liberty	policy
+liberty/collective-rule	Collective Rule	liberty	policy
+liberty/representation	Representation	liberty	policy
+liberty/meritocracy	Meritocracy	liberty	policy
+honor	Honor		branch
+honor/warrior-code	Warrior Code	honor	policy
+honor/discipline	Discipline	honor	policy
+honor/military-caste	Military Caste	honor	policy
+honor/military-tradition	Military Tradition	honor	policy
+honor/professional-army	Professional Army	honor	policy
+piety	Piety		branch
+piety/organized-religion	Organized Religion	piety	policy
+piety/mandate-of-heaven	Mandate of Heaven	piety	policy
+piety/theocracy	Theocracy	piety	policy
+piety/religious-tolerance	Religious Tolerance	piety	policy
+piety/reformation	Reformation	piety	policy
+patronage	Patronage		branch
+patronage/consulates	Consulates	patronage	policy
+patronage/philanthropy	Philanthropy	patronage	policy
+patronage/scholasticism	Scholasticism	patronage	policy
+patronage/cultural-diplomacy	Cultural Diplomacy	patronage	policy
+patronage/merchant-confederacy	Merchant Confederacy	patronage	policy
+aesthetics	Aesthetics		branch
+aesthetics/cultural-centers	Cultural Centers	aesthetics	policy
+aesthetics/fine-arts	Fine Arts	aesthetics	policy
+aesthetics/flourishing-of-the-arts	Flourishing of the Arts	aesthetics	policy
+aesthetics/artistic-genius	Artistic Genius	aesthetics	policy
+aesthetics/cultural-exchange	Cultural Exchange	aesthetics	policy
+commerce	Commerce		branch
+commerce/wagon-trains	Wagon Trains	commerce	policy
+commerce/mercenary-army	Mercenary Army	commerce	policy
+commerce/mercantilism	Mercantilism	commerce	policy
+commerce/entrepreneurship	Entrepreneurship	commerce	policy
+commerce/protectionism	Protectionism	commerce	policy
+exploration	Exploration		branch
+exploration/maritime-infrastructure	Maritime Infrastructure	exploration	policy
+exploration/naval-tradition	Naval Tradition	exploration	policy
+exploration/merchant-navy	Merchant Navy	exploration	policy
+exploration/navigation-school	Navigation School	exploration	policy
+exploration/treasure-fleets	Treasure Fleets	exploration	policy
+rationalism	Rationalism		branch
+rationalism/humanism	Humanism	rationalism	policy
+rationalism/secularism	Secularism	rationalism	policy
+rationalism/free-thought	Free Thought	rationalism	policy
+rationalism/sovereignty	Sovereignty	rationalism	policy
+rationalism/scientific-revolution	Scientific Revolution	rationalism	policy
+freedom	Freedom		ideology
+freedom/avant-garde	Avant Garde	freedom	tenet
+freedom/civil-society	Civil Society	freedom	tenet
+freedom/capitalism	Capitalism	freedom	tenet
+freedom/covert-action	Covert Action	freedom	tenet
+freedom/creative-expression	Creative Expression	freedom	tenet
+freedom/economic-union	Economic Union	freedom	tenet
+freedom/universal-healthcare	Universal Healthcare	freedom	tenet
+freedom/volunteer-army	Volunteer Army	freedom	tenet
+freedom/urbanization	Urbanization	freedom	tenet
+freedom/their-finest-hour	Their Finest Hour	freedom	tenet
+freedom/universal-suffrage	Universal Suffrage	freedom	tenet
+freedom/new-deal	New Deal	freedom	tenet
+freedom/arsenal-of-democracy	Arsenal of Democracy	freedom	tenet
+freedom/media-culture	Media Culture	freedom	tenet
+freedom/treaty-organization	Treaty Organization	freedom	tenet
+freedom/space-procurements	Space Procurements	freedom	tenet
+order	Order		ideology
+order/hero-of-the-people	Hero of the People	order	tenet
+order/socialist-realism	Socialist Realism	order	tenet
+order/skyscrapers	Skyscrapers	order	tenet
+order/patriotic-war	Patriotic War	order	tenet
+order/double-agents	Double Agents	order	tenet
+order/young-pioneers	Young Pioneers	order	tenet
+order/universal-healthcare	Universal Healthcare	order	tenet
+order/academy-of-sciences	Academy of Sciences	order	tenet
+order/party-leadership	Party Leadership	order	tenet
+order/resettlement	Resettlement	order	tenet
+order/cultural-revolution	Cultural Revolution	order	tenet
+order/workers-faculties	Workers' Faculties	order	tenet
+order/five-year-plan	Five-Year Plan	order	tenet
+order/dictatorship-of-the-proletariat	Dictatorship of the Proletariat	order	tenet
+order/iron-curtain	Iron Curtain	order	tenet
+order/spaceflight-pioneers	Spaceflight Pioneers	order	tenet
+autocracy	Autocracy		ideology
+autocracy/elite-forces	Elite Forces	autocracy	tenet
+autocracy/mobilization	Mobilization	autocracy	tenet
+autocracy/united-front	United Front	autocracy	tenet
+autocracy/futurism	Futurism	autocracy	tenet
+autocracy/industrial-espionage	Industrial Espionage	autocracy	tenet
+autocracy/fortified-borders	Fortified Borders	autocracy	tenet
+autocracy/universal-healthcare	Universal Healthcare	autocracy	tenet
+autocracy/militarism	Militarism	autocracy	tenet
+autocracy/lightning-warfare	Lightning Warfare	autocracy	tenet
+autocracy/police-state	Police State	autocracy	tenet
+autocracy/nationalism	Nationalism	autocracy	tenet
+autocracy/third-alternative	Third Alternative	autocracy	tenet
+autocracy/total-war	Total War	autocracy	tenet
+autocracy/cult-of-personality	Cult of Personality	autocracy	tenet
+autocracy/gunboat-diplomacy	Gunboat Diplomacy	autocracy	tenet
+autocracy/clausewitz-s-legacy	Clausewitz's Legacy	autocracy	tenet

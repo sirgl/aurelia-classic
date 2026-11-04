@@ -1,0 +1,43 @@
+# Translation of classic-ui-screen-city.ftl into ja. Keys are in the order of the English file.
+# Lines marked TODO still hold the English text: translate them and delete the marker.
+
+classic.ui.screen-city.default-name = Rivermere
+classic.ui.screen-city.subtitle = 首都  ·  都市管理
+classic.ui.screen-city.overview = 都市の概要
+classic.ui.screen-city.citizens = 市民
+classic.ui.screen-city.growing = あと3ターンで成長
+classic.ui.screen-city.food-stored = 食料の蓄え  ·  28 / 45
+classic.ui.screen-city.food = 食料
+classic.ui.screen-city.production = 生産力
+classic.ui.screen-city.science = 科学力
+classic.ui.screen-city.gold = ゴールド
+classic.ui.screen-city.culture = 文化
+classic.ui.screen-city.defence = 防御
+classic.ui.screen-city.buildings = 建造物
+classic.ui.screen-city.citizen-focus = 市民の重点
+classic.ui.screen-city.focus-balanced = バランス
+classic.ui.screen-city.focus-growth = 成長
+classic.ui.screen-city.focus-industry = 産業
+classic.ui.screen-city.assignments = 市民の配置
+classic.ui.screen-city.fields = 農地
+classic.ui.screen-city.workshops = 工房
+classic.ui.screen-city.scholars = 学者
+classic.ui.screen-city.established = 建設済みの建造物
+classic.ui.screen-city.palace = 宮殿
+classic.ui.screen-city.palace-effect = 科学力+3  ·  ゴールド+3
+classic.ui.screen-city.granary = 穀物庫
+classic.ui.screen-city.granary-effect = 食料+2
+classic.ui.screen-city.monument = 記念碑
+classic.ui.screen-city.monument-effect = 文化+2
+classic.ui.screen-city.choose-production = 生産を選択
+classic.ui.screen-city.cost-turns = 生産力 { $cost }  ·  { $n }ターン
+classic.ui.screen-city.add-to-queue = 生産キューに追加
+classic.ui.screen-city.queue = 生産キュー  /  { $n }
+classic.ui.screen-city.kind-building = 建造物
+classic.ui.screen-city.kind-melee-unit = 近接ユニット
+classic.ui.screen-city.warrior = 戦士
+classic.ui.screen-city.water-mill = 水車
+classic.ui.screen-city.granary-desc = 収穫を蓄えます。食料が増えれば、Rivermere はさらに成長できます。
+classic.ui.screen-city.warrior-desc = 谷を守り、開拓者を新天地へ護衛します。
+classic.ui.screen-city.monument-desc = 共有する歴史を祝い、都市の文化的な営みを高めます。
+classic.ui.screen-city.water-mill-desc = 川の流れを食料と生産的な労働に変えます。

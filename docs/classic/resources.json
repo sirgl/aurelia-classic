@@ -1,0 +1,1736 @@
+{
+ "schema": "classic-spec/1",
+ "catalog": "resources",
+ "edition": "Classic rule set (Unciv Gods & Kings ruleset plus own extensions)",
+ "count": 42,
+ "items": [
+  {
+   "id": "core:resource/iron",
+   "name": "Iron",
+   "class": "strategic",
+   "yields": {
+    "production": 1
+   },
+   "happiness": null,
+   "revealed_by_tech": "core:tech/iron-working",
+   "tradeable_with_tech": "core:tech/bronze-working",
+   "revealed_by_policy": null,
+   "improvement": [
+    "core:improvement/mine"
+   ],
+   "also_buildable_on": [
+    "core:improvement/customs-house",
+    "core:improvement/academy",
+    "core:improvement/citadel",
+    "core:improvement/manufactory",
+    "core:improvement/holy-site"
+   ],
+   "improved_yields": {},
+   "quantities": [
+    2,
+    6
+   ],
+   "terrains": [
+    "core:terrain/grassland",
+    "core:terrain/plains",
+    "core:terrain/desert",
+    "core:terrain/tundra",
+    "core:terrain/snow"
+   ],
+   "features": [],
+   "feature_terrains": [],
+   "hills": true,
+   "flatlands": true,
+   "only_city_states": false,
+   "nation_unique": null,
+   "wonder_production_pct": null,
+   "wonder_production_obsolete_era": null,
+   "provenance": "unciv: TileResources.json, Iron",
+   "unciv_fields": [
+    "class",
+    "improvement",
+    "revealed_by_tech",
+    "yields"
+   ]
+  },
+  {
+   "id": "core:resource/horses",
+   "name": "Horses",
+   "class": "strategic",
+   "yields": {
+    "production": 1
+   },
+   "happiness": null,
+   "revealed_by_tech": "core:tech/animal-husbandry",
+   "tradeable_with_tech": "core:tech/animal-husbandry",
+   "revealed_by_policy": null,
+   "improvement": [
+    "core:improvement/pasture"
+   ],
+   "also_buildable_on": [
+    "core:improvement/customs-house",
+    "core:improvement/academy",
+    "core:improvement/citadel",
+    "core:improvement/manufactory",
+    "core:improvement/holy-site"
+   ],
+   "improved_yields": {
+    "core:improvement/pasture": {
+     "production": 1
+    }
+   },
+   "quantities": [
+    2,
+    4
+   ],
+   "terrains": [
+    "core:terrain/grassland",
+    "core:terrain/plains",
+    "core:terrain/tundra"
+   ],
+   "features": [],
+   "feature_terrains": [],
+   "hills": false,
+   "flatlands": true,
+   "only_city_states": false,
+   "nation_unique": null,
+   "wonder_production_pct": null,
+   "wonder_production_obsolete_era": null,
+   "provenance": "unciv: TileResources.json, Horses",
+   "unciv_fields": [
+    "class",
+    "improvement",
+    "revealed_by_tech",
+    "yields"
+   ]
+  },
+  {
+   "id": "core:resource/coal",
+   "name": "Coal",
+   "class": "strategic",
+   "yields": {
+    "production": 1
+   },
+   "happiness": null,
+   "revealed_by_tech": "core:tech/industrialization",
+   "tradeable_with_tech": "core:tech/industrialization",
+   "revealed_by_policy": null,
+   "improvement": [
+    "core:improvement/mine"
+   ],
+   "also_buildable_on": [
+    "core:improvement/customs-house",
+    "core:improvement/academy",
+    "core:improvement/citadel",
+    "core:improvement/manufactory",
+    "core:improvement/holy-site"
+   ],
+   "improved_yields": {
+    "core:improvement/mine": {
+     "production": 1
+    }
+   },
+   "quantities": [
+    6
+   ],
+   "terrains": [
+    "core:terrain/grassland",
+    "core:terrain/plains"
+   ],
+   "features": [],
+   "feature_terrains": [],
+   "hills": true,
+   "flatlands": false,
+   "only_city_states": false,
+   "nation_unique": null,
+   "wonder_production_pct": null,
+   "wonder_production_obsolete_era": null,
+   "provenance": "unciv: TileResources.json, Coal",
+   "unciv_fields": [
+    "class",
+    "improvement",
+    "revealed_by_tech",
+    "yields"
+   ]
+  },
+  {
+   "id": "core:resource/oil",
+   "name": "Oil",
+   "class": "strategic",
+   "yields": {
+    "production": 1
+   },
+   "happiness": null,
+   "revealed_by_tech": "core:tech/biology",
+   "tradeable_with_tech": "core:tech/biology",
+   "revealed_by_policy": null,
+   "improvement": [
+    "core:improvement/oil-well",
+    "core:improvement/offshore-platform"
+   ],
+   "also_buildable_on": [
+    "core:improvement/customs-house",
+    "core:improvement/academy",
+    "core:improvement/citadel",
+    "core:improvement/manufactory",
+    "core:improvement/holy-site"
+   ],
+   "improved_yields": {
+    "core:improvement/oil-well": {
+     "production": 3
+    },
+    "core:improvement/offshore-platform": {
+     "production": 3
+    }
+   },
+   "quantities": [
+    5
+   ],
+   "terrains": [
+    "core:terrain/desert",
+    "core:terrain/tundra",
+    "core:terrain/snow",
+    "core:terrain/coast"
+   ],
+   "features": [
+    "core:feature/jungle",
+    "core:feature/marsh"
+   ],
+   "feature_terrains": [
+    "core:terrain/grassland",
+    "core:terrain/plains"
+   ],
+   "hills": false,
+   "flatlands": true,
+   "only_city_states": false,
+   "nation_unique": null,
+   "wonder_production_pct": null,
+   "wonder_production_obsolete_era": null,
+   "provenance": "unciv: TileResources.json, Oil",
+   "unciv_fields": [
+    "class",
+    "revealed_by_tech",
+    "yields"
+   ]
+  },
+  {
+   "id": "core:resource/aluminum",
+   "name": "Aluminum",
+   "class": "strategic",
+   "yields": {
+    "production": 1
+   },
+   "happiness": null,
+   "revealed_by_tech": "core:tech/electricity",
+   "tradeable_with_tech": "core:tech/electricity",
+   "revealed_by_policy": null,
+   "improvement": [
+    "core:improvement/mine"
+   ],
+   "also_buildable_on": [
+    "core:improvement/customs-house",
+    "core:improvement/academy",
+    "core:improvement/citadel",
+    "core:improvement/manufactory",
+    "core:improvement/holy-site"
+   ],
+   "improved_yields": {
+    "core:improvement/mine": {
+     "production": 1
+    }
+   },
+   "quantities": [
+    5
+   ],
+   "terrains": [
+    "core:terrain/plains",
+    "core:terrain/desert",
+    "core:terrain/tundra"
+   ],
+   "features": [],
+   "feature_terrains": [],
+   "hills": true,
+   "flatlands": false,
+   "only_city_states": false,
+   "nation_unique": null,
+   "wonder_production_pct": null,
+   "wonder_production_obsolete_era": null,
+   "provenance": "unciv: TileResources.json, Aluminum",
+   "unciv_fields": [
+    "class",
+    "improvement",
+    "revealed_by_tech",
+    "yields"
+   ]
+  },
+  {
+   "id": "core:resource/uranium",
+   "name": "Uranium",
+   "class": "strategic",
+   "yields": {
+    "production": 1
+   },
+   "happiness": null,
+   "revealed_by_tech": "core:tech/atomic-theory",
+   "tradeable_with_tech": "core:tech/atomic-theory",
+   "revealed_by_policy": null,
+   "improvement": [
+    "core:improvement/mine"
+   ],
+   "also_buildable_on": [
+    "core:improvement/customs-house",
+    "core:improvement/academy",
+    "core:improvement/citadel",
+    "core:improvement/manufactory",
+    "core:improvement/holy-site"
+   ],
+   "improved_yields": {
+    "core:improvement/mine": {
+     "production": 1
+    }
+   },
+   "quantities": [
+    2,
+    4
+   ],
+   "terrains": [
+    "core:terrain/grassland",
+    "core:terrain/plains",
+    "core:terrain/desert",
+    "core:terrain/tundra",
+    "core:terrain/snow"
+   ],
+   "features": [
+    "core:feature/jungle",
+    "core:feature/forest",
+    "core:feature/marsh"
+   ],
+   "feature_terrains": [
+    "core:terrain/grassland",
+    "core:terrain/plains",
+    "core:terrain/desert",
+    "core:terrain/tundra",
+    "core:terrain/snow"
+   ],
+   "hills": true,
+   "flatlands": true,
+   "only_city_states": false,
+   "nation_unique": null,
+   "wonder_production_pct": null,
+   "wonder_production_obsolete_era": null,
+   "provenance": "unciv: TileResources.json, Uranium",
+   "unciv_fields": [
+    "class",
+    "improvement",
+    "revealed_by_tech",
+    "yields"
+   ]
+  },
+  {
+   "id": "core:resource/wheat",
+   "name": "Wheat",
+   "class": "bonus",
+   "yields": {
+    "food": 1
+   },
+   "happiness": null,
+   "revealed_by_tech": null,
+   "tradeable_with_tech": null,
+   "revealed_by_policy": null,
+   "improvement": [
+    "core:improvement/farm"
+   ],
+   "also_buildable_on": [],
+   "improved_yields": {},
+   "quantities": [],
+   "terrains": [
+    "core:terrain/plains"
+   ],
+   "features": [
+    "core:feature/flood-plains"
+   ],
+   "feature_terrains": [
+    "core:terrain/desert"
+   ],
+   "hills": false,
+   "flatlands": true,
+   "only_city_states": false,
+   "nation_unique": null,
+   "wonder_production_pct": null,
+   "wonder_production_obsolete_era": null,
+   "provenance": "unciv: TileResources.json, Wheat",
+   "unciv_fields": [
+    "class",
+    "improvement",
+    "revealed_by_tech",
+    "yields"
+   ]
+  },
+  {
+   "id": "core:resource/cattle",
+   "name": "Cattle",
+   "class": "bonus",
+   "yields": {
+    "food": 1
+   },
+   "happiness": null,
+   "revealed_by_tech": null,
+   "tradeable_with_tech": "core:tech/animal-husbandry",
+   "revealed_by_policy": null,
+   "improvement": [
+    "core:improvement/pasture"
+   ],
+   "also_buildable_on": [],
+   "improved_yields": {
+    "core:improvement/pasture": {
+     "production": 1
+    }
+   },
+   "quantities": [],
+   "terrains": [
+    "core:terrain/grassland"
+   ],
+   "features": [],
+   "feature_terrains": [],
+   "hills": false,
+   "flatlands": true,
+   "only_city_states": false,
+   "nation_unique": null,
+   "wonder_production_pct": null,
+   "wonder_production_obsolete_era": null,
+   "provenance": "unciv: TileResources.json, Cattle",
+   "unciv_fields": [
+    "class",
+    "improvement",
+    "revealed_by_tech",
+    "yields"
+   ]
+  },
+  {
+   "id": "core:resource/sheep",
+   "name": "Sheep",
+   "class": "bonus",
+   "yields": {
+    "food": 1
+   },
+   "happiness": null,
+   "revealed_by_tech": null,
+   "tradeable_with_tech": "core:tech/animal-husbandry",
+   "revealed_by_policy": null,
+   "improvement": [
+    "core:improvement/pasture"
+   ],
+   "also_buildable_on": [],
+   "improved_yields": {
+    "core:improvement/pasture": {
+     "food": 1
+    }
+   },
+   "quantities": [],
+   "terrains": [
+    "core:terrain/grassland",
+    "core:terrain/plains",
+    "core:terrain/desert",
+    "core:terrain/hill"
+   ],
+   "features": [],
+   "feature_terrains": [],
+   "hills": true,
+   "flatlands": false,
+   "only_city_states": false,
+   "nation_unique": null,
+   "wonder_production_pct": null,
+   "wonder_production_obsolete_era": null,
+   "provenance": "unciv: TileResources.json, Sheep",
+   "unciv_fields": [
+    "class",
+    "improvement",
+    "revealed_by_tech",
+    "yields"
+   ]
+  },
+  {
+   "id": "core:resource/deer",
+   "name": "Deer",
+   "class": "bonus",
+   "yields": {
+    "food": 1
+   },
+   "happiness": null,
+   "revealed_by_tech": null,
+   "tradeable_with_tech": "core:tech/trapping",
+   "revealed_by_policy": null,
+   "improvement": [
+    "core:improvement/camp"
+   ],
+   "also_buildable_on": [],
+   "improved_yields": {
+    "core:improvement/camp": {
+     "production": 1
+    }
+   },
+   "quantities": [],
+   "terrains": [
+    "core:terrain/tundra"
+   ],
+   "features": [
+    "core:feature/forest"
+   ],
+   "feature_terrains": [
+    "core:terrain/grassland",
+    "core:terrain/plains",
+    "core:terrain/tundra",
+    "core:terrain/snow"
+   ],
+   "hills": true,
+   "flatlands": true,
+   "only_city_states": false,
+   "nation_unique": null,
+   "wonder_production_pct": null,
+   "wonder_production_obsolete_era": null,
+   "provenance": "unciv: TileResources.json, Deer",
+   "unciv_fields": [
+    "class",
+    "improvement",
+    "revealed_by_tech",
+    "yields"
+   ]
+  },
+  {
+   "id": "core:resource/bananas",
+   "name": "Bananas",
+   "class": "bonus",
+   "yields": {
+    "food": 1
+   },
+   "happiness": null,
+   "revealed_by_tech": null,
+   "tradeable_with_tech": "core:tech/calendar",
+   "revealed_by_policy": null,
+   "improvement": [
+    "core:improvement/plantation"
+   ],
+   "also_buildable_on": [],
+   "improved_yields": {
+    "core:improvement/plantation": {
+     "food": 2,
+     "production": -1
+    }
+   },
+   "quantities": [],
+   "terrains": [],
+   "features": [
+    "core:feature/jungle"
+   ],
+   "feature_terrains": [
+    "core:terrain/grassland",
+    "core:terrain/plains"
+   ],
+   "hills": false,
+   "flatlands": true,
+   "only_city_states": false,
+   "nation_unique": null,
+   "wonder_production_pct": null,
+   "wonder_production_obsolete_era": null,
+   "provenance": "unciv: TileResources.json, Bananas",
+   "unciv_fields": [
+    "class",
+    "improvement",
+    "revealed_by_tech",
+    "yields"
+   ]
+  },
+  {
+   "id": "core:resource/fish",
+   "name": "Fish",
+   "class": "bonus",
+   "yields": {
+    "food": 1
+   },
+   "happiness": null,
+   "revealed_by_tech": null,
+   "tradeable_with_tech": "core:tech/sailing",
+   "revealed_by_policy": null,
+   "improvement": [
+    "core:improvement/fishing-boats"
+   ],
+   "also_buildable_on": [],
+   "improved_yields": {
+    "core:improvement/fishing-boats": {
+     "food": 1
+    }
+   },
+   "quantities": [],
+   "terrains": [
+    "core:terrain/coast"
+   ],
+   "features": [],
+   "feature_terrains": [],
+   "hills": false,
+   "flatlands": false,
+   "only_city_states": false,
+   "nation_unique": null,
+   "wonder_production_pct": null,
+   "wonder_production_obsolete_era": null,
+   "provenance": "unciv: TileResources.json, Fish",
+   "unciv_fields": [
+    "class",
+    "improvement",
+    "revealed_by_tech",
+    "yields"
+   ]
+  },
+  {
+   "id": "core:resource/stone",
+   "name": "Stone",
+   "class": "bonus",
+   "yields": {
+    "production": 1
+   },
+   "happiness": null,
+   "revealed_by_tech": null,
+   "tradeable_with_tech": "core:tech/masonry",
+   "revealed_by_policy": null,
+   "improvement": [
+    "core:improvement/quarry"
+   ],
+   "also_buildable_on": [],
+   "improved_yields": {
+    "core:improvement/quarry": {
+     "production": 1
+    }
+   },
+   "quantities": [],
+   "terrains": [
+    "core:terrain/grassland",
+    "core:terrain/plains",
+    "core:terrain/desert",
+    "core:terrain/tundra",
+    "core:terrain/snow"
+   ],
+   "features": [],
+   "feature_terrains": [],
+   "hills": true,
+   "flatlands": false,
+   "only_city_states": false,
+   "nation_unique": null,
+   "wonder_production_pct": null,
+   "wonder_production_obsolete_era": null,
+   "provenance": "unciv: TileResources.json, Stone",
+   "unciv_fields": [
+    "class",
+    "improvement",
+    "revealed_by_tech",
+    "yields"
+   ]
+  },
+  {
+   "id": "core:resource/whales",
+   "name": "Whales",
+   "class": "luxury",
+   "yields": {
+    "food": 1,
+    "gold": 1
+   },
+   "happiness": 4,
+   "revealed_by_tech": null,
+   "tradeable_with_tech": "core:tech/sailing",
+   "revealed_by_policy": null,
+   "improvement": [
+    "core:improvement/fishing-boats"
+   ],
+   "also_buildable_on": [],
+   "improved_yields": {
+    "core:improvement/fishing-boats": {
+     "food": 1
+    }
+   },
+   "quantities": [],
+   "terrains": [
+    "core:terrain/coast"
+   ],
+   "features": [],
+   "feature_terrains": [],
+   "hills": false,
+   "flatlands": false,
+   "only_city_states": false,
+   "nation_unique": null,
+   "wonder_production_pct": null,
+   "wonder_production_obsolete_era": null,
+   "provenance": "unciv: TileResources.json, Whales",
+   "unciv_fields": [
+    "class",
+    "improvement",
+    "revealed_by_tech",
+    "yields"
+   ]
+  },
+  {
+   "id": "core:resource/pearls",
+   "name": "Pearls",
+   "class": "luxury",
+   "yields": {
+    "gold": 2
+   },
+   "happiness": 4,
+   "revealed_by_tech": null,
+   "tradeable_with_tech": "core:tech/sailing",
+   "revealed_by_policy": null,
+   "improvement": [
+    "core:improvement/fishing-boats"
+   ],
+   "also_buildable_on": [],
+   "improved_yields": {
+    "core:improvement/fishing-boats": {
+     "food": 1
+    }
+   },
+   "quantities": [],
+   "terrains": [
+    "core:terrain/coast"
+   ],
+   "features": [],
+   "feature_terrains": [],
+   "hills": false,
+   "flatlands": false,
+   "only_city_states": false,
+   "nation_unique": null,
+   "wonder_production_pct": null,
+   "wonder_production_obsolete_era": null,
+   "provenance": "unciv: TileResources.json, Pearls",
+   "unciv_fields": [
+    "class",
+    "improvement",
+    "revealed_by_tech",
+    "yields"
+   ]
+  },
+  {
+   "id": "core:resource/gold",
+   "name": "Gold",
+   "class": "luxury",
+   "yields": {
+    "gold": 2
+   },
+   "happiness": 4,
+   "revealed_by_tech": null,
+   "tradeable_with_tech": "core:tech/mining",
+   "revealed_by_policy": null,
+   "improvement": [
+    "core:improvement/mine"
+   ],
+   "also_buildable_on": [],
+   "improved_yields": {},
+   "quantities": [],
+   "terrains": [
+    "core:terrain/grassland",
+    "core:terrain/plains",
+    "core:terrain/desert"
+   ],
+   "features": [],
+   "feature_terrains": [],
+   "hills": true,
+   "flatlands": false,
+   "only_city_states": false,
+   "nation_unique": null,
+   "wonder_production_pct": null,
+   "wonder_production_obsolete_era": null,
+   "provenance": "unciv: TileResources.json, Gold Ore",
+   "unciv_fields": [
+    "class",
+    "improvement",
+    "revealed_by_tech",
+    "yields"
+   ]
+  },
+  {
+   "id": "core:resource/silver",
+   "name": "Silver",
+   "class": "luxury",
+   "yields": {
+    "gold": 2
+   },
+   "happiness": 4,
+   "revealed_by_tech": null,
+   "tradeable_with_tech": "core:tech/mining",
+   "revealed_by_policy": null,
+   "improvement": [
+    "core:improvement/mine"
+   ],
+   "also_buildable_on": [],
+   "improved_yields": {},
+   "quantities": [],
+   "terrains": [
+    "core:terrain/tundra",
+    "core:terrain/desert"
+   ],
+   "features": [],
+   "feature_terrains": [],
+   "hills": true,
+   "flatlands": false,
+   "only_city_states": false,
+   "nation_unique": null,
+   "wonder_production_pct": null,
+   "wonder_production_obsolete_era": null,
+   "provenance": "unciv: TileResources.json, Silver",
+   "unciv_fields": [
+    "class",
+    "improvement",
+    "revealed_by_tech",
+    "yields"
+   ]
+  },
+  {
+   "id": "core:resource/gems",
+   "name": "Gems",
+   "class": "luxury",
+   "yields": {
+    "gold": 3
+   },
+   "happiness": 4,
+   "revealed_by_tech": null,
+   "tradeable_with_tech": "core:tech/mining",
+   "revealed_by_policy": null,
+   "improvement": [
+    "core:improvement/mine"
+   ],
+   "also_buildable_on": [],
+   "improved_yields": {},
+   "quantities": [],
+   "terrains": [
+    "core:terrain/grassland",
+    "core:terrain/plains",
+    "core:terrain/desert",
+    "core:terrain/tundra"
+   ],
+   "features": [
+    "core:feature/jungle"
+   ],
+   "feature_terrains": [
+    "core:terrain/grassland",
+    "core:terrain/plains"
+   ],
+   "hills": true,
+   "flatlands": false,
+   "only_city_states": false,
+   "nation_unique": null,
+   "wonder_production_pct": null,
+   "wonder_production_obsolete_era": null,
+   "provenance": "unciv: TileResources.json, Gems",
+   "unciv_fields": [
+    "class",
+    "improvement",
+    "revealed_by_tech",
+    "yields"
+   ]
+  },
+  {
+   "id": "core:resource/marble",
+   "name": "Marble",
+   "class": "luxury",
+   "yields": {
+    "gold": 2
+   },
+   "happiness": 4,
+   "revealed_by_tech": null,
+   "tradeable_with_tech": "core:tech/masonry",
+   "revealed_by_policy": null,
+   "improvement": [
+    "core:improvement/quarry"
+   ],
+   "also_buildable_on": [],
+   "improved_yields": {
+    "core:improvement/quarry": {
+     "production": 1
+    }
+   },
+   "quantities": [],
+   "terrains": [
+    "core:terrain/grassland",
+    "core:terrain/plains",
+    "core:terrain/desert",
+    "core:terrain/tundra"
+   ],
+   "features": [],
+   "feature_terrains": [],
+   "hills": true,
+   "flatlands": false,
+   "only_city_states": false,
+   "nation_unique": null,
+   "wonder_production_pct": 15,
+   "wonder_production_obsolete_era": "core:era/medieval",
+   "provenance": "unciv: TileResources.json, Marble",
+   "unciv_fields": [
+    "class",
+    "improvement",
+    "revealed_by_tech",
+    "yields"
+   ]
+  },
+  {
+   "id": "core:resource/ivory",
+   "name": "Ivory",
+   "class": "luxury",
+   "yields": {
+    "gold": 2
+   },
+   "happiness": 4,
+   "revealed_by_tech": null,
+   "tradeable_with_tech": "core:tech/trapping",
+   "revealed_by_policy": null,
+   "improvement": [
+    "core:improvement/camp"
+   ],
+   "also_buildable_on": [],
+   "improved_yields": {
+    "core:improvement/camp": {
+     "gold": 1
+    }
+   },
+   "quantities": [],
+   "terrains": [
+    "core:terrain/plains"
+   ],
+   "features": [],
+   "feature_terrains": [],
+   "hills": false,
+   "flatlands": true,
+   "only_city_states": false,
+   "nation_unique": null,
+   "wonder_production_pct": null,
+   "wonder_production_obsolete_era": null,
+   "provenance": "unciv: TileResources.json, Ivory",
+   "unciv_fields": [
+    "class",
+    "improvement",
+    "revealed_by_tech",
+    "yields"
+   ]
+  },
+  {
+   "id": "core:resource/furs",
+   "name": "Furs",
+   "class": "luxury",
+   "yields": {
+    "gold": 2
+   },
+   "happiness": 4,
+   "revealed_by_tech": null,
+   "tradeable_with_tech": "core:tech/trapping",
+   "revealed_by_policy": null,
+   "improvement": [
+    "core:improvement/camp"
+   ],
+   "also_buildable_on": [],
+   "improved_yields": {
+    "core:improvement/camp": {
+     "gold": 1
+    }
+   },
+   "quantities": [],
+   "terrains": [
+    "core:terrain/tundra"
+   ],
+   "features": [
+    "core:feature/forest"
+   ],
+   "feature_terrains": [
+    "core:terrain/grassland",
+    "core:terrain/plains",
+    "core:terrain/tundra",
+    "core:terrain/snow"
+   ],
+   "hills": false,
+   "flatlands": true,
+   "only_city_states": false,
+   "nation_unique": null,
+   "wonder_production_pct": null,
+   "wonder_production_obsolete_era": null,
+   "provenance": "unciv: TileResources.json, Furs",
+   "unciv_fields": [
+    "class",
+    "improvement",
+    "revealed_by_tech",
+    "yields"
+   ]
+  },
+  {
+   "id": "core:resource/dyes",
+   "name": "Dyes",
+   "class": "luxury",
+   "yields": {
+    "gold": 2
+   },
+   "happiness": 4,
+   "revealed_by_tech": null,
+   "tradeable_with_tech": "core:tech/calendar",
+   "revealed_by_policy": null,
+   "improvement": [
+    "core:improvement/plantation"
+   ],
+   "also_buildable_on": [],
+   "improved_yields": {
+    "core:improvement/plantation": {
+     "gold": 1
+    }
+   },
+   "quantities": [],
+   "terrains": [],
+   "features": [
+    "core:feature/jungle",
+    "core:feature/forest"
+   ],
+   "feature_terrains": [
+    "core:terrain/grassland",
+    "core:terrain/plains"
+   ],
+   "hills": false,
+   "flatlands": true,
+   "only_city_states": false,
+   "nation_unique": null,
+   "wonder_production_pct": null,
+   "wonder_production_obsolete_era": null,
+   "provenance": "unciv: TileResources.json, Dyes",
+   "unciv_fields": [
+    "class",
+    "improvement",
+    "revealed_by_tech",
+    "yields"
+   ]
+  },
+  {
+   "id": "core:resource/spices",
+   "name": "Spices",
+   "class": "luxury",
+   "yields": {
+    "gold": 2
+   },
+   "happiness": 4,
+   "revealed_by_tech": null,
+   "tradeable_with_tech": "core:tech/calendar",
+   "revealed_by_policy": null,
+   "improvement": [
+    "core:improvement/plantation"
+   ],
+   "also_buildable_on": [],
+   "improved_yields": {
+    "core:improvement/plantation": {
+     "gold": 1
+    }
+   },
+   "quantities": [],
+   "terrains": [],
+   "features": [
+    "core:feature/jungle"
+   ],
+   "feature_terrains": [
+    "core:terrain/grassland",
+    "core:terrain/plains"
+   ],
+   "hills": false,
+   "flatlands": true,
+   "only_city_states": false,
+   "nation_unique": null,
+   "wonder_production_pct": null,
+   "wonder_production_obsolete_era": null,
+   "provenance": "unciv: TileResources.json, Spices",
+   "unciv_fields": [
+    "class",
+    "improvement",
+    "revealed_by_tech",
+    "yields"
+   ]
+  },
+  {
+   "id": "core:resource/silk",
+   "name": "Silk",
+   "class": "luxury",
+   "yields": {
+    "gold": 2
+   },
+   "happiness": 4,
+   "revealed_by_tech": null,
+   "tradeable_with_tech": "core:tech/calendar",
+   "revealed_by_policy": null,
+   "improvement": [
+    "core:improvement/plantation"
+   ],
+   "also_buildable_on": [],
+   "improved_yields": {
+    "core:improvement/plantation": {
+     "gold": 1
+    }
+   },
+   "quantities": [],
+   "terrains": [],
+   "features": [
+    "core:feature/forest"
+   ],
+   "feature_terrains": [
+    "core:terrain/grassland",
+    "core:terrain/plains"
+   ],
+   "hills": false,
+   "flatlands": true,
+   "only_city_states": false,
+   "nation_unique": null,
+   "wonder_production_pct": null,
+   "wonder_production_obsolete_era": null,
+   "provenance": "unciv: TileResources.json, Silk",
+   "unciv_fields": [
+    "class",
+    "improvement",
+    "revealed_by_tech",
+    "yields"
+   ]
+  },
+  {
+   "id": "core:resource/sugar",
+   "name": "Sugar",
+   "class": "luxury",
+   "yields": {
+    "gold": 2
+   },
+   "happiness": 4,
+   "revealed_by_tech": null,
+   "tradeable_with_tech": "core:tech/calendar",
+   "revealed_by_policy": null,
+   "improvement": [
+    "core:improvement/plantation"
+   ],
+   "also_buildable_on": [],
+   "improved_yields": {
+    "core:improvement/plantation": {
+     "gold": 1
+    }
+   },
+   "quantities": [],
+   "terrains": [],
+   "features": [
+    "core:feature/flood-plains",
+    "core:feature/marsh"
+   ],
+   "feature_terrains": [
+    "core:terrain/grassland",
+    "core:terrain/plains",
+    "core:terrain/desert"
+   ],
+   "hills": false,
+   "flatlands": true,
+   "only_city_states": false,
+   "nation_unique": null,
+   "wonder_production_pct": null,
+   "wonder_production_obsolete_era": null,
+   "provenance": "unciv: TileResources.json, Sugar",
+   "unciv_fields": [
+    "class",
+    "improvement",
+    "revealed_by_tech",
+    "yields"
+   ]
+  },
+  {
+   "id": "core:resource/cotton",
+   "name": "Cotton",
+   "class": "luxury",
+   "yields": {
+    "gold": 2
+   },
+   "happiness": 4,
+   "revealed_by_tech": null,
+   "tradeable_with_tech": "core:tech/calendar",
+   "revealed_by_policy": null,
+   "improvement": [
+    "core:improvement/plantation"
+   ],
+   "also_buildable_on": [],
+   "improved_yields": {
+    "core:improvement/plantation": {
+     "gold": 1
+    }
+   },
+   "quantities": [],
+   "terrains": [
+    "core:terrain/grassland",
+    "core:terrain/plains",
+    "core:terrain/desert"
+   ],
+   "features": [],
+   "feature_terrains": [],
+   "hills": false,
+   "flatlands": true,
+   "only_city_states": false,
+   "nation_unique": null,
+   "wonder_production_pct": null,
+   "wonder_production_obsolete_era": null,
+   "provenance": "unciv: TileResources.json, Cotton",
+   "unciv_fields": [
+    "class",
+    "improvement",
+    "revealed_by_tech",
+    "yields"
+   ]
+  },
+  {
+   "id": "core:resource/wine",
+   "name": "Wine",
+   "class": "luxury",
+   "yields": {
+    "gold": 2
+   },
+   "happiness": 4,
+   "revealed_by_tech": null,
+   "tradeable_with_tech": "core:tech/calendar",
+   "revealed_by_policy": null,
+   "improvement": [
+    "core:improvement/plantation"
+   ],
+   "also_buildable_on": [],
+   "improved_yields": {
+    "core:improvement/plantation": {
+     "gold": 1
+    }
+   },
+   "quantities": [],
+   "terrains": [
+    "core:terrain/grassland",
+    "core:terrain/plains"
+   ],
+   "features": [],
+   "feature_terrains": [],
+   "hills": false,
+   "flatlands": true,
+   "only_city_states": false,
+   "nation_unique": null,
+   "wonder_production_pct": null,
+   "wonder_production_obsolete_era": null,
+   "provenance": "unciv: TileResources.json, Wine",
+   "unciv_fields": [
+    "class",
+    "improvement",
+    "revealed_by_tech",
+    "yields"
+   ]
+  },
+  {
+   "id": "core:resource/incense",
+   "name": "Incense",
+   "class": "luxury",
+   "yields": {
+    "gold": 2
+   },
+   "happiness": 4,
+   "revealed_by_tech": null,
+   "tradeable_with_tech": "core:tech/calendar",
+   "revealed_by_policy": null,
+   "improvement": [
+    "core:improvement/plantation"
+   ],
+   "also_buildable_on": [],
+   "improved_yields": {
+    "core:improvement/plantation": {
+     "gold": 1
+    }
+   },
+   "quantities": [],
+   "terrains": [
+    "core:terrain/plains",
+    "core:terrain/desert"
+   ],
+   "features": [],
+   "feature_terrains": [],
+   "hills": false,
+   "flatlands": true,
+   "only_city_states": false,
+   "nation_unique": null,
+   "wonder_production_pct": null,
+   "wonder_production_obsolete_era": null,
+   "provenance": "unciv: TileResources.json, Incense",
+   "unciv_fields": [
+    "class",
+    "improvement",
+    "revealed_by_tech",
+    "yields"
+   ]
+  },
+  {
+   "id": "core:resource/jewelry",
+   "name": "Jewelry",
+   "class": "luxury",
+   "yields": {
+    "gold": 2
+   },
+   "happiness": 4,
+   "revealed_by_tech": null,
+   "tradeable_with_tech": null,
+   "revealed_by_policy": null,
+   "improvement": [],
+   "also_buildable_on": [],
+   "improved_yields": {},
+   "quantities": [],
+   "terrains": [],
+   "features": [],
+   "feature_terrains": [],
+   "hills": false,
+   "flatlands": true,
+   "only_city_states": true,
+   "nation_unique": null,
+   "wonder_production_pct": null,
+   "wonder_production_obsolete_era": null,
+   "provenance": "unciv: TileResources.json, Jewelry",
+   "unciv_fields": [
+    "class",
+    "revealed_by_tech",
+    "yields"
+   ]
+  },
+  {
+   "id": "core:resource/porcelain",
+   "name": "Porcelain",
+   "class": "luxury",
+   "yields": {
+    "gold": 2
+   },
+   "happiness": 4,
+   "revealed_by_tech": null,
+   "tradeable_with_tech": null,
+   "revealed_by_policy": null,
+   "improvement": [],
+   "also_buildable_on": [],
+   "improved_yields": {},
+   "quantities": [],
+   "terrains": [],
+   "features": [],
+   "feature_terrains": [],
+   "hills": false,
+   "flatlands": true,
+   "only_city_states": true,
+   "nation_unique": null,
+   "wonder_production_pct": null,
+   "wonder_production_obsolete_era": null,
+   "provenance": "unciv: TileResources.json, Porcelain",
+   "unciv_fields": [
+    "class",
+    "revealed_by_tech",
+    "yields"
+   ]
+  },
+  {
+   "id": "core:resource/copper",
+   "name": "Copper",
+   "class": "luxury",
+   "yields": {
+    "gold": 2
+   },
+   "happiness": 4,
+   "revealed_by_tech": null,
+   "tradeable_with_tech": "core:tech/mining",
+   "revealed_by_policy": null,
+   "improvement": [
+    "core:improvement/mine"
+   ],
+   "also_buildable_on": [],
+   "improved_yields": {},
+   "quantities": [],
+   "terrains": [
+    "core:terrain/grassland",
+    "core:terrain/plains",
+    "core:terrain/desert",
+    "core:terrain/tundra",
+    "core:terrain/snow"
+   ],
+   "features": [],
+   "feature_terrains": [],
+   "hills": false,
+   "flatlands": true,
+   "only_city_states": false,
+   "nation_unique": null,
+   "wonder_production_pct": null,
+   "wonder_production_obsolete_era": null,
+   "provenance": "unciv: TileResources.json, Copper",
+   "unciv_fields": [
+    "class",
+    "improvement",
+    "revealed_by_tech",
+    "yields"
+   ]
+  },
+  {
+   "id": "core:resource/salt",
+   "name": "Salt",
+   "class": "luxury",
+   "yields": {
+    "food": 1,
+    "gold": 1
+   },
+   "happiness": 4,
+   "revealed_by_tech": null,
+   "tradeable_with_tech": "core:tech/mining",
+   "revealed_by_policy": null,
+   "improvement": [
+    "core:improvement/mine"
+   ],
+   "also_buildable_on": [],
+   "improved_yields": {
+    "core:improvement/mine": {
+     "food": 1
+    }
+   },
+   "quantities": [],
+   "terrains": [
+    "core:terrain/plains",
+    "core:terrain/desert",
+    "core:terrain/tundra"
+   ],
+   "features": [],
+   "feature_terrains": [],
+   "hills": false,
+   "flatlands": true,
+   "only_city_states": false,
+   "nation_unique": null,
+   "wonder_production_pct": null,
+   "wonder_production_obsolete_era": null,
+   "provenance": "unciv: TileResources.json, Salt",
+   "unciv_fields": [
+    "class",
+    "improvement",
+    "revealed_by_tech",
+    "yields"
+   ]
+  },
+  {
+   "id": "core:resource/crab",
+   "name": "Crab",
+   "class": "luxury",
+   "yields": {
+    "food": 1,
+    "gold": 1
+   },
+   "happiness": 4,
+   "revealed_by_tech": null,
+   "tradeable_with_tech": "core:tech/sailing",
+   "revealed_by_policy": null,
+   "improvement": [
+    "core:improvement/fishing-boats"
+   ],
+   "also_buildable_on": [],
+   "improved_yields": {
+    "core:improvement/fishing-boats": {
+     "food": 1
+    }
+   },
+   "quantities": [],
+   "terrains": [
+    "core:terrain/coast"
+   ],
+   "features": [],
+   "feature_terrains": [],
+   "hills": false,
+   "flatlands": true,
+   "only_city_states": false,
+   "nation_unique": null,
+   "wonder_production_pct": null,
+   "wonder_production_obsolete_era": null,
+   "provenance": "unciv: TileResources.json, Crab",
+   "unciv_fields": [
+    "class",
+    "improvement",
+    "revealed_by_tech",
+    "yields"
+   ]
+  },
+  {
+   "id": "core:resource/truffles",
+   "name": "Truffles",
+   "class": "luxury",
+   "yields": {
+    "gold": 2
+   },
+   "happiness": 4,
+   "revealed_by_tech": null,
+   "tradeable_with_tech": "core:tech/trapping",
+   "revealed_by_policy": null,
+   "improvement": [
+    "core:improvement/camp"
+   ],
+   "also_buildable_on": [],
+   "improved_yields": {
+    "core:improvement/camp": {
+     "gold": 1
+    }
+   },
+   "quantities": [],
+   "terrains": [],
+   "features": [
+    "core:feature/forest",
+    "core:feature/marsh",
+    "core:feature/jungle"
+   ],
+   "feature_terrains": [
+    "core:terrain/grassland",
+    "core:terrain/plains"
+   ],
+   "hills": false,
+   "flatlands": true,
+   "only_city_states": false,
+   "nation_unique": null,
+   "wonder_production_pct": null,
+   "wonder_production_obsolete_era": null,
+   "provenance": "unciv: TileResources.json, Truffles",
+   "unciv_fields": [
+    "class",
+    "improvement",
+    "revealed_by_tech",
+    "yields"
+   ]
+  },
+  {
+   "id": "core:resource/citrus",
+   "name": "Citrus",
+   "class": "luxury",
+   "yields": {
+    "food": 1,
+    "gold": 1
+   },
+   "happiness": 4,
+   "revealed_by_tech": null,
+   "tradeable_with_tech": "core:tech/calendar",
+   "revealed_by_policy": null,
+   "improvement": [
+    "core:improvement/plantation"
+   ],
+   "also_buildable_on": [],
+   "improved_yields": {
+    "core:improvement/plantation": {
+     "gold": 1
+    }
+   },
+   "quantities": [],
+   "terrains": [
+    "core:terrain/grassland",
+    "core:terrain/plains"
+   ],
+   "features": [],
+   "feature_terrains": [],
+   "hills": false,
+   "flatlands": true,
+   "only_city_states": false,
+   "nation_unique": null,
+   "wonder_production_pct": null,
+   "wonder_production_obsolete_era": null,
+   "provenance": "unciv: TileResources.json, Citrus",
+   "unciv_fields": [
+    "class",
+    "improvement",
+    "revealed_by_tech",
+    "yields"
+   ]
+  },
+  {
+   "id": "core:resource/antiquity_site",
+   "name": "Antiquity Site",
+   "class": "archaeology",
+   "yields": {},
+   "happiness": null,
+   "revealed_by_tech": "core:tech/archaeology",
+   "tradeable_with_tech": null,
+   "revealed_by_policy": null,
+   "improvement": [
+    "core:improvement/archaeological-dig"
+   ],
+   "also_buildable_on": [],
+   "improved_yields": {},
+   "quantities": [],
+   "terrains": [],
+   "features": [],
+   "feature_terrains": [],
+   "hills": false,
+   "flatlands": true,
+   "only_city_states": false,
+   "nation_unique": null,
+   "wonder_production_pct": null,
+   "wonder_production_obsolete_era": null,
+   "provenance": "own value"
+  },
+  {
+   "id": "core:resource/nutmeg",
+   "name": "Nutmeg",
+   "class": "luxury",
+   "yields": {
+    "gold": 2
+   },
+   "happiness": 4,
+   "revealed_by_tech": null,
+   "tradeable_with_tech": null,
+   "revealed_by_policy": null,
+   "improvement": [],
+   "also_buildable_on": [],
+   "improved_yields": {},
+   "quantities": [],
+   "terrains": [],
+   "features": [],
+   "feature_terrains": [],
+   "hills": false,
+   "flatlands": false,
+   "only_city_states": false,
+   "nation_unique": "core:nation/indonesia",
+   "wonder_production_pct": null,
+   "wonder_production_obsolete_era": null,
+   "provenance": "own value"
+  },
+  {
+   "id": "core:resource/cloves",
+   "name": "Cloves",
+   "class": "luxury",
+   "yields": {
+    "gold": 2
+   },
+   "happiness": 4,
+   "revealed_by_tech": null,
+   "tradeable_with_tech": null,
+   "revealed_by_policy": null,
+   "improvement": [],
+   "also_buildable_on": [],
+   "improved_yields": {},
+   "quantities": [],
+   "terrains": [],
+   "features": [],
+   "feature_terrains": [],
+   "hills": false,
+   "flatlands": false,
+   "only_city_states": false,
+   "nation_unique": "core:nation/indonesia",
+   "wonder_production_pct": null,
+   "wonder_production_obsolete_era": null,
+   "provenance": "own value"
+  },
+  {
+   "id": "core:resource/pepper",
+   "name": "Pepper",
+   "class": "luxury",
+   "yields": {
+    "gold": 2
+   },
+   "happiness": 4,
+   "revealed_by_tech": null,
+   "tradeable_with_tech": null,
+   "revealed_by_policy": null,
+   "improvement": [],
+   "also_buildable_on": [],
+   "improved_yields": {},
+   "quantities": [],
+   "terrains": [],
+   "features": [],
+   "feature_terrains": [],
+   "hills": false,
+   "flatlands": false,
+   "only_city_states": false,
+   "nation_unique": "core:nation/indonesia",
+   "wonder_production_pct": null,
+   "wonder_production_obsolete_era": null,
+   "provenance": "own value"
+  },
+  {
+   "id": "core:resource/hidden_antiquity_site",
+   "name": "Hidden Antiquity Site",
+   "class": "archaeology",
+   "yields": {},
+   "happiness": null,
+   "revealed_by_tech": null,
+   "tradeable_with_tech": null,
+   "revealed_by_policy": "core:policy/exploration/finisher",
+   "improvement": [
+    "core:improvement/archaeological-dig"
+   ],
+   "also_buildable_on": [],
+   "improved_yields": {},
+   "quantities": [],
+   "terrains": [],
+   "features": [],
+   "feature_terrains": [],
+   "hills": false,
+   "flatlands": true,
+   "only_city_states": false,
+   "nation_unique": null,
+   "wonder_production_pct": null,
+   "wonder_production_obsolete_era": null,
+   "provenance": "own value"
+  },
+  {
+   "id": "core:resource/bison",
+   "name": "Bison",
+   "class": "bonus",
+   "yields": {
+    "food": 1
+   },
+   "happiness": null,
+   "revealed_by_tech": null,
+   "tradeable_with_tech": "core:tech/trapping",
+   "revealed_by_policy": null,
+   "improvement": [
+    "core:improvement/camp"
+   ],
+   "also_buildable_on": [],
+   "improved_yields": {
+    "core:improvement/camp": {
+     "production": 1
+    }
+   },
+   "quantities": [],
+   "terrains": [
+    "core:terrain/grassland",
+    "core:terrain/plains"
+   ],
+   "features": [],
+   "feature_terrains": [],
+   "hills": false,
+   "flatlands": true,
+   "only_city_states": false,
+   "nation_unique": null,
+   "wonder_production_pct": null,
+   "wonder_production_obsolete_era": null,
+   "in_standard_game": false,
+   "provenance": "own value"
+  },
+  {
+   "id": "core:resource/cocoa",
+   "name": "Cocoa",
+   "class": "luxury",
+   "yields": {
+    "gold": 1,
+    "food": 1
+   },
+   "happiness": 4,
+   "revealed_by_tech": null,
+   "tradeable_with_tech": "core:tech/calendar",
+   "revealed_by_policy": null,
+   "improvement": [
+    "core:improvement/plantation"
+   ],
+   "also_buildable_on": [],
+   "improved_yields": {
+    "core:improvement/plantation": {
+     "gold": 1
+    }
+   },
+   "quantities": [],
+   "terrains": [],
+   "features": [
+    "core:feature/jungle"
+   ],
+   "feature_terrains": [
+    "core:terrain/grassland",
+    "core:terrain/plains"
+   ],
+   "hills": false,
+   "flatlands": true,
+   "only_city_states": false,
+   "nation_unique": null,
+   "wonder_production_pct": null,
+   "wonder_production_obsolete_era": null,
+   "in_standard_game": false,
+   "provenance": "own value"
+  }
+ ],
+ "notice": "Derived from Unciv (https://github.com/yairm210/Unciv), MPL-2.0: rule fields of the entries marked `unciv:` come from Unciv's `Gods & Kings` JSON files at commit 18827b1f; entries marked `own value, unverified` have no Unciv counterpart. Listed per file in classic/docs/classic/UNCIV-ATTRIBUTION.md."
+}

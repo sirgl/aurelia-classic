@@ -1,0 +1,33 @@
+[package]
+name = "classic-content"
+version = "0.1.0"
+edition = "2021"
+description = "Content catalog and importer of the classic module."
+license = "MIT OR Apache-2.0"
+authors = ["The Aurelia contributors"]
+repository = "https://github.com/sirgl/aurelia-classic"
+keywords = ["strategy", "content", "gamedev"]
+categories = ["game-development"]
+rust-version = "1.98"
+publish = false
+
+[features]
+# The classic catalog importer (docs/classic/*.json -> assets/rules/classic/*.ron):
+# cargo run --release --offline -p classic-content --features importer --bin classic-import
+importer = ["dep:serde_json"]
+
+[dependencies]
+classic-rules = { path = "../classic-rules" }
+ron = "0.12.2"
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = { version = "1.0.151", optional = true }
+
+[dev-dependencies]
+serde_json = "1.0.151"
+kernel = { package = "aurelia-kernel", path = "../../../platform/crates/kernel", features = ["harness"] }
+classic-rules = { path = "../classic-rules", features = ["harness"] }
+
+[[bin]]
+name = "classic-import"
+path = "src/bin/classic_import.rs"
+required-features = ["importer"]

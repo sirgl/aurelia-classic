@@ -1,0 +1,285 @@
+{
+ "schema": "classic-spec/1",
+ "catalog": "terrain",
+ "edition": "Classic rule set (Unciv Gods & Kings ruleset plus own extensions)",
+ "count": 9,
+ "rivers": {
+  "river_yield": "none: a river gives no yield of its own; rivers matter for fresh water (farms), building requirements, city defense and combat. Own value, unverified.",
+  "river_attack_modifier_pct": -20,
+  "hills_extra_movement": 1,
+  "hills_extra_defense_pct": 25,
+  "yield_rules": [
+   {
+    "yield": "food",
+    "hills_change": 0,
+    "mountain_change": 0,
+    "lake_change": 1,
+    "city_tile_change": 0,
+    "city_tile_minimum": 2,
+    "golden_age_tile_bonus": 0,
+    "golden_age_tile_threshold": 0,
+    "golden_age_city_pct": 0
+   },
+   {
+    "yield": "production",
+    "hills_change": 0,
+    "mountain_change": 0,
+    "lake_change": 0,
+    "city_tile_change": 0,
+    "city_tile_minimum": 1,
+    "golden_age_tile_bonus": 0,
+    "golden_age_tile_threshold": 0,
+    "golden_age_city_pct": 20
+   },
+   {
+    "yield": "gold",
+    "hills_change": 0,
+    "mountain_change": 0,
+    "lake_change": 0,
+    "city_tile_change": 0,
+    "city_tile_minimum": 0,
+    "golden_age_tile_bonus": 1,
+    "golden_age_tile_threshold": 1,
+    "golden_age_city_pct": 0
+   },
+   {
+    "yield": "science",
+    "hills_change": 0,
+    "mountain_change": 0,
+    "lake_change": 0,
+    "city_tile_change": 0,
+    "city_tile_minimum": 0,
+    "golden_age_tile_bonus": 0,
+    "golden_age_tile_threshold": 0,
+    "golden_age_city_pct": 0
+   },
+   {
+    "yield": "culture",
+    "hills_change": 0,
+    "mountain_change": 0,
+    "lake_change": 0,
+    "city_tile_change": 0,
+    "city_tile_minimum": 0,
+    "golden_age_tile_bonus": 0,
+    "golden_age_tile_threshold": 0,
+    "golden_age_city_pct": 0
+   },
+   {
+    "yield": "faith",
+    "hills_change": 0,
+    "mountain_change": 0,
+    "lake_change": 0,
+    "city_tile_change": 0,
+    "city_tile_minimum": 0,
+    "golden_age_tile_bonus": 0,
+    "golden_age_tile_threshold": 0,
+    "golden_age_city_pct": 0
+   }
+  ],
+  "yield_rules_note": "City centre tile gets at least city_tile_minimum; during a Golden Age tiles with >= threshold of the yield get +bonus; golden_age_city_pct is a city-wide modifier. Own rule, not compared with Unciv (see docs/classic/SOURCES.md).",
+  "source": "own value, unverified"
+ },
+ "items": [
+  {
+   "id": "core:terrain/grassland",
+   "name": "Grassland",
+   "yields": {
+    "food": 2
+   },
+   "hills_yield_change": {
+    "food": -2,
+    "production": 2
+   },
+   "movement_cost": 1,
+   "impassable": false,
+   "defense_pct": 0,
+   "water": false,
+   "can_found_city": true,
+   "see_from": 1,
+   "see_through": 1,
+   "influence_cost": 1,
+   "build_modifier_pct": 0,
+   "provenance": "unciv: Terrains.json, Grassland",
+   "unciv_fields": [
+    "movement_cost",
+    "yields"
+   ]
+  },
+  {
+   "id": "core:terrain/plains",
+   "name": "Plains",
+   "yields": {
+    "food": 1,
+    "production": 1
+   },
+   "hills_yield_change": {
+    "food": -1,
+    "production": 1
+   },
+   "movement_cost": 1,
+   "impassable": false,
+   "defense_pct": 0,
+   "water": false,
+   "can_found_city": true,
+   "see_from": 1,
+   "see_through": 1,
+   "influence_cost": 1,
+   "build_modifier_pct": 0,
+   "provenance": "unciv: Terrains.json, Plains",
+   "unciv_fields": [
+    "movement_cost",
+    "yields"
+   ]
+  },
+  {
+   "id": "core:terrain/desert",
+   "name": "Desert",
+   "yields": {},
+   "hills_yield_change": {
+    "production": 2
+   },
+   "movement_cost": 1,
+   "impassable": false,
+   "defense_pct": 0,
+   "water": false,
+   "can_found_city": true,
+   "see_from": 1,
+   "see_through": 1,
+   "influence_cost": 2,
+   "build_modifier_pct": 0,
+   "provenance": "unciv: Terrains.json, Desert",
+   "unciv_fields": [
+    "movement_cost",
+    "yields"
+   ]
+  },
+  {
+   "id": "core:terrain/tundra",
+   "name": "Tundra",
+   "yields": {
+    "food": 1
+   },
+   "hills_yield_change": {
+    "food": -1,
+    "production": 2
+   },
+   "movement_cost": 1,
+   "impassable": false,
+   "defense_pct": 0,
+   "water": false,
+   "can_found_city": true,
+   "see_from": 1,
+   "see_through": 1,
+   "influence_cost": 2,
+   "build_modifier_pct": 0,
+   "provenance": "unciv: Terrains.json, Tundra",
+   "unciv_fields": [
+    "movement_cost",
+    "yields"
+   ]
+  },
+  {
+   "id": "core:terrain/snow",
+   "name": "Snow",
+   "yields": {},
+   "hills_yield_change": null,
+   "movement_cost": 1,
+   "impassable": false,
+   "defense_pct": 0,
+   "water": false,
+   "can_found_city": true,
+   "see_from": 1,
+   "see_through": 1,
+   "influence_cost": 2,
+   "build_modifier_pct": 0,
+   "provenance": "unciv: Terrains.json, Snow",
+   "unciv_fields": [
+    "movement_cost",
+    "yields"
+   ]
+  },
+  {
+   "id": "core:terrain/coast",
+   "name": "Coast",
+   "yields": {
+    "food": 1,
+    "gold": 1
+   },
+   "hills_yield_change": null,
+   "movement_cost": 1,
+   "impassable": false,
+   "defense_pct": 0,
+   "water": true,
+   "can_found_city": false,
+   "see_from": 0,
+   "see_through": 0,
+   "influence_cost": 2,
+   "build_modifier_pct": 0,
+   "provenance": "unciv: Terrains.json, Coast",
+   "unciv_fields": [
+    "movement_cost",
+    "yields"
+   ]
+  },
+  {
+   "id": "core:terrain/ocean",
+   "name": "Ocean",
+   "yields": {
+    "food": 1,
+    "gold": 1
+   },
+   "hills_yield_change": null,
+   "movement_cost": 1,
+   "impassable": false,
+   "defense_pct": 0,
+   "water": true,
+   "can_found_city": false,
+   "see_from": 0,
+   "see_through": 0,
+   "influence_cost": 3,
+   "build_modifier_pct": 0,
+   "provenance": "unciv: Terrains.json, Ocean",
+   "unciv_fields": [
+    "movement_cost",
+    "yields"
+   ]
+  },
+  {
+   "id": "core:terrain/mountain",
+   "name": "Mountain",
+   "yields": {},
+   "hills_yield_change": null,
+   "movement_cost": 1,
+   "impassable": false,
+   "defense_pct": 0,
+   "water": true,
+   "can_found_city": false,
+   "see_from": 0,
+   "see_through": 0,
+   "influence_cost": 0,
+   "build_modifier_pct": 0,
+   "plot_type_note": "Mountains are a plot type; impassable for land units (except Carthage after a Great General / promotions), yield 0, +1 sight.",
+   "provenance": "unciv: Terrains.json, Mountain",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:terrain/hill",
+   "name": "Hill",
+   "yields": {},
+   "hills_yield_change": null,
+   "movement_cost": 1,
+   "impassable": false,
+   "defense_pct": 0,
+   "water": true,
+   "can_found_city": true,
+   "see_from": 0,
+   "see_through": 0,
+   "influence_cost": 0,
+   "build_modifier_pct": 0,
+   "plot_type_note": "Hills are a plot type layered on a base terrain; movement +1 (HILLS_EXTRA_MOVEMENT), defense +25% (HILLS_EXTRA_DEFENSE); yields = base terrain + hills_yield_change.",
+   "provenance": "unciv: Terrains.json, Hill",
+   "unciv_fields": []
+  }
+ ],
+ "notice": "Derived from Unciv (https://github.com/yairm210/Unciv), MPL-2.0: rule fields of the entries marked `unciv:` come from Unciv's `Gods & Kings` JSON files at commit 18827b1f; entries marked `own value, unverified` have no Unciv counterpart. Listed per file in classic/docs/classic/UNCIV-ATTRIBUTION.md."
+}

@@ -1,0 +1,684 @@
+{
+ "_about": "Entries Unciv does not have whose numbers were checked or corrected by hand (provenance `own value`, no external source is named). Applied by classic/tools/import-unciv.py: `set` writes the value, `effects` lists the effect indices that are marked `own value` (\"all\" or a list), `effect_set` corrects fields of one effect, `effects_only` marks effects of an entry that cites Unciv. Entries not listed stay `own value, unverified`.",
+ "entries": {
+  "core:belief/follower/swords-into-plowshares": {
+   "effects": "all"
+  },
+  "core:belief/pantheon/earth-mother": {
+   "effects": "all"
+  },
+  "core:belief/pantheon/god-king": {
+   "effects": "all"
+  },
+  "core:belief/pantheon/sun-god": {
+   "effects": "all"
+  },
+  "core:belief/pantheon/tears-of-the-gods": {
+   "effects": "all"
+  },
+  "core:belief/reformation/charitable-missions": {
+   "effects": "all"
+  },
+  "core:belief/reformation/evangelism": {},
+  "core:belief/reformation/heathen-conversion": {
+   "effects": "all"
+  },
+  "core:belief/reformation/jesuit-education": {
+   "effects": "all"
+  },
+  "core:belief/reformation/religious-fervor": {
+   "effects": "all"
+  },
+  "core:belief/reformation/sacred-sites": {
+   "effects": "all"
+  },
+  "core:belief/reformation/to-the-glory-of-god": {
+   "effects": "all"
+  },
+  "core:belief/reformation/underground-sect": {
+   "effects": "all"
+  },
+  "core:belief/reformation/unity-of-the-prophets": {
+   "effects": "all"
+  },
+  "core:building/airport": {
+   "effects": [
+    0,
+    1,
+    2
+   ]
+  },
+  "core:building/artists_guild": {
+   "effects": "all"
+  },
+  "core:building/borobudur": {
+   "effects": "all"
+  },
+  "core:building/broadway": {
+   "effects": "all"
+  },
+  "core:building/candi": {
+   "effects": "all"
+  },
+  "core:building/caravansary": {
+   "effects": "all"
+  },
+  "core:building/ducal_stable": {
+   "effects": "all"
+  },
+  "core:building/east_india_company": {
+   "effects": "all"
+  },
+  "core:building/globe_theatre": {
+   "effects": "all"
+  },
+  "core:building/hanse": {
+   "effects": "all"
+  },
+  "core:building/hotel": {
+   "effects": "all"
+  },
+  "core:building/ikanda": {
+   "effects": "all"
+  },
+  "core:building/international_space_station": {
+   "effects": "all"
+  },
+  "core:building/musicians_guild": {
+   "effects": "all"
+  },
+  "core:building/national_visitor_center": {
+   "effects": "all"
+  },
+  "core:building/parthenon": {
+   "effects": "all"
+  },
+  "core:building/prora": {
+   "effects": "all"
+  },
+  "core:building/red_fort": {
+   "effects": [
+    1,
+    2
+   ]
+  },
+  "core:building/royal_library": {
+   "effects": "all"
+  },
+  "core:building/uffizi": {
+   "effects": "all"
+  },
+  "core:building/writers_guild": {
+   "effects": "all"
+  },
+  "core:building/zoo": {
+   "effects": "all"
+  },
+  "core:city-state/antananarivo": {},
+  "core:city-state/bogota": {},
+  "core:city-state/buenos-aires": {},
+  "core:city-state/byblos": {},
+  "core:city-state/ife": {},
+  "core:city-state/kiev": {},
+  "core:city-state/kyzyl": {},
+  "core:city-state/malacca": {},
+  "core:city-state/melbourne": {},
+  "core:city-state/ormus": {},
+  "core:city-state/panama-city": {},
+  "core:city-state/riga": {},
+  "core:city-state/samarkand": {},
+  "core:city-state/sofia": {},
+  "core:city-state/vilnius": {},
+  "core:city-state/wellington": {},
+  "core:improvement/archaeological-dig": {
+   "effects": "all"
+  },
+  "core:improvement/brazilwood-camp": {
+   "effects": "all"
+  },
+  "core:improvement/chateau": {
+   "effects": "all"
+  },
+  "core:improvement/encampment": {},
+  "core:improvement/feitoria": {
+   "effects": "all"
+  },
+  "core:improvement/kasbah": {
+   "effects": "all"
+  },
+  "core:nation/assyria": {
+   "ability_effects": "all"
+  },
+  "core:nation/brazil": {
+   "ability_effects": "all"
+  },
+  "core:nation/indonesia": {
+   "ability_effects": "all"
+  },
+  "core:nation/morocco": {
+   "ability_effects": "all"
+  },
+  "core:nation/poland": {
+   "ability_effects": "all"
+  },
+  "core:nation/portugal": {
+   "ability_effects": "all"
+  },
+  "core:nation/shoshone": {
+   "ability_effects": [
+    "0.1",
+    "0.2",
+    "0.3",
+    "0.4",
+    "0.5",
+    "0.6",
+    "0.7"
+   ]
+  },
+  "core:nation/zulu": {
+   "ability_effects": "all"
+  },
+  "core:natural-wonder/king-solomon-s-mines": {},
+  "core:natural-wonder/lake-victoria": {},
+  "core:natural-wonder/mt-fuji": {},
+  "core:natural-wonder/mt-kailash": {},
+  "core:natural-wonder/mt-kilimanjaro": {},
+  "core:natural-wonder/mt-sinai": {},
+  "core:policy/aesthetics/artistic-genius": {
+   "effects": "all"
+  },
+  "core:policy/aesthetics/cultural-centers": {
+   "effects": "all"
+  },
+  "core:policy/aesthetics/cultural-exchange": {
+   "effects": "all"
+  },
+  "core:policy/aesthetics/fine-arts": {
+   "effects": "all"
+  },
+  "core:policy/aesthetics/flourishing-of-the-arts": {
+   "effects": [
+    1
+   ]
+  },
+  "core:policy/autocracy/clausewitz-s-legacy": {
+   "effects": "all"
+  },
+  "core:policy/autocracy/cult-of-personality": {
+   "effects": "all"
+  },
+  "core:policy/autocracy/elite-forces": {},
+  "core:policy/autocracy/fortified-borders": {
+   "effects": "all"
+  },
+  "core:policy/autocracy/futurism": {
+   "effects": "all"
+  },
+  "core:policy/autocracy/gunboat-diplomacy": {
+   "effects": "all"
+  },
+  "core:policy/autocracy/industrial-espionage": {
+   "effects": "all"
+  },
+  "core:policy/autocracy/lightning-warfare": {
+   "effects": "all"
+  },
+  "core:policy/autocracy/mobilization": {
+   "effects": "all"
+  },
+  "core:policy/autocracy/third-alternative": {
+   "effects": [
+    1,
+    2
+   ]
+  },
+  "core:policy/autocracy/universal-healthcare": {
+   "effects": "all"
+  },
+  "core:policy/commerce/entrepreneurship": {
+   "effects": [
+    1,
+    2
+   ]
+  },
+  "core:policy/commerce/mercenary-army": {
+   "effects": "all"
+  },
+  "core:policy/commerce/wagon-trains": {
+   "effects": "all"
+  },
+  "core:policy/exploration": {},
+  "core:policy/exploration/finisher": {},
+  "core:policy/exploration/maritime-infrastructure": {
+   "effects": "all"
+  },
+  "core:policy/exploration/navigation-school": {
+   "effects": "all"
+  },
+  "core:policy/exploration/opener": {
+   "effects": "all"
+  },
+  "core:policy/exploration/treasure-fleets": {
+   "effects": "all",
+   "effect_set": {
+    "0": {
+     "amount": 4.0
+    }
+   }
+  },
+  "core:policy/freedom/arsenal-of-democracy": {
+   "effects": "all"
+  },
+  "core:policy/freedom/avant-garde": {
+   "effects": "all"
+  },
+  "core:policy/freedom/capitalism": {
+   "effects": "all"
+  },
+  "core:policy/freedom/covert-action": {
+   "effects": "all"
+  },
+  "core:policy/freedom/creative-expression": {
+   "effects": "all"
+  },
+  "core:policy/freedom/economic-union": {
+   "effects": "all",
+   "effect_set": {
+    "0": {
+     "amount": 3.0
+    }
+   }
+  },
+  "core:policy/freedom/media-culture": {
+   "effects": "all"
+  },
+  "core:policy/freedom/new-deal": {
+   "effects": "all"
+  },
+  "core:policy/freedom/space-procurements": {
+   "effects": "all"
+  },
+  "core:policy/freedom/their-finest-hour": {
+   "effects": "all"
+  },
+  "core:policy/freedom/treaty-organization": {},
+  "core:policy/freedom/universal-healthcare": {
+   "effects": "all"
+  },
+  "core:policy/freedom/urbanization": {
+   "effects": "all"
+  },
+  "core:policy/freedom/volunteer-army": {
+   "effects": "all"
+  },
+  "core:policy/order/academy-of-sciences": {
+   "effects": "all"
+  },
+  "core:policy/order/cultural-revolution": {
+   "effects": "all"
+  },
+  "core:policy/order/dictatorship-of-the-proletariat": {
+   "effects": "all"
+  },
+  "core:policy/order/double-agents": {
+   "effects": "all"
+  },
+  "core:policy/order/five-year-plan": {
+   "effects": "all"
+  },
+  "core:policy/order/hero-of-the-people": {
+   "effects": "all"
+  },
+  "core:policy/order/iron-curtain": {
+   "effects": "all"
+  },
+  "core:policy/order/party-leadership": {
+   "effects": "all"
+  },
+  "core:policy/order/patriotic-war": {
+   "effects": "all"
+  },
+  "core:policy/order/resettlement": {
+   "effects": "all"
+  },
+  "core:policy/order/skyscrapers": {
+   "effects": "all"
+  },
+  "core:policy/order/socialist-realism": {
+   "effects": "all"
+  },
+  "core:policy/order/spaceflight-pioneers": {
+   "effects": "all"
+  },
+  "core:policy/order/universal-healthcare": {
+   "effects": "all"
+  },
+  "core:policy/order/workers-faculties": {
+   "effects": "all"
+  },
+  "core:policy/order/young-pioneers": {
+   "effects": "all"
+  },
+  "core:policy/patronage/consulates": {
+   "effects": "all"
+  },
+  "core:policy/patronage/merchant-confederacy": {
+   "effects": "all"
+  },
+  "core:policy/patronage/philanthropy": {
+   "effects": "all"
+  },
+  "core:policy/piety/religious-tolerance": {
+   "effects": "all"
+  },
+  "core:project/international_games": {
+   "ability_effects": "all"
+  },
+  "core:project/international_space_station": {
+   "ability_effects": [
+    "tier2.0",
+    "tier3.0"
+   ]
+  },
+  "core:project/ss_booster": {},
+  "core:project/ss_cockpit": {},
+  "core:project/ss_engine": {},
+  "core:project/ss_stasis_chamber": {},
+  "core:project/world_s_fair": {
+   "ability_effects": "all"
+  },
+  "core:promotion/altitude-training": {
+   "effects": [
+    0
+   ]
+  },
+  "core:promotion/ambition": {
+   "effects": "all"
+  },
+  "core:promotion/anti-gunpowder": {
+   "effects": "all"
+  },
+  "core:promotion/buffalo-chest": {
+   "effects": "all"
+  },
+  "core:promotion/buffalo-horns": {
+   "effects": "all"
+  },
+  "core:promotion/buffalo-loins": {
+   "effects": "all"
+  },
+  "core:promotion/desert-warrior": {
+   "effects": "all"
+  },
+  "core:promotion/enemy-blade": {},
+  "core:promotion/evil-spirits": {
+   "effects": "all"
+  },
+  "core:promotion/extended-paradrop": {
+   "effects": "all"
+  },
+  "core:promotion/fast-admiral": {
+   "effects": "all"
+  },
+  "core:promotion/fast-general": {
+   "effects": "all"
+  },
+  "core:promotion/faster-heal": {},
+  "core:promotion/heavy-charge": {
+   "effects": "all"
+  },
+  "core:promotion/heroism": {
+   "effects": "all"
+  },
+  "core:promotion/homeland-guardian": {
+   "effects": "all"
+  },
+  "core:promotion/homeland-guardian-boogaloo": {
+   "effects": "all"
+  },
+  "core:promotion/ignore-terrain-cost": {
+   "effects": "all"
+  },
+  "core:promotion/invulnerabiility": {
+   "effects": "all"
+  },
+  "core:promotion/lightning-warfare": {
+   "effects": "all"
+  },
+  "core:promotion/moon-striker": {
+   "effects": "all"
+  },
+  "core:promotion/mystic-blade": {
+   "effects": "all"
+  },
+  "core:promotion/nationalism": {
+   "effects": "all"
+  },
+  "core:promotion/naval-tradition": {
+   "effects": "all"
+  },
+  "core:promotion/no-defensive-bonuses": {
+   "effects": "all"
+  },
+  "core:promotion/ocean-impassable": {
+   "effects": "all"
+  },
+  "core:promotion/only-attacks-cities": {
+   "effects": "all"
+  },
+  "core:promotion/only-defensive": {
+   "effects": "all"
+  },
+  "core:promotion/recruitment": {
+   "effects": "all"
+  },
+  "core:promotion/restlessness": {
+   "effects": "all"
+  },
+  "core:promotion/sapper": {
+   "effects": "all"
+  },
+  "core:promotion/sneak-attack": {
+   "effects": "all"
+  },
+  "core:promotion/trade-mission-bonus": {
+   "effects": [
+    0,
+    1
+   ]
+  },
+  "core:religion/catholicism": {},
+  "core:religion/eastern-orthodoxy": {},
+  "core:religion/protestantism": {},
+  "core:resource/antiquity_site": {},
+  "core:resource/bison": {},
+  "core:resource/cloves": {},
+  "core:resource/cocoa": {},
+  "core:resource/hidden_antiquity_site": {},
+  "core:resource/nutmeg": {},
+  "core:resource/pepper": {},
+  "core:tech/the-internet": {
+   "effects": "all"
+  },
+  "core:unit/archaeologist": {
+   "effects": "all"
+  },
+  "core:unit/bazooka": {
+   "effects": "all"
+  },
+  "core:unit/berber-cavalry": {
+   "effects": "all"
+  },
+  "core:unit/caravan": {
+   "set": {
+    "moves": 2
+   },
+   "effects": "all"
+  },
+  "core:unit/cargo-ship": {
+   "set": {
+    "moves": 4
+   },
+   "effects": "all"
+  },
+  "core:unit/comanche-riders": {
+   "set": {
+    "moves": 5
+   },
+   "effects": "all"
+  },
+  "core:unit/great-galleass": {
+   "effects": "all"
+  },
+  "core:unit/great-musician": {
+   "effects": "all"
+  },
+  "core:unit/great-writer": {
+   "effects": "all"
+  },
+  "core:unit/immortal": {
+   "effects": "all"
+  },
+  "core:unit/impi": {
+   "effects": "all"
+  },
+  "core:unit/kris-swordsman": {
+   "effects": "all"
+  },
+  "core:unit/merchant-of-venice": {
+   "effects": "all"
+  },
+  "core:unit/nau": {
+   "effects": "all"
+  },
+  "core:unit/pathfinder": {
+   "set": {
+    "upgrades_to": [
+     "core:unit/composite-bowman"
+    ]
+   },
+   "effects": "all"
+  },
+  "core:unit/pracinha": {
+   "effects": "all"
+  },
+  "core:unit/siege-tower": {
+   "effects": "all"
+  },
+  "core:unit/winged-hussar": {
+   "effects": "all"
+  },
+  "core:unit/work-boat": {
+   "set": {
+    "cost": 30
+   },
+   "effects": "all"
+  },
+  "core:unit/xcom-squad": {
+   "effects": "all"
+  },
+  "core:promotion/embarkation": {
+   "effects": "all"
+  },
+  "core:promotion/golden-age-points": {},
+  "core:promotion/goody-hut-picker": {
+   "effects": "all"
+  },
+  "core:promotion/double-plunder": {
+   "effects": "all"
+  },
+  "core:promotion/free-pillage-moves": {
+   "effects": "all"
+  },
+  "core:promotion/general-stacking": {
+   "effects": "all"
+  },
+  "core:promotion/movement-to-general": {
+   "effects": "all"
+  },
+  "core:promotion/defend-near-capital": {
+   "effects": [
+    0
+   ]
+  },
+  "core:promotion/flank-attack-bonus": {
+   "effects": "all"
+  },
+  "core:promotion/unwelcome-evangelist": {
+   "effects": "all"
+  },
+  "core:promotion/heal-if-destroy-enemy": {
+   "effects": [
+    1
+   ]
+  },
+  "core:policy/aesthetics/opener": {
+   "effects": "all"
+  },
+  "core:policy/aesthetics/finisher": {
+   "effects": "all"
+  },
+  "core:tech/animal-husbandry": {
+   "effects_only": true,
+   "effects": [
+    0
+   ]
+  },
+  "core:tech/sailing": {
+   "effects_only": true,
+   "effects": [
+    0
+   ]
+  },
+  "core:tech/engineering": {
+   "effects_only": true,
+   "effects": [
+    0
+   ]
+  },
+  "core:tech/compass": {
+   "effects_only": true,
+   "effects": [
+    0
+   ]
+  },
+  "core:tech/banking": {
+   "effects_only": true,
+   "effects": [
+    0
+   ]
+  },
+  "core:tech/biology": {
+   "effects_only": true,
+   "effects": [
+    0
+   ]
+  },
+  "core:tech/railroad": {
+   "effects_only": true,
+   "effects": [
+    0
+   ]
+  },
+  "core:tech/penicillin": {
+   "effects_only": true,
+   "effects": [
+    0
+   ]
+  },
+  "core:building/colossus": {
+   "effects_only": true,
+   "effects": [
+    2,
+    3
+   ]
+  },
+  "core:building/petra": {
+   "effects_only": true,
+   "effects": [
+    0,
+    3
+   ]
+  }
+ }
+}

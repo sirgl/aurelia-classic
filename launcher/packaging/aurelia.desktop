@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Aurelia
+Comment=Game inspired by Unciv with a similar rule set
+Exec=aurelia
+Icon=aurelia
+Terminal=false
+Categories=Game;StrategyGame;

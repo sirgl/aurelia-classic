@@ -1,0 +1,26 @@
+[package]
+name = "classic-web"
+version = "0.2.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+authors = ["The Aurelia contributors"]
+repository = "https://github.com/sirgl/aurelia-classic"
+keywords = ["launcher", "wasm", "gamedev"]
+categories = ["game-development", "wasm"]
+rust-version = "1.98"
+publish = false
+description = "Aurelia in a browser page"
+
+# The browser launcher of the classic game (lands/docs/web.md): `platform/tools/launcher/web-build.sh classic/launcher`
+# makes the `dist/` page from it. Platform's launcher-core plus ONE module, classic-ui. On any other
+# target the crate is empty, so the workspace still builds and tests natively.
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+launcher-core = { package = "aurelia-launcher-core", path = "../../../platform/crates/launcher-core" }
+classic-ui = { path = "../../crates/classic-ui" }
+# Pinned to the wasm-bindgen-cli that web-build.sh installs (the two must match).
+wasm-bindgen = "=0.2.129"
+wasm-bindgen-futures = "0.4.79"
+js-sys = "0.3.106"

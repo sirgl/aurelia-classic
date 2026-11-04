@@ -1,0 +1,100 @@
+# Builds the browser (WebAssembly) game and publishes it on GitHub Pages when a release is published.
+# Needs, once: Settings > Pages > Source = "GitHub Actions"; and, while aurelia-platform is private, a secret
+# PLATFORM_REPO_TOKEN (a fine-grained token with read access to the contents of sirgl/aurelia-platform).
+name: Play in the browser
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: write   # attaches the build to the release
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+env:
+  TOOLCHAIN: "1.98.1"
+  WASM_BINDGEN: "0.2.129"   # the version of the wasm-bindgen crate in Cargo.lock
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out classic
+        uses: actions/checkout@v4
+        with:
+          path: classic
+
+      - name: Check out the platform beside it
+        uses: actions/checkout@v4
+        with:
+          repository: sirgl/aurelia-platform
+          token: ${{ secrets.PLATFORM_REPO_TOKEN }}
+          path: platform
+
+      - name: Rust toolchain with the wasm target
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.TOOLCHAIN }}
+          targets: wasm32-unknown-unknown
+
+      - name: Cache cargo builds
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: classic
+
+      - name: Cache wasm-bindgen
+        id: bindgen
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/bin/wasm-bindgen
+          key: wasm-bindgen-${{ env.WASM_BINDGEN }}
+
+      - name: Install wasm-bindgen-cli
+        if: steps.bindgen.outputs.cache-hit != 'true'
+        run: cargo "+$TOOLCHAIN" install wasm-bindgen-cli --version "$WASM_BINDGEN" --locked
+
+      - name: Tool for the art pack
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y zstd
+
+      - name: Fetch the art pack
+        env:
+          AURELIA_ROOT: ${{ github.workspace }}
+          GH_TOKEN: ${{ github.token }}
+        run: sh platform/tools/fetch-assets.sh
+
+      - name: Build the browser page
+        env:
+          AURELIA_ROOT: ${{ github.workspace }}
+        run: sh platform/tools/launcher/web-build.sh classic/launcher dist/web
+
+      - name: Upload the page
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist/web
+
+      - name: Attach the build to the release
+        if: github.event_name == 'release'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tar -C dist/web -czf aurelia-web.tar.gz .
+          gh release upload "${{ github.event.release.tag_name }}" aurelia-web.tar.gz --clobber --repo "${{ github.repository }}"
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Publish to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

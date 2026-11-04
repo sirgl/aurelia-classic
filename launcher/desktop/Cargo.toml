@@ -1,0 +1,34 @@
+[package]
+name = "classic-desktop"
+version = "0.2.0"
+description = "Aurelia, the desktop launcher: a game inspired by Unciv with a similar rule set"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+authors = ["The Aurelia contributors"]
+repository = "https://github.com/sirgl/aurelia-classic"
+keywords = ["launcher", "desktop", "gamedev"]
+categories = ["game-development"]
+rust-version = "1.98"
+publish = false
+
+# The launcher of the classic game: the platform's launcher-core plus ONE module, classic-ui. It
+# depends on nothing else (no lands, no sandbox). The game binary is `aurelia-classic`.
+[dependencies]
+launcher-core = { package = "aurelia-launcher-core", path = "../../../platform/crates/launcher-core" }
+classic-ui = { path = "../../crates/classic-ui" }
+kernel = { package = "aurelia-kernel", path = "../../../platform/crates/kernel" }
+render = { package = "aurelia-render", version = "0.1.0", path = "../../../platform/crates/render" }
+client = { package = "aurelia-client", path = "../../../platform/crates/client" }
+
+[features]
+# The developer tools: offscreen captures and benches (`--screenshot`, `--bench*`) and the scripted
+# scenes. On by default for developer builds; OFF in packages
+# (`--no-default-features`).
+default = ["dev-tools"]
+dev-tools = ["classic-ui/dev-tools"]
+# Counts heap bytes (live, peak) for the memory lines of the headless benches.
+heap-stats = []
+
+[[bin]]
+name = "aurelia-classic"
+path = "src/main.rs"

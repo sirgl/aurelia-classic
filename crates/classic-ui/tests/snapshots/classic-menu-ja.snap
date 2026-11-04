@@ -1,0 +1,41 @@
+screen Menu 1366x768
+widgets
+  click "ストラテジーゲーム / AURELIA / 書かれるのを待つ世界 / 続ける / 新規ゲーム / セーブ / ロード / 設定 / 終了 / 不具合を報告" 0,0 1366x768
+  click "新規ゲーム" 89,342 320x44
+  click "設定" 89,454 320x38
+  click "終了" 89,502 320x38
+  click "不具合を報告" 89,550 320x34
+painted
+  clip 0,0 1366x768
+    rect 0,0 1366x768 fill #09161c
+    rect 0,0 1366x768 fill #182f35
+    circle 683,384 r169 stroke 1 #5c6859
+    mesh 2tri 0,0 1366x768
+    rect 0,0 533x768 fill #000000b0
+    text "ストラテジーゲーム" 89,99 98x13 #c1a263 11px
+    text "AURELIA" 89,131 207x61 #efe9d3 53.4px
+    text "書かれるのを待つ世界" 89,209 180x21 #92a8aa 18px
+    line 89,253 -> 329,253 stroke 1 #c1a263
+    rect 89,286 320x44 fill #192f34 r4
+    rect 89,286 320x44 stroke 1 #c1a263 r4
+    text "続ける" 228,300 42x16 #92a8aa 14px
+    rect 89,342 320x44 fill #192f34 r4
+    rect 89,342 320x44 stroke 1 #344849 r4
+    text "新規ゲーム" 214,356 70x16 #efe9d3 14px
+    rect 89,398 156x44 fill #192f34 r4
+    rect 89,398 156x44 stroke 1 #344849 r4
+    text "セーブ" 146,412 41x16 #92a8aa 14px
+    rect 253,398 156x44 fill #192f34 r4
+    rect 253,398 156x44 stroke 1 #344849 r4
+    text "ロード" 310,412 42x16 #92a8aa 14px
+    rect 89,454 320x38 fill #192f34 r4
+    rect 89,454 320x38 stroke 1 #344849 r4
+    text "設定" 235,465 28x16 #efe9d3 14px
+    rect 89,502 320x38 fill #192f34 r4
+    rect 89,502 320x38 stroke 1 #344849 r4
+    text "終了" 235,513 28x16 #efe9d3 14px
+    rect 89,550 320x34 fill #192f34 r4
+    rect 89,550 320x34 stroke 1 #344849 r4
+    text "不具合を報告" 207,559 84x16 #efe9d3 14px
+art
+  menu

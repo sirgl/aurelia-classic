@@ -1,0 +1,1667 @@
+{
+ "schema": "classic-spec/1",
+ "catalog": "unique_buildings",
+ "edition": "Classic rule set (Unciv Gods & Kings ruleset plus own extensions)",
+ "count": 20,
+ "items": [
+  {
+   "id": "core:building/floating_gardens",
+   "name": "Floating Gardens",
+   "kind": "unique",
+   "class": "core:building-class/watermill",
+   "cost": 75,
+   "faith_cost": null,
+   "maintenance": 1,
+   "required_tech": "core:tech/the-wheel",
+   "obsolete_tech": null,
+   "era": "core:era/ancient",
+   "hurry_cost_modifier": 25,
+   "conquest_survival_pct": 66,
+   "never_capture": false,
+   "specialists": null,
+   "great_person_points": null,
+   "great_work_slots": null,
+   "theming_bonuses": null,
+   "consumes_resources": [],
+   "requirements": {
+    "fresh_water": true
+   },
+   "cost_per_city_pct": null,
+   "max_start_era": null,
+   "free_start_era": null,
+   "effects": [
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "lake_tiles_of_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "tile.yield.food.flat",
+     "amount": 2,
+     "source": "unciv: Buildings.json, Floating Gardens"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "yield.food.flat",
+     "amount": 2,
+     "source": "unciv: Buildings.json, Floating Gardens"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "yield.production.flat",
+     "amount": 1,
+     "source": "unciv: Buildings.json, Floating Gardens"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "yield.food.pct",
+     "amount": 15,
+     "source": "unciv: Buildings.json, Floating Gardens"
+    }
+   ],
+   "nation": "core:nation/aztecs",
+   "replaces": "core:building/water_mill",
+   "art_id": "bnw:building/floating_gardens",
+   "provenance": "unciv: Buildings.json, Floating Gardens",
+   "unciv_fields": [
+    "cost",
+    "hurry_cost_modifier",
+    "maintenance",
+    "required_tech"
+   ]
+  },
+  {
+   "id": "core:building/mughal_fort",
+   "name": "Mughal Fort",
+   "kind": "unique",
+   "class": "core:building-class/castle",
+   "cost": 150,
+   "faith_cost": null,
+   "maintenance": 0,
+   "required_tech": "core:tech/chivalry",
+   "obsolete_tech": null,
+   "era": "core:era/medieval",
+   "hurry_cost_modifier": 25,
+   "conquest_survival_pct": 0,
+   "never_capture": false,
+   "specialists": null,
+   "great_person_points": null,
+   "great_work_slots": null,
+   "theming_bonuses": null,
+   "consumes_resources": [],
+   "requirements": {
+    "buildings_in_city": [
+     "core:building/walls"
+    ]
+   },
+   "cost_per_city_pct": null,
+   "max_start_era": null,
+   "free_start_era": null,
+   "effects": [
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "building.allows_range_strike",
+     "amount": true,
+     "needs_mechanic": "city_ranged_strike",
+     "source": "own value, unverified"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "city.defense.flat",
+     "amount": 7.0,
+     "source": "own value, unverified"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "city.max_hp.flat",
+     "amount": 25,
+     "source": "own value, unverified"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": {
+      "tech_known": "core:tech/flight"
+     },
+     "trigger": "passive",
+     "modifier": "yield.tourism.flat",
+     "amount": 2,
+     "source": "own value, unverified"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "yield.culture.flat",
+     "amount": 2,
+     "source": "unciv: Buildings.json, Mughal Fort"
+    }
+   ],
+   "nation": "core:nation/india",
+   "replaces": "core:building/castle",
+   "art_id": "bnw:building/mughal_fort",
+   "provenance": "unciv: Buildings.json, Mughal Fort",
+   "unciv_fields": [
+    "cost",
+    "hurry_cost_modifier",
+    "maintenance",
+    "required_tech"
+   ]
+  },
+  {
+   "id": "core:building/krepost",
+   "name": "Krepost",
+   "kind": "unique",
+   "class": "core:building-class/barracks",
+   "cost": 75,
+   "faith_cost": null,
+   "maintenance": 1,
+   "required_tech": "core:tech/bronze-working",
+   "obsolete_tech": null,
+   "era": "core:era/ancient",
+   "hurry_cost_modifier": 25,
+   "conquest_survival_pct": 0,
+   "never_capture": false,
+   "specialists": null,
+   "great_person_points": null,
+   "great_work_slots": null,
+   "theming_bonuses": null,
+   "consumes_resources": [],
+   "requirements": {},
+   "cost_per_city_pct": null,
+   "max_start_era": null,
+   "free_start_era": "core:era/industrial",
+   "effects": [
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "border.culture_cost.pct",
+     "amount": -25,
+     "source": "unciv: Buildings.json, Krepost"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "tile_purchase.cost.pct",
+     "amount": -25,
+     "source": "unciv: Buildings.json, Krepost"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "units_trained_here",
+      "filter": {
+       "domain": "core:domain/land"
+      }
+     },
+     "condition": null,
+     "trigger": "on_unit_trained",
+     "modifier": "unit.free_xp",
+     "amount": 15,
+     "source": "unciv: Buildings.json, Krepost"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "units_trained_here",
+      "filter": {
+       "domain": "core:domain/sea"
+      }
+     },
+     "condition": null,
+     "trigger": "on_unit_trained",
+     "modifier": "unit.free_xp",
+     "amount": 15,
+     "source": "unciv: Buildings.json, Krepost"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "units_trained_here",
+      "filter": {
+       "domain": "core:domain/air"
+      }
+     },
+     "condition": null,
+     "trigger": "on_unit_trained",
+     "modifier": "unit.free_xp",
+     "amount": 15,
+     "source": "unciv: Buildings.json, Krepost"
+    }
+   ],
+   "nation": "core:nation/russia",
+   "replaces": "core:building/barracks",
+   "art_id": "bnw:building/krepost",
+   "provenance": "unciv: Buildings.json, Krepost",
+   "unciv_fields": [
+    "cost",
+    "hurry_cost_modifier",
+    "maintenance",
+    "required_tech"
+   ]
+  },
+  {
+   "id": "core:building/longhouse",
+   "name": "Longhouse",
+   "kind": "unique",
+   "class": "core:building-class/workshop",
+   "cost": 100,
+   "faith_cost": null,
+   "maintenance": 2,
+   "required_tech": "core:tech/metal-casting",
+   "obsolete_tech": null,
+   "era": "core:era/medieval",
+   "hurry_cost_modifier": 25,
+   "conquest_survival_pct": 66,
+   "never_capture": false,
+   "specialists": {
+    "type": "core:specialist/engineer",
+    "slots": 1
+   },
+   "great_person_points": null,
+   "great_work_slots": null,
+   "theming_bonuses": null,
+   "consumes_resources": [],
+   "requirements": {},
+   "cost_per_city_pct": null,
+   "max_start_era": null,
+   "free_start_era": "core:era/industrial",
+   "effects": [
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "building.allows_production_trade_routes",
+     "amount": true,
+     "needs_mechanic": "internal_production_trade_routes",
+     "source": "own value, unverified"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "tiles_of_city",
+      "filter": {
+       "feature": "core:feature/forest"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "tile.yield.production.flat",
+     "amount": 1,
+     "source": "unciv: Buildings.json, Longhouse"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "yield.production.flat",
+     "amount": 2,
+     "source": "unciv: Buildings.json, Longhouse"
+    }
+   ],
+   "nation": "core:nation/iroquois",
+   "replaces": "core:building/workshop",
+   "art_id": "bnw:building/longhouse",
+   "provenance": "unciv: Buildings.json, Longhouse",
+   "unciv_fields": [
+    "cost",
+    "hurry_cost_modifier",
+    "maintenance",
+    "required_tech"
+   ]
+  },
+  {
+   "id": "core:building/bazaar",
+   "name": "Bazaar",
+   "kind": "unique",
+   "class": "core:building-class/market",
+   "cost": 100,
+   "faith_cost": null,
+   "maintenance": 0,
+   "required_tech": "core:tech/currency",
+   "obsolete_tech": null,
+   "era": "core:era/classical",
+   "hurry_cost_modifier": 25,
+   "conquest_survival_pct": 66,
+   "never_capture": false,
+   "specialists": {
+    "type": "core:specialist/merchant",
+    "slots": 1
+   },
+   "great_person_points": null,
+   "great_work_slots": null,
+   "theming_bonuses": null,
+   "consumes_resources": [],
+   "requirements": {},
+   "cost_per_city_pct": null,
+   "max_start_era": null,
+   "free_start_era": "core:era/industrial",
+   "effects": [
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "resource.extra_luxury_copy",
+     "amount": true,
+     "source": "own value, unverified"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "trade.route_recipient.gold.flat",
+     "amount": 1,
+     "source": "own value, unverified"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "trade.route_target.gold.flat",
+     "amount": 1,
+     "source": "own value, unverified"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "tiles_of_city",
+      "filter": {
+       "feature": "core:feature/oasis"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "tile.yield.gold.flat",
+     "amount": 2,
+     "source": "unciv: Buildings.json, Bazaar"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "tiles_of_city",
+      "filter": {
+       "resource": "core:resource/oil"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "tile.yield.gold.flat",
+     "amount": 2,
+     "source": "unciv: Buildings.json, Bazaar"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "yield.gold.flat",
+     "amount": 2,
+     "source": "unciv: Buildings.json, Bazaar"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "yield.gold.pct",
+     "amount": 25,
+     "source": "unciv: Buildings.json, Bazaar"
+    }
+   ],
+   "nation": "core:nation/arabia",
+   "replaces": "core:building/market",
+   "art_id": "bnw:building/bazaar",
+   "provenance": "unciv: Buildings.json, Bazaar",
+   "unciv_fields": [
+    "cost",
+    "hurry_cost_modifier",
+    "maintenance",
+    "required_tech"
+   ]
+  },
+  {
+   "id": "core:building/satrap_s_court",
+   "name": "Satrap's Court",
+   "kind": "unique",
+   "class": "core:building-class/bank",
+   "cost": 200,
+   "faith_cost": null,
+   "maintenance": 0,
+   "required_tech": "core:tech/banking",
+   "obsolete_tech": null,
+   "era": "core:era/renaissance",
+   "hurry_cost_modifier": 15,
+   "conquest_survival_pct": 66,
+   "never_capture": false,
+   "specialists": {
+    "type": "core:specialist/merchant",
+    "slots": 1
+   },
+   "great_person_points": null,
+   "great_work_slots": null,
+   "theming_bonuses": null,
+   "consumes_resources": [],
+   "requirements": {
+    "buildings_in_city": [
+     "core:building/market"
+    ]
+   },
+   "cost_per_city_pct": null,
+   "max_start_era": null,
+   "free_start_era": "core:era/information",
+   "effects": [
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "happiness.local",
+     "amount": 2,
+     "source": "unciv: Buildings.json, Satrap's Court"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "trade.route_recipient.gold.flat",
+     "amount": 1,
+     "source": "own value, unverified"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "trade.route_target.gold.flat",
+     "amount": 1,
+     "source": "own value, unverified"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "yield.gold.flat",
+     "amount": 2,
+     "source": "unciv: Buildings.json, Satrap's Court"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "yield.gold.pct",
+     "amount": 25,
+     "source": "unciv: Buildings.json, Satrap's Court"
+    }
+   ],
+   "nation": "core:nation/persia",
+   "replaces": "core:building/bank",
+   "art_id": "bnw:building/satrap_s_court",
+   "provenance": "unciv: Buildings.json, Satrap's Court",
+   "unciv_fields": [
+    "cost",
+    "hurry_cost_modifier",
+    "maintenance",
+    "required_tech"
+   ]
+  },
+  {
+   "id": "core:building/paper_maker",
+   "name": "Paper Maker",
+   "kind": "unique",
+   "class": "core:building-class/library",
+   "cost": 75,
+   "faith_cost": null,
+   "maintenance": 0,
+   "required_tech": "core:tech/writing",
+   "obsolete_tech": null,
+   "era": "core:era/ancient",
+   "hurry_cost_modifier": 25,
+   "conquest_survival_pct": 66,
+   "never_capture": false,
+   "specialists": null,
+   "great_person_points": null,
+   "great_work_slots": null,
+   "theming_bonuses": null,
+   "consumes_resources": [],
+   "requirements": {},
+   "cost_per_city_pct": null,
+   "max_start_era": null,
+   "free_start_era": "core:era/industrial",
+   "effects": [
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "yield.gold.flat",
+     "amount": 2,
+     "source": "unciv: Buildings.json, Paper Maker"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "yield.science.per_pop",
+     "amount": 0.5,
+     "source": "unciv: Buildings.json, Paper Maker"
+    }
+   ],
+   "nation": "core:nation/china",
+   "replaces": "core:building/library",
+   "art_id": "bnw:building/paper_maker",
+   "provenance": "unciv: Buildings.json, Paper Maker",
+   "unciv_fields": [
+    "cost",
+    "hurry_cost_modifier",
+    "maintenance",
+    "required_tech"
+   ]
+  },
+  {
+   "id": "core:building/wat",
+   "name": "Wat",
+   "kind": "unique",
+   "class": "core:building-class/university",
+   "cost": 160,
+   "faith_cost": 200,
+   "maintenance": 2,
+   "required_tech": "core:tech/education",
+   "obsolete_tech": null,
+   "era": "core:era/medieval",
+   "hurry_cost_modifier": 15,
+   "conquest_survival_pct": 66,
+   "never_capture": false,
+   "specialists": {
+    "type": "core:specialist/scientist",
+    "slots": 2
+   },
+   "great_person_points": null,
+   "great_work_slots": null,
+   "theming_bonuses": null,
+   "consumes_resources": [],
+   "requirements": {
+    "buildings_in_city": [
+     "core:building/library"
+    ],
+    "faith_purchase_unlocked_by_belief": true
+   },
+   "cost_per_city_pct": null,
+   "max_start_era": null,
+   "free_start_era": null,
+   "effects": [
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "tiles_of_city",
+      "filter": {
+       "feature": "core:feature/jungle"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "tile.yield.science.flat",
+     "amount": 2,
+     "source": "unciv: Buildings.json, Wat"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "yield.culture.flat",
+     "amount": 3,
+     "source": "unciv: Buildings.json, Wat"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "yield.science.pct",
+     "amount": 33,
+     "source": "unciv: Buildings.json, Wat"
+    }
+   ],
+   "nation": "core:nation/siam",
+   "replaces": "core:building/university",
+   "art_id": "bnw:building/wat",
+   "provenance": "unciv: Buildings.json, Wat",
+   "unciv_fields": [
+    "cost",
+    "hurry_cost_modifier",
+    "maintenance",
+    "required_tech"
+   ]
+  },
+  {
+   "id": "core:building/mud_pyramid_mosque",
+   "name": "Mud Pyramid Mosque",
+   "kind": "unique",
+   "class": "core:building-class/temple",
+   "cost": 100,
+   "faith_cost": null,
+   "maintenance": 0,
+   "required_tech": "core:tech/philosophy",
+   "obsolete_tech": null,
+   "era": "core:era/classical",
+   "hurry_cost_modifier": 25,
+   "conquest_survival_pct": 66,
+   "never_capture": false,
+   "specialists": null,
+   "great_person_points": null,
+   "great_work_slots": null,
+   "theming_bonuses": null,
+   "consumes_resources": [],
+   "requirements": {
+    "buildings_in_city": [
+     "core:building/shrine"
+    ]
+   },
+   "cost_per_city_pct": null,
+   "max_start_era": "core:era/renaissance",
+   "free_start_era": null,
+   "effects": [
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "yield.faith.flat",
+     "amount": 2,
+     "source": "unciv: Buildings.json, Mud Pyramid Mosque"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "yield.culture.flat",
+     "amount": 2,
+     "source": "unciv: Buildings.json, Mud Pyramid Mosque"
+    }
+   ],
+   "nation": "core:nation/songhai",
+   "replaces": "core:building/temple",
+   "art_id": "bnw:building/mud_pyramid_mosque",
+   "provenance": "unciv: Buildings.json, Mud Pyramid Mosque",
+   "unciv_fields": [
+    "cost",
+    "hurry_cost_modifier",
+    "maintenance",
+    "required_tech"
+   ]
+  },
+  {
+   "id": "core:building/burial_tomb",
+   "name": "Burial Tomb",
+   "kind": "unique",
+   "class": "core:building-class/temple",
+   "cost": 100,
+   "faith_cost": null,
+   "maintenance": 0,
+   "required_tech": "core:tech/philosophy",
+   "obsolete_tech": null,
+   "era": "core:era/classical",
+   "hurry_cost_modifier": 25,
+   "conquest_survival_pct": 66,
+   "never_capture": false,
+   "specialists": null,
+   "great_person_points": null,
+   "great_work_slots": null,
+   "theming_bonuses": null,
+   "consumes_resources": [],
+   "requirements": {
+    "buildings_in_city": [
+     "core:building/shrine"
+    ]
+   },
+   "cost_per_city_pct": null,
+   "max_start_era": "core:era/renaissance",
+   "free_start_era": null,
+   "effects": [
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "capture.plunder_gold.pct",
+     "amount": 100,
+     "source": "own value, unverified"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "happiness.local",
+     "amount": 2,
+     "source": "unciv: Buildings.json, Burial Tomb"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "yield.faith.flat",
+     "amount": 2,
+     "source": "unciv: Buildings.json, Burial Tomb"
+    }
+   ],
+   "nation": "core:nation/egypt",
+   "replaces": "core:building/temple",
+   "art_id": "bnw:building/burial_tomb",
+   "provenance": "unciv: Buildings.json, Burial Tomb",
+   "unciv_fields": [
+    "cost",
+    "hurry_cost_modifier",
+    "maintenance",
+    "required_tech"
+   ]
+  },
+  {
+   "id": "core:building/stele",
+   "name": "Stele",
+   "kind": "unique",
+   "class": "core:building-class/monument",
+   "cost": 40,
+   "faith_cost": null,
+   "maintenance": 1,
+   "required_tech": null,
+   "obsolete_tech": null,
+   "era": "core:era/ancient",
+   "hurry_cost_modifier": 40,
+   "conquest_survival_pct": 0,
+   "never_capture": true,
+   "specialists": null,
+   "great_person_points": null,
+   "great_work_slots": null,
+   "theming_bonuses": null,
+   "consumes_resources": [],
+   "requirements": {},
+   "cost_per_city_pct": null,
+   "max_start_era": null,
+   "free_start_era": "core:era/medieval",
+   "effects": [
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "yield.culture.flat",
+     "amount": 2,
+     "source": "unciv: Buildings.json, Stele"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "yield.faith.flat",
+     "amount": 2,
+     "source": "unciv: Buildings.json, Stele"
+    }
+   ],
+   "nation": "core:nation/ethiopia",
+   "replaces": "core:building/monument",
+   "art_id": "bnw:building/stele",
+   "provenance": "unciv: Buildings.json, Stele",
+   "unciv_fields": [
+    "cost",
+    "hurry_cost_modifier",
+    "maintenance",
+    "required_tech"
+   ]
+  },
+  {
+   "id": "core:building/ikanda",
+   "name": "Ikanda",
+   "kind": "unique",
+   "class": "core:building-class/barracks",
+   "cost": 75,
+   "faith_cost": null,
+   "maintenance": 1,
+   "required_tech": "core:tech/bronze-working",
+   "obsolete_tech": null,
+   "era": "core:era/ancient",
+   "hurry_cost_modifier": 25,
+   "conquest_survival_pct": 0,
+   "never_capture": true,
+   "specialists": null,
+   "great_person_points": null,
+   "great_work_slots": null,
+   "theming_bonuses": null,
+   "consumes_resources": [],
+   "requirements": {},
+   "cost_per_city_pct": null,
+   "max_start_era": null,
+   "free_start_era": "core:era/industrial",
+   "effects": [
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "units_trained_here"
+     },
+     "condition": null,
+     "trigger": "on_unit_trained",
+     "modifier": "grant.promotion",
+     "amount": 1,
+     "target": "core:promotion/buffalo-horns",
+     "source": "own value"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "units_trained_here",
+      "filter": {
+       "domain": "core:domain/land"
+      }
+     },
+     "condition": null,
+     "trigger": "on_unit_trained",
+     "modifier": "unit.free_xp",
+     "amount": 15,
+     "source": "own value"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "units_trained_here",
+      "filter": {
+       "domain": "core:domain/sea"
+      }
+     },
+     "condition": null,
+     "trigger": "on_unit_trained",
+     "modifier": "unit.free_xp",
+     "amount": 15,
+     "source": "own value"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "units_trained_here",
+      "filter": {
+       "domain": "core:domain/air"
+      }
+     },
+     "condition": null,
+     "trigger": "on_unit_trained",
+     "modifier": "unit.free_xp",
+     "amount": 15,
+     "source": "own value"
+    }
+   ],
+   "nation": "core:nation/zulu",
+   "replaces": "core:building/barracks",
+   "art_id": "bnw:building/ikanda",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:building/ducal_stable",
+   "name": "Ducal Stable",
+   "kind": "unique",
+   "class": "core:building-class/stable",
+   "cost": 75,
+   "faith_cost": null,
+   "maintenance": 0,
+   "required_tech": "core:tech/horseback-riding",
+   "obsolete_tech": null,
+   "era": "core:era/classical",
+   "hurry_cost_modifier": 25,
+   "conquest_survival_pct": 0,
+   "never_capture": true,
+   "specialists": null,
+   "great_person_points": null,
+   "great_work_slots": null,
+   "theming_bonuses": null,
+   "consumes_resources": [],
+   "requirements": {
+    "local_resources_any": [
+     "core:resource/horses",
+     "core:resource/sheep",
+     "core:resource/cattle"
+    ]
+   },
+   "cost_per_city_pct": null,
+   "max_start_era": null,
+   "free_start_era": null,
+   "effects": [
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "tiles_of_city",
+      "filter": {
+       "resource": "core:resource/sheep"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "tile.yield.production.flat",
+     "amount": 1,
+     "source": "own value"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "tiles_of_city",
+      "filter": {
+       "resource": "core:resource/horses"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "tile.yield.production.flat",
+     "amount": 1,
+     "source": "own value"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "tiles_of_city",
+      "filter": {
+       "resource": "core:resource/cattle"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "tile.yield.production.flat",
+     "amount": 1,
+     "source": "own value"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "tiles_of_city",
+      "filter": {
+       "resource": "core:resource/sheep"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "tile.yield.gold.flat",
+     "amount": 1,
+     "source": "own value"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "tiles_of_city",
+      "filter": {
+       "resource": "core:resource/horses"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "tile.yield.gold.flat",
+     "amount": 1,
+     "source": "own value"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "tiles_of_city",
+      "filter": {
+       "resource": "core:resource/cattle"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "tile.yield.gold.flat",
+     "amount": 1,
+     "source": "own value"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "units_trained_here",
+      "filter": {
+       "unit_combat": "core:unit-combat/mounted"
+      }
+     },
+     "condition": null,
+     "trigger": "on_unit_trained",
+     "modifier": "unit.free_xp",
+     "amount": 15,
+     "source": "own value"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city",
+      "filter": {
+       "unit_combat": "core:unit-combat/mounted"
+      }
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "production.units.pct",
+     "amount": 15,
+     "source": "own value"
+    }
+   ],
+   "nation": "core:nation/poland",
+   "replaces": "core:building/stable",
+   "art_id": "bnw:building/ducal_stable",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:building/royal_library",
+   "name": "Royal Library",
+   "kind": "unique",
+   "class": "core:building-class/library",
+   "cost": 75,
+   "faith_cost": null,
+   "maintenance": 1,
+   "required_tech": "core:tech/writing",
+   "obsolete_tech": null,
+   "era": "core:era/ancient",
+   "hurry_cost_modifier": 25,
+   "conquest_survival_pct": 0,
+   "never_capture": true,
+   "specialists": null,
+   "great_person_points": null,
+   "great_work_slots": {
+    "type": "core:great-work-slot/literature",
+    "count": 1
+   },
+   "theming_bonuses": null,
+   "consumes_resources": [],
+   "requirements": {},
+   "cost_per_city_pct": null,
+   "max_start_era": null,
+   "free_start_era": "core:era/industrial",
+   "effects": [
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "units_trained_here",
+      "filter": {
+       "domain": "core:domain/land"
+      }
+     },
+     "condition": null,
+     "trigger": "on_unit_trained",
+     "modifier": "unit.free_xp_per_great_work",
+     "amount": 10,
+     "source": "own value"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "units_trained_here",
+      "filter": {
+       "domain": "core:domain/sea"
+      }
+     },
+     "condition": null,
+     "trigger": "on_unit_trained",
+     "modifier": "unit.free_xp_per_great_work",
+     "amount": 10,
+     "source": "own value"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "units_trained_here",
+      "filter": {
+       "domain": "core:domain/air"
+      }
+     },
+     "condition": null,
+     "trigger": "on_unit_trained",
+     "modifier": "unit.free_xp_per_great_work",
+     "amount": 10,
+     "source": "own value"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "yield.science.per_pop",
+     "amount": 0.5,
+     "source": "own value"
+    }
+   ],
+   "nation": "core:nation/assyria",
+   "replaces": "core:building/library",
+   "art_id": "bnw:building/royal_library",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:building/candi",
+   "name": "Candi",
+   "kind": "unique",
+   "class": "core:building-class/garden",
+   "cost": 120,
+   "faith_cost": null,
+   "maintenance": 1,
+   "required_tech": "core:tech/theology",
+   "obsolete_tech": null,
+   "era": "core:era/medieval",
+   "hurry_cost_modifier": 25,
+   "conquest_survival_pct": 66,
+   "never_capture": false,
+   "specialists": null,
+   "great_person_points": null,
+   "great_work_slots": null,
+   "theming_bonuses": null,
+   "consumes_resources": [],
+   "requirements": {},
+   "cost_per_city_pct": null,
+   "max_start_era": null,
+   "free_start_era": null,
+   "effects": [
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "great_people.rate.pct",
+     "amount": 25,
+     "source": "own value"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "yield.faith.flat",
+     "amount": 2,
+     "source": "own value"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "yield.faith.per_religion_present",
+     "amount": 2.0,
+     "source": "own value"
+    }
+   ],
+   "nation": "core:nation/indonesia",
+   "replaces": "core:building/garden",
+   "art_id": "bnw:building/candi",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:building/hanse",
+   "name": "Hanse",
+   "kind": "unique",
+   "class": "core:building-class/bank",
+   "cost": 200,
+   "faith_cost": null,
+   "maintenance": 0,
+   "required_tech": "core:tech/banking",
+   "obsolete_tech": null,
+   "era": "core:era/renaissance",
+   "hurry_cost_modifier": 15,
+   "conquest_survival_pct": 66,
+   "never_capture": false,
+   "specialists": {
+    "type": "core:specialist/merchant",
+    "slots": 1
+   },
+   "great_person_points": null,
+   "great_work_slots": null,
+   "theming_bonuses": null,
+   "consumes_resources": [],
+   "requirements": {
+    "buildings_in_city": [
+     "core:building/market"
+    ]
+   },
+   "cost_per_city_pct": null,
+   "max_start_era": null,
+   "free_start_era": "core:era/information",
+   "effects": [
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "yield.production.pct_per_city_state_route",
+     "amount": 5,
+     "source": "own value"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "trade.route_recipient.gold.flat",
+     "amount": 1,
+     "source": "own value"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "trade.route_target.gold.flat",
+     "amount": 1,
+     "source": "own value"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "yield.gold.flat",
+     "amount": 2,
+     "source": "own value"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "yield.gold.pct",
+     "amount": 25,
+     "source": "own value"
+    }
+   ],
+   "nation": "core:nation/germany",
+   "replaces": "core:building/bank",
+   "art_id": "bnw:building/hanse",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:building/walls_of_babylon",
+   "name": "Walls of Babylon",
+   "kind": "unique",
+   "class": "core:building-class/walls",
+   "cost": 65,
+   "faith_cost": null,
+   "maintenance": 0,
+   "required_tech": "core:tech/masonry",
+   "obsolete_tech": null,
+   "era": "core:era/ancient",
+   "hurry_cost_modifier": 25,
+   "conquest_survival_pct": 0,
+   "never_capture": true,
+   "specialists": null,
+   "great_person_points": null,
+   "great_work_slots": null,
+   "theming_bonuses": null,
+   "consumes_resources": [],
+   "requirements": {},
+   "cost_per_city_pct": null,
+   "max_start_era": null,
+   "free_start_era": null,
+   "effects": [
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "building.allows_range_strike",
+     "amount": true,
+     "needs_mechanic": "city_ranged_strike",
+     "source": "own value, unverified"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "city.defense.flat",
+     "amount": 6.0,
+     "source": "own value, unverified"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "city.max_hp.flat",
+     "amount": 100,
+     "source": "own value, unverified"
+    }
+   ],
+   "nation": "core:nation/babylon",
+   "replaces": "core:building/walls",
+   "art_id": "bnw:building/walls_of_babylon",
+   "provenance": "unciv: Buildings.json, Walls of Babylon",
+   "unciv_fields": [
+    "cost",
+    "hurry_cost_modifier",
+    "maintenance",
+    "required_tech"
+   ]
+  },
+  {
+   "id": "core:building/ceilidh_hall",
+   "name": "Ceilidh Hall",
+   "kind": "unique",
+   "class": "core:building-class/opera_house",
+   "cost": 200,
+   "faith_cost": null,
+   "maintenance": 2,
+   "required_tech": "core:tech/acoustics",
+   "obsolete_tech": null,
+   "era": "core:era/renaissance",
+   "hurry_cost_modifier": 10,
+   "conquest_survival_pct": 100,
+   "never_capture": false,
+   "specialists": null,
+   "great_person_points": null,
+   "great_work_slots": {
+    "type": "core:great-work-slot/music",
+    "count": 1
+   },
+   "theming_bonuses": null,
+   "consumes_resources": [],
+   "requirements": {
+    "buildings_in_city": [
+     "core:building/amphitheater"
+    ]
+   },
+   "cost_per_city_pct": null,
+   "max_start_era": null,
+   "free_start_era": null,
+   "effects": [
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "happiness.local",
+     "amount": 3,
+     "source": "unciv: Buildings.json, Ceilidh Hall"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "yield.culture.flat",
+     "amount": 1,
+     "source": "own value, unverified"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "yield.culture.flat",
+     "amount": 1,
+     "source": "own value, unverified"
+    }
+   ],
+   "nation": "core:nation/celts",
+   "replaces": "core:building/opera_house",
+   "art_id": "bnw:building/ceilidh_hall",
+   "source": "own value, unverified",
+   "provenance": "unciv: Buildings.json, Ceilidh Hall",
+   "unciv_fields": [
+    "cost",
+    "hurry_cost_modifier",
+    "maintenance",
+    "required_tech"
+   ]
+  },
+  {
+   "id": "core:building/coffee_house",
+   "name": "Coffee House",
+   "kind": "unique",
+   "class": "core:building-class/windmill",
+   "cost": 250,
+   "faith_cost": null,
+   "maintenance": 2,
+   "required_tech": "core:tech/economics",
+   "obsolete_tech": null,
+   "era": "core:era/renaissance",
+   "hurry_cost_modifier": 25,
+   "conquest_survival_pct": 66,
+   "never_capture": false,
+   "specialists": {
+    "type": "core:specialist/engineer",
+    "slots": 1
+   },
+   "great_person_points": null,
+   "great_work_slots": null,
+   "theming_bonuses": null,
+   "consumes_resources": [],
+   "requirements": {},
+   "cost_per_city_pct": null,
+   "max_start_era": null,
+   "free_start_era": null,
+   "effects": [
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "great_people.rate.pct",
+     "amount": 25,
+     "source": "unciv: Buildings.json, Coffee House"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "yield.production.flat",
+     "amount": 2,
+     "source": "unciv: Buildings.json, Coffee House"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "yield.production.pct",
+     "amount": 5,
+     "source": "unciv: Buildings.json, Coffee House"
+    }
+   ],
+   "nation": "core:nation/austria",
+   "replaces": "core:building/windmill",
+   "art_id": "bnw:building/coffee_house",
+   "source": "unciv: Gods & Kings/Buildings.json, Coffee House (cost as the building cost of the Economics column of Techs.json, maintenance, required technology, replaced building; checked 2026-10-20)",
+   "provenance": "unciv: Buildings.json, Coffee House",
+   "unciv_fields": [
+    "cost",
+    "hurry_cost_modifier",
+    "maintenance",
+    "required_tech"
+   ]
+  },
+  {
+   "id": "core:building/pyramid",
+   "name": "Pyramid",
+   "kind": "unique",
+   "class": "core:building-class/shrine",
+   "cost": 40,
+   "faith_cost": null,
+   "maintenance": 1,
+   "required_tech": "core:tech/pottery",
+   "obsolete_tech": null,
+   "era": "core:era/ancient",
+   "hurry_cost_modifier": 25,
+   "conquest_survival_pct": 66,
+   "never_capture": true,
+   "specialists": null,
+   "great_person_points": null,
+   "great_work_slots": null,
+   "theming_bonuses": null,
+   "consumes_resources": [],
+   "requirements": {},
+   "cost_per_city_pct": null,
+   "max_start_era": "core:era/renaissance",
+   "free_start_era": "core:era/medieval",
+   "effects": [
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "yield.faith.flat",
+     "amount": 2,
+     "source": "unciv: Buildings.json, Pyramid"
+    },
+    {
+     "scope": "city",
+     "selector": {
+      "kind": "this_city"
+     },
+     "condition": null,
+     "trigger": "passive",
+     "modifier": "yield.science.flat",
+     "amount": 2,
+     "source": "unciv: Buildings.json, Pyramid"
+    }
+   ],
+   "nation": "core:nation/maya",
+   "replaces": "core:building/shrine",
+   "art_id": "bnw:building/pyramid",
+   "source": "unciv: Gods & Kings/Buildings.json, Pyramid (cost, maintenance, required technology, replaced building; checked 2026-10-20)",
+   "provenance": "unciv: Buildings.json, Pyramid",
+   "unciv_fields": [
+    "cost",
+    "maintenance",
+    "required_tech"
+   ]
+  }
+ ],
+ "notice": "Derived from Unciv (https://github.com/yairm210/Unciv), MPL-2.0: rule fields of the entries marked `unciv:` come from Unciv's `Gods & Kings` JSON files at commit 18827b1f; entries marked `own value, unverified` have no Unciv counterpart. Listed per file in classic/docs/classic/UNCIV-ATTRIBUTION.md."
+}

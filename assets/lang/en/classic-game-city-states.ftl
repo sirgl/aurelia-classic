@@ -1,0 +1,33 @@
+# Game layer: the city-state cards, quests and notices (game/city_states.rs).
+
+classic.game.city-states.you = You
+classic.game.city-states.quest-kill-camp = Destroy the barbarian camp
+classic.game.city-states.quest-connect = Connect { $name }
+classic.game.city-states.quest-build = Build { $name }
+classic.game.city-states.quest-find = Find { $name }
+classic.game.city-states.quest-natural-wonder = Discover a natural wonder
+classic.game.city-states.quest-give-gold = Give them gold
+classic.game.city-states.quest-pledge = Pledge to protect them
+classic.game.city-states.quest-bully = Demand tribute from { $name }
+classic.game.city-states.quest-denounce = Denounce { $name }
+classic.game.city-states.quest-contest = Contest: learn the most technologies
+classic.game.city-states.quest-invest = Gold gifts give 50% more influence
+classic.game.city-states.quest-reward = { $task } (+{ $n } influence)
+classic.game.city-states.done-gift = { $gold } gold given to { $name }
+classic.game.city-states.done-bully-gold = Tribute in gold taken from { $name }
+classic.game.city-states.done-buyout = You bought out { $name }
+classic.game.city-states.done-bully-worker = A worker taken from { $name }
+classic.game.city-states.done-pledge = You pledged to protect { $name }
+classic.game.city-states.done-unpledge = You withdrew your pledge to { $name }
+classic.game.city-states.trait-cultured = Cultured
+classic.game.city-states.trait-militaristic = Militaristic
+classic.game.city-states.trait-maritime = Maritime
+classic.game.city-states.trait-mercantile = Mercantile
+classic.game.city-states.trait-religious = Religious
+classic.game.city-states.trait-none = City-state
+classic.game.city-states.status-war = At war
+classic.game.city-states.status-allies = Allies
+classic.game.city-states.status-friends = Friends
+classic.game.city-states.status-angry = Angry
+classic.game.city-states.status-neutral = Neutral
+classic.game.city-states.not-on-map = Not on your map yet

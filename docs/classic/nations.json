@@ -1,0 +1,3600 @@
+{
+ "schema": "classic-spec/1",
+ "catalog": "nations",
+ "edition": "Classic rule set (Unciv Gods & Kings ruleset plus own extensions)",
+ "count": 43,
+ "items": [
+  {
+   "id": "core:nation/america",
+   "name": "America",
+   "adjective": "American",
+   "leader": {
+    "id": "core:leader/washington",
+    "name": "Washington"
+   },
+   "ability": [
+    {
+     "id": "core:trait/river-expansion",
+     "name": "Manifest Destiny",
+     "effects": [
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "all_cities"
+       },
+       "condition": null,
+       "trigger": "passive",
+       "modifier": "tile_purchase.cost.pct",
+       "amount": -50,
+       "source": "unciv: Nations.json, America"
+      },
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "all_units",
+        "filter": {
+         "unit_combat": "core:unit-combat/melee",
+         "promotion": "core:promotion/sentry"
+        }
+       },
+       "condition": null,
+       "trigger": "passive",
+       "modifier": "grant.promotion",
+       "amount": 1,
+       "source": "own value, unverified"
+      },
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "all_units",
+        "filter": {
+         "unit_combat": "core:unit-combat/archer",
+         "promotion": "core:promotion/sentry"
+        }
+       },
+       "condition": null,
+       "trigger": "passive",
+       "modifier": "grant.promotion",
+       "amount": 1,
+       "source": "own value, unverified"
+      },
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "all_units",
+        "filter": {
+         "unit_combat": "core:unit-combat/recon",
+         "promotion": "core:promotion/sentry"
+        }
+       },
+       "condition": null,
+       "trigger": "passive",
+       "modifier": "grant.promotion",
+       "amount": 1,
+       "source": "own value, unverified"
+      },
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "all_units",
+        "filter": {
+         "unit_combat": "core:unit-combat/mounted",
+         "promotion": "core:promotion/sentry"
+        }
+       },
+       "condition": null,
+       "trigger": "passive",
+       "modifier": "grant.promotion",
+       "amount": 1,
+       "source": "own value, unverified"
+      },
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "all_units",
+        "filter": {
+         "unit_combat": "core:unit-combat/siege",
+         "promotion": "core:promotion/sentry"
+        }
+       },
+       "condition": null,
+       "trigger": "passive",
+       "modifier": "grant.promotion",
+       "amount": 1,
+       "source": "own value, unverified"
+      },
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "all_units",
+        "filter": {
+         "unit_combat": "core:unit-combat/gun",
+         "promotion": "core:promotion/sentry"
+        }
+       },
+       "condition": null,
+       "trigger": "passive",
+       "modifier": "grant.promotion",
+       "amount": 1,
+       "source": "own value, unverified"
+      },
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "all_units",
+        "filter": {
+         "unit_combat": "core:unit-combat/armor",
+         "promotion": "core:promotion/sentry"
+        }
+       },
+       "condition": null,
+       "trigger": "passive",
+       "modifier": "grant.promotion",
+       "amount": 1,
+       "source": "own value, unverified"
+      }
+     ]
+    }
+   ],
+   "unique_units": [
+    "core:unit/b17",
+    "core:unit/minuteman"
+   ],
+   "unique_buildings": [],
+   "unique_improvements": [],
+   "start_bias": {
+    "none": true
+   },
+   "free_techs": [
+    "core:tech/agriculture"
+   ],
+   "free_units": [
+    {
+     "unit": "core:unit/settler",
+     "count": 1
+    }
+   ],
+   "preferred_religion": [
+    "core:religion/protestantism"
+   ],
+   "art_slug": "america",
+   "provenance": "unciv: Nations.json, America",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:nation/arabia",
+   "name": "Arabia",
+   "adjective": "Arabian",
+   "leader": {
+    "id": "core:leader/harun-al-rashid",
+    "name": "Harun al-Rashid"
+   },
+   "ability": [
+    {
+     "id": "core:trait/land-trade-gold",
+     "name": "Ships of the Desert",
+     "effects": [
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "player"
+       },
+       "condition": null,
+       "trigger": "passive",
+       "modifier": "trade.land_range.flat_tiles",
+       "amount": 5,
+       "source": "own value, unverified"
+      },
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "player"
+       },
+       "condition": null,
+       "trigger": "passive",
+       "modifier": "trade.religious_pressure.pct",
+       "amount": 100,
+       "source": "own value, unverified"
+      },
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "player",
+        "filter": {
+         "resource": "core:resource/oil"
+        }
+       },
+       "condition": null,
+       "trigger": "passive",
+       "modifier": "resource.quantity.pct",
+       "amount": 100,
+       "source": "unciv: Nations.json, Arabia"
+      }
+     ]
+    }
+   ],
+   "unique_units": [
+    "core:unit/camel-archer"
+   ],
+   "unique_buildings": [
+    "core:building/bazaar"
+   ],
+   "unique_improvements": [],
+   "start_bias": {
+    "region_priority": [
+     "desert"
+    ]
+   },
+   "free_techs": [
+    "core:tech/agriculture"
+   ],
+   "free_units": [
+    {
+     "unit": "core:unit/settler",
+     "count": 1
+    }
+   ],
+   "preferred_religion": [
+    "core:religion/islam"
+   ],
+   "art_slug": "arabia",
+   "provenance": "unciv: Nations.json, Arabia",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:nation/aztecs",
+   "name": "The Aztecs",
+   "adjective": "Aztec",
+   "leader": {
+    "id": "core:leader/montezuma",
+    "name": "Montezuma"
+   },
+   "ability": [
+    {
+     "id": "core:trait/culture-from-kills",
+     "name": "Sacrificial Captives",
+     "effects": [
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "player"
+       },
+       "condition": null,
+       "trigger": "on_kill",
+       "modifier": "culture.on_kill.pct_of_strength",
+       "amount": 100,
+       "source": "unciv: Nations.json, Aztecs"
+      }
+     ]
+    }
+   ],
+   "unique_units": [
+    "core:unit/jaguar"
+   ],
+   "unique_buildings": [
+    "core:building/floating_gardens"
+   ],
+   "unique_improvements": [],
+   "start_bias": {
+    "region_priority": [
+     "jungle"
+    ]
+   },
+   "free_techs": [
+    "core:tech/agriculture"
+   ],
+   "free_units": [
+    {
+     "unit": "core:unit/settler",
+     "count": 1
+    }
+   ],
+   "preferred_religion": [
+    "core:religion/catholicism"
+   ],
+   "art_slug": "aztecs",
+   "provenance": "unciv: Nations.json, Aztecs",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:nation/china",
+   "name": "China",
+   "adjective": "Chinese",
+   "leader": {
+    "id": "core:leader/wu-zetian",
+    "name": "Wu Zetian"
+   },
+   "ability": [
+    {
+     "id": "core:trait/art-of-war",
+     "name": "Art of War",
+     "effects": [
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "player",
+        "filter": {
+         "great_person": "core:unit/great-general"
+        }
+       },
+       "condition": null,
+       "trigger": "passive",
+       "modifier": "great_people.rate.pct",
+       "amount": 50,
+       "source": "unciv: Nations.json, China"
+      },
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "all_units"
+       },
+       "condition": null,
+       "trigger": "passive",
+       "modifier": "combat.great_general_bonus.pct",
+       "amount": 15,
+       "source": "own value, unverified"
+      }
+     ]
+    }
+   ],
+   "unique_units": [
+    "core:unit/chu-ko-nu"
+   ],
+   "unique_buildings": [
+    "core:building/paper_maker"
+   ],
+   "unique_improvements": [],
+   "start_bias": {
+    "none": true
+   },
+   "free_techs": [
+    "core:tech/agriculture"
+   ],
+   "free_units": [
+    {
+     "unit": "core:unit/settler",
+     "count": 1
+    }
+   ],
+   "preferred_religion": [
+    "core:religion/taoism"
+   ],
+   "art_slug": "china",
+   "provenance": "unciv: Nations.json, China",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:nation/egypt",
+   "name": "Egypt",
+   "adjective": "Egyptian",
+   "leader": {
+    "id": "core:leader/ramesses-ii",
+    "name": "Ramesses II"
+   },
+   "ability": [
+    {
+     "id": "core:trait/wonder-builder",
+     "name": "Monument Builders",
+     "effects": [
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "all_cities"
+       },
+       "condition": null,
+       "trigger": "passive",
+       "modifier": "production.wonders.pct",
+       "amount": 20,
+       "source": "unciv: Nations.json, Egypt"
+      }
+     ]
+    }
+   ],
+   "unique_units": [
+    "core:unit/war-chariot"
+   ],
+   "unique_buildings": [
+    "core:building/burial_tomb"
+   ],
+   "unique_improvements": [],
+   "start_bias": {
+    "region_avoid": [
+     "forest",
+     "jungle"
+    ]
+   },
+   "free_techs": [
+    "core:tech/agriculture"
+   ],
+   "free_units": [
+    {
+     "unit": "core:unit/settler",
+     "count": 1
+    }
+   ],
+   "preferred_religion": [
+    "core:religion/islam"
+   ],
+   "art_slug": "egypt",
+   "provenance": "unciv: Nations.json, Egypt",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:nation/england",
+   "name": "England",
+   "adjective": "English",
+   "leader": {
+    "id": "core:leader/elizabeth",
+    "name": "Elizabeth"
+   },
+   "ability": [
+    {
+     "id": "core:trait/ocean-movement",
+     "name": "Sun Never Sets",
+     "effects": [
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "all_units"
+       },
+       "condition": null,
+       "trigger": "passive",
+       "modifier": "unit.embarked_moves.flat",
+       "amount": 2,
+       "source": "own value, unverified"
+      },
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "player"
+       },
+       "condition": null,
+       "trigger": "passive",
+       "modifier": "espionage.spies.flat",
+       "amount": 1,
+       "source": "unciv: Nations.json, England"
+      },
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "all_units",
+        "filter": {
+         "unit_combat": "core:unit-combat/navalranged",
+         "promotion": "core:promotion/ocean-movement"
+        }
+       },
+       "condition": null,
+       "trigger": "passive",
+       "modifier": "grant.promotion",
+       "amount": 1,
+       "source": "own value, unverified"
+      },
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "all_units",
+        "filter": {
+         "unit_combat": "core:unit-combat/navalmelee",
+         "promotion": "core:promotion/ocean-movement"
+        }
+       },
+       "condition": null,
+       "trigger": "passive",
+       "modifier": "grant.promotion",
+       "amount": 1,
+       "source": "own value, unverified"
+      },
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "all_units",
+        "filter": {
+         "unit_combat": "core:unit-combat/submarine",
+         "promotion": "core:promotion/ocean-movement"
+        }
+       },
+       "condition": null,
+       "trigger": "passive",
+       "modifier": "grant.promotion",
+       "amount": 1,
+       "source": "own value, unverified"
+      },
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "all_units",
+        "filter": {
+         "unit_combat": "core:unit-combat/carrier",
+         "promotion": "core:promotion/ocean-movement"
+        }
+       },
+       "condition": null,
+       "trigger": "passive",
+       "modifier": "grant.promotion",
+       "amount": 1,
+       "source": "own value, unverified"
+      }
+     ]
+    }
+   ],
+   "unique_units": [
+    "core:unit/ship-of-the-line",
+    "core:unit/longbowman"
+   ],
+   "unique_buildings": [],
+   "unique_improvements": [],
+   "start_bias": {
+    "coastal": true
+   },
+   "free_techs": [
+    "core:tech/agriculture"
+   ],
+   "free_units": [
+    {
+     "unit": "core:unit/settler",
+     "count": 1
+    }
+   ],
+   "preferred_religion": [
+    "core:religion/protestantism"
+   ],
+   "art_slug": "england",
+   "provenance": "unciv: Nations.json, England",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:nation/france",
+   "name": "France",
+   "adjective": "French",
+   "leader": {
+    "id": "core:leader/napoleon",
+    "name": "Napoleon"
+   },
+   "ability": [
+    {
+     "id": "core:trait/enhanced-culture",
+     "name": "City of Light",
+     "effects": [
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "capital"
+       },
+       "condition": null,
+       "trigger": "passive",
+       "modifier": "theming.bonus.pct",
+       "amount": 100,
+       "source": "own value, unverified"
+      }
+     ]
+    }
+   ],
+   "unique_units": [
+    "core:unit/musketeer"
+   ],
+   "unique_buildings": [],
+   "unique_improvements": [
+    "core:improvement/chateau"
+   ],
+   "start_bias": {
+    "none": true
+   },
+   "free_techs": [
+    "core:tech/agriculture"
+   ],
+   "free_units": [
+    {
+     "unit": "core:unit/settler",
+     "count": 1
+    }
+   ],
+   "preferred_religion": [
+    "core:religion/catholicism"
+   ],
+   "art_slug": "france",
+   "provenance": "unciv: Nations.json, France",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:nation/germany",
+   "name": "Germany",
+   "adjective": "German",
+   "leader": {
+    "id": "core:leader/bismarck",
+    "name": "Bismarck"
+   },
+   "ability": [
+    {
+     "id": "core:trait/converts-land-barbarians",
+     "name": "Furor Teutonicus",
+     "effects": [
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "player"
+       },
+       "condition": null,
+       "trigger": "passive",
+       "modifier": "trait.land_barbarian_conversion_percent",
+       "amount": 67,
+       "needs_mechanic": "land_barbarian_conversion_percent",
+       "source": "unciv: Nations.json, Germany"
+      },
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "all_units",
+        "filter": {
+         "domain": "core:domain/land"
+        }
+       },
+       "condition": null,
+       "trigger": "passive",
+       "modifier": "unit.maintenance.pct",
+       "amount": -25,
+       "source": "unciv: Nations.json, Germany"
+      }
+     ]
+    }
+   ],
+   "unique_units": [
+    "core:unit/panzer"
+   ],
+   "unique_buildings": [
+    "core:building/hanse"
+   ],
+   "unique_improvements": [],
+   "start_bias": {
+    "none": true
+   },
+   "free_techs": [
+    "core:tech/agriculture"
+   ],
+   "free_units": [
+    {
+     "unit": "core:unit/settler",
+     "count": 1
+    }
+   ],
+   "preferred_religion": [
+    "core:religion/protestantism"
+   ],
+   "art_slug": "germany",
+   "provenance": "unciv: Nations.json, Germany",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:nation/greece",
+   "name": "Greece",
+   "adjective": "Greek",
+   "leader": {
+    "id": "core:leader/alexander",
+    "name": "Alexander"
+   },
+   "ability": [
+    {
+     "id": "core:trait/city-state-friendship",
+     "name": "Hellenic League",
+     "effects": [
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "player"
+       },
+       "condition": null,
+       "trigger": "passive",
+       "modifier": "trait.city_state_friendship_modifier",
+       "amount": 100,
+       "needs_mechanic": "city_state_friendship_modifier",
+       "source": "own value, unverified"
+      }
+     ]
+    }
+   ],
+   "unique_units": [
+    "core:unit/companion-cavalry",
+    "core:unit/hoplite"
+   ],
+   "unique_buildings": [],
+   "unique_improvements": [],
+   "start_bias": {
+    "none": true
+   },
+   "free_techs": [
+    "core:tech/agriculture"
+   ],
+   "free_units": [
+    {
+     "unit": "core:unit/settler",
+     "count": 1
+    }
+   ],
+   "preferred_religion": [
+    "core:religion/eastern-orthodoxy"
+   ],
+   "art_slug": "greece",
+   "provenance": "unciv: Nations.json, Greece",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:nation/india",
+   "name": "India",
+   "adjective": "Indian",
+   "leader": {
+    "id": "core:leader/gandhi",
+    "name": "Gandhi"
+   },
+   "ability": [
+    {
+     "id": "core:trait/population-growth",
+     "name": "Population Growth",
+     "effects": [
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "player"
+       },
+       "condition": null,
+       "trigger": "passive",
+       "modifier": "unhappiness.from_cities.pct",
+       "amount": 100,
+       "source": "unciv: Nations.json, India"
+      },
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "player"
+       },
+       "condition": null,
+       "trigger": "passive",
+       "modifier": "unhappiness.from_population.pct",
+       "amount": -50,
+       "source": "unciv: Nations.json, India"
+      }
+     ]
+    }
+   ],
+   "unique_units": [
+    "core:unit/war-elephant"
+   ],
+   "unique_buildings": [
+    "core:building/mughal_fort"
+   ],
+   "unique_improvements": [],
+   "start_bias": {
+    "region_priority": [
+     "grass"
+    ]
+   },
+   "free_techs": [
+    "core:tech/agriculture"
+   ],
+   "free_units": [
+    {
+     "unit": "core:unit/settler",
+     "count": 1
+    }
+   ],
+   "preferred_religion": [
+    "core:religion/hinduism"
+   ],
+   "art_slug": "india",
+   "provenance": "unciv: Nations.json, India",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:nation/iroquois",
+   "name": "The Iroquois",
+   "adjective": "Iroquois",
+   "leader": {
+    "id": "core:leader/hiawatha",
+    "name": "Hiawatha"
+   },
+   "ability": [
+    {
+     "id": "core:trait/ignore-terrain-in-forest",
+     "name": "The Great Warpath",
+     "effects": [
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "player"
+       },
+       "condition": null,
+       "trigger": "passive",
+       "modifier": "trait.move_friendly_woods_as_road",
+       "amount": true,
+       "needs_mechanic": "move_friendly_woods_as_road",
+       "source": "own value, unverified"
+      }
+     ]
+    }
+   ],
+   "unique_units": [
+    "core:unit/mohawk-warrior"
+   ],
+   "unique_buildings": [
+    "core:building/longhouse"
+   ],
+   "unique_improvements": [],
+   "start_bias": {
+    "region_priority": [
+     "forest"
+    ]
+   },
+   "free_techs": [
+    "core:tech/agriculture"
+   ],
+   "free_units": [
+    {
+     "unit": "core:unit/settler",
+     "count": 1
+    }
+   ],
+   "preferred_religion": [
+    "core:religion/protestantism"
+   ],
+   "art_slug": "iroquois",
+   "provenance": "unciv: Nations.json, Iroquois",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:nation/japan",
+   "name": "Japan",
+   "adjective": "Japanese",
+   "leader": {
+    "id": "core:leader/oda-nobunaga",
+    "name": "Oda Nobunaga"
+   },
+   "ability": [
+    {
+     "id": "core:trait/fight-well-damaged",
+     "name": "Bushido",
+     "effects": [
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "player"
+       },
+       "condition": null,
+       "trigger": "passive",
+       "modifier": "trait.fight_well_damaged",
+       "amount": true,
+       "needs_mechanic": "fight_well_damaged",
+       "source": "own value, unverified"
+      },
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "tiles_of_player",
+        "filter": {
+         "improvement": "core:improvement/fishing-boats"
+        }
+       },
+       "condition": null,
+       "trigger": "passive",
+       "modifier": "tile.yield.culture.flat",
+       "amount": 1,
+       "source": "own value, unverified"
+      },
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "tiles_of_player",
+        "filter": {
+         "feature": "core:feature/atoll"
+        }
+       },
+       "condition": null,
+       "trigger": "passive",
+       "modifier": "tile.yield.culture.flat_if_unimproved",
+       "amount": 2,
+       "source": "own value, unverified"
+      }
+     ]
+    }
+   ],
+   "unique_units": [
+    "core:unit/zero",
+    "core:unit/samurai"
+   ],
+   "unique_buildings": [],
+   "unique_improvements": [],
+   "start_bias": {
+    "coastal": true
+   },
+   "free_techs": [
+    "core:tech/agriculture"
+   ],
+   "free_units": [
+    {
+     "unit": "core:unit/settler",
+     "count": 1
+    }
+   ],
+   "preferred_religion": [
+    "core:religion/shinto"
+   ],
+   "art_slug": "japan",
+   "provenance": "unciv: Nations.json, Japan",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:nation/ottomans",
+   "name": "The Ottomans",
+   "adjective": "Ottoman",
+   "leader": {
+    "id": "core:leader/suleiman",
+    "name": "Suleiman"
+   },
+   "ability": [
+    {
+     "id": "core:trait/converts-sea-barbarians",
+     "name": "Barbary Corsairs",
+     "effects": [
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "all_units",
+        "filter": {
+         "domain": "core:domain/sea"
+        }
+       },
+       "condition": null,
+       "trigger": "passive",
+       "modifier": "unit.maintenance.pct",
+       "amount": -66,
+       "source": "unciv: Nations.json, The Ottomans"
+      },
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "all_units",
+        "filter": {
+         "unit_combat": "core:unit-combat/navalmelee",
+         "promotion": "core:promotion/prize-ships"
+        }
+       },
+       "condition": null,
+       "trigger": "passive",
+       "modifier": "grant.promotion",
+       "amount": 1,
+       "source": "own value, unverified"
+      }
+     ]
+    }
+   ],
+   "unique_units": [
+    "core:unit/sipahi",
+    "core:unit/janissary"
+   ],
+   "unique_buildings": [],
+   "unique_improvements": [],
+   "start_bias": {
+    "coastal": true
+   },
+   "free_techs": [
+    "core:tech/agriculture"
+   ],
+   "free_units": [
+    {
+     "unit": "core:unit/settler",
+     "count": 1
+    }
+   ],
+   "preferred_religion": [
+    "core:religion/islam"
+   ],
+   "art_slug": "ottomans",
+   "provenance": "unciv: Nations.json, The Ottomans",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:nation/persia",
+   "name": "Persia",
+   "adjective": "Persian",
+   "leader": {
+    "id": "core:leader/darius-i",
+    "name": "Darius I"
+   },
+   "ability": [
+    {
+     "id": "core:trait/enhanced-golden-ages",
+     "name": "Achaemenid Legacy",
+     "effects": [
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "player"
+       },
+       "condition": null,
+       "trigger": "passive",
+       "modifier": "golden_age.duration.pct",
+       "amount": 50,
+       "source": "unciv: Nations.json, Persia"
+      },
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "all_units"
+       },
+       "condition": {
+        "golden_age": true
+       },
+       "trigger": "passive",
+       "modifier": "unit.moves.flat",
+       "amount": 1,
+       "source": "unciv: Nations.json, Persia"
+      },
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "all_units"
+       },
+       "condition": {
+        "golden_age": true
+       },
+       "trigger": "passive",
+       "modifier": "combat.strength.pct",
+       "amount": 10,
+       "source": "unciv: Nations.json, Persia"
+      }
+     ]
+    }
+   ],
+   "unique_units": [
+    "core:unit/immortal"
+   ],
+   "unique_buildings": [
+    "core:building/satrap_s_court"
+   ],
+   "unique_improvements": [],
+   "start_bias": {
+    "none": true
+   },
+   "free_techs": [
+    "core:tech/agriculture"
+   ],
+   "free_units": [
+    {
+     "unit": "core:unit/settler",
+     "count": 1
+    }
+   ],
+   "preferred_religion": [
+    "core:religion/zoroastrianism"
+   ],
+   "art_slug": "persia",
+   "provenance": "unciv: Nations.json, Persia",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:nation/rome",
+   "name": "Rome",
+   "adjective": "Roman",
+   "leader": {
+    "id": "core:leader/augustus-caesar",
+    "name": "Augustus Caesar"
+   },
+   "ability": [
+    {
+     "id": "core:trait/capital-buildings-cheaper",
+     "name": "The Glory of Rome",
+     "effects": [
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "player"
+       },
+       "condition": null,
+       "trigger": "passive",
+       "modifier": "trait.capital_building_modifier",
+       "amount": 25,
+       "needs_mechanic": "capital_building_modifier",
+       "source": "unciv: Nations.json, Rome"
+      }
+     ]
+    }
+   ],
+   "unique_units": [
+    "core:unit/ballista",
+    "core:unit/legion"
+   ],
+   "unique_buildings": [],
+   "unique_improvements": [],
+   "start_bias": {
+    "none": true
+   },
+   "free_techs": [
+    "core:tech/agriculture"
+   ],
+   "free_units": [
+    {
+     "unit": "core:unit/settler",
+     "count": 1
+    }
+   ],
+   "preferred_religion": [
+    "core:religion/catholicism"
+   ],
+   "art_slug": "rome",
+   "provenance": "unciv: Nations.json, Rome",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:nation/russia",
+   "name": "Russia",
+   "adjective": "Russian",
+   "leader": {
+    "id": "core:leader/catherine",
+    "name": "Catherine"
+   },
+   "ability": [
+    {
+     "id": "core:trait/strategic-riches",
+     "name": "Siberian Riches",
+     "effects": [
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "player",
+        "filter": {
+         "resource": "core:resource/horses"
+        }
+       },
+       "condition": null,
+       "trigger": "passive",
+       "modifier": "resource.quantity.pct",
+       "amount": 100,
+       "source": "unciv: Nations.json, Russia"
+      },
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "player",
+        "filter": {
+         "resource": "core:resource/iron"
+        }
+       },
+       "condition": null,
+       "trigger": "passive",
+       "modifier": "resource.quantity.pct",
+       "amount": 100,
+       "source": "unciv: Nations.json, Russia"
+      },
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "player",
+        "filter": {
+         "resource": "core:resource/uranium"
+        }
+       },
+       "condition": null,
+       "trigger": "passive",
+       "modifier": "resource.quantity.pct",
+       "amount": 100,
+       "source": "unciv: Nations.json, Russia"
+      },
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "tiles_of_player"
+       },
+       "condition": null,
+       "trigger": "passive",
+       "modifier": "tile.yield.production.flat",
+       "amount": 1,
+       "source": "unciv: Nations.json, Russia",
+       "tag": "strategic_resource_tiles"
+      }
+     ]
+    }
+   ],
+   "unique_units": [
+    "core:unit/cossack"
+   ],
+   "unique_buildings": [
+    "core:building/krepost"
+   ],
+   "unique_improvements": [],
+   "start_bias": {
+    "region_priority": [
+     "tundra"
+    ]
+   },
+   "free_techs": [
+    "core:tech/agriculture"
+   ],
+   "free_units": [
+    {
+     "unit": "core:unit/settler",
+     "count": 1
+    }
+   ],
+   "preferred_religion": [
+    "core:religion/eastern-orthodoxy"
+   ],
+   "art_slug": "russia",
+   "provenance": "unciv: Nations.json, Russia",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:nation/siam",
+   "name": "Siam",
+   "adjective": "Siamese",
+   "leader": {
+    "id": "core:leader/ramkhamhaeng",
+    "name": "Ramkhamhaeng"
+   },
+   "ability": [
+    {
+     "id": "core:trait/city-state-bonuses",
+     "name": "Father Governs Children",
+     "effects": [
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "city_states"
+       },
+       "condition": null,
+       "trigger": "passive",
+       "modifier": "city_state.friend_bonus.pct",
+       "amount": 50,
+       "source": "own value, unverified"
+      }
+     ]
+    }
+   ],
+   "unique_units": [
+    "core:unit/naresuan-s-elephant"
+   ],
+   "unique_buildings": [
+    "core:building/wat"
+   ],
+   "unique_improvements": [],
+   "start_bias": {
+    "region_avoid": [
+     "forest"
+    ]
+   },
+   "free_techs": [
+    "core:tech/agriculture"
+   ],
+   "free_units": [
+    {
+     "unit": "core:unit/settler",
+     "count": 1
+    }
+   ],
+   "preferred_religion": [
+    "core:religion/buddhism"
+   ],
+   "art_slug": "siam",
+   "provenance": "unciv: Nations.json, Siam",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:nation/songhai",
+   "name": "Songhai",
+   "adjective": "Songhai",
+   "leader": {
+    "id": "core:leader/askia",
+    "name": "Askia"
+   },
+   "ability": [
+    {
+     "id": "core:trait/amphib-warlord",
+     "name": "River Warlord",
+     "effects": [
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "player"
+       },
+       "condition": null,
+       "trigger": "passive",
+       "modifier": "gold.plunder.pct",
+       "amount": 200,
+       "source": "own value, unverified"
+      },
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "all_units",
+        "filter": {
+         "unit_combat": "core:unit-combat/melee",
+         "promotion": "core:promotion/amphibious"
+        }
+       },
+       "condition": null,
+       "trigger": "passive",
+       "modifier": "grant.promotion",
+       "amount": 1,
+       "source": "own value, unverified"
+      },
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "all_units",
+        "filter": {
+         "unit_combat": "core:unit-combat/archer",
+         "promotion": "core:promotion/amphibious"
+        }
+       },
+       "condition": null,
+       "trigger": "passive",
+       "modifier": "grant.promotion",
+       "amount": 1,
+       "source": "own value, unverified"
+      },
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "all_units",
+        "filter": {
+         "unit_combat": "core:unit-combat/recon",
+         "promotion": "core:promotion/amphibious"
+        }
+       },
+       "condition": null,
+       "trigger": "passive",
+       "modifier": "grant.promotion",
+       "amount": 1,
+       "source": "own value, unverified"
+      },
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "all_units",
+        "filter": {
+         "unit_combat": "core:unit-combat/mounted",
+         "promotion": "core:promotion/amphibious"
+        }
+       },
+       "condition": null,
+       "trigger": "passive",
+       "modifier": "grant.promotion",
+       "amount": 1,
+       "source": "own value, unverified"
+      },
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "all_units",
+        "filter": {
+         "unit_combat": "core:unit-combat/siege",
+         "promotion": "core:promotion/amphibious"
+        }
+       },
+       "condition": null,
+       "trigger": "passive",
+       "modifier": "grant.promotion",
+       "amount": 1,
+       "source": "own value, unverified"
+      },
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "all_units",
+        "filter": {
+         "unit_combat": "core:unit-combat/gun",
+         "promotion": "core:promotion/amphibious"
+        }
+       },
+       "condition": null,
+       "trigger": "passive",
+       "modifier": "grant.promotion",
+       "amount": 1,
+       "source": "own value, unverified"
+      },
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "all_units",
+        "filter": {
+         "unit_combat": "core:unit-combat/armor",
+         "promotion": "core:promotion/amphibious"
+        }
+       },
+       "condition": null,
+       "trigger": "passive",
+       "modifier": "grant.promotion",
+       "amount": 1,
+       "source": "own value, unverified"
+      },
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "all_units",
+        "filter": {
+         "unit_combat": "core:unit-combat/melee",
+         "promotion": "core:promotion/war-canoes"
+        }
+       },
+       "condition": null,
+       "trigger": "passive",
+       "modifier": "grant.promotion",
+       "amount": 1,
+       "source": "own value, unverified"
+      },
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "all_units",
+        "filter": {
+         "unit_combat": "core:unit-combat/archer",
+         "promotion": "core:promotion/war-canoes"
+        }
+       },
+       "condition": null,
+       "trigger": "passive",
+       "modifier": "grant.promotion",
+       "amount": 1,
+       "source": "own value, unverified"
+      },
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "all_units",
+        "filter": {
+         "unit_combat": "core:unit-combat/recon",
+         "promotion": "core:promotion/war-canoes"
+        }
+       },
+       "condition": null,
+       "trigger": "passive",
+       "modifier": "grant.promotion",
+       "amount": 1,
+       "source": "own value, unverified"
+      },
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "all_units",
+        "filter": {
+         "unit_combat": "core:unit-combat/mounted",
+         "promotion": "core:promotion/war-canoes"
+        }
+       },
+       "condition": null,
+       "trigger": "passive",
+       "modifier": "grant.promotion",
+       "amount": 1,
+       "source": "own value, unverified"
+      },
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "all_units",
+        "filter": {
+         "unit_combat": "core:unit-combat/siege",
+         "promotion": "core:promotion/war-canoes"
+        }
+       },
+       "condition": null,
+       "trigger": "passive",
+       "modifier": "grant.promotion",
+       "amount": 1,
+       "source": "own value, unverified"
+      },
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "all_units",
+        "filter": {
+         "unit_combat": "core:unit-combat/gun",
+         "promotion": "core:promotion/war-canoes"
+        }
+       },
+       "condition": null,
+       "trigger": "passive",
+       "modifier": "grant.promotion",
+       "amount": 1,
+       "source": "own value, unverified"
+      },
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "all_units",
+        "filter": {
+         "unit_combat": "core:unit-combat/armor",
+         "promotion": "core:promotion/war-canoes"
+        }
+       },
+       "condition": null,
+       "trigger": "passive",
+       "modifier": "grant.promotion",
+       "amount": 1,
+       "source": "own value, unverified"
+      }
+     ]
+    }
+   ],
+   "unique_units": [
+    "core:unit/mandekalu-cavalry"
+   ],
+   "unique_buildings": [
+    "core:building/mud_pyramid_mosque"
+   ],
+   "unique_improvements": [],
+   "start_bias": {
+    "region_avoid": [
+     "tundra"
+    ]
+   },
+   "free_techs": [
+    "core:tech/agriculture"
+   ],
+   "free_units": [
+    {
+     "unit": "core:unit/settler",
+     "count": 1
+    }
+   ],
+   "preferred_religion": [
+    "core:religion/islam"
+   ],
+   "art_slug": "songhai",
+   "provenance": "unciv: Nations.json, Songhai",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:nation/ethiopia",
+   "name": "Ethiopia",
+   "adjective": "Ethiopian",
+   "leader": {
+    "id": "core:leader/haile-selassie",
+    "name": "Haile Selassie"
+   },
+   "ability": [
+    {
+     "id": "core:trait/bonus-against-tech",
+     "name": "Spirit of Adwa",
+     "effects": [
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "all_units"
+       },
+       "condition": {
+        "opponent": "nation_with_more_cities"
+       },
+       "trigger": "passive",
+       "modifier": "combat.strength.pct",
+       "amount": 20,
+       "source": "unciv: Nations.json, Ethiopia"
+      }
+     ]
+    }
+   ],
+   "unique_units": [
+    "core:unit/mehal-sefari"
+   ],
+   "unique_buildings": [
+    "core:building/stele"
+   ],
+   "unique_improvements": [],
+   "start_bias": {
+    "none": true
+   },
+   "free_techs": [
+    "core:tech/agriculture"
+   ],
+   "free_units": [
+    {
+     "unit": "core:unit/settler",
+     "count": 1
+    }
+   ],
+   "preferred_religion": [
+    "core:religion/eastern-orthodoxy"
+   ],
+   "art_slug": "ethiopia",
+   "provenance": "unciv: Nations.json, Ethiopia",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:nation/assyria",
+   "name": "Assyria",
+   "adjective": "Assyrian",
+   "leader": {
+    "id": "core:leader/ashurbanipal",
+    "name": "Ashurbanipal"
+   },
+   "ability": [
+    {
+     "id": "core:trait/slayer-of-tiamat",
+     "name": "Treasures of Nineveh",
+     "effects": [
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "player"
+       },
+       "condition": null,
+       "trigger": "passive",
+       "modifier": "trait.tech_from_city_conquer",
+       "amount": true,
+       "needs_mechanic": "tech_from_city_conquer",
+       "source": "own value"
+      }
+     ]
+    }
+   ],
+   "unique_units": [
+    "core:unit/siege-tower"
+   ],
+   "unique_buildings": [
+    "core:building/royal_library"
+   ],
+   "unique_improvements": [],
+   "start_bias": {
+    "region_avoid": [
+     "tundra"
+    ]
+   },
+   "free_techs": [
+    "core:tech/agriculture"
+   ],
+   "free_units": [
+    {
+     "unit": "core:unit/settler",
+     "count": 1
+    }
+   ],
+   "preferred_religion": [
+    "core:religion/zoroastrianism"
+   ],
+   "art_slug": "assyria",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:nation/brazil",
+   "name": "Brazil",
+   "adjective": "Brazilian",
+   "leader": {
+    "id": "core:leader/pedro-ii",
+    "name": "Pedro II"
+   },
+   "ability": [
+    {
+     "id": "core:trait/carnival",
+     "name": "Carnival",
+     "effects": [
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "player"
+       },
+       "condition": {
+        "golden_age": true
+       },
+       "trigger": "passive",
+       "modifier": "tourism.pct",
+       "amount": 100,
+       "source": "own value"
+      },
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "all_cities",
+        "filter": {
+         "great_person": "core:unit/great-artist"
+        }
+       },
+       "condition": {
+        "golden_age": true
+       },
+       "trigger": "passive",
+       "modifier": "great_people.rate.pct",
+       "amount": 50,
+       "source": "own value"
+      },
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "all_cities",
+        "filter": {
+         "great_person": "core:unit/great-musician"
+        }
+       },
+       "condition": {
+        "golden_age": true
+       },
+       "trigger": "passive",
+       "modifier": "great_people.rate.pct",
+       "amount": 50,
+       "source": "own value"
+      },
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "all_cities",
+        "filter": {
+         "great_person": "core:unit/great-writer"
+        }
+       },
+       "condition": {
+        "golden_age": true
+       },
+       "trigger": "passive",
+       "modifier": "great_people.rate.pct",
+       "amount": 50,
+       "source": "own value"
+      }
+     ]
+    }
+   ],
+   "unique_units": [
+    "core:unit/pracinha"
+   ],
+   "unique_buildings": [],
+   "unique_improvements": [
+    "core:improvement/brazilwood-camp"
+   ],
+   "start_bias": {
+    "region_priority": [
+     "jungle"
+    ]
+   },
+   "free_techs": [
+    "core:tech/agriculture"
+   ],
+   "free_units": [
+    {
+     "unit": "core:unit/settler",
+     "count": 1
+    }
+   ],
+   "preferred_religion": [
+    "core:religion/catholicism"
+   ],
+   "art_slug": "brazil",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:nation/indonesia",
+   "name": "Indonesia",
+   "adjective": "Indonesian",
+   "leader": {
+    "id": "core:leader/gajah-mada",
+    "name": "Gajah Mada"
+   },
+   "ability": [
+    {
+     "id": "core:trait/spice",
+     "name": "Spice Islanders",
+     "effects": [
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "player"
+       },
+       "condition": null,
+       "trigger": "passive",
+       "modifier": "trait.unique_luxury_cities",
+       "amount": 3,
+       "needs_mechanic": "unique_luxury_cities",
+       "source": "own value"
+      },
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "player"
+       },
+       "condition": null,
+       "trigger": "passive",
+       "modifier": "trait.unique_luxury_quantity",
+       "amount": 2,
+       "needs_mechanic": "unique_luxury_quantity",
+       "source": "own value"
+      },
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "player"
+       },
+       "condition": null,
+       "trigger": "passive",
+       "modifier": "trait.unique_luxury_requires_new_area",
+       "amount": true,
+       "needs_mechanic": "unique_luxury_requires_new_area",
+       "source": "own value"
+      }
+     ]
+    }
+   ],
+   "unique_units": [
+    "core:unit/kris-swordsman"
+   ],
+   "unique_buildings": [
+    "core:building/candi"
+   ],
+   "unique_improvements": [],
+   "start_bias": {
+    "coastal": true
+   },
+   "free_techs": [
+    "core:tech/agriculture"
+   ],
+   "free_units": [
+    {
+     "unit": "core:unit/settler",
+     "count": 1
+    }
+   ],
+   "preferred_religion": [
+    "core:religion/hinduism"
+   ],
+   "art_slug": "indonesia",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:nation/morocco",
+   "name": "Morocco",
+   "adjective": "Moroccan",
+   "leader": {
+    "id": "core:leader/ahmad-al-mansur",
+    "name": "Ahmad al-Mansur"
+   },
+   "ability": [
+    {
+     "id": "core:trait/gateway-africa",
+     "name": "Gateway to Africa",
+     "effects": [
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "player"
+       },
+       "condition": null,
+       "trigger": "passive",
+       "modifier": "trade.incoming_route.yield.gold.flat",
+       "amount": 2,
+       "source": "own value"
+      },
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "capital"
+       },
+       "condition": null,
+       "trigger": "passive",
+       "modifier": "yield.gold.per_trade_partner",
+       "amount": 3,
+       "source": "own value"
+      },
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "capital"
+       },
+       "condition": null,
+       "trigger": "passive",
+       "modifier": "yield.culture.per_trade_partner",
+       "amount": 1,
+       "source": "own value"
+      }
+     ]
+    }
+   ],
+   "unique_units": [
+    "core:unit/berber-cavalry"
+   ],
+   "unique_buildings": [],
+   "unique_improvements": [
+    "core:improvement/kasbah"
+   ],
+   "start_bias": {
+    "region_priority": [
+     "desert"
+    ]
+   },
+   "free_techs": [
+    "core:tech/agriculture"
+   ],
+   "free_units": [
+    {
+     "unit": "core:unit/settler",
+     "count": 1
+    }
+   ],
+   "preferred_religion": [
+    "core:religion/islam"
+   ],
+   "art_slug": "morocco",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:nation/poland",
+   "name": "Poland",
+   "adjective": "Polish",
+   "leader": {
+    "id": "core:leader/casimir-iii",
+    "name": "Casimir III"
+   },
+   "ability": [
+    {
+     "id": "core:trait/solidarity",
+     "name": "Solidarity",
+     "effects": [
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "player"
+       },
+       "condition": null,
+       "trigger": "passive",
+       "modifier": "trait.free_social_policies_per_era",
+       "amount": 1,
+       "needs_mechanic": "free_social_policies_per_era",
+       "source": "own value"
+      }
+     ]
+    }
+   ],
+   "unique_units": [
+    "core:unit/winged-hussar"
+   ],
+   "unique_buildings": [
+    "core:building/ducal_stable"
+   ],
+   "unique_improvements": [],
+   "start_bias": {
+    "region_priority": [
+     "plains"
+    ]
+   },
+   "free_techs": [
+    "core:tech/agriculture"
+   ],
+   "free_units": [
+    {
+     "unit": "core:unit/settler",
+     "count": 1
+    }
+   ],
+   "preferred_religion": [
+    "core:religion/catholicism"
+   ],
+   "art_slug": "poland",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:nation/portugal",
+   "name": "Portugal",
+   "adjective": "Portuguese",
+   "leader": {
+    "id": "core:leader/maria-i",
+    "name": "Maria I"
+   },
+   "ability": [
+    {
+     "id": "core:trait/extra-trade",
+     "name": "Mare Clausum",
+     "effects": [
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "player"
+       },
+       "condition": null,
+       "trigger": "passive",
+       "modifier": "trade.resource_diversity_gold.pct",
+       "amount": 100,
+       "source": "own value"
+      }
+     ]
+    }
+   ],
+   "unique_units": [
+    "core:unit/nau"
+   ],
+   "unique_buildings": [],
+   "unique_improvements": [
+    "core:improvement/feitoria"
+   ],
+   "start_bias": {
+    "coastal": true
+   },
+   "free_techs": [
+    "core:tech/agriculture"
+   ],
+   "free_units": [
+    {
+     "unit": "core:unit/settler",
+     "count": 1
+    }
+   ],
+   "preferred_religion": [
+    "core:religion/catholicism"
+   ],
+   "art_slug": "portugal",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:nation/shoshone",
+   "name": "The Shoshone",
+   "adjective": "Shoshone",
+   "leader": {
+    "id": "core:leader/pocatello",
+    "name": "Pocatello"
+   },
+   "ability": [
+    {
+     "id": "core:trait/great-expanse",
+     "name": "Great Expanse",
+     "effects": [
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "player"
+       },
+       "condition": null,
+       "trigger": "passive",
+       "modifier": "trait.extra_founded_city_territory_claim_range",
+       "amount": 8,
+       "needs_mechanic": "extra_founded_city_territory_claim_range",
+       "source": "own value, unverified"
+      },
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "all_units",
+        "filter": {
+         "unit_combat": "core:unit-combat/melee",
+         "promotion": "core:promotion/homeland-guardian-boogaloo"
+        }
+       },
+       "condition": null,
+       "trigger": "passive",
+       "modifier": "grant.promotion",
+       "amount": 1,
+       "source": "own value"
+      },
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "all_units",
+        "filter": {
+         "unit_combat": "core:unit-combat/archer",
+         "promotion": "core:promotion/homeland-guardian-boogaloo"
+        }
+       },
+       "condition": null,
+       "trigger": "passive",
+       "modifier": "grant.promotion",
+       "amount": 1,
+       "source": "own value"
+      },
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "all_units",
+        "filter": {
+         "unit_combat": "core:unit-combat/recon",
+         "promotion": "core:promotion/homeland-guardian-boogaloo"
+        }
+       },
+       "condition": null,
+       "trigger": "passive",
+       "modifier": "grant.promotion",
+       "amount": 1,
+       "source": "own value"
+      },
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "all_units",
+        "filter": {
+         "unit_combat": "core:unit-combat/mounted",
+         "promotion": "core:promotion/homeland-guardian-boogaloo"
+        }
+       },
+       "condition": null,
+       "trigger": "passive",
+       "modifier": "grant.promotion",
+       "amount": 1,
+       "source": "own value"
+      },
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "all_units",
+        "filter": {
+         "unit_combat": "core:unit-combat/siege",
+         "promotion": "core:promotion/homeland-guardian-boogaloo"
+        }
+       },
+       "condition": null,
+       "trigger": "passive",
+       "modifier": "grant.promotion",
+       "amount": 1,
+       "source": "own value"
+      },
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "all_units",
+        "filter": {
+         "unit_combat": "core:unit-combat/gun",
+         "promotion": "core:promotion/homeland-guardian-boogaloo"
+        }
+       },
+       "condition": null,
+       "trigger": "passive",
+       "modifier": "grant.promotion",
+       "amount": 1,
+       "source": "own value"
+      },
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "all_units",
+        "filter": {
+         "unit_combat": "core:unit-combat/armor",
+         "promotion": "core:promotion/homeland-guardian-boogaloo"
+        }
+       },
+       "condition": null,
+       "trigger": "passive",
+       "modifier": "grant.promotion",
+       "amount": 1,
+       "source": "own value"
+      }
+     ]
+    }
+   ],
+   "unique_units": [
+    "core:unit/pathfinder",
+    "core:unit/comanche-riders"
+   ],
+   "unique_buildings": [],
+   "unique_improvements": [],
+   "start_bias": {
+    "none": true
+   },
+   "free_techs": [
+    "core:tech/agriculture"
+   ],
+   "free_units": [
+    {
+     "unit": "core:unit/settler",
+     "count": 1
+    }
+   ],
+   "preferred_religion": [
+    "core:religion/protestantism"
+   ],
+   "art_slug": "shoshone",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:nation/venice",
+   "name": "Venice",
+   "adjective": "Venetian",
+   "leader": {
+    "id": "core:leader/enrico-dandolo",
+    "name": "Enrico Dandolo"
+   },
+   "ability": [
+    {
+     "id": "core:trait/super-city-state",
+     "name": "Serenissima",
+     "effects": [
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "player"
+       },
+       "condition": null,
+       "trigger": "passive",
+       "modifier": "trait.no_annexing",
+       "amount": true,
+       "needs_mechanic": "no_annexing",
+       "source": "own value, unverified"
+      },
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "player"
+       },
+       "condition": null,
+       "trigger": "passive",
+       "modifier": "trait.free_unit",
+       "amount": 1,
+       "target": "core:unit/great-merchant",
+       "source": "own value, unverified"
+      },
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "player"
+       },
+       "condition": null,
+       "trigger": "passive",
+       "modifier": "trait.free_unit_prereq_tech",
+       "amount": 1,
+       "target": "core:tech/optics",
+       "source": "own value, unverified"
+      },
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "player"
+       },
+       "condition": null,
+       "trigger": "passive",
+       "modifier": "trade.routes.pct",
+       "amount": 100,
+       "source": "own value, unverified"
+      },
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "player",
+        "filter": {
+         "unit": "core:unit/settler"
+        }
+       },
+       "condition": null,
+       "trigger": "passive",
+       "modifier": "forbid.train_unit_class",
+       "amount": 1,
+       "source": "own value, unverified"
+      }
+     ]
+    }
+   ],
+   "unique_units": [
+    "core:unit/merchant-of-venice",
+    "core:unit/great-galleass"
+   ],
+   "unique_buildings": [],
+   "unique_improvements": [],
+   "start_bias": {
+    "coastal": true,
+    "placed_first_along_ocean": true
+   },
+   "free_techs": [
+    "core:tech/agriculture"
+   ],
+   "free_units": [
+    {
+     "unit": "core:unit/settler",
+     "count": 1
+    }
+   ],
+   "preferred_religion": [
+    "core:religion/catholicism"
+   ],
+   "art_slug": "venice",
+   "provenance": "unciv: Nations.json, Venice",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:nation/zulu",
+   "name": "The Zulus",
+   "adjective": "Zulu",
+   "leader": {
+    "id": "core:leader/shaka",
+    "name": "Shaka"
+   },
+   "ability": [
+    {
+     "id": "core:trait/buffalo-horns",
+     "name": "Iklwa",
+     "effects": [
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "all_units"
+       },
+       "condition": null,
+       "trigger": "passive",
+       "modifier": "unit.xp_needed.pct",
+       "amount": -25,
+       "source": "own value"
+      },
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "all_units",
+        "filter": {
+         "unit_combat": "core:unit-combat/melee"
+        }
+       },
+       "condition": null,
+       "trigger": "passive",
+       "modifier": "unit.maintenance.pct",
+       "amount": -50,
+       "source": "own value"
+      }
+     ]
+    }
+   ],
+   "unique_units": [
+    "core:unit/impi"
+   ],
+   "unique_buildings": [
+    "core:building/ikanda"
+   ],
+   "unique_improvements": [],
+   "start_bias": {
+    "region_avoid": [
+     "jungle"
+    ]
+   },
+   "free_techs": [
+    "core:tech/agriculture"
+   ],
+   "free_units": [
+    {
+     "unit": "core:unit/settler",
+     "count": 1
+    }
+   ],
+   "preferred_religion": [
+    "core:religion/protestantism"
+   ],
+   "art_slug": "zulu",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:nation/babylon",
+   "name": "Babylon",
+   "adjective": "Babylonian",
+   "leader": {
+    "id": "core:leader/nebuchadnezzar-ii",
+    "name": "Nebuchadnezzar II"
+   },
+   "ability": [
+    {
+     "id": "core:trait/ingenious",
+     "name": "Ingenuity",
+     "effects": [
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "all_cities",
+        "filter": {
+         "great_person": "core:unit/great-scientist"
+        }
+       },
+       "condition": null,
+       "trigger": "passive",
+       "modifier": "great_people.rate.pct",
+       "amount": 50,
+       "source": "unciv: Nations.json, Babylon"
+      },
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "player"
+       },
+       "condition": null,
+       "trigger": "passive",
+       "modifier": "trait.free_unit",
+       "amount": 1,
+       "target": "core:unit/great-scientist",
+       "source": "own value, unverified"
+      },
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "player"
+       },
+       "condition": null,
+       "trigger": "passive",
+       "modifier": "trait.free_unit_prereq_tech",
+       "amount": 1,
+       "target": "core:tech/writing",
+       "source": "own value, unverified"
+      }
+     ]
+    }
+   ],
+   "unique_units": [
+    "core:unit/bowman"
+   ],
+   "unique_buildings": [
+    "core:building/walls_of_babylon"
+   ],
+   "unique_improvements": [],
+   "start_bias": {
+    "region_avoid": [
+     "tundra"
+    ]
+   },
+   "free_techs": [
+    "core:tech/agriculture"
+   ],
+   "free_units": [
+    {
+     "unit": "core:unit/settler",
+     "count": 1
+    }
+   ],
+   "preferred_religion": [
+    "core:religion/islam"
+   ],
+   "art_slug": "babylon",
+   "provenance": "unciv: Nations.json, Babylon",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:nation/mongolia",
+   "name": "Mongolia",
+   "adjective": "Mongolian",
+   "leader": {
+    "id": "core:leader/genghis-khan",
+    "name": "Genghis Khan"
+   },
+   "ability": [
+    {
+     "id": "core:trait/terror",
+     "name": "Mongol Terror",
+     "effects": [
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "all_units"
+       },
+       "condition": {
+        "opponent": "city_state"
+       },
+       "trigger": "passive",
+       "modifier": "combat.strength.pct",
+       "amount": 30,
+       "source": "unciv: Nations.json, Mongolia"
+      },
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "all_units",
+        "filter": {
+         "unit_combat": "core:unit-combat/mounted"
+        }
+       },
+       "condition": null,
+       "trigger": "passive",
+       "modifier": "unit.moves.flat",
+       "amount": 1,
+       "source": "unciv: Nations.json, Mongolia"
+      }
+     ]
+    }
+   ],
+   "unique_units": [
+    "core:unit/keshik",
+    "core:unit/khan"
+   ],
+   "unique_buildings": [],
+   "unique_improvements": [],
+   "start_bias": {
+    "region_priority": [
+     "plains"
+    ]
+   },
+   "free_techs": [
+    "core:tech/agriculture"
+   ],
+   "free_units": [
+    {
+     "unit": "core:unit/settler",
+     "count": 1
+    }
+   ],
+   "preferred_religion": [
+    "core:religion/tengriism"
+   ],
+   "art_slug": "mongolia",
+   "provenance": "unciv: Nations.json, Mongolia",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:nation/inca",
+   "name": "The Inca",
+   "adjective": "Incan",
+   "leader": {
+    "id": "core:leader/pachacuti",
+    "name": "Pachacuti"
+   },
+   "ability": [
+    {
+     "id": "core:trait/great-andean-road",
+     "name": "Great Andean Road",
+     "effects": [
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "player"
+       },
+       "condition": null,
+       "trigger": "passive",
+       "modifier": "trait.faster_in_hills",
+       "amount": true,
+       "needs_mechanic": "faster_in_hills",
+       "source": "own value, unverified"
+      },
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "player"
+       },
+       "condition": null,
+       "trigger": "passive",
+       "modifier": "route.maintenance.pct",
+       "amount": -50,
+       "source": "unciv: Nations.json, Inca"
+      },
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "player"
+       },
+       "condition": null,
+       "trigger": "passive",
+       "modifier": "trait.no_hills_improvement_maintenance",
+       "amount": true,
+       "needs_mechanic": "no_hills_improvement_maintenance",
+       "source": "own value, unverified"
+      }
+     ]
+    }
+   ],
+   "unique_units": [
+    "core:unit/slinger"
+   ],
+   "unique_buildings": [],
+   "unique_improvements": [
+    "core:improvement/terrace-farm"
+   ],
+   "start_bias": {
+    "region_priority": [
+     "hills"
+    ]
+   },
+   "free_techs": [
+    "core:tech/agriculture"
+   ],
+   "free_units": [
+    {
+     "unit": "core:unit/settler",
+     "count": 1
+    }
+   ],
+   "preferred_religion": [
+    "core:religion/catholicism"
+   ],
+   "art_slug": "inca",
+   "provenance": "unciv: Nations.json, Inca",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:nation/spain",
+   "name": "Spain",
+   "adjective": "Spanish",
+   "leader": {
+    "id": "core:leader/isabella",
+    "name": "Isabella"
+   },
+   "ability": [
+    {
+     "id": "core:trait/seven-cities",
+     "name": "Seven Cities of Gold",
+     "effects": [
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "player"
+       },
+       "condition": null,
+       "trigger": "on_discover_natural_wonder",
+       "modifier": "gold.on_discover_natural_wonder_first",
+       "amount": 500,
+       "source": "unciv: Nations.json, Spain"
+      },
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "player"
+       },
+       "condition": null,
+       "trigger": "on_discover_natural_wonder",
+       "modifier": "gold.on_discover_natural_wonder",
+       "amount": 100,
+       "source": "unciv: Nations.json, Spain"
+      },
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "tiles_of_player"
+       },
+       "condition": {
+        "tile": "natural_wonder"
+       },
+       "trigger": "passive",
+       "modifier": "tile.yield.any.pct",
+       "amount": 100,
+       "source": "unciv: Nations.json, Spain"
+      },
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "player"
+       },
+       "condition": null,
+       "trigger": "passive",
+       "modifier": "happiness.natural_wonders.pct",
+       "amount": 100,
+       "source": "own value, unverified"
+      }
+     ]
+    }
+   ],
+   "unique_units": [
+    "core:unit/tercio",
+    "core:unit/conquistador"
+   ],
+   "unique_buildings": [],
+   "unique_improvements": [],
+   "start_bias": {
+    "coastal": true
+   },
+   "free_techs": [
+    "core:tech/agriculture"
+   ],
+   "free_units": [
+    {
+     "unit": "core:unit/settler",
+     "count": 1
+    }
+   ],
+   "preferred_religion": [
+    "core:religion/catholicism"
+   ],
+   "art_slug": "spain",
+   "provenance": "unciv: Nations.json, Spain",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:nation/polynesia",
+   "name": "Polynesia",
+   "adjective": "Polynesian",
+   "leader": {
+    "id": "core:leader/kamehameha",
+    "name": "Kamehameha"
+   },
+   "ability": [
+    {
+     "id": "core:trait/wayfinding",
+     "name": "Wayfinding",
+     "effects": [
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "player"
+       },
+       "condition": null,
+       "trigger": "passive",
+       "modifier": "trait.embarked_all_water",
+       "amount": true,
+       "needs_mechanic": "embarked_all_water",
+       "source": "own value, unverified"
+      },
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "all_units"
+       },
+       "condition": {
+        "near_improvement": "see combat_bonus_improvement/nearby_improvement_bonus_range"
+       },
+       "trigger": "passive",
+       "modifier": "combat.strength.pct",
+       "amount": 10,
+       "source": "own value, unverified",
+       "tag": "nearby_improvement_combat_bonus"
+      },
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "player"
+       },
+       "condition": null,
+       "trigger": "passive",
+       "modifier": "trait.nearby_improvement_bonus_range",
+       "amount": 2,
+       "needs_mechanic": "nearby_improvement_bonus_range",
+       "source": "own value, unverified",
+       "tag": "nearby_improvement_bonus_range"
+      },
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "player"
+       },
+       "condition": null,
+       "trigger": "passive",
+       "modifier": "trait.combat_bonus_improvement",
+       "amount": 1,
+       "target": "core:improvement/moai",
+       "source": "own value, unverified",
+       "tag": "combat_bonus_improvement"
+      }
+     ]
+    }
+   ],
+   "unique_units": [
+    "core:unit/maori-warrior"
+   ],
+   "unique_buildings": [],
+   "unique_improvements": [
+    "core:improvement/moai"
+   ],
+   "start_bias": {
+    "coastal": true
+   },
+   "free_techs": [
+    "core:tech/agriculture"
+   ],
+   "free_units": [
+    {
+     "unit": "core:unit/settler",
+     "count": 1
+    }
+   ],
+   "preferred_religion": [
+    "core:religion/catholicism"
+   ],
+   "art_slug": "polynesia",
+   "provenance": "unciv: Nations.json, Polynesia",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:nation/denmark",
+   "name": "Denmark",
+   "adjective": "Danish",
+   "leader": {
+    "id": "core:leader/harald-bluetooth",
+    "name": "Harald Bluetooth"
+   },
+   "ability": [
+    {
+     "id": "core:trait/viking-fury",
+     "name": "Viking Fury",
+     "effects": [
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "all_units"
+       },
+       "condition": null,
+       "trigger": "passive",
+       "modifier": "unit.embarked_moves.flat",
+       "amount": 1,
+       "source": "unciv: Nations.json, Denmark"
+      },
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "player"
+       },
+       "condition": null,
+       "trigger": "passive",
+       "modifier": "trait.embarked_to_land_flat_cost",
+       "amount": true,
+       "needs_mechanic": "embarked_to_land_flat_cost",
+       "source": "own value, unverified"
+      },
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "all_units",
+        "filter": {
+         "unit_combat": "core:unit-combat/melee",
+         "promotion": "core:promotion/free-pillage-moves"
+        }
+       },
+       "condition": null,
+       "trigger": "passive",
+       "modifier": "grant.promotion",
+       "amount": 1,
+       "source": "own value, unverified"
+      },
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "all_units",
+        "filter": {
+         "unit_combat": "core:unit-combat/mounted",
+         "promotion": "core:promotion/free-pillage-moves"
+        }
+       },
+       "condition": null,
+       "trigger": "passive",
+       "modifier": "grant.promotion",
+       "amount": 1,
+       "source": "own value, unverified"
+      },
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "all_units",
+        "filter": {
+         "unit_combat": "core:unit-combat/recon",
+         "promotion": "core:promotion/free-pillage-moves"
+        }
+       },
+       "condition": null,
+       "trigger": "passive",
+       "modifier": "grant.promotion",
+       "amount": 1,
+       "source": "own value, unverified"
+      },
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "all_units",
+        "filter": {
+         "unit_combat": "core:unit-combat/armor",
+         "promotion": "core:promotion/free-pillage-moves"
+        }
+       },
+       "condition": null,
+       "trigger": "passive",
+       "modifier": "grant.promotion",
+       "amount": 1,
+       "source": "own value, unverified"
+      }
+     ]
+    }
+   ],
+   "unique_units": [
+    "core:unit/berserker",
+    "core:unit/norwegian-ski-infantry"
+   ],
+   "unique_buildings": [],
+   "unique_improvements": [],
+   "start_bias": {
+    "coastal": true
+   },
+   "free_techs": [
+    "core:tech/agriculture"
+   ],
+   "free_units": [
+    {
+     "unit": "core:unit/settler",
+     "count": 1
+    }
+   ],
+   "preferred_religion": [
+    "core:religion/catholicism"
+   ],
+   "art_slug": "denmark",
+   "provenance": "unciv: Nations.json, Denmark",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:nation/korea",
+   "name": "Korea",
+   "adjective": "Korean",
+   "leader": {
+    "id": "core:leader/sejong",
+    "name": "Sejong"
+   },
+   "ability": [
+    {
+     "id": "core:trait/scholars-jade-hall",
+     "name": "Scholars of the Jade Hall",
+     "effects": [
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "player"
+       },
+       "condition": null,
+       "trigger": "passive",
+       "modifier": "trait.tech_boost_from_capital_science_buildings",
+       "amount": true,
+       "needs_mechanic": "tech_boost_from_capital_science_buildings",
+       "source": "own value, unverified"
+      },
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "tiles_of_player",
+        "filter": {
+         "improvement": "core:improvement/academy"
+        }
+       },
+       "condition": null,
+       "trigger": "passive",
+       "modifier": "tile.yield.science.flat",
+       "amount": 2,
+       "source": "unciv: Nations.json, Korea"
+      },
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "tiles_of_player",
+        "filter": {
+         "improvement": "core:improvement/customs-house"
+        }
+       },
+       "condition": null,
+       "trigger": "passive",
+       "modifier": "tile.yield.science.flat",
+       "amount": 2,
+       "source": "unciv: Nations.json, Korea"
+      },
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "tiles_of_player",
+        "filter": {
+         "improvement": "core:improvement/manufactory"
+        }
+       },
+       "condition": null,
+       "trigger": "passive",
+       "modifier": "tile.yield.science.flat",
+       "amount": 2,
+       "source": "unciv: Nations.json, Korea"
+      },
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "tiles_of_player",
+        "filter": {
+         "improvement": "core:improvement/citadel"
+        }
+       },
+       "condition": null,
+       "trigger": "passive",
+       "modifier": "tile.yield.science.flat",
+       "amount": 2,
+       "source": "unciv: Nations.json, Korea"
+      },
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "tiles_of_player",
+        "filter": {
+         "improvement": "core:improvement/landmark"
+        }
+       },
+       "condition": null,
+       "trigger": "passive",
+       "modifier": "tile.yield.science.flat",
+       "amount": 2,
+       "source": "unciv: Nations.json, Korea"
+      },
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "tiles_of_player",
+        "filter": {
+         "improvement": "core:improvement/holy-site"
+        }
+       },
+       "condition": null,
+       "trigger": "passive",
+       "modifier": "tile.yield.science.flat",
+       "amount": 2,
+       "source": "unciv: Nations.json, Korea"
+      },
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "specialists_of_player",
+        "filter": {
+         "specialist": "core:specialist/artist"
+        }
+       },
+       "condition": null,
+       "trigger": "passive",
+       "modifier": "specialist.yield.science.flat",
+       "amount": 2,
+       "source": "unciv: Nations.json, Korea"
+      },
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "specialists_of_player",
+        "filter": {
+         "specialist": "core:specialist/scientist"
+        }
+       },
+       "condition": null,
+       "trigger": "passive",
+       "modifier": "specialist.yield.science.flat",
+       "amount": 2,
+       "source": "unciv: Nations.json, Korea"
+      },
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "specialists_of_player",
+        "filter": {
+         "specialist": "core:specialist/merchant"
+        }
+       },
+       "condition": null,
+       "trigger": "passive",
+       "modifier": "specialist.yield.science.flat",
+       "amount": 2,
+       "source": "unciv: Nations.json, Korea"
+      },
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "specialists_of_player",
+        "filter": {
+         "specialist": "core:specialist/engineer"
+        }
+       },
+       "condition": null,
+       "trigger": "passive",
+       "modifier": "specialist.yield.science.flat",
+       "amount": 2,
+       "source": "unciv: Nations.json, Korea"
+      },
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "specialists_of_player",
+        "filter": {
+         "specialist": "core:specialist/writer"
+        }
+       },
+       "condition": null,
+       "trigger": "passive",
+       "modifier": "specialist.yield.science.flat",
+       "amount": 2,
+       "source": "unciv: Nations.json, Korea"
+      },
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "specialists_of_player",
+        "filter": {
+         "specialist": "core:specialist/musician"
+        }
+       },
+       "condition": null,
+       "trigger": "passive",
+       "modifier": "specialist.yield.science.flat",
+       "amount": 2,
+       "source": "unciv: Nations.json, Korea"
+      }
+     ]
+    }
+   ],
+   "unique_units": [
+    "core:unit/turtle-ship",
+    "core:unit/hwach-a"
+   ],
+   "unique_buildings": [],
+   "unique_improvements": [],
+   "start_bias": {
+    "coastal": true
+   },
+   "free_techs": [
+    "core:tech/agriculture"
+   ],
+   "free_units": [
+    {
+     "unit": "core:unit/settler",
+     "count": 1
+    }
+   ],
+   "preferred_religion": [
+    "core:religion/confucianism"
+   ],
+   "art_slug": "korea",
+   "provenance": "unciv: Nations.json, Korea",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:nation/austria",
+   "name": "Austria",
+   "adjective": "Austrian",
+   "leader": {
+    "id": "core:leader/maria-theresa",
+    "name": "Maria Theresa"
+   },
+   "ability": [
+    {
+     "id": "core:trait/annex-city-state",
+     "name": "Diplomatic Marriage",
+     "effects": [
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "player"
+       },
+       "condition": null,
+       "trigger": "passive",
+       "modifier": "trait.able_to_annex_city_states",
+       "amount": true,
+       "needs_mechanic": "able_to_annex_city_states",
+       "source": "own value, unverified"
+      }
+     ],
+     "source": "own value, unverified"
+    }
+   ],
+   "unique_units": [
+    "core:unit/hussar"
+   ],
+   "unique_buildings": [
+    "core:building/coffee_house"
+   ],
+   "unique_improvements": [],
+   "start_bias": {
+    "region_priority": [
+     "hills"
+    ]
+   },
+   "free_techs": [
+    "core:tech/agriculture"
+   ],
+   "free_units": [
+    {
+     "unit": "core:unit/settler",
+     "count": 1
+    }
+   ],
+   "preferred_religion": [
+    "core:religion/catholicism"
+   ],
+   "art_slug": "austria",
+   "source": "own value, unverified",
+   "provenance": "unciv: Nations.json, Austria",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:nation/byzantium",
+   "name": "Byzantium",
+   "adjective": "Byzantine",
+   "leader": {
+    "id": "core:leader/theodora",
+    "name": "Theodora"
+   },
+   "ability": [
+    {
+     "id": "core:trait/extra-belief",
+     "name": "Patriarchate of Constantinople",
+     "effects": [
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "player"
+       },
+       "condition": null,
+       "trigger": "passive",
+       "modifier": "trait.bonus_religious_belief",
+       "amount": true,
+       "needs_mechanic": "bonus_religious_belief",
+       "source": "own value, unverified"
+      }
+     ],
+     "source": "own value, unverified"
+    }
+   ],
+   "unique_units": [
+    "core:unit/dromon",
+    "core:unit/cataphract"
+   ],
+   "unique_buildings": [],
+   "unique_improvements": [],
+   "start_bias": {
+    "coastal": true
+   },
+   "free_techs": [
+    "core:tech/agriculture"
+   ],
+   "free_units": [
+    {
+     "unit": "core:unit/settler",
+     "count": 1
+    }
+   ],
+   "preferred_religion": [
+    "core:religion/eastern-orthodoxy",
+    "core:religion/eastern-orthodoxy"
+   ],
+   "art_slug": "byzantium",
+   "source": "own value, unverified",
+   "provenance": "unciv: Nations.json, Byzantium",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:nation/carthage",
+   "name": "Carthage",
+   "adjective": "Carthaginian",
+   "leader": {
+    "id": "core:leader/dido",
+    "name": "Dido"
+   },
+   "ability": [
+    {
+     "id": "core:trait/phoenician-heritage",
+     "name": "Phoenician Heritage",
+     "effects": [
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "player"
+       },
+       "condition": null,
+       "trigger": "passive",
+       "modifier": "trait.crosses_mountains_after_great_general",
+       "amount": true,
+       "needs_mechanic": "crosses_mountains_after_great_general",
+       "source": "own value, unverified"
+      },
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "player"
+       },
+       "condition": null,
+       "trigger": "passive",
+       "modifier": "trait.free_building",
+       "amount": 1,
+       "target": "core:building/harbor",
+       "source": "own value, unverified"
+      }
+     ],
+     "source": "own value, unverified"
+    }
+   ],
+   "unique_units": [
+    "core:unit/african-forest-elephant",
+    "core:unit/quinquereme"
+   ],
+   "unique_buildings": [],
+   "unique_improvements": [],
+   "start_bias": {
+    "coastal": true
+   },
+   "free_techs": [
+    "core:tech/agriculture"
+   ],
+   "free_units": [
+    {
+     "unit": "core:unit/settler",
+     "count": 1
+    }
+   ],
+   "preferred_religion": [
+    "core:religion/islam"
+   ],
+   "art_slug": "carthage",
+   "source": "own value, unverified",
+   "provenance": "unciv: Nations.json, Carthage",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:nation/celts",
+   "name": "The Celts",
+   "adjective": "Celtic",
+   "leader": {
+    "id": "core:leader/boudicca",
+    "name": "Boudicca"
+   },
+   "ability": [
+    {
+     "id": "core:trait/faith-from-nature",
+     "name": "Druidic Lore",
+     "effects": [
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "player"
+       },
+       "condition": null,
+       "trigger": "passive",
+       "modifier": "trait.faith_from_unimproved_forest",
+       "amount": true,
+       "needs_mechanic": "faith_from_unimproved_forest",
+       "source": "own value, unverified"
+      }
+     ],
+     "source": "own value, unverified"
+    }
+   ],
+   "unique_units": [
+    "core:unit/pictish-warrior"
+   ],
+   "unique_buildings": [
+    "core:building/ceilidh_hall"
+   ],
+   "unique_improvements": [],
+   "start_bias": {
+    "region_priority": [
+     "forest"
+    ]
+   },
+   "free_techs": [
+    "core:tech/agriculture"
+   ],
+   "free_units": [
+    {
+     "unit": "core:unit/settler",
+     "count": 1
+    }
+   ],
+   "preferred_religion": [
+    "core:religion/catholicism"
+   ],
+   "art_slug": "celts",
+   "source": "own value, unverified",
+   "provenance": "unciv: Nations.json, Celts",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:nation/huns",
+   "name": "The Huns",
+   "adjective": "Hunnic",
+   "leader": {
+    "id": "core:leader/attila",
+    "name": "Attila"
+   },
+   "ability": [
+    {
+     "id": "core:trait/raze-and-horses",
+     "name": "Scourge of God",
+     "effects": [
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "player"
+       },
+       "condition": null,
+       "trigger": "passive",
+       "modifier": "trait.raze_speed_modifier",
+       "amount": 100,
+       "needs_mechanic": "raze_speed_modifier",
+       "source": "unciv: Nations.json, The Huns"
+      },
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "tiles_of_player",
+        "filter": {
+         "improvement": "core:improvement/pasture"
+        }
+       },
+       "condition": null,
+       "trigger": "passive",
+       "modifier": "tile.yield.production.flat",
+       "amount": 1,
+       "source": "unciv: Nations.json, The Huns"
+      }
+     ],
+     "source": "own value, unverified"
+    }
+   ],
+   "unique_units": [
+    "core:unit/horse-archer",
+    "core:unit/battering-ram"
+   ],
+   "unique_buildings": [],
+   "unique_improvements": [],
+   "start_bias": {
+    "region_avoid": [
+     "forest",
+     "jungle"
+    ]
+   },
+   "free_techs": [
+    "core:tech/agriculture",
+    "core:tech/animal-husbandry"
+   ],
+   "free_units": [
+    {
+     "unit": "core:unit/settler",
+     "count": 1
+    }
+   ],
+   "preferred_religion": [
+    "core:religion/tengriism"
+   ],
+   "art_slug": "huns",
+   "source": "own value, unverified",
+   "provenance": "unciv: Nations.json, The Huns",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:nation/maya",
+   "name": "The Maya",
+   "adjective": "Mayan",
+   "leader": {
+    "id": "core:leader/pacal",
+    "name": "Pacal"
+   },
+   "ability": [
+    {
+     "id": "core:trait/long-count",
+     "name": "The Long Count",
+     "effects": [
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "player"
+       },
+       "condition": null,
+       "trigger": "passive",
+       "modifier": "trait.maya_calendar_bonuses",
+       "amount": true,
+       "needs_mechanic": "maya_calendar_bonuses",
+       "source": "own value, unverified"
+      }
+     ],
+     "source": "own value, unverified"
+    }
+   ],
+   "unique_units": [
+    "core:unit/atlatlist"
+   ],
+   "unique_buildings": [
+    "core:building/pyramid"
+   ],
+   "unique_improvements": [],
+   "start_bias": {
+    "none": true
+   },
+   "free_techs": [
+    "core:tech/agriculture"
+   ],
+   "free_units": [
+    {
+     "unit": "core:unit/settler",
+     "count": 1
+    }
+   ],
+   "preferred_religion": [
+    "core:religion/catholicism"
+   ],
+   "art_slug": "maya",
+   "source": "own value, unverified",
+   "provenance": "unciv: Nations.json, The Maya",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:nation/netherlands",
+   "name": "The Netherlands",
+   "adjective": "Dutch",
+   "leader": {
+    "id": "core:leader/william",
+    "name": "William"
+   },
+   "ability": [
+    {
+     "id": "core:trait/luxury-retention",
+     "name": "Dutch East India Company",
+     "effects": [
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "player"
+       },
+       "condition": null,
+       "trigger": "passive",
+       "modifier": "trait.luxury_happiness_retention",
+       "amount": 50,
+       "needs_mechanic": "luxury_happiness_retention",
+       "source": "unciv: Nations.json, The Netherlands"
+      }
+     ],
+     "source": "own value, unverified"
+    }
+   ],
+   "unique_units": [
+    "core:unit/sea-beggar"
+   ],
+   "unique_buildings": [],
+   "unique_improvements": [
+    "core:improvement/polder"
+   ],
+   "start_bias": {
+    "region_priority": [
+     "grass"
+    ]
+   },
+   "free_techs": [
+    "core:tech/agriculture"
+   ],
+   "free_units": [
+    {
+     "unit": "core:unit/settler",
+     "count": 1
+    }
+   ],
+   "preferred_religion": [
+    "core:religion/protestantism",
+    "core:religion/protestantism"
+   ],
+   "art_slug": "netherlands",
+   "source": "own value, unverified",
+   "provenance": "unciv: Nations.json, The Netherlands",
+   "unciv_fields": []
+  },
+  {
+   "id": "core:nation/sweden",
+   "name": "Sweden",
+   "adjective": "Swedish",
+   "leader": {
+    "id": "core:leader/gustavus-adolphus",
+    "name": "Gustavus Adolphus"
+   },
+   "ability": [
+    {
+     "id": "core:trait/diplomacy-great-people",
+     "name": "Nobel Prize",
+     "effects": [
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "player"
+       },
+       "condition": null,
+       "trigger": "passive",
+       "modifier": "trait.great_person_gift_influence",
+       "amount": 90,
+       "needs_mechanic": "great_person_gift_influence",
+       "source": "unciv: Nations.json, Sweden"
+      },
+      {
+       "scope": "player",
+       "selector": {
+        "kind": "player"
+       },
+       "condition": null,
+       "trigger": "passive",
+       "modifier": "trait.dof_great_person_modifier",
+       "amount": 10,
+       "needs_mechanic": "dof_great_person_modifier",
+       "source": "unciv: Nations.json, Sweden"
+      }
+     ],
+     "source": "own value, unverified"
+    }
+   ],
+   "unique_units": [
+    "core:unit/carolean",
+    "core:unit/hakkapeliitta"
+   ],
+   "unique_buildings": [],
+   "unique_improvements": [],
+   "start_bias": {
+    "region_priority": [
+     "tundra"
+    ]
+   },
+   "free_techs": [
+    "core:tech/agriculture"
+   ],
+   "free_units": [
+    {
+     "unit": "core:unit/settler",
+     "count": 1
+    }
+   ],
+   "preferred_religion": [
+    "core:religion/protestantism",
+    "core:religion/protestantism"
+   ],
+   "art_slug": "sweden",
+   "source": "own value, unverified",
+   "provenance": "unciv: Nations.json, Sweden",
+   "unciv_fields": []
+  }
+ ],
+ "notice": "Derived from Unciv (https://github.com/yairm210/Unciv), MPL-2.0: rule fields of the entries marked `unciv:` come from Unciv's `Gods & Kings` JSON files at commit 18827b1f; entries marked `own value, unverified` have no Unciv counterpart. Listed per file in classic/docs/classic/UNCIV-ATTRIBUTION.md."
+}

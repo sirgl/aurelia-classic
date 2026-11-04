@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<!-- Mobile mode rewrites this tag (mode.js): no pinch zoom of the page, content under the notch. -->
+<meta name="viewport" id="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Aurelia</title>
+<meta name="description" content="Aurelia: a turn-based strategy game inspired by Unciv, in the browser.">
+<meta name="theme-color" content="#0b1418">
+<meta name="color-scheme" content="dark">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Aurelia">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="format-detection" content="telephone=no">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="48x48" href="icons/favicon.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<script src="mode.js"></script>
+<script src="report.js"></script>
+<script src="storage.js"></script>
+<style>
+  html, body { margin: 0; height: 100%; background: #0b1418; color: #cfe0dc; font-family: system-ui, sans-serif; overflow: hidden; overscroll-behavior: none; }
+  canvas { display: block; width: 100vw; height: 100vh; outline: none; }
+  #overlay { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; background: #0b1418; padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
+  #overlay.done { display: none; }
+  #bar { width: min(420px, 70vw); height: 6px; background: #1d2f35; border-radius: 3px; overflow: hidden; }
+  #fill { height: 100%; width: 0; background: #6fb3a5; transition: width .15s; }
+  #failure { max-width: 70ch; color: #f0b3a8; text-align: center; white-space: pre-wrap; }
+  #retry { display: none; font: inherit; font-size: 16px; min-height: 44px; padding: 0 24px; border-radius: 22px; border: 0; background: #6fb3a5; color: #0b1418; }
+  #overlay.failed #retry { display: inline-block; }
+  #play { display: none; font: inherit; font-size: 18px; min-height: 48px; padding: 0 28px; border-radius: 24px; border: 0; background: #6fb3a5; color: #0b1418; }
+  #overlay.ready #bar { display: none; }
+  #overlay.ready #play { display: inline-block; }
+  #modes { margin-top: 8px; font-size: 14px; color: #8fa7a2; text-align: center; }
+  #modes a { color: #9fd0c4; padding: 12px 6px; display: inline-block; }
+  #skip { display: none; }
+  #overlay.ready #skip { display: inline-block; }
+  .nojs { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; background: #0b1418; text-align: center; padding: 16px; z-index: 10; }
+  .nojs a { color: #9fd0c4; }
+  /* Mobile mode: the page never scrolls, zooms or selects; the canvas follows the visible area. */
+  html[data-mode="mobile"] body { position: fixed; inset: 0; width: 100%; touch-action: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
+  html[data-mode="mobile"] canvas { position: fixed; left: 0; top: var(--top, 0px); width: 100%; height: var(--vh, 100dvh); touch-action: none; }
+  /* A phone held upright: the game is played sideways, so a full-screen notice stands over everything (even a running
+     game: it only covers it, nothing pauses). A tablet (600 CSS px and wider) plays upright and keeps the hint bar. */
+  #rotate { display: none; position: fixed; inset: 0; z-index: 20; box-sizing: border-box; flex-direction: column; align-items: center; justify-content: center; gap: 14px; text-align: center; background: #0b1418; color: #cfe0dc; touch-action: none;
+    padding: max(24px, env(safe-area-inset-top)) max(24px, env(safe-area-inset-right)) max(24px, env(safe-area-inset-bottom)) max(24px, env(safe-area-inset-left)); }
+  #rotate svg { width: 96px; height: 96px; color: #6fb3a5; animation: turn 2.6s ease-in-out infinite; }
+  #rotate-title { font-size: 24px; line-height: 1.25; font-weight: 600; color: #efe9d3; }
+  #rotate-body { font-size: 17px; line-height: 1.4; max-width: 28ch; color: #9fb4b0; }
+  #rotate-play { display: none; font: inherit; font-size: 18px; min-height: 48px; padding: 0 28px; margin-top: 8px; border-radius: 24px; border: 0; background: #6fb3a5; color: #0b1418; }
+  #rotate.can-play #rotate-play { display: inline-block; }
+  :root:fullscreen #rotate-play { display: none !important; }
+  @keyframes turn { 0%, 20% { transform: rotate(0); } 55%, 80% { transform: rotate(-90deg); } 100% { transform: rotate(-90deg); } }
+  @media (prefers-reduced-motion: reduce) { #rotate svg { animation: none; transform: rotate(-90deg); } }
+  @media (orientation: portrait) and (max-width: 599px) { html[data-mode="mobile"] #rotate { display: flex; } }
+  #hint { display: none; position: fixed; z-index: 5; left: 0; right: 0; top: 0; align-items: center; justify-content: space-between; gap: 8px; box-sizing: border-box; padding: max(4px, env(safe-area-inset-top)) 8px 4px 16px; min-height: 36px; background: #1d2f35; color: #cfe0dc; font-size: 13px; }
+  html[data-mode="mobile"] #hint:not([hidden]) { display: flex; }
+  #hint button { font: inherit; font-size: 20px; line-height: 1; min-width: 44px; min-height: 36px; background: none; border: 0; color: inherit; }
+</style>
+</head>
+<body>
+<canvas id="canvas" tabindex="0"></canvas>
+<div id="rotate" role="alert" aria-live="polite"><svg viewBox="0 0 96 96" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="28" y="8" width="40" height="80" rx="7"/><path d="M44 78h8"/></svg><div id="rotate-title">Rotate your phone</div><div id="rotate-body"></div><button id="rotate-play" type="button"></button></div>
+<div id="hint" hidden><span></span><button type="button" aria-label="Close">&times;</button></div>
+<div id="overlay"><div id="status">Loading</div><div id="bar" role="progressbar" aria-valuemin="0" aria-valuemax="100"><div id="fill"></div></div><button id="play" type="button"></button><a id="skip" href="#" style="color:#8fa7a2;font-size:14px;padding:12px"></a><div id="failure"></div><button id="retry" type="button"></button><div id="modes"></div></div>
+<noscript><div class="nojs">
+  <div>Aurelia runs in the browser and needs JavaScript and WebAssembly. Please turn JavaScript on for this page.</div>
+  <div><a href="?mode=desktop">Desktop version</a> &middot; <a href="?mode=mobile">Phone and tablet version</a></div>
+</div></noscript>
+<script type="module">
+import { mark, drain, tracing } from "./trace.js";
+import { createArt } from "./art.js";
+import { createLoader, LoadError } from "./loader.js";
+
+// The page's own few words, in the browser's language (the game has its own language setting).
+const TEXT = {
+  en: { rotateTitle: "Rotate your phone", rotateBody: "Aurelia is played with the phone held sideways.", loading: "Loading", engine: "Loading the engine", index: "Loading the art index", art: "Loading the art", gpu: "Opening the GPU", failed: "Aurelia cannot start", play: "Play fullscreen", browser: "Play in the browser", rotate: "The game is easier to play with the phone turned sideways.", mobile: "Phone and tablet mode", desktop: "Desktop mode", toDesktop: "Switch to desktop mode", toMobile: "Switch to phone and tablet mode", close: "Close" },
+  ru: { rotateTitle: "Поверните телефон", rotateBody: "Aurelia играется с телефоном в горизонтальном положении.", loading: "\u0417\u0430\u0433\u0440\u0443\u0437\u043a\u0430", engine: "\u0417\u0430\u0433\u0440\u0443\u0437\u043a\u0430 \u0434\u0432\u0438\u0436\u043a\u0430", index: "\u0417\u0430\u0433\u0440\u0443\u0437\u043a\u0430 \u0441\u043f\u0438\u0441\u043a\u0430 \u043a\u0430\u0440\u0442\u0438\u043d\u043e\u043a", art: "\u0417\u0430\u0433\u0440\u0443\u0437\u043a\u0430 \u043a\u0430\u0440\u0442\u0438\u043d\u043e\u043a", gpu: "\u0417\u0430\u043f\u0443\u0441\u043a \u0432\u0438\u0434\u0435\u043e\u043a\u0430\u0440\u0442\u044b", failed: "Aurelia \u043d\u0435 \u0437\u0430\u043f\u0443\u0441\u043a\u0430\u0435\u0442\u0441\u044f", play: "\u0418\u0433\u0440\u0430\u0442\u044c \u043d\u0430 \u0432\u0435\u0441\u044c \u044d\u043a\u0440\u0430\u043d", browser: "\u0418\u0433\u0440\u0430\u0442\u044c \u0432 \u0431\u0440\u0430\u0443\u0437\u0435\u0440\u0435", rotate: "\u0412 \u0438\u0433\u0440\u0443 \u0443\u0434\u043e\u0431\u043d\u0435\u0435 \u0438\u0433\u0440\u0430\u0442\u044c, \u043f\u043e\u0432\u0435\u0440\u043d\u0443\u0432 \u0442\u0435\u043b\u0435\u0444\u043e\u043d \u043d\u0430\u0431\u043e\u043a.", mobile: "\u0420\u0435\u0436\u0438\u043c \u0434\u043b\u044f \u0442\u0435\u043b\u0435\u0444\u043e\u043d\u0430 \u0438 \u043f\u043b\u0430\u043d\u0448\u0435\u0442\u0430", desktop: "\u0420\u0435\u0436\u0438\u043c \u0434\u043b\u044f \u043a\u043e\u043c\u043f\u044c\u044e\u0442\u0435\u0440\u0430", toDesktop: "\u0412\u043a\u043b\u044e\u0447\u0438\u0442\u044c \u0440\u0435\u0436\u0438\u043c \u0434\u043b\u044f \u043a\u043e\u043c\u043f\u044c\u044e\u0442\u0435\u0440\u0430", toMobile: "\u0412\u043a\u043b\u044e\u0447\u0438\u0442\u044c \u0440\u0435\u0436\u0438\u043c \u0434\u043b\u044f \u0442\u0435\u043b\u0435\u0444\u043e\u043d\u0430 \u0438 \u043f\u043b\u0430\u043d\u0448\u0435\u0442\u0430", close: "\u0417\u0430\u043a\u0440\u044b\u0442\u044c" },
+  de: { rotateTitle: "Handy drehen", rotateBody: "Aurelia wird im Querformat gespielt.", loading: "Lädt", engine: "Spiel wird geladen", index: "Bilderliste wird geladen", art: "Bilder werden geladen", gpu: "Grafikkarte wird geöffnet", failed: "Aurelia kann nicht starten", play: "Im Vollbild spielen", browser: "Im Browser spielen", rotate: "Das Spiel lässt sich quer besser spielen.", mobile: "Modus für Handy und Tablet", desktop: "Desktop-Modus", toDesktop: "Zum Desktop-Modus wechseln", toMobile: "Zum Handy-Modus wechseln", close: "Schließen" },
+  fr: { rotateTitle: "Tournez votre téléphone", rotateBody: "Aurelia se joue en mode paysage, le téléphone à l'horizontale.", loading: "Chargement", engine: "Chargement du moteur", index: "Chargement de l'index des images", art: "Chargement des images", gpu: "Ouverture du GPU", failed: "Aurelia ne peut pas démarrer", play: "Jouer en plein écran", browser: "Jouer dans le navigateur", rotate: "Le jeu se joue mieux en tenant le téléphone à l'horizontale.", mobile: "Mode téléphone et tablette", desktop: "Mode ordinateur", toDesktop: "Passer au mode ordinateur", toMobile: "Passer au mode téléphone", close: "Fermer" },
+  es: { rotateTitle: "Gira el móvil", rotateBody: "Aurelia se juega con el móvil en horizontal.", loading: "Cargando", engine: "Cargando el motor", index: "Cargando el índice de imágenes", art: "Cargando las imágenes", gpu: "Abriendo la GPU", failed: "Aurelia no puede iniciarse", play: "Jugar a pantalla completa", browser: "Jugar en el navegador", rotate: "El juego se maneja mejor con el móvil en horizontal.", mobile: "Modo móvil y tableta", desktop: "Modo ordenador", toDesktop: "Cambiar al modo ordenador", toMobile: "Cambiar al modo móvil", close: "Cerrar" },
+  ja: { rotateTitle: "スマートフォンを横向きにしてください", rotateBody: "Aureliaは横向きの画面でプレイします。", loading: "読み込み中", engine: "エンジンを読み込み中", index: "画像の一覧を読み込み中", art: "画像を読み込み中", gpu: "GPUを起動中", failed: "Aureliaを起動できません", play: "全画面でプレイ", browser: "ブラウザでプレイ", rotate: "スマートフォンを横向きにすると遊びやすくなります。", mobile: "スマホ・タブレット用モード", desktop: "パソコン用モード", toDesktop: "パソコン用モードに切り替える", toMobile: "スマホ用モードに切り替える", close: "閉じる" },
+  zh: { rotateTitle: "请旋转手机", rotateBody: "请将手机横过来玩 Aurelia。", loading: "加载中", engine: "正在加载引擎", index: "正在加载图片索引", art: "正在加载图片", gpu: "正在启动显卡", failed: "Aurelia 无法启动", play: "全屏游玩", browser: "在浏览器中游玩", rotate: "横屏握持手机时更容易游玩。", mobile: "手机和平板模式", desktop: "桌面模式", toDesktop: "切换到桌面模式", toMobile: "切换到手机模式", close: "关闭" },
+};
+const language = (navigator.languages && navigator.languages[0] || navigator.language || "en").toLowerCase().split("-")[0];
+const text = TEXT[language] || TEXT.en;
+document.documentElement.lang = TEXT[language] ? language : "en";
+
+const $ = (id) => document.getElementById(id);
+const mode = window.aureliaMode;
+const mobile = mode.mode === "mobile";
+const status = (message, share) => {
+  $("status").textContent = message;
+  if (share !== undefined) $("fill").style.width = `${Math.round(share * 100)}%`;
+};
+const fail = (message) => {
+  $("failure").textContent = message;
+  status(text.failed);
+};
+status(text.loading);
+
+// The way to the other mode: a plain link (works with a middle click too) that also remembers the choice.
+const other = mobile ? "desktop" : "mobile";
+$("modes").innerHTML = "";
+{
+  const name = document.createElement("div");
+  name.textContent = mobile ? text.mobile : text.desktop;
+  const link = document.createElement("a");
+  link.href = mode.url(other);
+  link.textContent = mobile ? text.toDesktop : text.toMobile;
+  link.addEventListener("click", (event) => { event.preventDefault(); mode.switchTo(other); });
+  $("modes").append(name, link);
+}
+$("hint").querySelector("button").setAttribute("aria-label", text.close);
+$("rotate-title").textContent = text.rotateTitle;
+$("rotate-body").textContent = text.rotateBody;
+
+// Where the art lives: the page's own `assets/` folder, or any origin that serves the same
+// tree with CORS (GET from this page's origin), e.g. ?assets=https://art.example.com/v3/
+const custom = new URLSearchParams(location.search).get("assets");
+const base = custom || "assets/";
+let suffix = "";  // "?v=<art version>" (sizes.json): the art keeps its names, a new release must not meet an old cached picture
+const fetched = { files: 0, bytes: 0, failed: 0 };
+let api = null;   // the wasm's functions, once the loader has them (window.aureliaApi too, for tests and tools)
+const bytesOf = async (path) => {
+  mark("fetch", path);
+  const response = await fetch(`${base}${path}${suffix}`);
+  if (!response.ok) throw new Error(`${path}: HTTP ${response.status}`);
+  const bytes = new Uint8Array(await response.arrayBuffer());
+  mark("fetched", path, String(bytes.length));
+  return bytes;
+};
+const register = (path, bytes) => {
+  if (!bytes) { fetched.failed += 1; return; }
+  api.register_asset(path, bytes);
+  fetched.files += 1;
+  fetched.bytes += bytes.length;
+};
+const load = async (path) => {
+  try {
+    register(path, await bytesOf(path));
+  } catch (error) {
+    fetched.failed += 1;
+    console.warn(error);
+  }
+};
+// One progress bar for everything the first frame needs (loader.js): the wasm, the 3D models,
+// the atlas indexes and fonts (the fog engravings load after the menu is up). A failed download shows a retry button; only failed files are fetched again.
+$("retry").textContent = { ru: "\u041f\u043e\u0432\u0442\u043e\u0440\u0438\u0442\u044c", de: "Erneut versuchen", fr: "R\u00e9essayer", es: "Reintentar", ja: "\u518d\u8a66\u884c", zh: "\u91cd\u8bd5" }[language] || "Try again";
+const loader = createLoader((share) => {
+  if ($("overlay").classList.contains("failed")) return;  // downloads still running keep the failure message on screen
+  const percent = Math.round(share * 100);
+  $("bar").setAttribute("aria-valuenow", String(percent));
+  status(`${text.loading} ${percent}%`, share);
+});
+
+const boot = async () => {
+  const started = performance.now();
+  status(text.loading, 0);
+  const sizes = await loader.sizes();
+  window.__aureliaBuild = { wasm: sizes.wasm.file, art: sizes.art };  // which symbols file reads a panic trace (docs/web-traces.md)
+  if (!custom) suffix = `?v=${sizes.art}`;
+  // Pictures: fetched, decoded by the browser and handed over by the art service (art.js).
+  const art = window.__art ||= createArt(base, suffix);
+  art.prefetch("visual/generated/menu-v1.webp");  // the menu cover loads while the wasm compiles
+  // The manifest and the files the first frame reads (atlas indexes, fonts) do not need the engine:
+  // they are fetched while the wasm downloads and compiles, and handed over once it runs.
+  const early = (async () => {
+    const manifest = new TextDecoder().decode(await loader.bytes("manifest", `${base}manifest.tsv${suffix}`));
+    const rows = manifest.split("\n").map((line) => line.split("\t")).filter((r) => r[0]);
+    const boot = rows.filter((r) => r[0].endsWith(".tsv") || r[0].startsWith("fonts/"));
+    return { manifest, boot: boot.map((r) => r[0]), bytes: await Promise.all(boot.map((r) => loader.bytes(`art:${r[0]}`, `${base}${r[0]}${suffix}`, Number(r[1]) || 0))) };
+  })();
+  early.catch(() => {});
+  // The mobile glue is a small separate file: a desktop page never fetches it.
+  const phone = mobile ? await import("./mobile.js") : null;
+  const engine = await loader.engine(sizes);
+  const { manifest, boot: files, bytes } = await early;
+  api = window.aureliaApi = engine.api; // for tests and tools: wants_keyboard(), push_text()...
+  const wasm = engine.wasm;
+  status(text.index, 1);
+  api.set_manifest(manifest);
+  files.forEach((p, i) => { register(p, bytes[i]); });
+  status(text.gpu, 1);
+  api.offer_mode_switch(mobile);
+  phone?.prepare(api, { canvas: $("canvas"), hint: $("hint"), text });
+  await api.run("canvas");
+  loader.fog(api, sizes);  // the fog engravings come in the background, the map is fine without them
+  window.__boot = { ms: performance.now() - started, wasmBytes: wasm.memory.buffer.byteLength, bootFiles: files.length, bootBytes: fetched.bytes, mode: mode.mode, source: mode.source, sizes };
+  const overlay = $("overlay");
+  if (phone && phone.canEnterFullscreen()) {
+    // One tap for what a browser only allows from a gesture: fullscreen, landscape, screen kept on.
+    status(text.loading + " ✓");
+    $("status").textContent = "";
+    $("play").textContent = text.play;
+    $("skip").textContent = text.browser;
+    overlay.classList.add("ready");
+    const play = async () => { await phone.enterFullscreen(); phone.keepAwake(); overlay.classList.add("done"); };
+    $("play").addEventListener("click", play);
+    // Held upright, the rotate notice covers the page: its button is the same tap (fullscreen locks the screen sideways where the browser allows it).
+    $("rotate-play").textContent = text.play;
+    $("rotate").classList.add("can-play");
+    $("rotate-play").addEventListener("click", play);
+    $("skip").addEventListener("click", (event) => { event.preventDefault(); overlay.classList.add("done"); });
+  } else {
+    overlay.classList.add("done");
+    phone?.keepAwake();
+  }
+  // The game asks for pictures as screens show them; fetch what it listed.
+  const pump = async () => {
+    const wanted = Array.from(api.take_wanted());
+    if (wanted.length) (window.__pumped ||= []).push(...wanted);
+    await Promise.all(wanted.map(load));
+    window.__fetched = fetched;
+    setTimeout(pump, wanted.length ? 0 : 150);
+  };
+  pump();
+  art.bind({ register: api.register_picture, fail: api.fail_picture });
+  setInterval(() => { const rows = api.take_picture_requests(); if (rows) art.update(rows); }, 20);
+  if (tracing) setInterval(() => drain(api.take_trace), 50);
+};
+const start = async () => {
+  try {
+    await boot();
+  } catch (error) {
+    console.error(error);
+    fail(String(error && error.message ? error.message : error));
+    if (error instanceof LoadError) $("overlay").classList.add("failed");
+  }
+};
+$("retry").addEventListener("click", () => { $("overlay").classList.remove("failed"); $("failure").textContent = ""; start(); });
+start();
+</script>
+</body>
+</html>

@@ -1,0 +1,40 @@
+# Translation of classic-game-diplomacy.ftl into es. Keys are in the order of the English file.
+# Lines marked TODO still hold the English text: translate them and delete the marker.
+
+classic.game.diplomacy.offer-both = Ambos: { $what }
+classic.game.diplomacy.offer-give = Usted da: { $what }
+classic.game.diplomacy.offer-receive = Usted recibe: { $what }
+classic.game.diplomacy.item-gold = Oro
+classic.game.diplomacy.item-gold-amount = { NUMBER($n) } de oro
+classic.game.diplomacy.item-gold-per-turn = Oro por turno
+classic.game.diplomacy.item-gold-per-turn-amount = { NUMBER($n) } de oro por turno
+classic.game.diplomacy.item-resource-amount = { NUMBER($n) } { $name }
+classic.game.diplomacy.item-embassy = Embajada
+classic.game.diplomacy.item-open-borders = Fronteras abiertas
+classic.game.diplomacy.item-defensive-pact = Pacto defensivo
+classic.game.diplomacy.item-research-agreement = Acuerdo de investigación
+classic.game.diplomacy.item-friendship = Declaración de amistad
+classic.game.diplomacy.item-peace = Tratado de paz
+classic.game.diplomacy.item-war-on = Guerra contra { $name }
+classic.game.diplomacy.item-peace-with = Paz con { $name }
+classic.game.diplomacy.resource = Recurso
+classic.game.diplomacy.notice-peace = Paz con { $name }
+classic.game.diplomacy.notice-borders = Fronteras abiertas a { $name }
+classic.game.diplomacy.notice-war = Ha declarado la guerra a { $name }
+classic.game.diplomacy.notice-denounce = Ha denunciado a { $name }
+classic.game.diplomacy.notice-offered = Acuerdo ofrecido a { $name }
+classic.game.diplomacy.notice-accepted = Acuerdo aceptado
+classic.game.diplomacy.notice-refused = Acuerdo rechazado
+classic.game.diplomacy.state-war = En guerra desde el turno { $turn }
+classic.game.diplomacy.state-treaty = Tratado de paz hasta el turno { $turn }
+classic.game.diplomacy.state-peace = En paz
+classic.game.diplomacy.fact-our-embassy = Usted tiene una embajada con ellos
+classic.game.diplomacy.fact-their-embassy = Ellos tienen una embajada con usted
+classic.game.diplomacy.fact-we-grant-entry = Sus fronteras están abiertas para ellos
+classic.game.diplomacy.fact-they-grant-entry = Sus fronteras están abiertas para usted
+classic.game.diplomacy.fact-we-denounced = Usted los denunció
+classic.game.diplomacy.fact-they-denounced = Ellos lo denunciaron
+classic.game.diplomacy.fact-warmonger = Recuerda su belicismo ({ $n })
+classic.game.diplomacy.quantity-gold-now = { NUMBER($n) } de oro ahora
+classic.game.diplomacy.quantity-gold-per-turn = { NUMBER($n) } de oro por turno
+classic.game.diplomacy.quantity-resource = { $n } × { $name }

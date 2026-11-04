@@ -1,0 +1,1311 @@
+{
+ "_about": "Own-design tables of the systems that exist only in the expansion; applied by classic/tools/apply-own-design.py. The reasoning of every row is in classic/docs/classic/BNW-DESIGN.md.",
+ "systems": {
+  "trade routes": {
+   "ops": [
+    {
+     "catalog": "techs",
+     "entry": "Engineering",
+     "op": "remove",
+     "modifier": "trade.routes.flat"
+    },
+    {
+     "catalog": "techs",
+     "entry": "Compass",
+     "op": "remove",
+     "modifier": "trade.routes.flat"
+    },
+    {
+     "catalog": "techs",
+     "entry": "Banking",
+     "op": "remove",
+     "modifier": "trade.routes.flat"
+    },
+    {
+     "catalog": "techs",
+     "entry": "Biology",
+     "op": "remove",
+     "modifier": "trade.routes.flat"
+    },
+    {
+     "catalog": "techs",
+     "entry": "Penicillin",
+     "op": "remove",
+     "modifier": "trade.routes.flat"
+    },
+    {
+     "catalog": "techs",
+     "entry": "Currency",
+     "op": "add",
+     "effect": {
+      "scope": "player",
+      "selector": {
+       "kind": "player"
+      },
+      "condition": null,
+      "trigger": "on_research",
+      "modifier": "trade.routes.flat",
+      "amount": 1
+     }
+    },
+    {
+     "catalog": "techs",
+     "entry": "Guilds",
+     "op": "add",
+     "effect": {
+      "scope": "player",
+      "selector": {
+       "kind": "player"
+      },
+      "condition": null,
+      "trigger": "on_research",
+      "modifier": "trade.routes.flat",
+      "amount": 1
+     }
+    },
+    {
+     "catalog": "techs",
+     "entry": "Economics",
+     "op": "add",
+     "effect": {
+      "scope": "player",
+      "selector": {
+       "kind": "player"
+      },
+      "condition": null,
+      "trigger": "on_research",
+      "modifier": "trade.routes.flat",
+      "amount": 1
+     }
+    },
+    {
+     "catalog": "techs",
+     "entry": "Industrialization",
+     "op": "add",
+     "effect": {
+      "scope": "player",
+      "selector": {
+       "kind": "player"
+      },
+      "condition": null,
+      "trigger": "on_research",
+      "modifier": "trade.routes.flat",
+      "amount": 1
+     }
+    },
+    {
+     "catalog": "techs",
+     "entry": "Computers",
+     "op": "add",
+     "effect": {
+      "scope": "player",
+      "selector": {
+       "kind": "player"
+      },
+      "condition": null,
+      "trigger": "on_research",
+      "modifier": "trade.routes.flat",
+      "amount": 1
+     }
+    },
+    {
+     "catalog": "techs",
+     "entry": "Compass",
+     "op": "set",
+     "modifier": "trade.range.pct",
+     "amount": 15
+    },
+    {
+     "catalog": "techs",
+     "entry": "Refrigeration",
+     "op": "set",
+     "modifier": "trade.range.pct",
+     "amount": 15
+    },
+    {
+     "catalog": "techs",
+     "entry": "Combustion",
+     "op": "set",
+     "modifier": "trade.range.pct",
+     "amount": 15
+    },
+    {
+     "catalog": "buildings",
+     "entry": "Caravansary",
+     "op": "set",
+     "modifier": "trade.land_range.pct",
+     "amount": 40
+    },
+    {
+     "catalog": "buildings",
+     "entry": "Caravansary",
+     "op": "set",
+     "modifier": "trade.land_route.gold.flat",
+     "amount": 1.0
+    },
+    {
+     "catalog": "buildings",
+     "entry": "Harbor",
+     "op": "set",
+     "modifier": "trade.sea_range.pct",
+     "amount": 40
+    },
+    {
+     "catalog": "policies",
+     "entry": "Wagon Trains",
+     "op": "set",
+     "modifier": "trade.land_route.gold.flat",
+     "amount": 1.0
+    },
+    {
+     "catalog": "policies",
+     "entry": "Merchant Confederacy",
+     "op": "set",
+     "modifier": "trade.city_state_route.gold.flat",
+     "amount": 1.0
+    },
+    {
+     "catalog": "policies",
+     "entry": "Treasure Fleets",
+     "op": "set",
+     "modifier": "trade.sea_route.gold.flat",
+     "amount": 2.0
+    }
+   ]
+  },
+  "tourism, influence and great works": {
+   "ops": [
+    {
+     "catalog": "buildings",
+     "entry": "Museum",
+     "op": "field",
+     "field": "theming_bonuses",
+     "value": [
+      {
+       "bonus": 3,
+       "description": "Diverse collection",
+       "unique_eras": true,
+       "requires_unique_players": true
+      },
+      {
+       "bonus": 2,
+       "description": "Collection of one age",
+       "same_era": true
+      },
+      {
+       "bonus": 1,
+       "description": "Collection of one hand",
+       "requires_same_player": true
+      }
+     ]
+    },
+    {
+     "catalog": "wonders",
+     "entry": "Oxford University",
+     "op": "field",
+     "field": "theming_bonuses",
+     "value": [
+      {
+       "bonus": 3,
+       "description": "Diverse collection",
+       "unique_eras": true,
+       "requires_unique_players": true
+      },
+      {
+       "bonus": 2,
+       "description": "Collection of one age",
+       "same_era": true
+      },
+      {
+       "bonus": 1,
+       "description": "Collection of one hand",
+       "requires_same_player": true
+      }
+     ]
+    },
+    {
+     "catalog": "wonders",
+     "entry": "Sistine Chapel",
+     "op": "field",
+     "field": "theming_bonuses",
+     "value": [
+      {
+       "bonus": 3,
+       "description": "Diverse collection",
+       "unique_eras": true,
+       "requires_unique_players": true
+      },
+      {
+       "bonus": 2,
+       "description": "Collection of one age",
+       "same_era": true
+      },
+      {
+       "bonus": 1,
+       "description": "Collection of one hand",
+       "requires_same_player": true
+      }
+     ]
+    },
+    {
+     "catalog": "wonders",
+     "entry": "Globe Theatre",
+     "op": "field",
+     "field": "theming_bonuses",
+     "value": [
+      {
+       "bonus": 3,
+       "description": "Diverse collection",
+       "unique_eras": true,
+       "requires_unique_players": true
+      },
+      {
+       "bonus": 2,
+       "description": "Collection of one age",
+       "same_era": true
+      },
+      {
+       "bonus": 1,
+       "description": "Collection of one hand",
+       "requires_same_player": true
+      }
+     ]
+    },
+    {
+     "catalog": "wonders",
+     "entry": "Broadway",
+     "op": "field",
+     "field": "theming_bonuses",
+     "value": [
+      {
+       "bonus": 4,
+       "description": "Diverse collection",
+       "unique_eras": true,
+       "requires_unique_players": true
+      },
+      {
+       "bonus": 3,
+       "description": "Collection of one age",
+       "same_era": true
+      },
+      {
+       "bonus": 2,
+       "description": "Collection of one hand",
+       "requires_same_player": true
+      }
+     ]
+    },
+    {
+     "catalog": "buildings",
+     "entry": "Writers' Guild",
+     "op": "field",
+     "field": "great_person_points",
+     "value": {
+      "specialist": "core:specialist/writer",
+      "per_turn": 2
+     }
+    },
+    {
+     "catalog": "buildings",
+     "entry": "Artists' Guild",
+     "op": "field",
+     "field": "great_person_points",
+     "value": {
+      "specialist": "core:specialist/artist",
+      "per_turn": 2
+     }
+    },
+    {
+     "catalog": "buildings",
+     "entry": "Musicians' Guild",
+     "op": "field",
+     "field": "great_person_points",
+     "value": {
+      "specialist": "core:specialist/musician",
+      "per_turn": 2
+     }
+    },
+    {
+     "catalog": "buildings",
+     "entry": "Hotel",
+     "op": "set",
+     "modifier": "tourism.great_works.pct",
+     "amount": 40
+    },
+    {
+     "catalog": "buildings",
+     "entry": "Hotel",
+     "op": "set",
+     "modifier": "tourism.landmarks.pct_of_culture",
+     "amount": 40
+    },
+    {
+     "catalog": "buildings",
+     "entry": "Airport",
+     "op": "set",
+     "modifier": "tourism.great_works.pct",
+     "amount": 40
+    },
+    {
+     "catalog": "buildings",
+     "entry": "Airport",
+     "op": "set",
+     "modifier": "tourism.landmarks.pct_of_culture",
+     "amount": 40
+    },
+    {
+     "catalog": "wonders",
+     "entry": "National Visitor Center",
+     "op": "set",
+     "modifier": "tourism.great_works.pct",
+     "amount": 80
+    },
+    {
+     "catalog": "wonders",
+     "entry": "National Visitor Center",
+     "op": "set",
+     "modifier": "tourism.landmarks.pct_of_culture",
+     "amount": 80
+    },
+    {
+     "catalog": "policies",
+     "entry": "Media Culture",
+     "op": "set",
+     "modifier": "building.tourism.pct",
+     "amount": 25
+    },
+    {
+     "catalog": "techs",
+     "entry": "The Internet",
+     "op": "set",
+     "modifier": "tourism.pct",
+     "amount": 80
+    },
+    {
+     "catalog": "policies",
+     "entry": "Cultural Exchange",
+     "op": "set",
+     "modifier": "tourism.pct",
+     "amount": 12
+    },
+    {
+     "catalog": "policies",
+     "entry": "Futurism",
+     "op": "set",
+     "modifier": "tourism.on_unit_created.pct_of_recent",
+     "amount": 200
+    },
+    {
+     "catalog": "beliefs",
+     "entry": "Religious Art",
+     "op": "set",
+     "modifier": "building.yield.tourism.flat",
+     "amount": 4
+    },
+    {
+     "catalog": "wonders",
+     "entry": "Eiffel Tower",
+     "op": "set",
+     "modifier": "yield.tourism.flat",
+     "amount": 10
+    },
+    {
+     "catalog": "policies",
+     "entry": "core:policy/aesthetics/finisher",
+     "op": "set",
+     "modifier": "theming.bonus.pct",
+     "amount": 60
+    },
+    {
+     "catalog": "units",
+     "entry": "Great Musician",
+     "op": "ability",
+     "key": "one_shot_tourism",
+     "value": 7
+    },
+    {
+     "catalog": "units",
+     "entry": "Great Musician",
+     "op": "ability",
+     "key": "one_shot_tourism_percent_others",
+     "value": 12
+    },
+    {
+     "catalog": "wonders",
+     "entry": "Hermitage",
+     "op": "field",
+     "field": "great_work_slots",
+     "value": {
+      "type": "core:great-work-slot/art-artifact",
+      "count": 2
+     }
+    },
+    {
+     "catalog": "wonders",
+     "entry": "Hermitage",
+     "op": "field",
+     "field": "theming_bonuses",
+     "value": [
+      {
+       "bonus": 3,
+       "description": "Diverse collection",
+       "unique_eras": true,
+       "requires_unique_players": true,
+       "must_be_art": true
+      },
+      {
+       "bonus": 2,
+       "description": "Collection of one age",
+       "same_era": true,
+       "must_be_art": true
+      },
+      {
+       "bonus": 1,
+       "description": "Collection of one hand",
+       "requires_same_player": true,
+       "must_be_art": true
+      }
+     ]
+    },
+    {
+     "catalog": "wonders",
+     "entry": "Great Library",
+     "op": "field",
+     "field": "great_work_slots",
+     "value": {
+      "type": "core:great-work-slot/literature",
+      "count": 1
+     }
+    },
+    {
+     "catalog": "wonders",
+     "entry": "Great Library",
+     "op": "field",
+     "field": "theming_bonuses",
+     "value": []
+    },
+    {
+     "catalog": "wonders",
+     "entry": "Louvre",
+     "op": "field",
+     "field": "great_work_slots",
+     "value": {
+      "type": "core:great-work-slot/art-artifact",
+      "count": 3
+     }
+    },
+    {
+     "catalog": "wonders",
+     "entry": "Louvre",
+     "op": "field",
+     "field": "theming_bonuses",
+     "value": [
+      {
+       "bonus": 4,
+       "description": "Diverse collection",
+       "unique_eras": true,
+       "requires_unique_players": true
+      },
+      {
+       "bonus": 3,
+       "description": "Collection of one age",
+       "same_era": true
+      },
+      {
+       "bonus": 2,
+       "description": "Collection of one hand",
+       "requires_same_player": true
+      }
+     ]
+    },
+    {
+     "catalog": "wonders",
+     "entry": "Sydney Opera House",
+     "op": "field",
+     "field": "great_work_slots",
+     "value": {
+      "type": "core:great-work-slot/music",
+      "count": 4
+     }
+    },
+    {
+     "catalog": "wonders",
+     "entry": "Sydney Opera House",
+     "op": "field",
+     "field": "theming_bonuses",
+     "value": [
+      {
+       "bonus": 5,
+       "description": "Diverse collection",
+       "unique_eras": true,
+       "requires_unique_players": true
+      },
+      {
+       "bonus": 4,
+       "description": "Collection of one age",
+       "same_era": true
+      },
+      {
+       "bonus": 3,
+       "description": "Collection of one hand",
+       "requires_same_player": true
+      }
+     ]
+    },
+    {
+     "catalog": "wonders",
+     "entry": "Uffizi",
+     "op": "field",
+     "field": "great_work_slots",
+     "value": {
+      "type": "core:great-work-slot/art-artifact",
+      "count": 2
+     }
+    },
+    {
+     "catalog": "wonders",
+     "entry": "Uffizi",
+     "op": "field",
+     "field": "theming_bonuses",
+     "value": [
+      {
+       "bonus": 3,
+       "description": "Diverse collection",
+       "unique_eras": true,
+       "requires_unique_players": true
+      },
+      {
+       "bonus": 2,
+       "description": "Collection of one age",
+       "same_era": true
+      },
+      {
+       "bonus": 1,
+       "description": "Collection of one hand",
+       "requires_same_player": true
+      }
+     ]
+    },
+    {
+     "catalog": "units",
+     "entry": "Caravan",
+     "op": "field",
+     "field": "cost",
+     "value": 70
+    },
+    {
+     "catalog": "units",
+     "entry": "Cargo Ship",
+     "op": "field",
+     "field": "cost",
+     "value": 90
+    },
+    {
+     "catalog": "units",
+     "entry": "Archaeologist",
+     "op": "field",
+     "field": "cost",
+     "value": 175
+    },
+    {
+     "catalog": "buildings",
+     "entry": "Hotel",
+     "op": "field",
+     "field": "cost",
+     "value": 500
+    }
+   ]
+  },
+  "ideologies": {
+   "ops": [
+    {
+     "catalog": "policies",
+     "entry": "core:policy/freedom/avant-garde",
+     "op": "set",
+     "modifier": "great_people.rate.pct",
+     "amount": 20
+    },
+    {
+     "catalog": "policies",
+     "entry": "core:policy/order/hero-of-the-people",
+     "op": "set",
+     "modifier": "great_people.rate.pct",
+     "amount": 20
+    },
+    {
+     "catalog": "policies",
+     "entry": "core:policy/freedom/covert-action",
+     "op": "set",
+     "modifier": "espionage.rig_election.pct",
+     "amount": 75
+    },
+    {
+     "catalog": "policies",
+     "entry": "core:policy/order/double-agents",
+     "op": "set",
+     "modifier": "espionage.catch_chance.pct",
+     "amount": 75
+    },
+    {
+     "catalog": "policies",
+     "entry": "core:policy/autocracy/industrial-espionage",
+     "op": "set",
+     "modifier": "espionage.steal_rate.pct",
+     "amount": 75
+    },
+    {
+     "catalog": "policies",
+     "entry": "core:policy/freedom/economic-union",
+     "op": "set",
+     "modifier": "trade.route.gold.flat",
+     "amount": 2.0
+    },
+    {
+     "catalog": "policies",
+     "entry": "core:policy/order/skyscrapers",
+     "op": "set",
+     "modifier": "purchase.buildings.cost.pct",
+     "amount": -25
+    },
+    {
+     "catalog": "policies",
+     "entry": "core:policy/autocracy/mobilization",
+     "op": "set",
+     "modifier": "purchase.units.cost.pct",
+     "amount": -25
+    },
+    {
+     "catalog": "policies",
+     "entry": "core:policy/order/socialist-realism",
+     "op": "set",
+     "modifier": "production.building_class.pct",
+     "amount": 60
+    },
+    {
+     "catalog": "policies",
+     "entry": "core:policy/order/socialist-realism",
+     "op": "set",
+     "modifier": "building.happiness.flat",
+     "amount": 1
+    },
+    {
+     "catalog": "policies",
+     "entry": "core:policy/autocracy/elite-forces",
+     "op": "set",
+     "modifier": "combat.wounded_penalty.pct",
+     "amount": -20
+    },
+    {
+     "catalog": "policies",
+     "entry": "core:policy/autocracy/united-front",
+     "op": "set",
+     "modifier": "city_state.unit_gift_rate.pct",
+     "amount": 75
+    },
+    {
+     "catalog": "policies",
+     "entry": "core:policy/freedom/volunteer-army",
+     "op": "set",
+     "modifier": "unit.free_maintenance_slots.flat",
+     "amount": 5
+    },
+    {
+     "catalog": "policies",
+     "entry": "core:policy/freedom/volunteer-army",
+     "op": "set",
+     "modifier": "grant.unit",
+     "amount": 4
+    },
+    {
+     "catalog": "policies",
+     "entry": "core:policy/freedom/urbanization",
+     "op": "set",
+     "modifier": "building.happiness.flat",
+     "amount": 2,
+     "match": {
+      "building": "core:building/water_mill"
+     }
+    },
+    {
+     "catalog": "policies",
+     "entry": "core:policy/freedom/urbanization",
+     "op": "set",
+     "modifier": "building.happiness.flat",
+     "amount": 2,
+     "match": {
+      "building": "core:building/hospital"
+     }
+    },
+    {
+     "catalog": "policies",
+     "entry": "core:policy/freedom/urbanization",
+     "op": "set",
+     "modifier": "building.happiness.flat",
+     "amount": 2,
+     "match": {
+      "building": "core:building/medical_lab"
+     }
+    },
+    {
+     "catalog": "policies",
+     "entry": "core:policy/order/academy-of-sciences",
+     "op": "set",
+     "modifier": "building.happiness.flat",
+     "amount": 2,
+     "match": {
+      "building": "core:building/observatory"
+     }
+    },
+    {
+     "catalog": "policies",
+     "entry": "core:policy/order/academy-of-sciences",
+     "op": "set",
+     "modifier": "building.happiness.flat",
+     "amount": 2,
+     "match": {
+      "building": "core:building/public_school"
+     }
+    },
+    {
+     "catalog": "policies",
+     "entry": "core:policy/order/academy-of-sciences",
+     "op": "set",
+     "modifier": "building.happiness.flat",
+     "amount": 2,
+     "match": {
+      "building": "core:building/research_lab"
+     }
+    },
+    {
+     "catalog": "policies",
+     "entry": "core:policy/freedom/their-finest-hour",
+     "op": "set",
+     "modifier": "city.defense.pct",
+     "amount": 25
+    },
+    {
+     "catalog": "policies",
+     "entry": "core:policy/freedom/universal-suffrage",
+     "op": "set",
+     "modifier": "golden_age.duration.pct",
+     "amount": 35
+    },
+    {
+     "catalog": "policies",
+     "entry": "core:policy/freedom/new-deal",
+     "op": "set",
+     "modifier": "tile.yield.culture.flat",
+     "amount": 3
+    },
+    {
+     "catalog": "policies",
+     "entry": "core:policy/freedom/new-deal",
+     "op": "set",
+     "modifier": "tile.yield.science.flat",
+     "amount": 3
+    },
+    {
+     "catalog": "policies",
+     "entry": "core:policy/freedom/new-deal",
+     "op": "set",
+     "modifier": "tile.yield.gold.flat",
+     "amount": 3
+    },
+    {
+     "catalog": "policies",
+     "entry": "core:policy/freedom/new-deal",
+     "op": "set",
+     "modifier": "tile.yield.production.flat",
+     "amount": 3
+    },
+    {
+     "catalog": "policies",
+     "entry": "core:policy/freedom/new-deal",
+     "op": "set",
+     "modifier": "tile.yield.faith.flat",
+     "amount": 3
+    },
+    {
+     "catalog": "policies",
+     "entry": "core:policy/freedom/arsenal-of-democracy",
+     "op": "set",
+     "modifier": "production.military_units.pct",
+     "amount": 15
+    },
+    {
+     "catalog": "policies",
+     "entry": "core:policy/freedom/arsenal-of-democracy",
+     "op": "set",
+     "modifier": "city_state.unit_gift_influence.flat",
+     "amount": 12
+    },
+    {
+     "catalog": "policies",
+     "entry": "core:policy/order/party-leadership",
+     "op": "remove",
+     "modifier": "yield.food.flat"
+    },
+    {
+     "catalog": "policies",
+     "entry": "core:policy/order/party-leadership",
+     "op": "remove",
+     "modifier": "yield.gold.flat"
+    },
+    {
+     "catalog": "policies",
+     "entry": "core:policy/order/party-leadership",
+     "op": "remove",
+     "modifier": "yield.culture.flat"
+    },
+    {
+     "catalog": "policies",
+     "entry": "core:policy/order/resettlement",
+     "op": "set",
+     "modifier": "city.population.flat",
+     "amount": 2
+    },
+    {
+     "catalog": "policies",
+     "entry": "core:policy/order/cultural-revolution",
+     "op": "set",
+     "modifier": "tourism.pct",
+     "amount": 20
+    },
+    {
+     "catalog": "policies",
+     "entry": "core:policy/order/workers-faculties",
+     "op": "set",
+     "modifier": "production.building_class.pct",
+     "amount": 75
+    },
+    {
+     "catalog": "policies",
+     "entry": "core:policy/order/workers-faculties",
+     "op": "set",
+     "modifier": "yield.science.pct",
+     "amount": 20
+    },
+    {
+     "catalog": "policies",
+     "entry": "core:policy/order/five-year-plan",
+     "op": "set",
+     "modifier": "yield.production.flat",
+     "amount": 1
+    },
+    {
+     "catalog": "policies",
+     "entry": "core:policy/autocracy/militarism",
+     "op": "set",
+     "modifier": "building.happiness.flat",
+     "amount": 2,
+     "match": {
+      "building": "core:building/barracks"
+     }
+    },
+    {
+     "catalog": "policies",
+     "entry": "core:policy/autocracy/militarism",
+     "op": "set",
+     "modifier": "building.happiness.flat",
+     "amount": 2,
+     "match": {
+      "building": "core:building/armory"
+     }
+    },
+    {
+     "catalog": "policies",
+     "entry": "core:policy/autocracy/militarism",
+     "op": "set",
+     "modifier": "building.happiness.flat",
+     "amount": 2,
+     "match": {
+      "building": "core:building/military_academy"
+     }
+    },
+    {
+     "catalog": "policies",
+     "entry": "core:policy/autocracy/lightning-warfare",
+     "op": "set",
+     "modifier": "grant.promotion",
+     "amount": 1
+    },
+    {
+     "catalog": "policies",
+     "entry": "core:policy/autocracy/police-state",
+     "op": "set",
+     "modifier": "building.happiness.flat",
+     "amount": 2
+    },
+    {
+     "catalog": "policies",
+     "entry": "core:policy/autocracy/police-state",
+     "op": "set",
+     "modifier": "production.building_class.pct",
+     "amount": 75
+    },
+    {
+     "catalog": "policies",
+     "entry": "core:policy/autocracy/nationalism",
+     "op": "set",
+     "modifier": "unit.maintenance.pct",
+     "amount": -25
+    },
+    {
+     "catalog": "policies",
+     "entry": "core:policy/autocracy/third-alternative",
+     "op": "set",
+     "modifier": "resource.strategic_quantity.pct",
+     "amount": 150
+    },
+    {
+     "catalog": "policies",
+     "entry": "core:policy/autocracy/third-alternative",
+     "op": "set",
+     "modifier": "yield.food.flat",
+     "amount": 4
+    },
+    {
+     "catalog": "policies",
+     "entry": "core:policy/autocracy/third-alternative",
+     "op": "set",
+     "modifier": "yield.science.flat",
+     "amount": 4
+    },
+    {
+     "catalog": "policies",
+     "entry": "core:policy/autocracy/total-war",
+     "op": "set",
+     "modifier": "production.military_units.pct",
+     "amount": 20
+    },
+    {
+     "catalog": "policies",
+     "entry": "core:policy/autocracy/total-war",
+     "op": "set",
+     "modifier": "unit.free_xp",
+     "amount": 12
+    },
+    {
+     "catalog": "policies",
+     "entry": "core:policy/freedom/treaty-organization",
+     "op": "set",
+     "modifier": "city_state.influence_per_turn",
+     "amount": 3.0
+    },
+    {
+     "catalog": "policies",
+     "entry": "core:policy/order/dictatorship-of-the-proletariat",
+     "op": "set",
+     "modifier": "tourism.pct",
+     "amount": 30
+    },
+    {
+     "catalog": "policies",
+     "entry": "core:policy/order/iron-curtain",
+     "op": "set",
+     "modifier": "trade.internal_route.yield.pct",
+     "amount": 35
+    },
+    {
+     "catalog": "policies",
+     "entry": "core:policy/autocracy/cult-of-personality",
+     "op": "set",
+     "modifier": "tourism.pct",
+     "amount": 35
+    },
+    {
+     "catalog": "policies",
+     "entry": "core:policy/autocracy/gunboat-diplomacy",
+     "op": "set",
+     "modifier": "city_state.influence_per_turn",
+     "amount": 4.0
+    },
+    {
+     "catalog": "policies",
+     "entry": "core:policy/autocracy/gunboat-diplomacy",
+     "op": "set",
+     "modifier": "city_state.bully_score.pct",
+     "amount": 35
+    },
+    {
+     "catalog": "policies",
+     "entry": "core:policy/autocracy/clausewitz-s-legacy",
+     "op": "set",
+     "modifier": "combat.attack.pct",
+     "amount": 35
+    },
+    {
+     "catalog": "policies",
+     "entry": "core:policy/freedom/universal-healthcare",
+     "op": "remove",
+     "modifier": "building.happiness.flat",
+     "match": {
+      "building": "core:building/east_india_company"
+     }
+    },
+    {
+     "catalog": "policies",
+     "entry": "core:policy/freedom/universal-healthcare",
+     "op": "remove",
+     "modifier": "building.happiness.flat",
+     "match": {
+      "building": "core:building/ironworks"
+     }
+    },
+    {
+     "catalog": "policies",
+     "entry": "core:policy/freedom/universal-healthcare",
+     "op": "remove",
+     "modifier": "building.happiness.flat",
+     "match": {
+      "building": "core:building/oxford_university"
+     }
+    },
+    {
+     "catalog": "policies",
+     "entry": "core:policy/freedom/universal-healthcare",
+     "op": "remove",
+     "modifier": "building.happiness.flat",
+     "match": {
+      "building": "core:building/hermitage"
+     }
+    },
+    {
+     "catalog": "policies",
+     "entry": "core:policy/freedom/universal-healthcare",
+     "op": "remove",
+     "modifier": "building.happiness.flat",
+     "match": {
+      "building": "core:building/national_intelligence_agency"
+     }
+    },
+    {
+     "catalog": "policies",
+     "entry": "core:policy/freedom/universal-healthcare",
+     "op": "remove",
+     "modifier": "building.happiness.flat",
+     "match": {
+      "building": "core:building/national_visitor_center"
+     }
+    },
+    {
+     "catalog": "policies",
+     "entry": "core:policy/order/universal-healthcare",
+     "op": "remove",
+     "modifier": "building.happiness.flat",
+     "match": {
+      "building": "core:building/east_india_company"
+     }
+    },
+    {
+     "catalog": "policies",
+     "entry": "core:policy/order/universal-healthcare",
+     "op": "remove",
+     "modifier": "building.happiness.flat",
+     "match": {
+      "building": "core:building/ironworks"
+     }
+    },
+    {
+     "catalog": "policies",
+     "entry": "core:policy/order/universal-healthcare",
+     "op": "remove",
+     "modifier": "building.happiness.flat",
+     "match": {
+      "building": "core:building/oxford_university"
+     }
+    },
+    {
+     "catalog": "policies",
+     "entry": "core:policy/order/universal-healthcare",
+     "op": "remove",
+     "modifier": "building.happiness.flat",
+     "match": {
+      "building": "core:building/hermitage"
+     }
+    },
+    {
+     "catalog": "policies",
+     "entry": "core:policy/order/universal-healthcare",
+     "op": "remove",
+     "modifier": "building.happiness.flat",
+     "match": {
+      "building": "core:building/national_intelligence_agency"
+     }
+    },
+    {
+     "catalog": "policies",
+     "entry": "core:policy/order/universal-healthcare",
+     "op": "remove",
+     "modifier": "building.happiness.flat",
+     "match": {
+      "building": "core:building/national_visitor_center"
+     }
+    },
+    {
+     "catalog": "policies",
+     "entry": "core:policy/autocracy/universal-healthcare",
+     "op": "remove",
+     "modifier": "building.happiness.flat",
+     "match": {
+      "building": "core:building/east_india_company"
+     }
+    },
+    {
+     "catalog": "policies",
+     "entry": "core:policy/autocracy/universal-healthcare",
+     "op": "remove",
+     "modifier": "building.happiness.flat",
+     "match": {
+      "building": "core:building/ironworks"
+     }
+    },
+    {
+     "catalog": "policies",
+     "entry": "core:policy/autocracy/universal-healthcare",
+     "op": "remove",
+     "modifier": "building.happiness.flat",
+     "match": {
+      "building": "core:building/oxford_university"
+     }
+    },
+    {
+     "catalog": "policies",
+     "entry": "core:policy/autocracy/universal-healthcare",
+     "op": "remove",
+     "modifier": "building.happiness.flat",
+     "match": {
+      "building": "core:building/hermitage"
+     }
+    },
+    {
+     "catalog": "policies",
+     "entry": "core:policy/autocracy/universal-healthcare",
+     "op": "remove",
+     "modifier": "building.happiness.flat",
+     "match": {
+      "building": "core:building/national_intelligence_agency"
+     }
+    },
+    {
+     "catalog": "policies",
+     "entry": "core:policy/autocracy/universal-healthcare",
+     "op": "remove",
+     "modifier": "building.happiness.flat",
+     "match": {
+      "building": "core:building/national_visitor_center"
+     }
+    },
+    {
+     "catalog": "policies",
+     "entry": "core:policy/freedom",
+     "op": "field",
+     "field": "first_adopter_free_policies",
+     "value": 3
+    },
+    {
+     "catalog": "policies",
+     "entry": "core:policy/order",
+     "op": "field",
+     "field": "first_adopter_free_policies",
+     "value": 3
+    },
+    {
+     "catalog": "policies",
+     "entry": "core:policy/autocracy",
+     "op": "field",
+     "field": "first_adopter_free_policies",
+     "value": 3
+    },
+    {
+     "catalog": "buildings",
+     "entry": "Factory",
+     "op": "set",
+     "modifier": "building.x_built_triggers_ideology_choice",
+     "amount": 2
+    }
+   ]
+  },
+  "World Congress": {
+   "ops": [
+    {
+     "catalog": "wonders",
+     "entry": "core:project/world_s_fair",
+     "op": "field",
+     "field": "cost_per_player",
+     "value": 300
+    },
+    {
+     "catalog": "wonders",
+     "entry": "core:project/international_games",
+     "op": "field",
+     "field": "cost_per_player",
+     "value": 600
+    },
+    {
+     "catalog": "wonders",
+     "entry": "core:project/international_space_station",
+     "op": "field",
+     "field": "cost_per_player",
+     "value": 900
+    },
+    {
+     "catalog": "wonders",
+     "entry": "core:project/world_s_fair",
+     "op": "tier",
+     "tier": 1,
+     "modifier": "league_reward.golden_age_points",
+     "amount": 360
+    },
+    {
+     "catalog": "wonders",
+     "entry": "core:project/world_s_fair",
+     "op": "tier",
+     "tier": 3,
+     "modifier": "league_reward.culture_bonus_turns",
+     "amount": 15
+    },
+    {
+     "catalog": "wonders",
+     "entry": "core:project/international_games",
+     "op": "tier",
+     "tier": 1,
+     "modifier": "league_reward.happiness",
+     "amount": 2
+    },
+    {
+     "catalog": "wonders",
+     "entry": "core:project/international_games",
+     "op": "tier",
+     "tier": 2,
+     "modifier": "league_reward.happiness",
+     "amount": 2
+    },
+    {
+     "catalog": "wonders",
+     "entry": "core:project/international_games",
+     "op": "tier",
+     "tier": 2,
+     "modifier": "league_reward.city_state_influence_boost",
+     "amount": 25
+    },
+    {
+     "catalog": "wonders",
+     "entry": "core:project/international_games",
+     "op": "tier",
+     "tier": 3,
+     "modifier": "league_reward.tourism_bonus_turns",
+     "amount": 15
+    },
+    {
+     "catalog": "wonders",
+     "entry": "core:project/international_space_station",
+     "op": "tier",
+     "tier": 1,
+     "modifier": "league_reward.base_beakers_turns_to_count",
+     "amount": 5
+    }
+   ]
+  }
+ }
+}

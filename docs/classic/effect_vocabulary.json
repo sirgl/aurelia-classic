@@ -1,0 +1,5452 @@
+{
+ "schema": "classic-spec/1",
+ "catalog": "effect_vocabulary",
+ "edition": "Classic rule set (Unciv Gods & Kings ruleset plus own extensions)",
+ "note": "Every modifier / selector / trigger / condition key used by the catalogs. Modifiers with an entity prefix (policy., trait., belief., promotion., building., tech., improvement., project.) carry needs_mechanic: a dedicated mechanic must interpret them.",
+ "modifiers": {
+  "air.damage_taken_from_interception.pct": {
+   "count": 1,
+   "unit": "percent",
+   "scopes": [
+    "unit"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "promotions.json"
+   ]
+  },
+  "air.evasion.pct": {
+   "count": 2,
+   "unit": "percent",
+   "scopes": [
+    "unit"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "promotions.json"
+   ]
+  },
+  "air.intercept_chance.flat": {
+   "count": 4,
+   "unit": "flat",
+   "scopes": [
+    "unit"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "promotions.json"
+   ]
+  },
+  "air.interception_strength.pct": {
+   "count": 3,
+   "unit": "percent",
+   "scopes": [
+    "unit"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "promotions.json"
+   ]
+  },
+  "air.interceptions_per_turn.flat": {
+   "count": 1,
+   "unit": "flat",
+   "scopes": [
+    "unit"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "promotions.json"
+   ]
+  },
+  "air.sweep_strength.pct": {
+   "count": 3,
+   "unit": "percent",
+   "scopes": [
+    "unit"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "promotions.json"
+   ]
+  },
+  "aura.range": {
+   "count": 2,
+   "unit": "see_modifier",
+   "scopes": [
+    "unit"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "promotions.json"
+   ]
+  },
+  "belief.converts_barbarians": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [
+    "converts_barbarians"
+   ],
+   "used_in": [
+    "beliefs.json"
+   ]
+  },
+  "belief.faith_purchase_all_great_people": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [
+    "faith_purchase_all_great_people"
+   ],
+   "used_in": [
+    "beliefs.json"
+   ]
+  },
+  "belief.inquisitor_pressure_retention": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [
+    "inquisitor_pressure_retention"
+   ],
+   "used_in": [
+    "beliefs.json"
+   ]
+  },
+  "belief.other_religion_pressure_erosion": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [
+    "other_religion_pressure_erosion"
+   ],
+   "used_in": [
+    "beliefs.json"
+   ]
+  },
+  "belief.spy_pressure": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [
+    "spy_pressure"
+   ],
+   "used_in": [
+    "beliefs.json"
+   ]
+  },
+  "border.culture_cost.pct": {
+   "count": 4,
+   "unit": "percent",
+   "scopes": [
+    "city",
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "beliefs.json",
+    "policies.json",
+    "unique_buildings.json",
+    "wonders.json"
+   ]
+  },
+  "building.affect_spies_now": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "city"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [
+    "espionage_rank_now"
+   ],
+   "used_in": [
+    "wonders.json"
+   ]
+  },
+  "building.airlift": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "city"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [
+    "airlift"
+   ],
+   "used_in": [
+    "buildings.json"
+   ]
+  },
+  "building.allows_food_trade_routes": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "city"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [
+    "internal_food_trade_routes"
+   ],
+   "used_in": [
+    "buildings.json"
+   ]
+  },
+  "building.allows_production_trade_routes": {
+   "count": 2,
+   "unit": "see_modifier",
+   "scopes": [
+    "city"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [
+    "internal_production_trade_routes"
+   ],
+   "used_in": [
+    "buildings.json",
+    "unique_buildings.json"
+   ]
+  },
+  "building.allows_range_strike": {
+   "count": 6,
+   "unit": "see_modifier",
+   "scopes": [
+    "city"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [
+    "city_ranged_strike"
+   ],
+   "used_in": [
+    "buildings.json",
+    "unique_buildings.json"
+   ]
+  },
+  "building.allows_water_routes": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "city"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [
+    "sea_trade_routes"
+   ],
+   "used_in": [
+    "buildings.json"
+   ]
+  },
+  "building.border_obstacle": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "city"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [
+    "border_obstacle"
+   ],
+   "used_in": [
+    "wonders.json"
+   ]
+  },
+  "building.espionage": {
+   "count": 4,
+   "unit": "see_modifier",
+   "scopes": [
+    "city"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [
+    "espionage_building"
+   ],
+   "used_in": [
+    "buildings.json",
+    "wonders.json"
+   ]
+  },
+  "building.happiness.flat": {
+   "count": 65,
+   "unit": "flat",
+   "scopes": [
+    "city",
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "beliefs.json",
+    "policies.json",
+    "wonders.json"
+   ]
+  },
+  "building.no_occupied_unhappiness": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "city"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [
+    "no_occupied_unhappiness"
+   ],
+   "used_in": [
+    "buildings.json"
+   ]
+  },
+  "building.nullify_influence_modifier": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "city"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [
+    "nullify_tourism_tech_bonus"
+   ],
+   "used_in": [
+    "wonders.json"
+   ]
+  },
+  "building.tourism.pct": {
+   "count": 1,
+   "unit": "percent",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "policies.json"
+   ]
+  },
+  "building.x_built_triggers_ideology_choice": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "city"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [
+    "x_built_triggers_ideology_choice"
+   ],
+   "used_in": [
+    "buildings.json"
+   ]
+  },
+  "building.yield.culture.flat": {
+   "count": 7,
+   "unit": "flat",
+   "scopes": [
+    "city",
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "beliefs.json",
+    "policies.json",
+    "wonders.json"
+   ]
+  },
+  "building.yield.faith.flat": {
+   "count": 4,
+   "unit": "flat",
+   "scopes": [
+    "city",
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "beliefs.json",
+    "policies.json"
+   ]
+  },
+  "building.yield.food.flat": {
+   "count": 2,
+   "unit": "flat",
+   "scopes": [
+    "city"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "beliefs.json"
+   ]
+  },
+  "building.yield.gold.flat": {
+   "count": 10,
+   "unit": "flat",
+   "scopes": [
+    "city",
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "beliefs.json",
+    "policies.json",
+    "wonders.json"
+   ]
+  },
+  "building.yield.production.flat": {
+   "count": 2,
+   "unit": "flat",
+   "scopes": [
+    "city",
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "beliefs.json",
+    "policies.json"
+   ]
+  },
+  "building.yield.science.flat": {
+   "count": 5,
+   "unit": "flat",
+   "scopes": [
+    "city",
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "beliefs.json",
+    "policies.json"
+   ]
+  },
+  "building.yield.tourism.flat": {
+   "count": 2,
+   "unit": "flat",
+   "scopes": [
+    "city",
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "beliefs.json"
+   ]
+  },
+  "capture.plunder_gold.pct": {
+   "count": 1,
+   "unit": "percent",
+   "scopes": [
+    "city"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "unique_buildings.json"
+   ]
+  },
+  "city.air_capacity.flat": {
+   "count": 1,
+   "unit": "flat",
+   "scopes": [
+    "city"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "buildings.json"
+   ]
+  },
+  "city.defense.flat": {
+   "count": 8,
+   "unit": "flat",
+   "scopes": [
+    "city"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "buildings.json",
+    "unique_buildings.json",
+    "wonders.json"
+   ]
+  },
+  "city.defense.pct": {
+   "count": 2,
+   "unit": "percent",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "policies.json",
+    "wonders.json"
+   ]
+  },
+  "city.max_hp.flat": {
+   "count": 6,
+   "unit": "flat",
+   "scopes": [
+    "city"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "buildings.json",
+    "unique_buildings.json"
+   ]
+  },
+  "city.nuke_damage.pct": {
+   "count": 1,
+   "unit": "percent",
+   "scopes": [
+    "city"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "buildings.json"
+   ]
+  },
+  "city.population.flat": {
+   "count": 2,
+   "unit": "flat",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "on_city_founded",
+    "on_complete"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "policies.json",
+    "wonders.json"
+   ]
+  },
+  "city.ranged_strike.pct": {
+   "count": 2,
+   "unit": "percent",
+   "scopes": [
+    "city",
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "beliefs.json",
+    "policies.json"
+   ]
+  },
+  "city_connection.gold.pct": {
+   "count": 1,
+   "unit": "percent",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "wonders.json"
+   ]
+  },
+  "city_state.bully_score.pct": {
+   "count": 1,
+   "unit": "percent",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "policies.json"
+   ]
+  },
+  "city_state.friend_bonus.pct": {
+   "count": 1,
+   "unit": "percent",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "nations.json"
+   ]
+  },
+  "city_state.gold_gift_influence.pct": {
+   "count": 2,
+   "unit": "percent",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "beliefs.json",
+    "policies.json"
+   ]
+  },
+  "city_state.influence_decay.pct": {
+   "count": 1,
+   "unit": "percent",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "policies.json"
+   ]
+  },
+  "city_state.influence_per_turn": {
+   "count": 2,
+   "unit": "see_modifier",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "policies.json"
+   ]
+  },
+  "city_state.influence_resting_point.flat": {
+   "count": 2,
+   "unit": "flat",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "beliefs.json",
+    "policies.json"
+   ]
+  },
+  "city_state.unit_gift_influence.flat": {
+   "count": 1,
+   "unit": "flat",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "on_unit_gift"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "policies.json"
+   ]
+  },
+  "city_state.unit_gift_rate.pct": {
+   "count": 1,
+   "unit": "percent",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "policies.json"
+   ]
+  },
+  "combat.adjacent_friendly_unit.pct": {
+   "count": 1,
+   "unit": "percent",
+   "scopes": [
+    "unit"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "promotions.json"
+   ]
+  },
+  "combat.attack.pct": {
+   "count": 19,
+   "unit": "percent",
+   "scopes": [
+    "player",
+    "unit"
+   ],
+   "triggers": [
+    "on_adopt",
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "policies.json",
+    "promotions.json"
+   ]
+  },
+  "combat.attack_in_friendly_land.pct": {
+   "count": 1,
+   "unit": "percent",
+   "scopes": [
+    "unit"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "promotions.json"
+   ]
+  },
+  "combat.attack_open_terrain.pct": {
+   "count": 9,
+   "unit": "percent",
+   "scopes": [
+    "unit"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "promotions.json"
+   ]
+  },
+  "combat.attack_rough_terrain.pct": {
+   "count": 7,
+   "unit": "percent",
+   "scopes": [
+    "unit"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "promotions.json"
+   ]
+  },
+  "combat.attack_vs_city.pct": {
+   "count": 16,
+   "unit": "percent",
+   "scopes": [
+    "unit"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "promotions.json"
+   ]
+  },
+  "combat.attack_vs_fortified.pct": {
+   "count": 1,
+   "unit": "percent",
+   "scopes": [
+    "unit"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "promotions.json"
+   ]
+  },
+  "combat.attack_vs_wounded.pct": {
+   "count": 2,
+   "unit": "percent",
+   "scopes": [
+    "unit"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "promotions.json"
+   ]
+  },
+  "combat.city_attack_gold.pct_of_damage": {
+   "count": 4,
+   "unit": "percent",
+   "scopes": [
+    "unit"
+   ],
+   "triggers": [
+    "on_attack_city"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "promotions.json"
+   ]
+  },
+  "combat.defense.pct": {
+   "count": 15,
+   "unit": "percent",
+   "scopes": [
+    "unit"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "promotions.json"
+   ]
+  },
+  "combat.defense_open_terrain.pct": {
+   "count": 9,
+   "unit": "percent",
+   "scopes": [
+    "unit"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "promotions.json"
+   ]
+  },
+  "combat.defense_rough_terrain.pct": {
+   "count": 7,
+   "unit": "percent",
+   "scopes": [
+    "unit"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "promotions.json"
+   ]
+  },
+  "combat.defense_vs_ranged.pct": {
+   "count": 5,
+   "unit": "percent",
+   "scopes": [
+    "unit"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "promotions.json"
+   ]
+  },
+  "combat.embarked_defense.pct": {
+   "count": 2,
+   "unit": "percent",
+   "scopes": [
+    "unit"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "promotions.json"
+   ]
+  },
+  "combat.flank_bonus.pct": {
+   "count": 5,
+   "unit": "percent",
+   "scopes": [
+    "unit"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "promotions.json"
+   ]
+  },
+  "combat.great_general_bonus.pct": {
+   "count": 3,
+   "unit": "percent",
+   "scopes": [
+    "player",
+    "unit"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "nations.json",
+    "promotions.json"
+   ]
+  },
+  "combat.in_friendly_land.pct": {
+   "count": 3,
+   "unit": "percent",
+   "scopes": [
+    "unit"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "promotions.json"
+   ]
+  },
+  "combat.near_capital.pct": {
+   "count": 1,
+   "unit": "percent",
+   "scopes": [
+    "unit"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "promotions.json"
+   ]
+  },
+  "combat.outside_friendly_land.pct": {
+   "count": 1,
+   "unit": "percent",
+   "scopes": [
+    "unit"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "promotions.json"
+   ]
+  },
+  "combat.ranged_attack.pct": {
+   "count": 1,
+   "unit": "percent",
+   "scopes": [
+    "unit"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "promotions.json"
+   ]
+  },
+  "combat.ranged_attack_open_terrain.pct": {
+   "count": 3,
+   "unit": "percent",
+   "scopes": [
+    "unit"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "promotions.json"
+   ]
+  },
+  "combat.ranged_attack_rough_terrain.pct": {
+   "count": 3,
+   "unit": "percent",
+   "scopes": [
+    "unit"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "promotions.json"
+   ]
+  },
+  "combat.strength.pct": {
+   "count": 47,
+   "unit": "percent",
+   "scopes": [
+    "player",
+    "unit"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "beliefs.json",
+    "nations.json",
+    "policies.json",
+    "promotions.json"
+   ]
+  },
+  "combat.withdraw_chance.pct": {
+   "count": 2,
+   "unit": "percent",
+   "scopes": [
+    "unit"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "promotions.json"
+   ]
+  },
+  "combat.wounded_penalty.pct": {
+   "count": 1,
+   "unit": "percent",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "policies.json"
+   ]
+  },
+  "culture.on_kill.pct_of_strength": {
+   "count": 2,
+   "unit": "percent",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "on_kill"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "nations.json",
+    "policies.json"
+   ]
+  },
+  "damage.on_attack.chance_pct": {
+   "count": 1,
+   "unit": "percent",
+   "scopes": [
+    "unit"
+   ],
+   "triggers": [
+    "on_attack"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "promotions.json"
+   ]
+  },
+  "damage.on_attack.flat": {
+   "count": 1,
+   "unit": "flat",
+   "scopes": [
+    "unit"
+   ],
+   "triggers": [
+    "on_attack"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "promotions.json"
+   ]
+  },
+  "espionage.catch_chance.pct": {
+   "count": 1,
+   "unit": "percent",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "policies.json"
+   ]
+  },
+  "espionage.enemy_steal_rate.pct": {
+   "count": 5,
+   "unit": "percent",
+   "scopes": [
+    "city",
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "buildings.json",
+    "wonders.json"
+   ]
+  },
+  "espionage.new_spy_rank.flat": {
+   "count": 1,
+   "unit": "flat",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "wonders.json"
+   ]
+  },
+  "espionage.rig_election.pct": {
+   "count": 1,
+   "unit": "percent",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "policies.json"
+   ]
+  },
+  "espionage.spies.flat": {
+   "count": 2,
+   "unit": "flat",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "on_complete",
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "nations.json",
+    "wonders.json"
+   ]
+  },
+  "espionage.spy_rank.flat": {
+   "count": 1,
+   "unit": "flat",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "on_complete"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "wonders.json"
+   ]
+  },
+  "espionage.steal_rate.pct": {
+   "count": 1,
+   "unit": "percent",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "policies.json"
+   ]
+  },
+  "faith.on_great_person_expended": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "on_great_person_expended"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "beliefs.json"
+   ]
+  },
+  "faith.on_kill.pct_of_strength": {
+   "count": 1,
+   "unit": "percent",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "on_kill"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "beliefs.json"
+   ]
+  },
+  "faith_purchase.cost.pct": {
+   "count": 1,
+   "unit": "percent",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "policies.json"
+   ]
+  },
+  "faith_purchase.missionary_inquisitor.cost.pct": {
+   "count": 1,
+   "unit": "percent",
+   "scopes": [
+    "religion"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "beliefs.json"
+   ]
+  },
+  "forbid.train_unit_class": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "nations.json"
+   ]
+  },
+  "gold.on_city_first_converted": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "on_city_converted"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "beliefs.json"
+   ]
+  },
+  "gold.on_discover_natural_wonder": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "on_discover_natural_wonder"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "nations.json"
+   ]
+  },
+  "gold.on_discover_natural_wonder_first": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "on_discover_natural_wonder"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "nations.json"
+   ]
+  },
+  "gold.on_kill.pct_of_strength": {
+   "count": 1,
+   "unit": "percent",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "on_kill"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "policies.json"
+   ]
+  },
+  "gold.plunder.pct": {
+   "count": 1,
+   "unit": "percent",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "nations.json"
+   ]
+  },
+  "golden_age.duration.pct": {
+   "count": 3,
+   "unit": "percent",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "nations.json",
+    "policies.json",
+    "wonders.json"
+   ]
+  },
+  "golden_age.start": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "on_complete"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "wonders.json"
+   ]
+  },
+  "golden_age.start_turns": {
+   "count": 2,
+   "unit": "see_modifier",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "on_adopt"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "policies.json"
+   ]
+  },
+  "golden_age_points.on_kill.pct_of_strength": {
+   "count": 1,
+   "unit": "percent",
+   "scopes": [
+    "unit"
+   ],
+   "triggers": [
+    "on_kill"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "promotions.json"
+   ]
+  },
+  "grant.building": {
+   "count": 10,
+   "unit": "see_modifier",
+   "scopes": [
+    "city",
+    "player"
+   ],
+   "triggers": [
+    "on_complete",
+    "on_complete_and_new_cities"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "wonders.json"
+   ]
+  },
+  "grant.great_person_choice": {
+   "count": 2,
+   "unit": "see_modifier",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "on_adopt",
+    "on_complete"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "policies.json",
+    "wonders.json"
+   ]
+  },
+  "grant.great_work": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "city"
+   ],
+   "triggers": [
+    "on_complete"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "wonders.json"
+   ]
+  },
+  "grant.policy": {
+   "count": 5,
+   "unit": "see_modifier",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "on_complete"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "wonders.json"
+   ]
+  },
+  "grant.promotion": {
+   "count": 49,
+   "unit": "see_modifier",
+   "scopes": [
+    "city",
+    "player"
+   ],
+   "triggers": [
+    "on_unit_trained",
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "nations.json",
+    "policies.json",
+    "unique_buildings.json",
+    "wonders.json"
+   ]
+  },
+  "grant.random_promotion_after_combat": {
+   "count": 8,
+   "unit": "see_modifier",
+   "scopes": [
+    "unit"
+   ],
+   "triggers": [
+    "after_first_combat"
+   ],
+   "needs_mechanic": [
+    "post_combat_random_promotion"
+   ],
+   "used_in": [
+    "promotions.json"
+   ]
+  },
+  "grant.tech": {
+   "count": 3,
+   "unit": "see_modifier",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "on_adopt",
+    "on_complete"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "policies.json",
+    "wonders.json"
+   ]
+  },
+  "grant.unit": {
+   "count": 21,
+   "unit": "see_modifier",
+   "scopes": [
+    "city",
+    "player"
+   ],
+   "triggers": [
+    "on_adopt",
+    "on_complete"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "policies.json",
+    "wonders.json"
+   ]
+  },
+  "grant.unit_per_military_unit": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "on_complete"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "wonders.json"
+   ]
+  },
+  "great_people.rate.pct": {
+   "count": 19,
+   "unit": "percent",
+   "scopes": [
+    "city",
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "buildings.json",
+    "nations.json",
+    "policies.json",
+    "unique_buildings.json",
+    "wonders.json"
+   ]
+  },
+  "great_person_expended.gold.flat": {
+   "count": 1,
+   "unit": "flat",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "on_great_person_expended"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "wonders.json"
+   ]
+  },
+  "great_scientist.science.pct": {
+   "count": 1,
+   "unit": "percent",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "wonders.json"
+   ]
+  },
+  "great_work.yield.culture.flat": {
+   "count": 1,
+   "unit": "flat",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "policies.json"
+   ]
+  },
+  "growth.food_kept.pct": {
+   "count": 2,
+   "unit": "percent",
+   "scopes": [
+    "city"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "buildings.json"
+   ]
+  },
+  "growth.rate.pct": {
+   "count": 4,
+   "unit": "percent",
+   "scopes": [
+    "city",
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "beliefs.json",
+    "policies.json"
+   ]
+  },
+  "happiness.global": {
+   "count": 4,
+   "unit": "see_modifier",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "wonders.json"
+   ]
+  },
+  "happiness.local": {
+   "count": 17,
+   "unit": "see_modifier",
+   "scopes": [
+    "city",
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "beliefs.json",
+    "buildings.json",
+    "policies.json",
+    "unique_buildings.json",
+    "wonders.json"
+   ]
+  },
+  "happiness.natural_wonders.pct": {
+   "count": 1,
+   "unit": "percent",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "nations.json"
+   ]
+  },
+  "happiness.per_city": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "wonders.json"
+   ]
+  },
+  "happiness.per_city_connection": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "policies.json"
+   ]
+  },
+  "happiness.per_following_city": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "beliefs.json"
+   ]
+  },
+  "happiness.per_luxury.flat": {
+   "count": 1,
+   "unit": "flat",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "policies.json"
+   ]
+  },
+  "happiness.per_x_peaceful_foreign_followers": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "beliefs.json"
+   ]
+  },
+  "happiness.per_x_policies": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "wonders.json"
+   ]
+  },
+  "happiness.per_x_pop_in_city": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "policies.json"
+   ]
+  },
+  "heal.flat": {
+   "count": 4,
+   "unit": "flat",
+   "scopes": [
+    "player",
+    "unit"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "beliefs.json",
+    "promotions.json"
+   ]
+  },
+  "heal.in_enemy_land.flat": {
+   "count": 7,
+   "unit": "flat",
+   "scopes": [
+    "unit"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "promotions.json"
+   ]
+  },
+  "heal.in_friendly_land.flat": {
+   "count": 3,
+   "unit": "flat",
+   "scopes": [
+    "unit"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "promotions.json"
+   ]
+  },
+  "heal.in_neutral_land.flat": {
+   "count": 7,
+   "unit": "flat",
+   "scopes": [
+    "unit"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "promotions.json"
+   ]
+  },
+  "heal.on_kill.flat": {
+   "count": 3,
+   "unit": "flat",
+   "scopes": [
+    "unit"
+   ],
+   "triggers": [
+    "on_kill"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "promotions.json"
+   ]
+  },
+  "improvement.culture_adjacent_same_type": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "tile"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [
+    "culture_adjacent_same_type"
+   ],
+   "used_in": [
+    "improvements.json"
+   ]
+  },
+  "improvement.culture_bomb_radius": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "tile"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [
+    "culture_bomb_radius"
+   ],
+   "used_in": [
+    "improvements.json"
+   ]
+  },
+  "improvement.luxury_copies_siphoned_from_minor": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "tile"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [
+    "luxury_copies_siphoned_from_minor"
+   ],
+   "used_in": [
+    "improvements.json"
+   ]
+  },
+  "improvement.nearby_enemy_damage": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "tile"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [
+    "nearby_enemy_damage"
+   ],
+   "used_in": [
+    "improvements.json"
+   ]
+  },
+  "improvement.removes_resource": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "tile"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [
+    "removes_resource"
+   ],
+   "used_in": [
+    "improvements.json"
+   ]
+  },
+  "league.delegates.flat": {
+   "count": 1,
+   "unit": "flat",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "wonders.json"
+   ]
+  },
+  "league.delegates_per_diplomat.flat": {
+   "count": 1,
+   "unit": "flat",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "on_research"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "techs.json"
+   ]
+  },
+  "league_reward.base_beakers_turns_to_count": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "on_project_complete"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "wonders.json"
+   ]
+  },
+  "league_reward.building": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "on_project_complete"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "wonders.json"
+   ]
+  },
+  "league_reward.city_state_influence_boost": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "on_project_complete"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "wonders.json"
+   ]
+  },
+  "league_reward.culture_bonus_turns": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "on_project_complete"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "wonders.json"
+   ]
+  },
+  "league_reward.free_social_policies": {
+   "count": 2,
+   "unit": "see_modifier",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "on_project_complete"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "wonders.json"
+   ]
+  },
+  "league_reward.free_unit_class": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "on_project_complete"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "wonders.json"
+   ]
+  },
+  "league_reward.golden_age_points": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "on_project_complete"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "wonders.json"
+   ]
+  },
+  "league_reward.happiness": {
+   "count": 2,
+   "unit": "see_modifier",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "on_project_complete"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "wonders.json"
+   ]
+  },
+  "league_reward.tourism_bonus_turns": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "on_project_complete"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "wonders.json"
+   ]
+  },
+  "missionary.spreads.flat": {
+   "count": 1,
+   "unit": "flat",
+   "scopes": [
+    "city"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "wonders.json"
+   ]
+  },
+  "missionary.strength.pct": {
+   "count": 1,
+   "unit": "percent",
+   "scopes": [
+    "religion"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "beliefs.json"
+   ]
+  },
+  "policy.add_reformation_belief": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [
+    "add_reformation_belief"
+   ],
+   "used_in": [
+    "policies.json"
+   ]
+  },
+  "policy.always_see_barb_camps": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [
+    "always_see_barb_camps"
+   ],
+   "used_in": [
+    "policies.json"
+   ]
+  },
+  "policy.cost.pct": {
+   "count": 1,
+   "unit": "percent",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "wonders.json"
+   ]
+  },
+  "policy.cost_per_city.pct": {
+   "count": 1,
+   "unit": "percent",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "policies.json"
+   ]
+  },
+  "policy.enables_ss_part_hurry": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [
+    "enables_ss_part_hurry"
+   ],
+   "used_in": [
+    "policies.json"
+   ]
+  },
+  "policy.enables_ss_part_purchase": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [
+    "enables_ss_part_purchase"
+   ],
+   "used_in": [
+    "policies.json"
+   ]
+  },
+  "policy.free_building_on_conquest": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "policies.json"
+   ]
+  },
+  "policy.garrison_free_maintenance": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [
+    "garrison_free_maintenance"
+   ],
+   "used_in": [
+    "policies.json"
+   ]
+  },
+  "policy.half_specialist_food": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [
+    "half_specialist_food"
+   ],
+   "used_in": [
+    "policies.json"
+   ]
+  },
+  "policy.half_specialist_unhappiness": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [
+    "half_specialist_unhappiness"
+   ],
+   "used_in": [
+    "policies.json"
+   ]
+  },
+  "policy.happiness_to_culture": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [
+    "happiness_to_culture"
+   ],
+   "used_in": [
+    "policies.json"
+   ]
+  },
+  "policy.happiness_to_science": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [
+    "happiness_to_science"
+   ],
+   "used_in": [
+    "policies.json"
+   ]
+  },
+  "policy.minor_great_people_allies": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [
+    "minor_great_people_allies"
+   ],
+   "used_in": [
+    "policies.json"
+   ]
+  },
+  "policy.minor_resource_bonus": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [
+    "minor_resource_bonus"
+   ],
+   "used_in": [
+    "policies.json"
+   ]
+  },
+  "policy.minor_science_allies": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [
+    "minor_science_allies"
+   ],
+   "used_in": [
+    "policies.json"
+   ]
+  },
+  "policy.num_cities_free_culture_building": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [
+    "num_cities_free_culture_building"
+   ],
+   "used_in": [
+    "policies.json"
+   ]
+  },
+  "policy.num_cities_free_food_building": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [
+    "num_cities_free_food_building"
+   ],
+   "used_in": [
+    "policies.json"
+   ]
+  },
+  "policy.second_religion_pantheon": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [
+    "second_religion_pantheon"
+   ],
+   "used_in": [
+    "policies.json"
+   ]
+  },
+  "production.building_class.pct": {
+   "count": 13,
+   "unit": "percent",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "policies.json"
+   ]
+  },
+  "production.buildings.pct": {
+   "count": 2,
+   "unit": "percent",
+   "scopes": [
+    "city",
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "buildings.json",
+    "policies.json"
+   ]
+  },
+  "production.military_units.pct": {
+   "count": 2,
+   "unit": "percent",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "policies.json"
+   ]
+  },
+  "production.spaceship.pct": {
+   "count": 2,
+   "unit": "percent",
+   "scopes": [
+    "city",
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "buildings.json",
+    "wonders.json"
+   ]
+  },
+  "production.units.pct": {
+   "count": 8,
+   "unit": "percent",
+   "scopes": [
+    "city",
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "buildings.json",
+    "policies.json",
+    "unique_buildings.json",
+    "wonders.json"
+   ]
+  },
+  "production.wonders.pct": {
+   "count": 3,
+   "unit": "percent",
+   "scopes": [
+    "city",
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "beliefs.json",
+    "nations.json",
+    "policies.json"
+   ]
+  },
+  "project.allows_nukes": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "on_complete"
+   ],
+   "needs_mechanic": [
+    "allows_nukes"
+   ],
+   "used_in": [
+    "wonders.json"
+   ]
+  },
+  "promotion.air_sweep_capable": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "unit"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [
+    "air_sweep_capable"
+   ],
+   "used_in": [
+    "promotions.json"
+   ]
+  },
+  "promotion.allows_embarkation": {
+   "count": 3,
+   "unit": "see_modifier",
+   "scopes": [
+    "unit"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [
+    "allows_embarkation"
+   ],
+   "used_in": [
+    "promotions.json"
+   ]
+  },
+  "promotion.always_heal": {
+   "count": 5,
+   "unit": "see_modifier",
+   "scopes": [
+    "unit"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [
+    "always_heal"
+   ],
+   "used_in": [
+    "promotions.json"
+   ]
+  },
+  "promotion.amphib": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "unit"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [
+    "amphib"
+   ],
+   "used_in": [
+    "promotions.json"
+   ]
+  },
+  "promotion.can_move_after_attacking": {
+   "count": 6,
+   "unit": "see_modifier",
+   "scopes": [
+    "unit"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [
+    "can_move_after_attacking"
+   ],
+   "used_in": [
+    "promotions.json"
+   ]
+  },
+  "promotion.can_move_impassable": {
+   "count": 2,
+   "unit": "see_modifier",
+   "scopes": [
+    "unit"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [
+    "can_move_impassable"
+   ],
+   "used_in": [
+    "promotions.json"
+   ]
+  },
+  "promotion.capital_defense_falloff": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "unit"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [
+    "capital_defense_falloff"
+   ],
+   "used_in": [
+    "promotions.json"
+   ]
+  },
+  "promotion.capture_defeated_enemy": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "unit"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [
+    "capture_defeated_enemy"
+   ],
+   "used_in": [
+    "promotions.json"
+   ]
+  },
+  "promotion.city_attack_only": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "unit"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [
+    "city_attack_only"
+   ],
+   "used_in": [
+    "promotions.json"
+   ]
+  },
+  "promotion.embarked_all_water": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "unit"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [
+    "embarked_all_water"
+   ],
+   "used_in": [
+    "promotions.json"
+   ]
+  },
+  "promotion.flat_movement_cost": {
+   "count": 1,
+   "unit": "flat",
+   "scopes": [
+    "unit"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [
+    "flat_movement_cost"
+   ],
+   "used_in": [
+    "promotions.json"
+   ]
+  },
+  "promotion.free_pillage_moves": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "unit"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [
+    "free_pillage_moves"
+   ],
+   "used_in": [
+    "promotions.json"
+   ]
+  },
+  "promotion.great_admiral": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "unit"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [
+    "great_admiral"
+   ],
+   "used_in": [
+    "promotions.json"
+   ]
+  },
+  "promotion.great_general": {
+   "count": 2,
+   "unit": "see_modifier",
+   "scopes": [
+    "unit"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [
+    "great_general"
+   ],
+   "used_in": [
+    "promotions.json"
+   ]
+  },
+  "promotion.great_general_combat_modifier": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "unit"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [
+    "great_general_combat_modifier"
+   ],
+   "used_in": [
+    "promotions.json"
+   ]
+  },
+  "promotion.great_general_receives_movement": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "unit"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [
+    "great_general_receives_movement"
+   ],
+   "used_in": [
+    "promotions.json"
+   ]
+  },
+  "promotion.has_post_combat_promotions": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "unit"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [
+    "has_post_combat_promotions"
+   ],
+   "used_in": [
+    "promotions.json"
+   ]
+  },
+  "promotion.heal_if_destroy_excludes_barbarians": {
+   "count": 2,
+   "unit": "see_modifier",
+   "scopes": [
+    "unit"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [
+    "heal_if_destroy_excludes_barbarians"
+   ],
+   "used_in": [
+    "promotions.json"
+   ]
+  },
+  "promotion.heal_outside_friendly": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "unit"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [
+    "heal_outside_friendly"
+   ],
+   "used_in": [
+    "promotions.json"
+   ]
+  },
+  "promotion.heavy_charge": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "unit"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [
+    "heavy_charge"
+   ],
+   "used_in": [
+    "promotions.json"
+   ]
+  },
+  "promotion.hills_double_move": {
+   "count": 2,
+   "unit": "see_modifier",
+   "scopes": [
+    "unit"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [
+    "hills_double_move"
+   ],
+   "used_in": [
+    "promotions.json"
+   ]
+  },
+  "promotion.hovering_unit": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "unit"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [
+    "hovering_unit"
+   ],
+   "used_in": [
+    "promotions.json"
+   ]
+  },
+  "promotion.ignore_terrain_cost": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "unit"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [
+    "ignore_terrain_cost"
+   ],
+   "used_in": [
+    "promotions.json"
+   ]
+  },
+  "promotion.ignore_zoc": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "unit"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [
+    "ignore_zoc"
+   ],
+   "used_in": [
+    "promotions.json"
+   ]
+  },
+  "promotion.insta_heal": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "unit"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [
+    "insta_heal"
+   ],
+   "used_in": [
+    "promotions.json"
+   ]
+  },
+  "promotion.invisible": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "unit"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "promotions.json"
+   ]
+  },
+  "promotion.must_set_up_to_ranged_attack": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "unit"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [
+    "must_set_up_to_ranged_attack"
+   ],
+   "used_in": [
+    "promotions.json"
+   ]
+  },
+  "promotion.no_capture": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "unit"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [
+    "no_capture"
+   ],
+   "used_in": [
+    "promotions.json"
+   ]
+  },
+  "promotion.no_defensive_bonus": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "unit"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [
+    "no_defensive_bonus"
+   ],
+   "used_in": [
+    "promotions.json"
+   ]
+  },
+  "promotion.only_defensive": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "unit"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [
+    "only_defensive"
+   ],
+   "used_in": [
+    "promotions.json"
+   ]
+  },
+  "promotion.range_attack_ignore_los": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "unit"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [
+    "range_attack_ignore_los"
+   ],
+   "used_in": [
+    "promotions.json"
+   ]
+  },
+  "promotion.ranged_support_fire": {
+   "count": 2,
+   "unit": "see_modifier",
+   "scopes": [
+    "unit"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [
+    "ranged_support_fire"
+   ],
+   "used_in": [
+    "promotions.json"
+   ]
+  },
+  "promotion.recon": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "unit"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [
+    "recon"
+   ],
+   "used_in": [
+    "promotions.json"
+   ]
+  },
+  "promotion.rival_territory": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "unit"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [
+    "rival_territory"
+   ],
+   "used_in": [
+    "promotions.json"
+   ]
+  },
+  "promotion.rough_terrain_ends_turn": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "unit"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [
+    "rough_terrain_ends_turn"
+   ],
+   "used_in": [
+    "promotions.json"
+   ]
+  },
+  "promotion.sapper": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "unit"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [
+    "sapper"
+   ],
+   "used_in": [
+    "promotions.json"
+   ]
+  },
+  "promotion.see_invisible": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "unit"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "promotions.json"
+   ]
+  },
+  "prophet.faith_threshold.pct": {
+   "count": 1,
+   "unit": "percent",
+   "scopes": [
+    "religion"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "beliefs.json"
+   ]
+  },
+  "prophet.strength.pct": {
+   "count": 1,
+   "unit": "percent",
+   "scopes": [
+    "religion"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "beliefs.json"
+   ]
+  },
+  "purchase.buildings.cost.pct": {
+   "count": 1,
+   "unit": "percent",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "policies.json"
+   ]
+  },
+  "purchase.cost.pct": {
+   "count": 2,
+   "unit": "percent",
+   "scopes": [
+    "city",
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "policies.json",
+    "wonders.json"
+   ]
+  },
+  "purchase.units.cost.pct": {
+   "count": 1,
+   "unit": "percent",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "policies.json"
+   ]
+  },
+  "religion.pressure_out.pct": {
+   "count": 2,
+   "unit": "percent",
+   "scopes": [
+    "city",
+    "religion"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "beliefs.json",
+    "wonders.json"
+   ]
+  },
+  "religion.pressure_to_friendly_city_states.pct": {
+   "count": 1,
+   "unit": "percent",
+   "scopes": [
+    "religion"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "beliefs.json"
+   ]
+  },
+  "religion.spread_distance.pct": {
+   "count": 1,
+   "unit": "percent",
+   "scopes": [
+    "religion"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "beliefs.json"
+   ]
+  },
+  "religion.strength_loss_rival_land.pct": {
+   "count": 1,
+   "unit": "percent",
+   "scopes": [
+    "unit"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "promotions.json"
+   ]
+  },
+  "research_agreement.science.pct": {
+   "count": 2,
+   "unit": "percent",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "policies.json",
+    "wonders.json"
+   ]
+  },
+  "resource.extra_luxury_copy": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "city"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "unique_buildings.json"
+   ]
+  },
+  "resource.provide": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "buildings.json"
+   ]
+  },
+  "resource.quantity.pct": {
+   "count": 4,
+   "unit": "percent",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "nations.json"
+   ]
+  },
+  "resource.strategic_quantity.pct": {
+   "count": 1,
+   "unit": "percent",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "policies.json"
+   ]
+  },
+  "route.maintenance.pct": {
+   "count": 2,
+   "unit": "percent",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "nations.json",
+    "policies.json"
+   ]
+  },
+  "route.movement_cost.flat": {
+   "count": 1,
+   "unit": "flat",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "techs.json"
+   ]
+  },
+  "science.on_spread_per_other_religion_follower": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "on_religion_spread"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "beliefs.json"
+   ]
+  },
+  "specialist.yield.production.flat": {
+   "count": 9,
+   "unit": "flat",
+   "scopes": [
+    "city"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "beliefs.json",
+    "wonders.json"
+   ]
+  },
+  "specialist.yield.science.flat": {
+   "count": 8,
+   "unit": "flat",
+   "scopes": [
+    "city",
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "nations.json",
+    "policies.json",
+    "wonders.json"
+   ]
+  },
+  "tech.allow_embassy_trading_allowed": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "on_research"
+   ],
+   "needs_mechanic": [
+    "allow_embassy_trading_allowed"
+   ],
+   "used_in": [
+    "techs.json"
+   ]
+  },
+  "tech.allows_embarking": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "on_research"
+   ],
+   "needs_mechanic": [
+    "allows_embarking"
+   ],
+   "used_in": [
+    "techs.json"
+   ]
+  },
+  "tech.allows_world_congress": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "on_research"
+   ],
+   "needs_mechanic": [
+    "allows_world_congress"
+   ],
+   "used_in": [
+    "techs.json"
+   ]
+  },
+  "tech.bridge_building": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "on_research"
+   ],
+   "needs_mechanic": [
+    "bridge_building"
+   ],
+   "used_in": [
+    "techs.json"
+   ]
+  },
+  "tech.defensive_pact_trading_allowed": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "on_research"
+   ],
+   "needs_mechanic": [
+    "defensive_pact_trading_allowed"
+   ],
+   "used_in": [
+    "techs.json"
+   ]
+  },
+  "tech.embarked_all_water_passage": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "on_research"
+   ],
+   "needs_mechanic": [
+    "embarked_all_water_passage"
+   ],
+   "used_in": [
+    "techs.json"
+   ]
+  },
+  "tech.map_visible": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "on_research"
+   ],
+   "needs_mechanic": [
+    "map_visible"
+   ],
+   "used_in": [
+    "techs.json"
+   ]
+  },
+  "tech.open_borders_trading_allowed": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "on_research"
+   ],
+   "needs_mechanic": [
+    "open_borders_trading_allowed"
+   ],
+   "used_in": [
+    "techs.json"
+   ]
+  },
+  "tech.research_agreement_trading_allowed": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "on_research"
+   ],
+   "needs_mechanic": [
+    "research_agreement_trading_allowed"
+   ],
+   "used_in": [
+    "techs.json"
+   ]
+  },
+  "tech.triggers_archaeological_sites": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "on_research"
+   ],
+   "needs_mechanic": [
+    "triggers_archaeological_sites"
+   ],
+   "used_in": [
+    "techs.json"
+   ]
+  },
+  "text_only": {
+   "count": 4,
+   "unit": "see_modifier",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [
+    "hardcoded_policy_exploration_finisher",
+    "hardcoded_promotion_anti_helicopter",
+    "hardcoded_promotion_goody_hut_picker",
+    "hardcoded_promotion_sell_exotic_goods"
+   ],
+   "used_in": [
+    "policies.json",
+    "promotions.json"
+   ]
+  },
+  "theming.bonus.pct": {
+   "count": 2,
+   "unit": "percent",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "nations.json",
+    "policies.json"
+   ]
+  },
+  "tile.yield.any.pct": {
+   "count": 1,
+   "unit": "percent",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "nations.json"
+   ]
+  },
+  "tile.yield.culture.flat": {
+   "count": 12,
+   "unit": "flat",
+   "scopes": [
+    "city",
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "beliefs.json",
+    "buildings.json",
+    "nations.json",
+    "policies.json"
+   ]
+  },
+  "tile.yield.culture.flat_if_unimproved": {
+   "count": 1,
+   "unit": "flat",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "nations.json"
+   ]
+  },
+  "tile.yield.faith.flat": {
+   "count": 16,
+   "unit": "flat",
+   "scopes": [
+    "city",
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "beliefs.json",
+    "buildings.json",
+    "policies.json"
+   ]
+  },
+  "tile.yield.food.flat": {
+   "count": 12,
+   "unit": "flat",
+   "scopes": [
+    "city"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "beliefs.json",
+    "buildings.json",
+    "unique_buildings.json",
+    "wonders.json"
+   ]
+  },
+  "tile.yield.gold.flat": {
+   "count": 13,
+   "unit": "flat",
+   "scopes": [
+    "city",
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "buildings.json",
+    "policies.json",
+    "unique_buildings.json",
+    "wonders.json"
+   ]
+  },
+  "tile.yield.production.flat": {
+   "count": 21,
+   "unit": "flat",
+   "scopes": [
+    "city",
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "beliefs.json",
+    "buildings.json",
+    "nations.json",
+    "policies.json",
+    "unique_buildings.json",
+    "wonders.json"
+   ]
+  },
+  "tile.yield.science.flat": {
+   "count": 10,
+   "unit": "flat",
+   "scopes": [
+    "city",
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "buildings.json",
+    "nations.json",
+    "policies.json",
+    "unique_buildings.json"
+   ]
+  },
+  "tile_purchase.cost.pct": {
+   "count": 3,
+   "unit": "percent",
+   "scopes": [
+    "city",
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "nations.json",
+    "unique_buildings.json",
+    "wonders.json"
+   ]
+  },
+  "tourism.great_works.pct": {
+   "count": 3,
+   "unit": "percent",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "buildings.json",
+    "wonders.json"
+   ]
+  },
+  "tourism.landmarks.pct_of_culture": {
+   "count": 3,
+   "unit": "percent",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "buildings.json",
+    "wonders.json"
+   ]
+  },
+  "tourism.on_unit_created.pct_of_recent": {
+   "count": 3,
+   "unit": "percent",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "on_unit_created"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "policies.json"
+   ]
+  },
+  "tourism.pct": {
+   "count": 8,
+   "unit": "percent",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "on_research",
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "nations.json",
+    "policies.json",
+    "techs.json"
+   ]
+  },
+  "trade.city_state_route.gold.flat": {
+   "count": 1,
+   "unit": "flat",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "policies.json"
+   ]
+  },
+  "trade.incoming_route.yield.gold.flat": {
+   "count": 1,
+   "unit": "flat",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "nations.json"
+   ]
+  },
+  "trade.internal_route.yield.pct": {
+   "count": 1,
+   "unit": "percent",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "policies.json"
+   ]
+  },
+  "trade.land_range.flat_tiles": {
+   "count": 1,
+   "unit": "flat",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "nations.json"
+   ]
+  },
+  "trade.land_range.pct": {
+   "count": 1,
+   "unit": "percent",
+   "scopes": [
+    "city"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "buildings.json"
+   ]
+  },
+  "trade.land_route.gold.flat": {
+   "count": 2,
+   "unit": "flat",
+   "scopes": [
+    "city",
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "buildings.json",
+    "policies.json"
+   ]
+  },
+  "trade.range.pct": {
+   "count": 3,
+   "unit": "percent",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "techs.json"
+   ]
+  },
+  "trade.religious_pressure.pct": {
+   "count": 1,
+   "unit": "percent",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "nations.json"
+   ]
+  },
+  "trade.resource_diversity_gold.pct": {
+   "count": 1,
+   "unit": "percent",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "nations.json"
+   ]
+  },
+  "trade.route.gold.flat": {
+   "count": 1,
+   "unit": "flat",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "policies.json"
+   ]
+  },
+  "trade.route.yield.science.flat": {
+   "count": 1,
+   "unit": "flat",
+   "scopes": [
+    "city"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "beliefs.json"
+   ]
+  },
+  "trade.route_recipient.gold.flat": {
+   "count": 7,
+   "unit": "flat",
+   "scopes": [
+    "city"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "buildings.json",
+    "unique_buildings.json",
+    "wonders.json"
+   ]
+  },
+  "trade.route_target.gold.flat": {
+   "count": 7,
+   "unit": "flat",
+   "scopes": [
+    "city"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "buildings.json",
+    "unique_buildings.json",
+    "wonders.json"
+   ]
+  },
+  "trade.routes.flat": {
+   "count": 10,
+   "unit": "flat",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "on_research",
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "techs.json",
+    "wonders.json"
+   ]
+  },
+  "trade.routes.pct": {
+   "count": 1,
+   "unit": "percent",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "nations.json"
+   ]
+  },
+  "trade.sea_range.pct": {
+   "count": 1,
+   "unit": "percent",
+   "scopes": [
+    "city"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "buildings.json"
+   ]
+  },
+  "trade.sea_route.gold.flat": {
+   "count": 2,
+   "unit": "flat",
+   "scopes": [
+    "city",
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "buildings.json",
+    "policies.json"
+   ]
+  },
+  "trade_mission.gold.pct": {
+   "count": 2,
+   "unit": "percent",
+   "scopes": [
+    "player",
+    "unit"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "policies.json",
+    "promotions.json"
+   ]
+  },
+  "trade_mission.influence.pct": {
+   "count": 1,
+   "unit": "percent",
+   "scopes": [
+    "unit"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "promotions.json"
+   ]
+  },
+  "trait.able_to_annex_city_states": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [
+    "able_to_annex_city_states"
+   ],
+   "used_in": [
+    "nations.json"
+   ]
+  },
+  "trait.bonus_religious_belief": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [
+    "bonus_religious_belief"
+   ],
+   "used_in": [
+    "nations.json"
+   ]
+  },
+  "trait.capital_building_modifier": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [
+    "capital_building_modifier"
+   ],
+   "used_in": [
+    "nations.json"
+   ]
+  },
+  "trait.city_state_friendship_modifier": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [
+    "city_state_friendship_modifier"
+   ],
+   "used_in": [
+    "nations.json"
+   ]
+  },
+  "trait.combat_bonus_improvement": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "nations.json"
+   ]
+  },
+  "trait.crosses_mountains_after_great_general": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [
+    "crosses_mountains_after_great_general"
+   ],
+   "used_in": [
+    "nations.json"
+   ]
+  },
+  "trait.dof_great_person_modifier": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [
+    "dof_great_person_modifier"
+   ],
+   "used_in": [
+    "nations.json"
+   ]
+  },
+  "trait.embarked_all_water": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [
+    "embarked_all_water"
+   ],
+   "used_in": [
+    "nations.json"
+   ]
+  },
+  "trait.embarked_to_land_flat_cost": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [
+    "embarked_to_land_flat_cost"
+   ],
+   "used_in": [
+    "nations.json"
+   ]
+  },
+  "trait.extra_founded_city_territory_claim_range": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [
+    "extra_founded_city_territory_claim_range"
+   ],
+   "used_in": [
+    "nations.json"
+   ]
+  },
+  "trait.faith_from_unimproved_forest": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [
+    "faith_from_unimproved_forest"
+   ],
+   "used_in": [
+    "nations.json"
+   ]
+  },
+  "trait.faster_in_hills": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [
+    "faster_in_hills"
+   ],
+   "used_in": [
+    "nations.json"
+   ]
+  },
+  "trait.fight_well_damaged": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [
+    "fight_well_damaged"
+   ],
+   "used_in": [
+    "nations.json"
+   ]
+  },
+  "trait.free_building": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "nations.json"
+   ]
+  },
+  "trait.free_social_policies_per_era": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [
+    "free_social_policies_per_era"
+   ],
+   "used_in": [
+    "nations.json"
+   ]
+  },
+  "trait.free_unit": {
+   "count": 2,
+   "unit": "see_modifier",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "nations.json"
+   ]
+  },
+  "trait.free_unit_prereq_tech": {
+   "count": 2,
+   "unit": "see_modifier",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "nations.json"
+   ]
+  },
+  "trait.great_person_gift_influence": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [
+    "great_person_gift_influence"
+   ],
+   "used_in": [
+    "nations.json"
+   ]
+  },
+  "trait.land_barbarian_conversion_percent": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [
+    "land_barbarian_conversion_percent"
+   ],
+   "used_in": [
+    "nations.json"
+   ]
+  },
+  "trait.luxury_happiness_retention": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [
+    "luxury_happiness_retention"
+   ],
+   "used_in": [
+    "nations.json"
+   ]
+  },
+  "trait.maya_calendar_bonuses": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [
+    "maya_calendar_bonuses"
+   ],
+   "used_in": [
+    "nations.json"
+   ]
+  },
+  "trait.move_friendly_woods_as_road": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [
+    "move_friendly_woods_as_road"
+   ],
+   "used_in": [
+    "nations.json"
+   ]
+  },
+  "trait.nearby_improvement_bonus_range": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [
+    "nearby_improvement_bonus_range"
+   ],
+   "used_in": [
+    "nations.json"
+   ]
+  },
+  "trait.no_annexing": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [
+    "no_annexing"
+   ],
+   "used_in": [
+    "nations.json"
+   ]
+  },
+  "trait.no_hills_improvement_maintenance": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [
+    "no_hills_improvement_maintenance"
+   ],
+   "used_in": [
+    "nations.json"
+   ]
+  },
+  "trait.raze_speed_modifier": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [
+    "raze_speed_modifier"
+   ],
+   "used_in": [
+    "nations.json"
+   ]
+  },
+  "trait.tech_boost_from_capital_science_buildings": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [
+    "tech_boost_from_capital_science_buildings"
+   ],
+   "used_in": [
+    "nations.json"
+   ]
+  },
+  "trait.tech_from_city_conquer": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [
+    "tech_from_city_conquer"
+   ],
+   "used_in": [
+    "nations.json"
+   ]
+  },
+  "trait.unique_luxury_cities": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [
+    "unique_luxury_cities"
+   ],
+   "used_in": [
+    "nations.json"
+   ]
+  },
+  "trait.unique_luxury_quantity": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [
+    "unique_luxury_quantity"
+   ],
+   "used_in": [
+    "nations.json"
+   ]
+  },
+  "trait.unique_luxury_requires_new_area": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [
+    "unique_luxury_requires_new_area"
+   ],
+   "used_in": [
+    "nations.json"
+   ]
+  },
+  "unhappiness.from_cities.pct": {
+   "count": 1,
+   "unit": "percent",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "nations.json"
+   ]
+  },
+  "unhappiness.from_population.pct": {
+   "count": 1,
+   "unit": "percent",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "nations.json"
+   ]
+  },
+  "unhappiness.pct": {
+   "count": 3,
+   "unit": "percent",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "policies.json",
+    "wonders.json"
+   ]
+  },
+  "unit.attacks_per_turn.flat": {
+   "count": 5,
+   "unit": "flat",
+   "scopes": [
+    "unit"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "promotions.json"
+   ]
+  },
+  "unit.cargo.flat": {
+   "count": 7,
+   "unit": "flat",
+   "scopes": [
+    "unit"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "promotions.json"
+   ]
+  },
+  "unit.double_move": {
+   "count": 5,
+   "unit": "see_modifier",
+   "scopes": [
+    "unit"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "promotions.json"
+   ]
+  },
+  "unit.embarked_moves.flat": {
+   "count": 5,
+   "unit": "flat",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "on_research",
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "nations.json",
+    "policies.json",
+    "techs.json"
+   ]
+  },
+  "unit.embarked_sight.flat": {
+   "count": 3,
+   "unit": "flat",
+   "scopes": [
+    "unit"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "promotions.json"
+   ]
+  },
+  "unit.free_maintenance_slots.flat": {
+   "count": 1,
+   "unit": "flat",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "policies.json"
+   ]
+  },
+  "unit.free_xp": {
+   "count": 20,
+   "unit": "see_modifier",
+   "scopes": [
+    "city",
+    "player"
+   ],
+   "triggers": [
+    "on_unit_trained"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "buildings.json",
+    "policies.json",
+    "unique_buildings.json",
+    "wonders.json"
+   ]
+  },
+  "unit.free_xp_per_great_work": {
+   "count": 3,
+   "unit": "see_modifier",
+   "scopes": [
+    "city"
+   ],
+   "triggers": [
+    "on_unit_trained"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "unique_buildings.json"
+   ]
+  },
+  "unit.impassable_terrain": {
+   "count": 4,
+   "unit": "see_modifier",
+   "scopes": [
+    "unit"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "promotions.json"
+   ]
+  },
+  "unit.maintenance.pct": {
+   "count": 4,
+   "unit": "percent",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "nations.json",
+    "policies.json"
+   ]
+  },
+  "unit.moves.flat": {
+   "count": 15,
+   "unit": "flat",
+   "scopes": [
+    "player",
+    "unit"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "nations.json",
+    "promotions.json"
+   ]
+  },
+  "unit.naval_moves.flat": {
+   "count": 2,
+   "unit": "flat",
+   "scopes": [
+    "unit"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "promotions.json"
+   ]
+  },
+  "unit.paradrop_range.flat": {
+   "count": 2,
+   "unit": "flat",
+   "scopes": [
+    "unit"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "promotions.json"
+   ]
+  },
+  "unit.range.flat": {
+   "count": 2,
+   "unit": "flat",
+   "scopes": [
+    "unit"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "promotions.json"
+   ]
+  },
+  "unit.sight.flat": {
+   "count": 10,
+   "unit": "flat",
+   "scopes": [
+    "unit"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "promotions.json"
+   ]
+  },
+  "unit.upgrade_cost.pct": {
+   "count": 2,
+   "unit": "percent",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "policies.json",
+    "wonders.json"
+   ]
+  },
+  "unit.xp_gain.pct": {
+   "count": 2,
+   "unit": "percent",
+   "scopes": [
+    "player",
+    "unit"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "policies.json",
+    "promotions.json"
+   ]
+  },
+  "unit.xp_needed.pct": {
+   "count": 1,
+   "unit": "percent",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "nations.json"
+   ]
+  },
+  "unlock.faith_purchase_building": {
+   "count": 7,
+   "unit": "see_modifier",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "beliefs.json"
+   ]
+  },
+  "unlock.faith_purchase_units_from_era": {
+   "count": 8,
+   "unit": "see_modifier",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "beliefs.json"
+   ]
+  },
+  "unlock.unit": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "policies.json"
+   ]
+  },
+  "wonder.culture.pct": {
+   "count": 1,
+   "unit": "percent",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "policies.json"
+   ]
+  },
+  "worker.speed.pct": {
+   "count": 2,
+   "unit": "percent",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "policies.json",
+    "wonders.json"
+   ]
+  },
+  "world_wonder.yield.faith.flat": {
+   "count": 1,
+   "unit": "flat",
+   "scopes": [
+    "city"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "beliefs.json"
+   ]
+  },
+  "yield.culture.flat": {
+   "count": 62,
+   "unit": "flat",
+   "scopes": [
+    "city",
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "buildings.json",
+    "policies.json",
+    "unique_buildings.json",
+    "wonders.json"
+   ]
+  },
+  "yield.culture.pct": {
+   "count": 5,
+   "unit": "percent",
+   "scopes": [
+    "city",
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "buildings.json",
+    "wonders.json"
+   ]
+  },
+  "yield.culture.per_trade_partner": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "nations.json"
+   ]
+  },
+  "yield.culture.per_x_foreign_followers": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "religion"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "beliefs.json"
+   ]
+  },
+  "yield.faith.flat": {
+   "count": 18,
+   "unit": "flat",
+   "scopes": [
+    "city"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "buildings.json",
+    "unique_buildings.json",
+    "wonders.json"
+   ]
+  },
+  "yield.faith.per_foreign_following_city": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "religion"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "beliefs.json"
+   ]
+  },
+  "yield.faith.per_religion_present": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "city"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "unique_buildings.json"
+   ]
+  },
+  "yield.food.flat": {
+   "count": 8,
+   "unit": "flat",
+   "scopes": [
+    "city",
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "buildings.json",
+    "policies.json",
+    "unique_buildings.json",
+    "wonders.json"
+   ]
+  },
+  "yield.food.pct": {
+   "count": 2,
+   "unit": "percent",
+   "scopes": [
+    "city",
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "unique_buildings.json",
+    "wonders.json"
+   ]
+  },
+  "yield.gold.flat": {
+   "count": 14,
+   "unit": "flat",
+   "scopes": [
+    "city",
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "buildings.json",
+    "policies.json",
+    "unique_buildings.json",
+    "wonders.json"
+   ]
+  },
+  "yield.gold.pct": {
+   "count": 8,
+   "unit": "percent",
+   "scopes": [
+    "city",
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "buildings.json",
+    "policies.json",
+    "unique_buildings.json"
+   ]
+  },
+  "yield.gold.per_following_city": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "beliefs.json"
+   ]
+  },
+  "yield.gold.per_pop": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "policies.json"
+   ]
+  },
+  "yield.gold.per_trade_partner": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "nations.json"
+   ]
+  },
+  "yield.gold.per_x_followers": {
+   "count": 1,
+   "unit": "see_modifier",
+   "scopes": [
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "beliefs.json"
+   ]
+  },
+  "yield.production.flat": {
+   "count": 18,
+   "unit": "flat",
+   "scopes": [
+    "city",
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "beliefs.json",
+    "buildings.json",
+    "policies.json",
+    "unique_buildings.json",
+    "wonders.json"
+   ]
+  },
+  "yield.production.pct": {
+   "count": 5,
+   "unit": "percent",
+   "scopes": [
+    "city"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "buildings.json",
+    "unique_buildings.json"
+   ]
+  },
+  "yield.production.pct_per_city_state_route": {
+   "count": 1,
+   "unit": "percent",
+   "scopes": [
+    "city"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "unique_buildings.json"
+   ]
+  },
+  "yield.production.pct_per_follower_max": {
+   "count": 1,
+   "unit": "percent",
+   "scopes": [
+    "city"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "beliefs.json"
+   ]
+  },
+  "yield.science.flat": {
+   "count": 9,
+   "unit": "flat",
+   "scopes": [
+    "city",
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "buildings.json",
+    "policies.json",
+    "unique_buildings.json",
+    "wonders.json"
+   ]
+  },
+  "yield.science.pct": {
+   "count": 7,
+   "unit": "percent",
+   "scopes": [
+    "city",
+    "player"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "buildings.json",
+    "policies.json",
+    "unique_buildings.json",
+    "wonders.json"
+   ]
+  },
+  "yield.science.per_pop": {
+   "count": 4,
+   "unit": "see_modifier",
+   "scopes": [
+    "city"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "buildings.json",
+    "unique_buildings.json"
+   ]
+  },
+  "yield.tourism.flat": {
+   "count": 2,
+   "unit": "flat",
+   "scopes": [
+    "city"
+   ],
+   "triggers": [
+    "passive"
+   ],
+   "needs_mechanic": [],
+   "used_in": [
+    "unique_buildings.json",
+    "wonders.json"
+   ]
+  }
+ },
+ "selector_kinds": {
+  "adjacent_enemy_units": 2,
+  "adjacent_friendly_units": 3,
+  "all_cities": 63,
+  "all_units": 70,
+  "buildings_in_following_cities": 15,
+  "buildings_of_player": 82,
+  "capital": 20,
+  "cities_with_building": 3,
+  "city_states": 9,
+  "coastal_cities": 1,
+  "enemy_units_in_range": 2,
+  "following_cities": 26,
+  "great_works_of_player": 1,
+  "holy_city": 2,
+  "lake_tiles_of_city": 1,
+  "natural_wonder_tiles_of_following_cities": 1,
+  "player": 192,
+  "religion": 7,
+  "religion_founder": 12,
+  "river_tiles_of_city": 1,
+  "routes": 1,
+  "specialists_of_city": 9,
+  "specialists_of_following_cities": 1,
+  "specialists_of_player": 7,
+  "this_city": 257,
+  "this_tile": 5,
+  "this_unit": 311,
+  "tiles_of_city": 33,
+  "tiles_of_following_cities": 24,
+  "tiles_of_player": 22,
+  "units_trained_here": 26,
+  "water_resource_tiles_of_city": 3,
+  "water_tiles_of_city": 1
+ },
+ "triggers": {
+  "after_first_combat": 8,
+  "on_adopt": 14,
+  "on_attack": 2,
+  "on_attack_city": 4,
+  "on_city_converted": 1,
+  "on_city_founded": 1,
+  "on_complete": 36,
+  "on_complete_and_new_cities": 1,
+  "on_discover_natural_wonder": 2,
+  "on_great_person_expended": 2,
+  "on_kill": 8,
+  "on_project_complete": 11,
+  "on_religion_spread": 1,
+  "on_research": 22,
+  "on_unit_created": 3,
+  "on_unit_gift": 1,
+  "on_unit_trained": 26,
+  "passive": 1070
+ },
+ "condition_keys": {
+  "adjacent_to_friendly_city": 1,
+  "afraid": 1,
+  "before_era": 1,
+  "city_garrisoned": 3,
+  "city_on_river": 1,
+  "city_state_follows_religion": 1,
+  "doubles_with_tech": 1,
+  "golden_age": 6,
+  "max_distance": 1,
+  "min_followers": 4,
+  "min_population": 2,
+  "near_enemy_city_following_religion": 1,
+  "near_friendly_city_following_religion": 1,
+  "near_improvement": 1,
+  "on_tile": 27,
+  "opponent": 44,
+  "protected": 1,
+  "requires_peace": 1,
+  "target": 7,
+  "tech_known": 3,
+  "tile": 1,
+  "turns": 1,
+  "until_tech": 4,
+  "victim": 1
+ }
+}

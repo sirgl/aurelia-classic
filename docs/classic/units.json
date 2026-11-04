@@ -1,0 +1,3743 @@
+{
+ "schema": "classic-spec/1",
+ "catalog": "units",
+ "edition": "Classic rule set (Unciv Gods & Kings ruleset plus own extensions)",
+ "count": 82,
+ "items": [
+  {
+   "id": "core:unit/settler",
+   "name": "Settler",
+   "class": "core:unit-class/settler",
+   "role": "civilian",
+   "domain": "core:domain/land",
+   "era": "core:era/ancient",
+   "combat": 0,
+   "ranged_combat": 0,
+   "range": 0,
+   "moves": 2,
+   "sight": 2,
+   "cost": 106,
+   "faith_cost": null,
+   "required_tech": null,
+   "obsolete_tech": null,
+   "required_resources": [],
+   "upgrades_to": [],
+   "free_promotions": [],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 0,
+   "xp_value_defense": 0,
+   "abilities": {
+    "found": true,
+    "capture": "core:unit/worker",
+    "food": true,
+    "civilian_attack_priority": "high_early_game_only"
+   },
+   "art_id": "bnw:unit/settler",
+   "provenance": "unciv: Units.json, Settler",
+   "unciv_fields": [
+    "combat",
+    "cost",
+    "moves",
+    "obsolete_tech",
+    "ranged_combat",
+    "required_resources"
+   ]
+  },
+  {
+   "id": "core:unit/worker",
+   "name": "Worker",
+   "class": "core:unit-class/worker",
+   "role": "civilian",
+   "domain": "core:domain/land",
+   "era": "core:era/ancient",
+   "combat": 0,
+   "ranged_combat": 0,
+   "range": 0,
+   "moves": 2,
+   "sight": 2,
+   "cost": 70,
+   "faith_cost": null,
+   "required_tech": null,
+   "obsolete_tech": null,
+   "required_resources": [],
+   "upgrades_to": [],
+   "free_promotions": [],
+   "worker_actions": [
+    "core:build/road",
+    "core:build/railroad",
+    "core:build/farm",
+    "core:build/mine",
+    "core:build/trading-post",
+    "core:build/lumbermill",
+    "core:build/pasture",
+    "core:build/camp",
+    "core:build/plantation",
+    "core:build/quarry",
+    "core:build/well",
+    "core:build/fort",
+    "core:build/remove-jungle",
+    "core:build/remove-marsh",
+    "core:build/remove-forest",
+    "core:build/scrub-fallout",
+    "core:build/repair",
+    "core:build/remove-route",
+    "core:build/brazilwood-camp",
+    "core:build/kasbah",
+    "core:build/feitoria",
+    "core:build/chateau",
+    "core:build/terrace-farm",
+    "core:build/moai"
+   ],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 0,
+   "xp_value_defense": 0,
+   "abilities": {
+    "work_rate": 100,
+    "capture": "core:unit/worker",
+    "civilian_attack_priority": "low"
+   },
+   "art_id": "bnw:unit/worker",
+   "provenance": "unciv: Units.json, Worker",
+   "unciv_fields": [
+    "combat",
+    "cost",
+    "moves",
+    "obsolete_tech",
+    "ranged_combat",
+    "required_resources"
+   ]
+  },
+  {
+   "id": "core:unit/work-boat",
+   "name": "Work Boat",
+   "class": "core:unit-class/workboat",
+   "role": "civilian",
+   "domain": "core:domain/sea",
+   "era": "core:era/ancient",
+   "combat": 0,
+   "ranged_combat": 0,
+   "range": 0,
+   "moves": 4,
+   "sight": 2,
+   "cost": 30,
+   "faith_cost": null,
+   "required_tech": "core:tech/sailing",
+   "obsolete_tech": null,
+   "required_resources": [],
+   "upgrades_to": [],
+   "free_promotions": [
+    "core:promotion/ocean-impassable-until-astronomy"
+   ],
+   "worker_actions": [
+    "core:build/fishing-boats",
+    "core:build/offshore-platform",
+    "core:build/repair"
+   ],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 0,
+   "xp_value_defense": 3,
+   "abilities": {
+    "work_rate": 100,
+    "mechanized": true,
+    "civilian_attack_priority": "low"
+   },
+   "art_id": "bnw:unit/work-boat",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:unit/great-artist",
+   "name": "Great Artist",
+   "class": "core:unit-class/artist",
+   "role": "great-person",
+   "domain": "core:domain/land",
+   "era": "core:era/ancient",
+   "combat": 0,
+   "ranged_combat": 0,
+   "range": 0,
+   "moves": 2,
+   "sight": 2,
+   "cost": -1,
+   "faith_cost": null,
+   "required_tech": null,
+   "obsolete_tech": null,
+   "required_resources": [],
+   "upgrades_to": [],
+   "free_promotions": [],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 0,
+   "xp_value_defense": 0,
+   "abilities": {
+    "work_rate": 1,
+    "golden_age_turns": 8,
+    "special": "people",
+    "civilian_attack_priority": "high"
+   },
+   "art_id": "bnw:unit/great-artist",
+   "provenance": "unciv: Units.json, Great Artist",
+   "unciv_fields": [
+    "combat",
+    "moves",
+    "obsolete_tech",
+    "ranged_combat",
+    "required_resources",
+    "required_tech"
+   ]
+  },
+  {
+   "id": "core:unit/great-scientist",
+   "name": "Great Scientist",
+   "class": "core:unit-class/scientist",
+   "role": "great-person",
+   "domain": "core:domain/land",
+   "era": "core:era/ancient",
+   "combat": 0,
+   "ranged_combat": 0,
+   "range": 0,
+   "moves": 2,
+   "sight": 2,
+   "cost": -1,
+   "faith_cost": null,
+   "required_tech": null,
+   "obsolete_tech": null,
+   "required_resources": [],
+   "upgrades_to": [],
+   "free_promotions": [],
+   "worker_actions": [
+    "core:build/academy"
+   ],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 0,
+   "xp_value_defense": 0,
+   "abilities": {
+    "work_rate": 1,
+    "base_beakers_turns_to_count": 8,
+    "special": "people",
+    "civilian_attack_priority": "high"
+   },
+   "art_id": "bnw:unit/great-scientist",
+   "provenance": "unciv: Units.json, Great Scientist",
+   "unciv_fields": [
+    "combat",
+    "moves",
+    "obsolete_tech",
+    "ranged_combat",
+    "required_resources",
+    "required_tech"
+   ]
+  },
+  {
+   "id": "core:unit/great-merchant",
+   "name": "Great Merchant",
+   "class": "core:unit-class/merchant",
+   "role": "great-person",
+   "domain": "core:domain/land",
+   "era": "core:era/ancient",
+   "combat": 0,
+   "ranged_combat": 0,
+   "range": 0,
+   "moves": 2,
+   "sight": 2,
+   "cost": -1,
+   "faith_cost": null,
+   "required_tech": null,
+   "obsolete_tech": null,
+   "required_resources": [],
+   "upgrades_to": [],
+   "free_promotions": [],
+   "worker_actions": [
+    "core:build/customs-house"
+   ],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 0,
+   "xp_value_defense": 0,
+   "abilities": {
+    "work_rate": 1,
+    "base_gold": 350,
+    "num_gold_per_era": 50,
+    "special": "people",
+    "civilian_attack_priority": "high"
+   },
+   "art_id": "bnw:unit/great-merchant",
+   "provenance": "unciv: Units.json, Great Merchant",
+   "unciv_fields": [
+    "combat",
+    "moves",
+    "obsolete_tech",
+    "ranged_combat",
+    "required_resources",
+    "required_tech"
+   ]
+  },
+  {
+   "id": "core:unit/great-engineer",
+   "name": "Great Engineer",
+   "class": "core:unit-class/engineer",
+   "role": "great-person",
+   "domain": "core:domain/land",
+   "era": "core:era/ancient",
+   "combat": 0,
+   "ranged_combat": 0,
+   "range": 0,
+   "moves": 2,
+   "sight": 2,
+   "cost": -1,
+   "faith_cost": null,
+   "required_tech": null,
+   "obsolete_tech": null,
+   "required_resources": [],
+   "upgrades_to": [],
+   "free_promotions": [],
+   "worker_actions": [
+    "core:build/manufactory"
+   ],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 0,
+   "xp_value_defense": 0,
+   "abilities": {
+    "work_rate": 1,
+    "base_hurry": 300,
+    "hurry_multiplier": 30,
+    "special": "people",
+    "civilian_attack_priority": "high"
+   },
+   "art_id": "bnw:unit/great-engineer",
+   "provenance": "unciv: Units.json, Great Engineer",
+   "unciv_fields": [
+    "combat",
+    "moves",
+    "obsolete_tech",
+    "ranged_combat",
+    "required_resources",
+    "required_tech"
+   ]
+  },
+  {
+   "id": "core:unit/great-general",
+   "name": "Great General",
+   "class": "core:unit-class/great-general",
+   "role": "great-person",
+   "domain": "core:domain/land",
+   "era": "core:era/ancient",
+   "combat": 0,
+   "ranged_combat": 0,
+   "range": 0,
+   "moves": 2,
+   "sight": 2,
+   "cost": -1,
+   "faith_cost": null,
+   "required_tech": null,
+   "obsolete_tech": null,
+   "required_resources": [],
+   "upgrades_to": [],
+   "free_promotions": [
+    "core:promotion/great-general"
+   ],
+   "worker_actions": [
+    "core:build/citadel"
+   ],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 0,
+   "xp_value_defense": 0,
+   "abilities": {
+    "work_rate": 1,
+    "special": "people",
+    "civilian_attack_priority": "high"
+   },
+   "art_id": "bnw:unit/great-general",
+   "provenance": "unciv: Units.json, Great General",
+   "unciv_fields": [
+    "combat",
+    "moves",
+    "obsolete_tech",
+    "ranged_combat",
+    "required_resources",
+    "required_tech"
+   ]
+  },
+  {
+   "id": "core:unit/ss-stasis-chamber",
+   "name": "SS Stasis Chamber",
+   "class": "core:unit-class/ss-stasis-chamber",
+   "role": "spaceship-part",
+   "domain": "core:domain/land",
+   "era": "core:era/information",
+   "combat": 0,
+   "ranged_combat": 0,
+   "range": 0,
+   "moves": 2,
+   "sight": 2,
+   "cost": 750,
+   "faith_cost": null,
+   "required_tech": "core:tech/nanotechnology",
+   "obsolete_tech": null,
+   "required_resources": [
+    {
+     "resource": "core:resource/aluminum",
+     "amount": 1
+    }
+   ],
+   "upgrades_to": [],
+   "free_promotions": [],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 0,
+   "xp_value_defense": 0,
+   "abilities": {
+    "civilian_attack_priority": "high",
+    "spaceship_project": "core:project/ss_stasis_chamber",
+    "project_prereq": "core:project/apollo_program"
+   },
+   "provenance": "unciv: Units.json, SS Stasis Chamber",
+   "unciv_fields": [
+    "combat",
+    "cost",
+    "moves",
+    "obsolete_tech",
+    "ranged_combat",
+    "required_resources",
+    "required_tech"
+   ]
+  },
+  {
+   "id": "core:unit/ss-engine",
+   "name": "SS Engine",
+   "class": "core:unit-class/ss-engine",
+   "role": "spaceship-part",
+   "domain": "core:domain/land",
+   "era": "core:era/information",
+   "combat": 0,
+   "ranged_combat": 0,
+   "range": 0,
+   "moves": 2,
+   "sight": 2,
+   "cost": 750,
+   "faith_cost": null,
+   "required_tech": "core:tech/particle-physics",
+   "obsolete_tech": null,
+   "required_resources": [
+    {
+     "resource": "core:resource/aluminum",
+     "amount": 1
+    }
+   ],
+   "upgrades_to": [],
+   "free_promotions": [],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 0,
+   "xp_value_defense": 0,
+   "abilities": {
+    "civilian_attack_priority": "high",
+    "spaceship_project": "core:project/ss_engine",
+    "project_prereq": "core:project/apollo_program"
+   },
+   "provenance": "unciv: Units.json, SS Engine",
+   "unciv_fields": [
+    "combat",
+    "cost",
+    "moves",
+    "obsolete_tech",
+    "ranged_combat",
+    "required_resources",
+    "required_tech"
+   ]
+  },
+  {
+   "id": "core:unit/ss-cockpit",
+   "name": "SS Cockpit",
+   "class": "core:unit-class/ss-cockpit",
+   "role": "spaceship-part",
+   "domain": "core:domain/land",
+   "era": "core:era/information",
+   "combat": 0,
+   "ranged_combat": 0,
+   "range": 0,
+   "moves": 2,
+   "sight": 2,
+   "cost": 750,
+   "faith_cost": null,
+   "required_tech": "core:tech/satellites",
+   "obsolete_tech": null,
+   "required_resources": [
+    {
+     "resource": "core:resource/aluminum",
+     "amount": 1
+    }
+   ],
+   "upgrades_to": [],
+   "free_promotions": [],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 0,
+   "xp_value_defense": 0,
+   "abilities": {
+    "civilian_attack_priority": "high",
+    "spaceship_project": "core:project/ss_cockpit",
+    "project_prereq": "core:project/apollo_program"
+   },
+   "provenance": "unciv: Units.json, SS Cockpit",
+   "unciv_fields": [
+    "combat",
+    "cost",
+    "moves",
+    "obsolete_tech",
+    "ranged_combat",
+    "required_resources",
+    "required_tech"
+   ]
+  },
+  {
+   "id": "core:unit/ss-booster",
+   "name": "SS Booster",
+   "class": "core:unit-class/ss-booster",
+   "role": "spaceship-part",
+   "domain": "core:domain/land",
+   "era": "core:era/information",
+   "combat": 0,
+   "ranged_combat": 0,
+   "range": 0,
+   "moves": 2,
+   "sight": 2,
+   "cost": 750,
+   "faith_cost": null,
+   "required_tech": "core:tech/advanced-ballistics",
+   "obsolete_tech": null,
+   "required_resources": [
+    {
+     "resource": "core:resource/aluminum",
+     "amount": 1
+    }
+   ],
+   "upgrades_to": [],
+   "free_promotions": [],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 0,
+   "xp_value_defense": 0,
+   "abilities": {
+    "civilian_attack_priority": "high",
+    "spaceship_project": "core:project/ss_booster",
+    "project_prereq": "core:project/apollo_program"
+   },
+   "provenance": "unciv: Units.json, SS Booster",
+   "unciv_fields": [
+    "combat",
+    "cost",
+    "moves",
+    "obsolete_tech",
+    "ranged_combat",
+    "required_resources",
+    "required_tech"
+   ]
+  },
+  {
+   "id": "core:unit/missile-cruiser",
+   "name": "Missile Cruiser",
+   "class": "core:unit-class/missile-cruiser",
+   "role": "navalranged",
+   "domain": "core:domain/sea",
+   "era": "core:era/information",
+   "combat": 80,
+   "ranged_combat": 100,
+   "range": 3,
+   "moves": 7,
+   "sight": 2,
+   "cost": 425,
+   "faith_cost": null,
+   "required_tech": "core:tech/robotics",
+   "obsolete_tech": null,
+   "required_resources": [],
+   "upgrades_to": [],
+   "free_promotions": [
+    "core:promotion/see-invisible-submarine",
+    "core:promotion/anti-submarine-ii",
+    "core:promotion/cargo-iii",
+    "core:promotion/interception-iv",
+    "core:promotion/only-defensive"
+   ],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 3,
+   "xp_value_defense": 3,
+   "abilities": {
+    "pillage": true,
+    "ignore_building_defense": true,
+    "mechanized": true,
+    "air_intercept_range": 3,
+    "special_cargo": "missile",
+    "domain_cargo": "core:domain/air"
+   },
+   "art_id": "bnw:unit/missile-cruiser",
+   "provenance": "unciv: Units.json, Missile Cruiser",
+   "unciv_fields": [
+    "combat",
+    "cost",
+    "moves",
+    "obsolete_tech",
+    "ranged_combat",
+    "required_resources",
+    "required_tech"
+   ]
+  },
+  {
+   "id": "core:unit/nuclear-submarine",
+   "name": "Nuclear Submarine",
+   "class": "core:unit-class/nuclear-submarine",
+   "role": "submarine",
+   "domain": "core:domain/sea",
+   "era": "core:era/information",
+   "combat": 50,
+   "ranged_combat": 85,
+   "range": 3,
+   "moves": 6,
+   "sight": 2,
+   "cost": 425,
+   "faith_cost": null,
+   "required_tech": "core:tech/telecommunications",
+   "obsolete_tech": null,
+   "required_resources": [],
+   "upgrades_to": [],
+   "free_promotions": [
+    "core:promotion/invisible-submarine",
+    "core:promotion/see-invisible-submarine",
+    "core:promotion/cargo-ii",
+    "core:promotion/can-move-impassable",
+    "core:promotion/only-defensive",
+    "core:promotion/silent-hunter",
+    "core:promotion/extra-sight-i"
+   ],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 3,
+   "xp_value_defense": 3,
+   "abilities": {
+    "pillage": true,
+    "ignore_building_defense": true,
+    "mechanized": true,
+    "special_cargo": "missile",
+    "domain_cargo": "core:domain/air",
+    "range_attack_only_in_domain": true
+   },
+   "art_id": "bnw:unit/nuclear-submarine",
+   "provenance": "unciv: Units.json, Nuclear Submarine",
+   "unciv_fields": [
+    "combat",
+    "cost",
+    "moves",
+    "obsolete_tech",
+    "ranged_combat",
+    "required_resources",
+    "required_tech"
+   ]
+  },
+  {
+   "id": "core:unit/carrier",
+   "name": "Carrier",
+   "class": "core:unit-class/carrier",
+   "role": "carrier",
+   "domain": "core:domain/sea",
+   "era": "core:era/modern",
+   "combat": 40,
+   "ranged_combat": 0,
+   "range": 0,
+   "moves": 5,
+   "sight": 2,
+   "cost": 375,
+   "faith_cost": null,
+   "required_tech": "core:tech/electronics",
+   "obsolete_tech": null,
+   "required_resources": [],
+   "upgrades_to": [],
+   "free_promotions": [
+    "core:promotion/cargo-ii",
+    "core:promotion/only-defensive"
+   ],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 3,
+   "xp_value_defense": 3,
+   "abilities": {
+    "pillage": true,
+    "ignore_building_defense": true,
+    "mechanized": true,
+    "special_cargo": "fighter",
+    "domain_cargo": "core:domain/air"
+   },
+   "art_id": "bnw:unit/carrier",
+   "provenance": "unciv: Units.json, Carrier",
+   "unciv_fields": [
+    "combat",
+    "cost",
+    "moves",
+    "obsolete_tech",
+    "ranged_combat",
+    "required_resources",
+    "required_tech"
+   ]
+  },
+  {
+   "id": "core:unit/battleship",
+   "name": "Battleship",
+   "class": "core:unit-class/battleship",
+   "role": "navalranged",
+   "domain": "core:domain/sea",
+   "era": "core:era/modern",
+   "combat": 55,
+   "ranged_combat": 55,
+   "range": 3,
+   "moves": 5,
+   "sight": 2,
+   "cost": 375,
+   "faith_cost": null,
+   "required_tech": "core:tech/electronics",
+   "obsolete_tech": null,
+   "required_resources": [
+    {
+     "resource": "core:resource/oil",
+     "amount": 1
+    }
+   ],
+   "upgrades_to": [],
+   "free_promotions": [
+    "core:promotion/indirect-fire",
+    "core:promotion/only-defensive"
+   ],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 3,
+   "xp_value_defense": 3,
+   "abilities": {
+    "pillage": true,
+    "ignore_building_defense": true,
+    "mechanized": true
+   },
+   "art_id": "bnw:unit/battleship",
+   "provenance": "unciv: Units.json, Battleship",
+   "unciv_fields": [
+    "combat",
+    "cost",
+    "moves",
+    "obsolete_tech",
+    "ranged_combat",
+    "required_resources",
+    "required_tech"
+   ]
+  },
+  {
+   "id": "core:unit/submarine",
+   "name": "Submarine",
+   "class": "core:unit-class/submarine",
+   "role": "submarine",
+   "domain": "core:domain/sea",
+   "era": "core:era/modern",
+   "combat": 35,
+   "ranged_combat": 60,
+   "range": 2,
+   "moves": 5,
+   "sight": 2,
+   "cost": 325,
+   "faith_cost": null,
+   "required_tech": "core:tech/refrigeration",
+   "obsolete_tech": null,
+   "required_resources": [],
+   "upgrades_to": [
+    "core:unit/nuclear-submarine"
+   ],
+   "free_promotions": [
+    "core:promotion/invisible-submarine",
+    "core:promotion/see-invisible-submarine",
+    "core:promotion/can-move-impassable",
+    "core:promotion/only-defensive",
+    "core:promotion/silent-hunter"
+   ],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 3,
+   "xp_value_defense": 3,
+   "abilities": {
+    "pillage": true,
+    "ignore_building_defense": true,
+    "mechanized": true,
+    "range_attack_only_in_domain": true
+   },
+   "art_id": "bnw:unit/submarine",
+   "provenance": "unciv: Units.json, Submarine",
+   "unciv_fields": [
+    "combat",
+    "cost",
+    "moves",
+    "obsolete_tech",
+    "ranged_combat",
+    "required_resources",
+    "required_tech",
+    "upgrades_to"
+   ]
+  },
+  {
+   "id": "core:unit/destroyer",
+   "name": "Destroyer",
+   "class": "core:unit-class/destroyer",
+   "role": "navalmelee",
+   "domain": "core:domain/sea",
+   "era": "core:era/modern",
+   "combat": 55,
+   "ranged_combat": 0,
+   "range": 0,
+   "moves": 6,
+   "sight": 2,
+   "cost": 375,
+   "faith_cost": null,
+   "required_tech": "core:tech/combustion",
+   "obsolete_tech": null,
+   "required_resources": [],
+   "upgrades_to": [],
+   "free_promotions": [
+    "core:promotion/see-invisible-submarine",
+    "core:promotion/interception-ii",
+    "core:promotion/anti-submarine-ii",
+    "core:promotion/withdraw-before-melee"
+   ],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 3,
+   "xp_value_defense": 3,
+   "abilities": {
+    "pillage": true,
+    "ignore_building_defense": true,
+    "mechanized": true,
+    "air_intercept_range": 2
+   },
+   "art_id": "bnw:unit/destroyer",
+   "provenance": "unciv: Units.json, Destroyer",
+   "unciv_fields": [
+    "combat",
+    "cost",
+    "moves",
+    "obsolete_tech",
+    "ranged_combat",
+    "required_resources",
+    "required_tech"
+   ]
+  },
+  {
+   "id": "core:unit/ironclad",
+   "name": "Ironclad",
+   "class": "core:unit-class/ironclad",
+   "role": "navalmelee",
+   "domain": "core:domain/sea",
+   "era": "core:era/industrial",
+   "combat": 45,
+   "ranged_combat": 0,
+   "range": 0,
+   "moves": 3,
+   "sight": 2,
+   "cost": 250,
+   "faith_cost": null,
+   "required_tech": "core:tech/steam-power",
+   "obsolete_tech": "core:tech/combustion",
+   "required_resources": [
+    {
+     "resource": "core:resource/coal",
+     "amount": 1
+    }
+   ],
+   "upgrades_to": [
+    "core:unit/destroyer"
+   ],
+   "free_promotions": [
+    "core:promotion/steam-powered",
+    "core:promotion/fire-support"
+   ],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 3,
+   "xp_value_defense": 3,
+   "abilities": {
+    "pillage": true,
+    "ignore_building_defense": true,
+    "mechanized": true
+   },
+   "art_id": "bnw:unit/ironclad",
+   "provenance": "unciv: Units.json, Ironclad",
+   "unciv_fields": [
+    "combat",
+    "cost",
+    "moves",
+    "obsolete_tech",
+    "ranged_combat",
+    "required_resources",
+    "required_tech",
+    "upgrades_to"
+   ]
+  },
+  {
+   "id": "core:unit/frigate",
+   "name": "Frigate",
+   "class": "core:unit-class/frigate",
+   "role": "navalranged",
+   "domain": "core:domain/sea",
+   "era": "core:era/renaissance",
+   "combat": 25,
+   "ranged_combat": 28,
+   "range": 2,
+   "moves": 5,
+   "sight": 2,
+   "cost": 185,
+   "faith_cost": null,
+   "required_tech": "core:tech/navigation",
+   "obsolete_tech": "core:tech/electronics",
+   "required_resources": [
+    {
+     "resource": "core:resource/iron",
+     "amount": 1
+    }
+   ],
+   "upgrades_to": [
+    "core:unit/battleship"
+   ],
+   "free_promotions": [
+    "core:promotion/only-defensive"
+   ],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 3,
+   "xp_value_defense": 3,
+   "abilities": {
+    "pillage": true,
+    "mechanized": true
+   },
+   "art_id": "bnw:unit/frigate",
+   "provenance": "unciv: Units.json, Frigate",
+   "unciv_fields": [
+    "combat",
+    "cost",
+    "moves",
+    "obsolete_tech",
+    "ranged_combat",
+    "required_resources",
+    "required_tech",
+    "upgrades_to"
+   ]
+  },
+  {
+   "id": "core:unit/caravel",
+   "name": "Caravel",
+   "class": "core:unit-class/caravel",
+   "role": "navalmelee",
+   "domain": "core:domain/sea",
+   "era": "core:era/renaissance",
+   "combat": 20,
+   "ranged_combat": 0,
+   "range": 0,
+   "moves": 4,
+   "sight": 2,
+   "cost": 120,
+   "faith_cost": null,
+   "required_tech": "core:tech/astronomy",
+   "obsolete_tech": "core:tech/combustion",
+   "required_resources": [],
+   "upgrades_to": [
+    "core:unit/ironclad"
+   ],
+   "free_promotions": [
+    "core:promotion/extra-sight-i",
+    "core:promotion/withdraw-before-melee"
+   ],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 3,
+   "xp_value_defense": 3,
+   "abilities": {
+    "pillage": true,
+    "mechanized": true
+   },
+   "art_id": "bnw:unit/caravel",
+   "provenance": "unciv: Units.json, Caravel",
+   "unciv_fields": [
+    "combat",
+    "cost",
+    "moves",
+    "obsolete_tech",
+    "ranged_combat",
+    "required_resources",
+    "required_tech",
+    "upgrades_to"
+   ]
+  },
+  {
+   "id": "core:unit/trireme",
+   "name": "Trireme",
+   "class": "core:unit-class/trireme",
+   "role": "navalmelee",
+   "domain": "core:domain/sea",
+   "era": "core:era/ancient",
+   "combat": 10,
+   "ranged_combat": 0,
+   "range": 0,
+   "moves": 4,
+   "sight": 2,
+   "cost": 45,
+   "faith_cost": null,
+   "required_tech": "core:tech/sailing",
+   "obsolete_tech": "core:tech/astronomy",
+   "required_resources": [],
+   "upgrades_to": [
+    "core:unit/caravel"
+   ],
+   "free_promotions": [
+    "core:promotion/ocean-impassable"
+   ],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 3,
+   "xp_value_defense": 3,
+   "abilities": {
+    "pillage": true,
+    "mechanized": true
+   },
+   "art_id": "bnw:unit/trireme",
+   "provenance": "unciv: Units.json, Trireme",
+   "unciv_fields": [
+    "combat",
+    "cost",
+    "moves",
+    "obsolete_tech",
+    "ranged_combat",
+    "required_resources",
+    "required_tech",
+    "upgrades_to"
+   ]
+  },
+  {
+   "id": "core:unit/giant-death-robot",
+   "name": "Giant Death Robot",
+   "class": "core:unit-class/mech",
+   "role": "armor",
+   "domain": "core:domain/land",
+   "era": "core:era/information",
+   "combat": 150,
+   "ranged_combat": 0,
+   "range": 0,
+   "moves": 5,
+   "sight": 2,
+   "cost": 425,
+   "faith_cost": 1100,
+   "required_tech": "core:tech/nuclear-fusion",
+   "obsolete_tech": null,
+   "required_resources": [
+    {
+     "resource": "core:resource/uranium",
+     "amount": 1
+    }
+   ],
+   "upgrades_to": [],
+   "free_promotions": [
+    "core:promotion/no-defensive-bonuses",
+    "core:promotion/can-move-after-attacking"
+   ],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 3,
+   "xp_value_defense": 3,
+   "abilities": {
+    "pillage": true,
+    "ignore_building_defense": true,
+    "mechanized": true,
+    "requires_faith_purchase_enabled": true
+   },
+   "art_id": "bnw:unit/giant-death-robot",
+   "provenance": "unciv: Units.json, Giant Death Robot",
+   "unciv_fields": [
+    "combat",
+    "cost",
+    "moves",
+    "obsolete_tech",
+    "ranged_combat",
+    "required_resources",
+    "required_tech"
+   ]
+  },
+  {
+   "id": "core:unit/nuclear-missile",
+   "name": "Nuclear Missile",
+   "class": "core:unit-class/nuclear-missile",
+   "role": "missile",
+   "domain": "core:domain/air",
+   "era": "core:era/information",
+   "combat": 0,
+   "ranged_combat": 0,
+   "range": 12,
+   "moves": 2,
+   "sight": 2,
+   "cost": 1000,
+   "faith_cost": null,
+   "required_tech": "core:tech/advanced-ballistics",
+   "obsolete_tech": null,
+   "required_resources": [
+    {
+     "resource": "core:resource/uranium",
+     "amount": 2
+    }
+   ],
+   "upgrades_to": [],
+   "free_promotions": [
+    "core:promotion/evasion-i"
+   ],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 0,
+   "xp_value_defense": 2,
+   "abilities": {
+    "ignore_building_defense": true,
+    "mechanized": true,
+    "immobile": true,
+    "air_unit_cap": 1,
+    "suicide": true,
+    "nuke_damage_level": 2,
+    "special": "missile",
+    "project_prereq": "core:project/manhattan_project"
+   },
+   "art_id": "bnw:unit/nuclear-missile",
+   "provenance": "unciv: Units.json, Nuclear Missile",
+   "unciv_fields": [
+    "cost",
+    "obsolete_tech",
+    "required_tech"
+   ]
+  },
+  {
+   "id": "core:unit/stealth-bomber",
+   "name": "Stealth Bomber",
+   "class": "core:unit-class/stealth-bomber",
+   "role": "bomber",
+   "domain": "core:domain/air",
+   "era": "core:era/information",
+   "combat": 0,
+   "ranged_combat": 85,
+   "range": 20,
+   "moves": 2,
+   "sight": 2,
+   "cost": 425,
+   "faith_cost": null,
+   "required_tech": "core:tech/stealth",
+   "obsolete_tech": null,
+   "required_resources": [
+    {
+     "resource": "core:resource/aluminum",
+     "amount": 1
+    }
+   ],
+   "upgrades_to": [],
+   "free_promotions": [
+    "core:promotion/evasion-ii",
+    "core:promotion/air-recon"
+   ],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 3,
+   "xp_value_defense": 2,
+   "abilities": {
+    "ignore_building_defense": true,
+    "mechanized": true,
+    "immobile": true,
+    "air_unit_cap": 1,
+    "special": "stealth"
+   },
+   "art_id": "bnw:unit/stealth-bomber",
+   "provenance": "unciv: Units.json, Stealth Bomber",
+   "unciv_fields": [
+    "cost",
+    "obsolete_tech",
+    "required_tech"
+   ]
+  },
+  {
+   "id": "core:unit/jet-fighter",
+   "name": "Jet Fighter",
+   "class": "core:unit-class/jet-fighter",
+   "role": "fighter",
+   "domain": "core:domain/air",
+   "era": "core:era/information",
+   "combat": 0,
+   "ranged_combat": 75,
+   "range": 10,
+   "moves": 2,
+   "sight": 2,
+   "cost": 425,
+   "faith_cost": null,
+   "required_tech": "core:tech/lasers",
+   "obsolete_tech": null,
+   "required_resources": [
+    {
+     "resource": "core:resource/aluminum",
+     "amount": 1
+    }
+   ],
+   "upgrades_to": [],
+   "free_promotions": [
+    "core:promotion/interception-iv",
+    "core:promotion/air-sweep",
+    "core:promotion/air-recon",
+    "core:promotion/anti-air-ii"
+   ],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 3,
+   "xp_value_defense": 2,
+   "abilities": {
+    "ignore_building_defense": true,
+    "mechanized": true,
+    "immobile": true,
+    "air_unit_cap": 1,
+    "air_intercept_range": 10,
+    "special": "fighter"
+   },
+   "art_id": "bnw:unit/jet-fighter",
+   "provenance": "unciv: Units.json, Jet Fighter",
+   "unciv_fields": [
+    "cost",
+    "obsolete_tech",
+    "required_tech"
+   ]
+  },
+  {
+   "id": "core:unit/guided-missile",
+   "name": "Guided Missile",
+   "class": "core:unit-class/guided-missile",
+   "role": "missile",
+   "domain": "core:domain/air",
+   "era": "core:era/information",
+   "combat": 0,
+   "ranged_combat": 60,
+   "range": 8,
+   "moves": 2,
+   "sight": 2,
+   "cost": 150,
+   "faith_cost": null,
+   "required_tech": "core:tech/advanced-ballistics",
+   "obsolete_tech": null,
+   "required_resources": [],
+   "upgrades_to": [],
+   "free_promotions": [
+    "core:promotion/evasion-ii"
+   ],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 0,
+   "xp_value_defense": 2,
+   "abilities": {
+    "ignore_building_defense": true,
+    "mechanized": true,
+    "immobile": true,
+    "air_unit_cap": 1,
+    "suicide": true,
+    "no_maintenance": true,
+    "special": "missile"
+   },
+   "art_id": "bnw:unit/guided-missile",
+   "provenance": "unciv: Units.json, Guided Missile",
+   "unciv_fields": [
+    "cost",
+    "obsolete_tech",
+    "required_tech"
+   ]
+  },
+  {
+   "id": "core:unit/modern-armor",
+   "name": "Modern Armor",
+   "class": "core:unit-class/modern-armor",
+   "role": "armor",
+   "domain": "core:domain/land",
+   "era": "core:era/information",
+   "combat": 100,
+   "ranged_combat": 0,
+   "range": 0,
+   "moves": 5,
+   "sight": 2,
+   "cost": 425,
+   "faith_cost": 850,
+   "required_tech": "core:tech/lasers",
+   "obsolete_tech": null,
+   "required_resources": [
+    {
+     "resource": "core:resource/aluminum",
+     "amount": 1
+    }
+   ],
+   "upgrades_to": [
+    "core:unit/giant-death-robot"
+   ],
+   "free_promotions": [
+    "core:promotion/no-defensive-bonuses",
+    "core:promotion/can-move-after-attacking"
+   ],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 3,
+   "xp_value_defense": 3,
+   "abilities": {
+    "pillage": true,
+    "ignore_building_defense": true,
+    "mechanized": true,
+    "requires_faith_purchase_enabled": true
+   },
+   "art_id": "bnw:unit/modern-armor",
+   "provenance": "unciv: Units.json, Modern Armor",
+   "unciv_fields": [
+    "combat",
+    "cost",
+    "moves",
+    "obsolete_tech",
+    "ranged_combat",
+    "required_resources",
+    "required_tech",
+    "upgrades_to"
+   ]
+  },
+  {
+   "id": "core:unit/helicopter-gunship",
+   "name": "Helicopter Gunship",
+   "class": "core:unit-class/helicopter-gunship",
+   "role": "helicopter",
+   "domain": "core:domain/land",
+   "era": "core:era/atomic",
+   "combat": 60,
+   "ranged_combat": 0,
+   "range": 0,
+   "moves": 6,
+   "sight": 2,
+   "cost": 425,
+   "faith_cost": null,
+   "required_tech": "core:tech/computers",
+   "obsolete_tech": null,
+   "required_resources": [
+    {
+     "resource": "core:resource/aluminum",
+     "amount": 1
+    }
+   ],
+   "upgrades_to": [],
+   "free_promotions": [
+    "core:promotion/flat-movement-cost",
+    "core:promotion/hovering-unit",
+    "core:promotion/anti-tank",
+    "core:promotion/no-defensive-bonuses",
+    "core:promotion/no-capture"
+   ],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 3,
+   "xp_value_defense": 3,
+   "abilities": {
+    "pillage": true,
+    "ignore_building_defense": true
+   },
+   "art_id": "bnw:unit/helicopter-gunship",
+   "provenance": "unciv: Units.json, Helicopter Gunship",
+   "unciv_fields": [
+    "combat",
+    "cost",
+    "moves",
+    "obsolete_tech",
+    "ranged_combat",
+    "required_resources",
+    "required_tech"
+   ]
+  },
+  {
+   "id": "core:unit/mobile-sam",
+   "name": "Mobile SAM",
+   "class": "core:unit-class/mobile-sam",
+   "role": "gun",
+   "domain": "core:domain/land",
+   "era": "core:era/atomic",
+   "combat": 65,
+   "ranged_combat": 0,
+   "range": 2,
+   "moves": 3,
+   "sight": 2,
+   "cost": 425,
+   "faith_cost": 850,
+   "required_tech": "core:tech/rocketry",
+   "obsolete_tech": null,
+   "required_resources": [],
+   "upgrades_to": [],
+   "free_promotions": [
+    "core:promotion/interception-iv",
+    "core:promotion/anti-air"
+   ],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 3,
+   "xp_value_defense": 3,
+   "abilities": {
+    "pillage": true,
+    "ignore_building_defense": true,
+    "air_intercept_range": 2,
+    "conscription": 1,
+    "requires_faith_purchase_enabled": true
+   },
+   "art_id": "bnw:unit/mobile-sam",
+   "provenance": "unciv: Units.json, Mobile SAM",
+   "unciv_fields": [
+    "combat",
+    "cost",
+    "moves",
+    "obsolete_tech",
+    "ranged_combat",
+    "required_resources",
+    "required_tech"
+   ]
+  },
+  {
+   "id": "core:unit/rocket-artillery",
+   "name": "Rocket Artillery",
+   "class": "core:unit-class/rocket-artillery",
+   "role": "siege",
+   "domain": "core:domain/land",
+   "era": "core:era/atomic",
+   "combat": 45,
+   "ranged_combat": 60,
+   "range": 3,
+   "moves": 2,
+   "sight": 2,
+   "cost": 425,
+   "faith_cost": 850,
+   "required_tech": "core:tech/rocketry",
+   "obsolete_tech": null,
+   "required_resources": [
+    {
+     "resource": "core:resource/aluminum",
+     "amount": 1
+    }
+   ],
+   "upgrades_to": [],
+   "free_promotions": [
+    "core:promotion/indirect-fire",
+    "core:promotion/only-defensive",
+    "core:promotion/city-siege",
+    "core:promotion/no-defensive-bonuses",
+    "core:promotion/sight-penalty"
+   ],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 3,
+   "xp_value_defense": 3,
+   "abilities": {
+    "pillage": true,
+    "ignore_building_defense": true,
+    "mechanized": true,
+    "requires_faith_purchase_enabled": true
+   },
+   "art_id": "bnw:unit/rocket-artillery",
+   "provenance": "unciv: Units.json, Rocket Artillery",
+   "unciv_fields": [
+    "combat",
+    "cost",
+    "moves",
+    "obsolete_tech",
+    "ranged_combat",
+    "required_resources",
+    "required_tech"
+   ]
+  },
+  {
+   "id": "core:unit/mechanized-infantry",
+   "name": "Mechanized Infantry",
+   "class": "core:unit-class/mechanized-infantry",
+   "role": "gun",
+   "domain": "core:domain/land",
+   "era": "core:era/information",
+   "combat": 90,
+   "ranged_combat": 0,
+   "range": 0,
+   "moves": 3,
+   "sight": 2,
+   "cost": 375,
+   "faith_cost": 750,
+   "required_tech": "core:tech/mobile-tactics",
+   "obsolete_tech": null,
+   "required_resources": [],
+   "upgrades_to": [],
+   "free_promotions": [],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 3,
+   "xp_value_defense": 3,
+   "abilities": {
+    "pillage": true,
+    "ignore_building_defense": true,
+    "conscription": 7,
+    "requires_faith_purchase_enabled": true
+   },
+   "art_id": "bnw:unit/mechanized-infantry",
+   "provenance": "unciv: Units.json, Mechanized Infantry",
+   "unciv_fields": [
+    "combat",
+    "cost",
+    "moves",
+    "obsolete_tech",
+    "ranged_combat",
+    "required_resources",
+    "required_tech"
+   ]
+  },
+  {
+   "id": "core:unit/atomic-bomb",
+   "name": "Atomic Bomb",
+   "class": "core:unit-class/atomic-bomb",
+   "role": "missile",
+   "domain": "core:domain/air",
+   "era": "core:era/atomic",
+   "combat": 0,
+   "ranged_combat": 0,
+   "range": 10,
+   "moves": 2,
+   "sight": 2,
+   "cost": 600,
+   "faith_cost": null,
+   "required_tech": "core:tech/nuclear-fission",
+   "obsolete_tech": null,
+   "required_resources": [
+    {
+     "resource": "core:resource/uranium",
+     "amount": 1
+    }
+   ],
+   "upgrades_to": [],
+   "free_promotions": [
+    "core:promotion/evasion-i"
+   ],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 0,
+   "xp_value_defense": 2,
+   "abilities": {
+    "ignore_building_defense": true,
+    "mechanized": true,
+    "immobile": true,
+    "air_unit_cap": 1,
+    "suicide": true,
+    "nuke_damage_level": 1,
+    "special": "fighter",
+    "project_prereq": "core:project/manhattan_project"
+   },
+   "art_id": "bnw:unit/atomic-bomb",
+   "provenance": "unciv: Units.json, Atomic Bomb",
+   "unciv_fields": [
+    "cost",
+    "obsolete_tech",
+    "required_tech"
+   ]
+  },
+  {
+   "id": "core:unit/bomber",
+   "name": "Bomber",
+   "class": "core:unit-class/bomber",
+   "role": "bomber",
+   "domain": "core:domain/air",
+   "era": "core:era/atomic",
+   "combat": 0,
+   "ranged_combat": 65,
+   "range": 10,
+   "moves": 2,
+   "sight": 2,
+   "cost": 375,
+   "faith_cost": null,
+   "required_tech": "core:tech/radar",
+   "obsolete_tech": null,
+   "required_resources": [
+    {
+     "resource": "core:resource/oil",
+     "amount": 1
+    }
+   ],
+   "upgrades_to": [
+    "core:unit/stealth-bomber"
+   ],
+   "free_promotions": [],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 3,
+   "xp_value_defense": 2,
+   "abilities": {
+    "ignore_building_defense": true,
+    "mechanized": true,
+    "immobile": true,
+    "air_unit_cap": 1,
+    "special": "fighter"
+   },
+   "art_id": "bnw:unit/bomber",
+   "provenance": "unciv: Units.json, Bomber",
+   "unciv_fields": [
+    "cost",
+    "obsolete_tech",
+    "required_tech",
+    "upgrades_to"
+   ]
+  },
+  {
+   "id": "core:unit/fighter",
+   "name": "Fighter",
+   "class": "core:unit-class/fighter",
+   "role": "fighter",
+   "domain": "core:domain/air",
+   "era": "core:era/atomic",
+   "combat": 0,
+   "ranged_combat": 45,
+   "range": 8,
+   "moves": 2,
+   "sight": 2,
+   "cost": 375,
+   "faith_cost": null,
+   "required_tech": "core:tech/radar",
+   "obsolete_tech": null,
+   "required_resources": [
+    {
+     "resource": "core:resource/oil",
+     "amount": 1
+    }
+   ],
+   "upgrades_to": [
+    "core:unit/jet-fighter"
+   ],
+   "free_promotions": [
+    "core:promotion/interception-iv",
+    "core:promotion/air-sweep",
+    "core:promotion/air-recon",
+    "core:promotion/anti-air-ii"
+   ],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 3,
+   "xp_value_defense": 2,
+   "abilities": {
+    "ignore_building_defense": true,
+    "mechanized": true,
+    "immobile": true,
+    "air_unit_cap": 1,
+    "air_intercept_range": 8,
+    "special": "fighter"
+   },
+   "art_id": "bnw:unit/fighter",
+   "provenance": "unciv: Units.json, Fighter",
+   "unciv_fields": [
+    "cost",
+    "obsolete_tech",
+    "required_tech",
+    "upgrades_to"
+   ]
+  },
+  {
+   "id": "core:unit/paratrooper",
+   "name": "Paratrooper",
+   "class": "core:unit-class/paratrooper",
+   "role": "gun",
+   "domain": "core:domain/land",
+   "era": "core:era/atomic",
+   "combat": 65,
+   "ranged_combat": 0,
+   "range": 0,
+   "moves": 2,
+   "sight": 2,
+   "cost": 375,
+   "faith_cost": 750,
+   "required_tech": "core:tech/radar",
+   "obsolete_tech": null,
+   "required_resources": [],
+   "upgrades_to": [
+    "core:unit/xcom-squad"
+   ],
+   "free_promotions": [
+    "core:promotion/paradrop",
+    "core:promotion/free-pillage-moves"
+   ],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 3,
+   "xp_value_defense": 3,
+   "abilities": {
+    "pillage": true,
+    "ignore_building_defense": true,
+    "conscription": 1,
+    "requires_faith_purchase_enabled": true
+   },
+   "art_id": "bnw:unit/paratrooper",
+   "provenance": "unciv: Units.json, Paratrooper",
+   "unciv_fields": [
+    "combat",
+    "cost",
+    "moves",
+    "obsolete_tech",
+    "ranged_combat",
+    "required_resources",
+    "required_tech"
+   ]
+  },
+  {
+   "id": "core:unit/tank",
+   "name": "Tank",
+   "class": "core:unit-class/tank",
+   "role": "armor",
+   "domain": "core:domain/land",
+   "era": "core:era/atomic",
+   "combat": 70,
+   "ranged_combat": 0,
+   "range": 0,
+   "moves": 5,
+   "sight": 2,
+   "cost": 375,
+   "faith_cost": 750,
+   "required_tech": "core:tech/combined-arms",
+   "obsolete_tech": null,
+   "required_resources": [
+    {
+     "resource": "core:resource/oil",
+     "amount": 1
+    }
+   ],
+   "upgrades_to": [
+    "core:unit/modern-armor"
+   ],
+   "free_promotions": [
+    "core:promotion/no-defensive-bonuses",
+    "core:promotion/can-move-after-attacking"
+   ],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 3,
+   "xp_value_defense": 3,
+   "abilities": {
+    "pillage": true,
+    "ignore_building_defense": true,
+    "mechanized": true,
+    "requires_faith_purchase_enabled": true
+   },
+   "art_id": "bnw:unit/tank",
+   "provenance": "unciv: Units.json, Tank",
+   "unciv_fields": [
+    "combat",
+    "cost",
+    "moves",
+    "obsolete_tech",
+    "ranged_combat",
+    "required_resources",
+    "required_tech",
+    "upgrades_to"
+   ]
+  },
+  {
+   "id": "core:unit/artillery",
+   "name": "Artillery",
+   "class": "core:unit-class/artillery",
+   "role": "siege",
+   "domain": "core:domain/land",
+   "era": "core:era/industrial",
+   "combat": 21,
+   "ranged_combat": 28,
+   "range": 3,
+   "moves": 2,
+   "sight": 2,
+   "cost": 320,
+   "faith_cost": 500,
+   "required_tech": "core:tech/dynamite",
+   "obsolete_tech": null,
+   "required_resources": [],
+   "upgrades_to": [
+    "core:unit/rocket-artillery"
+   ],
+   "free_promotions": [
+    "core:promotion/indirect-fire",
+    "core:promotion/only-defensive",
+    "core:promotion/city-siege",
+    "core:promotion/no-defensive-bonuses",
+    "core:promotion/must-set-up",
+    "core:promotion/sight-penalty"
+   ],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 3,
+   "xp_value_defense": 3,
+   "abilities": {
+    "pillage": true,
+    "ignore_building_defense": true,
+    "mechanized": true,
+    "requires_faith_purchase_enabled": true
+   },
+   "art_id": "bnw:unit/artillery",
+   "provenance": "unciv: Units.json, Artillery",
+   "unciv_fields": [
+    "combat",
+    "cost",
+    "moves",
+    "obsolete_tech",
+    "ranged_combat",
+    "required_resources",
+    "required_tech",
+    "upgrades_to"
+   ]
+  },
+  {
+   "id": "core:unit/anti-aircraft-gun",
+   "name": "Anti-Aircraft Gun",
+   "class": "core:unit-class/anti-aircraft-gun",
+   "role": "gun",
+   "domain": "core:domain/land",
+   "era": "core:era/modern",
+   "combat": 50,
+   "ranged_combat": 0,
+   "range": 2,
+   "moves": 2,
+   "sight": 2,
+   "cost": 375,
+   "faith_cost": 750,
+   "required_tech": "core:tech/ballistics",
+   "obsolete_tech": "core:tech/rocketry",
+   "required_resources": [],
+   "upgrades_to": [
+    "core:unit/mobile-sam"
+   ],
+   "free_promotions": [
+    "core:promotion/interception-iv",
+    "core:promotion/anti-air"
+   ],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 3,
+   "xp_value_defense": 3,
+   "abilities": {
+    "pillage": true,
+    "ignore_building_defense": true,
+    "air_intercept_range": 2,
+    "conscription": 5,
+    "requires_faith_purchase_enabled": true
+   },
+   "art_id": "bnw:unit/anti-aircraft-gun",
+   "provenance": "unciv: Units.json, Anti-Aircraft Gun",
+   "unciv_fields": [
+    "combat",
+    "cost",
+    "moves",
+    "obsolete_tech",
+    "ranged_combat",
+    "required_resources",
+    "required_tech",
+    "upgrades_to"
+   ]
+  },
+  {
+   "id": "core:unit/anti-tank-gun",
+   "name": "Anti-Tank Gun",
+   "class": "core:unit-class/anti-tank-gun",
+   "role": "gun",
+   "domain": "core:domain/land",
+   "era": "core:era/atomic",
+   "combat": 50,
+   "ranged_combat": 0,
+   "range": 0,
+   "moves": 2,
+   "sight": 2,
+   "cost": 300,
+   "faith_cost": 600,
+   "required_tech": "core:tech/combined-arms",
+   "obsolete_tech": null,
+   "required_resources": [],
+   "upgrades_to": [
+    "core:unit/helicopter-gunship"
+   ],
+   "free_promotions": [
+    "core:promotion/anti-tank"
+   ],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 3,
+   "xp_value_defense": 3,
+   "abilities": {
+    "pillage": true,
+    "ignore_building_defense": true,
+    "conscription": 1,
+    "requires_faith_purchase_enabled": true
+   },
+   "art_id": "bnw:unit/anti-tank-gun",
+   "provenance": "unciv: Units.json, Anti-Tank Gun",
+   "unciv_fields": [
+    "combat",
+    "cost",
+    "moves",
+    "obsolete_tech",
+    "ranged_combat",
+    "required_resources",
+    "required_tech",
+    "upgrades_to"
+   ]
+  },
+  {
+   "id": "core:unit/infantry",
+   "name": "Infantry",
+   "class": "core:unit-class/infantry",
+   "role": "gun",
+   "domain": "core:domain/land",
+   "era": "core:era/modern",
+   "combat": 70,
+   "ranged_combat": 0,
+   "range": 0,
+   "moves": 2,
+   "sight": 2,
+   "cost": 375,
+   "faith_cost": 750,
+   "required_tech": "core:tech/plastics",
+   "obsolete_tech": "core:tech/mobile-tactics",
+   "required_resources": [],
+   "upgrades_to": [
+    "core:unit/mechanized-infantry"
+   ],
+   "free_promotions": [],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 3,
+   "xp_value_defense": 3,
+   "abilities": {
+    "pillage": true,
+    "ignore_building_defense": true,
+    "conscription": 6,
+    "requires_faith_purchase_enabled": true
+   },
+   "art_id": "bnw:unit/infantry",
+   "provenance": "unciv: Units.json, Infantry",
+   "unciv_fields": [
+    "combat",
+    "cost",
+    "moves",
+    "obsolete_tech",
+    "ranged_combat",
+    "required_resources",
+    "required_tech",
+    "upgrades_to"
+   ]
+  },
+  {
+   "id": "core:unit/foreign-legion",
+   "name": "Foreign Legion",
+   "class": "core:unit-class/great-war-infantry",
+   "role": "gun",
+   "domain": "core:domain/land",
+   "era": "core:era/modern",
+   "combat": 50,
+   "ranged_combat": 0,
+   "range": 0,
+   "moves": 2,
+   "sight": 2,
+   "cost": 320,
+   "faith_cost": 640,
+   "required_tech": "core:tech/replaceable-parts",
+   "obsolete_tech": "core:tech/plastics",
+   "required_resources": [],
+   "upgrades_to": [
+    "core:unit/infantry"
+   ],
+   "free_promotions": [
+    "core:promotion/foreign-lands"
+   ],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 3,
+   "xp_value_defense": 3,
+   "abilities": {
+    "pillage": true,
+    "ignore_building_defense": true,
+    "conscription": 6,
+    "requires_faith_purchase_enabled": true
+   },
+   "art_id": "bnw:unit/foreign-legion",
+   "provenance": "unciv: Units.json, Foreign Legion",
+   "unciv_fields": [
+    "combat",
+    "cost",
+    "moves",
+    "obsolete_tech",
+    "ranged_combat",
+    "required_resources",
+    "required_tech",
+    "upgrades_to"
+   ]
+  },
+  {
+   "id": "core:unit/cavalry",
+   "name": "Cavalry",
+   "class": "core:unit-class/cavalry",
+   "role": "mounted",
+   "domain": "core:domain/land",
+   "era": "core:era/industrial",
+   "combat": 34,
+   "ranged_combat": 0,
+   "range": 0,
+   "moves": 4,
+   "sight": 2,
+   "cost": 225,
+   "faith_cost": 450,
+   "required_tech": "core:tech/military-science",
+   "obsolete_tech": "core:tech/combustion",
+   "required_resources": [
+    {
+     "resource": "core:resource/horses",
+     "amount": 1
+    }
+   ],
+   "upgrades_to": [
+    "core:unit/landship"
+   ],
+   "free_promotions": [
+    "core:promotion/no-defensive-bonuses",
+    "core:promotion/can-move-after-attacking",
+    "core:promotion/city-penalty"
+   ],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 3,
+   "xp_value_defense": 3,
+   "abilities": {
+    "pillage": true,
+    "ignore_building_defense": true,
+    "requires_faith_purchase_enabled": true
+   },
+   "art_id": "bnw:unit/cavalry",
+   "provenance": "unciv: Units.json, Cavalry",
+   "unciv_fields": [
+    "combat",
+    "cost",
+    "moves",
+    "obsolete_tech",
+    "ranged_combat",
+    "required_resources",
+    "required_tech",
+    "upgrades_to"
+   ]
+  },
+  {
+   "id": "core:unit/rifleman",
+   "name": "Rifleman",
+   "class": "core:unit-class/rifleman",
+   "role": "gun",
+   "domain": "core:domain/land",
+   "era": "core:era/industrial",
+   "combat": 34,
+   "ranged_combat": 0,
+   "range": 0,
+   "moves": 2,
+   "sight": 2,
+   "cost": 225,
+   "faith_cost": 450,
+   "required_tech": "core:tech/rifling",
+   "obsolete_tech": "core:tech/replaceable-parts",
+   "required_resources": [],
+   "upgrades_to": [
+    "core:unit/great-war-infantry"
+   ],
+   "free_promotions": [],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 3,
+   "xp_value_defense": 3,
+   "abilities": {
+    "pillage": true,
+    "ignore_building_defense": true,
+    "conscription": 5,
+    "requires_faith_purchase_enabled": true
+   },
+   "art_id": "bnw:unit/rifleman",
+   "provenance": "unciv: Units.json, Rifleman",
+   "unciv_fields": [
+    "combat",
+    "cost",
+    "moves",
+    "obsolete_tech",
+    "ranged_combat",
+    "required_resources",
+    "required_tech",
+    "upgrades_to"
+   ]
+  },
+  {
+   "id": "core:unit/lancer",
+   "name": "Lancer",
+   "class": "core:unit-class/lancer",
+   "role": "mounted",
+   "domain": "core:domain/land",
+   "era": "core:era/renaissance",
+   "combat": 25,
+   "ranged_combat": 0,
+   "range": 0,
+   "moves": 4,
+   "sight": 2,
+   "cost": 185,
+   "faith_cost": 370,
+   "required_tech": "core:tech/metallurgy",
+   "obsolete_tech": "core:tech/combined-arms",
+   "required_resources": [
+    {
+     "resource": "core:resource/horses",
+     "amount": 1
+    }
+   ],
+   "upgrades_to": [
+    "core:unit/anti-tank-gun"
+   ],
+   "free_promotions": [
+    "core:promotion/no-defensive-bonuses",
+    "core:promotion/can-move-after-attacking",
+    "core:promotion/city-penalty",
+    "core:promotion/formation-1"
+   ],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 3,
+   "xp_value_defense": 3,
+   "abilities": {
+    "pillage": true,
+    "ignore_building_defense": true,
+    "requires_faith_purchase_enabled": true
+   },
+   "art_id": "bnw:unit/lancer",
+   "provenance": "unciv: Units.json, Lancer",
+   "unciv_fields": [
+    "combat",
+    "cost",
+    "moves",
+    "obsolete_tech",
+    "ranged_combat",
+    "required_resources",
+    "required_tech",
+    "upgrades_to"
+   ]
+  },
+  {
+   "id": "core:unit/cannon",
+   "name": "Cannon",
+   "class": "core:unit-class/cannon",
+   "role": "siege",
+   "domain": "core:domain/land",
+   "era": "core:era/renaissance",
+   "combat": 14,
+   "ranged_combat": 20,
+   "range": 2,
+   "moves": 2,
+   "sight": 2,
+   "cost": 185,
+   "faith_cost": 370,
+   "required_tech": "core:tech/chemistry",
+   "obsolete_tech": "core:tech/dynamite",
+   "required_resources": [],
+   "upgrades_to": [
+    "core:unit/artillery"
+   ],
+   "free_promotions": [
+    "core:promotion/only-defensive",
+    "core:promotion/city-siege",
+    "core:promotion/no-defensive-bonuses",
+    "core:promotion/must-set-up",
+    "core:promotion/sight-penalty"
+   ],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 3,
+   "xp_value_defense": 3,
+   "abilities": {
+    "pillage": true,
+    "ignore_building_defense": true,
+    "requires_faith_purchase_enabled": true
+   },
+   "art_id": "bnw:unit/cannon",
+   "provenance": "unciv: Units.json, Cannon",
+   "unciv_fields": [
+    "combat",
+    "cost",
+    "moves",
+    "obsolete_tech",
+    "ranged_combat",
+    "required_resources",
+    "required_tech",
+    "upgrades_to"
+   ]
+  },
+  {
+   "id": "core:unit/musketman",
+   "name": "Musketman",
+   "class": "core:unit-class/musketman",
+   "role": "gun",
+   "domain": "core:domain/land",
+   "era": "core:era/renaissance",
+   "combat": 24,
+   "ranged_combat": 0,
+   "range": 0,
+   "moves": 2,
+   "sight": 2,
+   "cost": 150,
+   "faith_cost": 300,
+   "required_tech": "core:tech/gunpowder",
+   "obsolete_tech": "core:tech/rifling",
+   "required_resources": [],
+   "upgrades_to": [
+    "core:unit/rifleman"
+   ],
+   "free_promotions": [],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 3,
+   "xp_value_defense": 3,
+   "abilities": {
+    "pillage": true,
+    "ignore_building_defense": true,
+    "conscription": 4,
+    "requires_faith_purchase_enabled": true
+   },
+   "art_id": "bnw:unit/musketman",
+   "provenance": "unciv: Units.json, Musketman",
+   "unciv_fields": [
+    "combat",
+    "cost",
+    "moves",
+    "obsolete_tech",
+    "ranged_combat",
+    "required_resources",
+    "required_tech",
+    "upgrades_to"
+   ]
+  },
+  {
+   "id": "core:unit/longswordsman",
+   "name": "Longswordsman",
+   "class": "core:unit-class/longswordsman",
+   "role": "melee",
+   "domain": "core:domain/land",
+   "era": "core:era/medieval",
+   "combat": 21,
+   "ranged_combat": 0,
+   "range": 0,
+   "moves": 2,
+   "sight": 2,
+   "cost": 120,
+   "faith_cost": 240,
+   "required_tech": "core:tech/steel",
+   "obsolete_tech": "core:tech/gunpowder",
+   "required_resources": [
+    {
+     "resource": "core:resource/iron",
+     "amount": 1
+    }
+   ],
+   "upgrades_to": [
+    "core:unit/musketman"
+   ],
+   "free_promotions": [],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 3,
+   "xp_value_defense": 3,
+   "abilities": {
+    "pillage": true,
+    "conscription": 3,
+    "requires_faith_purchase_enabled": true
+   },
+   "art_id": "bnw:unit/longswordsman",
+   "provenance": "unciv: Units.json, Longswordsman",
+   "unciv_fields": [
+    "combat",
+    "cost",
+    "moves",
+    "obsolete_tech",
+    "ranged_combat",
+    "required_resources",
+    "required_tech",
+    "upgrades_to"
+   ]
+  },
+  {
+   "id": "core:unit/trebuchet",
+   "name": "Trebuchet",
+   "class": "core:unit-class/trebuchet",
+   "role": "siege",
+   "domain": "core:domain/land",
+   "era": "core:era/medieval",
+   "combat": 12,
+   "ranged_combat": 14,
+   "range": 2,
+   "moves": 2,
+   "sight": 2,
+   "cost": 120,
+   "faith_cost": 240,
+   "required_tech": "core:tech/physics",
+   "obsolete_tech": "core:tech/chemistry",
+   "required_resources": [],
+   "upgrades_to": [
+    "core:unit/cannon"
+   ],
+   "free_promotions": [
+    "core:promotion/only-defensive",
+    "core:promotion/city-siege",
+    "core:promotion/no-defensive-bonuses",
+    "core:promotion/must-set-up",
+    "core:promotion/sight-penalty"
+   ],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 3,
+   "xp_value_defense": 3,
+   "abilities": {
+    "pillage": true,
+    "mechanized": true,
+    "requires_faith_purchase_enabled": true
+   },
+   "art_id": "bnw:unit/trebuchet",
+   "provenance": "unciv: Units.json, Trebuchet",
+   "unciv_fields": [
+    "combat",
+    "cost",
+    "moves",
+    "obsolete_tech",
+    "ranged_combat",
+    "required_resources",
+    "required_tech",
+    "upgrades_to"
+   ]
+  },
+  {
+   "id": "core:unit/knight",
+   "name": "Knight",
+   "class": "core:unit-class/knight",
+   "role": "mounted",
+   "domain": "core:domain/land",
+   "era": "core:era/medieval",
+   "combat": 20,
+   "ranged_combat": 0,
+   "range": 0,
+   "moves": 4,
+   "sight": 2,
+   "cost": 120,
+   "faith_cost": 240,
+   "required_tech": "core:tech/chivalry",
+   "obsolete_tech": "core:tech/military-science",
+   "required_resources": [
+    {
+     "resource": "core:resource/horses",
+     "amount": 1
+    }
+   ],
+   "upgrades_to": [
+    "core:unit/cavalry"
+   ],
+   "free_promotions": [
+    "core:promotion/no-defensive-bonuses",
+    "core:promotion/can-move-after-attacking",
+    "core:promotion/city-penalty"
+   ],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 3,
+   "xp_value_defense": 3,
+   "abilities": {
+    "pillage": true,
+    "requires_faith_purchase_enabled": true
+   },
+   "art_id": "bnw:unit/knight",
+   "provenance": "unciv: Units.json, Knight",
+   "unciv_fields": [
+    "combat",
+    "cost",
+    "moves",
+    "obsolete_tech",
+    "ranged_combat",
+    "required_resources",
+    "required_tech",
+    "upgrades_to"
+   ]
+  },
+  {
+   "id": "core:unit/crossbowman",
+   "name": "Crossbowman",
+   "class": "core:unit-class/crossbowman",
+   "role": "archer",
+   "domain": "core:domain/land",
+   "era": "core:era/medieval",
+   "combat": 13,
+   "ranged_combat": 18,
+   "range": 2,
+   "moves": 2,
+   "sight": 2,
+   "cost": 120,
+   "faith_cost": 240,
+   "required_tech": "core:tech/machinery",
+   "obsolete_tech": "core:tech/industrialization",
+   "required_resources": [],
+   "upgrades_to": [
+    "core:unit/gatling-gun"
+   ],
+   "free_promotions": [
+    "core:promotion/only-defensive"
+   ],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 3,
+   "xp_value_defense": 3,
+   "abilities": {
+    "pillage": true,
+    "requires_faith_purchase_enabled": true
+   },
+   "art_id": "bnw:unit/crossbowman",
+   "provenance": "unciv: Units.json, Crossbowman",
+   "unciv_fields": [
+    "combat",
+    "cost",
+    "moves",
+    "obsolete_tech",
+    "ranged_combat",
+    "required_resources",
+    "required_tech",
+    "upgrades_to"
+   ]
+  },
+  {
+   "id": "core:unit/pikeman",
+   "name": "Pikeman",
+   "class": "core:unit-class/pikeman",
+   "role": "melee",
+   "domain": "core:domain/land",
+   "era": "core:era/medieval",
+   "combat": 16,
+   "ranged_combat": 0,
+   "range": 0,
+   "moves": 2,
+   "sight": 2,
+   "cost": 90,
+   "faith_cost": 180,
+   "required_tech": "core:tech/civil-service",
+   "obsolete_tech": "core:tech/metallurgy",
+   "required_resources": [],
+   "upgrades_to": [
+    "core:unit/lancer"
+   ],
+   "free_promotions": [
+    "core:promotion/anti-mounted-i"
+   ],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 3,
+   "xp_value_defense": 3,
+   "abilities": {
+    "pillage": true,
+    "conscription": 3,
+    "requires_faith_purchase_enabled": true
+   },
+   "art_id": "bnw:unit/pikeman",
+   "provenance": "unciv: Units.json, Pikeman",
+   "unciv_fields": [
+    "combat",
+    "cost",
+    "moves",
+    "obsolete_tech",
+    "ranged_combat",
+    "required_resources",
+    "required_tech",
+    "upgrades_to"
+   ]
+  },
+  {
+   "id": "core:unit/landsknecht",
+   "name": "Landsknecht",
+   "class": "core:unit-class/landsknecht",
+   "role": "melee",
+   "domain": "core:domain/land",
+   "era": "core:era/medieval",
+   "combat": 16,
+   "ranged_combat": 0,
+   "range": 0,
+   "moves": 2,
+   "sight": 2,
+   "cost": 45,
+   "faith_cost": null,
+   "required_tech": "core:tech/civil-service",
+   "obsolete_tech": "core:tech/metallurgy",
+   "required_resources": [],
+   "upgrades_to": [
+    "core:unit/lancer"
+   ],
+   "free_promotions": [
+    "core:promotion/anti-mounted-i",
+    "core:promotion/free-pillage-moves",
+    "core:promotion/double-plunder"
+   ],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 3,
+   "xp_value_defense": 3,
+   "abilities": {
+    "pillage": true,
+    "purchase_only": true,
+    "move_after_purchase": true,
+    "conscription": 3,
+    "policy_type": "core:policy/commerce/mercenary-army"
+   },
+   "art_id": "bnw:unit/landsknecht",
+   "provenance": "unciv: Units.json, Landsknecht",
+   "unciv_fields": [
+    "combat",
+    "cost",
+    "moves",
+    "obsolete_tech",
+    "ranged_combat",
+    "required_resources",
+    "required_tech",
+    "upgrades_to"
+   ]
+  },
+  {
+   "id": "core:unit/catapult",
+   "name": "Catapult",
+   "class": "core:unit-class/catapult",
+   "role": "siege",
+   "domain": "core:domain/land",
+   "era": "core:era/classical",
+   "combat": 7,
+   "ranged_combat": 8,
+   "range": 2,
+   "moves": 2,
+   "sight": 2,
+   "cost": 75,
+   "faith_cost": 150,
+   "required_tech": "core:tech/mathematics",
+   "obsolete_tech": "core:tech/physics",
+   "required_resources": [],
+   "upgrades_to": [
+    "core:unit/trebuchet"
+   ],
+   "free_promotions": [
+    "core:promotion/only-defensive",
+    "core:promotion/city-siege",
+    "core:promotion/no-defensive-bonuses",
+    "core:promotion/must-set-up",
+    "core:promotion/sight-penalty"
+   ],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 3,
+   "xp_value_defense": 3,
+   "abilities": {
+    "pillage": true,
+    "mechanized": true,
+    "requires_faith_purchase_enabled": true
+   },
+   "art_id": "bnw:unit/catapult",
+   "provenance": "unciv: Units.json, Catapult",
+   "unciv_fields": [
+    "combat",
+    "cost",
+    "moves",
+    "obsolete_tech",
+    "ranged_combat",
+    "required_resources",
+    "required_tech",
+    "upgrades_to"
+   ]
+  },
+  {
+   "id": "core:unit/horseman",
+   "name": "Horseman",
+   "class": "core:unit-class/horseman",
+   "role": "mounted",
+   "domain": "core:domain/land",
+   "era": "core:era/classical",
+   "combat": 12,
+   "ranged_combat": 0,
+   "range": 0,
+   "moves": 4,
+   "sight": 2,
+   "cost": 75,
+   "faith_cost": 150,
+   "required_tech": "core:tech/horseback-riding",
+   "obsolete_tech": "core:tech/chivalry",
+   "required_resources": [
+    {
+     "resource": "core:resource/horses",
+     "amount": 1
+    }
+   ],
+   "upgrades_to": [
+    "core:unit/knight"
+   ],
+   "free_promotions": [
+    "core:promotion/no-defensive-bonuses",
+    "core:promotion/can-move-after-attacking",
+    "core:promotion/city-penalty"
+   ],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 3,
+   "xp_value_defense": 3,
+   "abilities": {
+    "pillage": true,
+    "requires_faith_purchase_enabled": true
+   },
+   "art_id": "bnw:unit/horseman",
+   "provenance": "unciv: Units.json, Horseman",
+   "unciv_fields": [
+    "combat",
+    "cost",
+    "moves",
+    "obsolete_tech",
+    "ranged_combat",
+    "required_resources",
+    "required_tech",
+    "upgrades_to"
+   ]
+  },
+  {
+   "id": "core:unit/swordsman",
+   "name": "Swordsman",
+   "class": "core:unit-class/swordsman",
+   "role": "melee",
+   "domain": "core:domain/land",
+   "era": "core:era/classical",
+   "combat": 14,
+   "ranged_combat": 0,
+   "range": 0,
+   "moves": 2,
+   "sight": 2,
+   "cost": 75,
+   "faith_cost": 150,
+   "required_tech": "core:tech/iron-working",
+   "obsolete_tech": "core:tech/steel",
+   "required_resources": [
+    {
+     "resource": "core:resource/iron",
+     "amount": 1
+    }
+   ],
+   "upgrades_to": [
+    "core:unit/longswordsman"
+   ],
+   "free_promotions": [],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 3,
+   "xp_value_defense": 3,
+   "abilities": {
+    "pillage": true,
+    "conscription": 1,
+    "requires_faith_purchase_enabled": true
+   },
+   "art_id": "bnw:unit/swordsman",
+   "provenance": "unciv: Units.json, Swordsman",
+   "unciv_fields": [
+    "combat",
+    "cost",
+    "moves",
+    "obsolete_tech",
+    "ranged_combat",
+    "required_resources",
+    "required_tech",
+    "upgrades_to"
+   ]
+  },
+  {
+   "id": "core:unit/chariot-archer",
+   "name": "Chariot Archer",
+   "class": "core:unit-class/chariot-archer",
+   "role": "archer",
+   "domain": "core:domain/land",
+   "era": "core:era/ancient",
+   "combat": 6,
+   "ranged_combat": 10,
+   "range": 2,
+   "moves": 4,
+   "sight": 2,
+   "cost": 56,
+   "faith_cost": 112,
+   "required_tech": "core:tech/the-wheel",
+   "obsolete_tech": "core:tech/chivalry",
+   "required_resources": [
+    {
+     "resource": "core:resource/horses",
+     "amount": 1
+    }
+   ],
+   "upgrades_to": [
+    "core:unit/knight"
+   ],
+   "free_promotions": [
+    "core:promotion/rough-terrain-ends-turn",
+    "core:promotion/no-defensive-bonuses",
+    "core:promotion/only-defensive"
+   ],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 3,
+   "xp_value_defense": 3,
+   "abilities": {
+    "pillage": true,
+    "requires_faith_purchase_enabled": true
+   },
+   "art_id": "bnw:unit/chariot-archer",
+   "provenance": "unciv: Units.json, Chariot Archer",
+   "unciv_fields": [
+    "combat",
+    "cost",
+    "moves",
+    "obsolete_tech",
+    "ranged_combat",
+    "required_resources",
+    "required_tech",
+    "upgrades_to"
+   ]
+  },
+  {
+   "id": "core:unit/spearman",
+   "name": "Spearman",
+   "class": "core:unit-class/spearman",
+   "role": "melee",
+   "domain": "core:domain/land",
+   "era": "core:era/ancient",
+   "combat": 11,
+   "ranged_combat": 0,
+   "range": 0,
+   "moves": 2,
+   "sight": 2,
+   "cost": 56,
+   "faith_cost": 112,
+   "required_tech": "core:tech/bronze-working",
+   "obsolete_tech": "core:tech/civil-service",
+   "required_resources": [],
+   "upgrades_to": [
+    "core:unit/pikeman"
+   ],
+   "free_promotions": [
+    "core:promotion/anti-mounted-i"
+   ],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 3,
+   "xp_value_defense": 3,
+   "abilities": {
+    "pillage": true,
+    "conscription": 2,
+    "requires_faith_purchase_enabled": true
+   },
+   "art_id": "bnw:unit/spearman",
+   "provenance": "unciv: Units.json, Spearman",
+   "unciv_fields": [
+    "combat",
+    "cost",
+    "moves",
+    "obsolete_tech",
+    "ranged_combat",
+    "required_resources",
+    "required_tech",
+    "upgrades_to"
+   ]
+  },
+  {
+   "id": "core:unit/archer",
+   "name": "Archer",
+   "class": "core:unit-class/archer",
+   "role": "archer",
+   "domain": "core:domain/land",
+   "era": "core:era/ancient",
+   "combat": 5,
+   "ranged_combat": 7,
+   "range": 2,
+   "moves": 2,
+   "sight": 2,
+   "cost": 40,
+   "faith_cost": 80,
+   "required_tech": "core:tech/archery",
+   "obsolete_tech": "core:tech/construction",
+   "required_resources": [],
+   "upgrades_to": [
+    "core:unit/composite-bowman"
+   ],
+   "free_promotions": [
+    "core:promotion/only-defensive"
+   ],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 3,
+   "xp_value_defense": 3,
+   "abilities": {
+    "pillage": true,
+    "requires_faith_purchase_enabled": true
+   },
+   "art_id": "bnw:unit/archer",
+   "provenance": "unciv: Units.json, Archer",
+   "unciv_fields": [
+    "combat",
+    "cost",
+    "moves",
+    "obsolete_tech",
+    "ranged_combat",
+    "required_resources",
+    "required_tech",
+    "upgrades_to"
+   ]
+  },
+  {
+   "id": "core:unit/scout",
+   "name": "Scout",
+   "class": "core:unit-class/scout",
+   "role": "recon",
+   "domain": "core:domain/land",
+   "era": "core:era/ancient",
+   "combat": 5,
+   "ranged_combat": 0,
+   "range": 0,
+   "moves": 2,
+   "sight": 2,
+   "cost": 25,
+   "faith_cost": 50,
+   "required_tech": null,
+   "obsolete_tech": "core:tech/scientific-theory",
+   "required_resources": [],
+   "upgrades_to": [],
+   "free_promotions": [
+    "core:promotion/ignore-terrain-cost"
+   ],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 3,
+   "xp_value_defense": 3,
+   "abilities": {
+    "pillage": true,
+    "no_bad_goodies": true,
+    "requires_faith_purchase_enabled": true
+   },
+   "art_id": "bnw:unit/scout",
+   "provenance": "unciv: Units.json, Scout",
+   "unciv_fields": [
+    "combat",
+    "cost",
+    "moves",
+    "obsolete_tech",
+    "ranged_combat",
+    "required_resources"
+   ]
+  },
+  {
+   "id": "core:unit/warrior",
+   "name": "Warrior",
+   "class": "core:unit-class/warrior",
+   "role": "melee",
+   "domain": "core:domain/land",
+   "era": "core:era/ancient",
+   "combat": 8,
+   "ranged_combat": 0,
+   "range": 0,
+   "moves": 2,
+   "sight": 2,
+   "cost": 40,
+   "faith_cost": 80,
+   "required_tech": null,
+   "obsolete_tech": "core:tech/metal-casting",
+   "required_resources": [],
+   "upgrades_to": [
+    "core:unit/swordsman"
+   ],
+   "free_promotions": [],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 3,
+   "xp_value_defense": 3,
+   "abilities": {
+    "pillage": true,
+    "conscription": 1,
+    "requires_faith_purchase_enabled": true
+   },
+   "art_id": "bnw:unit/warrior",
+   "provenance": "unciv: Units.json, Warrior",
+   "unciv_fields": [
+    "combat",
+    "cost",
+    "moves",
+    "obsolete_tech",
+    "ranged_combat",
+    "required_resources",
+    "upgrades_to"
+   ]
+  },
+  {
+   "id": "core:unit/great-prophet",
+   "name": "Great Prophet",
+   "class": "core:unit-class/prophet",
+   "role": "great-person",
+   "domain": "core:domain/land",
+   "era": "core:era/ancient",
+   "combat": 0,
+   "ranged_combat": 0,
+   "range": 0,
+   "moves": 2,
+   "sight": 2,
+   "cost": -1,
+   "faith_cost": null,
+   "required_tech": null,
+   "obsolete_tech": null,
+   "required_resources": [],
+   "upgrades_to": [],
+   "free_promotions": [
+    "core:promotion/rival-territory",
+    "core:promotion/sight-penalty"
+   ],
+   "worker_actions": [
+    "core:build/holy-site"
+   ],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 0,
+   "xp_value_defense": 0,
+   "abilities": {
+    "work_rate": 1,
+    "capture": "core:unit/great-prophet",
+    "religious_strength": 1000,
+    "spread_religion": true,
+    "religion_spreads": 4,
+    "found_religion": true,
+    "special": "people",
+    "civilian_attack_priority": "high"
+   },
+   "art_id": "bnw:unit/great-prophet",
+   "provenance": "unciv: Units.json, Great Prophet",
+   "unciv_fields": [
+    "combat",
+    "moves",
+    "obsolete_tech",
+    "ranged_combat",
+    "required_resources",
+    "required_tech"
+   ]
+  },
+  {
+   "id": "core:unit/missionary",
+   "name": "Missionary",
+   "class": "core:unit-class/missionary",
+   "role": "religious",
+   "domain": "core:domain/land",
+   "era": "core:era/ancient",
+   "combat": 0,
+   "ranged_combat": 0,
+   "range": 0,
+   "moves": 4,
+   "sight": 2,
+   "cost": -1,
+   "faith_cost": 200,
+   "required_tech": null,
+   "obsolete_tech": null,
+   "required_resources": [],
+   "upgrades_to": [],
+   "free_promotions": [
+    "core:promotion/rival-territory",
+    "core:promotion/sight-penalty",
+    "core:promotion/unwelcome-evangelist"
+   ],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 0,
+   "xp_value_defense": 0,
+   "abilities": {
+    "capture": "core:unit/missionary",
+    "religious_strength": 1000,
+    "spread_religion": true,
+    "religion_spreads": 2,
+    "civilian_attack_priority": "low"
+   },
+   "art_id": "bnw:unit/missionary",
+   "provenance": "unciv: Units.json, Missionary",
+   "unciv_fields": [
+    "combat",
+    "moves",
+    "obsolete_tech",
+    "ranged_combat",
+    "required_resources",
+    "required_tech"
+   ]
+  },
+  {
+   "id": "core:unit/composite-bowman",
+   "name": "Composite Bowman",
+   "class": "core:unit-class/composite-bowman",
+   "role": "archer",
+   "domain": "core:domain/land",
+   "era": "core:era/classical",
+   "combat": 7,
+   "ranged_combat": 11,
+   "range": 2,
+   "moves": 2,
+   "sight": 2,
+   "cost": 75,
+   "faith_cost": 150,
+   "required_tech": "core:tech/construction",
+   "obsolete_tech": "core:tech/machinery",
+   "required_resources": [],
+   "upgrades_to": [
+    "core:unit/crossbowman"
+   ],
+   "free_promotions": [
+    "core:promotion/only-defensive"
+   ],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 3,
+   "xp_value_defense": 3,
+   "abilities": {
+    "pillage": true,
+    "requires_faith_purchase_enabled": true
+   },
+   "art_id": "bnw:unit/composite-bowman",
+   "provenance": "unciv: Units.json, Composite Bowman",
+   "unciv_fields": [
+    "combat",
+    "cost",
+    "moves",
+    "obsolete_tech",
+    "ranged_combat",
+    "required_resources",
+    "required_tech",
+    "upgrades_to"
+   ]
+  },
+  {
+   "id": "core:unit/galleass",
+   "name": "Galleass",
+   "class": "core:unit-class/galleass",
+   "role": "navalranged",
+   "domain": "core:domain/sea",
+   "era": "core:era/medieval",
+   "combat": 16,
+   "ranged_combat": 17,
+   "range": 2,
+   "moves": 3,
+   "sight": 2,
+   "cost": 100,
+   "faith_cost": null,
+   "required_tech": "core:tech/compass",
+   "obsolete_tech": "core:tech/navigation",
+   "required_resources": [],
+   "upgrades_to": [
+    "core:unit/frigate"
+   ],
+   "free_promotions": [
+    "core:promotion/ocean-impassable",
+    "core:promotion/only-defensive"
+   ],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 3,
+   "xp_value_defense": 3,
+   "abilities": {
+    "pillage": true,
+    "mechanized": true
+   },
+   "art_id": "bnw:unit/galleass",
+   "provenance": "unciv: Units.json, Galleass",
+   "unciv_fields": [
+    "combat",
+    "cost",
+    "moves",
+    "obsolete_tech",
+    "ranged_combat",
+    "required_resources",
+    "required_tech",
+    "upgrades_to"
+   ]
+  },
+  {
+   "id": "core:unit/great-war-infantry",
+   "name": "Great War Infantry",
+   "class": "core:unit-class/great-war-infantry",
+   "role": "gun",
+   "domain": "core:domain/land",
+   "era": "core:era/modern",
+   "combat": 50,
+   "ranged_combat": 0,
+   "range": 0,
+   "moves": 2,
+   "sight": 2,
+   "cost": 320,
+   "faith_cost": 640,
+   "required_tech": "core:tech/replaceable-parts",
+   "obsolete_tech": "core:tech/plastics",
+   "required_resources": [],
+   "upgrades_to": [
+    "core:unit/infantry"
+   ],
+   "free_promotions": [],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 3,
+   "xp_value_defense": 3,
+   "abilities": {
+    "pillage": true,
+    "ignore_building_defense": true,
+    "requires_faith_purchase_enabled": true
+   },
+   "art_id": "bnw:unit/great-war-infantry",
+   "provenance": "unciv: Units.json, Great War Infantry",
+   "unciv_fields": [
+    "combat",
+    "cost",
+    "moves",
+    "obsolete_tech",
+    "ranged_combat",
+    "required_resources",
+    "required_tech",
+    "upgrades_to"
+   ]
+  },
+  {
+   "id": "core:unit/marine",
+   "name": "Marine",
+   "class": "core:unit-class/marine",
+   "role": "gun",
+   "domain": "core:domain/land",
+   "era": "core:era/atomic",
+   "combat": 65,
+   "ranged_combat": 0,
+   "range": 0,
+   "moves": 2,
+   "sight": 2,
+   "cost": 400,
+   "faith_cost": 800,
+   "required_tech": "core:tech/penicillin",
+   "obsolete_tech": null,
+   "required_resources": [],
+   "upgrades_to": [],
+   "free_promotions": [
+    "core:promotion/amphibious",
+    "core:promotion/embarked-sight",
+    "core:promotion/defensive-embarkation"
+   ],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 3,
+   "xp_value_defense": 3,
+   "abilities": {
+    "pillage": true,
+    "ignore_building_defense": true,
+    "requires_faith_purchase_enabled": true
+   },
+   "art_id": "bnw:unit/marine",
+   "provenance": "unciv: Units.json, Marine",
+   "unciv_fields": [
+    "combat",
+    "cost",
+    "moves",
+    "obsolete_tech",
+    "ranged_combat",
+    "required_resources",
+    "required_tech"
+   ]
+  },
+  {
+   "id": "core:unit/triplane",
+   "name": "Triplane",
+   "class": "core:unit-class/triplane",
+   "role": "fighter",
+   "domain": "core:domain/air",
+   "era": "core:era/modern",
+   "combat": 0,
+   "ranged_combat": 35,
+   "range": 5,
+   "moves": 2,
+   "sight": 2,
+   "cost": 325,
+   "faith_cost": null,
+   "required_tech": "core:tech/flight",
+   "obsolete_tech": "core:tech/radar",
+   "required_resources": [
+    {
+     "resource": "core:resource/oil",
+     "amount": 1
+    }
+   ],
+   "upgrades_to": [
+    "core:unit/fighter"
+   ],
+   "free_promotions": [
+    "core:promotion/interception-iii",
+    "core:promotion/air-sweep",
+    "core:promotion/air-recon",
+    "core:promotion/anti-air-ii"
+   ],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 3,
+   "xp_value_defense": 2,
+   "abilities": {
+    "ignore_building_defense": true,
+    "mechanized": true,
+    "immobile": true,
+    "air_unit_cap": 1,
+    "air_intercept_range": 5,
+    "special": "fighter"
+   },
+   "art_id": "bnw:unit/triplane",
+   "provenance": "unciv: Units.json, Triplane",
+   "unciv_fields": [
+    "cost",
+    "obsolete_tech",
+    "required_tech",
+    "upgrades_to"
+   ]
+  },
+  {
+   "id": "core:unit/great-war-bomber",
+   "name": "Great War Bomber",
+   "class": "core:unit-class/wwi-bomber",
+   "role": "bomber",
+   "domain": "core:domain/air",
+   "era": "core:era/modern",
+   "combat": 0,
+   "ranged_combat": 50,
+   "range": 6,
+   "moves": 2,
+   "sight": 2,
+   "cost": 325,
+   "faith_cost": null,
+   "required_tech": "core:tech/flight",
+   "obsolete_tech": "core:tech/radar",
+   "required_resources": [
+    {
+     "resource": "core:resource/oil",
+     "amount": 1
+    }
+   ],
+   "upgrades_to": [
+    "core:unit/bomber"
+   ],
+   "free_promotions": [],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 3,
+   "xp_value_defense": 2,
+   "abilities": {
+    "ignore_building_defense": true,
+    "mechanized": true,
+    "immobile": true,
+    "air_unit_cap": 1,
+    "special": "fighter"
+   },
+   "art_id": "bnw:unit/great-war-bomber",
+   "provenance": "unciv: Units.json, Great War Bomber",
+   "unciv_fields": [
+    "cost",
+    "obsolete_tech",
+    "required_tech",
+    "upgrades_to"
+   ]
+  },
+  {
+   "id": "core:unit/landship",
+   "name": "Landship",
+   "class": "core:unit-class/wwi-tank",
+   "role": "armor",
+   "domain": "core:domain/land",
+   "era": "core:era/modern",
+   "combat": 60,
+   "ranged_combat": 0,
+   "range": 0,
+   "moves": 4,
+   "sight": 2,
+   "cost": 350,
+   "faith_cost": null,
+   "required_tech": "core:tech/combustion",
+   "obsolete_tech": "core:tech/combined-arms",
+   "required_resources": [
+    {
+     "resource": "core:resource/oil",
+     "amount": 1
+    }
+   ],
+   "upgrades_to": [
+    "core:unit/tank"
+   ],
+   "free_promotions": [
+    "core:promotion/no-defensive-bonuses",
+    "core:promotion/can-move-after-attacking"
+   ],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 3,
+   "xp_value_defense": 3,
+   "abilities": {
+    "pillage": true,
+    "ignore_building_defense": true,
+    "mechanized": true
+   },
+   "art_id": "bnw:unit/landship",
+   "provenance": "unciv: Units.json, Landship",
+   "unciv_fields": [
+    "combat",
+    "cost",
+    "moves",
+    "obsolete_tech",
+    "ranged_combat",
+    "required_resources",
+    "required_tech",
+    "upgrades_to"
+   ]
+  },
+  {
+   "id": "core:unit/machine-gun",
+   "name": "Machine Gun",
+   "class": "core:unit-class/machine-gun",
+   "role": "archer",
+   "domain": "core:domain/land",
+   "era": "core:era/modern",
+   "combat": 60,
+   "ranged_combat": 60,
+   "range": 1,
+   "moves": 2,
+   "sight": 2,
+   "cost": 350,
+   "faith_cost": 700,
+   "required_tech": "core:tech/ballistics",
+   "obsolete_tech": null,
+   "required_resources": [],
+   "upgrades_to": [
+    "core:unit/mechanized-infantry"
+   ],
+   "free_promotions": [
+    "core:promotion/only-defensive"
+   ],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 3,
+   "xp_value_defense": 3,
+   "abilities": {
+    "pillage": true,
+    "ignore_building_defense": true,
+    "requires_faith_purchase_enabled": true
+   },
+   "art_id": "bnw:unit/machine-gun",
+   "provenance": "unciv: Units.json, Machine Gun",
+   "unciv_fields": [
+    "combat",
+    "cost",
+    "moves",
+    "obsolete_tech",
+    "ranged_combat",
+    "required_resources",
+    "required_tech",
+    "upgrades_to"
+   ]
+  },
+  {
+   "id": "core:unit/privateer",
+   "name": "Privateer",
+   "class": "core:unit-class/privateer",
+   "role": "navalmelee",
+   "domain": "core:domain/sea",
+   "era": "core:era/renaissance",
+   "combat": 25,
+   "ranged_combat": 0,
+   "range": 0,
+   "moves": 5,
+   "sight": 2,
+   "cost": 150,
+   "faith_cost": null,
+   "required_tech": "core:tech/navigation",
+   "obsolete_tech": null,
+   "required_resources": [],
+   "upgrades_to": [
+    "core:unit/destroyer"
+   ],
+   "free_promotions": [
+    "core:promotion/coastal-raider-1",
+    "core:promotion/prize-ships"
+   ],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 3,
+   "xp_value_defense": 3,
+   "abilities": {
+    "pillage": true,
+    "mechanized": true
+   },
+   "art_id": "bnw:unit/privateer",
+   "provenance": "unciv: Units.json, Privateer",
+   "unciv_fields": [
+    "combat",
+    "cost",
+    "moves",
+    "obsolete_tech",
+    "ranged_combat",
+    "required_resources",
+    "required_tech",
+    "upgrades_to"
+   ]
+  },
+  {
+   "id": "core:unit/inquisitor",
+   "name": "Inquisitor",
+   "class": "core:unit-class/inquisitor",
+   "role": "religious",
+   "domain": "core:domain/land",
+   "era": "core:era/ancient",
+   "combat": 0,
+   "ranged_combat": 0,
+   "range": 0,
+   "moves": 3,
+   "sight": 2,
+   "cost": -1,
+   "faith_cost": 200,
+   "required_tech": null,
+   "obsolete_tech": null,
+   "required_resources": [],
+   "upgrades_to": [],
+   "free_promotions": [
+    "core:promotion/extra-sight-i"
+   ],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 0,
+   "xp_value_defense": 0,
+   "abilities": {
+    "religious_strength": 1250,
+    "requires_enhanced_religion": true,
+    "remove_heresy": true,
+    "prohibits_spread": true,
+    "civilian_attack_priority": "low"
+   },
+   "art_id": "bnw:unit/inquisitor",
+   "provenance": "unciv: Units.json, Inquisitor",
+   "unciv_fields": [
+    "combat",
+    "moves",
+    "obsolete_tech",
+    "ranged_combat",
+    "required_resources",
+    "required_tech"
+   ]
+  },
+  {
+   "id": "core:unit/great-admiral",
+   "name": "Great Admiral",
+   "class": "core:unit-class/great-admiral",
+   "role": "great-person",
+   "domain": "core:domain/sea",
+   "era": "core:era/ancient",
+   "combat": 0,
+   "ranged_combat": 0,
+   "range": 0,
+   "moves": 4,
+   "sight": 2,
+   "cost": -1,
+   "faith_cost": null,
+   "required_tech": null,
+   "obsolete_tech": null,
+   "required_resources": [],
+   "upgrades_to": [],
+   "free_promotions": [
+    "core:promotion/great-admiral"
+   ],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 0,
+   "xp_value_defense": 0,
+   "abilities": {
+    "special": "people",
+    "civilian_attack_priority": "high"
+   },
+   "art_id": "bnw:unit/great-admiral",
+   "provenance": "unciv: Units.json, Great Admiral",
+   "unciv_fields": [
+    "combat",
+    "moves",
+    "obsolete_tech",
+    "ranged_combat",
+    "required_resources",
+    "required_tech"
+   ]
+  },
+  {
+   "id": "core:unit/gatling-gun",
+   "name": "Gatling Gun",
+   "class": "core:unit-class/gatlinggun",
+   "role": "archer",
+   "domain": "core:domain/land",
+   "era": "core:era/industrial",
+   "combat": 30,
+   "ranged_combat": 30,
+   "range": 1,
+   "moves": 2,
+   "sight": 2,
+   "cost": 225,
+   "faith_cost": 450,
+   "required_tech": "core:tech/industrialization",
+   "obsolete_tech": "core:tech/ballistics",
+   "required_resources": [],
+   "upgrades_to": [
+    "core:unit/machine-gun"
+   ],
+   "free_promotions": [
+    "core:promotion/only-defensive"
+   ],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 3,
+   "xp_value_defense": 3,
+   "abilities": {
+    "pillage": true,
+    "requires_faith_purchase_enabled": true
+   },
+   "art_id": "bnw:unit/gatling-gun",
+   "provenance": "unciv: Units.json, Gatling Gun",
+   "unciv_fields": [
+    "combat",
+    "cost",
+    "moves",
+    "obsolete_tech",
+    "ranged_combat",
+    "required_resources",
+    "required_tech",
+    "upgrades_to"
+   ]
+  },
+  {
+   "id": "core:unit/cargo-ship",
+   "name": "Cargo Ship",
+   "class": "core:unit-class/cargo-ship",
+   "role": "civilian",
+   "domain": "core:domain/sea",
+   "era": "core:era/ancient",
+   "combat": 0,
+   "ranged_combat": 0,
+   "range": 0,
+   "moves": 4,
+   "sight": 2,
+   "cost": 90,
+   "faith_cost": null,
+   "required_tech": "core:tech/sailing",
+   "obsolete_tech": null,
+   "required_resources": [],
+   "upgrades_to": [],
+   "free_promotions": [
+    "core:promotion/sight-penalty"
+   ],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 0,
+   "xp_value_defense": 3,
+   "abilities": {
+    "mechanized": true,
+    "immobile": true,
+    "no_maintenance": true,
+    "trade": true,
+    "civilian_attack_priority": "low"
+   },
+   "art_id": "bnw:unit/cargo-ship",
+   "provenance": "own value",
+   "effects": []
+  },
+  {
+   "id": "core:unit/caravan",
+   "name": "Caravan",
+   "class": "core:unit-class/caravan",
+   "role": "civilian",
+   "domain": "core:domain/land",
+   "era": "core:era/ancient",
+   "combat": 0,
+   "ranged_combat": 0,
+   "range": 0,
+   "moves": 2,
+   "sight": 2,
+   "cost": 70,
+   "faith_cost": null,
+   "required_tech": "core:tech/animal-husbandry",
+   "obsolete_tech": null,
+   "required_resources": [],
+   "upgrades_to": [],
+   "free_promotions": [
+    "core:promotion/sight-penalty"
+   ],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 0,
+   "xp_value_defense": 3,
+   "abilities": {
+    "mechanized": true,
+    "immobile": true,
+    "no_maintenance": true,
+    "trade": true,
+    "civilian_attack_priority": "low"
+   },
+   "art_id": "bnw:unit/caravan",
+   "provenance": "own value",
+   "effects": []
+  },
+  {
+   "id": "core:unit/great-writer",
+   "name": "Great Writer",
+   "class": "core:unit-class/writer",
+   "role": "great-person",
+   "domain": "core:domain/land",
+   "era": "core:era/ancient",
+   "combat": 0,
+   "ranged_combat": 0,
+   "range": 0,
+   "moves": 2,
+   "sight": 2,
+   "cost": -1,
+   "faith_cost": null,
+   "required_tech": null,
+   "obsolete_tech": null,
+   "required_resources": [],
+   "upgrades_to": [],
+   "free_promotions": [],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 0,
+   "xp_value_defense": 0,
+   "abilities": {
+    "work_rate": 1,
+    "base_culture_turns_to_count": 8,
+    "special": "people",
+    "civilian_attack_priority": "high"
+   },
+   "art_id": "bnw:unit/great-writer",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:unit/great-musician",
+   "name": "Great Musician",
+   "class": "core:unit-class/musician",
+   "role": "great-person",
+   "domain": "core:domain/land",
+   "era": "core:era/ancient",
+   "combat": 0,
+   "ranged_combat": 0,
+   "range": 0,
+   "moves": 2,
+   "sight": 2,
+   "cost": -1,
+   "faith_cost": null,
+   "required_tech": null,
+   "obsolete_tech": null,
+   "required_resources": [],
+   "upgrades_to": [],
+   "free_promotions": [],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 0,
+   "xp_value_defense": 0,
+   "abilities": {
+    "work_rate": 1,
+    "one_shot_tourism": 7,
+    "one_shot_tourism_percent_others": 12,
+    "special": "people",
+    "civilian_attack_priority": "high"
+   },
+   "art_id": "bnw:unit/great-musician",
+   "provenance": "own value",
+   "effects": []
+  },
+  {
+   "id": "core:unit/archaeologist",
+   "name": "Archaeologist",
+   "class": "core:unit-class/archaeologist",
+   "role": "civilian",
+   "domain": "core:domain/land",
+   "era": "core:era/industrial",
+   "combat": 0,
+   "ranged_combat": 0,
+   "range": 0,
+   "moves": 4,
+   "sight": 2,
+   "cost": 175,
+   "faith_cost": null,
+   "required_tech": "core:tech/archaeology",
+   "obsolete_tech": null,
+   "required_resources": [],
+   "upgrades_to": [],
+   "free_promotions": [],
+   "worker_actions": [
+    "core:build/archaeology-dig",
+    "core:build/landmark"
+   ],
+   "requires_buildings_in_city": [
+    "core:building/university"
+   ],
+   "xp_value_attack": 0,
+   "xp_value_defense": 0,
+   "abilities": {
+    "work_rate": 100,
+    "capture": "core:unit/archaeologist",
+    "civilian_attack_priority": "low"
+   },
+   "art_id": "bnw:unit/archaeologist",
+   "provenance": "own value",
+   "effects": []
+  },
+  {
+   "id": "core:unit/bazooka",
+   "name": "Bazooka",
+   "class": "core:unit-class/bazooka",
+   "role": "archer",
+   "domain": "core:domain/land",
+   "era": "core:era/atomic",
+   "combat": 85,
+   "ranged_combat": 85,
+   "range": 1,
+   "moves": 2,
+   "sight": 2,
+   "cost": 375,
+   "faith_cost": 750,
+   "required_tech": "core:tech/nuclear-fission",
+   "obsolete_tech": null,
+   "required_resources": [],
+   "upgrades_to": [],
+   "free_promotions": [
+    "core:promotion/only-defensive"
+   ],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 3,
+   "xp_value_defense": 3,
+   "abilities": {
+    "pillage": true,
+    "ignore_building_defense": true,
+    "requires_faith_purchase_enabled": true
+   },
+   "art_id": "bnw:unit/bazooka",
+   "provenance": "own value"
+  },
+  {
+   "id": "core:unit/xcom-squad",
+   "name": "XCOM Squad",
+   "class": "core:unit-class/xcom-squad",
+   "role": "gun",
+   "domain": "core:domain/land",
+   "era": "core:era/information",
+   "combat": 100,
+   "ranged_combat": 0,
+   "range": 0,
+   "moves": 2,
+   "sight": 2,
+   "cost": 400,
+   "faith_cost": 800,
+   "required_tech": "core:tech/nanotechnology",
+   "obsolete_tech": null,
+   "required_resources": [],
+   "upgrades_to": [],
+   "free_promotions": [
+    "core:promotion/extended-paradrop"
+   ],
+   "worker_actions": [],
+   "requires_buildings_in_city": [],
+   "xp_value_attack": 3,
+   "xp_value_defense": 3,
+   "abilities": {
+    "pillage": true,
+    "requires_faith_purchase_enabled": true
+   },
+   "art_id": "bnw:unit/xcom-squad",
+   "provenance": "own value"
+  }
+ ],
+ "notice": "Derived from Unciv (https://github.com/yairm210/Unciv), MPL-2.0: rule fields of the entries marked `unciv:` come from Unciv's `Gods & Kings` JSON files at commit 18827b1f; entries marked `own value, unverified` have no Unciv counterpart. Listed per file in classic/docs/classic/UNCIV-ATTRIBUTION.md."
+}
