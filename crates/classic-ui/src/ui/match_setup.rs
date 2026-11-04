@@ -213,6 +213,10 @@ pub struct GameOptions {
     pub city_states: u8,
     /// Barbarian camps and their units.
     pub barbarians: bool,
+    /// The balance of the starts: fair starts and "Strategic balance" (every start has horses and iron,
+    /// the early strategic resources of the rules, within three tiles). On by default; the setup screen
+    /// has no switch for `start_balance.strategic` yet.
+    pub start_balance: classic_rules::scenario::StartBalance,
 }
 
 impl Default for GameOptions {
@@ -224,6 +228,7 @@ impl Default for GameOptions {
             victories: Victories::default(),
             city_states: 0,
             barbarians: false,
+            start_balance: classic_rules::scenario::StartBalance::ON,
         }
     }
 }
@@ -323,6 +328,7 @@ pub fn prepare_game(new_game: NewGame) -> Result<PreparedMatch, String> {
         victories: options.victories.options(),
         script: options.map,
         speed: None,
+        start_balance: options.start_balance,
     };
     // The speed's last round becomes the time victory's (`NewGameOptions::speed`).
     let new_game = new_game.at_speed(&rules, options.speed.key()).unwrap_or(new_game);
@@ -432,6 +438,7 @@ impl MatchSetup {
             victories: self.victories,
             city_states: self.city_states,
             barbarians: true,
+            start_balance: classic_rules::scenario::StartBalance::ON,
         };
         Ok(NewGame { request, options })
     }

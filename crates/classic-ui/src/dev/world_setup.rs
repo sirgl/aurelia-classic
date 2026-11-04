@@ -40,11 +40,29 @@ fn wants(token: &str) -> bool {
     tokens().iter().any(|t| t == token)
 }
 
+/// AURELIA_GAME_START_BALANCE=off: the starts as the generator made them before the balance (the
+/// "before" screenshots of `docs/start-balance.md`); anything else: the balanced starts.
+pub fn start_balance() -> classic_rules::scenario::StartBalance {
+    match std::env::var("AURELIA_GAME_START_BALANCE").as_deref() {
+        Ok("off") => classic_rules::scenario::StartBalance::OFF,
+        _ => classic_rules::scenario::StartBalance::ON,
+    }
+}
+
+/// The scripted match without city-states, with the balance the environment asks for.
+pub fn match_plain(request: MatchRequest) -> Result<PreparedMatch, String> {
+    screens::prepare_game(screens::NewGame {
+        request,
+        options: screens::GameOptions { start_balance: start_balance(), ..Default::default() },
+    })
+}
+
 /// AURELIA_GAME_CITY_STATES: the scripted match with city-states (None: without).
 pub fn match_with_city_states(request: &MatchRequest) -> Option<PreparedMatch> {
     let count: u8 = std::env::var("AURELIA_GAME_CITY_STATES").ok()?.parse().ok()?;
     let options = screens::GameOptions {
         city_states: count,
+        start_balance: start_balance(),
         ..Default::default()
     };
     screens::prepare_game(screens::NewGame {

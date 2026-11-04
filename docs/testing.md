@@ -53,7 +53,8 @@ release (4,200 CPU s) and a one-line edit in `classic-rules` still rebuilt every
 Every pin passes under `fasttest`: the game is integer arithmetic and its hashes do not depend on
 the opt-level (the full suite passed at opt-levels 2 and 3; at 1 every test passed but
 `ai_selfplay::mid_game_starts_branch_from_a_log`, which is flaky at any level: it compares a
-wall-clock `f64` after a JSON round trip without serde_json's `float_roundtrip`). Benches and
+wall-clock `f64` after a JSON round trip; the qa crate now enables serde_json's `float_roundtrip`, which fixed the
+same class in `ai_grounds::economy_windows_replay_and_stop`). Benches and
 timings still use `--release`.
 
 ## The fast and the full set

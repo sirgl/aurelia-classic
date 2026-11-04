@@ -17,6 +17,7 @@
 //! AURELIA_GAME_SHOWCASE=placement (five sites: plain, slope, hill top, river bank, sea cliff, each a city;
 //! AURELIA_GAME_DEVELOPED grows them; AURELIA_GAME_PITCH=<degrees> lowers the camera: how objects meet the ground),
 //! AURELIA_GAME_NATION (content key of the observed nation, default core:nation/rome),
+//! AURELIA_GAME_START_BALANCE (off: the starts as the generator made them before the start balance),
 //! AURELIA_GAME_CITY_RENAME (set: the city screen opens with the list of names),
 //! AURELIA_GAME_SETUP / AURELIA_GAME_CITY_STATES / AURELIA_GAME_MAX_ROUNDS (see `world_setup`),
 //! AURELIA_GAME_TURN_FRAMES (frames after every end turn: the presentation plays),
@@ -197,7 +198,7 @@ impl Offscreen {
         };
         let mut prepared = match super::world_setup::match_with_city_states(&request) {
             Some(prepared) => prepared,
-            None => screens::prepare_match(request).expect("world"),
+            None => super::world_setup::match_plain(request).expect("world"),
         };
         if std::env::var("AURELIA_GAME_PARADE").is_ok() {
             parade(&mut prepared);

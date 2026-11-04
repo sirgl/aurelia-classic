@@ -163,6 +163,7 @@ impl GameSpec {
             victories: self.victories,
             script: self.script,
             speed: None,
+            ..NewGameOptions::default()
         };
         let options = if self.speed.is_empty() { options } else { options.at_speed(rules, &self.speed).unwrap_or(options) };
         (config, options)

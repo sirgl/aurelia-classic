@@ -1,6 +1,6 @@
 screen Map 1366x768
 widgets
-  click "0 (+6) Gold" 10,4 96x30
+  click "0 (+4) Gold" 10,4 96x30
   click "4 Food" 124,4 71x30
   click "4 Production" 213,4 108x30
   click "0 (+4) Science" 339,4 113x30
@@ -24,12 +24,13 @@ painted
     rect 794,322 29x27 stroke 2 #bb9c5c r4
     rect 796,324 25x23 fill #f23f3f r3
     path 5pt 802,329 13x14 fill #ebe7d5
-    image "atlas kraken" 515,31 191x80 tint #ffffff5b
+    image "atlas serpent" -172,508 363x265 tint #ffffff5b
+    image "atlas kraken" 1016,372 378x198 tint #ffffff5b
     rect 0,0 1366x40 fill #0b151ff0
     line 0,40 -> 1366,40 stroke 1 #bb9b5ca6
   clip 10,4 961x32
     figure 3 shapes 11,10 18x18 #bb9c5c #0b151ff0
-    text "0 (+6) Gold" 35,11 68x16 #ebe7d5 14px
+    text "0 (+4) Gold" 35,11 68x16 #ebe7d5 14px
     figure 9 shapes 125,9 18x19 #182d0d #89bc53 #2f3910 #4d8a1e #def89d
     text "4 Food" 149,11 43x16 #ebe7d5 14px
     figure 2 shapes 216,9 16x20 #bb9c5c
@@ -37,7 +38,7 @@ painted
     figure 3 shapes 340,9 17x18 #64c6eeb3 #64c6ef
     text "0 (+4) Science" 364,11 85x16 #ebe7d5 14px
     figure 5 shapes 472,9 15x18 #e8c45c
-    text "+9 Happiness" 495,11 83x16 #ebe7d5 14px
+    text "+5 Happiness" 495,11 83x16 #ebe7d5 14px
     figure 9 shapes 600,9 19x20 #bb9c5c
     text "Golden age 0/505" 624,11 111x16 #ebe7d5 14px
     figure 5 shapes 758,9 15x18 #d67cc4
@@ -87,8 +88,8 @@ painted
     rect 1070,580 270x159 fill #0a1620 r2
   clip 1070,580 270x159
     image "minimap" 1070,580 270x159
-    circle 1247,707 r2.6 fill #ebe7d5
-    rect 1204,673 87x69 stroke 1 #ebe7d5
+    circle 1179,604 r2.6 fill #ebe7d5
+    rect 1135,569 87x69 stroke 1 #ebe7d5
   clip 0,0 1366x768
     figure 8 shapes 1064,572 282x175 #bb9c5c
     rect 1105,523 245x37 fill #0b151ff0 r3

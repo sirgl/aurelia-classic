@@ -2,7 +2,8 @@
 //! then the city-states, the ruins, the barbarian player and the victory
 //! options.
 
-use kernel::scenario::generator::{assign_nations, pick_starts, start_player};
+use kernel::scenario::generator::{assign_nations, pick_starts_with, start_player};
+use kernel::scenario::start_balance::{balance_starts, BalanceReport, StartBalance};
 
 use crate::ids::PlayerId;
 use crate::rules::CompiledRuleset;
@@ -13,7 +14,7 @@ use crate::world::state::GameState;
 use crate::world::player::{ClassicKind, ClassicPlayers};
 
 /// Options of a new game beyond the map (setup screen).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct NewGameOptions {
     pub barbarians: crate::world::barbarians::BarbarianMode,
     /// City-states placed on the map (16 on a standard map; own value, unverified).
@@ -26,6 +27,25 @@ pub struct NewGameOptions {
     /// of another speed whose `victories` keep the Standard last round
     /// (`STANDARD_MAX_ROUNDS`) plays to the speed's last round.
     pub speed: Option<u8>,
+    /// The balance of the starts (`kernel::scenario::start_balance`), on by default: fair starts (a
+    /// minimum of food and production, starts close in value) and "Strategic balance" (every start has
+    /// the early strategic resources, horses and iron in Classic, within three tiles, in a small fixed
+    /// amount). The setup screen's switch is `start_balance.strategic`; `StartBalance::OFF` gives the
+    /// map of the generator before the balance existed, bit for bit.
+    pub start_balance: StartBalance,
+}
+
+impl Default for NewGameOptions {
+    fn default() -> Self {
+        Self {
+            barbarians: Default::default(),
+            city_states: 0,
+            victories: Default::default(),
+            script: Default::default(),
+            speed: None,
+            start_balance: StartBalance::ON,
+        }
+    }
 }
 
 impl NewGameOptions {
@@ -66,6 +86,17 @@ pub fn generate_new_game_on(
     options: NewGameOptions,
     land: LandOptions,
 ) -> GameState {
+    generate_new_game_report(rules, cfg, human_nation, options, land).0
+}
+
+/// `generate_new_game_on`, with what the start balance changed on the map (the census and the tests count it).
+pub fn generate_new_game_report(
+    rules: &CompiledRuleset,
+    cfg: &ScenarioConfig,
+    human_nation: Option<u8>,
+    options: NewGameOptions,
+    land: LandOptions,
+) -> (GameState, BalanceReport) {
     use crate::world::barbarians::BarbarianMode;
     let barbarians = options.barbarians != BarbarianMode::None;
     let minors = options.city_states.min(rules.module.city_states.len().min(u8::MAX as usize) as u8);
@@ -78,13 +109,15 @@ pub fn generate_new_game_on(
     };
     let mut game = generate_scripted_builder_with(&empty, rules, options.script, land);
     let nations = assign_nations(rules, cfg.players, human_nation, cfg.seed);
-    let starts = pick_starts(game.state(), rules, &nations, cfg.players);
+    let balance = options.start_balance;
+    let starts = pick_starts_with(game.state(), rules, &nations, cfg.players, &balance);
     kernel::scenario::sea_resources::support_starts(&mut game, &starts, cfg.seed);
     for (p, &tile) in starts.iter().enumerate() {
         let player = PlayerId(p as u8);
         game.set_player_nation(player, nations[p]);
         start_player(&mut game, player, nations[p], tile);
     }
+    let report = balance_starts(&mut game, &starts, cfg.seed, &balance);
     super::city_states::place_city_states(&mut game, cfg.players, minors, cfg.seed);
     super::ruins::place_ruins(&mut game, cfg.seed);
     if barbarians {
@@ -104,6 +137,6 @@ pub fn generate_new_game_on(
         victories.max_rounds = options.speed_values(rules).max_rounds();
     }
     game.auth_mut().module.victory.options = victories;
-    game.build()
+    (game.build(), report)
 }
 
