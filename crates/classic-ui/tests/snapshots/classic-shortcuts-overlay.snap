@@ -32,7 +32,8 @@ painted
     rect 661,299 25x23 fill #f23f3f r3
     path 5pt 667,304 12x14 fill #ebe7d5
     text "2" 694,304 7x13 #bb9c5c 11px
-    image "atlas kraken" 515,31 191x80 tint #ffffff5b
+    image "atlas serpent" -172,508 363x265 tint #ffffff5b
+    image "atlas kraken" 1016,372 378x198 tint #ffffff5b
     rect 0,0 1366x40 fill #0b151ff0
     line 0,40 -> 1366,40 stroke 1 #bb9b5ca6
   clip 10,4 974x32
@@ -80,7 +81,7 @@ painted
     rect 1070,580 270x159 fill #0a1620 r2
   clip 1070,580 270x159
     image "minimap" 1070,580 270x159
-    rect 1204,673 87x69 stroke 1 #ebe7d5
+    rect 1135,569 87x69 stroke 1 #ebe7d5
   clip 0,0 1366x768
     figure 8 shapes 1064,572 282x175 #bb9c5c
     rect 1105,523 245x37 fill #0b151ff0 r3

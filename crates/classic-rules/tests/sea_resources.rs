@@ -7,7 +7,7 @@ use classic_content::core::core_rules;
 use classic_rules::ids::{PlayerId, ResourceId, TileId};
 use classic_rules::rules::content::ResourceClass;
 use classic_rules::rules::roles::Ground;
-use classic_rules::scenario::{generate_new_game_with, MapScript, NewGameOptions, ScenarioConfig};
+use classic_rules::scenario::{generate_new_game_with, MapScript, NewGameOptions, ScenarioConfig, StartBalance};
 use classic_rules::world::size::WorldSize;
 use classic_rules::{compile_rules, CompiledRuleset, GameState};
 
@@ -166,15 +166,26 @@ fn deposits_are_deterministic_by_seed() {
     }
 }
 
+/// `new_game` with the start balance off: the generator's own land, without the deposits the balance
+/// puts near the starts (the balance values a start by the deposits at sea as well, so the starts, and
+/// with them those deposits, depend on whether the sea has any).
+fn new_game_unbalanced(rules: &CompiledRuleset, script: MapScript, size: WorldSize, seed: u64) -> GameState {
+    let (width, height) = size.grid();
+    let (nations, minors) = players(size);
+    let cfg = ScenarioConfig { seed, players: nations, width, height, cities: 0, units: 0, water_ratio: script.water_ratio(25) };
+    let options = NewGameOptions { city_states: minors, script, start_balance: StartBalance::OFF, ..Default::default() };
+    generate_new_game_with(rules, &cfg, None, options)
+}
+
 /// The sea is drawn from hashes of its own: with or without sea resources the land, its features and
-/// its land deposits are the same tile for tile.
+/// its land deposits are the same tile for tile (with the start balance off: see `new_game_unbalanced`).
 #[test]
 fn the_sea_does_not_move_the_land() {
     let (with, without) = (rules(), rules_without_sea());
     let water = with.terrain_kinds.palette().code(Ground::Water);
     for script in MapScript::ALL {
-        let a = new_game(&with, script, WorldSize::Tiny, 5);
-        let b = new_game(&without, script, WorldSize::Tiny, 5);
+        let a = new_game_unbalanced(&with, script, WorldSize::Tiny, 5);
+        let b = new_game_unbalanced(&without, script, WorldSize::Tiny, 5);
         let (ma, mb) = (a.view().auth.map(), b.view().auth.map());
         let n = ma.dimensions.tile_count() as u32;
         let land_deposits = |game: &GameState, rules: &CompiledRuleset| -> Vec<(u32, String)> {
@@ -210,7 +221,11 @@ fn a_coastal_start_has_a_deposit_at_sea_in_its_work_radius() {
                     continue;
                 };
                 let within = |t: TileId| dims.distance(start, t).is_some_and(|d| d <= 3);
-                let sea: Vec<TileId> = (0..dims.tile_count() as u32).map(TileId).filter(|&t| within(t) && map.terrain(t).map(|x| x.0) == Some(water)).collect();
+                // Water under ice holds no deposit ("never under ice or an atoll"): a start by an iced sea has none to find.
+                let sea: Vec<TileId> = (0..dims.tile_count() as u32)
+                    .map(TileId)
+                    .filter(|&t| within(t) && map.terrain(t).map(|x| x.0) == Some(water) && map.feature(t) == Some(None))
+                    .collect();
                 if sea.is_empty() {
                     continue;
                 }

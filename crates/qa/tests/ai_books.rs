@@ -123,7 +123,9 @@ fn a_book_on_its_measured_base_plays_its_games() {
 }
 
 /// The march into the fog (classic/docs/ai-books.md «The march into the fog»): on
-/// the land duel of seed 11 the rival's capital is known from the embassy of round 35,
+/// the land duel of seed 19 (seed 11 before the balanced starts of 4 November moved every world; the
+/// rounds and distances below were measured on that old world, on seed 19 `standard-scripted`'s army
+/// stops 7 tiles out of sight and `fog-march`'s 2 tiles from the walls) the rival's capital is known from the embassy of round 35,
 /// the land between is not. `rush-siege@standard` launches at round 63 and its army
 /// stands 8-9 tiles out from round 74 on, out of the capital's sight (the march's legs
 /// aim at the tiles the embassy showed around the capital, cut off by the fog); on
@@ -137,7 +139,7 @@ fn a_book_on_fog_march_walks_through_the_fog_to_its_target() {
     // that is `standard-scripted`, the base and the rival (`standard` plays the strategy net).
     for book in ["rush-siege@standard-scripted", "rush-siege@fog-march"] {
         war_probe::enable(true);
-        let (mut game, mut driver, seat) = duel_against(&rules, book, "pangaea", 11, "standard-scripted");
+        let (mut game, mut driver, seat) = duel_against(&rules, book, "pangaea", 19, "standard-scripted");
         play(&mut game, &rules, &mut driver, seat, 115);
         let probe = war_probe::take();
         war_probe::enable(false);

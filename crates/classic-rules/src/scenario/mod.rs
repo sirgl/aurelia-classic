@@ -12,7 +12,8 @@ pub use kernel::scenario::{
     settler_kind, MapScript, ScenarioConfig,
 };
 pub use kernel::scenario::LandOptions;
-pub use new_game::{generate_new_game_on, generate_new_game_with, NewGameOptions};
+pub use new_game::{generate_new_game_on, generate_new_game_report, generate_new_game_with, NewGameOptions};
+pub use kernel::scenario::start_balance::{BalanceReport, StartBalance, StartPolicy};
 
 #[cfg(test)]
 #[path = "generator_tests.rs"]
