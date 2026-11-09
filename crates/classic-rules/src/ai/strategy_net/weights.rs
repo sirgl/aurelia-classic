@@ -104,7 +104,15 @@ pub mod fe {
     pub const UNIQUE_MILITARY: usize = 43;
     pub const IDEOLOGY: usize = 44;
     pub const ROUTES_LEFT: usize = 45;
-    pub const N: usize = 46;
+    /// `war-open`'s features (`features::open`); 0 for every other variant.
+    pub const OPPORTUNITY: usize = 46;
+    pub const OP_FORMING: usize = 47;
+    pub const STRENGTH: usize = 48;
+    pub const PAYS: usize = 49;
+    pub const N: usize = 50;
+    /// The features every variant's net reads: the memory keeps these of a style's lock
+    /// (`Memory::encode`), `war-open`'s are events of the turn (`open::STYLE_EVENTS`).
+    pub const BASE_N: usize = 46;
 }
 
 /// Each feature's name and scale (0 … 1).
@@ -155,6 +163,10 @@ pub const FEATURES: [(&str, &str); fe::N] = [
     ("unique_military", "unique military units of the first two eras in the nation's rules"),
     ("ideology", "an ideology chosen"),
     ("routes_left", "trade routes it may still start: 3 → 1"),
+    ("opportunity", "war-open: the best known target's learned capture chance × its worth over an own city's: 50 % × 1 → 1"),
+    ("op_forming", "war-open: an offensive operation forms or marches, or its war chest is saved (1)"),
+    ("strength", "war-open: own military power over own plus the nearest rival's known power (0.5: level)"),
+    ("pays", "war-open: the war machine has a target whose war case is worth its army now (`operations::Outlook::pays`)"),
 ];
 
 // ---- layer 1: concepts ----
@@ -482,6 +494,55 @@ pub const POSTURE: [Neuron; 4] = [
         ],
     },
 ];
+
+// ---- war-open: a window of any era, and the war machine in the intent ----
+
+/// `war-open`'s additions to the net (classic/docs/ai-war-open.md): a strike window that opens
+/// on an opportunity in any era, and the operation the war machine forms in the intent. No other
+/// variant reads them (their features `fe::OPPORTUNITY`, `OP_FORMING`, `STRENGTH` are 0).
+pub mod open {
+    use super::fe::*;
+    use super::kc::*;
+    use super::{f, k, Act, Neuron, Term};
+
+    /// The window of any era: AND(an opportunity, an army not weaker than the neighbour's). The
+    /// leader's appetite (the traits, through `warlike`) widens the door; danger and a happiness
+    /// crisis shut it. `war-open`'s strike window is the larger of this and the early one.
+    pub const WINDOW: Neuron = Neuron {
+        name: "opportunity_window",
+        bias: -2100,
+        why: "AND(a war that pays, opportunity, strength): the war machine's case decides that a war pays, the opportunity and the army how wide the window is; without a war that pays the window stays shut (an open window without one priced an army for 15 % of the traced reviews and cost the economy; tuning offsets 200–201)",
+        act: Act::Unit,
+        terms: &[
+            f(PAYS, 1000, "AND: a target whose case pays (the war machine's verdict) …"),
+            f(OPPORTUNITY, 2000, "… the best target's chance × worth: the reason to strike"),
+            f(STRENGTH, 1600, "our army over the neighbour's: at parity (0.5) it gives half the door"),
+            k(WARLIKE, 600, "a warlike leader takes a smaller opportunity (the appetite, not the door)"),
+            f(TECH_LEAD, 400, "an era ahead: its units beat the neighbour's"),
+            k(DANGER, -800, "a threatened empire defends first"),
+            k(HAPPINESS_CRISIS, -1000, "conquered cities deepen a crisis"),
+        ],
+    };
+
+    /// Terms added to the logits of the styles, the aims and the postures: (index, term).
+    pub const STYLE: &[(usize, Term)] = &[
+        (2, f(OPPORTUNITY, 1000, "conquest: a target worth taking, in any era (the window adds the rest through `strike_window`)")),
+    ];
+    pub const AIM: &[(usize, Term)] = &[(2, f(OPPORTUNITY, 600, "domination: the capitals come into reach when cities fall"))];
+    pub const POSTURE: &[(usize, Term)] = &[
+        (2, f(OP_FORMING, 2000, "the war machine forms an operation: the posture prepares its army")),
+        (0, f(OP_FORMING, -1500, "an operation forming is not a time of peace")),
+    ];
+
+    /// The features a locked style takes from the turn besides `STYLE_EVENTS`: an opportunity
+    /// and the army's strength change with the neighbours, not with the empire's own growth.
+    pub const STYLE_EVENTS: [usize; 4] = [OPPORTUNITY, OP_FORMING, STRENGTH, PAYS];
+
+    /// `war-open`'s weights: the window's terms and bias, the intent's terms.
+    pub fn count() -> usize {
+        WINDOW.terms.len() + 1 + STYLE.len() + AIM.len() + POSTURE.len()
+    }
+}
 
 /// A choice of the intent changes only when the new one's share leads the
 /// held one's by more than this (thousandths: 15 %).

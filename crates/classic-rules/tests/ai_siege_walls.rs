@@ -170,7 +170,7 @@ fn siege_join_plays_the_tasked_siege_as_pre_join() {
     // `pre-camps` and `pre-workers` (the standards before the eleventh and the tenth promotion) and the candidates built on it
     // that change one thing elsewhere (`fog-march`, the nets' candidates and `standard-scripted`, the standard
     // before the twelfth promotion, too).
-    let on_standard = [Variant::PreCamps, Variant::PreWorkers, Variant::NoIdleCities, Variant::ScoutEarly, Variant::WorkersFit, Variant::TradeFit, Variant::ArmyFit, Variant::Camps, Variant::ArmyCamps, Variant::PromoFit, Variant::HealFirst, Variant::FogMarch, Variant::StrategyNet, Variant::UnitNet, Variant::Hybrid, Variant::StandardScripted, Variant::PreCsGifts];
+    let on_standard = [Variant::PreCamps, Variant::PreWorkers, Variant::NoIdleCities, Variant::ScoutEarly, Variant::WorkersFit, Variant::TradeFit, Variant::ArmyFit, Variant::Camps, Variant::ArmyCamps, Variant::PromoFit, Variant::HealFirst, Variant::FogMarch, Variant::StrategyNet, Variant::UnitNet, Variant::Hybrid, Variant::StandardScripted, Variant::PreCsGifts, Variant::WarOpen];
     assert!(on_standard.iter().all(|v| v.siege_join() == Variant::Standard.siege_join()));
     assert_eq!(Variant::ALL.iter().filter(|v| v.siege_join().any() && !v.unciv().parts().any() && !on_standard.contains(v)).count(), 2, "only `standard` and its alias `siege-join` carry the switches");
     assert_eq!(Variant::from_name("siege-join"), Some(Variant::SiegeJoin));

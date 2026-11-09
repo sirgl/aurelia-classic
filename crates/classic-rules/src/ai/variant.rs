@@ -663,6 +663,13 @@ pub enum Variant {
     /// the gold gifts go on to a city-state whose alliance holds past the next gift. Kept for
     /// the bench (`experimental-ai` only) as the control of that change.
     PreCsGifts,
+    /// `Standard` whose wars open on an opportunity and whose strategist and war machine are
+    /// one brain (`TurnBrief::war_open`, classic/docs/ai-war-open.md): the strategy net sees the
+    /// best target's chance and worth, its own strength against its neighbours and the
+    /// operation the war machine forms (`strategy_net::features`, `fe::OPPORTUNITY` …), its
+    /// strike window opens in any era, and its posture permits, prices and holds back the
+    /// offensive operation (`operations::posture_permits`). A candidate.
+    WarOpen,
 }
 
 /// The net's base: the expert the end-to-end net learns from and the mind it
@@ -683,7 +690,7 @@ const NUDGED_CANDIDATES: u32 = 40;
 
 impl Variant {
     /// The game's AI first.
-    pub const ALL: [Variant; 134] = [
+    pub const ALL: [Variant; 135] = [
         Variant::Standard,
         Variant::PreCamps,
         Variant::PreWorkers,
@@ -818,6 +825,7 @@ impl Variant {
         Variant::Hybrid,
         Variant::StandardScripted,
         Variant::PreCsGifts,
+        Variant::WarOpen,
     ];
 
     pub fn name(self) -> &'static str {
@@ -938,6 +946,7 @@ impl Variant {
             Variant::Hybrid => "hybrid",
             Variant::StandardScripted => "standard-scripted",
             Variant::PreCsGifts => "pre-cs-gifts",
+            Variant::WarOpen => "war-open",
             Variant::ArmyFit => "army-fit",
             Variant::Camps => "camps",
             Variant::ArmyCamps => "army-camps",
@@ -990,6 +999,8 @@ impl Variant {
             Variant::PromoFit | Variant::HealFirst => Variant::Standard,
             // `Standard` but for its march through the fog (`fog_march`).
             Variant::FogMarch => Variant::Standard,
+            // `Standard` but for the opening of its wars (`war_open`).
+            Variant::WarOpen => Variant::Standard,
             // `Standard` (since the twelfth promotion its alias) and `Standard` before it, without
             // the strategy net (`strategy_net`).
             Variant::StrategyNet | Variant::StandardScripted | Variant::PreCsGifts => Variant::Standard,
@@ -1026,7 +1037,7 @@ impl Variant {
         match self {
             // Unciv's modules inside the game's AI decide a capture as it does.
             v if v.unciv().parts().any() => Variant::Standard.conquest(),
-            Variant::Standard | Variant::PreCamps | Variant::PreWorkers | Variant::PreJoin | Variant::PuppetAll | Variant::SiegeJoin | Variant::PuppetWar | Variant::Unciv | Variant::UncivMilitary | Variant::TradeFit | Variant::NoIdleCities | Variant::ScoutEarly | Variant::WorkersFit | Variant::PromoFit | Variant::HealFirst | Variant::FogMarch | Variant::StrategyNet | Variant::UnitNet | Variant::Hybrid | Variant::StandardScripted | Variant::PreCsGifts => Conquest::PuppetAll,
+            Variant::Standard | Variant::PreCamps | Variant::PreWorkers | Variant::PreJoin | Variant::PuppetAll | Variant::SiegeJoin | Variant::PuppetWar | Variant::Unciv | Variant::UncivMilitary | Variant::TradeFit | Variant::NoIdleCities | Variant::ScoutEarly | Variant::WorkersFit | Variant::PromoFit | Variant::HealFirst | Variant::FogMarch | Variant::StrategyNet | Variant::UnitNet | Variant::Hybrid | Variant::StandardScripted | Variant::PreCsGifts | Variant::WarOpen => Conquest::PuppetAll,
             Variant::ArmyFit | Variant::Camps | Variant::ArmyCamps => Conquest::PuppetAll,
             Variant::PuppetPrice => Conquest::Priced,
             Variant::Net => NET_BASE.conquest(),
@@ -1066,7 +1077,7 @@ impl Variant {
             return Variant::Standard.siege_join();
         }
         match self {
-            Variant::Standard | Variant::PreCamps | Variant::PreWorkers | Variant::SiegeJoin | Variant::TradeFit | Variant::NoIdleCities | Variant::ScoutEarly | Variant::WorkersFit | Variant::PromoFit | Variant::HealFirst | Variant::FogMarch | Variant::StrategyNet | Variant::UnitNet | Variant::Hybrid | Variant::StandardScripted | Variant::PreCsGifts => crate::ai::siege_walls::SiegeJoin::ALL,
+            Variant::Standard | Variant::PreCamps | Variant::PreWorkers | Variant::SiegeJoin | Variant::TradeFit | Variant::NoIdleCities | Variant::ScoutEarly | Variant::WorkersFit | Variant::PromoFit | Variant::HealFirst | Variant::FogMarch | Variant::StrategyNet | Variant::UnitNet | Variant::Hybrid | Variant::StandardScripted | Variant::PreCsGifts | Variant::WarOpen => crate::ai::siege_walls::SiegeJoin::ALL,
             Variant::ArmyFit | Variant::Camps | Variant::ArmyCamps => crate::ai::siege_walls::SiegeJoin::ALL,
             Variant::Net => NET_BASE.siege_join(),
             _ => crate::ai::siege_walls::SiegeJoin::NONE,
@@ -1094,6 +1105,12 @@ impl Variant {
         self == Variant::FogMarch
     }
 
+    /// Its wars open on an opportunity and its strategy net and war machine are one brain
+    /// (`TurnBrief::war_open`): `WarOpen` alone (it reads the variant, not `scripted`).
+    pub fn war_open(self) -> bool {
+        self == Variant::WarOpen
+    }
+
     /// Its research, policies and choice among the allocator's best orders are the
     /// strategy net's (`ai::strategy_net`, `TurnBrief::strategy`): the game's AI since the
     /// twelfth promotion (3 November), its alias `StrategyNet`, and `Hybrid`. Not the variants
@@ -1105,7 +1122,7 @@ impl Variant {
             // Unciv's modules inside the game's AI play its strategy net but for their family.
             return Variant::Standard.strategy_net();
         }
-        matches!(self, Variant::Standard | Variant::StrategyNet | Variant::Hybrid | Variant::PreCsGifts)
+        matches!(self, Variant::Standard | Variant::StrategyNet | Variant::Hybrid | Variant::PreCsGifts | Variant::WarOpen)
     }
 
     /// The gold gifts stop at a city-state whose alliance holds past the next gift
@@ -1117,7 +1134,7 @@ impl Variant {
         if self.unciv().parts().any() {
             return Variant::Standard.cs_gift_cap();
         }
-        matches!(self, Variant::Standard | Variant::StrategyNet | Variant::Hybrid)
+        matches!(self, Variant::Standard | Variant::StrategyNet | Variant::Hybrid | Variant::WarOpen)
     }
 
     /// Its tactical and operations layer is the unit net's (`ai::unit_net`,
@@ -1140,7 +1157,7 @@ impl Variant {
     /// The candidates described as `Standard` with one change elsewhere: they carry each
     /// switch `Standard` takes in a promotion (`army_fit`, `camps` since the eleventh).
     fn on_standard(self) -> bool {
-        matches!(self, Variant::TradeFit | Variant::NoIdleCities | Variant::ScoutEarly | Variant::PromoFit | Variant::HealFirst | Variant::FogMarch | Variant::StrategyNet | Variant::UnitNet | Variant::Hybrid | Variant::StandardScripted | Variant::PreCsGifts)
+        matches!(self, Variant::TradeFit | Variant::NoIdleCities | Variant::ScoutEarly | Variant::PromoFit | Variant::HealFirst | Variant::FogMarch | Variant::StrategyNet | Variant::UnitNet | Variant::Hybrid | Variant::StandardScripted | Variant::PreCsGifts | Variant::WarOpen)
     }
 
     /// How much of the turn Unciv's AI plays (`ai::unciv`).
@@ -1254,12 +1271,16 @@ impl Variant {
     }
 
     /// The changes of the war logic this variant carries (`operations::WarTuning`):
-    /// `PuppetWar` is `Standard`'s with a capture priced as a puppet.
+    /// `PuppetWar` is `Standard`'s with a capture priced as a puppet, `WarOpen` `Standard`'s with
+    /// the war case of `SiegeFixes::OPEN`.
     pub fn war_tuning(self) -> crate::ai::operations::WarTuning {
         use crate::ai::operations::{SiegeFixes, WarTuning};
         let tuning = self.scripted_war_tuning();
         if self == Variant::PuppetWar {
             return WarTuning { siege: SiegeFixes { puppet: true, ..tuning.siege }, ..tuning };
+        }
+        if self == Variant::WarOpen {
+            return WarTuning { siege: SiegeFixes::OPEN, ..tuning };
         }
         tuning
     }
@@ -1451,7 +1472,7 @@ impl Variant {
         match self {
             Variant::Standard | Variant::PreCamps | Variant::WorkersFit => WorkersFit::ALL,
             Variant::TradeFit | Variant::NoIdleCities | Variant::ScoutEarly | Variant::ArmyFit | Variant::Camps | Variant::ArmyCamps => WorkersFit::ALL,
-            Variant::PromoFit | Variant::HealFirst | Variant::FogMarch | Variant::StrategyNet | Variant::UnitNet | Variant::Hybrid | Variant::StandardScripted | Variant::PreCsGifts => WorkersFit::ALL,
+            Variant::PromoFit | Variant::HealFirst | Variant::FogMarch | Variant::StrategyNet | Variant::UnitNet | Variant::Hybrid | Variant::StandardScripted | Variant::PreCsGifts | Variant::WarOpen => WorkersFit::ALL,
             Variant::UncivMilitary => WorkersFit::ALL,
             Variant::Net => NET_BASE.workers_fit(),
             _ => WorkersFit::NONE,
@@ -1687,7 +1708,7 @@ mod tests {
         assert_eq!(unpuppeted, Variant::Standard.war_tuning(), "`puppet-war` is `standard` but for the price of a capture");
         assert_eq!(Variant::from_name("puppet-war"), Some(war));
         // Every variant but those keeps the threshold: their games are unchanged by the promotion.
-        let puppets = [Variant::Standard, Variant::PreCamps, Variant::PreWorkers, Variant::PreJoin, Variant::PuppetPrice, Variant::PuppetAll, Variant::SiegeJoin, Variant::PuppetWar, Variant::Unciv, Variant::UncivMilitary, Variant::TradeFit, Variant::NoIdleCities, Variant::ScoutEarly, Variant::WorkersFit, Variant::ArmyFit, Variant::Camps, Variant::ArmyCamps, Variant::PromoFit, Variant::HealFirst, Variant::FogMarch, Variant::StrategyNet, Variant::UnitNet, Variant::Hybrid, Variant::StandardScripted, Variant::PreCsGifts];
+        let puppets = [Variant::Standard, Variant::PreCamps, Variant::PreWorkers, Variant::PreJoin, Variant::PuppetPrice, Variant::PuppetAll, Variant::SiegeJoin, Variant::PuppetWar, Variant::Unciv, Variant::UncivMilitary, Variant::TradeFit, Variant::NoIdleCities, Variant::ScoutEarly, Variant::WorkersFit, Variant::ArmyFit, Variant::Camps, Variant::ArmyCamps, Variant::PromoFit, Variant::HealFirst, Variant::FogMarch, Variant::StrategyNet, Variant::UnitNet, Variant::Hybrid, Variant::StandardScripted, Variant::PreCsGifts, Variant::WarOpen];
         assert!(Variant::ALL.iter().filter(|v| !puppets.contains(v) && !v.unciv().parts().any()).all(|v| v.conquest() == Conquest::Threshold));
     }
 
@@ -1709,7 +1730,7 @@ mod tests {
         assert_eq!(alias.siege_join(), standard.siege_join());
         // Unciv's modules inside `standard` follow it (`the_unciv_hybrids_are_standard_but_for_one_family`).
         let joined: Vec<Variant> = Variant::ALL.into_iter().filter(|v| v.siege_join().any() && !v.unciv().parts().any()).collect();
-        assert_eq!(joined, [standard, Variant::PreCamps, Variant::PreWorkers, alias, Variant::TradeFit, Variant::NoIdleCities, Variant::ScoutEarly, Variant::WorkersFit, Variant::ArmyFit, Variant::Camps, Variant::ArmyCamps, Variant::PromoFit, Variant::HealFirst, Variant::FogMarch, Variant::StrategyNet, Variant::UnitNet, Variant::Hybrid, Variant::StandardScripted, Variant::PreCsGifts], "only the game's AI and its alias besiege as `siege-join`");
+        assert_eq!(joined, [standard, Variant::PreCamps, Variant::PreWorkers, alias, Variant::TradeFit, Variant::NoIdleCities, Variant::ScoutEarly, Variant::WorkersFit, Variant::ArmyFit, Variant::Camps, Variant::ArmyCamps, Variant::PromoFit, Variant::HealFirst, Variant::FogMarch, Variant::StrategyNet, Variant::UnitNet, Variant::Hybrid, Variant::StandardScripted, Variant::PreCsGifts, Variant::WarOpen], "only the game's AI and its alias besiege as `siege-join`");
     }
 
     /// `trade-fit` is `Standard` in every switch, its siege and its decision of a captured city,
@@ -1782,7 +1803,7 @@ mod tests {
         assert_eq!(Variant::SiegeJoin.workers_fit(), before.workers_fit());
         assert_eq!(Variant::Net.workers_fit(), NET_BASE.workers_fit());
         let fit: Vec<Variant> = Variant::ALL.into_iter().filter(|v| v.workers_fit().any() && !v.unciv().parts().any()).collect();
-        assert_eq!(fit, [standard, Variant::PreCamps, Variant::UncivMilitary, Variant::TradeFit, Variant::NoIdleCities, Variant::ScoutEarly, alias, Variant::ArmyFit, Variant::Camps, Variant::ArmyCamps, Variant::PromoFit, Variant::HealFirst, Variant::FogMarch, Variant::StrategyNet, Variant::UnitNet, Variant::Hybrid, Variant::StandardScripted, Variant::PreCsGifts]);
+        assert_eq!(fit, [standard, Variant::PreCamps, Variant::UncivMilitary, Variant::TradeFit, Variant::NoIdleCities, Variant::ScoutEarly, alias, Variant::ArmyFit, Variant::Camps, Variant::ArmyCamps, Variant::PromoFit, Variant::HealFirst, Variant::FogMarch, Variant::StrategyNet, Variant::UnitNet, Variant::Hybrid, Variant::StandardScripted, Variant::PreCsGifts, Variant::WarOpen]);
         assert!(Variant::ALL.into_iter().filter(|v| v.unciv().parts().any()).all(|v| v.workers_fit() == standard.workers_fit()));
     }
 
@@ -1829,7 +1850,7 @@ mod tests {
         assert_eq!(Variant::from_name("strategy-net"), Some(alias));
         assert_eq!(Variant::from_name("standard-scripted"), cfg!(feature = "experimental-ai").then_some(before));
         let on: Vec<Variant> = Variant::ALL.into_iter().filter(|v| v.strategy_net() && !v.unciv().parts().any()).collect();
-        assert_eq!(on, [standard, alias, Variant::Hybrid, Variant::PreCsGifts]);
+        assert_eq!(on, [standard, alias, Variant::Hybrid, Variant::PreCsGifts, Variant::WarOpen]);
         assert!(Variant::ALL.into_iter().filter(|v| v.unciv().parts().any()).all(|v| v.strategy_net()));
     }
 
@@ -1838,12 +1859,32 @@ mod tests {
     #[test]
     fn the_gift_cap_is_standard_but_for_its_control() {
         let capped: Vec<Variant> = Variant::ALL.into_iter().filter(|v| v.cs_gift_cap() && !v.unciv().parts().any()).collect();
-        assert_eq!(capped, [Variant::Standard, Variant::StrategyNet, Variant::Hybrid]);
+        assert_eq!(capped, [Variant::Standard, Variant::StrategyNet, Variant::Hybrid, Variant::WarOpen]);
         assert!(Variant::ALL.into_iter().filter(|v| v.unciv().parts().any()).all(|v| v.cs_gift_cap()));
         let before = Variant::PreCsGifts;
         assert_eq!(switches(before), switches(Variant::Standard));
         assert!(before.strategy_net() && !before.cs_gift_cap());
         assert_eq!(Variant::from_name("pre-cs-gifts"), cfg!(feature = "experimental-ai").then_some(before));
+    }
+
+    /// `war-open` is `Standard` in every switch, its siege, workers, unit kinds, camps, net and
+    /// decision of a captured city, but for the opening of its wars and its war case
+    /// (`SiegeFixes::OPEN`); no other variant plays it.
+    #[test]
+    fn war_open_is_standard_but_for_its_wars() {
+        use crate::ai::operations::SiegeFixes;
+        let v = Variant::WarOpen;
+        let (open, standard) = (v.war_tuning(), Variant::Standard.war_tuning());
+        assert_eq!((open.siege, standard.siege), (SiegeFixes::OPEN, SiegeFixes::WAR_FIX));
+        assert_eq!(crate::ai::operations::WarTuning { siege: standard.siege, ..open }, standard, "only the war case differs");
+        assert_eq!(switches(v).replace(&format!("{open:?}"), &format!("{standard:?}")), switches(Variant::Standard));
+        assert_eq!(v.siege_join(), Variant::Standard.siege_join());
+        assert_eq!(v.workers_fit(), Variant::Standard.workers_fit());
+        assert_eq!(v.conquest(), Variant::Standard.conquest());
+        assert!(v.army_fit() && v.camps() && v.strategy_net() && v.cs_gift_cap() && !v.unit_net());
+        assert_eq!(Variant::from_name("war-open"), Some(v));
+        let open: Vec<Variant> = Variant::ALL.into_iter().filter(|v| v.war_open()).collect();
+        assert_eq!(open, [v]);
     }
 
     #[test]
@@ -1882,9 +1923,9 @@ mod tests {
         assert!(!Variant::WorkersFit.army_fit() && !Variant::WorkersFit.camps());
         assert!(!Variant::Net.army_fit() && !Variant::Net.camps() && !NET_BASE.army_fit() && !NET_BASE.camps());
         let fit: Vec<Variant> = Variant::ALL.into_iter().filter(|v| v.army_fit() && !v.unciv().parts().any()).collect();
-        assert_eq!(fit, [standard, Variant::UncivMilitary, Variant::TradeFit, Variant::NoIdleCities, Variant::ScoutEarly, Variant::ArmyFit, alias, Variant::PromoFit, Variant::HealFirst, Variant::FogMarch, Variant::StrategyNet, Variant::UnitNet, Variant::Hybrid, Variant::StandardScripted, Variant::PreCsGifts]);
+        assert_eq!(fit, [standard, Variant::UncivMilitary, Variant::TradeFit, Variant::NoIdleCities, Variant::ScoutEarly, Variant::ArmyFit, alias, Variant::PromoFit, Variant::HealFirst, Variant::FogMarch, Variant::StrategyNet, Variant::UnitNet, Variant::Hybrid, Variant::StandardScripted, Variant::PreCsGifts, Variant::WarOpen]);
         let camps: Vec<Variant> = Variant::ALL.into_iter().filter(|v| v.camps() && !v.unciv().parts().any()).collect();
-        assert_eq!(camps, [standard, Variant::TradeFit, Variant::NoIdleCities, Variant::ScoutEarly, Variant::Camps, alias, Variant::PromoFit, Variant::HealFirst, Variant::FogMarch, Variant::StrategyNet, Variant::UnitNet, Variant::Hybrid, Variant::StandardScripted, Variant::PreCsGifts]);
+        assert_eq!(camps, [standard, Variant::TradeFit, Variant::NoIdleCities, Variant::ScoutEarly, Variant::Camps, alias, Variant::PromoFit, Variant::HealFirst, Variant::FogMarch, Variant::StrategyNet, Variant::UnitNet, Variant::Hybrid, Variant::StandardScripted, Variant::PreCsGifts, Variant::WarOpen]);
         assert!(Variant::ALL.into_iter().filter(|v| v.unciv().parts().any()).all(|v| v.army_fit() && v.camps()));
     }
 }

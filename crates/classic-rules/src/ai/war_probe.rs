@@ -49,6 +49,26 @@ pub struct Estimate {
     pub happiness_price: i64,
     /// The score of one citizen at the map's scale.
     pub citizen: i64,
+    /// The target's tile; the case's terms (`operations::CaseParts`): the chance counted
+    /// (percent), the capture's worth before the chance, the units built, the units expected
+    /// lost, the weapons; the infamy bonus, the leader's appetite (percent), the capital stake.
+    pub target: u32,
+    pub chance: i64,
+    pub capture: i64,
+    pub built: i64,
+    pub lost: i64,
+    pub weapons: i64,
+    pub infamy: i64,
+    pub appetite: i64,
+    pub stake: i64,
+    /// The rounds the case counted (assemble + march + siege), the distance from our nearest
+    /// city, at war with the owner already, a weapon in the plan.
+    pub rounds: u32,
+    pub distance: i32,
+    pub at_war: bool,
+    pub armed: bool,
+    /// The learned chance's features of this plan (`operations::chance_features`).
+    pub features: [i64; crate::ai::operations::CHANCE_N],
 }
 
 /// A marching operation at the start of its player's turn (`operations::plan`): how
@@ -120,7 +140,7 @@ pub struct StartNote {
     pub free: u32,
     /// What the capture chance is learned from (`operations::chance_features`), and the chance
     /// the operation was admitted with, percent (None: the constant's).
-    pub features: [i64; 12],
+    pub features: [i64; crate::ai::operations::CHANCE_N],
     pub chance: Option<i64>,
 }
 
@@ -209,6 +229,11 @@ pub struct WarProbe {
     pub conquests: Vec<(u32, PlayerId, u32, u32, i32, crate::ai::conquest::Case)>,
     /// The marching operations, every turn of their march.
     pub marches: Vec<MarchSample>,
+    /// The members of every operation at the start of its player's turn, with their hammers:
+    /// (round, player, target, marching, [(unit id, cost)]).
+    pub members: Vec<(u32, PlayerId, u32, bool, Vec<(u64, u32)>)>,
+    /// The army units of every player that plans its operations, each turn: (round, player, ids).
+    pub alive: Vec<(u32, PlayerId, Vec<u64>)>,
 }
 
 thread_local! {

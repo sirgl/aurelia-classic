@@ -85,6 +85,23 @@ pub fn turn(player: u8, plan: &Plan, reviewed: bool, rules: &CompiledRuleset) {
         goals.join("; "),
         plan.target.map_or("-".to_owned(), |t| tech_name(rules, t)),
     ));
+    // `war-open`'s features and its window (none of the other variants has them).
+    use super::weights::{fe, kc};
+    let open = [fe::OPPORTUNITY, fe::OP_FORMING, fe::STRENGTH, fe::PAYS].map(|f| plan.features[f]);
+    if open.iter().any(|v| *v != 0) {
+        LINES.with(|l| {
+            if let Some(last) = l.borrow_mut().last_mut() {
+                last.push_str(&format!(
+                    " | war opportunity={:.2} forming={:.2} strength={:.2} window={:.2} pays={:.0}",
+                    open[0] as f64 / 1000.0,
+                    open[1] as f64 / 1000.0,
+                    open[2] as f64 / 1000.0,
+                    i.concepts[kc::STRIKE_WINDOW] as f64 / 1000.0,
+                    open[3] as f64 / 1000.0
+                ));
+            }
+        });
+    }
 }
 
 /// The style locked.

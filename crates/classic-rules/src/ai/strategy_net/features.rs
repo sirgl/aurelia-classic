@@ -256,6 +256,21 @@ pub fn survey(obs: &AIObservation<'_>, rules: &CompiledRuleset, state: &AiState)
     Survey { round: obs.round, cities: obs.own_cities.len() as u32, values }
 }
 
+/// `war-open`'s features of a turn (`fe::OPPORTUNITY`, `OP_FORMING`, `STRENGTH`): what the war
+/// machine sees (`operations::outlook`) — the best known target's learned capture chance × its
+/// worth over an own city's (50 % at a city as good as ours is 1), an offensive operation forming
+/// or marching (or its chest saved), and our military power over ours plus the known power of the
+/// target's owner (else the nearest rival's; 0.5 when level or no rival is known); and whether the
+/// war machine has a target whose war case pays now (`fe::PAYS`, `Outlook::pays`).
+pub fn open(obs: &AIObservation<'_>, brief: &TurnBrief, state: &AiState, rules: &CompiledRuleset, prices: &crate::ai::value::Prices, stakes: &crate::ai::grand_strategy::Stakes, out: &mut [Milli; N]) {
+    let outlook = crate::ai::operations::outlook(brief, state, rules, prices, stakes, &obs.view.met_eras());
+    out[PAYS] = if outlook.pays { ONE } else { 0 };
+    out[OPPORTUNITY] = unit(outlook.chance * outlook.relative / 50);
+    out[OP_FORMING] = if outlook.forming { ONE } else { 0 };
+    let (ours, theirs) = (i64::from(outlook.ours), i64::from(outlook.theirs));
+    out[STRENGTH] = if theirs == 0 { ONE / 2 } else { ours * ONE / (ours + theirs).max(1) };
+}
+
 /// The situation of a turn: the survey and the turn's own features.
 pub fn situation(obs: &AIObservation<'_>, brief: &TurnBrief, rules: &CompiledRuleset, survey: &Survey) -> [Milli; N] {
     let mut out = [0; N];

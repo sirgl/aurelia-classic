@@ -165,7 +165,7 @@ fn plan(rules: &CompiledRuleset, features: &[i64; fe::N], model: &Model) -> Plan
     let mut mult = price_mult(&intent);
     let review = goals::review(model, rules, &intent, &mut mult, &base(), 1, false);
     let target = review.goals.iter().filter(|g| !g.path.is_empty()).max_by_key(|g| g.rate).and_then(|g| g.path.last().copied());
-    Plan { round: 1, features: *features, city_target: 1 + intent.more_cities, intent, mult, goals: review.goals, target, growth: review.growth }
+    Plan { round: 1, features: *features, city_target: 1 + intent.more_cities, intent, mult, goals: review.goals, target, growth: review.growth, war_open: false }
 }
 
 fn grassland_capital(rules: &CompiledRuleset) -> ToyMap {
@@ -227,6 +227,45 @@ fn a_warlike_nation_with_a_rival_next_door_prepares_a_strike() {
     assert_eq!(i.style_pick, 2, "conquest: {:?}", i.style);
     assert_eq!(i.posture_pick, 2, "prepare: {:?}", i.posture);
     assert!(price_mult(&i)[pd::MILITARY] > 2000);
+}
+
+/// Scenario 3b (`war-open`): late in the game a neutral leader with a weak neighbour in reach — a
+/// target worth taking at a fair chance, a war case that pays, an army above the neighbour's —
+/// opens the window of any era and prepares the strike; the game's net (the early window alone)
+/// stays at peace. Without the opportunity, or with a case that does not pay, the window stays
+/// shut for `war-open` too.
+#[test]
+fn war_open_opens_a_window_in_any_era() {
+    use classic_rules::ai::strategy_net::intent_of;
+    let late = [(fe::ERA, 700), (fe::PROGRESS, 600), (fe::RIVAL_NEAR, 600), (fe::RIVAL_KNOWN, 1000), (fe::OPPORTUNITY, 600), (fe::STRENGTH, 650), (fe::PAYS, 1000)];
+    let f = neutral(&late);
+    let open = intent_of(&f, Held::default(), 6, 120, 67, true);
+    assert!(open.concepts[kc::STRIKE_WINDOW] > 500, "{:?}", open.concepts);
+    assert_eq!(open.posture_pick, 2, "prepare: {:?}", open.posture);
+    let game = intent(&f, Held::default(), 6, 120, 67);
+    assert!(game.concepts[kc::STRIKE_WINDOW] < 100, "the early window is shut late: {:?}", game.concepts);
+    assert_eq!(game.posture_pick, 0, "peace: {:?}", game.posture);
+    let none = neutral(&[(fe::ERA, 700), (fe::PROGRESS, 600), (fe::RIVAL_NEAR, 600), (fe::RIVAL_KNOWN, 1000), (fe::OPPORTUNITY, 50), (fe::STRENGTH, 500), (fe::PAYS, 1000)]);
+    let quiet = intent_of(&none, Held::default(), 6, 120, 67, true);
+    assert!(quiet.concepts[kc::STRIKE_WINDOW] < 100, "{:?}", quiet.concepts);
+    assert_eq!(quiet.posture_pick, 0, "peace: {:?}", quiet.posture);
+    // A good opportunity whose war case does not pay: the window stays shut.
+    let unpaid: Vec<(usize, i64)> = late.iter().copied().filter(|(f, _)| *f != fe::PAYS).collect();
+    let shut = intent_of(&neutral(&unpaid), Held::default(), 6, 120, 67, true);
+    assert!(shut.concepts[kc::STRIKE_WINDOW] < 100, "{:?}", shut.concepts);
+    assert_eq!(shut.posture_pick, 0, "peace: {:?}", shut.posture);
+}
+
+/// Scenario 3c (`war-open`): an operation the war machine forms holds the posture in prepare,
+/// and the military price with it; the game's net does not see the operation.
+#[test]
+fn war_open_prepares_the_operation_the_war_machine_forms() {
+    use classic_rules::ai::strategy_net::intent_of;
+    let f = neutral(&[(fe::ERA, 500), (fe::PROGRESS, 500), (fe::RIVAL_KNOWN, 1000), (fe::OP_FORMING, 1000), (fe::STRENGTH, 500)]);
+    let open = intent_of(&f, Held::default(), 5, 150, 67, true);
+    assert_eq!(open.posture_pick, 2, "prepare: {:?}", open.posture);
+    assert!(price_mult(&open)[pd::MILITARY] > 1000, "the army is priced up while it forms");
+    assert_eq!(intent(&f, Held::default(), 5, 150, 67).posture_pick, 0);
 }
 
 /// Scenario 4: The same nation without a rival in reach: no window.

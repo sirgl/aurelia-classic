@@ -94,9 +94,32 @@ pub fn survival(features: &[Milli; fe::N], concepts: &[Milli; kc::N]) -> bool {
 
 /// The concepts of a situation (`weights::CONCEPTS` in order).
 pub fn concepts(features: &[Milli; fe::N]) -> [Milli; kc::N] {
+    concepts_of(features, false)
+}
+
+/// The concepts; with `open` (`war-open`) the strike window is the larger of the early one and
+/// the window of any era (`weights::open::WINDOW`). No later concept reads the window.
+pub fn concepts_of(features: &[Milli; fe::N], open: bool) -> [Milli; kc::N] {
     let mut out = [0; kc::N];
     for (i, neuron) in weights::CONCEPTS.iter().enumerate() {
         out[i] = fire(neuron, features, &out);
+        if open && i == kc::STRIKE_WINDOW {
+            out[i] = out[i].max(fire(&weights::open::WINDOW, features, &out));
+        }
+    }
+    out
+}
+
+/// The logits of a table of the intent, with `war-open`'s terms (`weights::open`) when `extra`
+/// is given.
+fn logits_of(table: &[weights::Neuron], extra: Option<&[(usize, weights::Term)]>, features: &[Milli; fe::N], concepts: &[Milli; kc::N]) -> Vec<Milli> {
+    let mut out: Vec<Milli> = table.iter().map(|n| fire(n, features, concepts)).collect();
+    for (at, term) in extra.unwrap_or_default() {
+        let x = match term.input {
+            weights::Input::F(i) => features[i],
+            weights::Input::K(i) => concepts[i],
+        };
+        out[*at] += term.w * x / ONE;
     }
     out
 }
@@ -105,8 +128,14 @@ pub fn concepts(features: &[Milli; fe::N]) -> [Milli; kc::N] {
 /// turn, `cities` the cities now, `rounds_left` and `pace` (percent) the
 /// game's.
 pub fn intent(features: &[Milli; fe::N], held: Held, cities: u32, rounds_left: u32, pace: u32) -> Intent {
-    let concepts = concepts(features);
-    let logits = |table: &[weights::Neuron]| table.iter().map(|n| fire(n, features, &concepts)).collect::<Vec<_>>();
+    intent_of(features, held, cities, rounds_left, pace, false)
+}
+
+/// `intent`; with `open` the net of `war-open` (`weights::open`): the window of any era, the
+/// war machine's operation in the posture, the opportunity in the style and the aim.
+pub fn intent_of(features: &[Milli; fe::N], held: Held, cities: u32, rounds_left: u32, pace: u32, open: bool) -> Intent {
+    let concepts = concepts_of(features, open);
+    let extra = |table: &'static [(usize, weights::Term)]| open.then_some(table);
     // A locked style is the lock's situation with the turn's events.
     let (style, margin) = match &held.lock {
         Some(lock) => {
@@ -114,15 +143,24 @@ pub fn intent(features: &[Milli; fe::N], held: Held, cities: u32, rounds_left: u
             for e in weights::STYLE_EVENTS {
                 at_lock[e] = features[e];
             }
+            if open {
+                for e in weights::open::STYLE_EVENTS {
+                    at_lock[e] = features[e];
+                }
+            }
+            // The window of any era is a posture's reason, not a style's: a locked style weighs
+            // the opportunity itself (`weights::open::STYLE`), not the window it opens for a few
+            // reviews (with the window the conquest style held 35 % of the traced reviews and its
+            // prices cost the economy; tuning offsets 200–201).
             let lock_concepts = self::concepts(&at_lock);
-            let style_logits: Vec<Milli> = weights::STYLE.iter().map(|n| fire(n, &at_lock, &lock_concepts)).collect();
+            let style_logits = logits_of(&weights::STYLE, extra(weights::open::STYLE), &at_lock, &lock_concepts);
             let margin = if survival(features, &concepts) { weights::HYSTERESIS } else { weights::STYLE_LOCK };
             (softmax(&<[Milli; 3]>::try_from(style_logits).expect("three styles")), margin)
         }
-        None => (softmax(&<[Milli; 3]>::try_from(logits(&weights::STYLE)).expect("three styles")), weights::HYSTERESIS),
+        None => (softmax(&<[Milli; 3]>::try_from(logits_of(&weights::STYLE, extra(weights::open::STYLE), features, &concepts)).expect("three styles")), weights::HYSTERESIS),
     };
-    let aim = softmax(&<[Milli; 4]>::try_from(logits(&weights::AIM)).expect("four aims"));
-    let posture = softmax(&<[Milli; 4]>::try_from(logits(&weights::POSTURE)).expect("four postures"));
+    let aim = softmax(&<[Milli; 4]>::try_from(logits_of(&weights::AIM, extra(weights::open::AIM), features, &concepts)).expect("four aims"));
+    let posture = softmax(&<[Milli; 4]>::try_from(logits_of(&weights::POSTURE, extra(weights::open::POSTURE), features, &concepts)).expect("four postures"));
     let style_pick = hold(&style, held.style, margin);
     let aim_pick = hold(&aim, held.aim, weights::HYSTERESIS);
     let posture_pick = hold(&posture, held.posture, weights::HYSTERESIS);
@@ -276,6 +314,8 @@ pub struct Plan {
     /// Per city id: the cell's mean yields over H per yield slot, as
     /// thousandths of today's (a percent bonus is worth this much more).
     pub growth: Vec<(u64, [Milli; 6])>,
+    /// The net of `war-open` (`TurnBrief::war_open`): its army is the war machine's.
+    pub war_open: bool,
 }
 
 impl Plan {
@@ -370,8 +410,8 @@ impl Memory {
             Some(l) => {
                 w.0.push(1);
                 w.u32(l.round);
-                for v in l.situation {
-                    w.i64(v);
+                for v in &l.situation[..fe::BASE_N] {
+                    w.i64(*v);
                 }
             }
             None => w.0.push(0),
@@ -443,7 +483,7 @@ impl Memory {
         let lock = if r.u8()? == 1 {
             let round = r.u32()?;
             let mut situation = [0; fe::N];
-            for v in situation.iter_mut() {
+            for v in situation[..fe::BASE_N].iter_mut() {
                 *v = r.i64()?;
             }
             Some(StyleLock { round, situation })
@@ -539,7 +579,8 @@ pub fn branch_complete(rules: &CompiledRuleset, policies: &[PolicyId], branch: P
 /// The net's turn for a nation: the situation, the intent (held by the
 /// memory's hysteresis), the prices, and every few rounds the goals; the
 /// memory is written back. `prices` are the allocator's of the turn.
-pub fn think(obs: &AIObservation<'_>, brief: &crate::ai::planner::TurnBrief, state: &mut AiState, rules: &CompiledRuleset, prices: &Prices) -> Plan {
+/// `stakes`: the leader's in a war (`grand_strategy::Stakes`), read by `war-open` alone.
+pub fn think(obs: &AIObservation<'_>, brief: &crate::ai::planner::TurnBrief, state: &mut AiState, rules: &CompiledRuleset, prices: &Prices, stakes: &crate::ai::grand_strategy::Stakes) -> Plan {
     let mut memory = Memory::decode(&state.mind_memory);
     let round = obs.round;
     let cities = obs.own_cities.len() as u32;
@@ -550,9 +591,13 @@ pub fn think(obs: &AIObservation<'_>, brief: &crate::ai::planner::TurnBrief, sta
         memory.survey = Some(features::survey(obs, rules, state));
     }
     let survey = memory.survey.expect("surveyed above");
-    let situation = features::situation(obs, brief, rules, &survey);
+    let mut situation = features::situation(obs, brief, rules, &survey);
+    if brief.war_open {
+        // `war-open`: what the war machine sees (`features::open`).
+        features::open(obs, brief, state, rules, prices, stakes, &mut situation);
+    }
     let rounds_left = prices.rounds_left;
-    let mut intent = intent(&situation, memory.held, cities, rounds_left, pace);
+    let mut intent = intent_of(&situation, memory.held, cities, rounds_left, pace, brief.war_open);
     // The style is locked when the first branch may be opened after the
     // first survey of the surroundings, at the latest `LOCK_MAX_ROUNDS`.
     let mut lock = memory.held.lock;
@@ -603,7 +648,7 @@ pub fn think(obs: &AIObservation<'_>, brief: &crate::ai::planner::TurnBrief, sta
         let allowance = (intent.style[1] * weights::CITY_CEILING_WIDE + intent.style[2] * weights::CITY_CEILING_CONQUEST) / ONE / ONE;
         city_target = city_target.min(model + allowance as u32).max(cities);
     }
-    let plan = Plan { round, features: situation, intent, mult, goals: review.goals.clone(), target, city_target, growth: review.growth.clone() };
+    let plan = Plan { round, features: situation, intent, mult, goals: review.goals.clone(), target, city_target, growth: review.growth.clone(), war_open: brief.war_open };
     trace::turn(obs.player.0, &plan, review_due, rules);
     plan
 }

@@ -18,6 +18,9 @@
 //!                      and the same for the constants compiled in now
 //! --use A,B,…          the features the fit may use (default all)
 //! --ridge R            the ridge on the standardized weights (default 1)
+//! --speed NAME         the game speed (default Standard): the suite's rounds at its share
+//! --estimates FILE     one CSV row per war case priced (`war_probe::Estimate`: the chance,
+//!                      the capture's worth, the units built and lost, the value)
 //! --label war|target   predict a city of the operation's enemy taken from its start to 20
 //!                      rounds after its end (default), or its own target taken
 
@@ -28,7 +31,7 @@ use std::sync::Mutex;
 use aurelia_qa::bench::modules::{BenchRules, ClassicBench};
 use aurelia_qa::bench::play::{play_match, Pairing};
 use aurelia_qa::bench::suite::{Match, Seating, Suite};
-use classic_rules::ai::operations::{learned_chance, CHANCE_FEATURES};
+use classic_rules::ai::operations::{learned_chance, open_chance, CHANCE_FEATURES, CHANCE_N as N};
 use classic_rules::ai::war_probe;
 
 struct Options {
@@ -44,10 +47,12 @@ struct Options {
     /// What the fit predicts: `war` (default), a city of the enemy taken in the operation's
     /// war; `target`, its own target taken.
     label: String,
+    speed: Option<String>,
+    estimates: Option<String>,
 }
 
 fn options() -> Result<Options, String> {
-    let mut o = Options { variant: "war-fix-plain".into(), suite: "standard".into(), seeds: 100_001..100_011, jobs: 4, out: None, fit: Vec::new(), used: None, ridge: 1.0, label: "war".into() };
+    let mut o = Options { variant: "war-fix-plain".into(), suite: "standard".into(), seeds: 100_001..100_011, jobs: 4, out: None, fit: Vec::new(), used: None, ridge: 1.0, label: "war".into(), speed: None, estimates: None };
     let mut args = std::env::args().skip(1).peekable();
     while let Some(flag) = args.next() {
         let mut value = || args.next().ok_or_else(|| format!("{flag} needs a value"));
@@ -63,6 +68,8 @@ fn options() -> Result<Options, String> {
             "--out" => o.out = Some(value()?),
             "--use" => o.used = Some(value()?.split(',').map(str::to_owned).collect()),
             "--label" => o.label = value()?,
+            "--speed" => o.speed = Some(value()?),
+            "--estimates" => o.estimates = Some(value()?),
             "--ridge" => o.ridge = value()?.parse().map_err(|e| format!("{e}"))?,
             "--fit" => {
                 o.fit.push(value()?);
@@ -97,15 +104,36 @@ struct Row {
     /// Cities of the enemy the player took from the start until 20 rounds after the end (or its
     /// next operation): what the war the operation fought brought.
     war_captures: u32,
-    features: [i64; 12],
+    /// Its members (distinct units), those that died while members (by the player's army at its
+    /// next turn), their hammers, and whether it marched.
+    members: u32,
+    lost: u32,
+    lost_hammers: u32,
+    marched: bool,
+    /// The value it was admitted at, the rounds counted, the units missing, needed and free.
+    value: i64,
+    rounds: u32,
+    missing: u32,
+    need: u32,
+    free: u32,
+    features: [i64; N],
 }
 
 fn play(o: &Options) -> Result<(), String> {
     let suite = Suite::named(&o.suite).ok_or("unknown suite")?;
+    let suite = match &o.speed {
+        None => suite,
+        Some(speed) => {
+            let rules = ClassicBench::rules();
+            let def = rules.speed_named(speed).ok_or_else(|| format!("unknown speed {speed}"))?;
+            suite.at_speed(&def.key, &def.values)
+        }
+    };
     let matches: Vec<Match> = suite.maps.iter().flat_map(|map| o.seeds.clone().map(move |seed| Match { map: *map, seed, seating: Seating::All })).collect();
     let pairing = Pairing { baseline: o.variant.clone(), candidate: o.variant.clone() };
     let next = AtomicUsize::new(0);
     let rows: Mutex<Vec<(usize, Vec<Row>)>> = Mutex::new(Vec::new());
+    let estimates: Mutex<Vec<(usize, String)>> = Mutex::new(Vec::new());
     let started = std::time::Instant::now();
     std::thread::scope(|scope| {
         for _ in 0..o.jobs.clamp(1, matches.len().max(1)) {
@@ -143,11 +171,42 @@ fn play(o: &Options) -> Result<(), String> {
                             eprintln!("estimate r{} p{} pop {} value {} gain {} cost {} unrest {} worth {} missing {} need {} free {} excess {}", e.round, e.player.0, e.population, e.value, e.gain, e.cost, e.unrest, e.worth, e.missing, e.need, e.free, e.excess);
                         }
                     }
+                    if o.estimates.is_some() {
+                        let mut text = String::new();
+                        for e in &probe.estimates {
+                            let f: Vec<String> = e.features.iter().map(|x| x.to_string()).collect();
+                            text.push_str(&format!(
+                                "{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}\n",
+                                game.label(), game.seed, e.round, e.player.0, e.enemy.0, e.target, e.population, e.value, e.gain, e.cost, e.chance, e.capture, e.built, e.lost, e.weapons,
+                                e.infamy, e.appetite, e.stake, e.rounds, e.distance, u8::from(e.at_war), u8::from(e.armed), e.missing, e.need, e.free, e.excess, f.join(",")
+                            ));
+                        }
+                        estimates.lock().expect("estimates").push((at, text));
+                    }
                     let mut out = Vec::new();
                     for (at, start) in probe.starts.iter().enumerate() {
                         let end = probe.ends.iter().find(|e| e.player == start.player && e.target == start.target && e.round >= start.round);
                         let next = probe.starts[at + 1..].iter().find(|s| s.player == start.player).map_or(u32::MAX, |s| s.round);
                         let until = end.map_or(suite.rounds, |e| e.round + 20).min(next);
+                        // Its members and their losses: a member missing from the player's army at the
+                        // player's next turn died (a released member is still in the army).
+                        let own = |r: u32| probe.alive.iter().find(|(round, p, _)| *p == start.player && *round > r).map(|(_, _, ids)| ids);
+                        let mut seen: Vec<(u64, u32)> = Vec::new();
+                        let mut dead: Vec<u64> = Vec::new();
+                        let mut marched = false;
+                        let last = end.map_or(u32::MAX, |e| e.round);
+                        for (round, _, _, marching, members) in probe.members.iter().filter(|(r, p, t, _, _)| *p == start.player && *t == start.target && (start.round..=last).contains(r)) {
+                            marched |= *marching;
+                            for (id, cost) in members {
+                                if !seen.iter().any(|(i, _)| i == id) {
+                                    seen.push((*id, *cost));
+                                }
+                                if own(*round).is_some_and(|ids| !ids.contains(id)) && !dead.contains(id) {
+                                    dead.push(*id);
+                                }
+                            }
+                        }
+                        let lost_hammers = seen.iter().filter(|(i, _)| dead.contains(i)).map(|(_, c)| *c).sum();
                         let war_captures = probe.captures.iter().filter(|(round, player, _, from)| *player == start.player && *from == Some(start.enemy) && (start.round..until).contains(round)).count() as u32;
                         out.push(Row {
                             label: game.label(),
@@ -159,6 +218,15 @@ fn play(o: &Options) -> Result<(), String> {
                             cause: end.map_or("Running".to_owned(), |e| format!("{:?}", e.cause)),
                             end_round: end.map_or(suite.rounds, |e| e.round),
                             war_captures,
+                            members: seen.len() as u32,
+                            lost: dead.len() as u32,
+                            lost_hammers,
+                            marched,
+                            value: start.value,
+                            rounds: start.rounds,
+                            missing: start.missing,
+                            need: start.need,
+                            free: start.free,
                             features: start.features,
                         });
                     }
@@ -170,7 +238,7 @@ fn play(o: &Options) -> Result<(), String> {
     });
     let mut rows = rows.into_inner().map_err(|e| e.to_string())?;
     rows.sort_by_key(|(at, _)| *at);
-    let mut text = format!("game,seed,round,player,target,chance,cause,end_round,war_captures,{}\n", CHANCE_FEATURES.join(","));
+    let mut text = format!("game,seed,round,player,target,chance,cause,end_round,war_captures,{},value,rounds,missing,need,free,members,lost,lost_hammers,marched\n", CHANCE_FEATURES.join(","));
     let (mut total, mut captured, mut wars_won) = (0, 0, 0);
     for row in rows.iter().flat_map(|(_, r)| r) {
         total += 1;
@@ -178,7 +246,10 @@ fn play(o: &Options) -> Result<(), String> {
         wars_won += usize::from(row.war_captures > 0);
         let features: Vec<String> = row.features.iter().map(|f| f.to_string()).collect();
         let chance = row.chance.map_or(String::new(), |c| c.to_string());
-        text.push_str(&format!("{},{},{},{},{},{},{},{},{},{}\n", row.label, row.seed, row.round, row.player, row.target, chance, row.cause, row.end_round, row.war_captures, features.join(",")));
+        text.push_str(&format!(
+            "{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}\n",
+            row.label, row.seed, row.round, row.player, row.target, chance, row.cause, row.end_round, row.war_captures, features.join(","), row.value, row.rounds, row.missing, row.need, row.free, row.members, row.lost, row.lost_hammers, u8::from(row.marched)
+        ));
     }
     println!(
         "{} games, {total} operations, {captured} took their target ({:.1} %), {wars_won} took a city of their enemy ({:.1} %), {:.0} s",
@@ -191,6 +262,14 @@ fn play(o: &Options) -> Result<(), String> {
         std::fs::File::create(path).and_then(|mut f| f.write_all(text.as_bytes())).map_err(|e| format!("{path}: {e}"))?;
         println!("wrote {path}");
     }
+    if let Some(path) = &o.estimates {
+        let mut parts = estimates.into_inner().map_err(|e| e.to_string())?;
+        parts.sort_by_key(|(at, _)| *at);
+        let header = format!("game,seed,round,player,enemy,target,population,value,gain,cost,chance,capture,built,lost,weapons,infamy,appetite,stake,rounds,distance,at_war,armed,missing,need,free,excess,{}\n", CHANCE_FEATURES.join(","));
+        let body: String = parts.into_iter().map(|(_, t)| t).collect();
+        std::fs::write(path, header + &body).map_err(|e| format!("{path}: {e}"))?;
+        println!("wrote {path}");
+    }
     Ok(())
 }
 
@@ -198,8 +277,8 @@ fn play(o: &Options) -> Result<(), String> {
 struct Sample {
     seed: u64,
     captured: bool,
-    features: [f64; 12],
-    raw: [i64; 12],
+    features: [f64; N],
+    raw: [i64; N],
 }
 
 fn read(paths: &[String], war_label: bool) -> Result<Vec<Sample>, String> {
@@ -208,11 +287,11 @@ fn read(paths: &[String], war_label: bool) -> Result<Vec<Sample>, String> {
         let text = std::fs::read_to_string(path).map_err(|e| format!("{path}: {e}"))?;
         for line in text.lines().skip(1) {
             let cells: Vec<&str> = line.split(',').collect();
-            if cells.len() < 9 + 12 {
+            if cells.len() < 9 + N {
                 continue;
             }
-            let mut raw = [0i64; 12];
-            for (i, cell) in cells[9..21].iter().enumerate() {
+            let mut raw = [0i64; N];
+            for (i, cell) in cells[9..9 + N].iter().enumerate() {
                 raw[i] = cell.parse().map_err(|e| format!("{path}: {e}"))?;
             }
             // An operation still running at the game's end has no outcome.
@@ -231,61 +310,61 @@ fn sigmoid(z: f64) -> f64 {
 }
 
 /// Logistic regression by Newton's method on standardized features with a small ridge.
-fn logistic(samples: &[&Sample], used: [bool; 12], ridge: f64) -> (f64, [f64; 12]) {
+fn logistic(samples: &[&Sample], used: [bool; N], ridge: f64) -> (f64, [f64; N]) {
     let n = samples.len().max(1) as f64;
-    let mut mean = [0.0; 12];
-    let mut sd = [0.0; 12];
+    let mut mean = [0.0; N];
+    let mut sd = [0.0; N];
     for s in samples {
-        for j in 0..12 {
+        for j in 0..N {
             mean[j] += s.features[j] / n;
         }
     }
     for s in samples {
-        for j in 0..12 {
+        for j in 0..N {
             sd[j] += (s.features[j] - mean[j]).powi(2) / n;
         }
     }
     let sd = sd.map(|v| v.sqrt().max(1e-9));
-    let x: Vec<[f64; 13]> = samples
+    let x: Vec<[f64; N + 1]> = samples
         .iter()
         .map(|s| {
-            let mut row = [1.0; 13];
-            for j in 0..12 {
+            let mut row = [1.0; N + 1];
+            for j in 0..N {
                 row[j + 1] = if used[j] { (s.features[j] - mean[j]) / sd[j] } else { 0.0 };
             }
             row
         })
         .collect();
     let y: Vec<f64> = samples.iter().map(|s| f64::from(u8::from(s.captured))).collect();
-    let mut beta = [0.0; 13];
+    let mut beta = [0.0; N + 1];
     for _ in 0..50 {
-        let mut grad = [0.0; 13];
-        let mut hess = [[0.0; 13]; 13];
+        let mut grad = [0.0; N + 1];
+        let mut hess = [[0.0; N + 1]; N + 1];
         for (row, yi) in x.iter().zip(&y) {
             let p = sigmoid(row.iter().zip(&beta).map(|(a, b)| a * b).sum());
             let w = (p * (1.0 - p)).max(1e-9);
-            for a in 0..13 {
+            for a in 0..N + 1 {
                 grad[a] += (yi - p) * row[a];
-                for b in 0..13 {
+                for b in 0..N + 1 {
                     hess[a][b] += w * row[a] * row[b];
                 }
             }
         }
-        for a in 1..13 {
+        for a in 1..N + 1 {
             grad[a] -= ridge * beta[a];
             hess[a][a] += ridge;
         }
         let step = solve(hess, grad);
-        for a in 0..13 {
+        for a in 0..N + 1 {
             beta[a] += step[a];
         }
         if step.iter().map(|s| s.abs()).fold(0.0, f64::max) < 1e-8 {
             break;
         }
     }
-    let mut weights = [0.0; 12];
+    let mut weights = [0.0; N];
     let mut intercept = beta[0];
-    for j in 0..12 {
+    for j in 0..N {
         weights[j] = beta[j + 1] / sd[j];
         intercept -= beta[j + 1] * mean[j] / sd[j];
     }
@@ -293,19 +372,19 @@ fn logistic(samples: &[&Sample], used: [bool; 12], ridge: f64) -> (f64, [f64; 12
 }
 
 /// Gaussian elimination with partial pivoting.
-fn solve(mut a: [[f64; 13]; 13], mut b: [f64; 13]) -> [f64; 13] {
-    for col in 0..13 {
-        let pivot = (col..13).max_by(|&i, &j| a[i][col].abs().total_cmp(&a[j][col].abs())).unwrap_or(col);
+fn solve(mut a: [[f64; N + 1]; N + 1], mut b: [f64; N + 1]) -> [f64; N + 1] {
+    for col in 0..N + 1 {
+        let pivot = (col..N + 1).max_by(|&i, &j| a[i][col].abs().total_cmp(&a[j][col].abs())).unwrap_or(col);
         a.swap(col, pivot);
         b.swap(col, pivot);
         let d = a[col][col];
         if d.abs() < 1e-12 {
             continue;
         }
-        for row in 0..13 {
+        for row in 0..N + 1 {
             if row != col {
                 let f = a[row][col] / d;
-                for k in col..13 {
+                for k in col..N + 1 {
                     a[row][k] -= f * a[col][k];
                 }
                 b[row] -= f * b[col];
@@ -338,7 +417,7 @@ fn report(name: &str, samples: &[&Sample], predict: &dyn Fn(&Sample) -> f64) {
 
 fn fit(o: &Options) -> Result<(), String> {
     let samples = read(&o.fit, o.label != "target")?;
-    let used: [bool; 12] = std::array::from_fn(|j| o.used.as_ref().is_none_or(|u| u.iter().any(|n| n == CHANCE_FEATURES[j])));
+    let used: [bool; N] = std::array::from_fn(|j| o.used.as_ref().is_none_or(|u| u.iter().any(|n| n == CHANCE_FEATURES[j])));
     let train: Vec<&Sample> = samples.iter().filter(|s| s.seed % 2 == 1).collect();
     let test: Vec<&Sample> = samples.iter().filter(|s| s.seed % 2 == 0).collect();
     let rate = |set: &[&Sample]| 100.0 * set.iter().filter(|s| s.captured).count() as f64 / set.len().max(1) as f64;
@@ -356,12 +435,13 @@ fn fit(o: &Options) -> Result<(), String> {
     report("the constant 35 %", &test, &|_| 35.0);
     report("the siege model (`siege_chance`)", &test, &|s| s.raw[1] as f64);
     report("the compiled `learned_chance`", &test, &|s| learned_chance(&s.raw) as f64);
+    report("the compiled `open_chance` (war-open)", &test, &|s| open_chance(&s.raw) as f64);
     report("this fit (integer)", &test, &fitted);
     println!("\nweights (per unit of the feature, logit):");
     for (name, w) in CHANCE_FEATURES.iter().zip(&weights) {
         println!("  {name:>14}: {w:+.5}");
     }
     println!("\npub const CHANCE_INTERCEPT: i64 = {int_intercept};");
-    println!("pub const CHANCE_WEIGHTS: [i64; 12] = [{}];", int_weights.iter().map(|w| w.to_string()).collect::<Vec<_>>().join(", "));
+    println!("pub const CHANCE_WEIGHTS: [i64; CHANCE_N] = [{}];", int_weights.iter().map(|w| w.to_string()).collect::<Vec<_>>().join(", "));
     Ok(())
 }

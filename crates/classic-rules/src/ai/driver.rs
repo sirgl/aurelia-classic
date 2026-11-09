@@ -584,6 +584,11 @@ impl ClassicMind {
         brief.army_fit = self.variant.army_fit();
         brief.camps = self.variant.camps();
         brief.fog_march = self.variant.fog_march();
+        brief.war_open = self.variant.war_open();
+        brief.met_eras = observation.view.met_eras();
+        if brief.war_open {
+            brief.scores = observation.view.race().scores;
+        }
         brief.trade_fit = self.variant.trade_fit();
         (brief.tall, brief.building_order) = self.tall.unwrap_or_else(|| (self.variant.tall(), self.variant.building_order()));
         brief.conquest = self.conquest.unwrap_or_else(|| self.variant.conquest());
@@ -652,7 +657,7 @@ impl ClassicMind {
                 } else {
                     None
                 };
-                let plan = crate::ai::strategy_net::think(observation, &brief, state, rules, &prices);
+                let plan = crate::ai::strategy_net::think(observation, &brief, state, rules, &prices, &stakes);
                 #[cfg(feature = "experimental-ai")]
                 if let Some(unit) = unit_part {
                     state.mind_memory = crate::ai::unit_net::memory::join(&state.mind_memory, &unit);

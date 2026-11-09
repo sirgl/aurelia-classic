@@ -551,6 +551,12 @@ pub fn military_value(plan: &Plan, prices: &Prices, cost: u32) -> i64 {
     if excess <= 0 || plan.intent.posture_pick < 2 {
         return 0;
     }
+    // `war-open`: the army a war is prepared with is the war machine's, an operation's need
+    // (`operations::demand`); the net adds units while one forms or a war is fought, not for a
+    // window the machine finds no target in.
+    if plan.war_open && plan.intent.posture_pick == 2 && plan.features[super::weights::fe::OP_FORMING] == 0 {
+        return 0;
+    }
     let posture = if plan.intent.posture_pick >= 2 { plan.intent.posture[2] + plan.intent.posture[3] } else { 0 };
     let need = (ONE - plan.features[super::weights::fe::FORCE]).max(posture).max(plan.intent.concepts[kc::DANGER]);
     let hammers = i64::from(cost) * prices.production / i64::from(prices.rounds_left.max(1));

@@ -177,16 +177,36 @@ pub struct SiegeFixes {
     /// eighth promotion (`captured_parts`), not annexed at `combat::ANNEX_POPULATION` citizens
     /// (`Variant::PuppetWar`, classic/docs/ai-conquest-payoff.md "Promoted").
     pub puppet: bool,
+    /// With `priced`: a mood line the captured city's unrest pushes the empire below costs its
+    /// rate for the rounds the empire takes to climb back (`value::UNREST_RECOVERY_ROUNDS`), not
+    /// to the end of the game (`Prices::kept_city_unrest_recovering`; `war-open`).
+    pub recovery: bool,
+    /// The army an operation expects to lose is the share its members lost in the operations
+    /// measured (`OPEN_LOSS_PERCENT`), not the constant `LOSS_PERCENT` (`war-open`).
+    pub loss: bool,
+    /// With `priced`: a captured city's citizens yield what the empire's own do (`Prices::
+    /// citizen_yield`: production, science, gold, culture, faith), not half a hammer and half a
+    /// beaker each (`city_worth`; `war-open`).
+    pub yields: bool,
+    /// With `yields`: the rival's loss counts by where it stands (`rival_percent`): all of the
+    /// city's points and yields when it leads the others, half when it is ahead of us, nothing
+    /// when it is behind (the time victory compares our score with the best other one; a war on a
+    /// laggard feeds the bystanders; `war-open`).
+    pub rank: bool,
 }
 
 impl SiegeFixes {
-    pub const NONE: SiegeFixes = SiegeFixes { assault: false, garrison: false, close: false, chance: false, recover: false, learned: false, priced: false, worth: false, asset: false, puppet: false };
+    pub const NONE: SiegeFixes = SiegeFixes { assault: false, garrison: false, close: false, chance: false, recover: false, learned: false, priced: false, worth: false, asset: false, puppet: false, recovery: false, loss: false, yields: false, rank: false };
     /// The five fixes of the `siege` variant.
-    pub const ALL: SiegeFixes = SiegeFixes { assault: true, garrison: true, close: true, chance: true, recover: true, learned: false, priced: false, worth: false, asset: false, puppet: false };
+    pub const ALL: SiegeFixes = SiegeFixes { assault: true, garrison: true, close: true, chance: true, recover: true, learned: false, priced: false, worth: false, asset: false, puppet: false, recovery: false, loss: false, yields: false, rank: false };
     /// The fixes of `war-fix` (classic/docs/ai-war-fix.md): the `siege` five with the learned
     /// chance in place of the siege model's, the capture priced by the rules, and a siege worth
     /// its city.
-    pub const WAR_FIX: SiegeFixes = SiegeFixes { assault: true, garrison: true, close: true, chance: false, recover: true, learned: true, priced: true, worth: true, asset: true, puppet: false };
+    pub const WAR_FIX: SiegeFixes = SiegeFixes { assault: true, garrison: true, close: true, chance: false, recover: true, learned: true, priced: true, worth: true, asset: true, puppet: false, recovery: false, loss: false, yields: false, rank: false };
+    /// `war-open`'s (classic/docs/ai-war-open.md): `WAR_FIX` with the capture priced as the puppet
+    /// the AI makes of it, its unrest for the rounds the empire takes to recover, its citizens
+    /// yielding what the empire's do, and the army's loss as measured.
+    pub const OPEN: SiegeFixes = SiegeFixes { puppet: true, recovery: true, loss: true, yields: true, rank: true, ..SiegeFixes::WAR_FIX };
 }
 
 /// What a unit kind is to an operation's army: None for non-combat,
@@ -438,6 +458,13 @@ pub fn plan(brief: &TurnBrief, state: &mut AiState, rules: &CompiledRuleset, rou
             let sighted = routes.view().is_visible(operation.target);
             p.marches.push(crate::ai::war_probe::MarchSample { round: brief.round, player: brief.player, enemy: operation.enemy, target: operation.target.0, launched: operation.phase_round, members: members.len() as u32, nearest, sighted });
         }
+        // What the operations' armies lose: their members, and the player's army a turn later.
+        for operation in state.operations() {
+            let members = members(brief, state, operation.target).iter().map(|u| (u.id.0, rules.units[u.kind.0 as usize].cost)).collect();
+            p.members.push((brief.round, brief.player, operation.target.0, operation.phase == OperationPhase::Marching, members));
+        }
+        let army = brief.units.iter().filter(|u| army_role(rules, u.kind).is_some()).map(|u| u.id.0).collect();
+        p.alive.push((brief.round, brief.player, army));
     });
     for operation in state.operations().to_vec() {
         out.extend(advance(brief, state, rules, &operation, gate.decisive(operation.target)));
@@ -722,7 +749,8 @@ fn start(brief: &TurnBrief, state: &mut AiState, rules: &CompiledRuleset, routes
     let ready = in_season(brief)
         && brief.cities.len() >= 2
         && brief.round + brief.speed.pace_rounds(PREPARE_ROUNDS) >= brief.speed.game_round(EARLIEST_WAR_ROUND)
-        && strategy_wages_war(brief, state.strategy.current);
+        && strategy_wages_war(brief, state.strategy.current)
+        && posture_permits(brief);
     if !ready {
         return None;
     }
@@ -774,7 +802,7 @@ fn start(brief: &TurnBrief, state: &mut AiState, rules: &CompiledRuleset, routes
     let chosen = chosen?;
     crate::ai::war_probe::note(|p| {
         let city = state.seen_cities().iter().find(|c| c.tile == chosen.operation.target).copied();
-        let (features, chance) = city.map_or(([0; 12], None), |city| {
+        let (features, chance) = city.map_or(([0; CHANCE_N], None), |city| {
             let estimate = estimate_city(brief, rules, &city, arsenal.melee);
             let features = chance_features(brief, state, rules, &arsenal, &city, &estimate, chosen.operation.need, None);
             (features, model_chance(brief, state, rules, &arsenal, &city, &estimate, chosen.operation.need, None))
@@ -794,6 +822,14 @@ pub(crate) fn strategy_wages_war(brief: &TurnBrief, strategy: Strategy) -> bool 
         Strategy::Recover => brief.war.siege.recover,
         Strategy::Defend => false,
     }
+}
+
+/// `war-open` (`TurnBrief::war_open`): a new offensive operation starts only when the strategy
+/// net's posture is to prepare a war or to wage one; at peace and in defence the war machine
+/// starts none (one brain: the net opens the window, the operation picks the target in it).
+/// Every other variant: always.
+pub(crate) fn posture_permits(brief: &TurnBrief) -> bool {
+    !brief.war_open || brief.strategy.as_ref().is_some_and(|plan| plan.intent.posture_pick >= 2)
 }
 
 /// The war plan's turn (classic/docs/ai-allocator.md "Military treasury"): a plan keeps
@@ -835,6 +871,13 @@ pub const PLAN_SWITCH_PERCENT: i64 = 130;
 pub const SUCCESS_PERCENT: i64 = 35;
 /// Share of the army an operation expects to lose, percent.
 pub const LOSS_PERCENT: i64 = 50;
+/// The same, measured on `war-open`'s own operations (`SiegeFixes::loss`): the units its members
+/// lost from the operation's start to its end over the units it planned — 66 % in 638 operations
+/// of `war-open` (pace, Quick, seed offset 201; 124 % of those that marched, whose every unit on
+/// an assault of the target joins them, 15 % of those recalled or timed out before; `ai-war-ops`,
+/// classic/docs/ai-war-open.md). The operations of `war-fix-model`, mostly recalled before they
+/// march, lost 25 %; `LOSS_PERCENT` guessed half.
+pub const OPEN_LOSS_PERCENT: i64 = 66;
 /// Share of the city's points taken from the rival that counts for us,
 /// percent: the time victory compares our score with the best other one.
 pub const RIVAL_PERCENT: i64 = 50;
@@ -871,13 +914,32 @@ impl WarCase {
 /// With `chance` (`SiegeFixes::chance`, `siege_chance`) the chance is the model's, not the
 /// constant's or the weapon's.
 #[allow(clippy::too_many_arguments)]
-fn war_case(prices: &Prices, stakes: &Stakes, rules: &CompiledRuleset, arsenal: &Arsenal, city: &SeenCity, need: Composition, missing: Composition, rounds: u32, armed: Option<&crate::ai::strikes::Armed>, chance: Option<i64>, fixes: SiegeFixes) -> WarCase {
+fn war_case(prices: &Prices, stakes: &Stakes, rules: &CompiledRuleset, arsenal: &Arsenal, city: &SeenCity, need: Composition, missing: Composition, rounds: u32, armed: Option<&crate::ai::strikes::Armed>, chance: Option<i64>, fixes: SiegeFixes, rival: i64) -> WarCase {
+    war_case_parts(prices, stakes, rules, arsenal, city, need, missing, rounds, armed, chance, fixes, rival).0
+}
+
+/// The terms of a war's case (the war probe's diagnosis, `war_probe::Estimate`): the chance it
+/// counted (percent), the capture's worth before the chance, the hammers and upkeep of the units
+/// it builds, the units it expects to lose and the weapons it plans.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct CaseParts {
+    pub success: i64,
+    pub capture: Centi,
+    pub built: Centi,
+    pub lost: Centi,
+    pub weapons: Centi,
+}
+
+/// `war_case` and its terms.
+#[allow(clippy::too_many_arguments)]
+/// `rival`: the share of the rival's loss that counts, percent (`rival_percent`).
+fn war_case_parts(prices: &Prices, stakes: &Stakes, rules: &CompiledRuleset, arsenal: &Arsenal, city: &SeenCity, need: Composition, missing: Composition, rounds: u32, armed: Option<&crate::ai::strikes::Armed>, chance: Option<i64>, fixes: SiegeFixes, rival: i64) -> (WarCase, CaseParts) {
     let priced = fixes.priced;
     let stake = stakes.capital(city.tile);
     let decisive = stake.is_some_and(|s| s.decisive);
     let gain = match stake {
         Some(stake) if decisive => stake.value,
-        _ if priced => captured_gain(prices, stakes, city.population, rounds, fixes.puppet) + stake.map_or(0, |s| s.value),
+        _ if priced => captured_gain_by(prices, stakes, city.population, rounds, fixes, rival) + stake.map_or(0, |s| s.value),
         _ => city_gain(prices, stakes, city, rounds) + stake.map_or(0, |s| s.value),
     };
     // Upkeep to the end of the game, which a decisive capture ends.
@@ -889,13 +951,14 @@ fn war_case(prices: &Prices, stakes: &Stakes, rules: &CompiledRuleset, arsenal: 
     };
     let army = |c: Composition| [ArmyRole::Melee, ArmyRole::Ranged, ArmyRole::Siege].iter().map(|r| unit_cost(*r) * i64::from(c.of(*r))).sum::<i64>();
     let built = if fixes.asset { 0 } else { army(missing) * hammer } + i64::from(missing.total()) * upkeep;
-    let lost = army(need) * crate::ai::genome::get(crate::ai::genome::Knob::LossPercent) / 100 * hammer;
+    let loss = if fixes.loss { OPEN_LOSS_PERCENT } else { crate::ai::genome::get(crate::ai::genome::Knob::LossPercent) };
+    let lost = army(need) * loss / 100 * hammer;
     let base = crate::ai::genome::get(crate::ai::genome::Knob::SuccessPercent);
     // The weapon the plan counts on (`strikes::armory`) gives the chance it gives and costs its
     // hammers and, for a nuclear one, the world's memory of it.
     let (success, weapons) = armed.map_or((base, 0), |a| (a.success, i64::from(a.extra_hammers) * hammer + a.public_cost));
     let success = chance.unwrap_or(success);
-    WarCase { gain: success * gain / 100, cost: built + lost + weapons }
+    (WarCase { gain: success * gain / 100, cost: built + lost + weapons }, CaseParts { success, capture: gain, built, lost, weapons })
 }
 
 /// The chance, percent, that `army` takes `city` (`SiegeFixes::chance`): none when the
@@ -929,14 +992,19 @@ pub(crate) fn siege_chance(rules: &CompiledRuleset, arsenal: &Arsenal, city: &Ci
 #[allow(clippy::too_many_arguments)]
 fn model_chance(brief: &TurnBrief, state: &AiState, rules: &CompiledRuleset, arsenal: &Arsenal, city: &SeenCity, estimate: &CityEstimate, army: Composition, since: Option<u32>) -> Option<i64> {
     if brief.war.siege.learned {
-        return Some(learned_chance(&chance_features(brief, state, rules, arsenal, city, estimate, army, since)));
+        let features = chance_features(brief, state, rules, arsenal, city, estimate, army, since);
+        return Some(if brief.war_open { open_chance(&features) } else { learned_chance(&features) });
     }
     brief.war.siege.chance.then(|| siege_chance(rules, arsenal, estimate, army, defence(brief, city.owner, city.tile)))
 }
 
+/// The features of the learned capture chance (`CHANCE_FEATURES`).
+pub const CHANCE_N: usize = 15;
+
 /// What an operation's outcome is learned from, all known to the player when it plans
-/// (classic/docs/ai-war-fix.md "The capture chance"): integers, in this order.
-pub const CHANCE_FEATURES: [&str; 12] = [
+/// (classic/docs/ai-war-fix.md "The capture chance", classic/docs/ai-war-open.md): integers, in
+/// this order; the last three are `war-open`'s (the game's AI weighs them 0).
+pub const CHANCE_FEATURES: [&str; CHANCE_N] = [
     "power_share",
     "siege_model",
     "distance",
@@ -949,6 +1017,9 @@ pub const CHANCE_FEATURES: [&str; 12] = [
     "enemy_threat",
     "army",
     "own_cities",
+    "strength",
+    "era_edge",
+    "ready",
 ];
 
 /// The features of an operation of `army` against `city` (`CHANCE_FEATURES`): the army's
@@ -957,9 +1028,12 @@ pub const CHANCE_FEATURES: [&str; 12] = [
 /// (`siege_chance`), the distance from our nearest city, the city's population, the
 /// defenders' power over the army's (percent, at most 400), at war already, the round in
 /// tens, the enemy's cities we know, its defensive pacts we know, its threat near our cities
-/// over our whole army (percent, at most 400), the army's units and our cities.
+/// over our whole army (percent, at most 400), the army's units and our cities; our military
+/// power's share of ours and the enemy's known power (`known_power`, percent), our era less the
+/// enemy's (−3…3), and the share of the army that stands ready (its members and the free units
+/// that fill its roles, percent).
 #[allow(clippy::too_many_arguments)]
-pub fn chance_features(brief: &TurnBrief, state: &AiState, rules: &CompiledRuleset, arsenal: &Arsenal, city: &SeenCity, estimate: &CityEstimate, army: Composition, since: Option<u32>) -> [i64; 12] {
+pub fn chance_features(brief: &TurnBrief, state: &AiState, rules: &CompiledRuleset, arsenal: &Arsenal, city: &SeenCity, estimate: &CityEstimate, army: Composition, since: Option<u32>) -> [i64; CHANCE_N] {
     let guard = defence(brief, city.owner, city.tile);
     let full = crate::world::unit::UNIT_MAX_HP;
     let power = |role: ArmyRole| {
@@ -972,6 +1046,14 @@ pub fn chance_features(brief: &TurnBrief, state: &AiState, rules: &CompiledRules
     let relation = brief.relation(city.owner);
     let threat = state.relation(city.owner).map_or(0, |m| m.threat);
     let enemy_cities = state.seen_cities().iter().filter(|c| c.owner == city.owner).count() as i64;
+    let mine = i64::from(brief.military_power);
+    let strength = mine * 100 / (mine + i64::from(known_power(brief, state, rules, city.owner, &brief.met_eras))).max(1);
+    let own_era = crate::ai::strategy_net::features::era_of(rules, &brief.techs) as i64;
+    let their_era = brief.met_eras.iter().find(|(p, _)| *p == city.owner).map_or(own_era, |(_, e)| i64::from(*e));
+    let mut have = composition_of(rules, members(brief, state, city.tile).iter().map(|u| u.kind));
+    let free = composition_of(rules, free_units(brief, state, rules).map(|u| u.kind));
+    (have.melee, have.ranged, have.siege) = (have.melee.saturating_add(free.melee), have.ranged.saturating_add(free.ranged), have.siege.saturating_add(free.siege));
+    let ready = i64::from(army.total() - shortfall(army, have).total()) * 100 / i64::from(army.total().max(1));
     [
         ours * 100 / (ours + theirs).max(1),
         siege_chance(rules, arsenal, estimate, army, guard),
@@ -985,12 +1067,15 @@ pub fn chance_features(brief: &TurnBrief, state: &AiState, rules: &CompiledRules
         (i64::from(threat) * 100 / i64::from(brief.military_power.max(1))).min(400),
         i64::from(army.total()),
         brief.cities.len() as i64,
+        strength,
+        (own_era - their_era).clamp(-3, 3),
+        ready,
     ]
 }
 
 /// The logit of the learned capture chance, thousandths: the intercept, then a weight per
 /// feature of `CHANCE_FEATURES` (`CHANCE_WEIGHTS`).
-fn chance_logit(features: &[i64; 12]) -> i64 {
+fn chance_logit(features: &[i64; CHANCE_N]) -> i64 {
     CHANCE_INTERCEPT + features.iter().zip(CHANCE_WEIGHTS).map(|(x, w)| x * w).sum::<i64>() / 1000
 }
 
@@ -1009,12 +1094,33 @@ fn chance_logit(features: &[i64; 12]) -> i64 {
 /// model's chance, the round, the enemy's cities and pacts add nothing on the held-out seeds
 /// (classic/docs/ai-war-fix.md).
 pub const CHANCE_INTERCEPT: i64 = -1657;
-pub const CHANCE_WEIGHTS: [i64; 12] = [-6986, 0, -61418, -53107, 1909, -990031, 0, 0, 0, -36668, 204117, 18862];
+pub const CHANCE_WEIGHTS: [i64; CHANCE_N] = [-6986, 0, -61418, -53107, 1909, -990031, 0, 0, 0, -36668, 204117, 18862, 0, 0, 0];
 
 /// The learned chance, percent, that an operation with `features` takes its city
 /// (`SiegeFixes::learned`): the logistic of `chance_logit`, integer only.
-pub fn learned_chance(features: &[i64; 12]) -> i64 {
+pub fn learned_chance(features: &[i64; CHANCE_N]) -> i64 {
     logistic_percent(chance_logit(features))
+}
+
+/// The same model refitted on the operations of `war-open` (`TurnBrief::war_open`): its army is
+/// prepared by the posture and its wars open on an opportunity, so its operations are not the
+/// ones `CHANCE_WEIGHTS` were fitted on; the fit may use the three features the game's AI weighs 0.
+/// Fitted (`ai-war-ops --fit ops-wfm-200.csv ops-v1-200.csv ops-e2-201.csv --use power_share,
+/// guard_share,at_war,enemy_threat,distance,population,army,own_cities,strength,era_edge,ready
+/// --ridge 5`) on 2 055 operations with an outcome of the pace suite at Quick (100 games of
+/// `war-fix-model` and 100 of the first `war-open` at seed offset 200, 100 of `war-open` with the
+/// first fit at offset 201): test log loss 0.314 against 0.316 for a constant and 0.331 for
+/// `CHANCE_WEIGHTS`, calibrated (predicted 9 % → 9 % taken, 27 % → 13 %, 44 % → 22 %). The
+/// second turn of the loop: the first fit (1 417 operations) admitted `war-open`'s operations at
+/// 27.7 % and 14.7 % took a city. Per unit, logit: an era ahead +0.28, the army +0.24 a unit,
+/// distance −0.067 a tile, at war already −0.69; the strength and the ready army add nothing
+/// (classic/docs/ai-war-open.md).
+pub const OPEN_CHANCE_INTERCEPT: i64 = -1193;
+pub const OPEN_CHANCE_WEIGHTS: [i64; CHANCE_N] = [-9830, 0, -66899, -65621, -8240, -689142, 0, 0, 0, -19137, 235035, -35079, -2122, 278011, -4646];
+
+/// `learned_chance` by `war-open`'s fit (`OPEN_CHANCE_WEIGHTS`).
+pub fn open_chance(features: &[i64; CHANCE_N]) -> i64 {
+    logistic_percent(OPEN_CHANCE_INTERCEPT + features.iter().zip(OPEN_CHANCE_WEIGHTS).map(|(x, w)| x * w).sum::<i64>() / 1000)
 }
 
 /// The logistic of a logit in thousandths, percent: a table at quarters, linearly between.
@@ -1066,7 +1172,7 @@ pub(crate) fn running_detail(brief: &TurnBrief, state: &AiState, rules: &Compile
         rounds = rounds.min(assemble + march + SIEGE_ROUNDS_ESTIMATE);
     }
     let chance = model_chance(brief, state, rules, &arsenal, city, &estimate_target(brief, rules, city), operation.need, Some(operation.since_round));
-    let case = war_case(prices, stakes, rules, &arsenal, city, operation.need, missing, rounds, crate::ai::strikes::on_hand_best(&brief.armory), chance, brief.war.siege);
+    let case = war_case(prices, stakes, rules, &arsenal, city, operation.need, missing, rounds, crate::ai::strikes::on_hand_best(&brief.armory), chance, brief.war.siege, rival_percent(brief, city.owner));
     Some((case, missing.total(), operation.need.total()))
 }
 
@@ -1083,7 +1189,7 @@ pub fn running_case(brief: &TurnBrief, state: &AiState, rules: &CompiledRuleset,
     let rounds = (distance * 2).div_ceil(3) + 1 + SIEGE_ROUNDS_ESTIMATE;
     let arsenal = Arsenal::of(brief, rules);
     let chance = model_chance(brief, state, rules, &arsenal, city, &estimate_target(brief, rules, city), operation.need, Some(operation.since_round));
-    let mut case = war_case(prices, stakes, rules, &arsenal, city, operation.need, missing, rounds, crate::ai::strikes::on_hand_best(&brief.armory), chance, brief.war.siege);
+    let mut case = war_case(prices, stakes, rules, &arsenal, city, operation.need, missing, rounds, crate::ai::strikes::on_hand_best(&brief.armory), chance, brief.war.siege, rival_percent(brief, city.owner));
     case.gain += infamy_bonus(brief, enemy);
     Some(case)
 }
@@ -1099,16 +1205,33 @@ pub fn running_case(brief: &TurnBrief, state: &AiState, rules: &CompiledRuleset,
 /// (`SiegeFixes::puppet`) every captured city is priced as a puppet, as the game's AI keeps it
 /// since the eighth promotion (`Conquest::PuppetAll`).
 pub fn captured_gain(prices: &Prices, stakes: &Stakes, population: u32, rounds: u32, puppet: bool) -> Centi {
-    let (worth, unrest) = captured_parts(prices, population, rounds, puppet);
+    captured_gain_by(prices, stakes, population, rounds, SiegeFixes { puppet, ..SiegeFixes::NONE }, RIVAL_PERCENT)
+}
+
+/// `captured_gain` with the fixes' pricing of the capture (`SiegeFixes::puppet`, `recovery`).
+pub fn captured_gain_by(prices: &Prices, stakes: &Stakes, population: u32, rounds: u32, fixes: SiegeFixes, rival: i64) -> Centi {
+    let (worth, unrest) = captured_parts_by(prices, population, rounds, fixes, rival);
     worth - unrest * stakes.unrest / 100
 }
 
 /// `captured_gain` in its parts: the worth from the rounds the city yields on, and the unrest.
 pub fn captured_parts(prices: &Prices, population: u32, rounds: u32, puppet: bool) -> (Centi, Centi) {
+    captured_parts_by(prices, population, rounds, SiegeFixes { puppet, ..SiegeFixes::NONE }, RIVAL_PERCENT)
+}
+
+/// `captured_parts` with the fixes' pricing (`SiegeFixes::puppet`, `recovery`, `yields`, `rank`
+/// with `rival`, the share of the rival's loss that counts).
+pub fn captured_parts_by(prices: &Prices, population: u32, rounds: u32, fixes: SiegeFixes, rival: i64) -> (Centi, Centi) {
     let kept = crate::systems::combat::city::captured_population(population.max(1), 0);
-    let annexed = !puppet && kept >= crate::ai::combat::ANNEX_POPULATION;
+    let annexed = !fixes.puppet && kept >= crate::ai::combat::ANNEX_POPULATION;
     let resistance = if annexed { kept } else { 0 };
-    (city_worth(prices, kept, rounds + resistance), prices.kept_city_unrest_steps(kept, annexed))
+    let unrest = if fixes.recovery { prices.kept_city_unrest_recovering(kept, annexed) } else { prices.kept_city_unrest_steps(kept, annexed) };
+    let worth = match (fixes.yields, fixes.rank) {
+        (true, true) => city_worth_ranked(prices, kept, rounds + resistance, rival),
+        (true, false) => city_worth_yielding(prices, kept, rounds + resistance),
+        _ => city_worth(prices, kept, rounds + resistance),
+    };
+    (worth, unrest)
 }
 
 /// The score a captured city brings: its worth less its unrest.
@@ -1127,6 +1250,152 @@ pub fn city_worth(prices: &Prices, population: u32, rounds: u32) -> Centi {
     let points = score.city + score.land * (crate::ai::value::FIRST_RING + population) + score.citizen * population;
     let yields = prices.later(population * (prices.production + prices.science) / 2, rounds);
     points + yields + points * crate::ai::genome::get(crate::ai::genome::Knob::RivalPercent) / 100
+}
+
+// ---- What the strategist reads of the war machine (`war-open`) ----
+
+/// The war machine as the strategy net of `war-open` reads it (`strategy_net::features::open`):
+/// the best known target and the strength of its owner's army against ours.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct Outlook {
+    /// The best known target (by chance × relative worth): its learned capture chance (percent),
+    /// the capture's worth over an own city's of the mean size (thousandths), its tile and owner.
+    pub chance: i64,
+    pub relative: i64,
+    pub target: Option<TileId>,
+    pub enemy: Option<PlayerId>,
+    /// Our military power and the known power of the target's owner (else the nearest rival's).
+    pub ours: u32,
+    pub theirs: u32,
+    /// An offensive operation forms or marches, or a war plan saves its chest.
+    pub forming: bool,
+    /// A target whose war case pays now: `candidate` admits it (value ≥ 0, in time) with the
+    /// leader's `stakes` and the units free for a march, before the route is checked.
+    pub pays: bool,
+}
+
+/// The war machine's outlook of a turn (`Outlook`): every known city of a nation within
+/// `OBJECTIVE_RANGE` of our nearest city, valued as `candidate` values it before the route is
+/// known — the army that takes it by the siege model (`composition_by`), its chance by the model
+/// learned from outcomes (`learned_chance`), the capture priced by the rules as the puppet the
+/// AI makes of it (`captured_gain`) over the worth of an own city of the empire's mean size.
+/// `met_eras`: the era of every nation met (`PlayerQueries::met_eras`); `stakes`: the leader's.
+pub fn outlook(brief: &TurnBrief, state: &AiState, rules: &CompiledRuleset, prices: &Prices, stakes: &Stakes, met_eras: &[(PlayerId, u8)]) -> Outlook {
+    let mut out = Outlook { ours: brief.military_power, forming: !state.operations().is_empty() || state.war_plan.is_some(), ..Outlook::default() };
+    let arsenal = Arsenal::of(brief, rules);
+    let major = |p: PlayerId| brief.relation(p).is_some_and(|r| r.kind == crate::world::player::PlayerKind::Major);
+    let citizens: u32 = brief.cities.iter().map(|c| c.population).sum();
+    let mean = citizens / (brief.cities.len() as u32).max(1);
+    let own = if brief.war.siege.yields { city_worth_yielding(prices, mean.max(1), 0) } else { city_worth(prices, mean.max(1), 0) }.max(1);
+    let neutral = Stakes::neutral();
+    let mut best: Option<(i64, i64, i64, SeenCity)> = None;
+    let mut nearest: Option<(i32, PlayerId)> = None;
+    for city in state.seen_cities().iter().filter(|c| major(c.owner)) {
+        let Some(distance) = brief.nearest_city(brief.dims, city.tile).and_then(|c| brief.dims.distance(c.tile, city.tile)) else { continue };
+        if nearest.is_none_or(|(d, p)| (distance, city.owner.0) < (d, p.0)) {
+            nearest = Some((distance, city.owner));
+        }
+        if distance > OBJECTIVE_RANGE || arsenal.melee.is_none() {
+            continue;
+        }
+        let estimate = estimate_city(brief, rules, city, arsenal.melee);
+        let threat = state.relation(city.owner).map_or(0, |m| m.threat).max(defence(brief, city.owner, city.tile));
+        let Some(need) = composition_by(rules, &arsenal, &estimate, threat, brief.army_fit) else { continue };
+        let chance = open_chance(&chance_features(brief, state, rules, &arsenal, city, &estimate, need, None));
+        let rounds = (distance as u32 * 2).div_ceil(3) + 1 + SIEGE_ROUNDS_ESTIMATE;
+        let relative = (captured_gain_by(prices, &neutral, city.population, rounds, brief.war.siege, rival_percent(brief, city.owner)) * 1000 / own).clamp(0, 2000);
+        let key = chance * relative;
+        if best.is_none_or(|(k, _, _, c)| (key, std::cmp::Reverse(city.tile)) > (k, std::cmp::Reverse(c.tile))) {
+            best = Some((key, chance, relative, *city));
+        }
+    }
+    if let Some((_, chance, relative, city)) = best {
+        (out.chance, out.relative, out.target, out.enemy) = (chance, relative, Some(city.tile), Some(city.owner));
+    }
+    if arsenal.melee.is_some() && brief.cities.len() >= 2 {
+        let free = composition_of(rules, strike_units(brief, state, rules).map(|u| u.kind));
+        out.pays = targets(brief, state).into_iter().any(|(city, horizon)| candidate(brief, state, rules, &arsenal, free, &city, horizon, WarGate::Value(prices, stakes)).is_some_and(|c| c.fits()));
+    }
+    let rival = out.enemy.or(nearest.map(|(_, p)| p));
+    if let Some(rival) = rival {
+        out.theirs = known_power(brief, state, rules, rival, met_eras);
+    }
+    out
+}
+
+/// Army units a nation of these rules keeps a city, tenths: the AI's own army at a look for an
+/// operation is 14.35 units for 5.5 cities (classic/docs/ai-war-audit-current.md, `pace`).
+pub const ARMY_PER_CITY_TENTHS: u64 = 26;
+
+/// The military power of `rival` as the player can know it (`unit_power`): the largest of its
+/// units in sight, its army remembered near our cities (`RelationMemory::threat`) and the army a
+/// nation of its known cities keeps (`ARMY_PER_CITY_TENTHS`) of its era's best melee unit
+/// (`era_strength`), since nothing tells the size of an army out of sight. `met_eras`: the era of
+/// every nation met.
+pub fn known_power(brief: &TurnBrief, state: &AiState, rules: &CompiledRuleset, rival: PlayerId, met_eras: &[(PlayerId, u8)]) -> u32 {
+    let seen: u32 = brief.sightings.iter().filter(|s| s.owner == rival && s.military).map(|s| s.power).sum();
+    let threat = state.relation(rival).map_or(0, |m| m.threat);
+    let cities = state.seen_cities().iter().filter(|c| c.owner == rival).count() as u64;
+    let own_era = crate::ai::strategy_net::features::era_of(rules, &brief.techs);
+    let their_era = met_eras.iter().find(|(p, _)| *p == rival).map_or(own_era, |(_, e)| usize::from(*e));
+    let kept = cities * ARMY_PER_CITY_TENTHS * era_strength(rules, their_era) / 10;
+    seen.max(threat).max(kept.min(u64::from(u32::MAX)) as u32)
+}
+
+/// The strength of the best melee unit the rules give by an era (its index): what an army of that
+/// era fights with.
+pub fn era_strength(rules: &CompiledRuleset, era: usize) -> u64 {
+    let era_of = |t: Option<crate::ids::TechId>| t.and_then(|t| rules.technologies.get(usize::from(t.0))).and_then(|d| d.content_era).map_or(0, |e| crate::ai::strategy_net::features::era_index(rules, e));
+    (0..rules.units.len())
+        .filter(|i| army_role(rules, UnitKindId(*i as u16)) == Some(ArmyRole::Melee))
+        .filter(|i| rules.units[*i].nation.is_none() && !rules.units[*i].unbuildable && era_of(rules.units[*i].required_tech) <= era)
+        .map(|i| u64::from(rules.units[i].strength))
+        .max()
+        .unwrap_or(1)
+        .max(1)
+}
+
+/// `city_worth` whose citizens yield what the empire's own do (`SiegeFixes::yields`,
+/// `Prices::citizen_yield`): a captured city held to the end made 5.0 hammers, 5.8 beakers, 2.9
+/// gold and 2.1 culture a round at 5.1 citizens (classic/docs/ai-conquest-payoff.md), where
+/// `city_worth` counts half a hammer and half a beaker a citizen.
+pub fn city_worth_yielding(prices: &Prices, population: u32, rounds: u32) -> Centi {
+    let score = prices.score;
+    let population = i64::from(population.max(1));
+    let points = score.city + score.land * (crate::ai::value::FIRST_RING + population) + score.citizen * population;
+    let yields = prices.later(population * prices.citizen_yield, rounds);
+    points + yields + points * crate::ai::genome::get(crate::ai::genome::Knob::RivalPercent) / 100
+}
+
+/// `city_worth_yielding` whose rival's loss counts `rival` percent of the city's points and yields
+/// (`SiegeFixes::rank`, `rival_percent`): what the rival loses is the city's score and the yields
+/// it no longer makes.
+pub fn city_worth_ranked(prices: &Prices, population: u32, rounds: u32, rival: i64) -> Centi {
+    let score = prices.score;
+    let population = i64::from(population.max(1));
+    let points = score.city + score.land * (crate::ai::value::FIRST_RING + population) + score.citizen * population;
+    let yields = prices.later(population * prices.citizen_yield, rounds);
+    (points + yields) * (100 + rival) / 100
+}
+
+/// The share of a rival's loss that counts for us, percent: with `SiegeFixes::rank` by where the
+/// rival stands on the victory screen (`TurnBrief::scores`) — 100 when it leads the others (the
+/// one the time victory compares us with), half when it is only ahead of us, nothing when it is
+/// behind us; `RIVAL_PERCENT` without it or with no scores known.
+pub fn rival_percent(brief: &TurnBrief, rival: PlayerId) -> i64 {
+    let score = |p: PlayerId| brief.scores.iter().find(|(q, _)| *q == p).map(|(_, s)| *s);
+    let (Some(ours), Some(theirs)) = (score(brief.player), score(rival)) else { return RIVAL_PERCENT };
+    if !brief.war.siege.rank {
+        return RIVAL_PERCENT;
+    }
+    let best = brief.scores.iter().filter(|(p, _)| *p != brief.player).map(|(_, s)| *s).max().unwrap_or(0);
+    if theirs >= best {
+        100
+    } else if theirs > ours {
+        RIVAL_PERCENT
+    } else {
+        0
+    }
 }
 
 /// A player without an operation looks for one this turn: every turn in a
@@ -1193,10 +1462,24 @@ fn candidate(
             WarGate::Value(prices, stakes) => {
                 let rounds = assemble + march + SIEGE_ROUNDS_ESTIMATE;
                 let chance = model_chance(brief, state, rules, arsenal, city, target, need, None);
-                let case = war_case(prices, stakes, rules, arsenal, city, need, missing, rounds, armed, chance, brief.war.siege);
+                let (case, parts) = war_case_parts(prices, stakes, rules, arsenal, city, need, missing, rounds, armed, chance, brief.war.siege, rival_percent(brief, city.owner));
                 let value = case.value(stakes) + infamy_bonus(brief, city.owner);
                 crate::ai::war_probe::note(|p| {
                     p.estimates.push(crate::ai::war_probe::Estimate {
+                        target: city.tile.0,
+                        chance: parts.success,
+                        capture: parts.capture,
+                        built: parts.built,
+                        lost: parts.lost,
+                        weapons: parts.weapons,
+                        infamy: infamy_bonus(brief, city.owner),
+                        appetite: stakes.appetite,
+                        stake: stakes.capital(city.tile).map_or(0, |s| s.value),
+                        rounds,
+                        distance,
+                        at_war: brief.at_war(city.owner),
+                        armed: armed.is_some(),
+                        features: chance_features(brief, state, rules, arsenal, city, target, need, None),
                         round: brief.round,
                         player: brief.player,
                         enemy: city.owner,
@@ -1506,7 +1789,7 @@ fn target_worth(brief: &TurnBrief, state: &AiState, rules: &CompiledRuleset, pri
     let distance = brief.nearest_city(brief.dims, target).and_then(|c| brief.dims.distance(c.tile, target)).unwrap_or(0).max(0) as u32;
     let rounds = (distance * 2).div_ceil(3) + 1 + SIEGE_ROUNDS_ESTIMATE;
     let chance = model_chance(brief, state, rules, &arsenal, city, &estimate, army, None);
-    let case = war_case(prices, stakes, rules, &arsenal, city, army, Composition::default(), rounds, crate::ai::strikes::on_hand_best(&brief.armory), chance, brief.war.siege);
+    let case = war_case(prices, stakes, rules, &arsenal, city, army, Composition::default(), rounds, crate::ai::strikes::on_hand_best(&brief.armory), chance, brief.war.siege, rival_percent(brief, city.owner));
     Some((case.value(stakes) + infamy_bonus(brief, city.owner), army, arsenal))
 }
 

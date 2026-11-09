@@ -269,6 +269,11 @@ pub struct TurnBrief {
     pub sightings: Vec<Sighting>,
     /// Sum of strength × health of own military units.
     pub military_power: u32,
+    /// The era of every nation met (`PlayerQueries::met_eras`): the war machine's enemy's era.
+    pub met_eras: Vec<(PlayerId, u8)>,
+    /// The victory screen's scores, ours first (`PlayerQueries::race`; `war-open` only, empty for
+    /// the others): where a rival stands (`operations::rival_percent`).
+    pub scores: Vec<(PlayerId, i64)>,
     pub total_population: u32,
     /// Excess happiness of the empire now (`derived::happiness`).
     pub happiness: i32,
@@ -360,6 +365,9 @@ pub struct TurnBrief {
     /// Its armies march through the land they have never seen
     /// (`planner_units::fog_approach`, `Variant::fog_march`).
     pub fog_march: bool,
+    /// Its wars open on an opportunity and the strategy net's posture permits and prices the
+    /// offensive operation (`Variant::war_open`, `operations::posture_permits`).
+    pub war_open: bool,
     /// The tall play the variant carries (`ai::tall`, `Variant::tall`), the
     /// cities it keeps and what a site meeting a science building's condition
     /// adds (`tall::turn_site_bonuses`); Off, None and empty for the others.
@@ -447,6 +455,8 @@ impl TurnBrief {
                 .collect(),
             sightings: sightings(obs, rules),
             military_power,
+            met_eras: Vec::new(),
+            scores: Vec::new(),
             total_population: obs.own_cities.iter().map(|c| c.population).sum(),
             happiness: obs.economy.happiness.excess(),
             turn_happiness: obs.economy.turn_happiness,
@@ -480,6 +490,7 @@ impl TurnBrief {
             army_fit: false,
             camps: false,
             fog_march: false,
+            war_open: false,
             tall: crate::ai::tall::Tall::Off,
             tall_cities: None,
             tall_sites: Vec::new(),

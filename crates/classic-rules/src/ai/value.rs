@@ -177,6 +177,9 @@ pub struct Prices {
     /// influence is above the alliance plus the rounds the next gift is away
     /// (`city_states::gift_ceiling`). Off only in the control `Variant::PreCsGifts`.
     pub gift_cap: bool,
+    /// What a citizen of the empire yields a turn, kept to the last round, at these prices
+    /// (`citizen_yield`): the worth of a captured city's citizens under `SiegeFixes::yields`.
+    pub citizen_yield: Centi,
 }
 
 /// The spaceship parts an empire still has to build: the hammers of those
@@ -315,6 +318,7 @@ impl Prices {
             pace: obs.speed.pace_percent,
             city_cap: None,
             gift_cap,
+            citizen_yield: 0,
         };
         match model {
             PriceModel::Tiles => {
@@ -349,6 +353,7 @@ impl Prices {
             prices.science = prices.reach_science(obs, rules);
             prices.production = prices.production.max(prices.science * PROCESS_SHARE / 100);
         }
+        prices.citizen_yield = citizen_yield(obs, &prices);
         prices
     }
 
@@ -1041,6 +1046,27 @@ impl Prices {
     }
 }
 
+/// What a citizen of the empire yields a turn, kept to the last round, at the prices: the cities'
+/// production, science, gold, culture and faith over their citizens (`Prices::citizen_yield`).
+fn citizen_yield(obs: &AIObservation<'_>, prices: &Prices) -> Centi {
+    let citizens: i64 = obs.own_cities.iter().map(|c| i64::from(c.population)).sum();
+    let worth: i64 = obs
+        .own_cities
+        .iter()
+        .map(|c| {
+            let i = c.income;
+            i64::from(i.production.max(0)) * prices.production + i64::from(i.science.max(0)) * prices.science + i64::from(i.gold.max(0)) * prices.gold + i64::from(i.culture) * prices.culture + i64::from(i.faith) * prices.faith
+        })
+        .sum();
+    worth / citizens.max(1)
+}
+
+/// Standard rounds an empire takes to climb back over a mood line a captured city pushed it
+/// below (`Prices::kept_city_unrest_recovering`): after a puppet given at round 66 (Quick) the
+/// taker's excess happiness was −4.3 ten rounds later and −1.3 sixty rounds later
+/// (classic/docs/ai-conquest-payoff.md, the gift twins), about 80 Quick rounds to the line.
+pub const UNREST_RECOVERY_ROUNDS: u32 = 120;
+
 /// Points of excess happiness a new city must leave over (`Prices::affords_city`).
 pub const FOUNDING_MARGIN: i64 = 2;
 
@@ -1090,6 +1116,21 @@ impl Prices {
             return self.captured_city_unrest_flat(population);
         }
         self.unrest_by_steps(self.kept_city_unrest_hundredths(population, annexed))
+    }
+
+    /// `kept_city_unrest_steps` whose mood lines cost their rate for the rounds the empire takes
+    /// to climb back over them (`UNREST_RECOVERY_ROUNDS` at the game's pace), not to the end of
+    /// the game: the drift of every point as there (`operations::SiegeFixes::recovery`).
+    pub fn kept_city_unrest_recovering(&self, population: u32, annexed: bool) -> Centi {
+        if self.model != PriceModel::Uses {
+            return self.captured_city_unrest_flat(population);
+        }
+        let hundredths = self.kept_city_unrest_hundredths(population, annexed);
+        let drift = self.drift * hundredths / 100;
+        let steps = self.unrest_by_steps(hundredths) - drift;
+        let left = i64::from(self.rounds_left.max(1));
+        let below = (i64::from(UNREST_RECOVERY_ROUNDS) * i64::from(self.pace.max(1)) / 100).clamp(1, left);
+        drift + steps * below / left
     }
 
     /// What `hundredths` of a point of new unhappiness cost the empire by the moods it
@@ -1571,6 +1612,7 @@ mod tests {
             pace: 100,
             city_cap: None,
             gift_cap: true,
+            citizen_yield: 0,
         };
         let flat = prices.captured_city_unrest_flat(2);
         assert_eq!(flat, 5 * 2_700, "the flat price: five points at the price of a point");
