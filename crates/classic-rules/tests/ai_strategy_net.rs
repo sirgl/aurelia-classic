@@ -249,10 +249,11 @@ fn war_open_opens_a_window_in_any_era() {
     let quiet = intent_of(&none, Held::default(), 6, 120, 67, true);
     assert!(quiet.concepts[kc::STRIKE_WINDOW] < 100, "{:?}", quiet.concepts);
     assert_eq!(quiet.posture_pick, 0, "peace: {:?}", quiet.posture);
-    // A good opportunity whose war case does not pay: the window stays shut.
+    // A good opportunity whose war case does not pay: the window stays below what turns the
+    // posture (0.2 here), and the posture at peace.
     let unpaid: Vec<(usize, i64)> = late.iter().copied().filter(|(f, _)| *f != fe::PAYS).collect();
     let shut = intent_of(&neutral(&unpaid), Held::default(), 6, 120, 67, true);
-    assert!(shut.concepts[kc::STRIKE_WINDOW] < 100, "{:?}", shut.concepts);
+    assert!(shut.concepts[kc::STRIKE_WINDOW] < 400, "{:?}", shut.concepts);
     assert_eq!(shut.posture_pick, 0, "peace: {:?}", shut.posture);
 }
 
@@ -730,7 +731,7 @@ fn goal_through(path: Vec<TechId>, worth: i64) -> Goal {
 
 fn plan_with(goals: Vec<Goal>, target: Option<TechId>) -> Plan {
     let i: Intent = intent(&neutral(&[]), Held::default(), 1, 198, 67);
-    Plan { round: 1, features: neutral(&[]), mult: price_mult(&i), intent: i, goals, target, city_target: 1, growth: Vec::new() }
+    Plan { round: 1, features: neutral(&[]), mult: price_mult(&i), intent: i, goals, target, city_target: 1, growth: Vec::new(), war_open: false }
 }
 
 /// Scenario 18: A goal behind a bridge technology worth nothing itself: the bridge first.

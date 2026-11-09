@@ -56,7 +56,10 @@ fn the_learned_chance_is_an_integer_logistic() {
         assert!(p >= last, "monotone at {logit}");
         last = p;
     }
-    assert_eq!(CHANCE_FEATURES.len(), 12);
+    // The war-fix model's twelve and `war-open`'s three (`strength`, `era_edge`, `ready`), which
+    // the game's AI weighs 0 (classic/docs/ai-war-open.md).
+    assert_eq!(CHANCE_FEATURES.len(), 15);
+    assert_eq!(classic_rules::ai::operations::CHANCE_WEIGHTS[12..], [0, 0, 0]);
 }
 
 /// The fitted chance is what the games deliver, not what the siege model promises: about one
@@ -65,7 +68,7 @@ fn the_learned_chance_is_an_integer_logistic() {
 /// cities, or when the war runs already.
 #[test]
 fn the_learned_chance_is_what_the_games_deliver() {
-    let base: [i64; 12] = [60, 86, 8, 4, 10, 0, 18, 4, 0, 10, 6, 7];
+    let base: [i64; 15] = [60, 86, 8, 4, 10, 0, 18, 4, 0, 10, 6, 7, 50, 0, 100];
     let chance = learned_chance(&base);
     assert!((5..=30).contains(&chance), "{chance} %");
     let changed = |at: usize, to: i64| {
