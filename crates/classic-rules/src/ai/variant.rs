@@ -685,6 +685,12 @@ pub enum Variant {
     /// (`TurnBrief::tactician_fit`, classic/docs/ai-tactician-fit.md). The mind plays `WarPays` in every
     /// other switch (`ClassicMind::new`).
     TacticianFit,
+    /// `WarPays` whose operations count an army as gathered when its members stand within the muster
+    /// radius plus their own movement (`TurnBrief::muster_fix`, `operations::muster_reach`), with the
+    /// scripted tactics (no unit net). The muster fix of `TacticianFit` measured alone
+    /// (classic/docs/ai-war-muster.md). The mind plays `WarPays` in every other switch
+    /// (`ClassicMind::new`). A bench-only candidate, `experimental-ai` only.
+    WarMuster,
 }
 
 /// The net's base: the expert the end-to-end net learns from and the mind it
@@ -705,7 +711,7 @@ const NUDGED_CANDIDATES: u32 = 40;
 
 impl Variant {
     /// The game's AI first.
-    pub const ALL: [Variant; 138] = [
+    pub const ALL: [Variant; 139] = [
         Variant::Standard,
         Variant::PreCamps,
         Variant::PreWorkers,
@@ -844,6 +850,7 @@ impl Variant {
         Variant::Sharp,
         Variant::WarPays,
         Variant::TacticianFit,
+        Variant::WarMuster,
     ];
 
     pub fn name(self) -> &'static str {
@@ -968,6 +975,7 @@ impl Variant {
             Variant::Sharp => "sharp",
             Variant::WarPays => "war-pays",
             Variant::TacticianFit => "tactician-fit",
+            Variant::WarMuster => "war-muster",
             Variant::ArmyFit => "army-fit",
             Variant::Camps => "camps",
             Variant::ArmyCamps => "army-camps",
@@ -1001,7 +1009,7 @@ impl Variant {
         cfg!(feature = "experimental-ai")
             || !matches!(
                 self,
-                Variant::Net | Variant::UnitNet | Variant::Hybrid | Variant::SiteNet | Variant::ChoiceNet | Variant::ChoiceNetProduction | Variant::ChoiceNetResearch | Variant::StandardScripted | Variant::PreCsGifts | Variant::Sharp | Variant::TacticianFit
+                Variant::Net | Variant::UnitNet | Variant::Hybrid | Variant::SiteNet | Variant::ChoiceNet | Variant::ChoiceNetProduction | Variant::ChoiceNetResearch | Variant::StandardScripted | Variant::PreCsGifts | Variant::Sharp | Variant::TacticianFit | Variant::WarMuster
             )
     }
 
@@ -1148,6 +1156,12 @@ impl Variant {
     /// `WarPays` in every other switch (`ClassicMind::new`).
     pub fn tactician_fit(self) -> bool {
         self == Variant::TacticianFit
+    }
+
+    /// The muster fix alone (`TurnBrief::muster_fix`): `WarMuster`, which the mind plays as `WarPays`
+    /// in every other switch (`ClassicMind::new`).
+    pub fn war_muster(self) -> bool {
+        self == Variant::WarMuster
     }
 
     /// Its research, policies and choice among the allocator's best orders are the

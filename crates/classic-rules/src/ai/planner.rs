@@ -374,6 +374,10 @@ pub struct TurnBrief {
     pub war_pays: bool,
     /// `tactician-fit` (`Variant::tactician_fit`): `war_pays` with the fitted tactical layer.
     pub tactician_fit: bool,
+    /// `war-muster` and `tactician-fit`: an army is gathered within the muster radius plus its own movement.
+    pub muster_fix: bool,
+    /// `war-muster` alone: the army's places are filled by current units only (`operations::current`).
+    pub war_muster: bool,
     /// The tall play the variant carries (`ai::tall`, `Variant::tall`), the
     /// cities it keeps and what a site meeting a science building's condition
     /// adds (`tall::turn_site_bonuses`); Off, None and empty for the others.
@@ -500,6 +504,8 @@ impl TurnBrief {
             sharp: false,
             war_pays: false,
             tactician_fit: false,
+            muster_fix: false,
+            war_muster: false,
             tall: crate::ai::tall::Tall::Off,
             tall_cities: None,
             tall_sites: Vec::new(),

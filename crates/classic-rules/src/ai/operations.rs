@@ -76,6 +76,22 @@ pub const MARCH_LIMIT: u32 = 20;
 pub fn march_limit(brief: &TurnBrief) -> u32 {
     if brief.war.march { WAR_WEARINESS_ROUNDS / 2 } else { MARCH_LIMIT }
 }
+/// The age at which a marching operation ends: `march_limit`; for `war-muster`
+/// (`TurnBrief::war_muster`) no later than the time its plan gave the march and the siege (the walk
+/// of `running_case`) with the siege estimate once and a half. The army is composed to take the city
+/// in `PLAN_SIEGE_ROUNDS` rounds of strikes; a siege that outlasts its estimate by half is not the
+/// one the army was planned for, and the operations that ran to `march_limit` lost 25 units each
+/// (median) for the 8 of 17 heavy losers of offset 200 that ended by it, while every operation that
+/// ended by taking its city had taken at most its planned time (`war-muster` before this rule,
+/// runs/ops/wm2-200.csv, wm3-200.csv).
+fn march_end(brief: &TurnBrief, operation: &Operation) -> u32 {
+    if !brief.war_muster {
+        return march_limit(brief);
+    }
+    let distance = brief.dims.distance(operation.muster, operation.target).unwrap_or(0).max(0) as u32;
+    let planned = (distance * 2).div_ceil(3) + 1 + SIEGE_ROUNDS_ESTIMATE + SIEGE_ROUNDS_ESTIMATE / 2;
+    planned.min(march_limit(brief))
+}
 /// Members beyond the need an operation takes while it forms.
 pub const EXTRA_MEMBERS: u32 = 2;
 /// Free units farther than this from the muster point are not recruited.
@@ -582,7 +598,7 @@ fn advance(brief: &TurnBrief, state: &mut AiState, rules: &CompiledRuleset, oper
     let over = match operation.phase {
         _ if !target_held(state, operation) => true,
         OperationPhase::Forming => age > form_limit,
-        OperationPhase::Marching => !at_war || age > march_limit(brief) || outmatched(brief, rules, operation, &members),
+        OperationPhase::Marching => !at_war || age > march_end(brief, operation) || outmatched(brief, rules, operation, &members),
     };
     if over {
         crate::ai::war_probe::note(|p| {
@@ -594,7 +610,7 @@ fn advance(brief: &TurnBrief, state: &mut AiState, rules: &CompiledRuleset, oper
                 EndCause::FormTimeout
             } else if !at_war {
                 EndCause::Peace
-            } else if age > march_limit(brief) {
+            } else if age > march_end(brief, operation) {
                 EndCause::MarchTimeout
             } else {
                 EndCause::Outmatched
@@ -659,7 +675,7 @@ fn assembled(brief: &TurnBrief, rules: &CompiledRuleset, operation: &Operation, 
 }
 
 /// How far from the muster point a member stands with the army: `MUSTER_RADIUS + 1`; for
-/// `tactician-fit` (`TurnBrief::tactician_fit`) one turn's march more, the unit's movement in tiles.
+/// `war-muster` and `tactician-fit` (`TurnBrief::muster_fix`) one turn's march more, the unit's movement in tiles.
 /// The muster point lies on the staging ring at the enemy's border: at peace the tiles within
 /// `MUSTER_RADIUS` of it that are neither the enemy's land nor in the city's strike hold four or
 /// five units (one military unit a tile), so a twelve-unit army stood on average 4.8 tiles from it
@@ -668,7 +684,7 @@ fn assembled(brief: &TurnBrief, rules: &CompiledRuleset, operation: &Operation, 
 /// (classic/docs/ai-tactician-fit.md).
 fn muster_reach(brief: &TurnBrief, rules: &CompiledRuleset, kind: UnitKindId) -> i32 {
     let base = MUSTER_RADIUS + 1;
-    if !brief.tactician_fit {
+    if !brief.muster_fix {
         return base;
     }
     base + i32::from(rules.units.get(kind.0 as usize).map_or(1, |d| d.movement.max(1)))
@@ -858,7 +874,29 @@ fn start(brief: &TurnBrief, state: &mut AiState, rules: &CompiledRuleset, routes
 /// look at the war machine (`outlook`) count the same units, so their verdicts agree.
 fn counted_free(brief: &TurnBrief, state: &AiState, rules: &CompiledRuleset) -> Composition {
     let on_assault = |u: &&UnitBrief| brief.war.siege.assault && u.hp >= HEAL_BELOW_HP && army_role(rules, u.kind).is_some() && matches!(state.task_of(u.id).map(|t| t.task), Some(UnitTask::Assault { .. }));
-    composition_of(rules, strike_units(brief, state, rules).chain(brief.units.iter().filter(on_assault)).map(|u| u.kind))
+    let arsenal = Arsenal::of(brief, rules);
+    composition_of(rules, strike_units(brief, state, rules).chain(brief.units.iter().filter(on_assault)).filter(|u| current(brief, rules, &arsenal, u.kind)).map(|u| u.kind))
+}
+
+/// The share of the best trainable kind's strength a unit needs to fill a place of the army, percent:
+/// two thirds. The rules' generations of one role step by a third to a half of the strength (melee:
+/// 8, 11, 14, 16, 21), so a unit under two thirds of the best kind is a generation or more behind and
+/// deals the siege model a fraction of the damage the army was planned with (`composition` plans
+/// with the best kind). On offset 200 the operations that started with most places filled by
+/// existing units took a city in 15–30 % of the cases, those that built their army in 39–43 %
+/// (`war-pays`, classic/docs/ai-war-muster.md). Only `war-muster` (`TurnBrief::war_muster`).
+pub const CURRENT_PERCENT: i64 = 67;
+
+/// A unit of `kind` fills a place of an army: the army counts every unit with the strength the plan
+/// was made with, not any unit of the role (`CURRENT_PERCENT`). Without `TurnBrief::war_muster`
+/// every unit does.
+fn current(brief: &TurnBrief, rules: &CompiledRuleset, arsenal: &Arsenal, kind: UnitKindId) -> bool {
+    if !brief.war_muster {
+        return true;
+    }
+    let Some(role) = army_role(rules, kind) else { return true };
+    let Some(best) = arsenal.kind(role) else { return true };
+    i64::from(role_strength(rules, kind, role)) * 100 >= i64::from(role_strength(rules, best, role)) * CURRENT_PERCENT
 }
 
 /// A new operation or raid may start under `strategy`: not while defending; not while
@@ -1749,12 +1787,14 @@ fn recruit(brief: &TurnBrief, state: &mut AiState, rules: &CompiledRuleset, oper
     let target = operation.target;
     let mut have = composition_of(rules, members(brief, state, target).iter().map(|u| u.kind));
     let switching = if brief.war.siege.assault { assault_recruits(brief, state, rules, operation, gate) } else { Vec::new() };
+    let arsenal = Arsenal::of(brief, rules);
     let mut candidates: Vec<(i32, EntityId, UnitKindId)> = strike_units(brief, state, rules)
         .filter(|u| match operation.phase {
             OperationPhase::Forming => true,
             OperationPhase::Marching => state.task_of(u.id).map(|t| t.task) == Some(UnitTask::Assault { target }),
         })
         .chain(switching)
+        .filter(|u| current(brief, rules, &arsenal, u.kind))
         .map(|u| (dims.distance(u.tile, operation.muster).unwrap_or(i32::MAX), u.id, u.kind))
         .filter(|(d, _, _)| operation.phase == OperationPhase::Marching || *d <= range)
         .collect();

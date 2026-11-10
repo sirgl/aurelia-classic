@@ -210,6 +210,9 @@ pub struct Recall {
     pub nearest_member: i32,
     /// The saving the same city would give without the army being able to arrive in time.
     pub reaches: bool,
+    /// Members within `DEFENCE_RADIUS` of the operation's target, and the nearest member's distance to it.
+    pub at_walls: u32,
+    pub to_target: i32,
 }
 
 /// A raid that formed, and what it did (`ai::raid`).
