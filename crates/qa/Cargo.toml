@@ -106,5 +106,9 @@ default = ["gpu"]
 gpu = ["classic-rules/gpu"]
 
 [[bin]]
+name = "ai-exam"
+path = "src/bin/ai-exam.rs"
+
+[[bin]]
 name = "ai-strategy-trace"
 path = "src/bin/ai-strategy-trace.rs"
