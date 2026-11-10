@@ -700,6 +700,12 @@ pub enum Variant {
     /// `TurnBrief::wonder_race` = 2), instead of the flat `100 − 2 × turns`. The mind plays `Sharp`
     /// in every other switch. A candidate, `experimental-ai` only.
     WonderRace,
+    /// `Next` that drops a lost wonder order and does not hurry-buy one (`TurnBrief::wonder_race`
+    /// = 1): the control of `NextW`. A candidate, `experimental-ai` only.
+    NextCancel,
+    /// `Next` with `WonderRace`'s rule and price (`TurnBrief::wonder_race` = 2). A candidate,
+    /// `experimental-ai` only.
+    NextW,
 }
 
 /// The net's base: the expert the end-to-end net learns from and the mind it
@@ -720,7 +726,7 @@ const NUDGED_CANDIDATES: u32 = 40;
 
 impl Variant {
     /// The game's AI first.
-    pub const ALL: [Variant; 140] = [
+    pub const ALL: [Variant; 142] = [
         Variant::Standard,
         Variant::PreCamps,
         Variant::PreWorkers,
@@ -861,6 +867,8 @@ impl Variant {
         Variant::Next,
         Variant::WonderCancel,
         Variant::WonderRace,
+        Variant::NextCancel,
+        Variant::NextW,
     ];
 
     pub fn name(self) -> &'static str {
@@ -987,6 +995,8 @@ impl Variant {
             Variant::Next => "next",
             Variant::WonderCancel => "wonder-cancel",
             Variant::WonderRace => "wonder-race",
+            Variant::NextCancel => "next-cancel",
+            Variant::NextW => "next-w",
             Variant::ArmyFit => "army-fit",
             Variant::Camps => "camps",
             Variant::ArmyCamps => "army-camps",
@@ -1020,7 +1030,7 @@ impl Variant {
         cfg!(feature = "experimental-ai")
             || !matches!(
                 self,
-                Variant::Net | Variant::UnitNet | Variant::Hybrid | Variant::SiteNet | Variant::ChoiceNet | Variant::ChoiceNetProduction | Variant::ChoiceNetResearch | Variant::StandardScripted | Variant::PreCsGifts | Variant::Sharp | Variant::TallReal | Variant::Next | Variant::WonderCancel | Variant::WonderRace
+                Variant::Net | Variant::UnitNet | Variant::Hybrid | Variant::SiteNet | Variant::ChoiceNet | Variant::ChoiceNetProduction | Variant::ChoiceNetResearch | Variant::StandardScripted | Variant::PreCsGifts | Variant::Sharp | Variant::TallReal | Variant::Next | Variant::WonderCancel | Variant::WonderRace | Variant::NextCancel | Variant::NextW
             )
     }
 
@@ -1161,8 +1171,8 @@ impl Variant {
     /// wonder by the chance to finish it first. The mind plays `Sharp` (`ClassicMind::new`).
     pub fn wonder_race(self) -> u8 {
         match self {
-            Variant::WonderCancel => 1,
-            Variant::WonderRace => 2,
+            Variant::WonderCancel | Variant::NextCancel => 1,
+            Variant::WonderRace | Variant::NextW => 2,
             _ => 0,
         }
     }
@@ -1173,10 +1183,11 @@ impl Variant {
         self == Variant::TallReal
     }
 
-    /// `TallReal` with the review's fixes (`TurnBrief::next`): `Next` alone, which the mind plays
-    /// as `TallReal` with the flag (`ClassicMind::new`).
+    /// `TallReal` with the review's fixes (`TurnBrief::next`): `Next` and the variants built on it
+    /// (`NextCancel`, `NextW`), which the mind plays as `TallReal` with the flag
+    /// (`ClassicMind::new`).
     pub fn next(self) -> bool {
-        self == Variant::Next
+        matches!(self, Variant::Next | Variant::NextCancel | Variant::NextW)
     }
 
     /// Its research, policies and choice among the allocator's best orders are the
