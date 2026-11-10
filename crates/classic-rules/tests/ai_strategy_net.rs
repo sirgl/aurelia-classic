@@ -792,11 +792,20 @@ fn the_memory_round_trips() {
     assert_eq!(Memory::decode(&[1, 2, 3]), Memory::default(), "another mind's bytes");
     // `sharp`'s section comes after the rest and only when there is one: the other variants'
     // bytes are what they were.
-    let sharp = Memory { sharp: Some(classic_rules::ai::strategy_net::sharp::Memory { ratio: 870, trend: 430 }), ..memory.clone() };
+    let sharp = Memory { sharp: Some(classic_rules::ai::strategy_net::sharp::Memory { ratio: 870, trend: 430, rivals: None, fits: None }), ..memory.clone() };
     let (plain, with) = (memory.encode(), sharp.encode());
     assert_eq!(&with[..plain.len()], &plain[..], "the same bytes before the section");
-    assert_eq!(with.len(), plain.len() + 17);
+    assert_eq!(with.len(), plain.len() + 1 + 2 * 8, "the marker and two numbers");
     assert_eq!(Memory::decode(&with), sharp);
+    // `next`'s section adds the rivals it knew and the science victory's fit; its marker says so.
+    for (rivals, fits) in [(Some(3), None), (Some(0), Some(true)), (None, Some(false))] {
+        let next = Memory { sharp: Some(classic_rules::ai::strategy_net::sharp::Memory { ratio: 870, trend: 430, rivals, fits }), ..memory.clone() };
+        assert_eq!(Memory::decode(&next.encode()), next);
+    }
+    let next = Memory { sharp: Some(classic_rules::ai::strategy_net::sharp::Memory { ratio: 870, trend: 430, rivals: Some(3), fits: Some(true) }), ..memory.clone() };
+    let bytes = next.encode();
+    assert_eq!(bytes.len(), plain.len() + 1 + 4 * 8, "the marker and four numbers");
+    assert_eq!(Memory::decode(&bytes[..bytes.len() - 1]).sharp, None, "a cut section is no section");
 }
 
 /// The net counts a few hundred hand weights.
@@ -1084,12 +1093,20 @@ fn sharp_counts_the_food_left_in_the_store() {
     };
     let standard = CellPrices::of(&base(), &[1000; pd::N]);
     let sharp = standard.scaled(true);
+    // Standard prices a food more as almost nothing when it crosses no growth threshold (24 at
+    // H 20); sharp counts the food left in the store as a share of a citizen. A threshold that
+    // lands between two foods still makes one of them the cheaper (a fourth of the first at H 40),
+    // so the test compares the worst cases and the sums, not each food with the first.
+    let (mut sharp_min, mut standard_min) = (i64::MAX, i64::MAX);
     for h in [20, 40, 60] {
         let gains: Vec<i64> = (1..=4).map(|f| with(f, &sharp, h) - with(f - 1, &sharp, h)).collect();
         let before: Vec<i64> = (1..=4).map(|f| with(f, &standard, h) - with(f - 1, &standard, h)).collect();
         assert!(gains[0] > before[0], "H {h}: sharp {gains:?}, standard {before:?}");
-        assert!(gains.iter().all(|g| *g * 4 > gains[0]), "H {h}: no food more worth almost nothing: {gains:?}");
+        assert!(gains.iter().sum::<i64>() > before.iter().sum::<i64>() * 5 / 4, "H {h}: four foods worth more: {gains:?} against {before:?}");
+        sharp_min = sharp_min.min(*gains.iter().min().unwrap());
+        standard_min = standard_min.min(*before.iter().min().unwrap());
     }
+    assert!(sharp_min > 10 * standard_min, "no food more worth almost nothing: sharp's least {sharp_min}, standard's {standard_min}");
     let end = CellPrices::of(&Base { rounds_left: 3, ..base() }, &[1000; pd::N]);
     assert!(food_price(&m, &plan, &end.scaled(true), 3) <= food_price(&m, &plan, &end, 3));
 }
@@ -1126,6 +1143,7 @@ fn tall_real_takes_the_science_branch_whole_before_the_tenets() {
     assert!(!rationalism.is_empty() && !tenets.is_empty());
     let mut p = plan(&rules, &great_land_no_room(), &m);
     p.intent.tall_real = true;
+    p.intent.science_first = true;
     let culture = Culture { adoptable: tenets.iter().chain(&rationalism).copied().collect(), ..Culture::default() };
     match choose_policy(&m, &rules, &p, &base(), &culture) {
         Some(PolicyChoice::Adopt(policy)) => assert!(rationalism.contains(&policy), "adopted {}", rules.module.policies[policy.0 as usize].key),
@@ -1133,11 +1151,44 @@ fn tall_real_takes_the_science_branch_whole_before_the_tenets() {
     }
 }
 
-/// `tall-real`'s policy cost weight is the science branch's percents, read from the rules: the
-/// classic science branch's opener (+10 % while happy) and its +17 % in a city with a university.
+/// `tall-real`'s policy cost weight is the science branch's percents p, read from the rules, as
+/// the share p / (100 + p) of the science they make: the normal branch whose policies carry the
+/// most science percents (a city percent, the percent while happy), whichever the rules name.
 #[test]
 fn tall_real_weighs_the_policy_cost_by_the_science_branch() {
+    use classic_rules::rules::effects::{Modifier, YieldKind};
     let rules = classic();
     let share = classic_rules::ai::tall_real::policy_share(&rules);
-    assert_eq!(share, 27 * 1000 / 127, "{share}");
+    let percents = |b: PolicyBranchId| -> i64 {
+        rules
+            .module
+            .policies
+            .iter()
+            .filter(|p| p.branch == Some(b))
+            .flat_map(|p| classic_rules::ai::strategy_net::cell::effects_of(&p.effects))
+            .map(|e| match e.modifier {
+                Modifier::AddYieldPercent { yield_kind: YieldKind::Science, percent } => i64::from(percent.max(0)),
+                Modifier::AddStat { stat: classic_rules::rules::stats::Stat::Module(classic_rules::rules::stats::ClassicStat::Society(classic_rules::classic::stats::SocietyStat::ScienceWhileHappyPercent)), amount } => i64::from(amount.max(0)),
+                _ => 0,
+            })
+            .sum()
+    };
+    let science = (0..rules.module.policy_branches.len())
+        .map(|i| PolicyBranchId(i as u16))
+        .filter(|b| classic_rules::ai::strategy_net::branches::is_normal(&rules, *b))
+        .filter(|b| classic_rules::ai::strategy_net::branches::dominant(&classic_rules::ai::strategy_net::branches::character(&rules, *b)) == Some(classic_rules::ai::strategy_net::weights::branch::ch::SCIENCE))
+        .map(percents)
+        .max()
+        .expect("the rules have a science branch");
+    assert!(science > 0, "the science branch carries science percents");
+    assert_eq!(share, science * 1000 / (100 + science), "{share} from {science} %");
+    assert!(share > 0 && share < 500, "a share of the science, not all of it: {share}");
 }
+
+/// The choices the code names are the ones it means.
+#[test]
+fn the_named_choices_are_their_names() {
+    use classic_rules::ai::strategy_net::weights::{AIMS, AIM_DIPLOMACY, AIM_SCIENCE, STYLES, STYLE_TALL};
+    assert_eq!((STYLES[STYLE_TALL], AIMS[AIM_SCIENCE], AIMS[AIM_DIPLOMACY]), ("tall", "science", "diplomacy"));
+}
+

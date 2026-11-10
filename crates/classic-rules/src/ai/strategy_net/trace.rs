@@ -124,6 +124,65 @@ pub fn turn(player: u8, plan: &Plan, reviewed: bool, rules: &CompiledRuleset) {
     }
 }
 
+/// The diplomatic standing at a review: the grand strategy's path, the city-states we and the
+/// best-allied rival lead, the gold, the World Congress (trace only).
+pub fn diplo(obs: &crate::knowledge::observation::AIObservation<'_>, state: &crate::ai::state::AiState, intent: &super::Intent) {
+    if !enabled() {
+        return;
+    }
+    let ours = obs.city_states.iter().filter(|c| c.ally == Some(obs.player)).count();
+    let mut rivals: Vec<u8> = obs.city_states.iter().filter_map(|c| c.ally).filter(|p| *p != obs.player).map(|p| p.0).collect();
+    rivals.sort_unstable();
+    let best = rivals.chunk_by(|a, b| a == b).map(<[u8]>::len).max().unwrap_or(0);
+    let congress = obs.congress.as_ref().map_or_else(|| "-".to_owned(), |c| format!("un {} needed {}", c.united_nations, c.needed));
+    let ids: Vec<String> = obs.city_states.iter().filter(|c| c.ally == Some(obs.player)).map(|c| c.player.0.to_string()).collect();
+    push(format!(
+        "r{} p{} DIPLO path {} aim {} tall_real {} | cs allies {} of {} (best rival {}) | gold {} treasury {} | congress {} | ids {}",
+        obs.round,
+        obs.player.0,
+        crate::ai::grand_strategy::path_of(state).name(),
+        AIMS[intent.aim_pick],
+        intent.tall_real,
+        ours,
+        obs.city_states.len(),
+        best,
+        obs.economy.income.gold,
+        obs.economy.treasury,
+        congress,
+        if ids.is_empty() { "-".to_owned() } else { ids.join(",") }
+    ));
+}
+
+/// A gold gift the allocator bought, with the city-state's ally and our influence before it
+/// (trace only; every variant that prices gifts, `PriceModel::Uses`).
+pub fn gift(obs: &crate::knowledge::observation::AIObservation<'_>, city_state: crate::ids::PlayerId, gold: u32, value: i64) {
+    if !enabled() {
+        return;
+    }
+    let info = obs.city_states.iter().find(|c| c.player == city_state);
+    let ally = info.and_then(|c| c.ally).map_or_else(|| "-".to_owned(), |p| p.0.to_string());
+    push(format!(
+        "r{} p{} GIFT cs {} gold {} value {} ally {} influence {} treasury {}",
+        obs.round,
+        obs.player.0,
+        city_state.0,
+        gold,
+        value,
+        ally,
+        info.map_or(0, |c| c.influence),
+        obs.economy.treasury
+    ));
+}
+
+/// Our delegates cast for ourselves in a World Leader vote, against the delegates it needs and
+/// the proposals they are split over (trace only).
+pub fn leader_vote(obs: &crate::knowledge::observation::AIObservation<'_>, cast: u16, all: u16, needed: u16, proposals: usize) {
+    if !enabled() {
+        return;
+    }
+    push(format!("r{} p{} VOTE leader cast {cast} of {all} needed {needed} proposals {proposals}", obs.round, obs.player.0));
+}
+
 /// The style locked.
 pub fn lock(player: u8, round: u32, intent: &super::Intent) {
     if !enabled() {

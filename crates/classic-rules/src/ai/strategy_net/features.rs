@@ -34,6 +34,18 @@ pub const ROOM_RADIUS: i32 = 10;
 pub const SITE_SPACING: i32 = 4;
 /// Sites counted at most.
 pub const ROOM_SITES: usize = 6;
+
+/// The nearest rival city's distance as the `RIVAL_NEAR` feature: 1 at `RIVAL_NEAR_FULL` tiles or
+/// closer (its cities' rings and ours meet on the sites between, three tiles each way and one
+/// between), 0 from `RIVAL_NEAR_NONE` (farther than an operation's reach,
+/// `planner_strategy::OBJECTIVE_RANGE`, by a city's ring) on, linear between. `sharp` reads its
+/// rival by land on the same scale (`sharp::survey`), so the net's weights keep their meaning.
+pub const RIVAL_NEAR_FULL: i64 = 7;
+pub const RIVAL_NEAR_NONE: i64 = 18;
+
+pub fn rival_near(distance: i32) -> Milli {
+    ramp(RIVAL_NEAR_NONE - i64::from(distance), 0, RIVAL_NEAR_NONE - RIVAL_NEAR_FULL)
+}
 /// The radius in which ruins near home are counted.
 pub const RUINS_RADIUS: i32 = 12;
 /// The radius in which a city-state is near.
@@ -195,7 +207,7 @@ pub fn survey(obs: &AIObservation<'_>, rules: &CompiledRuleset, state: &AiState)
         // The nearest known city of a rival nation.
         let rival = state.seen_cities().iter().filter(|c| is_major(c.owner)).filter_map(|c| dims.distance(capital, c.tile)).min();
         set(RIVAL_KNOWN, if rival.is_some() { ONE } else { 0 });
-        set(RIVAL_NEAR, rival.map_or(0, |d| ramp(18 - i64::from(d), 0, 11)));
+        set(RIVAL_NEAR, rival.map_or(0, rival_near));
         // City-states with a city near the capital.
         let mut near: Vec<PlayerId> = state
             .seen_cities()

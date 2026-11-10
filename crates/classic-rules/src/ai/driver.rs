@@ -79,6 +79,9 @@ pub struct ClassicMind {
     /// `Variant::TallReal`: the mind plays `Sharp` (`sharp` set) whose tall style reaches for the
     /// science victory (`TurnBrief::tall_real`, `ai::tall_real`).
     tall_real: bool,
+    /// `Variant::Next`: the mind plays `TallReal` (`tall_real` set) with the review's fixes
+    /// (`TurnBrief::next`).
+    next: bool,
 }
 
 /// The environment variable that makes the game's AI another variant
@@ -108,7 +111,9 @@ impl ClassicMind {
     pub fn new(variant: Variant) -> Self {
         // `sharp` is `Standard` in every switch but its strategy net (`TurnBrief::sharp`).
         // `tall-real` is `sharp` with its tall play (`TurnBrief::tall_real`).
-        let tall_real = variant.tall_real();
+        // `next` is `tall-real` with the review's fixes (`TurnBrief::next`).
+        let next = variant.next();
+        let tall_real = variant.tall_real() || next;
         let sharp = variant.sharp() || tall_real;
         let variant = if sharp { Variant::Standard } else { variant };
         let mut advisors = AdvisorRegistry::default();
@@ -128,7 +133,7 @@ impl ClassicMind {
         let walls = (book.is_some() || variant.siege_walls()).then(|| Box::new(crate::ai::siege_walls::SiegeWalls::new().joined(variant.siege_join())));
         let unciv = variant.unciv().any().then(|| Box::new(crate::ai::unciv::UncivMind::new(variant.unciv())));
         let variant = if named.is_some() { Variant::PrePuppet } else { variant };
-        Self { advisors, variant, genome: None, humans: Vec::new(), walks: Default::default(), choice: None, #[cfg(feature = "experimental-ai")] net, book, named, walls, conquest: None, unciv, tall: None, sharp, tall_real }
+        Self { advisors, variant, genome: None, humans: Vec::new(), walks: Default::default(), choice: None, #[cfg(feature = "experimental-ai")] net, book, named, walls, conquest: None, unciv, tall: None, sharp, tall_real, next }
     }
 
     /// A league book that may play on another base (`book_on`): a duel book
@@ -171,7 +176,7 @@ impl ClassicMind {
         advisors.register(crate::classic::ClassicSystem::Diplomacy, Box::new(diplomacy));
         // The net plays on `NET_BASE`: its siege too.
         let walls = variant.siege_walls().then(|| Box::new(crate::ai::siege_walls::SiegeWalls::new().joined(variant.siege_join())));
-        Self { advisors, variant, genome: None, humans: Vec::new(), walks: Default::default(), choice: None, net: Some(Box::new(net)), book: None, named: None, walls, conquest: None, unciv: None, tall: None, sharp: false, tall_real: false }
+        Self { advisors, variant, genome: None, humans: Vec::new(), walks: Default::default(), choice: None, net: Some(Box::new(net)), book: None, named: None, walls, conquest: None, unciv: None, tall: None, sharp: false, tall_real: false, next: false }
     }
 
     /// The net's part (`Variant::Net`), if any.
@@ -209,6 +214,9 @@ impl ClassicMind {
     }
 
     pub fn variant(&self) -> Variant {
+        if self.next {
+            return Variant::Next;
+        }
         if self.tall_real {
             return Variant::TallReal;
         }
@@ -604,8 +612,11 @@ impl ClassicMind {
         brief.war_open = self.variant.war_open();
         brief.sharp = self.sharp;
         brief.tall_real = self.tall_real;
+        brief.next = self.next;
         // `tall-real` finishes its spaceship by the space plan where the science victory fits the
-        // game (`victory::space_plan`, `ai::tall_real`).
+        // game (`victory::space_plan`, `ai::tall_real`), on every seat; `next` too: the plan on its
+        // tall seats only measured worse (pace against `sharp`, offsets 200+201: 65.7 % against
+        // 70.5 % on every seat).
         let space_plan = self.tall_real && crate::ai::tall_real::science_game(observation, rules);
         brief.space_finish |= space_plan;
         brief.met_eras = observation.view.met_eras();
@@ -644,6 +655,10 @@ impl ClassicMind {
                 prices.city_cap = Some(target);
                 brief.tall_cities = Some(target);
                 brief.tall_sites = crate::ai::tall::turn_site_bonuses(observation, rules, brief.tall, prices.rounds_left);
+            }
+            // `next`: an alliance's delegates toward the World Leader vote count in its gifts.
+            if self.next {
+                prices.delegate = crate::ai::city_states::delegate_worth(observation);
             }
             if self.variant.sea_work() {
                 brief.sea_jobs = crate::ai::sea_work::sea_values(observation, &brief, rules, &prices);
@@ -886,5 +901,17 @@ mod sharp_tests {
         let flagged: Vec<Variant> = Variant::ALL.into_iter().filter(|v| v.tall_real()).collect();
         assert_eq!(flagged, [Variant::TallReal]);
         assert_eq!(Variant::from_name("tall-real"), cfg!(feature = "experimental-ai").then_some(Variant::TallReal));
+    }
+
+    /// `next` is `tall-real` with the review's fixes: the mind plays `Standard` with the three
+    /// flags and names itself `next`; `tall-real` and `sharp` do not carry its flag.
+    #[test]
+    fn next_plays_tall_real_with_its_flag() {
+        let mind = ClassicMind::new(Variant::Next);
+        assert_eq!((mind.variant, mind.sharp, mind.tall_real, mind.next, mind.variant()), (Variant::Standard, true, true, true, Variant::Next));
+        assert!(!ClassicMind::new(Variant::TallReal).next && !ClassicMind::new(Variant::Sharp).next);
+        let flagged: Vec<Variant> = Variant::ALL.into_iter().filter(|v| v.next()).collect();
+        assert_eq!(flagged, [Variant::Next]);
+        assert_eq!(Variant::from_name("next"), cfg!(feature = "experimental-ai").then_some(Variant::Next));
     }
 }

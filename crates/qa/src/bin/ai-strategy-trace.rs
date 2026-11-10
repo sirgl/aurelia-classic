@@ -11,7 +11,8 @@
 //! --map SCRIPT         the map script (default pangaea)
 //! --size NAME          the map size (default small)
 //! --seed N             the seed (default 1)
-//! --seating even|odd   which seats are the candidate's (default even)
+//! --seating even|odd|all  which seats are the candidate's (default even; all: the bench's
+//!                      solo game, every seat the candidate)
 //! --candidate NAME     the variant on the candidate seats (default strategy-net)
 //! --baseline NAME      the variant on the others (default standard)
 //! --only KINDS         the kinds of lines printed, comma-separated: review,
@@ -52,7 +53,8 @@ fn run() -> Result<(), String> {
                 seating = match value()?.as_str() {
                     "even" => Seating::Even,
                     "odd" => Seating::Odd,
-                    other => return Err(format!("--seating {other}: even or odd")),
+                    "all" => Seating::All,
+                    other => return Err(format!("--seating {other}: even, odd or all")),
                 }
             }
             "--candidate" => candidate = value()?,

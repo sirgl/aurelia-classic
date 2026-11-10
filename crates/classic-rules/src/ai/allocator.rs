@@ -399,6 +399,9 @@ impl Allocator {
                 Reason::GiftGold => gifts += 1,
                 _ => hurries += 1,
             }
+            if let Command::GiftGold { city_state, gold, .. } = offer.command {
+                crate::ai::strategy_net::trace::gift(obs, city_state, gold, offer.value as i64);
+            }
             out.push(Decision::act(offer.actor, reason, offer.command));
         }
         out

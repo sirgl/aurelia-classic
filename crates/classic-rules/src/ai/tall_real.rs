@@ -68,10 +68,58 @@ pub fn science_game(obs: &AIObservation<'_>, rules: &CompiledRuleset) -> bool {
         && i64::from(obs.victories.max_rounds) * 100 >= speed * EARLIEST_VICTORY_PERCENT
 }
 
-/// Whether a seat of `tall-real` plays the real tall style now: the held style is tall (index 0)
-/// and the science victory fits the game.
-pub fn plays(obs: &AIObservation<'_>, rules: &CompiledRuleset, style_pick: usize) -> bool {
-    style_pick == 0 && science_game(obs, rules)
+/// Whether a seat of `tall-real` plays the real tall style now: the held style is tall and the
+/// science victory fits the game; `next` passes `fits`, its own judgment held from the style's
+/// lock (`science_fits`; None before the lock: not yet).
+pub fn plays(obs: &AIObservation<'_>, rules: &CompiledRuleset, style_pick: usize, fits: Option<Option<bool>>) -> bool {
+    style_pick == crate::ai::strategy_net::weights::STYLE_TALL
+        && match fits {
+            Some(held) => held == Some(true),
+            None => science_game(obs, rules),
+        }
+}
+
+// ---- `next` (`TurnBrief::next`): when the science victory fits, from the rules ----
+
+/// Beakers of `base` (the rules' costs) at the game's costs now: the speed's and the map's
+/// research percents and the per-city term of `cities` non-puppet cities.
+fn at_game_cost(obs: &AIObservation<'_>, base: i64, cities: u32, research_per_city: i64) -> i64 {
+    let size = crate::world::size::WorldSize::of(crate::world::facts::TileFacts::dimensions(&obs.view));
+    let world = i64::from(crate::classic::world_size::research_percent(size));
+    let speed = i64::from(obs.speed.science_percent);
+    base * speed / 100 * world / 100 * (10_000 + research_per_city * (i64::from(cities.max(1)) - 1)) / 10_000
+}
+
+/// `next`: the beakers of the technologies the spaceship still needs — those its victory's
+/// projects and its parts require, with their prerequisites (`grand_strategy::remaining_beakers`;
+/// `victory_beakers` counts every project's technology) — at the game's costs now (no discount
+/// for the technologies others know: the cautious bound).
+fn victory_need(obs: &AIObservation<'_>, rules: &CompiledRuleset, cities: u32, research_per_city: i64) -> i64 {
+    let base = i64::try_from(crate::ai::grand_strategy::remaining_beakers(obs, rules)).unwrap_or(i64::MAX / 1_000_000);
+    at_game_cost(obs, base, cities, research_per_city)
+}
+
+/// `next`: the science victory fits the seat's game — it is on, the rules have its parts, and
+/// the empire's science, growing as it grows on the bench (`SCIENCE_GROWTH_POWER`, `rounds_to`),
+/// gathers the beakers of the spaceship's technologies (`victory_need`) with the rounds the ship
+/// takes to build (`grand_strategy::SPACESHIP_ROUNDS` at the speed's pace) left before the end.
+/// Read from the rules' costs and the empire's science, not from a share of the game's length.
+/// It is judged once, at the style's lock (`strategy_net::think` keeps it): the power law from
+/// the first rounds' science projects a victory in tens of rounds, and a mid-game projection
+/// misses the late growth of the science buildings (the tuning traces' tall seat that won at
+/// round 313 was projected past the end from round 60 to 230).
+pub fn science_fits(obs: &AIObservation<'_>, rules: &CompiledRuleset, rounds_left: u32) -> bool {
+    let ship = obs.speed.pace_rounds(crate::ai::grand_strategy::SPACESHIP_ROUNDS);
+    if !obs.victories.enabled(VictoryKind::Science) || crate::world::victory::spaceship_parts(rules).is_empty() || rounds_left <= ship {
+        return false;
+    }
+    let size = crate::world::size::WorldSize::of(crate::world::facts::TileFacts::dimensions(&obs.view));
+    let need = victory_need(obs, rules, costed(obs), crate::classic::world_size::tech_cost_per_city(size));
+    let rounds = rounds_to(i64::from(obs.economy.income.science), need, obs.round, rounds_left - ship);
+    if crate::ai::strategy_net::trace::enabled() {
+        crate::ai::strategy_net::trace::push(format!("r{} p{} FIT science {} need {} → {:?} of {} (ship {})", obs.round, obs.player.0, obs.economy.income.science, need, rounds, rounds_left - ship, ship));
+    }
+    rounds.is_some()
 }
 
 /// The cities that raise the research and policy costs: the non-puppet ones.
@@ -200,15 +248,15 @@ fn victory_beakers(obs: &AIObservation<'_>, rules: &CompiledRuleset, cities: u32
         let way = crate::ai::strategy_net::goals::path(rules, &obs.economy.techs, &planned, t);
         planned.extend(way);
     }
-    let base = crate::ai::strategy_net::goals::beakers(rules, &planned, 100);
-    let size = crate::world::size::WorldSize::of(crate::world::facts::TileFacts::dimensions(&obs.view));
-    let world = i64::from(crate::classic::world_size::research_percent(size));
-    let speed = i64::from(obs.speed.science_percent);
-    base * speed / 100 * world / 100 * (10_000 + research_per_city * (i64::from(cities.max(1)) - 1)) / 10_000
+    at_game_cost(obs, crate::ai::strategy_net::goals::beakers(rules, &planned, 100), cities, research_per_city)
 }
 
 impl SizeModel {
-    pub fn of(obs: &AIObservation<'_>, rules: &CompiledRuleset, rounds_left: u32) -> Self {
+    /// The horizon: the power growth's rounds to the victory's technologies; `tall-real` floors
+    /// it at `EARLIEST_VICTORY_PERCENT` of the speed's game and counts every project's
+    /// technology, `next` plays only from the lock on (`science_fits`), needs no floor and counts
+    /// the spaceship's own (`victory_need`).
+    pub fn of(obs: &AIObservation<'_>, rules: &CompiledRuleset, rounds_left: u32, next: bool) -> Self {
         let size = crate::world::size::WorldSize::of(crate::world::facts::TileFacts::dimensions(&obs.view));
         let research_per_city = crate::classic::world_size::tech_cost_per_city(size);
         let policy_per_city = crate::classic::world_size::policy_cost_per_city(size);
@@ -218,11 +266,16 @@ impl SizeModel {
         let per_citizen = (i64::from(obs.economy.income.science.max(0)) * 100 / population.max(1)).max(bare_citizen);
         let pace = obs.speed;
         // The horizon: the science victory's round at the science growing as it does, if sooner.
-        let need = victory_beakers(obs, rules, cities, research_per_city);
-        // Never before `EARLIEST_VICTORY_PERCENT` of the speed's game: the power growth from a
-        // science of a few beakers in the first rounds projects a victory in 40 rounds.
-        let earliest = (i64::from(obs.speed.max_rounds()) * EARLIEST_VICTORY_PERCENT / 100 - i64::from(obs.round)).clamp(0, i64::from(rounds_left)) as u32;
-        let horizon = rounds_to(i64::from(obs.economy.income.science), need, obs.round, rounds_left).unwrap_or(rounds_left).clamp(earliest, rounds_left);
+        let horizon = if next {
+            let need = victory_need(obs, rules, cities, research_per_city);
+            rounds_to(i64::from(obs.economy.income.science), need, obs.round, rounds_left).unwrap_or(rounds_left)
+        } else {
+            let need = victory_beakers(obs, rules, cities, research_per_city);
+            // Never before `EARLIEST_VICTORY_PERCENT` of the speed's game: the power growth from a
+            // science of a few beakers in the first rounds projects a victory in 40 rounds.
+            let earliest = (i64::from(obs.speed.max_rounds()) * EARLIEST_VICTORY_PERCENT / 100 - i64::from(obs.round)).clamp(0, i64::from(rounds_left)) as u32;
+            rounds_to(i64::from(obs.economy.income.science), need, obs.round, rounds_left).unwrap_or(rounds_left).clamp(earliest, rounds_left)
+        };
         let n = obs.own_cities.len().max(1) as i64;
         let surplus = (obs.own_cities.iter().map(|c| i64::from(c.income.food_surplus.max(0))).sum::<i64>() / n).max(1);
         let production = i64::from(obs.speed.production_percent.max(1));
@@ -313,8 +366,8 @@ impl SizeModel {
 
 /// The cities a real tall seat keeps (its puppets beside them): the cities now and the new ones
 /// that pay.
-pub fn city_target(obs: &AIObservation<'_>, rules: &CompiledRuleset, rounds_left: u32) -> u32 {
-    let model = SizeModel::of(obs, rules, rounds_left);
+pub fn city_target(obs: &AIObservation<'_>, rules: &CompiledRuleset, rounds_left: u32, next: bool) -> u32 {
+    let model = SizeModel::of(obs, rules, rounds_left, next);
     let more = model.more();
     if crate::ai::strategy_net::trace::enabled() {
         crate::ai::strategy_net::trace::push(format!(
@@ -371,6 +424,19 @@ mod tests {
             city_unhappiness: 400,
             pace: kernel::rules::speeds::SpeedValues::STANDARD,
         }
+    }
+
+    /// `next`'s fit at the lock (`science_fits`): the power growth from the lock's science
+    /// gathers the classic spaceship's technologies (112 734 beakers at Quick on a small map, the
+    /// tuning traces' need at round 15) before a 330-round game's end with the ship's rounds to
+    /// spare, not before a 198-round game's; a faster start fits sooner.
+    #[test]
+    fn the_lock_judges_the_game_by_its_length_and_the_science() {
+        let ship = 16;
+        let need = 112_734;
+        assert!(rounds_to(6, need, 15, 330 - 15 - ship).is_some());
+        assert!(rounds_to(6, need, 15, 198 - 15 - ship).is_none());
+        assert!(rounds_to(9, need, 15, 330) < rounds_to(6, need, 15, 330));
     }
 
     /// A young city grows by the rules' thresholds: more citizen-rounds the longer it lives and

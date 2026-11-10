@@ -684,6 +684,12 @@ pub enum Variant {
     /// first and finishes its spaceship's parts by the space plan. The mind plays `Standard` in
     /// every other switch (`ClassicMind::new`). A candidate, `experimental-ai` only.
     TallReal,
+    /// `TallReal` with the fixes of its review and of `Sharp`'s (`TurnBrief::next`, `ai::tall_real`):
+    /// when the science victory fits a seat's game is derived from the beakers its technologies
+    /// need against what the empire earns by the end; the tall play and the space plan are the
+    /// tall seats' only. The mind plays `Standard` in every other switch (`ClassicMind::new`). A
+    /// candidate, `experimental-ai` only.
+    Next,
 }
 
 /// The net's base: the expert the end-to-end net learns from and the mind it
@@ -704,7 +710,7 @@ const NUDGED_CANDIDATES: u32 = 40;
 
 impl Variant {
     /// The game's AI first.
-    pub const ALL: [Variant; 137] = [
+    pub const ALL: [Variant; 138] = [
         Variant::Standard,
         Variant::PreCamps,
         Variant::PreWorkers,
@@ -842,6 +848,7 @@ impl Variant {
         Variant::WarOpen,
         Variant::Sharp,
         Variant::TallReal,
+        Variant::Next,
     ];
 
     pub fn name(self) -> &'static str {
@@ -965,6 +972,7 @@ impl Variant {
             Variant::WarOpen => "war-open",
             Variant::Sharp => "sharp",
             Variant::TallReal => "tall-real",
+            Variant::Next => "next",
             Variant::ArmyFit => "army-fit",
             Variant::Camps => "camps",
             Variant::ArmyCamps => "army-camps",
@@ -998,7 +1006,7 @@ impl Variant {
         cfg!(feature = "experimental-ai")
             || !matches!(
                 self,
-                Variant::Net | Variant::UnitNet | Variant::Hybrid | Variant::SiteNet | Variant::ChoiceNet | Variant::ChoiceNetProduction | Variant::ChoiceNetResearch | Variant::StandardScripted | Variant::PreCsGifts | Variant::Sharp | Variant::TallReal
+                Variant::Net | Variant::UnitNet | Variant::Hybrid | Variant::SiteNet | Variant::ChoiceNet | Variant::ChoiceNetProduction | Variant::ChoiceNetResearch | Variant::StandardScripted | Variant::PreCsGifts | Variant::Sharp | Variant::TallReal | Variant::Next
             )
     }
 
@@ -1139,6 +1147,12 @@ impl Variant {
     /// `TallReal` alone, which the mind plays as `Sharp` (`ClassicMind::new`).
     pub fn tall_real(self) -> bool {
         self == Variant::TallReal
+    }
+
+    /// `TallReal` with the review's fixes (`TurnBrief::next`): `Next` alone, which the mind plays
+    /// as `TallReal` with the flag (`ClassicMind::new`).
+    pub fn next(self) -> bool {
+        self == Variant::Next
     }
 
     /// Its research, policies and choice among the allocator's best orders are the
