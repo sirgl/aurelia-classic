@@ -79,9 +79,21 @@ Tuning seeds 200–209 only, 800 games each (`war-pays` against `standard`, Quic
 
 Pace on offset 200 (the frozen build): head to head 200 games 51.0 % (48.5–53.5), science per turn at round 264 335.3 against 339.4 (−1.2 %); solo 100 games 1.65 wars, 0.54 captured cities and 4 capitals lost per game / in total, 161 of 165 wars by peace deal, 3 science victories by round 330 (`standard`: 2 in 100). A better share than the 49.6 % cannot be told from noise: the standard error of a ten-offset mean is about 0.8 points.
 
-## 6. Not done
+## 6. Acceptance (offsets 250–259, frozen at `ef9501a`, run once) [measured]
 
-- The gates ask 50 % with a lower bound of 47 % at 800 games; every build of the lane lies at 49–50 %, so the point estimate decides about half the time.
+| gate | command | result | |
+|---|---|---|---|
+| points share ≥ 50 % and CI low ≥ 47 % | `ai-tournament --candidate war-pays --suite standard --speed quick --repeat 10 --seed-offset 250 --jobs 4` (800 games) | **50.1 % (49.4–50.7)**; the ten offsets 50.0 / 46.2 / 51.2 / 48.8 / 50.0 / 50.0 / 50.6 / 51.2 / 51.2 / 51.2 %; `war-pays` declared 68 wars and captured 26 cities in the ten runs (`standard`: 46 wars) | passed (no difference shown) |
+| pace head to head: share ≥ 50 % (point), science per turn at the last checkpoint ≥ −3 % | `ai-tournament --candidate war-pays --suite pace --speed quick --seed-offset 250 --jobs 4` (200 games) | **53.0 % (48.5–57.5)**, paired score difference +7.2 (−14.4…+30.5); science per turn 588.6 against 583.5 at the end (+0.9 %), 324.7 against 322.6 at round 264 (+0.7 %); `war-pays` captured 43 cities and lost 24, declared 113 wars (`standard`: 8, 23, 70) | passed |
+| solo pace: wars ≥ 1 a game, captured ≥ 0.5 a game, capitals captured > 0 | `ai-tournament --solo war-pays --suite pace --speed quick --seed-offset 250 --jobs 4` (100 games) | wars **1.54** (154), captured **0.44** (44), capitals lost **0**; 151 of 154 wars by deal; 0 science victories | **failed** (two of three) |
+
+The solo gate fails by the selectivity this lane was asked for: with only the wars the odds rule admits, 100 games of five `war-pays` seats declare 154 wars (`war-open`: 368 on offsets 220) and take 44 cities (100) with no capital among them. The tuning offset 200 gave 54 and 4 with the same build, so the margin of 0.54 over 0.5 was inside the noise of a hundred games (a Poisson count of 50 has a standard deviation of 7). The honest result of the lane: **wars cannot pay until operations take cities more often than 29 % of the time or lose fewer units; the most selective version that keeps the share at 50 % wages about a tenth of a war per standard-suite game and takes 0.44 cities per solo pace game, which is below the pre-registered 0.5.** The gate is not waived and the build is not retuned on the acceptance seeds.
+
+`standard` and `war-open` unchanged (the frozen binary): `ai-tournament --solo standard --suite standard --speed quick --jobs 4` → result hash `22e61a7bed77b7d5`; `ai-tournament --solo war-open --suite pace --speed quick --seed-offset 220 --jobs 4` → `8f9edd9097d2fe4d`.
+
+## 7. Not done
+
+- The gates ask 50 % with a lower bound of 47 % at 800 games; every build of the lane lies at 49–50 %, so the point estimate decides about half the time (it landed at 50.1 %).
 - The loss constant was not iterated: lowering it to the 52 % measured on the frozen build admits more operations and changes the build that was tuned.
 - Operations that take a city 29 % of the time still lose 6–7 units each; the first iteration measured the expected loss of an operation at about 100 points against a capture worth 20–60, and a capture rate of 29 % does not close that gap. Wars cannot pay until the operations take cities more often, or lose fewer units: tactics, which this lane does not touch.
 - Not measured: duels, Standard speed, a human opponent.
