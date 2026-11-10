@@ -126,6 +126,7 @@ pub mod taste;
 pub mod tactical;
 pub mod tactics;
 pub mod tall;
+pub mod tall_real;
 pub mod trace;
 pub mod value;
 pub mod variant;

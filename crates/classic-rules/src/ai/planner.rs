@@ -370,6 +370,8 @@ pub struct TurnBrief {
     pub war_open: bool,
     /// Its strategy net chooses sharply and sees more (`Variant::sharp`, `strategy_net::sharp`).
     pub sharp: bool,
+    /// Its tall style reaches for the science victory (`Variant::tall_real`, `ai::tall_real`).
+    pub tall_real: bool,
     /// The tall play the variant carries (`ai::tall`, `Variant::tall`), the
     /// cities it keeps and what a site meeting a science building's condition
     /// adds (`tall::turn_site_bonuses`); Off, None and empty for the others.
@@ -494,6 +496,7 @@ impl TurnBrief {
             fog_march: false,
             war_open: false,
             sharp: false,
+            tall_real: false,
             tall: crate::ai::tall::Tall::Off,
             tall_cities: None,
             tall_sites: Vec::new(),

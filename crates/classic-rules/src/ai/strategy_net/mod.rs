@@ -70,6 +70,9 @@ pub struct Intent {
     /// The intent of `sharp` (`Net::sharp`): its prices follow the held choice and its cell runs on
     /// its own scale (`sharp::rows`, `CellPrices::sharp`).
     pub sharp: bool,
+    /// `tall-real`'s tall play (`ai::tall_real::plays`): the held style tall where the science
+    /// victory fits the game; its aim is science and its cities the rules' size model's.
+    pub tall_real: bool,
 }
 
 /// Which net thinks: `standard`'s, with `war-open`'s window and terms (`open`), with `sharp`'s
@@ -263,7 +266,7 @@ pub fn intent_net(features: &[Milli; fe::N], held: Held, cities: u32, rounds_lef
     }
     let h = (h / ONE).clamp(weights::HORIZON_MIN, weights::HORIZON_MAX);
     let horizon = (h * i64::from(pace.max(1)) / 100).clamp(1, i64::from(rounds_left.max(1))) as u32;
-    Intent { concepts, style, aim, posture, style_pick, aim_pick, posture_pick, more_cities: more_cities as u32, horizon, locked: held.lock.is_some(), sharp: net.sharp }
+    Intent { concepts, style, aim, posture, style_pick, aim_pick, posture_pick, more_cities: more_cities as u32, horizon, locked: held.lock.is_some(), sharp: net.sharp, tall_real: false }
 }
 
 /// The 13 rows of the price layer: the 11 shares and the 2 gates.
@@ -707,6 +710,14 @@ pub fn think(obs: &AIObservation<'_>, brief: &crate::ai::planner::TurnBrief, sta
     if let Some(from) = memory.held.style.filter(|s| *s != intent.style_pick) {
         trace::style_change(obs.player.0, round, from, &intent);
     }
+    // `tall-real`: a tall seat where the science victory fits the game aims at it
+    // (`ai::tall_real`); its city count is the rules' size model's.
+    if brief.tall_real && crate::ai::tall_real::plays(obs, rules, intent.style_pick) {
+        intent.tall_real = true;
+        intent.aim_pick = 0;
+        let target = crate::ai::tall_real::city_target(obs, rules, prices.rounds_left);
+        intent.more_cities = target.saturating_sub(cities);
+    }
     memory.held = Held { style: Some(intent.style_pick), aim: Some(intent.aim_pick), posture: Some(intent.posture_pick), lock };
     let mut mult = price_mult(&intent);
     let at_war = situation[fe::AT_WAR] > 0;
@@ -738,7 +749,7 @@ pub fn think(obs: &AIObservation<'_>, brief: &crate::ai::planner::TurnBrief, sta
     // The rules' city model is the ceiling (`brief.tall_cities`: the count with
     // the most science per research cost); wide and conquest play may pass it.
     let mut city_target = cities + intent.more_cities;
-    if let Some(model) = brief.tall_cities {
+    if let Some(model) = brief.tall_cities.filter(|_| !intent.tall_real) {
         let allowance = (intent.style[1] * weights::CITY_CEILING_WIDE + intent.style[2] * weights::CITY_CEILING_CONQUEST) / ONE / ONE;
         city_target = city_target.min(model + allowance as u32).max(cities);
     }

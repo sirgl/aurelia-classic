@@ -41,7 +41,7 @@ pub fn take() -> Vec<String> {
     LINES.with(|l| std::mem::take(&mut *l.borrow_mut()))
 }
 
-fn push(line: String) {
+pub fn push(line: String) {
     LINES.with(|l| l.borrow_mut().push(line));
 }
 

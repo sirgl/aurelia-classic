@@ -464,9 +464,19 @@ impl BenchRules for ClassicBench {
         let victory = game.view().auth.module().victory();
         let prerequisites = classic_rules::ai::victory::prerequisite_projects(rules);
         let parts = classic_rules::world::victory::spaceship_parts(rules);
+        let kinds = classic_rules::ai::victory::part_kinds(rules);
+        let auth = game.view().auth;
+        let built = parts
+            .iter()
+            .map(|(p, needed)| {
+                let walking = auth.units().iter_cores().filter(|u| u.owner == player && kinds.iter().any(|(k, q, _)| *k == u.kind && q == p)).count() as u32;
+                (u32::from(victory.project_count(player, *p)) + walking).min(u32::from(*needed))
+            })
+            .sum();
         crate::bench::play::SpaceProgress {
             project_done: !prerequisites.is_empty() && prerequisites.iter().all(|p| victory.project_count(player, *p) > 0),
             parts: parts.iter().map(|(p, needed)| u32::from(victory.project_count(player, *p).min(*needed))).sum(),
+            built,
         }
     }
 

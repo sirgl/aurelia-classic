@@ -94,6 +94,10 @@ pub struct Pace {
     /// before read none).
     #[serde(default)]
     pub parts: Vec<u32>,
+    /// The most parts the nation had built at once, installed or not (reports saved before
+    /// read 0): a ship built whole that the game did not end with was not installed.
+    #[serde(default)]
+    pub built: u32,
 }
 
 impl Pace {
@@ -128,6 +132,7 @@ impl Pace {
         while self.parts.len() < space.parts as usize {
             self.parts.push(round);
         }
+        self.built = self.built.max(space.built);
     }
 }
 
@@ -138,6 +143,8 @@ pub struct SpaceProgress {
     pub project_done: bool,
     /// Parts installed.
     pub parts: u32,
+    /// Parts installed and part units alive (built, not installed), at most the ship's.
+    pub built: u32,
 }
 
 /// What a nation won and lost in fights (the commands its module

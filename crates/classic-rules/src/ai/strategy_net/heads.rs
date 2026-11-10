@@ -275,6 +275,17 @@ pub fn choose_policy(model: &Model, rules: &CompiledRuleset, plan: &Plan, base: 
     }
     let branch_of = |p: PolicyId| rules.module.policies.get(usize::from(p.0)).and_then(|d| d.branch);
     let is_ideology = |b: PolicyBranchId| rules.module.policy_branches.get(usize::from(b.0)).is_some_and(|d| d.kind == crate::classic::content::PolicyBranchKind::Ideology);
+    // `tall-real` (`Intent::tall_real`): the science branch (a normal branch whose largest
+    // character is science), once open, is taken whole before anything else — the tenets and the
+    // other branches too: its percents multiply every city's science (the book's order,
+    // classic/docs/ai-science-audit.md).
+    if plan.intent.tall_real {
+        let science = |b: PolicyBranchId| super::branches::is_normal(rules, b) && super::branches::dominant(&super::branches::character(rules, b)) == Some(super::weights::branch::ch::SCIENCE);
+        let pick = culture.adoptable.iter().copied().filter(|p| branch_of(*p).is_some_and(science)).max_by_key(|p| (worth(*p), std::cmp::Reverse(p.0)));
+        if let Some(policy) = pick {
+            return Some(PolicyChoice::Adopt(policy));
+        }
+    }
     // Started branches: the best adoptable policy, valued by the branch's rest.
     let mut started: Vec<(Milli, i64, PolicyId)> = Vec::new();
     let mut branches: Vec<PolicyBranchId> = culture.adoptable.iter().filter_map(|p| branch_of(*p)).collect();

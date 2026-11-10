@@ -677,6 +677,13 @@ pub enum Variant {
     /// score's trend and a rival running away. The mind plays `Standard` in every other switch
     /// (`ClassicMind::new`). A candidate, `experimental-ai` only.
     Sharp,
+    /// `Sharp` whose tall style is a way of playing that reaches the science victory
+    /// (`TurnBrief::tall_real`, `ai::tall_real`): where the science victory fits the game's
+    /// length, a tall seat keeps the cities the rules' costs and yields make worth it, aims at the
+    /// science victory, saves its culture for the science branch, orders its science buildings
+    /// first and finishes its spaceship's parts by the space plan. The mind plays `Standard` in
+    /// every other switch (`ClassicMind::new`). A candidate, `experimental-ai` only.
+    TallReal,
 }
 
 /// The net's base: the expert the end-to-end net learns from and the mind it
@@ -697,7 +704,7 @@ const NUDGED_CANDIDATES: u32 = 40;
 
 impl Variant {
     /// The game's AI first.
-    pub const ALL: [Variant; 136] = [
+    pub const ALL: [Variant; 137] = [
         Variant::Standard,
         Variant::PreCamps,
         Variant::PreWorkers,
@@ -834,6 +841,7 @@ impl Variant {
         Variant::PreCsGifts,
         Variant::WarOpen,
         Variant::Sharp,
+        Variant::TallReal,
     ];
 
     pub fn name(self) -> &'static str {
@@ -956,6 +964,7 @@ impl Variant {
             Variant::PreCsGifts => "pre-cs-gifts",
             Variant::WarOpen => "war-open",
             Variant::Sharp => "sharp",
+            Variant::TallReal => "tall-real",
             Variant::ArmyFit => "army-fit",
             Variant::Camps => "camps",
             Variant::ArmyCamps => "army-camps",
@@ -989,7 +998,7 @@ impl Variant {
         cfg!(feature = "experimental-ai")
             || !matches!(
                 self,
-                Variant::Net | Variant::UnitNet | Variant::Hybrid | Variant::SiteNet | Variant::ChoiceNet | Variant::ChoiceNetProduction | Variant::ChoiceNetResearch | Variant::StandardScripted | Variant::PreCsGifts | Variant::Sharp
+                Variant::Net | Variant::UnitNet | Variant::Hybrid | Variant::SiteNet | Variant::ChoiceNet | Variant::ChoiceNetProduction | Variant::ChoiceNetResearch | Variant::StandardScripted | Variant::PreCsGifts | Variant::Sharp | Variant::TallReal
             )
     }
 
@@ -1124,6 +1133,12 @@ impl Variant {
     /// mind plays as `Standard` in every other switch (`ClassicMind::new`).
     pub fn sharp(self) -> bool {
         self == Variant::Sharp
+    }
+
+    /// Its tall style reaches for the science victory (`TurnBrief::tall_real`, `ai::tall_real`):
+    /// `TallReal` alone, which the mind plays as `Sharp` (`ClassicMind::new`).
+    pub fn tall_real(self) -> bool {
+        self == Variant::TallReal
     }
 
     /// Its research, policies and choice among the allocator's best orders are the

@@ -1093,3 +1093,51 @@ fn sharp_counts_the_food_left_in_the_store() {
     let end = CellPrices::of(&Base { rounds_left: 3, ..base() }, &[1000; pd::N]);
     assert!(food_price(&m, &plan, &end.scaled(true), 3) <= food_price(&m, &plan, &end, 3));
 }
+
+// ---- tall-real (`ai::tall_real`) ----
+
+/// `tall-real`: once the science branch is open, its policies go before an ideology's tenets
+/// (the book's order: its percents multiply every city's science).
+#[test]
+fn tall_real_takes_the_science_branch_whole_before_the_tenets() {
+    let rules = classic();
+    let map = grassland_capital(&rules);
+    let science = branch(&rules, "core:policy/rationalism");
+    let ideology = branch(&rules, "core:policy/freedom");
+    let mut m = model(&rules, &map, 8, &start_techs(&rules), 4);
+    for b in [science, ideology] {
+        m.branches.push(b);
+        if let Some(opener) = rules.module.policy_branches[b.0 as usize].opener {
+            m.policies.push(opener);
+        }
+    }
+    let first_row = |b: PolicyBranchId| -> Vec<classic_rules::ids::PolicyId> {
+        rules
+            .module
+            .policies
+            .iter()
+            .enumerate()
+            .filter(|(_, d)| d.branch == Some(b) && d.prerequisites.is_empty() && d.role != classic_rules::rules::content::PolicyRole::Opener && d.role != classic_rules::rules::content::PolicyRole::Finisher)
+            .map(|(i, _)| classic_rules::ids::PolicyId(i as u16))
+            .collect()
+    };
+    let rationalism = first_row(science);
+    let tenets = first_row(ideology);
+    assert!(!rationalism.is_empty() && !tenets.is_empty());
+    let mut p = plan(&rules, &great_land_no_room(), &m);
+    p.intent.tall_real = true;
+    let culture = Culture { adoptable: tenets.iter().chain(&rationalism).copied().collect(), ..Culture::default() };
+    match choose_policy(&m, &rules, &p, &base(), &culture) {
+        Some(PolicyChoice::Adopt(policy)) => assert!(rationalism.contains(&policy), "adopted {}", rules.module.policies[policy.0 as usize].key),
+        _ => panic!("no adoption"),
+    }
+}
+
+/// `tall-real`'s policy cost weight is the science branch's percents, read from the rules: the
+/// classic science branch's opener (+10 % while happy) and its +17 % in a city with a university.
+#[test]
+fn tall_real_weighs_the_policy_cost_by_the_science_branch() {
+    let rules = classic();
+    let share = classic_rules::ai::tall_real::policy_share(&rules);
+    assert_eq!(share, 27 * 1000 / 127, "{share}");
+}
