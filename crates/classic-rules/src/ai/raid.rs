@@ -446,7 +446,7 @@ fn form(brief: &TurnBrief, state: &mut AiState, rules: &CompiledRuleset, routes:
     let mut chosen = None;
     for (_, target, _, declares) in found_cases.into_iter().take(MAX_WAY_CHECKS) {
         let Some(home) = brief.nearest_city(brief.dims, target).map(|c| c.tile) else { continue };
-        let Some(stage) = routes.stage(walker, home, target) else { continue };
+        let Some(stage) = routes.stage(walker, home, target, crate::ai::operations::STAGING_DISTANCE, crate::ai::operations::BORDER_REACH) else { continue };
         let gather = group
             .iter()
             .map(|u| brief.dims.distance(u.tile, home).unwrap_or(0).max(0) as u32 / u32::from(rules.units[u.kind.0 as usize].movement.max(1)))

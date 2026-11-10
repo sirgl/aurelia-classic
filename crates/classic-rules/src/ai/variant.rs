@@ -691,6 +691,9 @@ pub enum Variant {
     /// (classic/docs/ai-war-muster.md). The mind plays `WarPays` in every other switch
     /// (`ClassicMind::new`). A bench-only candidate, `experimental-ai` only.
     WarMuster,
+    /// `WarMuster` with the press / hold / withdraw call at the walls made from what the seat sees
+    /// (`TurnBrief::siege_call`, `siege_walls::call`). A bench-only candidate, `experimental-ai` only.
+    SiegeCall,
 }
 
 /// The net's base: the expert the end-to-end net learns from and the mind it
@@ -711,7 +714,7 @@ const NUDGED_CANDIDATES: u32 = 40;
 
 impl Variant {
     /// The game's AI first.
-    pub const ALL: [Variant; 139] = [
+    pub const ALL: [Variant; 140] = [
         Variant::Standard,
         Variant::PreCamps,
         Variant::PreWorkers,
@@ -851,6 +854,7 @@ impl Variant {
         Variant::WarPays,
         Variant::TacticianFit,
         Variant::WarMuster,
+        Variant::SiegeCall,
     ];
 
     pub fn name(self) -> &'static str {
@@ -976,6 +980,7 @@ impl Variant {
             Variant::WarPays => "war-pays",
             Variant::TacticianFit => "tactician-fit",
             Variant::WarMuster => "war-muster",
+            Variant::SiegeCall => "siege-call",
             Variant::ArmyFit => "army-fit",
             Variant::Camps => "camps",
             Variant::ArmyCamps => "army-camps",
@@ -1009,7 +1014,7 @@ impl Variant {
         cfg!(feature = "experimental-ai")
             || !matches!(
                 self,
-                Variant::Net | Variant::UnitNet | Variant::Hybrid | Variant::SiteNet | Variant::ChoiceNet | Variant::ChoiceNetProduction | Variant::ChoiceNetResearch | Variant::StandardScripted | Variant::PreCsGifts | Variant::Sharp | Variant::TacticianFit | Variant::WarMuster
+                Variant::Net | Variant::UnitNet | Variant::Hybrid | Variant::SiteNet | Variant::ChoiceNet | Variant::ChoiceNetProduction | Variant::ChoiceNetResearch | Variant::StandardScripted | Variant::PreCsGifts | Variant::Sharp | Variant::TacticianFit | Variant::WarMuster | Variant::SiegeCall
             )
     }
 
@@ -1162,6 +1167,12 @@ impl Variant {
     /// in every other switch (`ClassicMind::new`).
     pub fn war_muster(self) -> bool {
         self == Variant::WarMuster
+    }
+
+    /// The call at the walls (`TurnBrief::siege_call`): `SiegeCall`, which the mind plays as `WarMuster`
+    /// in every other switch (`ClassicMind::new`).
+    pub fn siege_call(self) -> bool {
+        self == Variant::SiegeCall
     }
 
     /// Its research, policies and choice among the allocator's best orders are the

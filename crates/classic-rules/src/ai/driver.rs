@@ -82,6 +82,8 @@ pub struct ClassicMind {
     fit: bool,
     /// `Variant::WarMuster`: `pays` with the muster fix (`TurnBrief::muster_fix`), scripted tactics.
     muster: bool,
+    /// `Variant::SiegeCall`: `muster` with the call at the walls (`TurnBrief::siege_call`).
+    call: bool,
 }
 
 /// The environment variable that makes the game's AI another variant
@@ -116,7 +118,9 @@ impl ClassicMind {
         let fit = variant.tactician_fit();
         let variant = if fit { Variant::WarPays } else { variant };
         // `war-muster` is `WarPays` in every switch but the muster fix (`TurnBrief::muster_fix`).
-        let muster = variant.war_muster();
+        // `siege-call` is `WarMuster` with the call at the walls (`TurnBrief::siege_call`).
+        let call = variant.siege_call();
+        let muster = variant.war_muster() || call;
         let variant = if muster { Variant::WarPays } else { variant };
         // `war-pays` is `WarOpen` in every switch but its own (`TurnBrief::war_pays`).
         let pays = variant.war_pays();
@@ -138,7 +142,7 @@ impl ClassicMind {
         let walls = (book.is_some() || variant.siege_walls()).then(|| Box::new(crate::ai::siege_walls::SiegeWalls::new().joined(variant.siege_join())));
         let unciv = variant.unciv().any().then(|| Box::new(crate::ai::unciv::UncivMind::new(variant.unciv())));
         let variant = if named.is_some() { Variant::PrePuppet } else { variant };
-        Self { advisors, variant, genome: None, humans: Vec::new(), walks: Default::default(), choice: None, #[cfg(feature = "experimental-ai")] net, book, named, walls, conquest: None, unciv, tall: None, sharp, pays, fit, muster }
+        Self { advisors, variant, genome: None, humans: Vec::new(), walks: Default::default(), choice: None, #[cfg(feature = "experimental-ai")] net, book, named, walls, conquest: None, unciv, tall: None, sharp, pays, fit, muster, call }
     }
 
     /// A league book that may play on another base (`book_on`): a duel book
@@ -181,7 +185,7 @@ impl ClassicMind {
         advisors.register(crate::classic::ClassicSystem::Diplomacy, Box::new(diplomacy));
         // The net plays on `NET_BASE`: its siege too.
         let walls = variant.siege_walls().then(|| Box::new(crate::ai::siege_walls::SiegeWalls::new().joined(variant.siege_join())));
-        Self { advisors, variant, genome: None, humans: Vec::new(), walks: Default::default(), choice: None, net: Some(Box::new(net)), book: None, named: None, walls, conquest: None, unciv: None, tall: None, sharp: false, pays: false, fit: false, muster: false }
+        Self { advisors, variant, genome: None, humans: Vec::new(), walks: Default::default(), choice: None, net: Some(Box::new(net)), book: None, named: None, walls, conquest: None, unciv: None, tall: None, sharp: false, pays: false, fit: false, muster: false, call: false }
     }
 
     /// The net's part (`Variant::Net`), if any.
@@ -224,6 +228,9 @@ impl ClassicMind {
         }
         if self.fit {
             return Variant::TacticianFit;
+        }
+        if self.call {
+            return Variant::SiegeCall;
         }
         if self.muster {
             return Variant::WarMuster;
@@ -634,6 +641,7 @@ impl ClassicMind {
         brief.tactician_fit = self.fit;
         brief.muster_fix = self.fit || self.muster;
         brief.war_muster = self.muster;
+        brief.siege_call = if self.call { crate::ai::planner::CallFixes::from_env() } else { crate::ai::planner::CallFixes::NONE };
         brief.met_eras = observation.view.met_eras();
         if brief.war_open {
             brief.scores = observation.view.race().scores;

@@ -298,6 +298,11 @@ pub struct Arsenal {
     pub melee: Option<UnitKindId>,
     pub ranged: Option<UnitKindId>,
     pub siege: Option<UnitKindId>,
+    /// `siege-call`: the distance slots are ranged units while they can bring the city down (`CallFixes::ranged`).
+    pub ranged_first: bool,
+    /// Most escorts an army takes against the enemy's field power: `MAX_ESCORTS`; `siege-call` twice that
+    /// (`CallFixes::threat`: the units that reach the target during the siege are more than those near it now).
+    pub escort_cap: u8,
 }
 
 impl Arsenal {
@@ -306,6 +311,8 @@ impl Arsenal {
             melee: best_kind(brief, rules, ArmyRole::Melee),
             ranged: best_kind(brief, rules, ArmyRole::Ranged),
             siege: best_kind(brief, rules, ArmyRole::Siege),
+            ranged_first: brief.siege_call.ranged,
+            escort_cap: if brief.siege_call.threat { 2 * MAX_ESCORTS } else { MAX_ESCORTS },
         }
     }
 
@@ -320,6 +327,12 @@ impl Arsenal {
 
 fn best_kind(brief: &TurnBrief, rules: &CompiledRuleset, role: ArmyRole) -> Option<UnitKindId> {
     let mut best: Option<(u16, u32, UnitKindId)> = None;
+    // `siege-call` (`CallFixes::melee`): a melee kind by the fighting power it buys per hammer. Two units fight
+    // as the squares of their strengths (the exchange of blows each side lands scales with the strength ratio
+    // and each side's hit points drain in proportion), so strength squared over production cost ranks the
+    // kinds; the strongest kind alone (the game's choice) buys a spearman for the price of two warriors.
+    let by_cost = brief.siege_call.melee && role == ArmyRole::Melee;
+    let mut best_value = 0u64;
     for index in 0..rules.units.len() {
         let kind = UnitKindId(index as u16);
         if army_role(rules, kind) != Some(role) || !trainable(brief, rules, kind) {
@@ -327,6 +340,14 @@ fn best_kind(brief: &TurnBrief, rules: &CompiledRuleset, role: ArmyRole) -> Opti
         }
         let strength = role_strength(rules, kind, role);
         let cost = rules.units[index].cost;
+        if by_cost {
+            let value = u64::from(strength) * u64::from(strength) * 1000 / u64::from(cost.max(1));
+            if best.is_none() || value > best_value || (value == best_value && strength > best.map_or(0, |b| b.0)) {
+                best = Some((strength, cost, kind));
+                best_value = value;
+            }
+            continue;
+        }
         if best.is_none_or(|(s, c, _)| strength > s || (strength == s && cost < c)) {
             best = Some((strength, cost, kind));
         }
@@ -413,9 +434,19 @@ pub fn composition(rules: &CompiledRuleset, arsenal: &Arsenal, city: &CityEstima
 /// a ranged kind (`TurnBrief::army_fit`: the field fights of the training grounds are won
 /// by armies about half ranged, classic/docs/ai-army.md).
 pub fn composition_by(rules: &CompiledRuleset, arsenal: &Arsenal, city: &CityEstimate, threat: u32, ranged_escorts: bool) -> Option<Composition> {
+    // `siege-call` (`CallFixes::ranged`): ranged units first; siege units only where an army of them cannot bring
+    // the city down within `MAX_ARMY` (the estimate shows ranged units cannot).
+    if arsenal.ranged_first && arsenal.ranged.is_some() && arsenal.siege.is_some() {
+        return composition_with(rules, arsenal, city, threat, ranged_escorts, ArmyRole::Ranged).or_else(|| composition_with(rules, arsenal, city, threat, ranged_escorts, ArmyRole::Siege));
+    }
+    let distance_role = if arsenal.siege.is_some() { ArmyRole::Siege } else { ArmyRole::Ranged };
+    composition_with(rules, arsenal, city, threat, ranged_escorts, distance_role)
+}
+
+/// `composition_by` with the distance role given.
+fn composition_with(rules: &CompiledRuleset, arsenal: &Arsenal, city: &CityEstimate, threat: u32, ranged_escorts: bool, distance_role: ArmyRole) -> Option<Composition> {
     let melee = arsenal.melee?;
     let melee_strike = strike(rules, melee, ArmyRole::Melee, city);
-    let distance_role = if arsenal.siege.is_some() { ArmyRole::Siege } else { ArmyRole::Ranged };
     let distance_strike = arsenal.kind(distance_role).map(|k| strike(rules, k, distance_role, city));
     let mut army = Composition { melee: 2, ..Composition::default() };
     if distance_strike.is_some() {
@@ -439,7 +470,7 @@ pub fn composition_by(rules: &CompiledRuleset, arsenal: &Arsenal, city: &CityEst
     // One escort per strength of our best melee unit in the enemy's field
     // power (strength × health) seen near us.
     let strength = u32::from(rules.units[melee.0 as usize].strength).max(1);
-    let escorts = threat.div_ceil(strength).min(u32::from(MAX_ESCORTS)) as u8;
+    let escorts = threat.div_ceil(strength).min(u32::from(arsenal.escort_cap)) as u8;
     if ranged_escorts && arsenal.ranged.is_some() {
         army.ranged += escorts;
     } else {
@@ -451,7 +482,7 @@ pub fn composition_by(rules: &CompiledRuleset, arsenal: &Arsenal, city: &CityEst
 /// One more unit for `army` as `composition` adds them: a distance unit while they are fewer
 /// than the melee units, else a melee unit.
 fn grow(army: &mut Composition, arsenal: &Arsenal) {
-    let distance_role = if arsenal.siege.is_some() { ArmyRole::Siege } else { ArmyRole::Ranged };
+    let distance_role = if arsenal.siege.is_some() && !(arsenal.ranged_first && arsenal.ranged.is_some()) { ArmyRole::Siege } else { ArmyRole::Ranged };
     if arsenal.kind(distance_role).is_some() && army.ranged + army.siege < army.melee {
         army.add(distance_role);
     } else {
@@ -543,23 +574,23 @@ impl<'a> Routes<'a> {
     /// (`STAGING_DISTANCE`), cheapest first — at peace the enemy's closed
     /// borders stop the walk there. None: the known way ends farther than
     /// `BORDER_REACH` (another landmass, or beyond the search budget).
-    pub fn stage(&mut self, kind: UnitKindId, from: TileId, target: TileId) -> Option<Stage> {
+    pub fn stage(&mut self, kind: UnitKindId, from: TileId, target: TileId, ring: i32, reach: i32) -> Option<Stage> {
         let map = KnownMap::of_kind(&self.view, kind);
         let dims = self.view.dimensions();
         let mut best: Option<(i32, u32, TileId)> = None;
         let mut visit = |tile: TileId, points: u32| {
             let distance = dims.distance(tile, target).unwrap_or(i32::MAX);
-            if distance < STAGING_DISTANCE {
+            if distance < ring {
                 return Visit::Continue;
             }
             if best.is_none_or(|b| (distance, points, tile) < b) {
                 best = Some((distance, points, tile));
             }
-            if distance == STAGING_DISTANCE { Visit::Stop } else { Visit::Continue }
+            if distance == ring { Visit::Stop } else { Visit::Continue }
         };
         let limit = DecisionBudget::default().search();
         explore(&map, from, &Blockers::new(Vec::new()), &mut self.scratch, limit, &mut self.stats, &mut visit);
-        let (distance, points, tile) = best.filter(|(d, _, _)| *d <= BORDER_REACH)?;
+        let (distance, points, tile) = best.filter(|(d, _, _)| *d <= reach)?;
         let moves = self.view.rules().units[kind.0 as usize].movement.max(1) * crate::world::unit::MOVE_DENOMINATOR;
         // The rest is the enemy's land, walked at war: two thirds of a tile
         // a round.
@@ -595,6 +626,7 @@ fn advance(brief: &TurnBrief, state: &mut AiState, rules: &CompiledRuleset, oper
     let age = brief.round.saturating_sub(operation.phase_round);
     let at_war = brief.at_war(operation.enemy);
     let form_limit = brief.speed.pace_rounds(if decisive { DECISIVE_FORM_LIMIT } else { FORM_LIMIT });
+    note_met(brief, operation);
     let over = match operation.phase {
         _ if !target_held(state, operation) => true,
         OperationPhase::Forming => age > form_limit,
@@ -653,6 +685,65 @@ fn outmatched(brief: &TurnBrief, rules: &CompiledRuleset, operation: &Operation,
     2 * defence(brief, operation.enemy, operation.target) > 3 * ours
 }
 
+/// What the seat's last attempt on a target showed (`CallFixes::threat`): the most enemy power it saw near
+/// the target while the operation lived. Kept in the mind's thread, not in the saved memory (the format of the
+/// saved AI memory does not change); it starts again when the round counter runs back (a new game).
+#[derive(Debug, Default)]
+struct Attempts {
+    round: u32,
+    met: std::collections::BTreeMap<(PlayerId, TileId), u32>,
+}
+
+thread_local! {
+    static ATTEMPTS: std::cell::RefCell<Attempts> = std::cell::RefCell::new(Attempts::default());
+}
+
+/// Notes the enemy power seen near the target of a running operation.
+fn note_met(brief: &TurnBrief, operation: &Operation) {
+    if !brief.siege_call.threat {
+        return;
+    }
+    let seen = defence(brief, operation.enemy, operation.target);
+    ATTEMPTS.with(|a| {
+        let mut a = a.borrow_mut();
+        if brief.round < a.round {
+            *a = Attempts::default();
+        }
+        a.round = brief.round;
+        let slot = a.met.entry((brief.player, operation.target)).or_insert(0);
+        *slot = (*slot).max(seen);
+    });
+}
+
+/// What the last attempt on `target` met there, unless the target is in sight now (the sighting is fresher
+/// than the memory: a defence gone shows as no defenders near the city).
+fn remembered_met(brief: &TurnBrief, state: &AiState, target: TileId) -> u32 {
+    if state.seen_cities().iter().any(|c| c.tile == target && c.last_seen_round == brief.round) {
+        return 0;
+    }
+    ATTEMPTS.with(|a| {
+        let a = a.borrow();
+        if brief.round < a.round { 0 } else { a.met.get(&(brief.player, target)).copied().unwrap_or(0) }
+    })
+}
+
+/// The enemy power the army for `target` is sized against: the relation's threat and the units in sight
+/// near the target; for `siege-call` (`CallFixes::threat`) the units in sight that can stand at the target
+/// before the siege is over: within `DEFENCE_RADIUS` plus what our own melee kind walks in the rounds the
+/// plan gives the siege (`PLAN_SIEGE_ROUNDS`), their movement being what ours is (the kinds of two nations
+/// of one era move alike); a sighting is the unit as seen at the start of this turn, so its age is nil
+/// and one out of sight is not counted.
+fn threat_to(brief: &TurnBrief, rules: &CompiledRuleset, state: &AiState, arsenal: &Arsenal, enemy: PlayerId, target: TileId) -> u32 {
+    let base = state.relation(enemy).map_or(0, |m| m.threat).max(defence(brief, enemy, target));
+    if !brief.siege_call.threat {
+        return base;
+    }
+    let walk = arsenal.melee.map_or(1, |k| i32::from(rules.units[k.0 as usize].movement.max(1)));
+    let reach = DEFENCE_RADIUS + walk * PLAN_SIEGE_ROUNDS as i32;
+    let coming: u32 = brief.sightings.iter().filter(|s| s.owner == enemy && s.military && brief.dims.distance(s.tile, target).is_some_and(|d| d <= reach)).map(|s| s.power).sum();
+    base.max(coming).max(remembered_met(brief, state, target))
+}
+
 /// Power of `enemy`'s military units the player sees within
 /// `DEFENCE_RADIUS` of `target`.
 fn defence(brief: &TurnBrief, enemy: PlayerId, target: TileId) -> u32 {
@@ -666,13 +757,32 @@ fn assembled(brief: &TurnBrief, rules: &CompiledRuleset, operation: &Operation, 
     let dims = brief.dims;
     let present = members
         .iter()
-        .filter(|u| u.hp >= HEAL_BELOW_HP && dims.distance(u.tile, operation.muster).is_some_and(|d| d <= muster_reach(brief, rules, u.kind)));
+        .filter(|u| u.hp >= HEAL_BELOW_HP && dims.distance(u.tile, operation.muster).is_some_and(|d| d <= muster_reach(brief, rules, u.kind)))
+        .filter(|u| !brief.siege_call.ready || strike_ready(brief, rules, operation, u));
     let present = composition_of(rules, present.map(|u| u.kind));
     if shortfall(operation.need, present).total() == 0 {
         return true;
     }
     age >= brief.speed.pace_rounds(FORM_PATIENCE) && present.melee > 0 && present.total() * 4 >= operation.need.total() * 3
 }
+
+/// `siege-call` (`CallFixes::ready`): the member can stand at the city's ring within two turns: its distance to
+/// the target is at most the ring plus two turns of its movement. The war is declared when the army the plan
+/// needs is all so placed, so that the first turn of the war is a march of one or two turns to a strike by
+/// everything, not a column strung out over the march that the defender sees coming and reinforces against.
+fn strike_ready(brief: &TurnBrief, rules: &CompiledRuleset, operation: &Operation, unit: &UnitBrief) -> bool {
+    // The members crowd around the muster point (one military unit a tile, none on the enemy's land at
+    // peace): `MUSTER_RADIUS` tiles of slack beyond the bound the muster point itself keeps (`Routes::stage`).
+    brief.dims.distance(unit.tile, operation.target).is_some_and(|d| d <= strike_bound(rules, unit.kind) + MUSTER_RADIUS)
+}
+
+/// The most tiles from the target a unit of `kind` is ready to strike from (`strike_ready`).
+pub fn strike_bound(rules: &CompiledRuleset, kind: UnitKindId) -> i32 {
+    STAGING_DISTANCE + READY_TURNS * i32::from(rules.units.get(kind.0 as usize).map_or(1, |d| d.movement.max(1)))
+}
+
+/// Turns the army may need to reach the ring after the declaration (`strike_ready`).
+pub const READY_TURNS: i32 = 2;
 
 /// How far from the muster point a member stands with the army: `MUSTER_RADIUS + 1`; for
 /// `war-muster` and `tactician-fit` (`TurnBrief::muster_fix`) one turn's march more, the unit's movement in tiles.
@@ -824,7 +934,14 @@ fn start(brief: &TurnBrief, state: &mut AiState, rules: &CompiledRuleset, routes
     let considered = candidates.len();
     let mut chosen = None;
     for mut candidate in candidates.into_iter().take(MAX_ROUTE_CHECKS) {
-        let stage = routes.stage(walker, candidate.operation.muster, candidate.operation.target);
+        // `siege-call` (`CallFixes::ready`): the army musters one turn of its movement beyond the city's strike,
+        // where the city does not see it, and strikes from there within two turns (`strike_ready`).
+        let (ring, reach) = if brief.siege_call.ready {
+            (STAGING_DISTANCE + i32::from(rules.units[walker.0 as usize].movement.max(1)), strike_bound(rules, walker))
+        } else {
+            (STAGING_DISTANCE, BORDER_REACH)
+        };
+        let stage = routes.stage(walker, candidate.operation.muster, candidate.operation.target, ring, reach);
         let Some(stage) = stage else { continue };
         candidate.operation.muster = stage.tile;
         candidate.assemble += stage.walk;
@@ -1390,7 +1507,7 @@ pub fn outlook(brief: &TurnBrief, state: &AiState, rules: &CompiledRuleset, pric
             continue;
         }
         let estimate = estimate_city(brief, rules, city, arsenal.melee);
-        let threat = state.relation(city.owner).map_or(0, |m| m.threat).max(defence(brief, city.owner, city.tile));
+        let threat = threat_to(brief, rules, state, &arsenal, city.owner, city.tile);
         let Some(need) = composition_by(rules, &arsenal, &estimate, threat, brief.army_fit) else { continue };
         let chance = open_chance(&chance_features(brief, state, rules, &arsenal, city, &estimate, need, None));
         let rounds = (distance as u32 * 2).div_ceil(3) + 1 + SIEGE_ROUNDS_ESTIMATE;
@@ -1559,7 +1676,7 @@ fn candidate(
     if distance > if decisive { DECISIVE_RANGE } else { OBJECTIVE_RANGE } {
         return None;
     }
-    let threat = state.relation(city.owner).map_or(0, |m| m.threat).max(defence(brief, city.owner, city.tile));
+    let threat = threat_to(brief, rules, state, &arsenal, city.owner, city.tile);
     let estimate = estimate_city(brief, rules, city, arsenal.melee);
     // Before the route is known: the whole way at two thirds of a tile a
     // round (`start` replaces it by the staging tile's walk and strike).
@@ -1897,7 +2014,7 @@ fn target_worth(brief: &TurnBrief, state: &AiState, rules: &CompiledRuleset, pri
     }
     let city = state.seen_cities().iter().find(|c| c.tile == target)?;
     let estimate = estimate_target(brief, rules, city);
-    let threat = state.relation(city.owner).map_or(0, |m| m.threat).max(defence(brief, city.owner, city.tile));
+    let threat = threat_to(brief, rules, state, &arsenal, city.owner, city.tile);
     let army = composition_by(rules, &arsenal, &estimate, threat, brief.army_fit)?;
     let distance = brief.nearest_city(brief.dims, target).and_then(|c| brief.dims.distance(c.tile, target)).unwrap_or(0).max(0) as u32;
     let rounds = (distance * 2).div_ceil(3) + 1 + SIEGE_ROUNDS_ESTIMATE;

@@ -220,6 +220,44 @@ pub struct UnitBrief {
     pub hp: u16,
 }
 
+/// The parts of `siege-call` (`Variant::SiegeCall`), each a class fix of the operations layer or of the call at the
+/// walls; the bench switches them off one by one with `SIEGE_CALL_ON` (a comma list of the names that stay on;
+/// unset: all). Only `siege-call` carries any.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct CallFixes {
+    /// Declare the war only when the whole army can strike within two turns, and muster out of the city's strike.
+    pub ready: bool,
+    /// Distance units are ranged by default; siege units only where ranged units cannot bring the city down.
+    pub ranged: bool,
+    /// The melee kind is chosen by strength squared per production cost.
+    pub melee: bool,
+    /// The army is sized against the enemy units that can reach the target during the siege.
+    pub threat: bool,
+    /// The press / hold / withdraw call at the walls (`siege_walls::call`).
+    pub call: bool,
+}
+
+impl CallFixes {
+    pub const NONE: CallFixes = CallFixes { ready: false, ranged: false, melee: false, threat: false, call: false };
+    pub const ALL: CallFixes = CallFixes { ready: true, ranged: true, melee: true, threat: true, call: true };
+
+    pub fn any(self) -> bool {
+        self != Self::NONE
+    }
+
+    /// `ALL`, or the names in `SIEGE_CALL_ON` (the bench's switch).
+    pub fn from_env() -> CallFixes {
+        static FIXES: std::sync::OnceLock<CallFixes> = std::sync::OnceLock::new();
+        *FIXES.get_or_init(|| match std::env::var("SIEGE_CALL_ON") {
+            Ok(list) => {
+                let on = |n: &str| list.split(',').any(|x| x.trim() == n);
+                CallFixes { ready: on("ready"), ranged: on("ranged"), melee: on("melee"), threat: on("threat"), call: on("call") }
+            }
+            Err(_) => CallFixes::ALL,
+        })
+    }
+}
+
 /// A foreign unit seen at the start of the turn.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Sighting {
@@ -378,6 +416,8 @@ pub struct TurnBrief {
     pub muster_fix: bool,
     /// `war-muster` alone: the army's places are filled by current units only (`operations::current`).
     pub war_muster: bool,
+    /// `siege-call` alone: the press / hold / withdraw call at the walls (`siege_walls::call`).
+    pub siege_call: CallFixes,
     /// The tall play the variant carries (`ai::tall`, `Variant::tall`), the
     /// cities it keeps and what a site meeting a science building's condition
     /// adds (`tall::turn_site_bonuses`); Off, None and empty for the others.
@@ -506,6 +546,7 @@ impl TurnBrief {
             tactician_fit: false,
             muster_fix: false,
             war_muster: false,
+            siege_call: CallFixes::NONE,
             tall: crate::ai::tall::Tall::Off,
             tall_cities: None,
             tall_sites: Vec::new(),
