@@ -349,6 +349,9 @@ pub fn play_match<R: BenchRules>(rules: &CompiledRuleset<R::M>, suite: &Suite, g
     driver.set_trace_capacity(0);
     driver.record_journal();
     let mut log = MatchLog::new(&seats, R::OPENING_ROUNDS);
+    if crate::bench::rival::enabled() {
+        log.probe = Some(crate::bench::rival::RivalProbe::new(&seats));
+    }
     for seat in &mut log.seats {
         seat.leader = R::leader(&game, rules, seat.player);
     }
@@ -361,6 +364,13 @@ pub fn play_match<R: BenchRules>(rules: &CompiledRuleset<R::M>, suite: &Suite, g
         }
         play_round::<R>(&mut game, rules, &mut driver, &mut log, recorder.as_mut()).map_err(|e| format!("{label}: {e}"))?;
         log.after_round::<R>(&game, rules, &suite.checkpoints);
+        if let Some(probe) = log.probe.as_mut() {
+            probe.after_round::<R>(&game, rules, &suite.checkpoints, false);
+        }
+    }
+    if let Some(mut probe) = log.probe.take() {
+        probe.after_round::<R>(&game, rules, &suite.checkpoints, true);
+        probe.finish(&label, game_match.seed, &pairing.candidate, &pairing.baseline, round(&game));
     }
     if let Some(r) = recorder {
         let seated: &Seated<R::Mind> = driver.mind_mut();
@@ -412,6 +422,14 @@ fn play_round<R: BenchRules>(
             if let Some(r) = recorder.as_mut() {
                 r.turn_start(game, rules, game.view().auth.active_player());
             }
+            if let Some(probe) = log.probe.as_mut() {
+                probe.turn_start::<R>(game, rules, game.view().auth.active_player());
+            }
+        }
+        if ends_turn {
+            if let Some(probe) = log.probe.as_mut() {
+                probe.before_end::<R>(game, rules, game.view().auth.active_player());
+            }
         }
         let step_started = Instant::now();
         let outcome = driver.step(game, rules);
@@ -429,6 +447,9 @@ fn play_round<R: BenchRules>(
                 log.journal::<R>(game, player, &journal);
                 log.deliveries::<R>(game, &journal);
                 log.decisions::<R>(this_round, player, &journal);
+                if let Some(probe) = log.probe.as_mut() {
+                    probe.player_done::<R>(game, rules, player, &journal);
+                }
                 (turn_started, before, ending) = (now, after, std::time::Duration::ZERO);
             }
             StepOutcome::RoundDone => break,
@@ -475,6 +496,8 @@ struct MatchLog {
     wars: Vec<OpenWar>,
     /// Technologies each seat started with, by seat.
     start_techs: Vec<usize>,
+    /// The rival-model probe (`bench::rival`; on with `AURELIA_RIVAL_PROBE`).
+    probe: Option<crate::bench::rival::RivalProbe>,
 }
 
 impl MatchLog {
@@ -503,7 +526,7 @@ impl MatchLog {
                 pace: Pace::default(),
             })
             .collect();
-        Self { seats, round_ms: Vec::new(), wars: Vec::new(), start_techs: Vec::new() }
+        Self { seats, round_ms: Vec::new(), wars: Vec::new(), start_techs: Vec::new(), probe: None }
     }
 
     fn seat(&mut self, player: PlayerId) -> Option<&mut SeatResult> {

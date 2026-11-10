@@ -5,6 +5,7 @@ pub mod modules;
 pub mod pace;
 pub mod play;
 pub mod report;
+pub mod rival;
 pub mod science;
 pub mod sequential;
 pub mod stats;

@@ -25,6 +25,13 @@ pub const SCRIPTED_EXPERT: &str = "standard-scripted";
 /// [`SCRIPTED_EXPERT`] as a variant.
 pub const SCRIPTED_EXPERT_VARIANT: Variant = Variant::StandardScripted;
 
+/// The target of a blow that may fall on a city (`BenchRules::city_blow`).
+#[derive(Debug, Clone, Copy)]
+pub enum CityBlow {
+    City(kernel::ids::CityHandle),
+    Tile(kernel::ids::TileId),
+}
+
 /// What a player has at one moment.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Standing {
@@ -162,6 +169,17 @@ pub trait BenchRules {
     /// A command that fights (its destroyed units and taken cities are the
     /// bench's combat record).
     fn is_combat(command: &<Self::M as RulesModule>::Command) -> bool;
+
+    /// The speed's pace percent and the production a turn of each of the player's cities (probe only).
+    fn order_inputs(_game: &GameState<Self::M>, _rules: &CompiledRuleset<Self::M>, _player: PlayerId) -> (u32, Vec<(kernel::ids::CityHandle, u32)>) {
+        (100, Vec::new())
+    }
+
+    /// What a command strikes when it is a blow on a city's tile: the city, or a tile (probe only,
+    /// `bench::rival`).
+    fn city_blow(_command: &<Self::M as RulesModule>::Command) -> Option<CityBlow> {
+        None
+    }
 
     /// The original capitals of the player's rivals, by founder, and
     /// whether the player knows each one's tile (empty: the module has no
@@ -514,6 +532,19 @@ impl BenchRules for ClassicBench {
             .collect();
         capitals.sort();
         capitals
+    }
+
+    fn order_inputs(game: &GameState<Self::M>, rules: &CompiledRuleset<Self::M>, player: PlayerId) -> (u32, Vec<(kernel::ids::CityHandle, u32)>) {
+        let obs = game.ai_observation(rules, player);
+        (obs.speed.pace_percent, obs.own_cities.iter().map(|c| (c.handle, c.income.production.max(0) as u32)).collect())
+    }
+
+    fn city_blow(command: &classic_rules::Command) -> Option<CityBlow> {
+        match command {
+            classic_rules::Command::AttackCity { city, .. } => Some(CityBlow::City(*city)),
+            classic_rules::Command::RangedAttack { target, .. } => Some(CityBlow::Tile(*target)),
+            _ => None,
+        }
     }
 
     fn by_agreement(command: &classic_rules::Command) -> bool {
