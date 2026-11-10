@@ -71,6 +71,12 @@ pub struct Versus {
     /// score minus the baseline seats' — both versions on the same world
     /// in both seatings, so the world's own size and wealth cancel.
     pub score_difference: BlockEstimate,
+    /// The victory-weighted share (the owner's basis of 10 November 2026): the candidate's
+    /// victories weighted by kind over both sides', a real victory (science, culture, diplomatic,
+    /// domination) 1 and a victory by time ¼ (`victory_weight`), by the same seed blocks as
+    /// `share`. Reports saved before it read as zeros.
+    #[serde(default)]
+    pub victory_share: BlockEstimate,
     pub blocks: Vec<SeedBlock>,
 }
 
@@ -83,6 +89,35 @@ pub struct SeedBlock {
     /// The sum over its games of the candidate's minus the baseline's
     /// mean final score.
     pub score_difference: f64,
+    /// Its games won by each side, by a real victory and by time
+    /// (`victory_weight`); reports saved before read as zeros.
+    #[serde(default)]
+    pub real: [u32; 2],
+    #[serde(default)]
+    pub time: [u32; 2],
+}
+
+/// The weight of a victory in the victory-weighted share, in quarters so that the sums stay
+/// integers: a real victory (science, culture, diplomatic, domination) counts 1, a victory by
+/// time (the best score at the last round) ¼ — the owner's basis of 10 November 2026: the real
+/// victories count, the score is the fallback.
+pub const REAL_VICTORY_QUARTERS: u32 = 4;
+pub const TIME_VICTORY_QUARTERS: u32 = 1;
+
+/// The victory kind of a game decided by the score at the last round.
+const TIME_VICTORY: &str = "time";
+
+/// A victory's weight in quarters (`REAL_VICTORY_QUARTERS`, `TIME_VICTORY_QUARTERS`).
+pub fn victory_weight(kind: &str) -> u32 {
+    if kind == TIME_VICTORY { TIME_VICTORY_QUARTERS } else { REAL_VICTORY_QUARTERS }
+}
+
+impl SeedBlock {
+    /// The candidate's weighted victories and both sides' (quarters).
+    fn weighted(&self) -> BlockSum {
+        let side = |at: usize| self.real[at] * REAL_VICTORY_QUARTERS + self.time[at] * TIME_VICTORY_QUARTERS;
+        BlockSum { total: f64::from(side(0)), games: side(0) + side(1) }
+    }
 }
 
 /// What the primary metric says: its interval above, around or below the
@@ -112,6 +147,7 @@ impl Versus {
             share,
             design_effect: share.design_effect(games),
             score_difference: BlockEstimate::of(&sums(|b| b.score_difference)),
+            victory_share: BlockEstimate::of(&blocks.iter().map(SeedBlock::weighted).collect::<Vec<_>>()),
             blocks,
         }
     }
@@ -164,6 +200,29 @@ impl Versus {
             out,
             "Wins {} of {} games, draws {}; {} seed blocks, design effect {deff} (above 1: an interval over independent games is too narrow). Paired difference per seed block, the candidate's minus the baseline's mean final score: {:+.1} (95 % CI {:+.1}…{:+.1}).\n",
             self.candidate_wins, self.games, self.draws, s.blocks, d.mean, d.low, d.high
+        );
+        self.victory_markdown(out);
+    }
+
+    /// Real victories of each side (science, culture, diplomatic, domination; not time).
+    pub fn real_wins(&self) -> [u32; 2] {
+        self.blocks.iter().fold([0, 0], |[c, b], k| [c + k.real[0], b + k.real[1]])
+    }
+
+    /// The victory-weighted share, the real victories of both sides and the games a real victory
+    /// ended.
+    fn victory_markdown(&self, out: &mut String) {
+        let v = &self.victory_share;
+        let [candidate, baseline] = self.real_wins();
+        let real = candidate + baseline;
+        let _ = writeln!(
+            out,
+            "**Victory-weighted share (a real victory 1, a victory by time ¼): {:.1} % (95 % CI {:.1}–{:.1} %, seed-block bootstrap).** Real victories: candidate {candidate}, baseline {baseline}; games ended by a real victory {real} of {} ({:.1} %).\n",
+            100.0 * v.mean,
+            100.0 * v.low,
+            100.0 * v.high,
+            self.games,
+            100.0 * f64::from(real) / f64::from(self.games.max(1))
         );
     }
 }
@@ -795,7 +854,7 @@ fn seed_blocks(results: &[MatchResult]) -> Vec<SeedBlock> {
         let at = match blocks.iter().position(|b| b.seed == r.seed) {
             Some(at) => at,
             None => {
-                blocks.push(SeedBlock { seed: r.seed, games: 0, points: 0.0, score_difference: 0.0 });
+                blocks.push(SeedBlock { seed: r.seed, games: 0, points: 0.0, score_difference: 0.0, real: [0; 2], time: [0; 2] });
                 blocks.len() - 1
             }
         };
@@ -803,6 +862,14 @@ fn seed_blocks(results: &[MatchResult]) -> Vec<SeedBlock> {
         block.games += 1;
         block.points += candidate_points(r);
         block.score_difference += final_score(r, Side::Candidate) - final_score(r, Side::Baseline);
+        if let Some((w, kind)) = r.winner().and_then(|w| w.victory.map(|kind| (w, kind))) {
+            let at = usize::from(w.side != Side::Candidate);
+            if kind == TIME_VICTORY {
+                block.time[at] += 1;
+            } else {
+                block.real[at] += 1;
+            }
+        }
     }
     blocks
 }
@@ -931,13 +998,13 @@ fn match_line(r: &MatchResult) -> MatchLine {
 pub fn repeats_markdown(reports: &[TournamentReport]) -> String {
     let mut out = String::new();
     let _ = writeln!(out, "## Repeats: {} independent suites\n", reports.len());
-    let _ = writeln!(out, "| seed offset | candidate wins | draws | share | 95 % CI | seed blocks | design effect | score difference | result hash |");
-    let _ = writeln!(out, "|---:|---:|---:|---:|---|---:|---:|---:|---|");
+    let _ = writeln!(out, "| seed offset | candidate wins | draws | share | 95 % CI | victory-weighted share | real victories | seed blocks | design effect | score difference | result hash |");
+    let _ = writeln!(out, "|---:|---:|---:|---:|---|---:|---|---:|---:|---:|---|");
     let runs: Vec<&Versus> = reports.iter().filter_map(|r| r.versus.as_ref()).collect();
     for (report, v) in reports.iter().zip(&runs) {
         let _ = writeln!(
             out,
-            "| {} | {}/{} | {} | {:.1} % | {:.1}–{:.1} % | {} | {} | {:+.1} | `{}` |",
+            "| {} | {}/{} | {} | {:.1} % | {:.1}–{:.1} % | {:.1} % | {} / {} | {} | {} | {:+.1} | `{}` |",
             report.seed_offset,
             v.candidate_wins,
             v.games,
@@ -945,6 +1012,9 @@ pub fn repeats_markdown(reports: &[TournamentReport]) -> String {
             100.0 * v.share.mean,
             100.0 * v.share.low,
             100.0 * v.share.high,
+            100.0 * v.victory_share.mean,
+            v.real_wins()[0],
+            v.real_wins()[1],
             v.share.blocks,
             v.design_effect.map_or_else(|| "—".to_owned(), |e| format!("{e:.2}")),
             v.score_difference.mean,
@@ -1153,6 +1223,25 @@ mod tests {
         assert_eq!((versus.candidate_wins, versus.draws, versus.games), (2, 1, 4));
         assert_eq!((versus.share.mean, versus.score_difference.mean, versus.expected), (0.625, 25.0, 0.5));
         assert_eq!(versus.verdict(), Verdict::TooFewBlocks, "two seeds decide nothing");
+    }
+
+    /// The victory-weighted share: a real victory 1, a victory by time ¼, a draw nothing; the
+    /// candidate's weighted victories over both sides', by seed blocks as the points share.
+    #[test]
+    fn real_victories_outweigh_time() {
+        let won = |seed: u64, side: Side, kind: &'static str| {
+            let mut r = duel(seed, Some(side), [600, 600]);
+            r.seats.iter_mut().filter(|s| s.victory.is_some()).for_each(|s| s.victory = Some(kind));
+            r
+        };
+        let results = [won(1, Side::Candidate, "science"), won(1, Side::Baseline, "time"), won(2, Side::Candidate, "time"), duel(2, None, [500, 500])];
+        let versus = report(&results).versus.unwrap();
+        assert_eq!(versus.real_wins(), [1, 0]);
+        assert_eq!(versus.victory_share.mean, 5.0 / 6.0, "candidate 1 + ¼, baseline ¼");
+        assert_eq!(versus.share.mean, 0.625, "the points share is unchanged");
+        let blocks: Vec<([u32; 2], [u32; 2])> = versus.blocks.iter().map(|b| (b.real, b.time)).collect();
+        assert_eq!(blocks, [([1, 0], [0, 1]), ([0, 0], [1, 0])]);
+        assert!(report(&results).markdown(false).contains("Victory-weighted share (a real victory 1, a victory by time ¼): 83.3 %"));
     }
 
     /// The same games give the same report, intervals included; pooling
