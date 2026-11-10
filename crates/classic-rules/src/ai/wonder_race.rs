@@ -46,16 +46,57 @@ fn wonder_era(rules: &CompiledRuleset, kind: BuildingKindId) -> u8 {
         .map_or(0, |e| e.index)
 }
 
-/// The chance, percent, that an order of the wonder that takes `standard_turns` (Standard speed)
-/// is finished before any other nation does it. The inputs are what the seat knows: the eras of
-/// the nations it has met (`met_eras`, `PlayerQueries::met_eras`) against the wonder's era, and
-/// the turns the order takes; the table (`wonder_chance`) is the bench's rate of won orders by
-/// those two. A nation not met adds nothing the seat can know: the table's rows carry the average
-/// of the unmet.
-pub fn chance(rules: &CompiledRuleset, met_eras: &[(crate::ids::PlayerId, u8)], kind: BuildingKindId, standard_turns: i64) -> i64 {
-    use crate::ai::wonder_chance::{CHANCE, TURNS};
-    let era = wonder_era(rules, kind);
-    let able = met_eras.iter().filter(|(_, e)| *e >= era).count().min(CHANCE[0].len() - 1);
-    let row = TURNS.iter().position(|&t| standard_turns <= i64::from(t)).unwrap_or(TURNS.len() - 1);
-    i64::from(CHANCE[row][able])
+/// What the seat knows of the race, taken once a turn (`Allocator::new`).
+#[derive(Debug, Clone, Default)]
+pub struct Known {
+    /// The eras of the nations met (`PlayerQueries::met_eras`).
+    met_eras: Vec<(crate::ids::PlayerId, u8)>,
+    /// The seat's place among itself and the nations it met by score (1 = best): the victory
+    /// screen's score list (`PlayerQueries::race`).
+    rank: usize,
+    /// The cities of other nations the seat has seen: owner, citizens when last seen, rounds since.
+    seen: Vec<(crate::ids::PlayerId, u32, u32)>,
 }
+
+impl Known {
+    pub fn of(obs: &AIObservation<'_>, brief: &crate::ai::planner::TurnBrief, state: &crate::ai::state::AiState) -> Self {
+        use crate::knowledge::public::PlayerQueries;
+        let race = obs.view.race();
+        let own = race.own_score();
+        Known {
+            met_eras: brief.met_eras.clone(),
+            rank: 1 + race.scores.iter().skip(1).filter(|(_, s)| *s > own).count(),
+            seen: state.seen_cities().iter().map(|c| (c.owner, c.population, obs.round.saturating_sub(c.last_seen_round))).collect(),
+        }
+    }
+}
+
+/// The chance, percent, that an order of the wonder that takes `standard_turns` (Standard speed)
+/// is finished before any other nation does it, from what the seat knows (`Known`) and the
+/// table (`wonder_chance`, the bench's rate of won orders):
+/// - the turns the order takes;
+/// - the seat's place by score among the nations it met (the stronger seat wins more races);
+/// - the largest city the seat has seen of a met nation whose era reaches the wonder's era (the
+///   nations that can build it), its citizens widened by the rounds since the sighting
+///   (`AGE_ROUNDS_PER_CITIZEN`): none seen is the first column. A nation not met adds nothing the
+///   seat can know; the average of the unmet is in the table.
+pub fn chance(rules: &CompiledRuleset, known: &Known, kind: BuildingKindId, standard_turns: i64) -> i64 {
+    use crate::ai::wonder_chance::{CHANCE, POPULATION, TURNS};
+    let era = wonder_era(rules, kind);
+    let rival = known
+        .seen
+        .iter()
+        .filter(|(owner, _, _)| known.met_eras.iter().any(|(p, e)| p == owner && *e >= era))
+        .map(|(_, pop, age)| pop + age / AGE_ROUNDS_PER_CITIZEN)
+        .max()
+        .unwrap_or(0);
+    let row = TURNS.iter().position(|&t| standard_turns <= i64::from(t)).unwrap_or(TURNS.len() - 1);
+    let rank = known.rank.clamp(1, CHANCE[0].len()) - 1;
+    let size = POPULATION.iter().position(|&p| rival <= p).unwrap_or(POPULATION.len() - 1);
+    i64::from(CHANCE[row][rank][size])
+}
+
+/// A sighted city is taken to have grown by a citizen in this many rounds since it was seen (the
+/// sighting's age widens the estimate of the rival's production; fitted with the table: the step
+/// where the won rate of the orders by the sighted population is the same at every age).
+pub const AGE_ROUNDS_PER_CITIZEN: u32 = crate::ai::wonder_chance::FITTED_AGE;

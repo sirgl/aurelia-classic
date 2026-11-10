@@ -76,6 +76,8 @@ pub struct OrderRec {
     pub best_pop_age: u32,
     /// Rank by score of the seat among the living majors when the order was put (1 = best).
     pub rank_score: u32,
+    /// The same among the seat and the met rivals only (the victory screen's score list).
+    pub rank_met: u32,
     /// "won", "lost" (another city completed the wonder first), "cancelled", "open".
     pub outcome: &'static str,
     pub closed: u32,
@@ -397,6 +399,11 @@ impl RivalProbe {
         }
         let mine = R::score(game, rules, owner);
         let rank_score = 1 + (0..players.count() as u8).map(PlayerId).filter(|p| *p != owner && players.is_major(*p) && players.is_alive(*p) && R::score(game, rules, *p) > mine).count() as u32;
+        let rank_met = 1
+            + (0..players.count() as u8)
+                .map(PlayerId)
+                .filter(|p| *p != owner && players.is_major(*p) && players.is_alive(*p) && view.contact(*p).met_round.is_some() && R::score(game, rules, *p) > mine)
+                .count() as u32;
         let remaining = cost.saturating_sub(stock);
         OrderRec {
             seat: owner.0,
@@ -413,6 +420,7 @@ impl RivalProbe {
             best_pop,
             best_pop_age,
             rank_score,
+            rank_met,
             outcome: "open",
             closed: 0,
         }
