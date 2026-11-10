@@ -374,6 +374,9 @@ pub struct TurnBrief {
     pub tall_real: bool,
     /// `tall-real` with the review's fixes (`Variant::next`, `ai::tall_real`).
     pub next: bool,
+    /// The wonder-race switch (`Variant::wonder_race`): 0 off, 1 lost wonder orders are dropped, 2
+    /// the wonder's price is the chance to finish it first (`ai::wonder_race`).
+    pub wonder_race: u8,
     /// The tall play the variant carries (`ai::tall`, `Variant::tall`), the
     /// cities it keeps and what a site meeting a science building's condition
     /// adds (`tall::turn_site_bonuses`); Off, None and empty for the others.
@@ -500,6 +503,7 @@ impl TurnBrief {
             sharp: false,
             tall_real: false,
             next: false,
+            wonder_race: 0,
             tall: crate::ai::tall::Tall::Off,
             tall_cities: None,
             tall_sites: Vec::new(),

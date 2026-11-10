@@ -690,6 +690,16 @@ pub enum Variant {
     /// tall seats' only. The mind plays `Standard` in every other switch (`ClassicMind::new`). A
     /// candidate, `experimental-ai` only.
     Next,
+    /// `Sharp` that drops a wonder order the moment another nation has built the wonder (the
+    /// rules burn the stock of a city that completes a lost wonder, `lost_wonder_race`) and does
+    /// not hurry-buy one (`TurnBrief::wonder_race` = 1). The control of `WonderRace`. A candidate,
+    /// `experimental-ai` only.
+    WonderCancel,
+    /// `WonderCancel` whose price of a world wonder is the chance to finish it first, from what
+    /// the seat knows of its rivals and a table fitted to the bench (`ai::wonder_race`,
+    /// `TurnBrief::wonder_race` = 2), instead of the flat `100 − 2 × turns`. The mind plays `Sharp`
+    /// in every other switch. A candidate, `experimental-ai` only.
+    WonderRace,
 }
 
 /// The net's base: the expert the end-to-end net learns from and the mind it
@@ -710,7 +720,7 @@ const NUDGED_CANDIDATES: u32 = 40;
 
 impl Variant {
     /// The game's AI first.
-    pub const ALL: [Variant; 138] = [
+    pub const ALL: [Variant; 140] = [
         Variant::Standard,
         Variant::PreCamps,
         Variant::PreWorkers,
@@ -849,6 +859,8 @@ impl Variant {
         Variant::Sharp,
         Variant::TallReal,
         Variant::Next,
+        Variant::WonderCancel,
+        Variant::WonderRace,
     ];
 
     pub fn name(self) -> &'static str {
@@ -973,6 +985,8 @@ impl Variant {
             Variant::Sharp => "sharp",
             Variant::TallReal => "tall-real",
             Variant::Next => "next",
+            Variant::WonderCancel => "wonder-cancel",
+            Variant::WonderRace => "wonder-race",
             Variant::ArmyFit => "army-fit",
             Variant::Camps => "camps",
             Variant::ArmyCamps => "army-camps",
@@ -1006,7 +1020,7 @@ impl Variant {
         cfg!(feature = "experimental-ai")
             || !matches!(
                 self,
-                Variant::Net | Variant::UnitNet | Variant::Hybrid | Variant::SiteNet | Variant::ChoiceNet | Variant::ChoiceNetProduction | Variant::ChoiceNetResearch | Variant::StandardScripted | Variant::PreCsGifts | Variant::Sharp | Variant::TallReal | Variant::Next
+                Variant::Net | Variant::UnitNet | Variant::Hybrid | Variant::SiteNet | Variant::ChoiceNet | Variant::ChoiceNetProduction | Variant::ChoiceNetResearch | Variant::StandardScripted | Variant::PreCsGifts | Variant::Sharp | Variant::TallReal | Variant::Next | Variant::WonderCancel | Variant::WonderRace
             )
     }
 
@@ -1141,6 +1155,16 @@ impl Variant {
     /// mind plays as `Standard` in every other switch (`ClassicMind::new`).
     pub fn sharp(self) -> bool {
         self == Variant::Sharp
+    }
+
+    /// The wonder-race switch (`TurnBrief::wonder_race`): 1 drops lost wonder orders, 2 prices a
+    /// wonder by the chance to finish it first. The mind plays `Sharp` (`ClassicMind::new`).
+    pub fn wonder_race(self) -> u8 {
+        match self {
+            Variant::WonderCancel => 1,
+            Variant::WonderRace => 2,
+            _ => 0,
+        }
     }
 
     /// Its tall style reaches for the science victory (`TurnBrief::tall_real`, `ai::tall_real`):

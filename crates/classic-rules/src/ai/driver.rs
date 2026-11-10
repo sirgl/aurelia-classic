@@ -82,6 +82,9 @@ pub struct ClassicMind {
     /// `Variant::Next`: the mind plays `TallReal` (`tall_real` set) with the review's fixes
     /// (`TurnBrief::next`).
     next: bool,
+    /// `Variant::WonderCancel` (1) and `WonderRace` (2): `Sharp` with the wonder-race switch
+    /// (`TurnBrief::wonder_race`, `ai::wonder_race`).
+    wonder_race: u8,
 }
 
 /// The environment variable that makes the game's AI another variant
@@ -114,7 +117,8 @@ impl ClassicMind {
         // `next` is `tall-real` with the review's fixes (`TurnBrief::next`).
         let next = variant.next();
         let tall_real = variant.tall_real() || next;
-        let sharp = variant.sharp() || tall_real;
+        let wonder_race = variant.wonder_race();
+        let sharp = variant.sharp() || tall_real || wonder_race > 0;
         let variant = if sharp { Variant::Standard } else { variant };
         let mut advisors = AdvisorRegistry::default();
         // The alias `siege-walls` plays as `PrePuppet` (the standard of the seventh promotion) in
@@ -133,7 +137,7 @@ impl ClassicMind {
         let walls = (book.is_some() || variant.siege_walls()).then(|| Box::new(crate::ai::siege_walls::SiegeWalls::new().joined(variant.siege_join())));
         let unciv = variant.unciv().any().then(|| Box::new(crate::ai::unciv::UncivMind::new(variant.unciv())));
         let variant = if named.is_some() { Variant::PrePuppet } else { variant };
-        Self { advisors, variant, genome: None, humans: Vec::new(), walks: Default::default(), choice: None, #[cfg(feature = "experimental-ai")] net, book, named, walls, conquest: None, unciv, tall: None, sharp, tall_real, next }
+        Self { advisors, variant, genome: None, humans: Vec::new(), walks: Default::default(), choice: None, #[cfg(feature = "experimental-ai")] net, book, named, walls, conquest: None, unciv, tall: None, sharp, tall_real, next, wonder_race }
     }
 
     /// A league book that may play on another base (`book_on`): a duel book
@@ -176,7 +180,7 @@ impl ClassicMind {
         advisors.register(crate::classic::ClassicSystem::Diplomacy, Box::new(diplomacy));
         // The net plays on `NET_BASE`: its siege too.
         let walls = variant.siege_walls().then(|| Box::new(crate::ai::siege_walls::SiegeWalls::new().joined(variant.siege_join())));
-        Self { advisors, variant, genome: None, humans: Vec::new(), walks: Default::default(), choice: None, net: Some(Box::new(net)), book: None, named: None, walls, conquest: None, unciv: None, tall: None, sharp: false, tall_real: false, next: false }
+        Self { advisors, variant, genome: None, humans: Vec::new(), walks: Default::default(), choice: None, net: Some(Box::new(net)), book: None, named: None, walls, conquest: None, unciv: None, tall: None, sharp: false, tall_real: false, next: false, wonder_race: 0 }
     }
 
     /// The net's part (`Variant::Net`), if any.
@@ -219,6 +223,11 @@ impl ClassicMind {
         }
         if self.tall_real {
             return Variant::TallReal;
+        }
+        match self.wonder_race {
+            1 => return Variant::WonderCancel,
+            2 => return Variant::WonderRace,
+            _ => {}
         }
         if self.sharp {
             return Variant::Sharp;
@@ -613,6 +622,7 @@ impl ClassicMind {
         brief.sharp = self.sharp;
         brief.tall_real = self.tall_real;
         brief.next = self.next;
+        brief.wonder_race = self.wonder_race;
         // `tall-real` finishes its spaceship by the space plan where the science victory fits the
         // game (`victory::space_plan`, `ai::tall_real`), on every seat; `next` too: the plan on its
         // tall seats only measured worse (pace against `sharp`, offsets 200+201: 65.7 % against

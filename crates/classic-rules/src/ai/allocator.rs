@@ -103,6 +103,8 @@ pub struct Allocator {
     /// The strategy net's plan (`ai::strategy_net`): the choice among the best orders
     /// is its production head's. None: the allocator's own.
     strategy: Option<std::sync::Arc<crate::ai::strategy_net::Plan>>,
+    /// The wonder-race switch (`TurnBrief::wonder_race`).
+    race: u8,
     /// The unit net's turn (`ai::unit_net`): its commander's orders are offered. None: off.
     #[cfg(feature = "experimental-ai")]
     unit_net: Option<std::sync::Arc<crate::ai::unit_net::UnitNetTurn>>,
@@ -143,6 +145,7 @@ impl Allocator {
             trade_ordered: std::cell::Cell::new(0),
             load: brief.workers.demand.then(|| crate::ai::planner_workers::WorkLoad::of(&obs.view, rules, brief, state.strategy.current)),
             strategy: brief.strategy.clone(),
+            race: brief.wonder_race,
             #[cfg(feature = "experimental-ai")]
             unit_net: brief.unit_net.clone(),
         }
@@ -444,6 +447,10 @@ impl Allocator {
         let hammer = self.prices.production / i64::from(self.prices.rounds_left);
         for city in &obs.own_cities {
             let Some(&item) = city.queue.first() else { continue };
+            // A wonder another nation has completed is not bought (`ai::wonder_race`).
+            if self.race > 0 && crate::ai::wonder_race::lost(obs, rules, city, item) {
+                continue;
+            }
             let Some(price) = obs.view.own_hurry_price(city.handle) else { continue };
             let Some(cost) = obs.view.own_production_cost(city.handle, item) else { continue };
             let time = turns(obs, rules, city, item);

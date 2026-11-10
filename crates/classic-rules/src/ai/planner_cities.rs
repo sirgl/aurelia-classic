@@ -210,6 +210,9 @@ pub(crate) fn plan_cities_with(
     };
     out.extend(hurried.iter().filter(|d| d.actor == Actor::Player).cloned());
     for city in cities {
+        // A lost wonder is dropped, the rest of the queue kept (`ai::wonder_race`): the stock stays.
+        let cleaned = (brief.wonder_race > 0).then(|| drop_lost_wonders(obs, &empire, tools.rules, city, &mut out)).flatten();
+        let city = cleaned.as_ref().unwrap_or(city);
         // A city plans again, with the refused item banned for it, when the
         // rules refuse its choice; the empire's totals are those from before.
         let before = empire.clone();
@@ -235,6 +238,20 @@ pub(crate) fn plan_cities_with(
         empire.refused.clear();
     }
     out
+}
+
+/// The city without the world wonders another nation has completed: the queue cleared and the
+/// others ordered again (None: no lost wonder queued). The stock stays in the city.
+fn drop_lost_wonders(obs: &AIObservation<'_>, empire: &Empire, rules: &CompiledRuleset, city: &OwnCity, out: &mut Vec<Decision>) -> Option<OwnCity> {
+    if !city.queue.iter().any(|item| crate::ai::wonder_race::lost(obs, rules, city, *item)) {
+        return None;
+    }
+    let kept: Vec<ProductionItem> = city.queue.iter().copied().filter(|item| !crate::ai::wonder_race::lost(obs, rules, city, *item)).collect();
+    let clear = Command::ClearProduction { player: empire.player, city: city.handle };
+    out.push(Decision::act(Actor::City(city.id), Reason::ProduceBuilding, clear));
+    let cleaned = OwnCity { queue: kept, ..city.clone() };
+    out.extend(cleaned.queue.iter().map(|item| order(empire, &cleaned, *item, Reason::ProduceBuilding)));
+    Some(cleaned)
 }
 
 /// The orders of one city this turn, by need: the first path that has one.
