@@ -229,3 +229,18 @@ fn the_space_finish_ai_builds_the_project_in_the_strong_city() {
     assert_ne!(capital, Some(project));
     assert_eq!(weak, Some(project));
 }
+
+/// `tall-real` (`ai::tall_real`) plans its spaceship as `space-finish` does where the science
+/// victory fits the game: the capital busy with a building takes the project. Parts built and not
+/// installed by the end lost victories to the plain march order (tuning log, work/nets/tall).
+#[cfg(feature = "experimental-ai")]
+#[test]
+fn tall_real_plans_its_spaceship() {
+    let (mut game, rules, capital, _weak) = space_age(12);
+    let building = plain_building(&game, &rules, capital);
+    enqueue(&mut game, &rules, capital, building);
+    let mut driver = AiDriver::with_mind(AiSettings::for_rules(&rules, rules.default_difficulty()), vec![P1], ClassicMind::new(Variant::TallReal));
+    driver.run(&mut game, &rules, u32::MAX);
+    let first = game.view().auth.cities().get(capital).unwrap().queue.first().copied();
+    assert_eq!(first, Some(ProductionItem::Project(apollo(&rules))));
+}

@@ -604,6 +604,10 @@ impl ClassicMind {
         brief.war_open = self.variant.war_open();
         brief.sharp = self.sharp;
         brief.tall_real = self.tall_real;
+        // `tall-real` finishes its spaceship by the space plan where the science victory fits the
+        // game (`victory::space_plan`, `ai::tall_real`).
+        let space_plan = self.tall_real && crate::ai::tall_real::science_game(observation, rules);
+        brief.space_finish |= space_plan;
         brief.met_eras = observation.view.met_eras();
         if brief.war_open {
             brief.scores = observation.view.race().scores;
@@ -629,7 +633,7 @@ impl ClassicMind {
             let mut prices = crate::ai::value::Prices::of_switches(observation, rules, self.variant.price_model(), self.variant.science_pricing(), self.variant.true_effects(), self.variant.cs_gift_cap());
             prices.unrest_steps = brief.war.unrest;
             prices.content_founding = self.variant.content_founding();
-            if self.variant.space_finish() {
+            if self.variant.space_finish() || space_plan {
                 prices.space = Some(crate::ai::value::SpaceDemand::of(observation, rules));
             }
             if brief.tall.plays() || brief.tall.book_cities() {

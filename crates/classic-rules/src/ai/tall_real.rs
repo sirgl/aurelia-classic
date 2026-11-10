@@ -22,7 +22,10 @@
 //!   strategy net's science aim (`strategy_net::think`), the science branch whole before any other
 //!   choice once open (`strategy_net::heads::choose_policy`), the culture waiting for it once the
 //!   first branch is open (`heads::science_ahead`, the book's measured wait), the science buildings
-//!   ordered first in every city by beakers per hammer (`tall::BuildingOrder::Science`).
+//!   ordered first in every city by beakers per hammer (`tall::BuildingOrder::Science`), and the
+//!   spaceship's items by the space plan with its parts walking around the units in the way
+//!   (`victory::space_plan`, `TurnBrief::space_finish`; parts built and not installed by the end
+//!   lost victories to `standard`'s single march order).
 //!
 //! Integer arithmetic, deterministic; only the player's own observation and the rules are read.
 
