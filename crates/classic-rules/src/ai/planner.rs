@@ -235,15 +235,17 @@ pub struct CallFixes {
     pub threat: bool,
     /// The press / hold / withdraw call at the walls (`siege_walls::call`).
     pub call: bool,
+    /// The planning estimate of a city carries the defence its owner can have built (`siege_walls::default_defence`).
+    pub walls: bool,
 }
 
 impl CallFixes {
-    pub const NONE: CallFixes = CallFixes { ready: false, ranged: false, melee: false, threat: false, call: false };
-    pub const ALL: CallFixes = CallFixes { ready: true, ranged: true, melee: true, threat: true, call: true };
+    pub const NONE: CallFixes = CallFixes { ready: false, ranged: false, melee: false, threat: false, call: false, walls: false };
+    pub const ALL: CallFixes = CallFixes { ready: true, ranged: true, melee: true, threat: true, call: true, walls: true };
     /// What `siege-call` plays: the fixes that measured better on the tuning offsets 200-202 (300 solo pace games,
     /// `runs/ops`): ranged units first and the press call. `ready` cut the losses and not the share, `melee` and
     /// `threat` lowered both (see `LOG.md`); they stay in the code, off, for the bench to switch on.
-    pub const DEFAULT: CallFixes = CallFixes { ready: false, ranged: true, melee: false, threat: false, call: true };
+    pub const DEFAULT: CallFixes = CallFixes { ready: false, ranged: true, melee: false, threat: false, call: true, walls: false };
 
     pub fn any(self) -> bool {
         self != Self::NONE
@@ -255,7 +257,7 @@ impl CallFixes {
         *FIXES.get_or_init(|| match std::env::var("SIEGE_CALL_ON") {
             Ok(list) => {
                 let on = |n: &str| list.split(',').any(|x| x.trim() == n);
-                CallFixes { ready: on("ready"), ranged: on("ranged"), melee: on("melee"), threat: on("threat"), call: on("call") }
+                CallFixes { ready: on("ready"), ranged: on("ranged"), melee: on("melee"), threat: on("threat"), call: on("call"), walls: on("walls") }
             }
             Err(_) => CallFixes::DEFAULT,
         })

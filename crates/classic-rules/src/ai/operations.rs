@@ -376,9 +376,12 @@ pub fn estimate_city(brief: &TurnBrief, rules: &CompiledRuleset, city: &SeenCity
     let techs = rules.technologies.len().max(1);
     let share = brief.techs.len().min(techs) * 100 / techs;
     let garrison = garrison.map_or(0, |k| i64::from(rules.units[k.0 as usize].strength) * 100 * 100 / CITY_STRENGTH_FROM_GARRISON_DIVISOR);
+    // `siege-call` (`CallFixes::walls`): the walls and strength the owner may have built by the technologies we
+    // know (the planning estimate assumed a city of 200 hit points; a walled one has 250).
+    let (extra_strength, extra_hp) = if brief.siege_call.walls { crate::ai::siege_walls::default_defence(brief, rules, city.population) } else { (0, 0) };
     CityEstimate {
-        strength: CITY_STRENGTH_BASE + i64::from(city.population) * CITY_STRENGTH_PER_POP + CITY_TECH_STRENGTH[share] + garrison,
-        hp: CITY_BASE_HIT_POINTS,
+        strength: CITY_STRENGTH_BASE + i64::from(city.population) * CITY_STRENGTH_PER_POP + CITY_TECH_STRENGTH[share] + garrison + extra_strength,
+        hp: CITY_BASE_HIT_POINTS.saturating_add(extra_hp),
         heal: CITY_HEAL_PER_TURN as u16,
     }
 }
