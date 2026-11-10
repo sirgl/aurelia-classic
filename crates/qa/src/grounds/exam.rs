@@ -320,6 +320,7 @@ pub struct Run {
     trigger: Option<u32>,
     reinforce_kinds: Vec<UnitKindId>,
     lost_at_trigger: u32,
+    trig_near: Vec<EntityId>,
     min_dist: f64,
     founded: Option<u32>,
     pub info: BTreeMap<String, String>,
@@ -369,6 +370,7 @@ pub fn build(sc: Sc, rules: &CompiledRuleset, world: &World, control: bool) -> R
         trigger: None,
         reinforce_kinds: Vec::new(),
         lost_at_trigger: 0,
+        trig_near: Vec::new(),
         min_dist: f64::MAX,
         founded: None,
         info: BTreeMap::new(),
@@ -920,6 +922,7 @@ impl Run {
             if self.sc == Sc::C3 && self.trigger.is_none() && mine.iter().any(|(_, c)| dist(game, c.tile, target) <= 6) {
                 self.trigger = Some(rel);
                 self.lost_at_trigger = (self.n0 - mine.len()) as u32;
+                self.trig_near = mine.iter().filter(|(_, c)| dist(game, c.tile, target) <= 6).map(|(p, _)| p.id).collect();
                 let free: Vec<TileId> = free_land(rules, game, game.view().auth.map().land_area(target));
                 let mut ring: Vec<TileId> = free.into_iter().filter(|&t| (1..=2).contains(&dist(game, t, target))).collect();
                 ring.sort_by_key(|&t| (dist(game, t, target), t.0));
@@ -1083,6 +1086,9 @@ impl Run {
                 m.insert("min_dist".to_owned(), if self.min_dist == f64::MAX { -1.0 } else { self.min_dist });
                 m.insert("trigger".to_owned(), self.trigger.map_or(-1.0, f64::from));
                 m.insert("lost_at_trigger".to_owned(), f64::from(self.lost_at_trigger));
+                // Exam addition (not part of the win rule): the units within 6 tiles when the reinforcement came, and how many of them live at the end.
+                m.insert("near_at_trigger".to_owned(), self.trig_near.len() as f64);
+                m.insert("near_alive_end".to_owned(), mine.iter().filter(|(p, _)| self.trig_near.contains(&p.id)).count() as f64);
             }
             _ => {}
         }
@@ -1111,7 +1117,9 @@ pub struct Row {
 pub fn play(rules: &CompiledRuleset, mut game: GameState, mut run: Run, instance: usize, player: &str, live: bool) -> Result<Row, String> {
     let mind = |n: &str| ClassicBench::mind(n).ok_or_else(|| format!("no AI variant {n}"));
     let reference = player.starts_with("ref-").then_some(player);
-    let base = if reference.is_some() { "standard" } else { player };
+    // `v2`: the big net's only weights on disk (read only), in process (`net:v2:FILE`); EXAM_V2 names another file.
+    let v2 = format!("net:v2:{}", std::env::var("EXAM_V2").unwrap_or_else(|_| "/Users/roman.ivanov/civ/work/v2-gpu/data/C-cont.v2".to_owned()));
+    let base = if reference.is_some() { "standard" } else if player == "v2" { v2.as_str() } else { player };
     let nations = majors(&game);
     let mut seats = Vec::new();
     for p in &nations {

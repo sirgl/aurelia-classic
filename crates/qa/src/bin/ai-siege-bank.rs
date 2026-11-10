@@ -39,6 +39,11 @@
 //! --set K=V,…          `unit_net::fit` overrides for every layer (dev only)
 //! --jobs N             (default 4)
 //! --out FILE           the rows (CSV)
+//!
+//! The tactics exam's C2 references (an exam addition; they change no AI): the layer `ref-press` plays
+//! `war-pays` with its operation members pressed by a script every turn (a shooter fires at the city, a melee
+//! unit attacks it when next to it, else a foe next to it, else the unit walks at the city); `ref-holdN` is
+//! `war-pays` with the attacker out of play (its turns ended unplayed) for the first N rounds, then as war-pays.
 
 use std::collections::BTreeMap;
 use std::io::Write;
@@ -484,6 +489,62 @@ fn military_ids(game: &GameState, rules: &CompiledRuleset, owner: PlayerId) -> V
     game.view().auth.units().iter_cores().filter(|u| u.owner == owner && army_role(rules, u.kind).is_some()).map(|u| u.id).collect()
 }
 
+/// `ref-press` for the operation's members at the attacker's turn start (see the header).
+fn press_members(game: &mut GameState, rules: &CompiledRuleset, pos: &Position) -> u64 {
+    use classic_rules::Command;
+    let mut made = 0;
+    let dist = |g: &GameState, a: TileId, b: TileId| g.view().auth.map().dimensions.distance(a, b).unwrap_or(i32::MAX);
+    for _ in 0..3 {
+        let members: Vec<(classic_rules::ids::UnitHandle, classic_rules::ids::UnitKindId, TileId)> = {
+            let auth = game.view().auth;
+            auth.indexes().units_of(pos.player).iter().filter_map(|h| auth.units().get(*h).map(|u| (*h, u.core.kind, u.core.tile, u.core.id))).filter(|(_, _, _, id)| pos.members.contains(id)).map(|(h, k, t, _)| (h, k, t)).collect()
+        };
+        for (h, kind, tile) in members {
+            let ranged = classic_rules::ai::combat::ranged_range(rules, kind).is_some();
+            let city_h = game.view().auth.indexes().city_on_tile(pos.target);
+            let mut cmds: Vec<Command> = Vec::new();
+            if ranged {
+                cmds.push(Command::RangedAttack { unit: h, target: pos.target });
+            } else if let Some(city) = city_h {
+                cmds.push(Command::AttackCity { attacker: h, city });
+            }
+            let auth = game.view().auth;
+            let mut foes: Vec<(classic_rules::ids::UnitHandle, TileId)> = auth.indexes().units_of(pos.enemy).iter().filter_map(|u| auth.units().get(*u).map(|x| (*u, x.core.tile))).filter(|(_, t)| dist(game, tile, *t) <= if ranged { 3 } else { 1 }).collect();
+            foes.sort_by_key(|(_, t)| (dist(game, tile, *t), t.0));
+            for (fh, ft) in foes {
+                cmds.push(if ranged { Command::RangedAttack { unit: h, target: ft } } else { Command::AttackUnit { attacker: h, defender: fh } });
+            }
+            let mut acted = false;
+            for cmd in cmds {
+                if game.accepts_order(rules, pos.player, &cmd) && game.execute(rules, cmd).is_ok() {
+                    made += 1;
+                    acted = true;
+                    break;
+                }
+            }
+            if acted || dist(game, tile, pos.target) <= 1 {
+                continue;
+            }
+            let steps = rules.units.get(kind.0 as usize).map_or(1, |d| i32::from(d.movement.max(1)));
+            let auth = game.view().auth;
+            let mut tiles: Vec<TileId> = (0..auth.map().tile_count() as u32)
+                .map(TileId)
+                .filter(|t| *t != tile && dist(game, tile, *t) <= steps && auth.indexes().units_on(*t).is_empty() && auth.indexes().city_on_tile(*t).is_none() && dist(game, *t, pos.target) < dist(game, tile, pos.target))
+                .collect();
+            tiles.sort_by_key(|&t| (dist(game, t, pos.target), t.0));
+            tiles.truncate(10);
+            for t in tiles {
+                let cmd = Command::MoveUnit { unit: h, destination: t };
+                if game.accepts_order(rules, pos.player, &cmd) && game.execute(rules, cmd).is_ok() {
+                    made += 1;
+                    break;
+                }
+            }
+        }
+    }
+    made
+}
+
 /// A layer named `tactician-fit@NAME` plays the candidate NAME of `--candidates`.
 fn play_layer(rules: &CompiledRuleset, dir: &str, pos: &Position, layer: &str, others: &str, dice: Option<u64>, rounds: u32, candidates: &[(String, &'static classic_rules::ai::unit_net::fit::Numbers)]) -> Result<Outcome, String> {
     match layer.split_once('@') {
@@ -503,7 +564,11 @@ fn play_position(rules: &CompiledRuleset, dir: &str, pos: &Position, layer: &str
     if let Some(dice) = dice {
         game.reseed_streams(dice);
     }
-    let mut driver: Driver = AiDriver::with_mind(ClassicBench::settings(rules), Vec::new(), Seated::new(mind(others)?, vec![(pos.player, mind(layer)?)]));
+    // The exam's references play `war-pays` (the bank's own attacker) with the script.
+    let press = layer == "ref-press";
+    let hold: u32 = layer.strip_prefix("ref-hold").and_then(|n| n.parse().ok()).unwrap_or(0);
+    let layer = if press || hold > 0 { "war-pays" } else { layer };
+    let mut driver: Driver = AiDriver::with_mind(ClassicBench::settings(rules), if hold > 0 { vec![pos.player] } else { Vec::new() }, Seated::new(mind(others)?, vec![(pos.player, mind(layer)?)]));
     driver.set_trace_capacity(0);
     driver.load(&save.ai, game.view().auth.map().tile_count(), rules).map_err(|e| format!("{}: memory {e:?}", pos.file))?;
     let army = military_ids(&game, rules, pos.player);
@@ -511,10 +576,27 @@ fn play_position(rules: &CompiledRuleset, dir: &str, pos: &Position, layer: &str
     let mut out = Outcome::default();
     let mut damage_before = city_at(&game, rules, pos.target).map_or(0, |c| c.1);
     let stop = pos.round + rounds;
+    let mut pressed: Option<u32> = None;
+    let mut released = hold == 0;
     'rounds: while !game.is_over() && round(&game) < stop {
         loop {
+            if !released && round(&game) >= pos.round + hold {
+                driver.set_humans(Vec::new());
+                released = true;
+            }
+            if press && game.view().auth.active_player() == pos.player && pressed != Some(round(&game)) {
+                pressed = Some(round(&game));
+                press_members(&mut game, rules, pos);
+            }
             match driver.step(&mut game, rules) {
                 StepOutcome::Worked => {}
+                StepOutcome::Waiting if !released && !game.is_over() => {
+                    // The attacker is out of play: its turn ends unplayed.
+                    let end = classic_rules::Command::EndTurn { player: game.view().auth.active_player() };
+                    if game.execute(rules, end).is_err() {
+                        break 'rounds;
+                    }
+                }
                 StepOutcome::PlayerDone(p) => {
                     let city = city_at(&game, rules, pos.target);
                     let damage = city.map_or(0, |c| c.1);
