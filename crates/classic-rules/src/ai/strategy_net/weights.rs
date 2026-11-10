@@ -109,7 +109,12 @@ pub mod fe {
     pub const OP_FORMING: usize = 47;
     pub const STRENGTH: usize = 48;
     pub const PAYS: usize = 49;
-    pub const N: usize = 50;
+    /// `sharp`'s features (`sharp::features`); 0 for every other variant.
+    pub const SPACE_OWN: usize = 50;
+    pub const SPACE_RIVAL: usize = 51;
+    pub const SCORE_TREND: usize = 52;
+    pub const RUNAWAY: usize = 53;
+    pub const N: usize = 54;
     /// The features every variant's net reads: the memory keeps these of a style's lock
     /// (`Memory::encode`), `war-open`'s are events of the turn (`open::STYLE_EVENTS`).
     pub const BASE_N: usize = 46;
@@ -167,6 +172,10 @@ pub const FEATURES: [(&str, &str); fe::N] = [
     ("op_forming", "war-open: an offensive operation forms or marches, or its war chest is saved (1)"),
     ("strength", "war-open: own military power over own plus the nearest rival's known power (0.5: level)"),
     ("pays", "war-open: the war machine has a target whose war case is worth its army now (`operations::Outlook::pays`)"),
+    ("space_own", "sharp: the beakers of the spaceship's technologies we know over all of them (0.8) and its parts built (0.2)"),
+    ("space_rival", "sharp: the era of the most advanced rival met over the spaceship's era"),
+    ("score_trend", "sharp: our score over the best rival's, its change since the last survey: −0.1 → 0, none 0.5, +0.1 → 1"),
+    ("runaway", "sharp: the best rival's score over the next best nation's, ours included: +50 % → 1 (0 while we lead)"),
 ];
 
 // ---- layer 1: concepts ----

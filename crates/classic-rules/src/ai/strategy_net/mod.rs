@@ -33,6 +33,7 @@ pub mod goals;
 pub mod heads;
 pub mod layers;
 pub mod model;
+pub mod sharp;
 pub mod trace;
 pub mod weights;
 
@@ -66,6 +67,17 @@ pub struct Intent {
     pub horizon: u32,
     /// The style is locked (`weights::LOCK_MIN_ROUNDS`).
     pub locked: bool,
+    /// The intent of `sharp` (`Net::sharp`): its prices follow the held choice and its cell runs on
+    /// its own scale (`sharp::rows`, `CellPrices::sharp`).
+    pub sharp: bool,
+}
+
+/// Which net thinks: `standard`'s, with `war-open`'s window and terms (`open`), with `sharp`'s
+/// choice and inputs (`sharp`).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct Net {
+    pub open: bool,
+    pub sharp: bool,
 }
 
 /// The choices held from the last turn.
@@ -100,9 +112,15 @@ pub fn concepts(features: &[Milli; fe::N]) -> [Milli; kc::N] {
 /// The concepts; with `open` (`war-open`) the strike window is the larger of the early one and
 /// the window of any era (`weights::open::WINDOW`). No later concept reads the window.
 pub fn concepts_of(features: &[Milli; fe::N], open: bool) -> [Milli; kc::N] {
+    concepts_net(features, Net { open, sharp: false })
+}
+
+/// The concepts of a net: `concepts_of`, with `sharp`'s terms (`sharp::w::CONCEPTS`) when `sharp`.
+pub fn concepts_net(features: &[Milli; fe::N], net: Net) -> [Milli; kc::N] {
+    let open = net.open;
     let mut out = [0; kc::N];
     for (i, neuron) in weights::CONCEPTS.iter().enumerate() {
-        out[i] = fire(neuron, features, &out);
+        out[i] = if net.sharp { sharp::fire_with(neuron, sharp::w::CONCEPTS, i, features, &out) } else { fire(neuron, features, &out) };
         if open && i == kc::STRIKE_WINDOW {
             out[i] = out[i].max(fire(&weights::open::WINDOW, features, &out));
         }
@@ -134,8 +152,35 @@ pub fn intent(features: &[Milli; fe::N], held: Held, cities: u32, rounds_left: u
 /// `intent`; with `open` the net of `war-open` (`weights::open`): the window of any era, the
 /// war machine's operation in the posture, the opportunity in the style and the aim.
 pub fn intent_of(features: &[Milli; fe::N], held: Held, cities: u32, rounds_left: u32, pace: u32, open: bool) -> Intent {
-    let concepts = concepts_of(features, open);
+    intent_net(features, held, cities, rounds_left, pace, Net { open, sharp: false })
+}
+
+/// The logits of a table with `sharp`'s terms added (`sharp::w`), and its bias for `at`.
+fn sharpened(mut logits: Vec<Milli>, table: &[(usize, weights::Term)], features: &[Milli; fe::N], concepts: &[Milli; kc::N]) -> Vec<Milli> {
+    for (at, term) in table {
+        let x = match term.input {
+            weights::Input::F(i) => features[i],
+            weights::Input::K(i) => concepts[i],
+        };
+        logits[*at] += term.w * x / ONE;
+    }
+    logits
+}
+
+/// The style logits of `sharp`: its terms and the tall bias.
+fn sharp_style(logits: Vec<Milli>, features: &[Milli; fe::N], concepts: &[Milli; kc::N]) -> Vec<Milli> {
+    let mut out = sharpened(logits, sharp::w::STYLE, features, concepts);
+    out[0] += sharp::w::TALL_BIAS;
+    out
+}
+
+/// `intent_of` for a net (`Net`): `sharp`'s concepts, terms and temperatures when `sharp`.
+pub fn intent_net(features: &[Milli; fe::N], held: Held, cities: u32, rounds_left: u32, pace: u32, net: Net) -> Intent {
+    let open = net.open;
+    let concepts = concepts_net(features, net);
     let extra = |table: &'static [(usize, weights::Term)]| open.then_some(table);
+    let temper = |logits: [Milli; 3], t: Milli| if net.sharp { sharp::tempered(&logits, t) } else { logits };
+    let temper4 = |logits: [Milli; 4], t: Milli| if net.sharp { sharp::tempered(&logits, t) } else { logits };
     // A locked style is the lock's situation with the turn's events.
     let (style, margin) = match &held.lock {
         Some(lock) => {
@@ -148,19 +193,37 @@ pub fn intent_of(features: &[Milli; fe::N], held: Held, cities: u32, rounds_left
                     at_lock[e] = features[e];
                 }
             }
+            if net.sharp {
+                for e in sharp::w::STYLE_EVENTS {
+                    at_lock[e] = features[e];
+                }
+            }
             // The window of any era is a posture's reason, not a style's: a locked style weighs
             // the opportunity itself (`weights::open::STYLE`), not the window it opens for a few
             // reviews (with the window the conquest style held 35 % of the traced reviews and its
             // prices cost the economy; tuning offsets 200–201).
-            let lock_concepts = self::concepts(&at_lock);
-            let style_logits = logits_of(&weights::STYLE, extra(weights::open::STYLE), &at_lock, &lock_concepts);
+            let lock_concepts = concepts_net(&at_lock, Net { open: false, sharp: net.sharp });
+            let mut style_logits = logits_of(&weights::STYLE, extra(weights::open::STYLE), &at_lock, &lock_concepts);
+            if net.sharp {
+                style_logits = sharp_style(style_logits, &at_lock, &lock_concepts);
+            }
             let margin = if survival(features, &concepts) { weights::HYSTERESIS } else { weights::STYLE_LOCK };
-            (softmax(&<[Milli; 3]>::try_from(style_logits).expect("three styles")), margin)
+            (softmax(&temper(<[Milli; 3]>::try_from(style_logits).expect("three styles"), sharp::w::STYLE_TEMPERATURE)), margin)
         }
-        None => (softmax(&<[Milli; 3]>::try_from(logits_of(&weights::STYLE, extra(weights::open::STYLE), features, &concepts)).expect("three styles")), weights::HYSTERESIS),
+        None => {
+            let mut style_logits = logits_of(&weights::STYLE, extra(weights::open::STYLE), features, &concepts);
+            if net.sharp {
+                style_logits = sharp_style(style_logits, features, &concepts);
+            }
+            (softmax(&temper(<[Milli; 3]>::try_from(style_logits).expect("three styles"), sharp::w::STYLE_TEMPERATURE)), weights::HYSTERESIS)
+        }
     };
-    let aim = softmax(&<[Milli; 4]>::try_from(logits_of(&weights::AIM, extra(weights::open::AIM), features, &concepts)).expect("four aims"));
-    let posture = softmax(&<[Milli; 4]>::try_from(logits_of(&weights::POSTURE, extra(weights::open::POSTURE), features, &concepts)).expect("four postures"));
+    let mut aim_logits = logits_of(&weights::AIM, extra(weights::open::AIM), features, &concepts);
+    if net.sharp {
+        aim_logits = sharpened(aim_logits, sharp::w::AIM, features, &concepts);
+    }
+    let aim = softmax(&temper4(<[Milli; 4]>::try_from(aim_logits).expect("four aims"), sharp::w::AIM_TEMPERATURE));
+    let posture = softmax(&temper4(<[Milli; 4]>::try_from(logits_of(&weights::POSTURE, extra(weights::open::POSTURE), features, &concepts)).expect("four postures"), sharp::w::POSTURE_TEMPERATURE));
     let style_pick = hold(&style, held.style, margin);
     let aim_pick = hold(&aim, held.aim, weights::HYSTERESIS);
     let posture_pick = hold(&posture, held.posture, weights::HYSTERESIS);
@@ -193,9 +256,14 @@ pub fn intent_of(features: &[Milli; fe::N], held: Held, cities: u32, rounds_left
     for (name, w, _) in weights::HORIZON_TERMS {
         h += w * share(name);
     }
+    if net.sharp {
+        for (feature, w, _) in sharp::w::HORIZON {
+            h += w * features[*feature];
+        }
+    }
     let h = (h / ONE).clamp(weights::HORIZON_MIN, weights::HORIZON_MAX);
     let horizon = (h * i64::from(pace.max(1)) / 100).clamp(1, i64::from(rounds_left.max(1))) as u32;
-    Intent { concepts, style, aim, posture, style_pick, aim_pick, posture_pick, more_cities: more_cities as u32, horizon, locked: held.lock.is_some() }
+    Intent { concepts, style, aim, posture, style_pick, aim_pick, posture_pick, more_cities: more_cities as u32, horizon, locked: held.lock.is_some(), sharp: net.sharp }
 }
 
 /// The 13 rows of the price layer: the 11 shares and the 2 gates.
@@ -212,7 +280,7 @@ pub fn rows(intent: &Intent) -> [Milli; 13] {
 /// Layer 2: the price multipliers of an intent (food 1000: the cell sets
 /// it).
 pub fn price_mult(intent: &Intent) -> [Milli; pd::N] {
-    let rows = rows(intent);
+    let rows = if intent.sharp { sharp::rows(intent) } else { rows(intent) };
     let mut mult = [ONE; pd::N];
     for (row, price, w, _) in weights::PRICE_ROWS {
         mult[*price] += rows[*row] * w / ONE * weights::PRICE_GAIN / ONE;
@@ -348,6 +416,9 @@ pub struct Memory {
     /// The last review of the goals.
     pub review: Option<Review>,
     pub target: Option<TechId>,
+    /// `sharp`'s own (`sharp::Memory`): written after the rest, only when there is one, so the
+    /// other variants' memory keeps its bytes.
+    pub sharp: Option<sharp::Memory>,
 }
 
 /// A review of the goals and of the cell's prices.
@@ -363,6 +434,8 @@ pub struct Review {
 
 /// The memory's format version (the first byte).
 const MEMORY_VERSION: u8 = 0x5B;
+/// The marker of `sharp`'s section at the memory's end (`Memory::sharp`).
+const SHARP_SECTION: u8 = 0x5C;
 
 struct Writer(Vec<u8>);
 
@@ -465,6 +538,11 @@ impl Memory {
             }
             None => w.0.push(0),
         }
+        if let Some(m) = &self.sharp {
+            w.0.push(SHARP_SECTION);
+            w.i64(m.ratio);
+            w.i64(m.trend);
+        }
         w.0
     }
 
@@ -546,7 +624,14 @@ impl Memory {
         } else {
             None
         };
-        Some(Memory { held, survey, review, target })
+        // `sharp`'s section: its marker and two numbers, the memory's last 17 bytes.
+        let sharp = if r.0.len() == 17 && r.0[0] == SHARP_SECTION {
+            r.u8()?;
+            Some(sharp::Memory { ratio: r.i64()?, trend: r.i64()? })
+        } else {
+            None
+        };
+        Some(Memory { held, survey, review, target, sharp })
     }
 }
 
@@ -588,7 +673,11 @@ pub fn think(obs: &AIObservation<'_>, brief: &crate::ai::planner::TurnBrief, sta
     let paced = |rounds: u32| (rounds * pace / 100).max(1);
     let survey_due = memory.survey.as_ref().is_none_or(|s| round >= s.round + paced(weights::goal::SURVEY_ROUNDS) || s.cities != cities);
     if survey_due {
-        memory.survey = Some(features::survey(obs, rules, state));
+        let mut survey = features::survey(obs, rules, state);
+        if brief.sharp {
+            sharp::survey(obs, state, &mut survey);
+        }
+        memory.survey = Some(survey);
     }
     let survey = memory.survey.expect("surveyed above");
     let mut situation = features::situation(obs, brief, rules, &survey);
@@ -596,8 +685,13 @@ pub fn think(obs: &AIObservation<'_>, brief: &crate::ai::planner::TurnBrief, sta
         // `war-open`: what the war machine sees (`features::open`).
         features::open(obs, brief, state, rules, prices, stakes, &mut situation);
     }
+    if brief.sharp {
+        // `sharp`: the features on scales that keep moving and its new inputs (`sharp::features`).
+        sharp::features(obs, brief, rules, state, &mut memory.sharp, survey_due, &mut situation);
+    }
     let rounds_left = prices.rounds_left;
-    let mut intent = intent_of(&situation, memory.held, cities, rounds_left, pace, brief.war_open);
+    let net = Net { open: brief.war_open, sharp: brief.sharp };
+    let mut intent = intent_net(&situation, memory.held, cities, rounds_left, pace, net);
     // The style is locked when the first branch may be opened after the
     // first survey of the surroundings, at the latest `LOCK_MAX_ROUNDS`.
     let mut lock = memory.held.lock;

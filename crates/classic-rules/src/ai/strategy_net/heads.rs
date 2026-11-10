@@ -206,7 +206,7 @@ fn policy_worth(model: &Model, rules: &CompiledRuleset, prices: &CellPrices, val
 /// part, other effects).
 pub fn policy_values(model: &Model, rules: &CompiledRuleset, plan: &Plan, base: &Base) -> Vec<(PolicyId, i64, i64)> {
     let horizon = i64::from(plan.intent.horizon.max(1));
-    let prices = CellPrices::of(base, &plan.mult);
+    let prices = CellPrices::of(base, &plan.mult).scaled(plan.intent.sharp);
     let room = i64::from(plan.city_target.saturating_sub(model.cities.len() as u32));
     let valuer = Valuer { model, rules, base, mult: &plan.mult, horizon: base.rounds_left.max(1), room, fight: fight(&plan.intent) };
     let empty = CellPlan::new(model);
@@ -225,7 +225,7 @@ pub fn policy_values(model: &Model, rules: &CompiledRuleset, plan: &Plan, base: 
 /// The policy head over a model.
 pub fn choose_policy(model: &Model, rules: &CompiledRuleset, plan: &Plan, base: &Base, culture: &Culture) -> Option<PolicyChoice> {
     let horizon = i64::from(plan.intent.horizon.max(1));
-    let prices = CellPrices::of(base, &plan.mult);
+    let prices = CellPrices::of(base, &plan.mult).scaled(plan.intent.sharp);
     let room = i64::from(plan.city_target.saturating_sub(model.cities.len() as u32));
     let valuer = Valuer { model, rules, base, mult: &plan.mult, horizon: base.rounds_left.max(1), room, fight: fight(&plan.intent) };
     let empty = CellPlan::new(model);

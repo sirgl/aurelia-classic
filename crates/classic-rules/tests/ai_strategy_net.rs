@@ -787,9 +787,16 @@ fn the_memory_round_trips() {
     let i = intent(&great_land_no_room(), Held::default(), 1, 198, 67);
     let mut mult = price_mult(&i);
     let review = goals::review(&m, &rules, &i, &mut mult, &base(), 7, false);
-    let memory = Memory { held: Held { style: Some(0), aim: Some(1), posture: None, lock: Some(StyleLock { round: 13, situation: great_land_no_room() }) }, survey: None, review: Some(review), target: Some(TechId(5)) };
+    let memory = Memory { held: Held { style: Some(0), aim: Some(1), posture: None, lock: Some(StyleLock { round: 13, situation: great_land_no_room() }) }, survey: None, review: Some(review), target: Some(TechId(5)), sharp: None };
     assert_eq!(Memory::decode(&memory.encode()), memory);
     assert_eq!(Memory::decode(&[1, 2, 3]), Memory::default(), "another mind's bytes");
+    // `sharp`'s section comes after the rest and only when there is one: the other variants'
+    // bytes are what they were.
+    let sharp = Memory { sharp: Some(classic_rules::ai::strategy_net::sharp::Memory { ratio: 870, trend: 430 }), ..memory.clone() };
+    let (plain, with) = (memory.encode(), sharp.encode());
+    assert_eq!(&with[..plain.len()], &plain[..], "the same bytes before the section");
+    assert_eq!(with.len(), plain.len() + 17);
+    assert_eq!(Memory::decode(&with), sharp);
 }
 
 /// The net counts a few hundred hand weights.
@@ -997,4 +1004,92 @@ fn era_dump() {
     let rules = classic();
     for (i, e) in rules.eras.iter().enumerate() { println!("era {i} {}", e.key); }
     for b in rules.module.policy_branches.iter() { println!("{} era {:?} relig {} excl {:?}", b.key, b.era_prerequisite, b.locked_without_religion, b.mutually_exclusive_with); }
+}
+
+// ---- `sharp` (`strategy_net::sharp`) ----
+
+/// `sharp`: the prices follow the held choice. The same situation priced by `standard`'s blend and
+/// by `sharp`'s rows: the held style and aim take a larger share, so a tall science plan prices
+/// science higher and a city lower than the blend does; the softmax of a lower temperature gives
+/// the leading choice a larger share.
+#[test]
+fn sharp_prices_follow_the_held_choice() {
+    use classic_rules::ai::strategy_net::{intent_net, Net};
+    let f = great_land_no_room();
+    let blend = intent(&f, Held::default(), 1, 198, 67);
+    let sharp = intent_net(&f, Held::default(), 1, 198, 67, Net { open: false, sharp: true });
+    assert_eq!(blend.style_pick, 0, "tall: {:?}", blend.style);
+    assert_eq!(sharp.style_pick, 0, "tall: {:?}", sharp.style);
+    assert!(sharp.style[0] > blend.style[0], "a sharper share: {:?} against {:?}", sharp.style, blend.style);
+    let (b, s) = (price_mult(&blend), price_mult(&sharp));
+    assert!(s[pd::SCIENCE] > b[pd::SCIENCE], "science {} against {}", s[pd::SCIENCE], b[pd::SCIENCE]);
+    assert!(s[pd::EXPANSION] < b[pd::EXPANSION], "a city {} against {}", s[pd::EXPANSION], b[pd::EXPANSION]);
+    // `standard`'s intent is what it was: `intent` is the net without `sharp`.
+    assert_eq!(intent_net(&f, Held::default(), 1, 198, 67, Net::default()), blend);
+}
+
+/// `sharp`: the leader moves the style. On the same middling land with room, a scholar who does
+/// not like new cities plays tall, a leader who likes them plays wide; `standard` plays both wide.
+#[test]
+fn sharp_the_leader_moves_the_style() {
+    use classic_rules::ai::strategy_net::{intent_net, Net};
+    let land = [(fe::CAP_FOOD, 400), (fe::CAP_PROD, 300), (fe::SITES_FOOD, 300), (fe::CAP_LUX, 600), (fe::ROOM, 667), (fe::HAPPY, 1000)];
+    let with = |traits: &[(usize, i64)]| {
+        let mut pairs = land.to_vec();
+        pairs.extend_from_slice(traits);
+        neutral(&pairs)
+    };
+    let scholar = with(&[(fe::T_EXPANSION, 400), (fe::T_SCIENCE, 900), (fe::T_WONDERS, 600)]);
+    let settler = with(&[(fe::T_EXPANSION, 900), (fe::T_SCIENCE, 400), (fe::T_WONDERS, 400)]);
+    let net = Net { open: false, sharp: true };
+    let (s, w) = (intent_net(&scholar, Held::default(), 1, 198, 67, net), intent_net(&settler, Held::default(), 1, 198, 67, net));
+    assert_eq!(s.style_pick, 0, "the scholar plays tall: {:?}", s.style);
+    assert_eq!(w.style_pick, 1, "the settler plays wide: {:?}", w.style);
+    assert_eq!(intent(&scholar, Held::default(), 1, 198, 67).style_pick, 1, "standard: wide");
+}
+
+/// `sharp`'s era-relative scales come from the rules' data: the era's technologies and buildings
+/// cost more in every later era, so the same beakers and hammers are a smaller feature; the
+/// spaceship's technologies exist and lie in a late era.
+#[test]
+fn sharp_scales_grow_with_the_era() {
+    use classic_rules::ai::strategy_net::sharp::{era_building_cost, era_tech_cost, space_era, space_techs};
+    let rules = classic();
+    let eras = rules.eras.len();
+    let techs: Vec<i64> = (0..eras).map(|e| era_tech_cost(&rules, e, 100)).collect();
+    let buildings: Vec<i64> = (0..eras).map(|e| era_building_cost(&rules, e, 100)).collect();
+    assert!(techs.windows(2).all(|w| w[1] >= w[0]) && techs[eras - 1] > 4 * techs[0], "{techs:?}");
+    assert!(buildings.windows(2).all(|w| w[1] >= w[0]) && buildings[eras - 1] > 2 * buildings[0], "{buildings:?}");
+    assert!(!space_techs(&rules).is_empty());
+    assert!(space_era(&rules) + 2 >= eras, "the spaceship is a late era's: {} of {eras}", space_era(&rules));
+}
+
+/// `sharp`'s cell scale. `standard`'s cell counts a citizen only when the food crosses a threshold
+/// within H: on a toy capital at H 20 the second and the fourth food more a turn are worth 24
+/// centi-points against 1 193 for the first; `sharp`'s counts the store and the tail's growth as a
+/// share of a citizen, so no food more is worth almost nothing for missing a threshold, and the
+/// first food is worth more than the whole citizens alone (the tail's growth). At the game's end
+/// its run covers the rounds left, not ten steps of them.
+#[test]
+fn sharp_counts_the_food_left_in_the_store() {
+    let rules = classic();
+    let m = model(&rules, &grassland_capital(&rules), 3, &start_techs(&rules), 40);
+    let plan = CellPlan::new(&m);
+    let with = |food: i64, prices: &CellPrices, h: i64| {
+        let mut fed = plan.clone();
+        let mut flat = [0; 6];
+        flat[0] = food * 100;
+        fed.deltas[0].push(Delta { flat, ..Delta::default() });
+        run(&m, &fed, prices, h).value
+    };
+    let standard = CellPrices::of(&base(), &[1000; pd::N]);
+    let sharp = standard.scaled(true);
+    for h in [20, 40, 60] {
+        let gains: Vec<i64> = (1..=4).map(|f| with(f, &sharp, h) - with(f - 1, &sharp, h)).collect();
+        let before: Vec<i64> = (1..=4).map(|f| with(f, &standard, h) - with(f - 1, &standard, h)).collect();
+        assert!(gains[0] > before[0], "H {h}: sharp {gains:?}, standard {before:?}");
+        assert!(gains.iter().all(|g| *g * 4 > gains[0]), "H {h}: no food more worth almost nothing: {gains:?}");
+    }
+    let end = CellPrices::of(&Base { rounds_left: 3, ..base() }, &[1000; pd::N]);
+    assert!(food_price(&m, &plan, &end.scaled(true), 3) <= food_price(&m, &plan, &end, 3));
 }

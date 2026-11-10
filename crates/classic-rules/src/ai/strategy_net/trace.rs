@@ -15,6 +15,17 @@ use crate::rules::CompiledRuleset;
 thread_local! {
     static ON: Cell<bool> = const { Cell::new(false) };
     static LINES: RefCell<Vec<String>> = const { RefCell::new(Vec::new()) };
+    /// The cell's food price over the allocator's before its clamps (`weights::FOOD_MIN`,
+    /// `FOOD_MAX`), thousandths, of the review being traced.
+    static FOOD_RAW: Cell<Option<i64>> = const { Cell::new(None) };
+}
+
+/// The cell's food price over the allocator's before the clamps (`goals::review`): printed on
+/// the review's line.
+pub fn food_raw(raw: i64) {
+    if enabled() {
+        FOOD_RAW.with(|c| c.set(Some(raw)));
+    }
 }
 
 pub fn enable(on: bool) {
@@ -85,6 +96,15 @@ pub fn turn(player: u8, plan: &Plan, reviewed: bool, rules: &CompiledRuleset) {
         goals.join("; "),
         plan.target.map_or("-".to_owned(), |t| tech_name(rules, t)),
     ));
+    // The food price before its clamps and every feature the net read (thousandths, in the order
+    // of `weights::FEATURES`).
+    let raw = FOOD_RAW.with(|c| c.take());
+    let features: Vec<String> = plan.features.iter().map(|v| v.to_string()).collect();
+    LINES.with(|l| {
+        if let Some(last) = l.borrow_mut().last_mut() {
+            last.push_str(&format!(" | food_raw {} | f[{}]", raw.map_or("-".to_owned(), |r| format!("{:.2}", r as f64 / 1000.0)), features.join(",")));
+        }
+    });
     // `war-open`'s features and its window (none of the other variants has them).
     use super::weights::{fe, kc};
     let open = [fe::OPPORTUNITY, fe::OP_FORMING, fe::STRENGTH, fe::PAYS].map(|f| plan.features[f]);

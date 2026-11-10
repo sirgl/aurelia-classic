@@ -309,6 +309,9 @@ pub struct CellPrices {
     /// Rounds left in the game: after H the run's last step goes on at its
     /// rate to the end (the allocator's measure: a change kept to the end).
     pub rounds_left: i64,
+    /// `sharp`'s scale (`sharp_tail`): the run covers the horizon and no more, the food left in
+    /// the store and the tail's growth count as a share of a citizen.
+    pub sharp: bool,
 }
 
 impl CellPrices {
@@ -317,7 +320,12 @@ impl CellPrices {
         for (s, u) in unit.iter_mut().enumerate().skip(1) {
             *u = base.slot(s) * super::slot_mult(mult, s) / base.rounds_left.max(1);
         }
-        CellPrices { unit, citizen: base.citizen * mult[super::weights::pd::CITIZEN] / 1000, rounds_left: base.rounds_left.max(1) }
+        CellPrices { unit, citizen: base.citizen * mult[super::weights::pd::CITIZEN] / 1000, rounds_left: base.rounds_left.max(1), sharp: false }
+    }
+
+    /// These prices on `sharp`'s scale when `sharp` (`Intent::sharp`).
+    pub fn scaled(self, sharp: bool) -> Self {
+        CellPrices { sharp, ..self }
     }
 }
 
@@ -389,7 +397,9 @@ impl Choice {
 
 /// The run of `model` under `plan` over `horizon` rounds.
 pub fn run(model: &Model, plan: &Plan, prices: &CellPrices, horizon: i64) -> Outcome {
-    let steps = STEPS;
+    // `sharp`: no more steps than rounds in the horizon (a horizon of 3 rounds ran 10 of them,
+    // every yield priced as kept to the last round: the food price at 4.00 at the game's end).
+    let steps = if prices.sharp { STEPS.min(horizon.max(1)) } else { STEPS };
     let dt = (horizon / steps).max(1);
     let n = model.cities.len();
     let mut pop: Vec<i64> = model.cities.iter().map(|c| c.population).collect();
@@ -408,6 +418,9 @@ pub fn run(model: &Model, plan: &Plan, prices: &CellPrices, horizon: i64) -> Out
     let mut active: Vec<usize> = Vec::new();
     let mut on_tiles: Vec<usize> = Vec::new();
     let mut taken: Vec<bool> = Vec::new();
+    // `sharp`: each city's food surplus and yields at the last step (the tail's growth).
+    let mut tail_food = vec![0i64; if prices.sharp { n } else { 0 }];
+    let mut tail_yields = vec![[0i64; 6]; if prices.sharp { n } else { 0 }];
     for step in 0..steps {
         let t = step * dt;
         // The empire's mood: today's and the plan's happiness. The citizens
@@ -508,6 +521,10 @@ pub fn run(model: &Model, plan: &Plan, prices: &CellPrices, horizon: i64) -> Out
                 surplus = surplus * (100 + growth) / 100 * mood_growth / 100;
             }
             store[i] += surplus * dt;
+            if prices.sharp && step == steps - 1 {
+                tail_food[i] = surplus.max(0);
+                tail_yields[i] = total;
+            }
             while store[i] >= threshold(pop[i], model.pace) && pop[i] < 200 {
                 store[i] -= threshold(pop[i], model.pace);
                 pop[i] += 1;
@@ -529,9 +546,36 @@ pub fn run(model: &Model, plan: &Plan, prices: &CellPrices, horizon: i64) -> Out
     }
     let gained = pop.iter().sum::<i64>() - start;
     let tail = (prices.rounds_left - steps * dt).max(0);
-    let value = (1..6).map(|s| (produced[s] + last[s] * tail) / 100 * prices.unit[s] / 1000).sum::<i64>() + gained * prices.citizen;
+    let mut value = (1..6).map(|s| (produced[s] + last[s] * tail) / 100 * prices.unit[s] / 1000).sum::<i64>() + gained * prices.citizen;
+    if prices.sharp {
+        value += sharp_tail(model, prices, &pop, &store, &tail_food, &tail_yields, tail);
+    }
     let mean = sums.iter().map(|s| s.map(|v| v / steps)).collect();
     Outcome { value, citizens: gained, first, mean }
+}
+
+/// `sharp`'s value of the food a run leaves: the store at the end and the last step's surplus kept
+/// through the tail grow citizens at the rules' thresholds (the last one a share of a citizen),
+/// each worth the citizen price and its city's yields a citizen for half the tail (they come
+/// through it). Without it a food more a turn was worth a whole citizen or nothing, by whether it
+/// crossed a threshold within H: the cell's food price ran from 0.27 to 10.9 times the
+/// allocator's, both clamps 38 % of the reviews (tuning traces, offsets 200 001…200 012).
+fn sharp_tail(model: &Model, prices: &CellPrices, pop: &[i64], store: &[i64], tail_food: &[i64], tail_yields: &[[i64; 6]], tail: i64) -> i64 {
+    let mut value = 0;
+    for i in 0..pop.len() {
+        let mut food = store[i] + tail_food[i] * tail;
+        let mut p = pop[i];
+        let mut citizens = 0i64;
+        while p < 200 && food >= threshold(p, model.pace) {
+            food -= threshold(p, model.pace);
+            p += 1;
+            citizens += 1000;
+        }
+        citizens += food * 1000 / threshold(p, model.pace).max(1);
+        let each: i64 = (1..6).map(|s| tail_yields[i][s] / pop[i].max(1) * (tail / 2) / 100 * prices.unit[s] / 1000).sum();
+        value += citizens * (prices.citizen + each) / 1000;
+    }
+    value
 }
 
 /// The rounds a run over `horizon` covers (`STEPS` whole steps).

@@ -73,6 +73,9 @@ pub struct ClassicMind {
     /// Dev-only: the tall book's play and building order on another base
     /// (`book_on`: `tall-book@standard`); None: the variant's.
     tall: Option<(crate::ai::tall::Tall, crate::ai::tall::BuildingOrder)>,
+    /// `Variant::Sharp`: the mind plays `Standard` (`variant`) with the strategy net's sharp choice
+    /// and inputs (`TurnBrief::sharp`).
+    sharp: bool,
 }
 
 /// The environment variable that makes the game's AI another variant
@@ -100,6 +103,9 @@ impl Default for ClassicMind {
 
 impl ClassicMind {
     pub fn new(variant: Variant) -> Self {
+        // `sharp` is `Standard` in every switch but its strategy net (`TurnBrief::sharp`).
+        let sharp = variant.sharp();
+        let variant = if sharp { Variant::Standard } else { variant };
         let mut advisors = AdvisorRegistry::default();
         // The alias `siege-walls` plays as `PrePuppet` (the standard of the seventh promotion) in
         // everything, its peace too (before the seventh promotion it made peace as a variant
@@ -117,7 +123,7 @@ impl ClassicMind {
         let walls = (book.is_some() || variant.siege_walls()).then(|| Box::new(crate::ai::siege_walls::SiegeWalls::new().joined(variant.siege_join())));
         let unciv = variant.unciv().any().then(|| Box::new(crate::ai::unciv::UncivMind::new(variant.unciv())));
         let variant = if named.is_some() { Variant::PrePuppet } else { variant };
-        Self { advisors, variant, genome: None, humans: Vec::new(), walks: Default::default(), choice: None, #[cfg(feature = "experimental-ai")] net, book, named, walls, conquest: None, unciv, tall: None }
+        Self { advisors, variant, genome: None, humans: Vec::new(), walks: Default::default(), choice: None, #[cfg(feature = "experimental-ai")] net, book, named, walls, conquest: None, unciv, tall: None, sharp }
     }
 
     /// A league book that may play on another base (`book_on`): a duel book
@@ -160,7 +166,7 @@ impl ClassicMind {
         advisors.register(crate::classic::ClassicSystem::Diplomacy, Box::new(diplomacy));
         // The net plays on `NET_BASE`: its siege too.
         let walls = variant.siege_walls().then(|| Box::new(crate::ai::siege_walls::SiegeWalls::new().joined(variant.siege_join())));
-        Self { advisors, variant, genome: None, humans: Vec::new(), walks: Default::default(), choice: None, net: Some(Box::new(net)), book: None, named: None, walls, conquest: None, unciv: None, tall: None }
+        Self { advisors, variant, genome: None, humans: Vec::new(), walks: Default::default(), choice: None, net: Some(Box::new(net)), book: None, named: None, walls, conquest: None, unciv: None, tall: None, sharp: false }
     }
 
     /// The net's part (`Variant::Net`), if any.
@@ -198,6 +204,9 @@ impl ClassicMind {
     }
 
     pub fn variant(&self) -> Variant {
+        if self.sharp {
+            return Variant::Sharp;
+        }
         self.named.unwrap_or(self.variant)
     }
 
@@ -585,6 +594,7 @@ impl ClassicMind {
         brief.camps = self.variant.camps();
         brief.fog_march = self.variant.fog_march();
         brief.war_open = self.variant.war_open();
+        brief.sharp = self.sharp;
         brief.met_eras = observation.view.met_eras();
         if brief.war_open {
             brief.scores = observation.view.race().scores;
@@ -826,4 +836,24 @@ fn barbarian_decisions(observation: &AIObservation<'_>, rules: &CompiledRuleset)
         .into_iter()
         .map(|command| Decision::act(Actor::Player, Reason::SystemAdvisor, command))
         .collect()
+}
+
+#[cfg(test)]
+mod sharp_tests {
+    use super::*;
+
+    /// `sharp` is `Standard` in every switch but its strategy net: the mind plays `Standard` with
+    /// the flag (`TurnBrief::sharp`) and names itself `sharp`; no other variant has the flag.
+    #[test]
+    fn sharp_plays_standard_with_its_flag() {
+        let mind = ClassicMind::new(Variant::Sharp);
+        assert_eq!((mind.variant, mind.sharp, mind.variant()), (Variant::Standard, true, Variant::Sharp));
+        for v in [Variant::Standard, Variant::WarOpen, Variant::StrategyNet] {
+            let other = ClassicMind::new(v);
+            assert_eq!((other.variant(), other.sharp), (v, false));
+        }
+        let flagged: Vec<Variant> = Variant::ALL.into_iter().filter(|v| v.sharp()).collect();
+        assert_eq!(flagged, [Variant::Sharp]);
+        assert_eq!(Variant::from_name("sharp"), cfg!(feature = "experimental-ai").then_some(Variant::Sharp));
+    }
 }

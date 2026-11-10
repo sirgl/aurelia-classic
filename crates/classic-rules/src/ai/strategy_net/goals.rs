@@ -334,11 +334,16 @@ fn rate(model: &Model, rules: &CompiledRuleset, prices: &CellPrices, plan: &Cell
 /// and the goals.
 pub fn review(model: &Model, rules: &CompiledRuleset, intent: &Intent, mult: &mut [Milli; pd::N], base: &Base, round: u32, at_war: bool) -> Review {
     let horizon = i64::from(intent.horizon.max(1));
-    let prices = CellPrices::of(base, mult);
+    let prices = CellPrices::of(base, mult).scaled(intent.sharp);
     let empty = CellPlan::new(model);
     let food = food_price(model, &empty, &prices, horizon);
-    mult[pd::FOOD] = if base.food > 0 { (food * ONE / base.food).clamp(FOOD_MIN, FOOD_MAX) } else { ONE };
     let outcome = run(model, &empty, &prices, horizon);
+    // `sharp`: the allocator's food price on the cell's scale (its citizen worth its yields too).
+    let reference = if intent.sharp { super::sharp::food_reference(model, &prices, base) } else { base.food };
+    if reference > 0 {
+        super::trace::food_raw(food * ONE / reference);
+    }
+    mult[pd::FOOD] = if reference > 0 { (food * ONE / reference).clamp(FOOD_MIN, FOOD_MAX) } else { ONE };
     let growth = model
         .cities
         .iter()
@@ -361,7 +366,7 @@ pub fn review(model: &Model, rules: &CompiledRuleset, intent: &Intent, mult: &mu
 /// rounds), best rate first (a diagnostic of the pointer's screening).
 pub fn ranked(model: &Model, rules: &CompiledRuleset, intent: &Intent, mult: &[Milli; pd::N], base: &Base) -> Vec<(GoalKind, i64, i64, i64)> {
     let horizon = i64::from(intent.horizon.max(1));
-    let prices = CellPrices::of(base, mult);
+    let prices = CellPrices::of(base, mult).scaled(intent.sharp);
     let rounds_left = base.rounds_left.max(1);
     let valuer = Valuer { model, rules, base, mult, horizon: rounds_left, room: i64::from(intent.more_cities), fight: super::heads::fight(intent) };
     let plan = CellPlan::new(model);
@@ -383,7 +388,7 @@ pub fn choose(model: &Model, rules: &CompiledRuleset, intent: &Intent, mult: &[M
         return Vec::new();
     }
     let horizon = i64::from(intent.horizon.max(1));
-    let prices = CellPrices::of(base, mult);
+    let prices = CellPrices::of(base, mult).scaled(intent.sharp);
     let rounds_left = base.rounds_left.max(1);
     let valuer = Valuer { model, rules, base, mult, horizon: rounds_left, room: i64::from(intent.more_cities), fight: super::heads::fight(intent) };
     let mut plan = CellPlan::new(model);

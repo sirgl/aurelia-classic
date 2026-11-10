@@ -70,6 +70,7 @@ fn run() -> Result<(), String> {
     let game = Match { map: MapSpec { script, size }, seed, seating };
     let pairing = Pairing { baseline, candidate };
     println!("strategy net: {} hand weights", weights::count());
+    println!("features: {}", weights::FEATURES.iter().map(|(name, _)| *name).collect::<Vec<_>>().join(" "));
     trace::enable(true);
     let result = play_match::<ClassicBench>(&rules, &suite, &game, &pairing)?;
     trace::enable(false);
