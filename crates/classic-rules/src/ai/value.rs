@@ -1065,6 +1065,7 @@ fn citizen_yield(obs: &AIObservation<'_>, prices: &Prices) -> Centi {
 /// below (`Prices::kept_city_unrest_recovering`): after a puppet given at round 66 (Quick) the
 /// taker's excess happiness was −4.3 ten rounds later and −1.3 sixty rounds later
 /// (classic/docs/ai-conquest-payoff.md, the gift twins), about 80 Quick rounds to the line.
+/// TUNED, not derived: one case measured the 80; 120 is a hand-picked margin over it.
 pub const UNREST_RECOVERY_ROUNDS: u32 = 120;
 
 /// Points of excess happiness a new city must leave over (`Prices::affords_city`).

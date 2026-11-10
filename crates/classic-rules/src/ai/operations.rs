@@ -193,20 +193,27 @@ pub struct SiegeFixes {
     /// when it is behind (the time victory compares our score with the best other one; a war on a
     /// laggard feeds the bystanders; `war-open`).
     pub rank: bool,
+    /// With `loss`: the loss is the one measured on `war-pays`'s own operations
+    /// (`PAYS_LOSS_PERCENT`), not `war-open`'s (`war-pays`).
+    pub pays: bool,
 }
 
 impl SiegeFixes {
-    pub const NONE: SiegeFixes = SiegeFixes { assault: false, garrison: false, close: false, chance: false, recover: false, learned: false, priced: false, worth: false, asset: false, puppet: false, recovery: false, loss: false, yields: false, rank: false };
+    pub const NONE: SiegeFixes = SiegeFixes { assault: false, garrison: false, close: false, chance: false, recover: false, learned: false, priced: false, worth: false, asset: false, puppet: false, recovery: false, loss: false, yields: false, rank: false, pays: false };
     /// The five fixes of the `siege` variant.
-    pub const ALL: SiegeFixes = SiegeFixes { assault: true, garrison: true, close: true, chance: true, recover: true, learned: false, priced: false, worth: false, asset: false, puppet: false, recovery: false, loss: false, yields: false, rank: false };
+    pub const ALL: SiegeFixes = SiegeFixes { assault: true, garrison: true, close: true, chance: true, recover: true, learned: false, priced: false, worth: false, asset: false, puppet: false, recovery: false, loss: false, yields: false, rank: false, pays: false };
     /// The fixes of `war-fix` (classic/docs/ai-war-fix.md): the `siege` five with the learned
     /// chance in place of the siege model's, the capture priced by the rules, and a siege worth
     /// its city.
-    pub const WAR_FIX: SiegeFixes = SiegeFixes { assault: true, garrison: true, close: true, chance: false, recover: true, learned: true, priced: true, worth: true, asset: true, puppet: false, recovery: false, loss: false, yields: false, rank: false };
+    pub const WAR_FIX: SiegeFixes = SiegeFixes { assault: true, garrison: true, close: true, chance: false, recover: true, learned: true, priced: true, worth: true, asset: true, puppet: false, recovery: false, loss: false, yields: false, rank: false, pays: false };
     /// `war-open`'s (classic/docs/ai-war-open.md): `WAR_FIX` with the capture priced as the puppet
     /// the AI makes of it, its unrest for the rounds the empire takes to recover, its citizens
     /// yielding what the empire's do, and the army's loss as measured.
     pub const OPEN: SiegeFixes = SiegeFixes { puppet: true, recovery: true, loss: true, yields: true, rank: true, ..SiegeFixes::WAR_FIX };
+    /// `war-pays`' (classic/docs/ai-war-pays.md): `OPEN` with the loss measured on its own operations;
+    /// `rival_percent` gives it a flat `RIVAL_PERCENT` (`rank` bought twice the captures in the head to head and no
+    /// share: tuning offsets 200–209, paired +0.00, CI −1.35…+1.35).
+    pub const PAYS: SiegeFixes = SiegeFixes { pays: true, ..SiegeFixes::OPEN };
 }
 
 /// What a unit kind is to an operation's army: None for non-combat,
@@ -756,10 +763,7 @@ fn start(brief: &TurnBrief, state: &mut AiState, rules: &CompiledRuleset, routes
     }
     let arsenal = Arsenal::of(brief, rules);
     let walker = arsenal.melee?;
-    // With `SiegeFixes::assault` the units on an assault are not free, but an operation may still
-    // take them (`assault_recruits`): its army counts them as the game's AI does.
-    let on_assault = |u: &&UnitBrief| brief.war.siege.assault && u.hp >= HEAL_BELOW_HP && army_role(rules, u.kind).is_some() && matches!(state.task_of(u.id).map(|t| t.task), Some(UnitTask::Assault { .. }));
-    let free = composition_of(rules, strike_units(brief, state, rules).chain(brief.units.iter().filter(on_assault)).map(|u| u.kind));
+    let free = counted_free(brief, state, rules);
     let mut candidates: Vec<Candidate> = targets(brief, state)
         .into_iter()
         .filter_map(|(city, horizon)| candidate(brief, state, rules, &arsenal, free, &city, horizon, gate))
@@ -811,6 +815,15 @@ fn start(brief: &TurnBrief, state: &mut AiState, rules: &CompiledRuleset, routes
     });
     state.start_operation(chosen.operation);
     Some(Decision::refuse(Actor::Player, Reason::FormOperation))
+}
+
+/// The army a new operation counts on: the units free for a strike. With `SiegeFixes::assault`
+/// the units on an assault are not free, but an operation may still take them
+/// (`assault_recruits`): its army counts them as the game's AI does. `start` and the strategist's
+/// look at the war machine (`outlook`) count the same units, so their verdicts agree.
+fn counted_free(brief: &TurnBrief, state: &AiState, rules: &CompiledRuleset) -> Composition {
+    let on_assault = |u: &&UnitBrief| brief.war.siege.assault && u.hp >= HEAL_BELOW_HP && army_role(rules, u.kind).is_some() && matches!(state.task_of(u.id).map(|t| t.task), Some(UnitTask::Assault { .. }));
+    composition_of(rules, strike_units(brief, state, rules).chain(brief.units.iter().filter(on_assault)).map(|u| u.kind))
 }
 
 /// A new operation or raid may start under `strategy`: not while defending; not while
@@ -876,8 +889,13 @@ pub const LOSS_PERCENT: i64 = 50;
 /// of `war-open` (pace, Quick, seed offset 201; 124 % of those that marched, whose every unit on
 /// an assault of the target joins them, 15 % of those recalled or timed out before; `ai-war-ops`,
 /// classic/docs/ai-war-open.md). The operations of `war-fix-model`, mostly recalled before they
-/// march, lost 25 %; `LOSS_PERCENT` guessed half.
+/// march, lost 25 %; `LOSS_PERCENT` guessed half. TUNED: measured on build E2 of the lane, not on the frozen
+/// one, and it bypasses the genome's `LossPercent` knob.
 pub const OPEN_LOSS_PERCENT: i64 = 66;
+/// The same measured on `war-pays`'s own operations: 67.3 % of the need in 292 operations (pace, Quick,
+/// seeds 203001–204021 with `ai-war-ops`; 101 % of those that marched). A measured constant, not
+/// derived; re-measure it when the operations change.
+pub const PAYS_LOSS_PERCENT: i64 = 67;
 /// Share of the city's points taken from the rival that counts for us,
 /// percent: the time victory compares our score with the best other one.
 pub const RIVAL_PERCENT: i64 = 50;
@@ -951,7 +969,7 @@ fn war_case_parts(prices: &Prices, stakes: &Stakes, rules: &CompiledRuleset, ars
     };
     let army = |c: Composition| [ArmyRole::Melee, ArmyRole::Ranged, ArmyRole::Siege].iter().map(|r| unit_cost(*r) * i64::from(c.of(*r))).sum::<i64>();
     let built = if fixes.asset { 0 } else { army(missing) * hammer } + i64::from(missing.total()) * upkeep;
-    let loss = if fixes.loss { OPEN_LOSS_PERCENT } else { crate::ai::genome::get(crate::ai::genome::Knob::LossPercent) };
+    let loss = if fixes.loss { if fixes.pays { PAYS_LOSS_PERCENT } else { OPEN_LOSS_PERCENT } } else { crate::ai::genome::get(crate::ai::genome::Knob::LossPercent) };
     let lost = army(need) * loss / 100 * hammer;
     let base = crate::ai::genome::get(crate::ai::genome::Knob::SuccessPercent);
     // The weapon the plan counts on (`strikes::armory`) gives the chance it gives and costs its
@@ -1313,8 +1331,9 @@ pub fn outlook(brief: &TurnBrief, state: &AiState, rules: &CompiledRuleset, pric
         (out.chance, out.relative, out.target, out.enemy) = (chance, relative, Some(city.tile), Some(city.owner));
     }
     if arsenal.melee.is_some() && brief.cities.len() >= 2 {
-        let free = composition_of(rules, strike_units(brief, state, rules).map(|u| u.kind));
-        out.pays = targets(brief, state).into_iter().any(|(city, horizon)| candidate(brief, state, rules, &arsenal, free, &city, horizon, WarGate::Value(prices, stakes)).is_some_and(|c| c.fits()));
+        // `war-pays`: the units `start` counts (`free_units`), so that the two verdicts agree.
+        let free = if brief.war_pays { counted_free(brief, state, rules) } else { composition_of(rules, strike_units(brief, state, rules).map(|u| u.kind)) };
+        out.pays = crate::ai::war_probe::muted(|| targets(brief, state).into_iter().any(|(city, horizon)| candidate(brief, state, rules, &arsenal, free, &city, horizon, WarGate::Value(prices, stakes)).is_some_and(|c| c.fits())));
     }
     let rival = out.enemy.or(nearest.map(|(_, p)| p));
     if let Some(rival) = rival {
@@ -1325,6 +1344,7 @@ pub fn outlook(brief: &TurnBrief, state: &AiState, rules: &CompiledRuleset, pric
 
 /// Army units a nation of these rules keeps a city, tenths: the AI's own army at a look for an
 /// operation is 14.35 units for 5.5 cities (classic/docs/ai-war-audit-current.md, `pace`).
+/// TUNED, not derived: the AI's own ratio applied to rivals, whose armies nothing tells.
 pub const ARMY_PER_CITY_TENTHS: u64 = 26;
 
 /// The military power of `rival` as the player can know it (`unit_power`): the largest of its
@@ -1385,7 +1405,7 @@ pub fn city_worth_ranked(prices: &Prices, population: u32, rounds: u32, rival: i
 pub fn rival_percent(brief: &TurnBrief, rival: PlayerId) -> i64 {
     let score = |p: PlayerId| brief.scores.iter().find(|(q, _)| *q == p).map(|(_, s)| *s);
     let (Some(ours), Some(theirs)) = (score(brief.player), score(rival)) else { return RIVAL_PERCENT };
-    if !brief.war.siege.rank {
+    if !brief.war.siege.rank || brief.war_pays {
         return RIVAL_PERCENT;
     }
     let best = brief.scores.iter().filter(|(p, _)| *p != brief.player).map(|(_, s)| *s).max().unwrap_or(0);
@@ -1431,6 +1451,21 @@ fn targets(brief: &TurnBrief, state: &AiState) -> Vec<(SeenCity, Horizon)> {
     out
 }
 
+/// `war-pays`: the odds an operation takes a city, read from the operations of `war-open` (pace,
+/// Quick, 300 games of the tuning seeds 200–202, classic/docs/ai-war-pays.md): those started in a war
+/// that was already running took a city of their enemy in 3 % of the cases (the first operation of the war
+/// ended recalled, outmatched or by peace, and the enemy stands armed), those started at peace against
+/// a city of at most `MAX_TARGET_POPULATION` citizens in about 29 %, against a larger one 9 %. Tuned
+/// constants, not derived ones.
+fn odds_are_good(city: &SeenCity, horizon: Horizon) -> bool {
+    matches!(horizon, Horizon::Peace) && i64::from(city.population) <= MAX_TARGET_POPULATION
+}
+
+/// The largest target `war-pays` starts an operation against, in citizens: a city of 9 or more
+/// held 8 % of the cases against 22–29 % for the smaller ones (it heals behind more walls and
+/// keeps a larger garrison). Tuned on the war-open operations of offsets 200–201.
+pub const MAX_TARGET_POPULATION: i64 = 8;
+
 #[allow(clippy::too_many_arguments)]
 fn candidate(
     brief: &TurnBrief,
@@ -1442,6 +1477,9 @@ fn candidate(
     horizon: Horizon,
     gate: WarGate<'_>,
 ) -> Option<Candidate> {
+    if brief.war_pays && !odds_are_good(city, horizon) {
+        return None;
+    }
     let muster = brief.nearest_city(brief.dims, city.tile)?;
     let distance = brief.dims.distance(muster.tile, city.tile)?;
     let decisive = gate.decisive(city.tile);

@@ -78,7 +78,21 @@ pub struct Intent {
 pub struct Net {
     pub open: bool,
     pub sharp: bool,
+    /// `war-pays`: the window of any era needs a war that pays (`fe::PAYS`), it is a condition, not a term;
+    /// an operation forming does not tilt the posture (`weights::open::POSTURE`: it cost a point, see the doc).
+    pub pays: bool,
 }
+
+impl Net {
+    /// `war-pays` leaves the opportunity out of the style and the aim (`weights::open::STYLE`, `AIM`,
+    /// `STYLE_EVENTS`); see classic/docs/ai-war-pays.md for the measurement.
+    pub fn pays_no_style(self) -> bool {
+        self.pays && PAYS_NO_STYLE
+    }
+}
+
+/// `war-pays`: no opportunity in the style and the aim (see `Net::pays_no_style`).
+const PAYS_NO_STYLE: bool = true;
 
 /// The choices held from the last turn.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -112,7 +126,7 @@ pub fn concepts(features: &[Milli; fe::N]) -> [Milli; kc::N] {
 /// The concepts; with `open` (`war-open`) the strike window is the larger of the early one and
 /// the window of any era (`weights::open::WINDOW`). No later concept reads the window.
 pub fn concepts_of(features: &[Milli; fe::N], open: bool) -> [Milli; kc::N] {
-    concepts_net(features, Net { open, sharp: false })
+    concepts_net(features, Net { open, sharp: false, pays: false })
 }
 
 /// The concepts of a net: `concepts_of`, with `sharp`'s terms (`sharp::w::CONCEPTS`) when `sharp`.
@@ -121,7 +135,7 @@ pub fn concepts_net(features: &[Milli; fe::N], net: Net) -> [Milli; kc::N] {
     let mut out = [0; kc::N];
     for (i, neuron) in weights::CONCEPTS.iter().enumerate() {
         out[i] = if net.sharp { sharp::fire_with(neuron, sharp::w::CONCEPTS, i, features, &out) } else { fire(neuron, features, &out) };
-        if open && i == kc::STRIKE_WINDOW {
+        if open && i == kc::STRIKE_WINDOW && (!net.pays || features[fe::PAYS] > 0) {
             out[i] = out[i].max(fire(&weights::open::WINDOW, features, &out));
         }
     }
@@ -152,7 +166,12 @@ pub fn intent(features: &[Milli; fe::N], held: Held, cities: u32, rounds_left: u
 /// `intent`; with `open` the net of `war-open` (`weights::open`): the window of any era, the
 /// war machine's operation in the posture, the opportunity in the style and the aim.
 pub fn intent_of(features: &[Milli; fe::N], held: Held, cities: u32, rounds_left: u32, pace: u32, open: bool) -> Intent {
-    intent_net(features, held, cities, rounds_left, pace, Net { open, sharp: false })
+    intent_net(features, held, cities, rounds_left, pace, Net { open, sharp: false, pays: false })
+}
+
+/// `intent_of` for `war-pays`: `war-open`'s net whose window of any era needs a war that pays.
+pub fn intent_pays(features: &[Milli; fe::N], held: Held, cities: u32, rounds_left: u32, pace: u32) -> Intent {
+    intent_net(features, held, cities, rounds_left, pace, Net { open: true, sharp: false, pays: true })
 }
 
 /// The logits of a table with `sharp`'s terms added (`sharp::w`), and its bias for `at`.
@@ -178,7 +197,8 @@ fn sharp_style(logits: Vec<Milli>, features: &[Milli; fe::N], concepts: &[Milli;
 pub fn intent_net(features: &[Milli; fe::N], held: Held, cities: u32, rounds_left: u32, pace: u32, net: Net) -> Intent {
     let open = net.open;
     let concepts = concepts_net(features, net);
-    let extra = |table: &'static [(usize, weights::Term)]| open.then_some(table);
+    let extra_style = |table: &'static [(usize, weights::Term)]| (open && !net.pays_no_style()).then_some(table);
+    let extra_posture = |table: &'static [(usize, weights::Term)]| (open && !net.pays).then_some(table);
     let temper = |logits: [Milli; 3], t: Milli| if net.sharp { sharp::tempered(&logits, t) } else { logits };
     let temper4 = |logits: [Milli; 4], t: Milli| if net.sharp { sharp::tempered(&logits, t) } else { logits };
     // A locked style is the lock's situation with the turn's events.
@@ -188,7 +208,7 @@ pub fn intent_net(features: &[Milli; fe::N], held: Held, cities: u32, rounds_lef
             for e in weights::STYLE_EVENTS {
                 at_lock[e] = features[e];
             }
-            if open {
+            if open && !net.pays_no_style() {
                 for e in weights::open::STYLE_EVENTS {
                     at_lock[e] = features[e];
                 }
@@ -202,8 +222,8 @@ pub fn intent_net(features: &[Milli; fe::N], held: Held, cities: u32, rounds_lef
             // the opportunity itself (`weights::open::STYLE`), not the window it opens for a few
             // reviews (with the window the conquest style held 35 % of the traced reviews and its
             // prices cost the economy; tuning offsets 200–201).
-            let lock_concepts = concepts_net(&at_lock, Net { open: false, sharp: net.sharp });
-            let mut style_logits = logits_of(&weights::STYLE, extra(weights::open::STYLE), &at_lock, &lock_concepts);
+            let lock_concepts = concepts_net(&at_lock, Net { open: false, sharp: net.sharp, pays: false });
+            let mut style_logits = logits_of(&weights::STYLE, extra_style(weights::open::STYLE), &at_lock, &lock_concepts);
             if net.sharp {
                 style_logits = sharp_style(style_logits, &at_lock, &lock_concepts);
             }
@@ -211,19 +231,19 @@ pub fn intent_net(features: &[Milli; fe::N], held: Held, cities: u32, rounds_lef
             (softmax(&temper(<[Milli; 3]>::try_from(style_logits).expect("three styles"), sharp::w::STYLE_TEMPERATURE)), margin)
         }
         None => {
-            let mut style_logits = logits_of(&weights::STYLE, extra(weights::open::STYLE), features, &concepts);
+            let mut style_logits = logits_of(&weights::STYLE, extra_style(weights::open::STYLE), features, &concepts);
             if net.sharp {
                 style_logits = sharp_style(style_logits, features, &concepts);
             }
             (softmax(&temper(<[Milli; 3]>::try_from(style_logits).expect("three styles"), sharp::w::STYLE_TEMPERATURE)), weights::HYSTERESIS)
         }
     };
-    let mut aim_logits = logits_of(&weights::AIM, extra(weights::open::AIM), features, &concepts);
+    let mut aim_logits = logits_of(&weights::AIM, extra_style(weights::open::AIM), features, &concepts);
     if net.sharp {
         aim_logits = sharpened(aim_logits, sharp::w::AIM, features, &concepts);
     }
     let aim = softmax(&temper4(<[Milli; 4]>::try_from(aim_logits).expect("four aims"), sharp::w::AIM_TEMPERATURE));
-    let posture = softmax(&temper4(<[Milli; 4]>::try_from(logits_of(&weights::POSTURE, extra(weights::open::POSTURE), features, &concepts)).expect("four postures"), sharp::w::POSTURE_TEMPERATURE));
+    let posture = softmax(&temper4(<[Milli; 4]>::try_from(logits_of(&weights::POSTURE, extra_posture(weights::open::POSTURE), features, &concepts)).expect("four postures"), sharp::w::POSTURE_TEMPERATURE));
     let style_pick = hold(&style, held.style, margin);
     let aim_pick = hold(&aim, held.aim, weights::HYSTERESIS);
     let posture_pick = hold(&posture, held.posture, weights::HYSTERESIS);
@@ -690,7 +710,7 @@ pub fn think(obs: &AIObservation<'_>, brief: &crate::ai::planner::TurnBrief, sta
         sharp::features(obs, brief, rules, state, &mut memory.sharp, survey_due, &mut situation);
     }
     let rounds_left = prices.rounds_left;
-    let net = Net { open: brief.war_open, sharp: brief.sharp };
+    let net = Net { open: brief.war_open, sharp: brief.sharp, pays: brief.war_pays };
     let mut intent = intent_net(&situation, memory.held, cities, rounds_left, pace, net);
     // The style is locked when the first branch may be opened after the
     // first survey of the surroundings, at the latest `LOCK_MAX_ROUNDS`.

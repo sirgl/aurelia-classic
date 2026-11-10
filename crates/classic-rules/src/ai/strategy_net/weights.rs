@@ -514,6 +514,9 @@ pub mod open {
     use super::kc::*;
     use super::{f, k, Act, Neuron, Term};
 
+    /// TUNED, not derived: the bias and the term weights below were set by hand on the tuning seeds
+    /// (offsets 200–201, classic/docs/ai-war-open.md); `war-pays` keeps them and makes `PAYS` a
+    /// condition (`Net::pays`).
     /// The window of any era: AND(an opportunity, an army not weaker than the neighbour's). The
     /// leader's appetite (the traits, through `warlike`) widens the door; danger and a happiness
     /// crisis shut it. `war-open`'s strike window is the larger of this and the early one.

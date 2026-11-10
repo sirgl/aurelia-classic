@@ -238,6 +238,17 @@ pub struct WarProbe {
 
 thread_local! {
     static PROBE: RefCell<WarProbe> = RefCell::new(WarProbe::default());
+    /// Notes are not recorded while a look that is no decision runs (`muted`).
+    static MUTED: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+/// Run `f` without recording: the strategist's look at the war machine (`operations::outlook`)
+/// prices the same cases as `start`, which records them; both recording doubled the estimates.
+pub(crate) fn muted<R>(f: impl FnOnce() -> R) -> R {
+    let before = MUTED.with(|m| m.replace(true));
+    let out = f();
+    MUTED.with(|m| m.set(before));
+    out
 }
 
 /// Switch the probe of this thread on (and clear it) or off.
@@ -263,7 +274,7 @@ pub fn on() -> bool {
 pub(crate) fn note(f: impl FnOnce(&mut WarProbe)) {
     PROBE.with(|p| {
         let mut p = p.borrow_mut();
-        if p.enabled {
+        if p.enabled && !MUTED.with(|m| m.get()) {
             f(&mut p);
         }
     });

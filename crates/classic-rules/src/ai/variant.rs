@@ -677,6 +677,10 @@ pub enum Variant {
     /// score's trend and a rival running away. The mind plays `Standard` in every other switch
     /// (`ClassicMind::new`). A candidate, `experimental-ai` only.
     Sharp,
+    /// `WarOpen` with the lane's second iteration (`TurnBrief::war_pays`, classic/docs/ai-war-pays.md): the
+    /// strike window needs a war that pays, wars are started only on the odds measured, and a war that
+    /// has stopped paying is ended. The mind plays `WarOpen` in every other switch (`ClassicMind::new`).
+    WarPays,
 }
 
 /// The net's base: the expert the end-to-end net learns from and the mind it
@@ -697,7 +701,7 @@ const NUDGED_CANDIDATES: u32 = 40;
 
 impl Variant {
     /// The game's AI first.
-    pub const ALL: [Variant; 136] = [
+    pub const ALL: [Variant; 137] = [
         Variant::Standard,
         Variant::PreCamps,
         Variant::PreWorkers,
@@ -834,6 +838,7 @@ impl Variant {
         Variant::PreCsGifts,
         Variant::WarOpen,
         Variant::Sharp,
+        Variant::WarPays,
     ];
 
     pub fn name(self) -> &'static str {
@@ -956,6 +961,7 @@ impl Variant {
             Variant::PreCsGifts => "pre-cs-gifts",
             Variant::WarOpen => "war-open",
             Variant::Sharp => "sharp",
+            Variant::WarPays => "war-pays",
             Variant::ArmyFit => "army-fit",
             Variant::Camps => "camps",
             Variant::ArmyCamps => "army-camps",
@@ -1124,6 +1130,12 @@ impl Variant {
     /// mind plays as `Standard` in every other switch (`ClassicMind::new`).
     pub fn sharp(self) -> bool {
         self == Variant::Sharp
+    }
+
+    /// The second iteration of the war lane (`TurnBrief::war_pays`): `WarPays` alone, which the mind
+    /// plays as `WarOpen` in every other switch (`ClassicMind::new`).
+    pub fn war_pays(self) -> bool {
+        self == Variant::WarPays
     }
 
     /// Its research, policies and choice among the allocator's best orders are the
