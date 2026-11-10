@@ -32,3 +32,30 @@ pub fn lost(obs: &AIObservation<'_>, rules: &CompiledRuleset, city: &OwnCity, it
         ProductionItem::Unit(_) | ProductionItem::Project(_) => false,
     }
 }
+
+/// The era of the technology that opens the wonder (the content era's order): a nation of an
+/// earlier era cannot build it.
+fn wonder_era(rules: &CompiledRuleset, kind: BuildingKindId) -> u8 {
+    rules
+        .buildings
+        .get(kind.0 as usize)
+        .and_then(|d| d.required_tech)
+        .and_then(|t| rules.technologies.get(t.0 as usize))
+        .and_then(|t| t.content_era)
+        .and_then(|e| rules.eras.get(e.0 as usize))
+        .map_or(0, |e| e.index)
+}
+
+/// The chance, percent, that an order of the wonder that takes `standard_turns` (Standard speed)
+/// is finished before any other nation does it. The inputs are what the seat knows: the eras of
+/// the nations it has met (`met_eras`, `PlayerQueries::met_eras`) against the wonder's era, and
+/// the turns the order takes; the table (`wonder_chance`) is the bench's rate of won orders by
+/// those two. A nation not met adds nothing the seat can know: the table's rows carry the average
+/// of the unmet.
+pub fn chance(rules: &CompiledRuleset, met_eras: &[(crate::ids::PlayerId, u8)], kind: BuildingKindId, standard_turns: i64) -> i64 {
+    use crate::ai::wonder_chance::{CHANCE, TURNS};
+    let era = wonder_era(rules, kind);
+    let able = met_eras.iter().filter(|(_, e)| *e >= era).count().min(CHANCE[0].len() - 1);
+    let row = TURNS.iter().position(|&t| standard_turns <= i64::from(t)).unwrap_or(TURNS.len() - 1);
+    i64::from(CHANCE[row][able])
+}

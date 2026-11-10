@@ -132,6 +132,7 @@ pub mod value;
 pub mod variant;
 pub mod victory;
 pub mod weak_fighter;
+pub mod wonder_chance;
 pub mod wonder_race;
 
 pub use driver::{AiDriver, DriverPhase, StepOutcome};

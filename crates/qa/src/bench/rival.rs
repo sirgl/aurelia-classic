@@ -24,6 +24,17 @@ pub const PROBE_ENV: &str = "AURELIA_RIVAL_PROBE";
 
 /// A hostile unit this close to a city is a threat (`ai::defence::THREAT_RADIUS`).
 const THREAT_RADIUS: i32 = classic_rules::ai::defence::THREAT_RADIUS;
+/// Rounds of a window of the hammers and burned hammers by time (a fifth of a pace game).
+const WINDOW: u32 = 66;
+
+fn add_window(windows: &mut Vec<u64>, round: u32, amount: u64) {
+    let at = (round.saturating_sub(1) / WINDOW) as usize;
+    if windows.len() <= at {
+        windows.resize(at + 1, 0);
+    }
+    windows[at] += amount;
+}
+
 /// Every this many rounds the seat's production is sampled (the sum of the samples × this is its total).
 const SAMPLE_EVERY: u32 = 10;
 
@@ -156,6 +167,9 @@ struct SeatLine {
     wonders: WonderTally,
     /// Sum of the sampled production a turn × `SAMPLE_EVERY`: the seat's hammers over the match.
     hammers: u64,
+    /// The same by windows of `WINDOW` rounds, and the burned hammers by the window of the burn.
+    hammers_by: Vec<u64>,
+    burned_by: Vec<u64>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -177,6 +191,8 @@ pub struct RivalProbe {
     seats: Vec<(PlayerId, Side)>,
     tally: BTreeMap<u8, WonderTally>,
     hammers: BTreeMap<u8, u64>,
+    hammers_by: BTreeMap<u8, Vec<u64>>,
+    burned_by: BTreeMap<u8, Vec<u64>>,
     orders: HashMap<(CityHandle, BuildingKindId), Order>,
     completions: Vec<Completion>,
     ages: Vec<AgeRow>,
@@ -215,6 +231,8 @@ impl RivalProbe {
             seats: seats.to_vec(),
             tally: seats.iter().map(|(p, _)| (p.0, WonderTally::default())).collect(),
             hammers: BTreeMap::new(),
+            hammers_by: BTreeMap::new(),
+            burned_by: BTreeMap::new(),
             orders: HashMap::new(),
             completions: Vec::new(),
             ages: Vec::new(),
@@ -436,6 +454,7 @@ impl RivalProbe {
                     if order.head {
                         tally.burned += 1;
                         tally.burned_hammers += u64::from(order.cost);
+                        add_window(self.burned_by.entry(player.0).or_default(), now, u64::from(order.cost));
                     } else {
                         tally.redirected += 1;
                     }
@@ -515,6 +534,7 @@ impl RivalProbe {
                 if auth.players().is_alive(seat) {
                     let production = R::economy(game, rules, seat).production.max(0) as u64;
                     *self.hammers.entry(seat.0).or_default() += production * u64::from(SAMPLE_EVERY);
+                    add_window(self.hammers_by.entry(seat.0).or_default(), now, production * u64::from(SAMPLE_EVERY));
                 }
             }
         }
@@ -579,6 +599,8 @@ impl RivalProbe {
                 side: if *side == Side::Candidate { "candidate" } else { "baseline" },
                 wonders: self.tally.get(&p.0).cloned().unwrap_or_default(),
                 hammers: self.hammers.get(&p.0).copied().unwrap_or(0),
+                hammers_by: self.hammers_by.get(&p.0).cloned().unwrap_or_default(),
+                burned_by: self.burned_by.get(&p.0).cloned().unwrap_or_default(),
             })
             .collect();
         let line = Line { label, seed, candidate, baseline, rounds, seats, completions: self.completions, ages: self.ages, blows: self.blows, orders: self.order_log };

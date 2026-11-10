@@ -105,6 +105,8 @@ pub struct Allocator {
     strategy: Option<std::sync::Arc<crate::ai::strategy_net::Plan>>,
     /// The wonder-race switch (`TurnBrief::wonder_race`).
     race: u8,
+    /// The eras of the nations met (`TurnBrief::met_eras`), for the wonder race.
+    met_eras: Vec<(crate::ids::PlayerId, u8)>,
     /// The unit net's turn (`ai::unit_net`): its commander's orders are offered. None: off.
     #[cfg(feature = "experimental-ai")]
     unit_net: Option<std::sync::Arc<crate::ai::unit_net::UnitNetTurn>>,
@@ -146,6 +148,7 @@ impl Allocator {
             load: brief.workers.demand.then(|| crate::ai::planner_workers::WorkLoad::of(&obs.view, rules, brief, state.strategy.current)),
             strategy: brief.strategy.clone(),
             race: brief.wonder_race,
+            met_eras: if brief.wonder_race > 1 { brief.met_eras.clone() } else { Vec::new() },
             #[cfg(feature = "experimental-ai")]
             unit_net: brief.unit_net.clone(),
         }
@@ -316,7 +319,11 @@ impl Allocator {
             let mut value = self.prices.building(obs, rules, city, kind, self.cities, time);
             if wonder {
                 let standard_time = i64::from(time) * 100 / i64::from(obs.speed.pace_percent.max(1));
-                let chance = (100 - WONDER_RISK_PER_TURN * standard_time).max(crate::ai::genome::get(crate::ai::genome::Knob::WonderMinChance));
+                let chance = if self.race > 1 {
+                    crate::ai::wonder_race::chance(rules, &self.met_eras, kind, standard_time)
+                } else {
+                    (100 - WONDER_RISK_PER_TURN * standard_time).max(crate::ai::genome::get(crate::ai::genome::Knob::WonderMinChance))
+                };
                 value -= self.prices.score.wonder * (100 - chance) / 100;
             }
             out.push((item, value, Reason::ProduceBuilding));
