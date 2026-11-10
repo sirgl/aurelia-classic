@@ -244,3 +244,27 @@ fn tall_real_plans_its_spaceship() {
     let first = game.view().auth.cities().get(capital).unwrap().queue.first().copied();
     assert_eq!(first, Some(ProductionItem::Project(apollo(&rules))));
 }
+
+/// `next`'s fit at the lock (`tall_real::science_fits`): where every technology is known the
+/// science victory fits whenever it is enabled and the rounds left exceed the ship's; with the
+/// victory off, or with no more rounds than the ship takes, it does not; with all the
+/// technologies still to find it does not fit a handful of rounds past the ship.
+#[test]
+fn the_science_fit_follows_the_victory_the_rounds_and_the_technologies() {
+    use classic_rules::ai::grand_strategy::SPACESHIP_ROUNDS;
+    use classic_rules::ai::tall_real::science_fits;
+    let (mut game, rules, _, _) = space_age(1);
+    let ship = game.ai_observation(&rules, P0).speed.pace_rounds(SPACESHIP_ROUNDS);
+    let fits = |game: &GameState, left: u32| science_fits(&game.ai_observation(&rules, P0), &rules, left);
+    assert!(fits(&game, ship + 100), "every technology known, rounds to spare");
+    assert!(!fits(&game, ship), "no round left after the ship");
+    let options = game.view().auth.module().victory().options().with(classic_rules::world::victory::VictoryKind::Science, false);
+    game.debug_set_victory_options(options);
+    assert!(!fits(&game, ship + 100), "the science victory is off");
+    let rules = compile_rules(core_rules()).unwrap();
+    let mut fresh = GameState::new(&rules, GameConfig { players: 2, width: 30, height: 20, rng_seed: 5 });
+    fresh.debug_found_city(&rules, P0, tile(&fresh, 5, 5));
+    fresh.debug_found_city(&rules, P1, tile(&fresh, 25, 15));
+    let obs = fresh.ai_observation(&rules, P0);
+    assert!(!science_fits(&obs, &rules, ship + 5), "all technologies to find in five rounds");
+}

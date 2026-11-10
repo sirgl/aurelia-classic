@@ -446,6 +446,27 @@ fn priced_gifts_add_the_alliance_delegates_at_their_price() {
     assert!(values(&game, 2 * price).is_empty(), "past the ceiling no price buys a gift");
 }
 
+/// `next`'s delegate price is 0 until the World Congress exists (Printing Press) and positive
+/// once it counts the delegates the World Leader vote needs.
+#[test]
+fn a_delegate_is_worth_nothing_before_the_congress_and_something_after() {
+    use classic_rules::ai::city_states::delegate_worth;
+    let (mut game, rules) = world("core:city-state/byblos");
+    let worth = |game: &GameState| delegate_worth(&game.ai_observation(&rules, P0));
+    assert_eq!(worth(&game), 0, "no congress yet");
+    let press = rules.technologies.iter().position(|t| t.key == "core:tech/printing-press").unwrap();
+    game.debug_learn(&rules, P1, classic_rules::ids::TechId(press as u16));
+    for _ in 0..2 {
+        let round = game.view().auth.turn().round;
+        while game.view().auth.turn().round == round {
+            let active = game.view().auth.active_player();
+            game.execute(&rules, Command::EndTurn { player: active }).unwrap();
+        }
+    }
+    assert!(game.view().auth.module().congress().founded(), "the Printing Press founds the congress");
+    assert!(worth(&game) > 0, "the congress counts the delegates: {}", worth(&game));
+}
+
 /// A cultured friend adds 3 culture a turn to the player's pool (ancient
 /// era), an ally 3 more (the culture pool of track B).
 #[test]

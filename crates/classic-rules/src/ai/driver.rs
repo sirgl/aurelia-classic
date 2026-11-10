@@ -220,8 +220,8 @@ impl ClassicMind {
     pub fn variant(&self) -> Variant {
         if self.next {
             return match self.wonder_race {
-                1 => Variant::NextCancel,
-                2 => Variant::NextW,
+                1 => Variant::NextW,
+                2 => Variant::NextRace,
                 _ => Variant::Next,
             };
         }
@@ -925,21 +925,21 @@ mod sharp_tests {
         assert_eq!((mind.variant, mind.sharp, mind.tall_real, mind.next, mind.variant()), (Variant::Standard, true, true, true, Variant::Next));
         assert!(!ClassicMind::new(Variant::TallReal).next && !ClassicMind::new(Variant::Sharp).next);
         let flagged: Vec<Variant> = Variant::ALL.into_iter().filter(|v| v.next()).collect();
-        assert_eq!(flagged, [Variant::Next, Variant::NextCancel, Variant::NextW]);
+        assert_eq!(flagged, [Variant::Next, Variant::NextW, Variant::NextRace]);
         assert_eq!(Variant::from_name("next"), cfg!(feature = "experimental-ai").then_some(Variant::Next));
     }
 
-    /// `next-w` is `next` with the wonder-race rule and price, `next-cancel` with the rule only:
+    /// `next-race` is `next` with the wonder-race rule and price, `next-w` with the rule only:
     /// they carry `next`'s flags and name themselves; `next` carries no wonder-race switch.
     #[test]
     fn next_w_is_next_with_the_wonder_race() {
-        for (variant, race) in [(Variant::Next, 0), (Variant::NextCancel, 1), (Variant::NextW, 2)] {
+        for (variant, race) in [(Variant::Next, 0), (Variant::NextW, 1), (Variant::NextRace, 2)] {
             let mind = ClassicMind::new(variant);
             assert_eq!((mind.variant, mind.sharp, mind.tall_real, mind.next, mind.wonder_race, mind.variant()), (Variant::Standard, true, true, true, race, variant));
         }
         assert!(!ClassicMind::new(Variant::WonderRace).next);
         assert_eq!(ClassicMind::new(Variant::WonderRace).variant(), Variant::WonderRace);
+        assert_eq!(Variant::from_name("next-race"), cfg!(feature = "experimental-ai").then_some(Variant::NextRace));
         assert_eq!(Variant::from_name("next-w"), cfg!(feature = "experimental-ai").then_some(Variant::NextW));
-        assert_eq!(Variant::from_name("next-cancel"), cfg!(feature = "experimental-ai").then_some(Variant::NextCancel));
     }
 }

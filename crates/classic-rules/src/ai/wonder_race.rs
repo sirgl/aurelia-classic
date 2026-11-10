@@ -33,6 +33,12 @@ pub fn lost(obs: &AIObservation<'_>, rules: &CompiledRuleset, city: &OwnCity, it
     }
 }
 
+/// The head of the city's queue the seat may hurry-buy: none for an empty queue, and none for a
+/// lost wonder where the switch is on (`race` > 0): the gold would buy a stock the rules burn.
+pub fn hurry_head(race: u8, obs: &AIObservation<'_>, rules: &CompiledRuleset, city: &OwnCity) -> Option<ProductionItem> {
+    city.queue.first().copied().filter(|item| race == 0 || !lost(obs, rules, city, *item))
+}
+
 /// The era of the technology that opens the wonder (the content era's order): a nation of an
 /// earlier era cannot build it.
 fn wonder_era(rules: &CompiledRuleset, kind: BuildingKindId) -> u8 {

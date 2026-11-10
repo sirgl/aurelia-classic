@@ -453,11 +453,8 @@ impl Allocator {
         let mut out = Vec::new();
         let hammer = self.prices.production / i64::from(self.prices.rounds_left);
         for city in &obs.own_cities {
-            let Some(&item) = city.queue.first() else { continue };
             // A wonder another nation has completed is not bought (`ai::wonder_race`).
-            if self.race > 0 && crate::ai::wonder_race::lost(obs, rules, city, item) {
-                continue;
-            }
+            let Some(item) = crate::ai::wonder_race::hurry_head(self.race, obs, rules, city) else { continue };
             let Some(price) = obs.view.own_hurry_price(city.handle) else { continue };
             let Some(cost) = obs.view.own_production_cost(city.handle, item) else { continue };
             let time = turns(obs, rules, city, item);
