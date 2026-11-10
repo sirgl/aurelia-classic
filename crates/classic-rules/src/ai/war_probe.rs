@@ -111,6 +111,30 @@ pub struct StartCheck {
     pub started: bool,
 }
 
+/// A forming operation at its player's turn (`operations::advance`): whether it may march.
+#[derive(Debug, Clone, Copy)]
+pub struct FormingSample {
+    pub round: u32,
+    pub player: PlayerId,
+    pub target: u32,
+    /// The army near the muster point covers the need (`operations::assembled`).
+    pub assembled: bool,
+    /// The defenders seen near the target are half as strong again as the members.
+    pub outmatched: bool,
+    /// At war with the target's owner already, or a war may be declared now.
+    pub may_declare: bool,
+    pub members: u32,
+    /// Members within `MUSTER_RADIUS + 1` of the muster point, those of them healthy, the wounded,
+    /// the sum of the members' distances to the muster point, the need, the muster's distance to
+    /// the target.
+    pub near: u32,
+    pub near_healthy: u32,
+    pub wounded: u32,
+    pub distance_sum: u32,
+    pub need: u32,
+    pub muster_to_target: i32,
+}
+
 /// An operation that ended.
 #[derive(Debug, Clone, Copy)]
 pub struct OperationEnd {
@@ -234,6 +258,8 @@ pub struct WarProbe {
     pub members: Vec<(u32, PlayerId, u32, bool, Vec<(u64, u32)>)>,
     /// The army units of every player that plans its operations, each turn: (round, player, ids).
     pub alive: Vec<(u32, PlayerId, Vec<u64>)>,
+    /// The forming operations, every turn they form.
+    pub forming: Vec<FormingSample>,
 }
 
 thread_local! {

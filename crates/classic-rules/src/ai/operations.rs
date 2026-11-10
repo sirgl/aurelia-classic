@@ -605,6 +605,25 @@ fn advance(brief: &TurnBrief, state: &mut AiState, rules: &CompiledRuleset, oper
         return vec![Decision::refuse(Actor::Player, Reason::EndOperation)];
     }
     let ready = assembled(brief, rules, operation, &members, age) && !outmatched(brief, rules, operation, &members);
+    if operation.phase == OperationPhase::Forming {
+        crate::ai::war_probe::note(|p| {
+            p.forming.push(crate::ai::war_probe::FormingSample {
+                round: brief.round,
+                player: brief.player,
+                target: operation.target.0,
+                assembled: assembled(brief, rules, operation, &members, age),
+                outmatched: outmatched(brief, rules, operation, &members),
+                may_declare: at_war || may_declare(brief, state, operation),
+                members: members.len() as u32,
+                near: members.iter().filter(|u| brief.dims.distance(u.tile, operation.muster).is_some_and(|d| d <= MUSTER_RADIUS + 1)).count() as u32,
+                near_healthy: members.iter().filter(|u| u.hp >= HEAL_BELOW_HP && brief.dims.distance(u.tile, operation.muster).is_some_and(|d| d <= MUSTER_RADIUS + 1)).count() as u32,
+                wounded: members.iter().filter(|u| u.hp < HEAL_BELOW_HP).count() as u32,
+                distance_sum: members.iter().filter_map(|u| brief.dims.distance(u.tile, operation.muster)).sum::<i32>().max(0) as u32,
+                need: operation.need.total(),
+                muster_to_target: brief.dims.distance(operation.muster, operation.target).unwrap_or(-1),
+            })
+        });
+    }
     if operation.phase != OperationPhase::Forming || !ready {
         return Vec::new();
     }
@@ -631,12 +650,28 @@ fn assembled(brief: &TurnBrief, rules: &CompiledRuleset, operation: &Operation, 
     let dims = brief.dims;
     let present = members
         .iter()
-        .filter(|u| u.hp >= HEAL_BELOW_HP && dims.distance(u.tile, operation.muster).is_some_and(|d| d <= MUSTER_RADIUS + 1));
+        .filter(|u| u.hp >= HEAL_BELOW_HP && dims.distance(u.tile, operation.muster).is_some_and(|d| d <= muster_reach(brief, rules, u.kind)));
     let present = composition_of(rules, present.map(|u| u.kind));
     if shortfall(operation.need, present).total() == 0 {
         return true;
     }
     age >= brief.speed.pace_rounds(FORM_PATIENCE) && present.melee > 0 && present.total() * 4 >= operation.need.total() * 3
+}
+
+/// How far from the muster point a member stands with the army: `MUSTER_RADIUS + 1`; for
+/// `tactician-fit` (`TurnBrief::tactician_fit`) one turn's march more, the unit's movement in tiles.
+/// The muster point lies on the staging ring at the enemy's border: at peace the tiles within
+/// `MUSTER_RADIUS` of it that are neither the enemy's land nor in the city's strike hold four or
+/// five units (one military unit a tile), so a twelve-unit army stood on average 4.8 tiles from it
+/// and four of its members within reach: 27 of 114 operations of `war-pays` (tuning offset 200)
+/// formed for their whole limit with 12.9 members against a need of 11.9 and never marched
+/// (classic/docs/ai-tactician-fit.md).
+fn muster_reach(brief: &TurnBrief, rules: &CompiledRuleset, kind: UnitKindId) -> i32 {
+    let base = MUSTER_RADIUS + 1;
+    if !brief.tactician_fit {
+        return base;
+    }
+    base + i32::from(rules.units.get(kind.0 as usize).map_or(1, |d| d.movement.max(1)))
 }
 
 /// March: declare the war first when at peace (when allowed now), make the

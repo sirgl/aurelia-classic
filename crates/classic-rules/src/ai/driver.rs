@@ -78,6 +78,8 @@ pub struct ClassicMind {
     sharp: bool,
     /// `Variant::WarPays`: the mind plays `WarOpen` (`variant`) with the flag (`TurnBrief::war_pays`).
     pays: bool,
+    /// `Variant::TacticianFit`: `pays` with the flag (`TurnBrief::tactician_fit`).
+    fit: bool,
 }
 
 /// The environment variable that makes the game's AI another variant
@@ -108,6 +110,9 @@ impl ClassicMind {
         // `sharp` is `Standard` in every switch but its strategy net (`TurnBrief::sharp`).
         let sharp = variant.sharp();
         let variant = if sharp { Variant::Standard } else { variant };
+        // `tactician-fit` is `WarPays` in every switch but its own (`TurnBrief::tactician_fit`).
+        let fit = variant.tactician_fit();
+        let variant = if fit { Variant::WarPays } else { variant };
         // `war-pays` is `WarOpen` in every switch but its own (`TurnBrief::war_pays`).
         let pays = variant.war_pays();
         let variant = if pays { Variant::WarOpen } else { variant };
@@ -128,7 +133,7 @@ impl ClassicMind {
         let walls = (book.is_some() || variant.siege_walls()).then(|| Box::new(crate::ai::siege_walls::SiegeWalls::new().joined(variant.siege_join())));
         let unciv = variant.unciv().any().then(|| Box::new(crate::ai::unciv::UncivMind::new(variant.unciv())));
         let variant = if named.is_some() { Variant::PrePuppet } else { variant };
-        Self { advisors, variant, genome: None, humans: Vec::new(), walks: Default::default(), choice: None, #[cfg(feature = "experimental-ai")] net, book, named, walls, conquest: None, unciv, tall: None, sharp, pays }
+        Self { advisors, variant, genome: None, humans: Vec::new(), walks: Default::default(), choice: None, #[cfg(feature = "experimental-ai")] net, book, named, walls, conquest: None, unciv, tall: None, sharp, pays, fit }
     }
 
     /// A league book that may play on another base (`book_on`): a duel book
@@ -171,7 +176,7 @@ impl ClassicMind {
         advisors.register(crate::classic::ClassicSystem::Diplomacy, Box::new(diplomacy));
         // The net plays on `NET_BASE`: its siege too.
         let walls = variant.siege_walls().then(|| Box::new(crate::ai::siege_walls::SiegeWalls::new().joined(variant.siege_join())));
-        Self { advisors, variant, genome: None, humans: Vec::new(), walks: Default::default(), choice: None, net: Some(Box::new(net)), book: None, named: None, walls, conquest: None, unciv: None, tall: None, sharp: false, pays: false }
+        Self { advisors, variant, genome: None, humans: Vec::new(), walks: Default::default(), choice: None, net: Some(Box::new(net)), book: None, named: None, walls, conquest: None, unciv: None, tall: None, sharp: false, pays: false, fit: false }
     }
 
     /// The net's part (`Variant::Net`), if any.
@@ -212,10 +217,21 @@ impl ClassicMind {
         if self.sharp {
             return Variant::Sharp;
         }
+        if self.fit {
+            return Variant::TacticianFit;
+        }
         if self.pays {
             return Variant::WarPays;
         }
         self.named.unwrap_or(self.variant)
+    }
+
+    /// Its tactical and operations layer is the unit net's: `unit-net`, `hybrid`, and
+    /// `tactician-fit` (`TurnBrief::tactician_fit`: the unit net with its fitted numbers,
+    /// `unit_net::fit`).
+    #[cfg(feature = "experimental-ai")]
+    fn unit_net_on(&self) -> bool {
+        self.variant.unit_net() || self.fit
     }
 
     /// A league opponent's book, if any (`ai::books`).
@@ -254,7 +270,7 @@ impl AiMind<Classic> for ClassicMind {
     ) -> Option<LocalObservation<'g>> {
         let mut radius = settings.budget.local_radius;
         #[cfg(feature = "experimental-ai")]
-        if self.variant.unit_net() {
+        if self.unit_net_on() {
             // The unit net's tactician and its "who is next" see the whole theatre (`ai::unit_net`).
             radius = radius.max(crate::ai::unit_net::weights::fields::SIGHT);
         }
@@ -338,7 +354,7 @@ impl AiMind<Classic> for ClassicMind {
             start.opening.retain(|d| !unciv.replaces(rules, &sight.own_units, d));
         }
         #[cfg(feature = "experimental-ai")]
-        if self.variant.unit_net() {
+        if self.unit_net_on() {
             // The commander's turn (`ai::unit_net`): its operations, orders and plan; the
             // tactician moves and strikes with the units of its theatres, not the advisors.
             let _span = prof::span("classic/unit_net_begin");
@@ -607,6 +623,7 @@ impl ClassicMind {
         brief.war_open = self.variant.war_open();
         brief.sharp = self.sharp;
         brief.war_pays = self.pays;
+        brief.tactician_fit = self.fit;
         brief.met_eras = observation.view.met_eras();
         if brief.war_open {
             brief.scores = observation.view.race().scores;
@@ -672,7 +689,7 @@ impl ClassicMind {
                 let _span = prof::span("classic/strategy_net");
                 // `hybrid` keeps the unit net's memory beside the strategy net's (`unit_net::memory`).
                 #[cfg(feature = "experimental-ai")]
-                let unit_part = if self.variant.unit_net() {
+                let unit_part = if self.unit_net_on() {
                     let (strategy, unit) = crate::ai::unit_net::memory::split(&state.mind_memory);
                     state.mind_memory = strategy;
                     Some(unit)
@@ -881,5 +898,20 @@ mod sharp_tests {
         assert_eq!(flagged, [Variant::WarPays]);
         assert_eq!(Variant::from_name("war-pays"), Some(Variant::WarPays));
         assert!(mind.variant.war_open() && !Variant::WarPays.war_open());
+    }
+
+    /// `tactician-fit` is `WarPays` in every switch but its own flag (`TurnBrief::tactician_fit`); no
+    /// other variant has the flag, and `war-pays` keeps its own.
+    #[test]
+    fn tactician_fit_plays_war_pays_with_its_flag() {
+        let mind = ClassicMind::new(Variant::TacticianFit);
+        assert_eq!((mind.variant, mind.pays, mind.fit, mind.sharp, mind.variant()), (Variant::WarOpen, true, true, false, Variant::TacticianFit));
+        let pays = ClassicMind::new(Variant::WarPays);
+        assert_eq!((pays.variant(), pays.fit), (Variant::WarPays, false));
+        let flagged: Vec<Variant> = Variant::ALL.into_iter().filter(|v| v.tactician_fit()).collect();
+        assert_eq!(flagged, [Variant::TacticianFit]);
+        assert_eq!(Variant::from_name("tactician-fit"), cfg!(feature = "experimental-ai").then_some(Variant::TacticianFit));
+        #[cfg(feature = "experimental-ai")]
+        assert!(mind.unit_net_on() && !pays.unit_net_on() && !ClassicMind::new(Variant::Standard).unit_net_on());
     }
 }

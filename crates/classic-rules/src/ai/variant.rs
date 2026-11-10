@@ -681,6 +681,10 @@ pub enum Variant {
     /// strike window needs a war that pays, wars are started only on the odds measured, and a war that
     /// has stopped paying is ended. The mind plays `WarOpen` in every other switch (`ClassicMind::new`).
     WarPays,
+    /// `WarPays` with the tactical layer of its operations fitted on real siege positions
+    /// (`TurnBrief::tactician_fit`, classic/docs/ai-tactician-fit.md). The mind plays `WarPays` in every
+    /// other switch (`ClassicMind::new`).
+    TacticianFit,
 }
 
 /// The net's base: the expert the end-to-end net learns from and the mind it
@@ -701,7 +705,7 @@ const NUDGED_CANDIDATES: u32 = 40;
 
 impl Variant {
     /// The game's AI first.
-    pub const ALL: [Variant; 137] = [
+    pub const ALL: [Variant; 138] = [
         Variant::Standard,
         Variant::PreCamps,
         Variant::PreWorkers,
@@ -839,6 +843,7 @@ impl Variant {
         Variant::WarOpen,
         Variant::Sharp,
         Variant::WarPays,
+        Variant::TacticianFit,
     ];
 
     pub fn name(self) -> &'static str {
@@ -962,6 +967,7 @@ impl Variant {
             Variant::WarOpen => "war-open",
             Variant::Sharp => "sharp",
             Variant::WarPays => "war-pays",
+            Variant::TacticianFit => "tactician-fit",
             Variant::ArmyFit => "army-fit",
             Variant::Camps => "camps",
             Variant::ArmyCamps => "army-camps",
@@ -995,7 +1001,7 @@ impl Variant {
         cfg!(feature = "experimental-ai")
             || !matches!(
                 self,
-                Variant::Net | Variant::UnitNet | Variant::Hybrid | Variant::SiteNet | Variant::ChoiceNet | Variant::ChoiceNetProduction | Variant::ChoiceNetResearch | Variant::StandardScripted | Variant::PreCsGifts | Variant::Sharp
+                Variant::Net | Variant::UnitNet | Variant::Hybrid | Variant::SiteNet | Variant::ChoiceNet | Variant::ChoiceNetProduction | Variant::ChoiceNetResearch | Variant::StandardScripted | Variant::PreCsGifts | Variant::Sharp | Variant::TacticianFit
             )
     }
 
@@ -1136,6 +1142,12 @@ impl Variant {
     /// plays as `WarOpen` in every other switch (`ClassicMind::new`).
     pub fn war_pays(self) -> bool {
         self == Variant::WarPays
+    }
+
+    /// The tactic lane (`TurnBrief::tactician_fit`): `TacticianFit` alone, which the mind plays as
+    /// `WarPays` in every other switch (`ClassicMind::new`).
+    pub fn tactician_fit(self) -> bool {
+        self == Variant::TacticianFit
     }
 
     /// Its research, policies and choice among the allocator's best orders are the

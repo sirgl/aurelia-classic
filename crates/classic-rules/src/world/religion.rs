@@ -254,6 +254,12 @@ impl ReligionState {
     }
 
 
+    /// Harness-only: the prophets' stream restarted (`ClassicGame::reseed_streams`).
+    #[cfg(any(test, feature = "harness"))]
+    pub(crate) fn reseed_prophets(&mut self, rng: StreamRng) {
+        self.prophet_rng = rng;
+    }
+
     pub(crate) fn roll_prophet(&mut self, below: u64) -> u64 {
         self.prophet_rng.below(below)
     }

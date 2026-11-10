@@ -44,6 +44,13 @@ pub trait ClassicGame {
     ) -> (AIObservation<'a>, crate::metrics::WorkCounters);
 
 
+    /// Harness-only: every random stream of the game (combat, events, the
+    /// barbarians', the prophets', the archaeology's) restarted from streams of
+    /// `seed`, so copies of one game that reseed alike draw the same dice from
+    /// here on (a counterfactual tool's common random numbers).
+    #[cfg(any(test, feature = "harness"))]
+    fn reseed_streams(&mut self, seed: u64);
+
     #[cfg(any(test, feature = "harness"))]
     fn debug_force_war(&mut self, rules: &CompiledRuleset, player: PlayerId, enemy: PlayerId);
 
@@ -193,6 +200,18 @@ impl ClassicGame for GameState {
         self.commit_journal(rules, &journal);
     }
 
+
+    #[cfg(any(test, feature = "harness"))]
+    fn reseed_streams(&mut self, seed: u64) {
+        use crate::rng::StreamRng;
+        let stream = |salt: u64| StreamRng::new(mix(seed ^ mix(salt)));
+        let world = self.world_mut();
+        world.rng.combat = stream(1);
+        world.rng.events = stream(2);
+        world.module.barbarians.reseed(stream(3));
+        world.module.religion.reseed_prophets(stream(4));
+        world.module.tourism.archaeology_mut().rng = stream(5);
+    }
 
     #[cfg(any(test, feature = "harness"))]
     fn debug_discover(&mut self, rules: &CompiledRuleset, player: PlayerId, tech: crate::ids::TechId) {
@@ -360,4 +379,13 @@ impl ClassicGame for GameState {
     fn outcome(&self) -> Option<crate::world::victory::Outcome> {
         self.view().auth.module.victory.outcome()
     }
+}
+
+/// SplitMix64's finaliser.
+#[cfg(any(test, feature = "harness"))]
+fn mix(mut z: u64) -> u64 {
+    z = z.wrapping_add(0x9e37_79b9_7f4a_7c15);
+    z = (z ^ (z >> 30)).wrapping_mul(0xbf58_476d_1ce4_e5b9);
+    z = (z ^ (z >> 27)).wrapping_mul(0x94d0_49bb_1331_11eb);
+    z ^ (z >> 31)
 }
