@@ -221,8 +221,8 @@ pub struct UnitBrief {
 }
 
 /// The parts of `siege-call` (`Variant::SiegeCall`), each a class fix of the operations layer or of the call at the
-/// walls; the bench switches them off one by one with `SIEGE_CALL_ON` (a comma list of the names that stay on;
-/// unset: all). Only `siege-call` carries any.
+/// walls; the bench sets them with `SIEGE_CALL_ON` (a comma list of the names that are on; unset: `DEFAULT`).
+/// Only `siege-call` carries any.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct CallFixes {
     /// Declare the war only when the whole army can strike within two turns, and muster out of the city's strike.
@@ -240,6 +240,10 @@ pub struct CallFixes {
 impl CallFixes {
     pub const NONE: CallFixes = CallFixes { ready: false, ranged: false, melee: false, threat: false, call: false };
     pub const ALL: CallFixes = CallFixes { ready: true, ranged: true, melee: true, threat: true, call: true };
+    /// What `siege-call` plays: the fixes that measured better on the tuning offsets 200-202 (300 solo pace games,
+    /// `runs/ops`): ranged units first and the press call. `ready` cut the losses and not the share, `melee` and
+    /// `threat` lowered both (see `LOG.md`); they stay in the code, off, for the bench to switch on.
+    pub const DEFAULT: CallFixes = CallFixes { ready: false, ranged: true, melee: false, threat: false, call: true };
 
     pub fn any(self) -> bool {
         self != Self::NONE
@@ -253,7 +257,7 @@ impl CallFixes {
                 let on = |n: &str| list.split(',').any(|x| x.trim() == n);
                 CallFixes { ready: on("ready"), ranged: on("ranged"), melee: on("melee"), threat: on("threat"), call: on("call") }
             }
-            Err(_) => CallFixes::ALL,
+            Err(_) => CallFixes::DEFAULT,
         })
     }
 }
