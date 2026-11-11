@@ -122,11 +122,47 @@ impl Diplomatic {
     }
 }
 
+/// Dev switches of the vote guard's parts while they are tuned (`VG_STEP`, bits: 1 the alliances of
+/// a rival, 2 the host election); all on when unset. Gone with the freeze.
+pub fn part(bit: u32) -> bool {
+    use std::sync::OnceLock;
+    static BITS: OnceLock<u32> = OnceLock::new();
+    *BITS.get_or_init(|| std::env::var("VG_STEP").ok().and_then(|v| v.parse().ok()).unwrap_or(3)) & bit != 0
+}
+
+/// Whom the seat votes for as host of the league (a `ChangeHost` election at a special session),
+/// when the nation with the most delegates it knows could win the World Leader vote with the host's
+/// seats and the seat is not that nation: the strongest of the others, itself included. The host holds
+/// the seats of `SpecialSession::host_delegates` for good (until the next election), so denying them to
+/// the front-runner costs it as many alliances; every guard reads the same table, so they vote
+/// for the same nation and carry the plurality. None: vote for itself, as the plain AI does.
+pub fn host_choice(obs: &AIObservation<'_>) -> Option<PlayerId> {
+    let c = obs.congress.as_ref().filter(|c| c.united_nations && c.needed > 0 && c.delegates.len() > 1)?;
+    if !obs.victories.enabled(crate::world::victory::VictoryKind::Diplomatic) {
+        return None;
+    }
+    let front = c.delegates.iter().max_by_key(|(p, d)| (*d, std::cmp::Reverse(p.0)))?.0;
+    if front == obs.player {
+        return None;
+    }
+    // Alliances it could still take before the leader vote: the ramp of the diplomatic race.
+    let interval = kernel::rules::speeds::SpeedValues::scale(last_session().turns_between, obs.speed.pace_percent).max(1);
+    let reach = flips_in(obs, interval).min(obs.city_states.len() as i64);
+    let delegates = c.delegates.iter().find(|(p, _)| *p == front)?.1;
+    if chance_for(i32::from(c.needed) - i32::from(delegates), reach) == 0 {
+        return None;
+    }
+    c.delegates.iter().filter(|(p, _)| *p != front).max_by_key(|(p, d)| (*d, std::cmp::Reverse(p.0))).map(|(p, _)| *p)
+}
+
 /// What losing the game to a rival's vote costs the seat, in the measure of the allocator
 /// (`grand_strategy::prize`): 0 while no rival can win the next vote (no race, or every rival out
 /// of reach), so that nothing else is computed then.
 pub fn guard_prize(obs: &AIObservation<'_>) -> Centi {
     use crate::knowledge::public::PlayerQueries;
+    if !part(1) {
+        return 0;
+    }
     let Some(race) = diplomatic(obs) else { return 0 };
     if race.rivals.iter().all(|r| r.chance == 0) {
         return 0;

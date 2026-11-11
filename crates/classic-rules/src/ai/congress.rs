@@ -81,11 +81,25 @@ fn supports(obs: &AIObservation<'_>, proposal: &Proposal) -> bool {
 /// All delegates on the open session: elections for itself, yes/no by
 /// `supports`, split evenly over the proposals.
 pub fn vote_orders(obs: &AIObservation<'_>) -> Vec<Command> {
+    vote_orders_for(obs, false)
+}
+
+/// `vote_orders`; with `guard` (`Variant::VoteGuard`) the host election goes to the strongest
+/// nation but the front-runner when the front-runner could win the World Leader vote
+/// (`victory_watch::host_choice`), and it takes all the delegates a second resolution on the table
+/// would take (the plain AI splits them over the proposals, so a proposal beside the election halves
+/// its vote).
+pub fn vote_orders_for(obs: &AIObservation<'_>, guard: bool) -> Vec<Command> {
     let Some(info) = &obs.congress else {
         return Vec::new();
     };
     if !info.in_session || info.delegates_left == 0 || info.proposals.is_empty() {
         return Vec::new();
+    }
+    let host = guard.then(|| crate::ai::victory_watch::part(2).then(|| crate::ai::victory_watch::host_choice(obs)).flatten()).flatten();
+    if let (Some(host), Some(i)) = (host, info.proposals.iter().position(|p| p.kind == ResolutionKind::ChangeHost)) {
+        // All the delegates on the host election, the rest abstain.
+        return vec![Command::CastVotes { player: obs.player, proposal: i as u8, choice: u32::from(host.0), delegates: info.delegates_left }];
     }
     let share = split(info);
     let mut left = info.delegates_left;
@@ -174,7 +188,7 @@ impl crate::ai::system::SystemAdvisor for CongressAdvisor {
         let obs = input.observation;
         crate::ai::strategy_net::trace::watch(obs);
         let weights = Weights::of(input.state.strategy.current);
-        let mut out = crate::ai::combat::proposals(8, vote_orders(obs));
+        let mut out = crate::ai::combat::proposals(8, vote_orders_for(obs, input.brief.vote_guard));
         out.extend(crate::ai::combat::proposals(6, proposal_orders(obs, input.rules, &weights)));
         out.extend(crate::ai::combat::proposals(5, project_orders(obs)));
         out

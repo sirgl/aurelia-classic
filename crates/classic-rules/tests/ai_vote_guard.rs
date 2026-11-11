@@ -43,6 +43,12 @@ fn end_round(game: &mut GameState, rules: &CompiledRuleset) {
 /// P1 holds `rival_allies` of the four city-states with influence 80; P0 has 40 with each of
 /// them. `contact`: P0 has met P1 (it has met the city-states and P2 either way).
 fn scene(rival_allies: u8, contact: bool) -> (GameState, CompiledRuleset) {
+    scene_with(rival_allies, contact, false)
+}
+
+/// `staged`: the league is founded at the Council's era and the United Nations comes later, with a
+/// host election on the table when it opens (P1 is the host, P2 holds the fourth city-state).
+fn scene_with(rival_allies: u8, contact: bool, staged: bool) -> (GameState, CompiledRuleset) {
     let rules = compile_rules(core_rules()).unwrap();
     let mut game = GameState::new(&rules, GameConfig { players: 7, width: 40, height: 30, rng_seed: 11 });
     for i in 0..4u8 {
@@ -63,8 +69,39 @@ fn scene(rival_allies: u8, contact: bool) -> (GameState, CompiledRuleset) {
     if contact {
         game.debug_meet(P0, P1);
     }
-    for t in 0..rules.technologies.len() {
-        game.debug_learn(&rules, P1, TechId(t as u16));
+    let mut order: Vec<usize> = (0..rules.technologies.len()).collect();
+    order.sort_by_key(|i| (rules.technologies[*i].cost, *i));
+    if staged {
+        for i in &order {
+            game.debug_learn(&rules, P1, TechId(*i as u16));
+            if classic_rules::world::congress::game_era(game.view().auth, &rules) >= 4 {
+                break;
+            }
+        }
+        for _ in 0..3 {
+            end_round(&mut game, &rules);
+        }
+        assert!(game.view().auth.module().congress().founded() && !game.view().auth.module().congress().united_nations());
+        for i in 0..rival_allies {
+            game.debug_set_influence(&rules, cs(i), P1, 80);
+        }
+        game.debug_set_influence(&rules, cs(3), P2, 80);
+    }
+    for i in &order {
+        game.debug_learn(&rules, P1, TechId(*i as u16));
+    }
+    if staged {
+        for _ in 0..40 {
+            end_round(&mut game, &rules);
+            let congress = game.view().auth.module().congress();
+            if congress.united_nations() && congress.in_session() {
+                break;
+            }
+        }
+        let congress = game.view().auth.module().congress();
+        assert!(congress.in_session() && congress.united_nations(), "the United Nations opens its first session");
+        assert!(congress.proposals().iter().any(|p| p.kind == classic_rules::world::congress::ResolutionKind::ChangeHost));
+        return (game, rules);
     }
     // The league is founded, a first session passes, and the next one elects the World Leader.
     for _ in 0..60 {
@@ -186,6 +223,67 @@ fn a_rival_far_from_the_threshold_is_left_alone() {
     game.debug_earn(P0, 3000);
     assert!(contested(&game, &rules, PRIZE).is_empty());
     assert_eq!(chance_for(3, 0), 0);
+}
+
+/// On the last turn before the session opens the seat buys the alliance whole, in one gift larger
+/// than any of the screen's sizes, and holds it when the rival's influence is what it estimated
+/// (the seat's own alliances are not shown here: the ceiling of a top-up); the gift takes the
+/// alliance, the delegate passes from the rival to the seat.
+#[test]
+fn on_the_last_turn_the_seat_takes_the_alliance_in_one_lump() {
+    let (mut game, rules) = scene(3, true);
+    for _ in 0..40 {
+        if game.view().auth.module().congress().turns_until_session() <= 1 {
+            break;
+        }
+        end_round(&mut game, &rules);
+    }
+    assert_eq!(game.view().auth.module().congress().turns_until_session(), 1);
+    for i in 0..4 {
+        game.debug_set_influence(&rules, cs(i), P0, 40);
+        game.debug_set_influence(&rules, cs(i), P1, if i < 3 { 70 } else { 0 });
+    }
+    game.debug_earn(P0, 6000);
+    let offers = contested(&game, &rules, PRIZE);
+    assert_eq!(offers.len(), 3, "one lump for each of the rival's alliances: {offers:?}");
+    let (city_state, gold, _) = *offers.iter().max_by_key(|o| o.2).unwrap();
+    assert!(gold > 500, "larger than any gift of the screen: {gold}");
+    let delegates = |game: &GameState, p: PlayerId| classic_rules::world::congress::delegates(game.view().auth, &rules, p);
+    let (rival_before, seat_before) = (delegates(&game, P1), delegates(&game, P0));
+    game.execute(&rules, Command::GiftGold { player: P0, city_state, gold }).unwrap();
+    assert_eq!((delegates(&game, P1), delegates(&game, P0)), (rival_before - 1, seat_before + 1), "the alliance changed hands");
+}
+
+/// The host election of the United Nations' first session: a guard votes all its delegates for the
+/// strongest nation but the front-runner when the front-runner could win the World Leader vote with
+/// the host's seats; the plain AI votes for itself, and so does a guard that has never met the
+/// front-runner (it does not know it).
+#[test]
+fn a_guard_denies_the_host_to_the_front_runner() {
+    use classic_rules::ai::congress::{vote_orders, vote_orders_for};
+    use classic_rules::ai::victory_watch::host_choice;
+    let vote = |game: &GameState, rules: &CompiledRuleset, guard: bool| {
+        let obs = game.ai_observation(rules, P0);
+        let orders = if guard { vote_orders_for(&obs, true) } else { vote_orders(&obs) };
+        orders.into_iter().find_map(|o| match o {
+            Command::CastVotes { choice, delegates, proposal, .. } if obs.congress.as_ref().unwrap().proposals[proposal as usize].kind == classic_rules::world::congress::ResolutionKind::ChangeHost => Some((choice, delegates)),
+            _ => None,
+        })
+    };
+    // P1 has the host's two seats and 3 alliances: 9 of the 9 the vote needs. P2 is the next strongest.
+    let (game, rules) = scene_with(3, true, true);
+    let obs = game.ai_observation(&rules, P0);
+    assert_eq!(host_choice(&obs), Some(P2));
+    assert_eq!(vote(&game, &rules, false).map(|v| v.0), Some(u32::from(P0.0)), "the plain AI votes for itself");
+    assert_eq!(vote(&game, &rules, true), Some((u32::from(P2.0), obs.congress.as_ref().unwrap().delegates_left)), "all its delegates");
+    // The front-runner short of the threshold by more than it can buy: no reason to deny it.
+    let (game, rules) = scene_with(0, true, true);
+    assert_eq!(host_choice(&game.ai_observation(&rules, P0)), None);
+    // Never met: the front-runner is not in the table.
+    let (game, rules) = scene_with(3, false, true);
+    let obs = game.ai_observation(&rules, P0);
+    assert!(obs.congress.as_ref().unwrap().delegates.iter().all(|(p, _)| *p != P1));
+    assert_eq!(vote(&game, &rules, true).map(|v| v.0), Some(u32::from(P0.0)));
 }
 
 /// The whole mind: the seat of `vote-guard` gifts to the rival's city-states in its turn and
