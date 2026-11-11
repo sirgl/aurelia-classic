@@ -345,6 +345,13 @@ fn decide_military(
         }
         return decision;
     }
+    if view.brief.raid_war {
+        // The unit has its task before the pillage asks what it is free for.
+        ensure_task(view, state, tools);
+        if let Some(decision) = crate::ai::raid_war::sortie(view, state, tools) {
+            return decision;
+        }
+    }
     follow_task(view, state, tools)
 }
 

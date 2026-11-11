@@ -95,6 +95,7 @@ pub mod planner_units;
 pub mod planner_value;
 pub mod planner_workers;
 pub mod field_craft;
+pub mod raid_war;
 pub mod raid;
 pub mod policies;
 pub mod policy_branches;

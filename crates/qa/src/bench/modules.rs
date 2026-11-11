@@ -163,6 +163,11 @@ pub trait BenchRules {
     /// bench's combat record).
     fn is_combat(command: &<Self::M as RulesModule>::Command) -> bool;
 
+    /// A command that pillages a tile (counted in the combat record: the AI's raids).
+    fn is_pillage(_command: &<Self::M as RulesModule>::Command) -> bool {
+        false
+    }
+
     /// The original capitals of the player's rivals, by founder, and
     /// whether the player knows each one's tile (empty: the module has no
     /// domination by capitals).
@@ -479,6 +484,10 @@ impl BenchRules for ClassicBench {
 
     fn goal_name(goal: u8) -> Option<&'static str> {
         classic_rules::ai::grand_strategy::VictoryPath::from_code(goal).map(|p| p.name())
+    }
+
+    fn is_pillage(command: &classic_rules::Command) -> bool {
+        matches!(command, classic_rules::Command::Pillage { .. })
     }
 
     fn is_combat(command: &classic_rules::Command) -> bool {

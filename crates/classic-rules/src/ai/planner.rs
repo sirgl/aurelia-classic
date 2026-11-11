@@ -376,6 +376,8 @@ pub struct TurnBrief {
     pub tactician_fit: bool,
     /// `field-craft` (`Variant::field_craft`): `Standard` with the tactics exam's fixes.
     pub field_craft: bool,
+    /// `raid-war` (`Variant::raid_war`): `Standard` with the pillaging of `ai::raid_war`.
+    pub raid_war: bool,
     /// The tall play the variant carries (`ai::tall`, `Variant::tall`), the
     /// cities it keeps and what a site meeting a science building's condition
     /// adds (`tall::turn_site_bonuses`); Off, None and empty for the others.
@@ -503,6 +505,7 @@ impl TurnBrief {
             war_pays: false,
             tactician_fit: false,
             field_craft: false,
+            raid_war: false,
             tall: crate::ai::tall::Tall::Off,
             tall_cities: None,
             tall_sites: Vec::new(),

@@ -39,8 +39,9 @@ pub fn abroad(view: &UnitView<'_, '_>) -> bool {
 
 /// A friendly unit that depends on this one: a civilian of ours, or a ranged unit of ours, outside a city within
 /// one tile of the unit that has no other friendly melee unit on or next to its tile. Leaving it would expose it
-/// (a civilian is captured, a ranged unit is struck in melee), so the unit stays.
-pub fn has_dependant(view: &UnitView<'_, '_>, rules: &crate::rules::CompiledRuleset) -> bool {
+/// (a civilian is captured, a ranged unit is struck in melee), so the unit stays. With `danger` the ward counts only
+/// when a hostile fighter is within that many tiles of it (a ward at peace at home is not left exposed).
+pub fn has_dependant(view: &UnitView<'_, '_>, rules: &crate::rules::CompiledRuleset, danger: Option<i32>) -> bool {
     let me = view.local.unit;
     let dims = view.local.view.dimensions();
     let role = |k| crate::ai::planner::role_of(rules, k);
@@ -48,6 +49,7 @@ pub fn has_dependant(view: &UnitView<'_, '_>, rules: &crate::rules::CompiledRule
     view.local.own_units.iter().filter(|w| w.id != me.id).any(|w| {
         let weak = !matches!(role(w.kind), crate::ai::planner::AiRole::Military | crate::ai::planner::AiRole::Naval) || (role(w.kind) == crate::ai::planner::AiRole::Military && !melee(w));
         weak && dims.distance(w.tile, me.tile).is_some_and(|d| d <= 1)
+            && danger.is_none_or(|radius| crate::ai::planner_units::threatened(view, rules, w.tile, radius))
             && !view.brief.cities.iter().any(|c| c.tile == w.tile)
             && !view.local.own_units.iter().any(|o| o.id != me.id && o.id != w.id && melee(o) && dims.distance(o.tile, w.tile).is_some_and(|d| d <= 1))
     })
@@ -63,9 +65,9 @@ pub fn sortie(view: &UnitView<'_, '_>, state: &AiState, tools: &mut PlanTools<'_
     if unit.moves_left == 0 || !unit.can_attack || !rules.units[unit.kind.0 as usize].combat.pillage {
         return None;
     }
-    let prices = view.brief.prices.as_ref()?;
+    let prices_known = view.brief.prices.is_some();
     let enemies: Vec<PlayerId> = view.brief.relations.iter().filter(|r| r.at_war && r.kind == crate::world::player::PlayerKind::Major).map(|r| r.other).collect();
-    if enemies.is_empty() {
+    if enemies.is_empty() || !prices_known {
         return None;
     }
     // A unit with a task of the empire's keeps it; a spare garrison, a wounded unit and an idle one are
@@ -81,11 +83,27 @@ pub fn sortie(view: &UnitView<'_, '_>, state: &AiState, tools: &mut PlanTools<'_
         Some(UnitTask::Operation { target }) => state.operation(target).is_some_and(|o| o.phase == crate::ai::state::OperationPhase::Forming),
         Some(_) => false,
     };
-    if !free || has_dependant(view, rules) {
+    if !free || has_dependant(view, rules, None) {
+        return None;
+    }
+    trip(view, tools, SORTIE_ROUNDS)
+}
+
+/// The pillage trip of a unit that is free to go (the freedom is the caller's), looking `rounds` of its walking
+/// for prey: to the nearest prey that pays, or the pillage where it stands.
+pub(crate) fn trip(view: &UnitView<'_, '_>, tools: &mut PlanTools<'_>, rounds: i32) -> Option<Decision> {
+    let unit = view.local.unit;
+    let rules = tools.rules;
+    if unit.moves_left == 0 || !unit.can_attack || !rules.units[unit.kind.0 as usize].combat.pillage {
+        return None;
+    }
+    let prices = view.brief.prices.as_ref()?;
+    let enemies: Vec<PlayerId> = view.brief.relations.iter().filter(|r| r.at_war && r.kind == crate::world::player::PlayerKind::Major).map(|r| r.other).collect();
+    if enemies.is_empty() {
         return None;
     }
     let dims = view.local.view.dimensions();
-    let reach = i32::from(rules.units[unit.kind.0 as usize].movement.max(1)) * SORTIE_ROUNDS;
+        let reach = i32::from(rules.units[unit.kind.0 as usize].movement.max(1)) * rounds;
     let mut prey: Vec<(i32, TileId, crate::ids::ImprovementId)> = Vec::new();
     for tile in crate::math::tiles_in_hex_radius(&dims, unit.tile, reach) {
         let Some(snapshot) = view.local.view.tile(tile).snapshot().copied() else { continue };
@@ -118,17 +136,23 @@ pub fn sortie(view: &UnitView<'_, '_>, state: &AiState, tools: &mut PlanTools<'_
     let exposure = threats.as_ref().map(|t| Exposure::of(t, rules, view.brief.fight.source, &unit));
     let healed = |hp: u16| (hp.saturating_add(PILLAGE_HEAL_HP)).min(UNIT_MAX_HP);
     // The trip: the nearest prey, up to what one unit pillages in a raid (`raid::PILLAGES_PER_RAIDER`).
-    let trip: (i64, i64) = prey.iter().take(crate::ai::raid::PILLAGES_PER_RAIDER).map(|(_, _, i)| crate::ai::raid::improvement_value(prices, rules, *i)).fold((0, 0), |(d, g), (vd, vg)| (d + vd, g + vg));
+    let gain: (i64, i64) = prey.iter().take(crate::ai::raid::PILLAGES_PER_RAIDER).map(|(_, _, i)| crate::ai::raid::improvement_value(prices, rules, *i)).fold((0, 0), |(d, g), (vd, vg)| (d + vd, g + vg));
     let heal = price * i64::from(healed(unit.hp) - unit.hp) / i64::from(UNIT_MAX_HP);
-    for (_, tile, _) in prey.iter().copied().take(SORTIE_TRIES) {
-        // Risk: the raid's floor for a trip (`raid::LOSS_MIN_PERCENT` of the unit's price) and the
-        // chance of death where it would pillage times the price (the damage is not priced: a hurt unit
-        // rests and returns, a dead one does not). The unit pillages with the hit points it will have
-        // after the pillage (the heal comes with it).
-        let danger = exposure.as_ref().map(|e| e.danger(tile, healed(unit.hp), false, &[]));
-        let death = danger.map_or(0, |d| i64::from(d.death_permille));
-        let risk = price * crate::ai::raid::LOSS_MIN_PERCENT / 100 + price * death / 1000;
-        if trip.0 + trip.1 + heal <= risk {
+    // Risk: the raid's floor for a trip (`raid::LOSS_MIN_PERCENT` of the unit's price) and the
+    // chance of death where it would pillage times the price (the damage is not priced: a hurt unit
+    // rests and returns, a dead one does not). The unit pillages with the hit points it will have
+    // after the pillage (the heal comes with it).
+    let scored: Vec<(i64, i32, TileId)> = prey
+        .iter()
+        .take(SORTIE_TRIES)
+        .map(|(d, tile, _)| {
+            let danger = exposure.as_ref().map(|e| e.danger(*tile, healed(unit.hp), false, &[]));
+            let death = danger.map_or(0, |d| i64::from(d.death_permille));
+            (price * crate::ai::raid::LOSS_MIN_PERCENT / 100 + price * death / 1000, *d, *tile)
+        })
+        .collect();
+    for (risk, _, tile) in scored {
+        if gain.0 + gain.1 + heal <= risk {
             continue;
         }
         let actor = Actor::Unit(unit.id);

@@ -367,6 +367,8 @@ pub struct Run {
     pub trace: Vec<String>,
     wounded_start: u32,
     contact: BTreeMap<String, f64>,
+    /// `ref-hold`: the tile the melee unit goes to and holds.
+    hold: Option<TileId>,
 }
 
 /// How many rounds the pair may take to reach defensive ground in T1s: two, so that it has both the walk and a
@@ -460,6 +462,7 @@ pub fn build(sc: Sc, rules: &CompiledRuleset, world: &World, control: bool) -> R
         info: BTreeMap::new(),
         trace: Vec::new(),
         wounded_start: 0,
+        hold: None,
     };
     run.info.insert("era".into(), game.view().auth.players().nation_era_of(learner, rules).to_string());
     run.info.insert("enemy_era".into(), game.view().auth.players().nation_era_of(enemy, rules).to_string());
@@ -1034,12 +1037,123 @@ impl Run {
         made
     }
 
+    /// The scripted holding reference at the learner's turn start (`ref-hold`, T1 scenes): the melee unit goes to the
+    /// best defensive tile within two turns' walk (the rules' own `tile_defense_percent`; it stays where it is when
+    /// nothing is better), fortifies and never leaves it; the ranged unit takes the tile beside the melee unit's that
+    /// no foe stands next to (else the one farthest from the foes, then the best ground) and never retreats from it;
+    /// each strikes the foe with the least health in its reach before it stands. The script sees the scene's foes
+    /// (the owner's expectation is a player who watches them). Returns commands made.
+    fn hold_turn(&mut self, rules: &CompiledRuleset, game: &mut GameState) -> u64 {
+        if game.view().auth.active_player() != self.learner {
+            return 0;
+        }
+        let learner = self.learner;
+        let mut made = 0;
+        let mut order = self.mine_alive(game);
+        order.sort_by_key(|(_, c)| (classic_rules::ai::combat::ranged_range(rules, c.kind).is_some(), c.id.0));
+        for (p, c) in order {
+            let Some(me) = self.alive_h(game, &p, learner) else { continue };
+            if me.moves_left == 0 {
+                continue;
+            }
+            let range = classic_rules::ai::combat::ranged_range(rules, me.kind);
+            let walk = rules.units.get(me.kind.0 as usize).map_or(1, |d| i32::from(d.movement.max(1)));
+            let defence = |game: &GameState, t: TileId| classic_rules::combat::terrain::tile_defense_percent(game.view().auth, rules, t, learner) as i32;
+            if range.is_none() && self.hold.is_none() {
+                // The ground: the best defence within two turns' walk, the nearest of the best, the lowest tile on a tie.
+                let mut best: Option<((i32, i32, u32), TileId)> = None;
+                for t in around(game, c.tile, 2 * walk) {
+                    let t = TileId(t);
+                    let auth = game.view().auth;
+                    if t != c.tile && (!auth.indexes().units_on(t).is_empty() || auth.indexes().city_on_tile(t).is_some() || !battle::standable(rules, game, t)) {
+                        continue;
+                    }
+                    let key = (-defence(game, t), dist(game, c.tile, t), t.0);
+                    if best.is_none_or(|b| key < b.0) {
+                        best = Some((key, t));
+                    }
+                }
+                self.hold = Some(best.map_or(c.tile, |b| b.1));
+            }
+            let Some(anchor) = self.hold else { continue };
+            let foes = self.theirs_alive(game);
+            // Where this unit stands: the melee unit on the held ground; the ranged unit on a neighbour of it.
+            let goal = if range.is_none() {
+                anchor
+            } else {
+                let mut best: Option<((bool, i32, i32, u32), TileId)> = None;
+                for t in around(game, anchor, 1) {
+                    let t = TileId(t);
+                    let auth = game.view().auth;
+                    if t == anchor || (t != c.tile && (!auth.indexes().units_on(t).is_empty() || auth.indexes().city_on_tile(t).is_some() || !battle::standable(rules, game, t))) {
+                        continue;
+                    }
+                    let next_to_foe = foes.iter().any(|(_, f)| dist(game, f.tile, t) <= 1);
+                    let far = foes.iter().map(|(_, f)| dist(game, f.tile, t)).min().unwrap_or(3).min(3);
+                    let key = (next_to_foe, -far, -defence(game, t), t.0);
+                    if best.is_none_or(|b| key < b.0) {
+                        best = Some((key, t));
+                    }
+                }
+                best.map_or(c.tile, |b| b.1)
+            };
+            // The strike: the foe with the least health in reach, from where the unit stands.
+            let strike = |game: &mut GameState, me: &kernel::world::unit::UnitCore, p: &Piece, made: &mut u64| {
+                let mut targets: Vec<(u16, u32, Command)> = Vec::new();
+                for (fp, fc) in self.theirs_alive(game) {
+                    let d = dist(game, me.tile, fc.tile);
+                    let cmd = match range {
+                        Some(r) if d <= r => Command::RangedAttack { unit: p.h, target: fc.tile },
+                        None if d <= 1 => Command::AttackUnit { attacker: p.h, defender: fp.h },
+                        _ => continue,
+                    };
+                    targets.push((fc.hp, fc.id.0 as u32, cmd));
+                }
+                targets.sort_by_key(|t| (t.0, t.1));
+                for (_, _, cmd) in targets {
+                    if game.accepts_order(rules, learner, &cmd) && game.execute(rules, cmd).is_ok() {
+                        *made += 1;
+                        return true;
+                    }
+                }
+                false
+            };
+            // Walk to the goal (the reachable tile nearest it), then strike or fortify.
+            if me.tile != goal {
+                let mut tiles: Vec<TileId> = game.player_view(rules, learner).own_reachable(p.h).into_iter().map(|(t, _)| t).filter(|t| *t != me.tile && game.view().auth.indexes().units_on(*t).is_empty()).collect();
+                tiles.sort_by_key(|&t| (dist(game, t, goal), t.0));
+                let here = dist(game, me.tile, goal);
+                tiles.retain(|&t| dist(game, t, goal) < here);
+                for t in tiles.into_iter().take(12) {
+                    let cmd = Command::MoveUnit { unit: p.h, destination: t };
+                    if game.accepts_order(rules, learner, &cmd) && game.execute(rules, cmd).is_ok() {
+                        made += 1;
+                        break;
+                    }
+                }
+            }
+            let Some(now) = self.alive_h(game, &p, learner) else { continue };
+            if !strike(game, &now, &p, &mut made) && now.tile == goal && range.is_none() {
+                let cmd = Command::Fortify { unit: p.h };
+                if game.accepts_order(rules, learner, &cmd) && game.execute(rules, cmd).is_ok() {
+                    made += 1;
+                }
+            }
+            // The unit's turn is over: `standard` plays the rest of the seat and must not move it.
+            stand(game, p.h);
+        }
+        made
+    }
+
     /// The scripted pillage reference at the learner's turn start (`ref-pillage`): each unit walks to
     /// the nearest unpillaged improvement of the enemy and pillages it. Returns commands made.
     pub fn reference_turn(&mut self, rules: &CompiledRuleset, game: &mut GameState) -> u64 {
         let mut made = 0;
         if matches!(self.sc, Sc::C1 | Sc::C3) {
             return self.press_turn(rules, game);
+        }
+        if matches!(self.sc, Sc::T1a | Sc::T1b | Sc::T1d | Sc::T1s | Sc::T1k) {
+            return self.hold_turn(rules, game);
         }
         if !matches!(self.sc, Sc::T5 | Sc::T5r | Sc::T5b) || game.view().auth.active_player() != self.learner {
             return 0;

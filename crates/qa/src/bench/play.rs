@@ -192,6 +192,9 @@ pub struct CombatRecord {
     /// before read none; summed records keep the earliest).
     #[serde(default)]
     pub first_capture: Option<u32>,
+    /// Tiles it pillaged (the commands applied).
+    #[serde(default)]
+    pub pillages: u32,
 }
 
 /// The width of a bucket of `war_lengths`, in rounds, and their count.
@@ -224,6 +227,7 @@ impl CombatRecord {
                 (Some(a), Some(b)) => Some(a.min(b)),
                 (a, b) => a.or(b),
             },
+            pillages: self.pillages + other.pillages,
         }
     }
 
@@ -538,6 +542,9 @@ impl MatchLog {
                     }
                     _ => {}
                 }
+            }
+            if R::is_pillage(&command.command) {
+                self.record(player, |r| r.pillages += 1);
             }
             if !R::is_combat(&command.command) {
                 continue;

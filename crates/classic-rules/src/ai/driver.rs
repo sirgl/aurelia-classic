@@ -82,6 +82,8 @@ pub struct ClassicMind {
     fit: bool,
     /// `Variant::FieldCraft`: the mind plays `Standard` (`variant`) with the flag (`TurnBrief::field_craft`).
     field: bool,
+    /// `Variant::RaidWar`: the mind plays `Standard` (`variant`) with the flag (`TurnBrief::raid_war`).
+    raidw: bool,
 }
 
 /// The environment variable that makes the game's AI another variant
@@ -115,6 +117,9 @@ impl ClassicMind {
         // `field-craft` is `Standard` in every switch but its own (`TurnBrief::field_craft`).
         let field = variant.field_craft();
         let variant = if field { Variant::Standard } else { variant };
+        // `raid-war` is `Standard` in every switch but its own (`TurnBrief::raid_war`).
+        let raidw = variant.raid_war();
+        let variant = if raidw { Variant::Standard } else { variant };
         // `tactician-fit` is `WarPays` in every switch but its own (`TurnBrief::tactician_fit`).
         let fit = variant.tactician_fit();
         let variant = if fit { Variant::WarPays } else { variant };
@@ -138,7 +143,7 @@ impl ClassicMind {
         let walls = (book.is_some() || variant.siege_walls()).then(|| Box::new(crate::ai::siege_walls::SiegeWalls::new().joined(variant.siege_join())));
         let unciv = variant.unciv().any().then(|| Box::new(crate::ai::unciv::UncivMind::new(variant.unciv())));
         let variant = if named.is_some() { Variant::PrePuppet } else { variant };
-        Self { advisors, variant, genome: None, humans: Vec::new(), walks: Default::default(), choice: None, #[cfg(feature = "experimental-ai")] net, book, named, walls, conquest: None, unciv, tall: None, sharp, pays, fit, field }
+        Self { advisors, variant, genome: None, humans: Vec::new(), walks: Default::default(), choice: None, #[cfg(feature = "experimental-ai")] net, book, named, walls, conquest: None, unciv, tall: None, sharp, pays, fit, field, raidw }
     }
 
     /// A league book that may play on another base (`book_on`): a duel book
@@ -181,7 +186,7 @@ impl ClassicMind {
         advisors.register(crate::classic::ClassicSystem::Diplomacy, Box::new(diplomacy));
         // The net plays on `NET_BASE`: its siege too.
         let walls = variant.siege_walls().then(|| Box::new(crate::ai::siege_walls::SiegeWalls::new().joined(variant.siege_join())));
-        Self { advisors, variant, genome: None, humans: Vec::new(), walks: Default::default(), choice: None, net: Some(Box::new(net)), book: None, named: None, walls, conquest: None, unciv: None, tall: None, sharp: false, pays: false, fit: false, field: false }
+        Self { advisors, variant, genome: None, humans: Vec::new(), walks: Default::default(), choice: None, net: Some(Box::new(net)), book: None, named: None, walls, conquest: None, unciv: None, tall: None, sharp: false, pays: false, fit: false, field: false, raidw: false }
     }
 
     /// The net's part (`Variant::Net`), if any.
@@ -224,6 +229,9 @@ impl ClassicMind {
         }
         if self.field {
             return Variant::FieldCraft;
+        }
+        if self.raidw {
+            return Variant::RaidWar;
         }
         if self.fit {
             return Variant::TacticianFit;
@@ -633,6 +641,7 @@ impl ClassicMind {
         brief.war_pays = self.pays;
         brief.tactician_fit = self.fit;
         brief.field_craft = self.field;
+        brief.raid_war = self.raidw;
         brief.met_eras = observation.view.met_eras();
         if brief.war_open {
             brief.scores = observation.view.race().scores;

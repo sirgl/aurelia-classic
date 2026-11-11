@@ -688,6 +688,9 @@ pub enum Variant {
     /// `Standard` with the field-craft fixes of the tactics exam (`TurnBrief::field_craft`): raids,
     /// guarding, a ranged unit in a small fight. Bench-only (`experimental-ai`).
     FieldCraft,
+    /// `Standard` with the pillaging of `ai::raid_war` (`TurnBrief::raid_war`): a free unit pillages in a war that
+    /// exists for another reason. Bench-only (`experimental-ai`).
+    RaidWar,
 }
 
 /// The net's base: the expert the end-to-end net learns from and the mind it
@@ -708,7 +711,7 @@ const NUDGED_CANDIDATES: u32 = 40;
 
 impl Variant {
     /// The game's AI first.
-    pub const ALL: [Variant; 139] = [
+    pub const ALL: [Variant; 140] = [
         Variant::Standard,
         Variant::PreCamps,
         Variant::PreWorkers,
@@ -848,6 +851,7 @@ impl Variant {
         Variant::WarPays,
         Variant::TacticianFit,
         Variant::FieldCraft,
+        Variant::RaidWar,
     ];
 
     pub fn name(self) -> &'static str {
@@ -973,6 +977,7 @@ impl Variant {
             Variant::WarPays => "war-pays",
             Variant::TacticianFit => "tactician-fit",
             Variant::FieldCraft => "field-craft",
+            Variant::RaidWar => "raid-war",
             Variant::ArmyFit => "army-fit",
             Variant::Camps => "camps",
             Variant::ArmyCamps => "army-camps",
@@ -1006,7 +1011,7 @@ impl Variant {
         cfg!(feature = "experimental-ai")
             || !matches!(
                 self,
-                Variant::Net | Variant::UnitNet | Variant::Hybrid | Variant::SiteNet | Variant::ChoiceNet | Variant::ChoiceNetProduction | Variant::ChoiceNetResearch | Variant::StandardScripted | Variant::PreCsGifts | Variant::Sharp | Variant::TacticianFit | Variant::FieldCraft
+                Variant::Net | Variant::UnitNet | Variant::Hybrid | Variant::SiteNet | Variant::ChoiceNet | Variant::ChoiceNetProduction | Variant::ChoiceNetResearch | Variant::StandardScripted | Variant::PreCsGifts | Variant::Sharp | Variant::TacticianFit | Variant::FieldCraft | Variant::RaidWar
             )
     }
 
@@ -1159,6 +1164,12 @@ impl Variant {
     /// `Standard` in every other switch (`ClassicMind::new`).
     pub fn field_craft(self) -> bool {
         self == Variant::FieldCraft
+    }
+
+    /// The pillaging in a war that exists (`TurnBrief::raid_war`): `RaidWar` alone, which the mind plays as
+    /// `Standard` in every other switch (`ClassicMind::new`).
+    pub fn raid_war(self) -> bool {
+        self == Variant::RaidWar
     }
 
     /// Its research, policies and choice among the allocator's best orders are the

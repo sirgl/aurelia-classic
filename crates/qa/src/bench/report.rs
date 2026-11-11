@@ -1035,13 +1035,13 @@ fn conquest_headline(combats: &[(&str, CombatRecord)], out: &mut String) {
 /// One line of combat totals per side; «attacks won» are the wars declared
 /// on the side in which the declarer took one of its cities.
 fn combat_rows<'s>(rows: impl Iterator<Item = (String, &'s str, CombatRecord)>, out: &mut String) {
-    let _ = writeln!(out, "| side | variant | cities captured | captured cities held at the end | cities lost | capitals lost | units killed | units lost | wars declared | wars on it | attacks won |");
-    let _ = writeln!(out, "|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|");
+    let _ = writeln!(out, "| side | variant | cities captured | captured cities held at the end | cities lost | capitals lost | units killed | units lost | wars declared | wars on it | attacks won | tiles pillaged |");
+    let _ = writeln!(out, "|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|");
     for (side, variant, c) in rows {
         let _ = writeln!(
             out,
-            "| {side} | {variant} | {} | {} | {} | {} | {} | {} | {} | {} | {} |",
-            c.captured, c.held, c.cities_lost, c.capitals_lost, c.kills, c.units_lost, c.wars, c.attacked, c.attacks_lost
+            "| {side} | {variant} | {} | {} | {} | {} | {} | {} | {} | {} | {} | {} |",
+            c.captured, c.held, c.cities_lost, c.capitals_lost, c.kills, c.units_lost, c.wars, c.attacked, c.attacks_lost, c.pillages
         );
     }
     out.push('\n');
