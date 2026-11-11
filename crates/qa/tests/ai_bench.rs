@@ -103,7 +103,11 @@ use kernel::replay::hash::authoritative_hash;
 /// - 4 November, balanced starts (classic/docs/start-balance.md): the smoke game's maps have other
 ///   starts (chosen by the real yields round them, with horses and iron near each) and other deposits, so
 ///   the game differs: 6eb9f185cee7f36e -> 6ee9092d56f035ca. No change of the AI.
-const SMOKE_RESULT_HASH: &str = "6ee9092d56f035ca";
+/// - 11 November, the thirteenth promotion: `standard` plays as `next-w` (classic/docs/ai-strategy-net.md
+///   "Promoted: next-w"); its strategy net, tall seats and wonder orders change the smoke game:
+///   752dcbddd8b2ba1a, the hash of the benched `next-w` (`runs/bin-w`, 5079048) against itself,
+///   measured; the old `standard` against itself (now `pre-next`) gave the old 6ee9092d56f035ca.
+const SMOKE_RESULT_HASH: &str = "752dcbddd8b2ba1a";
 
 fn pairing(candidate: &str) -> Pairing {
     Pairing { baseline: "standard".to_owned(), candidate: candidate.to_owned() }

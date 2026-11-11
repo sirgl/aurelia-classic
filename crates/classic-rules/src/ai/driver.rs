@@ -59,8 +59,9 @@ pub struct ClassicMind {
     net: Option<Box<NetPlayer>>,
     /// A league opponent's book (`ai::books`): the mind plays `PrePuppet` with it.
     book: Option<Box<crate::ai::books::BookPlayer>>,
-    /// The variant by its name when the mind plays it as `PrePuppet`: a book, or
-    /// the alias `siege-walls`; None: `variant`.
+    /// The variant by its name when the mind plays it as another: a book or the alias
+    /// `siege-walls` as `PrePuppet`, the alias `next-w` as `Standard` (the thirteenth
+    /// promotion); None: `variant` (or the flags' variant, `variant()`).
     named: Option<Variant>,
     /// The siege of walled cities (`ai::siege_walls`): `standard` since the seventh
     /// promotion, its alias `siege-walls`, `net` on it, and the books.
@@ -74,7 +75,9 @@ pub struct ClassicMind {
     /// (`book_on`: `tall-book@standard`); None: the variant's.
     tall: Option<(crate::ai::tall::Tall, crate::ai::tall::BuildingOrder)>,
     /// `Variant::Sharp`: the mind plays `Standard` (`variant`) with the strategy net's sharp choice
-    /// and inputs (`TurnBrief::sharp`).
+    /// and inputs (`TurnBrief::sharp`). Set with the next three for the game's AI since the
+    /// thirteenth promotion (`Variant::Standard`, as `Variant::NextW`); `Variant::PreNext` plays
+    /// `Standard`'s switches without any of them.
     sharp: bool,
     /// `Variant::TallReal`: the mind plays `Sharp` (`sharp` set) whose tall style reaches for the
     /// science victory (`TurnBrief::tall_real`, `ai::tall_real`).
@@ -115,6 +118,9 @@ impl ClassicMind {
         // `sharp` is `Standard` in every switch but its strategy net (`TurnBrief::sharp`).
         // `tall-real` is `sharp` with its tall play (`TurnBrief::tall_real`).
         // `next` is `tall-real` with the review's fixes (`TurnBrief::next`).
+        // `standard` (since the thirteenth promotion) and its alias `next-w` are `next` with the
+        // wonder rule (`TurnBrief::wonder_race` = 1).
+        let requested = variant;
         let next = variant.next();
         let tall_real = variant.tall_real() || next;
         let wonder_race = variant.wonder_race();
@@ -137,6 +143,8 @@ impl ClassicMind {
         let walls = (book.is_some() || variant.siege_walls()).then(|| Box::new(crate::ai::siege_walls::SiegeWalls::new().joined(variant.siege_join())));
         let unciv = variant.unciv().any().then(|| Box::new(crate::ai::unciv::UncivMind::new(variant.unciv())));
         let variant = if named.is_some() { Variant::PrePuppet } else { variant };
+        // The alias `next-w` plays as `Standard` under its name.
+        let named = named.or((requested == Variant::NextW).then_some(requested));
         Self { advisors, variant, genome: None, humans: Vec::new(), walks: Default::default(), choice: None, #[cfg(feature = "experimental-ai")] net, book, named, walls, conquest: None, unciv, tall: None, sharp, tall_real, next, wonder_race }
     }
 
@@ -158,6 +166,9 @@ impl ClassicMind {
         if !Self::rebases(book) || Self::rebases(base) || base.net() || base.unciv().any() {
             return None;
         }
+        // A base gives its switches, not the flags of the game's AI since the thirteenth
+        // promotion: a book on `standard` plays on `pre-next`, as before the promotion.
+        let base = if base == Variant::Standard { Variant::PreNext } else { base };
         let peace = crate::ai::diplomacy::DiplomacyAdvisor { peace: book.peace_making() };
         let mut mind = if book.book().is_some() {
             // `new` plays the book on `PrePuppet`: the base and its siege are `base`'s instead.
@@ -220,7 +231,8 @@ impl ClassicMind {
     pub fn variant(&self) -> Variant {
         if self.next {
             return match self.wonder_race {
-                1 => Variant::NextW,
+                // The game's AI since the thirteenth promotion, or its alias `next-w`.
+                1 => self.named.unwrap_or(Variant::Standard),
                 2 => Variant::NextRace,
                 _ => Variant::Next,
             };
@@ -891,12 +903,14 @@ mod sharp_tests {
     use super::*;
 
     /// `sharp` is `Standard` in every switch but its strategy net: the mind plays `Standard` with
-    /// the flag (`TurnBrief::sharp`) and names itself `sharp`; no other variant has the flag.
+    /// the flag (`TurnBrief::sharp`) and names itself `sharp`; no other variant has the flag of its
+    /// own (the game's AI carries it since the thirteenth promotion,
+    /// `the_game_plays_next_w_and_pre_next_is_the_standard_before`).
     #[test]
     fn sharp_plays_standard_with_its_flag() {
         let mind = ClassicMind::new(Variant::Sharp);
         assert_eq!((mind.variant, mind.sharp, mind.variant()), (Variant::Standard, true, Variant::Sharp));
-        for v in [Variant::Standard, Variant::WarOpen, Variant::StrategyNet] {
+        for v in [Variant::PreNext, Variant::WarOpen, Variant::StrategyNet] {
             let other = ClassicMind::new(v);
             assert_eq!((other.variant(), other.sharp), (v, false));
         }
@@ -925,7 +939,7 @@ mod sharp_tests {
         assert_eq!((mind.variant, mind.sharp, mind.tall_real, mind.next, mind.variant()), (Variant::Standard, true, true, true, Variant::Next));
         assert!(!ClassicMind::new(Variant::TallReal).next && !ClassicMind::new(Variant::Sharp).next);
         let flagged: Vec<Variant> = Variant::ALL.into_iter().filter(|v| v.next()).collect();
-        assert_eq!(flagged, [Variant::Next, Variant::NextW, Variant::NextRace]);
+        assert_eq!(flagged, [Variant::Standard, Variant::Next, Variant::NextW, Variant::NextRace]);
         assert_eq!(Variant::from_name("next"), cfg!(feature = "experimental-ai").then_some(Variant::Next));
     }
 
@@ -941,5 +955,30 @@ mod sharp_tests {
         assert_eq!(ClassicMind::new(Variant::WonderRace).variant(), Variant::WonderRace);
         assert_eq!(Variant::from_name("next-race"), cfg!(feature = "experimental-ai").then_some(Variant::NextRace));
         assert_eq!(Variant::from_name("next-w"), cfg!(feature = "experimental-ai").then_some(Variant::NextW));
+    }
+
+    /// The thirteenth promotion (11 November): the game's AI is the mind of `next-w` — `Standard`'s
+    /// switches with the flags of `sharp`, `tall-real`, `next` and the wonder rule — and names
+    /// itself `standard`; `next-w` stays as its alias with the same mind; `pre-next` is the standard
+    /// before it: `Standard`'s switches without a flag (bench only).
+    #[test]
+    fn the_game_plays_next_w_and_pre_next_is_the_standard_before() {
+        let flags = |m: &ClassicMind| (m.sharp, m.tall_real, m.next, m.wonder_race);
+        let (standard, alias, before) = (ClassicMind::new(Variant::Standard), ClassicMind::new(Variant::NextW), ClassicMind::new(Variant::PreNext));
+        assert_eq!((standard.variant, flags(&standard), standard.variant()), (Variant::Standard, (true, true, true, 1), Variant::Standard));
+        assert_eq!((alias.variant, flags(&alias), alias.variant()), (Variant::Standard, (true, true, true, 1), Variant::NextW));
+        assert_eq!((before.variant, flags(&before), before.variant()), (Variant::PreNext, (false, false, false, 0), Variant::PreNext));
+        assert_eq!(flags(&ClassicMind::default()), flags(&standard), "the game's AI");
+        // Every other variant keeps its flags: none but the line of `sharp` (the flags `new` reads).
+        let line = [Variant::Standard, Variant::NextW, Variant::Sharp, Variant::TallReal, Variant::Next, Variant::WonderCancel, Variant::WonderRace, Variant::NextRace];
+        for v in Variant::ALL.into_iter().filter(|v| !line.contains(v)) {
+            assert_eq!((v.sharp(), v.tall_real(), v.next(), v.wonder_race()), (false, false, false, 0), "{}", v.name());
+        }
+        // A book on `standard` plays on `pre-next`, as before the promotion.
+        let tall = ClassicMind::book_on(Variant::TallBook, Variant::Standard).unwrap();
+        assert_eq!((tall.variant, flags(&tall)), (Variant::PreNext, (false, false, false, 0)));
+        let duel = ClassicMind::book_on(Variant::RushSiege, Variant::Standard).unwrap();
+        assert_eq!((duel.variant, flags(&duel)), (Variant::PreNext, (false, false, false, 0)));
+        assert_eq!(Variant::from_name("pre-next"), cfg!(feature = "experimental-ai").then_some(Variant::PreNext));
     }
 }

@@ -99,12 +99,13 @@ fn clearing_a_queue_keeps_the_stock() {
     assert_eq!(stock(&game), before);
 }
 
-/// The AI of `next-w` and `next-race` drops the lost wonder from the queue holding it; the
-/// plain AI leaves it there to burn the stock.
+/// The AI of `next-w` and `next-race` drops the lost wonder from the queue holding it, and so does
+/// the game's AI since the thirteenth promotion (`standard` plays `next-w`); the plain AI
+/// (`pre-next`, the standard before it) leaves it there to burn the stock.
 #[cfg(feature = "experimental-ai")]
 #[test]
 fn the_wonder_race_ai_drops_a_lost_order_and_the_plain_ai_keeps_it() {
-    for (variant, drops) in [(Variant::Standard, false), (Variant::NextW, true), (Variant::NextRace, true)] {
+    for (variant, drops) in [(Variant::PreNext, false), (Variant::Standard, true), (Variant::NextW, true), (Variant::NextRace, true)] {
         let (mut game, rules, a, b, _, wonder) = lost_race();
         let mut driver = AiDriver::with_mind(AiSettings::for_rules(&rules, rules.default_difficulty()), vec![P1], ClassicMind::new(variant));
         driver.run(&mut game, &rules, u32::MAX);
@@ -112,6 +113,16 @@ fn the_wonder_race_ai_drops_a_lost_order_and_the_plain_ai_keeps_it() {
         assert_eq!(held, !drops, "{variant:?}");
         assert!(!queue(&game, b).contains(&ProductionItem::Building(wonder)));
     }
+}
+
+/// The game's AI drops a lost wonder in every build (the thirteenth promotion: `standard` plays
+/// `next-w`; the wonder rule is not behind `experimental-ai`).
+#[test]
+fn the_games_ai_drops_a_lost_order() {
+    let (mut game, rules, a, _, _, wonder) = lost_race();
+    let mut driver = AiDriver::with_mind(AiSettings::for_rules(&rules, rules.default_difficulty()), vec![P1], ClassicMind::new(Variant::Standard));
+    driver.run(&mut game, &rules, u32::MAX);
+    assert!(!queue(&game, a).contains(&ProductionItem::Building(wonder)));
 }
 
 /// The chance table of a world wonder (`ai::wonder_chance`, fitted to the bench) does not rise

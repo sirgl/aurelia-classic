@@ -76,7 +76,17 @@
 //! of the two switches. In the twelfth promotion (3 November) `Standard` took the strategy
 //! net of `StrategyNet` (`strategy_net`: research, policies and the choice of orders;
 //! classic/docs/ai-strategy-net.md "Promoted"); `StandardScripted` is the standard before it
-//! (bench only, `experimental-ai`); `StrategyNet` stays as an alias that plays as `Standard`.
+//! (bench only, `experimental-ai`); `StrategyNet` stays as an alias that plays as `Standard` did
+//! then: as `PreNext` since the thirteenth promotion. In the thirteenth promotion (11 November)
+//! `Standard` took the play of `NextW`: the strategy net's sharp choice (`TurnBrief::sharp`), the
+//! tall style that reaches for the science victory (`TurnBrief::tall_real`) with the review's
+//! fixes and the delegates' price (`TurnBrief::next`, `Prices::delegate`), and the lost wonder
+//! orders dropped (`TurnBrief::wonder_race` = 1; classic/docs/ai-strategy-net.md "Promoted: next-w").
+//! These are flags of the mind (`ClassicMind::new`), not switches of a variant: every variant
+//! described as `Standard` with or without a change plays its switches without them, as measured,
+//! i.e. on `PreNext`, the standard before it (bench only, `experimental-ai`). `NextW` stays as an
+//! alias that plays as `Standard`; `Sharp`, `TallReal`, `Next`, `WonderCancel`, `WonderRace` and
+//! `NextRace` stay as measured.
 
 use crate::ai::grand_strategy::Stakes;
 use crate::ai::operations::WarGate;
@@ -128,6 +138,14 @@ pub enum Variant {
     /// Since the twelfth promotion (3 November) its research, policies and choice among the
     /// allocator's best orders are the strategy net's, as `StrategyNet`'s are
     /// (`ai::strategy_net`, classic/docs/ai-strategy-net.md "Promoted").
+    /// Since the thirteenth promotion (11 November) it plays as `NextW`: its strategy net chooses
+    /// sharply and sees more (`TurnBrief::sharp`), its tall seats reach for the science victory
+    /// where it fits the game, judged at the style's lock from the rules' costs (`TurnBrief::tall_real`,
+    /// `TurnBrief::next`, `ai::tall_real`), the delegates an alliance brings toward the World
+    /// Leader vote count in its city-state gifts (`Prices::delegate`), and a wonder order another
+    /// nation has built is dropped and not hurry-bought (`TurnBrief::wonder_race` = 1,
+    /// `ai::wonder_race`); classic/docs/ai-strategy-net.md "Promoted: next-w". The mind plays its
+    /// switches with these flags (`ClassicMind::new`).
     #[default]
     Standard,
     /// The game's AI before the eleventh promotion (2 November): `Standard` without the
@@ -642,7 +660,7 @@ pub enum Variant {
     /// forward by the rules' growth, 3–5 goals chosen by their marginal value, and the
     /// heads that score every candidate by prices · effects over its turns. Promoted to
     /// `Standard` on 3 November (the twelfth promotion); kept under its name as an alias that
-    /// plays as `Standard`.
+    /// plays as `Standard` did then: as `PreNext` since the thirteenth promotion.
     StrategyNet,
     /// `Standard` whose tactical and operations layer is the hand-weighted unit net
     /// (`ai::unit_net`, classic/docs/ai-unit-net.md): a commander that runs the
@@ -675,7 +693,8 @@ pub enum Variant {
     /// personality, the land and the neighbours move the style, the features keep moving all game
     /// (era-relative science, production and cities), and it sees the distance to victory, the
     /// score's trend and a rival running away. The mind plays `Standard` in every other switch
-    /// (`ClassicMind::new`). A candidate, `experimental-ai` only.
+    /// (`ClassicMind::new`): since the thirteenth promotion `PreNext`, `Standard`'s switches
+    /// without the flags of `NextW`. A candidate, `experimental-ai` only.
     Sharp,
     /// `Sharp` whose tall style is a way of playing that reaches the science victory
     /// (`TurnBrief::tall_real`, `ai::tall_real`): where the science victory fits the game's
@@ -702,11 +721,19 @@ pub enum Variant {
     WonderRace,
     /// `Next` that drops a lost wonder order and does not hurry-buy one (`TurnBrief::wonder_race`
     /// = 1): the variant `next-w` of the programme. The chance table of `NextRace` added nothing
-    /// to it on the tuning offsets. A candidate, `experimental-ai` only.
+    /// to it on the tuning offsets. Promoted to `Standard` on 11 November (the thirteenth
+    /// promotion); kept under its name as an alias that plays as `Standard` (`experimental-ai`
+    /// only, as before).
     NextW,
     /// `Next` with `WonderRace`'s rule and price (`TurnBrief::wonder_race` = 2): the control that
     /// tested the table on `next`. A candidate, `experimental-ai` only.
     NextRace,
+    /// The game's AI before the thirteenth promotion (11 November): `Standard` in every switch,
+    /// played without the flags of `NextW` (sharp, tall-real, next, the wonder rule). The control
+    /// of the promotion and the standard the variants described as `Standard` with or without a
+    /// change play on (`Sharp` and its line add their flags to it). Kept for the bench
+    /// (`experimental-ai` only).
+    PreNext,
 }
 
 /// The net's base: the expert the end-to-end net learns from and the mind it
@@ -727,7 +754,7 @@ const NUDGED_CANDIDATES: u32 = 40;
 
 impl Variant {
     /// The game's AI first.
-    pub const ALL: [Variant; 142] = [
+    pub const ALL: [Variant; 143] = [
         Variant::Standard,
         Variant::PreCamps,
         Variant::PreWorkers,
@@ -870,6 +897,7 @@ impl Variant {
         Variant::WonderRace,
         Variant::NextW,
         Variant::NextRace,
+        Variant::PreNext,
     ];
 
     pub fn name(self) -> &'static str {
@@ -998,6 +1026,7 @@ impl Variant {
             Variant::WonderRace => "wonder-race",
             Variant::NextW => "next-w",
             Variant::NextRace => "next-race",
+            Variant::PreNext => "pre-next",
             Variant::ArmyFit => "army-fit",
             Variant::Camps => "camps",
             Variant::ArmyCamps => "army-camps",
@@ -1025,13 +1054,16 @@ impl Variant {
 
     /// The variant can be played by this build: the nets and the variants that need them
     /// exist only with `experimental-ai` (the game is built without it), and so does the
-    /// bench's control `StandardScripted`. The strategy net is the game's since the twelfth
-    /// promotion: `strategy-net`, its alias, is in every build.
+    /// bench's controls `StandardScripted`, `PreCsGifts` and `PreNext`, and the candidates of the
+    /// strategy net's line (`Sharp` … `NextRace`). The strategy net is the game's since the twelfth
+    /// promotion: `strategy-net`, its alias, is in every build. The play of `next-w` is the game's
+    /// since the thirteenth: `Standard` carries its flags in every build (none of its code is
+    /// behind the feature); the name `next-w` stays the bench's.
     pub fn compiled(self) -> bool {
         cfg!(feature = "experimental-ai")
             || !matches!(
                 self,
-                Variant::Net | Variant::UnitNet | Variant::Hybrid | Variant::SiteNet | Variant::ChoiceNet | Variant::ChoiceNetProduction | Variant::ChoiceNetResearch | Variant::StandardScripted | Variant::PreCsGifts | Variant::Sharp | Variant::TallReal | Variant::Next | Variant::WonderCancel | Variant::WonderRace | Variant::NextW | Variant::NextRace
+                Variant::Net | Variant::UnitNet | Variant::Hybrid | Variant::SiteNet | Variant::ChoiceNet | Variant::ChoiceNetProduction | Variant::ChoiceNetResearch | Variant::StandardScripted | Variant::PreCsGifts | Variant::Sharp | Variant::TallReal | Variant::Next | Variant::WonderCancel | Variant::WonderRace | Variant::NextW | Variant::NextRace | Variant::PreNext
             )
     }
 
@@ -1055,6 +1087,8 @@ impl Variant {
             // `Standard` (since the twelfth promotion its alias) and `Standard` before it, without
             // the strategy net (`strategy_net`).
             Variant::StrategyNet | Variant::StandardScripted | Variant::PreCsGifts => Variant::Standard,
+            // `Standard` before the thirteenth promotion: its switches without the flags of `next-w`.
+            Variant::PreNext => Variant::Standard,
             // `Standard` but for their tactical and operations layer (`unit_net`) and the
             // hybrid's strategy net.
             Variant::UnitNet | Variant::Hybrid => Variant::Standard,
@@ -1088,7 +1122,7 @@ impl Variant {
         match self {
             // Unciv's modules inside the game's AI decide a capture as it does.
             v if v.unciv().parts().any() => Variant::Standard.conquest(),
-            Variant::Standard | Variant::PreCamps | Variant::PreWorkers | Variant::PreJoin | Variant::PuppetAll | Variant::SiegeJoin | Variant::PuppetWar | Variant::Unciv | Variant::UncivMilitary | Variant::TradeFit | Variant::NoIdleCities | Variant::ScoutEarly | Variant::WorkersFit | Variant::PromoFit | Variant::HealFirst | Variant::FogMarch | Variant::StrategyNet | Variant::UnitNet | Variant::Hybrid | Variant::StandardScripted | Variant::PreCsGifts | Variant::WarOpen => Conquest::PuppetAll,
+            Variant::Standard | Variant::PreCamps | Variant::PreWorkers | Variant::PreJoin | Variant::PuppetAll | Variant::SiegeJoin | Variant::PuppetWar | Variant::Unciv | Variant::UncivMilitary | Variant::TradeFit | Variant::NoIdleCities | Variant::ScoutEarly | Variant::WorkersFit | Variant::PromoFit | Variant::HealFirst | Variant::FogMarch | Variant::StrategyNet | Variant::UnitNet | Variant::Hybrid | Variant::StandardScripted | Variant::PreCsGifts | Variant::WarOpen | Variant::PreNext => Conquest::PuppetAll,
             Variant::ArmyFit | Variant::Camps | Variant::ArmyCamps => Conquest::PuppetAll,
             Variant::PuppetPrice => Conquest::Priced,
             Variant::Net => NET_BASE.conquest(),
@@ -1128,7 +1162,7 @@ impl Variant {
             return Variant::Standard.siege_join();
         }
         match self {
-            Variant::Standard | Variant::PreCamps | Variant::PreWorkers | Variant::SiegeJoin | Variant::TradeFit | Variant::NoIdleCities | Variant::ScoutEarly | Variant::WorkersFit | Variant::PromoFit | Variant::HealFirst | Variant::FogMarch | Variant::StrategyNet | Variant::UnitNet | Variant::Hybrid | Variant::StandardScripted | Variant::PreCsGifts | Variant::WarOpen => crate::ai::siege_walls::SiegeJoin::ALL,
+            Variant::Standard | Variant::PreCamps | Variant::PreWorkers | Variant::SiegeJoin | Variant::TradeFit | Variant::NoIdleCities | Variant::ScoutEarly | Variant::WorkersFit | Variant::PromoFit | Variant::HealFirst | Variant::FogMarch | Variant::StrategyNet | Variant::UnitNet | Variant::Hybrid | Variant::StandardScripted | Variant::PreCsGifts | Variant::WarOpen | Variant::PreNext => crate::ai::siege_walls::SiegeJoin::ALL,
             Variant::ArmyFit | Variant::Camps | Variant::ArmyCamps => crate::ai::siege_walls::SiegeJoin::ALL,
             Variant::Net => NET_BASE.siege_join(),
             _ => crate::ai::siege_walls::SiegeJoin::NONE,
@@ -1147,7 +1181,7 @@ impl Variant {
             return Variant::Standard.army_fit();
         }
         // `UncivMilitary`'s cities and operations are `Standard`'s, its units Unciv's.
-        matches!(self, Variant::Standard | Variant::ArmyFit | Variant::ArmyCamps | Variant::UncivMilitary) || self.on_standard()
+        matches!(self, Variant::Standard | Variant::PreNext | Variant::ArmyFit | Variant::ArmyCamps | Variant::UncivMilitary) || self.on_standard()
     }
 
     /// Its armies march through the land they have never seen (`planner_units::fog_approach`,
@@ -1169,10 +1203,11 @@ impl Variant {
     }
 
     /// The wonder-race switch (`TurnBrief::wonder_race`): 1 drops lost wonder orders, 2 prices a
-    /// wonder by the chance to finish it first. The mind plays `Sharp` (`ClassicMind::new`).
+    /// wonder by the chance to finish it first. The mind plays `Sharp` (`ClassicMind::new`). 1 for
+    /// the game's AI since the thirteenth promotion and its alias `NextW`.
     pub fn wonder_race(self) -> u8 {
         match self {
-            Variant::WonderCancel | Variant::NextW => 1,
+            Variant::Standard | Variant::WonderCancel | Variant::NextW => 1,
             Variant::WonderRace | Variant::NextRace => 2,
             _ => 0,
         }
@@ -1186,14 +1221,15 @@ impl Variant {
 
     /// `TallReal` with the review's fixes (`TurnBrief::next`): `Next` and the variants built on it
     /// (`NextW`, `NextRace`), which the mind plays as `TallReal` with the flag
-    /// (`ClassicMind::new`).
+    /// (`ClassicMind::new`); the game's AI since the thirteenth promotion, as `NextW`.
     pub fn next(self) -> bool {
-        matches!(self, Variant::Next | Variant::NextW | Variant::NextRace)
+        matches!(self, Variant::Standard | Variant::Next | Variant::NextW | Variant::NextRace)
     }
 
     /// Its research, policies and choice among the allocator's best orders are the
     /// strategy net's (`ai::strategy_net`, `TurnBrief::strategy`): the game's AI since the
-    /// twelfth promotion (3 November), its alias `StrategyNet`, and `Hybrid`. Not the variants
+    /// twelfth promotion (3 November), `PreNext` (the game's AI before the thirteenth), its
+    /// alias `StrategyNet`, and `Hybrid`. Not the variants
     /// built on an earlier standard, not `StandardScripted` (the standard before it) and not
     /// the other candidates on `Standard`: they stay as measured. Unciv's modules inside
     /// `Standard` (`std-unciv-*`) follow it.
@@ -1202,19 +1238,19 @@ impl Variant {
             // Unciv's modules inside the game's AI play its strategy net but for their family.
             return Variant::Standard.strategy_net();
         }
-        matches!(self, Variant::Standard | Variant::StrategyNet | Variant::Hybrid | Variant::PreCsGifts | Variant::WarOpen)
+        matches!(self, Variant::Standard | Variant::PreNext | Variant::StrategyNet | Variant::Hybrid | Variant::PreCsGifts | Variant::WarOpen)
     }
 
     /// The gold gifts stop at a city-state whose alliance holds past the next gift
     /// (`Prices::gift_cap`, `city_states::gift_ceiling`): the game's AI since the thirteenth
-    /// change (3 November), its alias `StrategyNet` and `Hybrid`, Unciv's modules inside
+    /// change (3 November), `PreNext`, its alias `StrategyNet` and `Hybrid`, Unciv's modules inside
     /// `Standard`. Not `PreCsGifts` (the standard before it), not the variants built on an
     /// earlier standard: they stay as measured.
     pub fn cs_gift_cap(self) -> bool {
         if self.unciv().parts().any() {
             return Variant::Standard.cs_gift_cap();
         }
-        matches!(self, Variant::Standard | Variant::StrategyNet | Variant::Hybrid | Variant::WarOpen)
+        matches!(self, Variant::Standard | Variant::PreNext | Variant::StrategyNet | Variant::Hybrid | Variant::WarOpen)
     }
 
     /// Its tactical and operations layer is the unit net's (`ai::unit_net`,
@@ -1231,7 +1267,7 @@ impl Variant {
         if self.unciv().parts().any() {
             return Variant::Standard.camps();
         }
-        matches!(self, Variant::Standard | Variant::Camps | Variant::ArmyCamps) || self.on_standard()
+        matches!(self, Variant::Standard | Variant::PreNext | Variant::Camps | Variant::ArmyCamps) || self.on_standard()
     }
 
     /// The candidates described as `Standard` with one change elsewhere: they carry each
@@ -1552,7 +1588,7 @@ impl Variant {
         match self {
             Variant::Standard | Variant::PreCamps | Variant::WorkersFit => WorkersFit::ALL,
             Variant::TradeFit | Variant::NoIdleCities | Variant::ScoutEarly | Variant::ArmyFit | Variant::Camps | Variant::ArmyCamps => WorkersFit::ALL,
-            Variant::PromoFit | Variant::HealFirst | Variant::FogMarch | Variant::StrategyNet | Variant::UnitNet | Variant::Hybrid | Variant::StandardScripted | Variant::PreCsGifts | Variant::WarOpen => WorkersFit::ALL,
+            Variant::PromoFit | Variant::HealFirst | Variant::FogMarch | Variant::StrategyNet | Variant::UnitNet | Variant::Hybrid | Variant::StandardScripted | Variant::PreCsGifts | Variant::WarOpen | Variant::PreNext => WorkersFit::ALL,
             Variant::UncivMilitary => WorkersFit::ALL,
             Variant::Net => NET_BASE.workers_fit(),
             _ => WorkersFit::NONE,
@@ -1788,7 +1824,7 @@ mod tests {
         assert_eq!(unpuppeted, Variant::Standard.war_tuning(), "`puppet-war` is `standard` but for the price of a capture");
         assert_eq!(Variant::from_name("puppet-war"), Some(war));
         // Every variant but those keeps the threshold: their games are unchanged by the promotion.
-        let puppets = [Variant::Standard, Variant::PreCamps, Variant::PreWorkers, Variant::PreJoin, Variant::PuppetPrice, Variant::PuppetAll, Variant::SiegeJoin, Variant::PuppetWar, Variant::Unciv, Variant::UncivMilitary, Variant::TradeFit, Variant::NoIdleCities, Variant::ScoutEarly, Variant::WorkersFit, Variant::ArmyFit, Variant::Camps, Variant::ArmyCamps, Variant::PromoFit, Variant::HealFirst, Variant::FogMarch, Variant::StrategyNet, Variant::UnitNet, Variant::Hybrid, Variant::StandardScripted, Variant::PreCsGifts, Variant::WarOpen];
+        let puppets = [Variant::Standard, Variant::PreCamps, Variant::PreWorkers, Variant::PreJoin, Variant::PuppetPrice, Variant::PuppetAll, Variant::SiegeJoin, Variant::PuppetWar, Variant::Unciv, Variant::UncivMilitary, Variant::TradeFit, Variant::NoIdleCities, Variant::ScoutEarly, Variant::WorkersFit, Variant::ArmyFit, Variant::Camps, Variant::ArmyCamps, Variant::PromoFit, Variant::HealFirst, Variant::FogMarch, Variant::StrategyNet, Variant::UnitNet, Variant::Hybrid, Variant::StandardScripted, Variant::PreCsGifts, Variant::WarOpen, Variant::PreNext];
         assert!(Variant::ALL.iter().filter(|v| !puppets.contains(v) && !v.unciv().parts().any()).all(|v| v.conquest() == Conquest::Threshold));
     }
 
@@ -1810,7 +1846,7 @@ mod tests {
         assert_eq!(alias.siege_join(), standard.siege_join());
         // Unciv's modules inside `standard` follow it (`the_unciv_hybrids_are_standard_but_for_one_family`).
         let joined: Vec<Variant> = Variant::ALL.into_iter().filter(|v| v.siege_join().any() && !v.unciv().parts().any()).collect();
-        assert_eq!(joined, [standard, Variant::PreCamps, Variant::PreWorkers, alias, Variant::TradeFit, Variant::NoIdleCities, Variant::ScoutEarly, Variant::WorkersFit, Variant::ArmyFit, Variant::Camps, Variant::ArmyCamps, Variant::PromoFit, Variant::HealFirst, Variant::FogMarch, Variant::StrategyNet, Variant::UnitNet, Variant::Hybrid, Variant::StandardScripted, Variant::PreCsGifts, Variant::WarOpen], "only the game's AI and its alias besiege as `siege-join`");
+        assert_eq!(joined, [standard, Variant::PreCamps, Variant::PreWorkers, alias, Variant::TradeFit, Variant::NoIdleCities, Variant::ScoutEarly, Variant::WorkersFit, Variant::ArmyFit, Variant::Camps, Variant::ArmyCamps, Variant::PromoFit, Variant::HealFirst, Variant::FogMarch, Variant::StrategyNet, Variant::UnitNet, Variant::Hybrid, Variant::StandardScripted, Variant::PreCsGifts, Variant::WarOpen, Variant::PreNext], "only the game's AI and its alias besiege as `siege-join`");
     }
 
     /// `trade-fit` is `Standard` in every switch, its siege and its decision of a captured city,
@@ -1883,7 +1919,7 @@ mod tests {
         assert_eq!(Variant::SiegeJoin.workers_fit(), before.workers_fit());
         assert_eq!(Variant::Net.workers_fit(), NET_BASE.workers_fit());
         let fit: Vec<Variant> = Variant::ALL.into_iter().filter(|v| v.workers_fit().any() && !v.unciv().parts().any()).collect();
-        assert_eq!(fit, [standard, Variant::PreCamps, Variant::UncivMilitary, Variant::TradeFit, Variant::NoIdleCities, Variant::ScoutEarly, alias, Variant::ArmyFit, Variant::Camps, Variant::ArmyCamps, Variant::PromoFit, Variant::HealFirst, Variant::FogMarch, Variant::StrategyNet, Variant::UnitNet, Variant::Hybrid, Variant::StandardScripted, Variant::PreCsGifts, Variant::WarOpen]);
+        assert_eq!(fit, [standard, Variant::PreCamps, Variant::UncivMilitary, Variant::TradeFit, Variant::NoIdleCities, Variant::ScoutEarly, alias, Variant::ArmyFit, Variant::Camps, Variant::ArmyCamps, Variant::PromoFit, Variant::HealFirst, Variant::FogMarch, Variant::StrategyNet, Variant::UnitNet, Variant::Hybrid, Variant::StandardScripted, Variant::PreCsGifts, Variant::WarOpen, Variant::PreNext]);
         assert!(Variant::ALL.into_iter().filter(|v| v.unciv().parts().any()).all(|v| v.workers_fit() == standard.workers_fit()));
     }
 
@@ -1930,7 +1966,7 @@ mod tests {
         assert_eq!(Variant::from_name("strategy-net"), Some(alias));
         assert_eq!(Variant::from_name("standard-scripted"), cfg!(feature = "experimental-ai").then_some(before));
         let on: Vec<Variant> = Variant::ALL.into_iter().filter(|v| v.strategy_net() && !v.unciv().parts().any()).collect();
-        assert_eq!(on, [standard, alias, Variant::Hybrid, Variant::PreCsGifts, Variant::WarOpen]);
+        assert_eq!(on, [standard, alias, Variant::Hybrid, Variant::PreCsGifts, Variant::WarOpen, Variant::PreNext]);
         assert!(Variant::ALL.into_iter().filter(|v| v.unciv().parts().any()).all(|v| v.strategy_net()));
     }
 
@@ -1939,7 +1975,7 @@ mod tests {
     #[test]
     fn the_gift_cap_is_standard_but_for_its_control() {
         let capped: Vec<Variant> = Variant::ALL.into_iter().filter(|v| v.cs_gift_cap() && !v.unciv().parts().any()).collect();
-        assert_eq!(capped, [Variant::Standard, Variant::StrategyNet, Variant::Hybrid, Variant::WarOpen]);
+        assert_eq!(capped, [Variant::Standard, Variant::StrategyNet, Variant::Hybrid, Variant::WarOpen, Variant::PreNext]);
         assert!(Variant::ALL.into_iter().filter(|v| v.unciv().parts().any()).all(|v| v.cs_gift_cap()));
         let before = Variant::PreCsGifts;
         assert_eq!(switches(before), switches(Variant::Standard));
@@ -2003,9 +2039,31 @@ mod tests {
         assert!(!Variant::WorkersFit.army_fit() && !Variant::WorkersFit.camps());
         assert!(!Variant::Net.army_fit() && !Variant::Net.camps() && !NET_BASE.army_fit() && !NET_BASE.camps());
         let fit: Vec<Variant> = Variant::ALL.into_iter().filter(|v| v.army_fit() && !v.unciv().parts().any()).collect();
-        assert_eq!(fit, [standard, Variant::UncivMilitary, Variant::TradeFit, Variant::NoIdleCities, Variant::ScoutEarly, Variant::ArmyFit, alias, Variant::PromoFit, Variant::HealFirst, Variant::FogMarch, Variant::StrategyNet, Variant::UnitNet, Variant::Hybrid, Variant::StandardScripted, Variant::PreCsGifts, Variant::WarOpen]);
+        assert_eq!(fit, [standard, Variant::UncivMilitary, Variant::TradeFit, Variant::NoIdleCities, Variant::ScoutEarly, Variant::ArmyFit, alias, Variant::PromoFit, Variant::HealFirst, Variant::FogMarch, Variant::StrategyNet, Variant::UnitNet, Variant::Hybrid, Variant::StandardScripted, Variant::PreCsGifts, Variant::WarOpen, Variant::PreNext]);
         let camps: Vec<Variant> = Variant::ALL.into_iter().filter(|v| v.camps() && !v.unciv().parts().any()).collect();
-        assert_eq!(camps, [standard, Variant::TradeFit, Variant::NoIdleCities, Variant::ScoutEarly, Variant::Camps, alias, Variant::PromoFit, Variant::HealFirst, Variant::FogMarch, Variant::StrategyNet, Variant::UnitNet, Variant::Hybrid, Variant::StandardScripted, Variant::PreCsGifts, Variant::WarOpen]);
+        assert_eq!(camps, [standard, Variant::TradeFit, Variant::NoIdleCities, Variant::ScoutEarly, Variant::Camps, alias, Variant::PromoFit, Variant::HealFirst, Variant::FogMarch, Variant::StrategyNet, Variant::UnitNet, Variant::Hybrid, Variant::StandardScripted, Variant::PreCsGifts, Variant::WarOpen, Variant::PreNext]);
         assert!(Variant::ALL.into_iter().filter(|v| v.unciv().parts().any()).all(|v| v.army_fit() && v.camps()));
+    }
+
+    /// The thirteenth promotion (11 November): `pre-next`, the standard before it, is `Standard` in
+    /// every switch, its siege, workers, unit kinds, camps, strategy net, gift cap and decision of a
+    /// captured city; the play of `next-w` is the mind's flags (`ClassicMind::new`), which
+    /// `Standard` and `NextW` carry alone of the variants outside the line of `sharp`. Exists only
+    /// for the bench (`experimental-ai`).
+    #[test]
+    fn pre_next_is_standard_in_every_switch() {
+        let (standard, before) = (Variant::Standard, Variant::PreNext);
+        assert_eq!(switches(before), switches(standard));
+        assert_eq!(before.scripted(), standard);
+        assert_eq!(before.siege_join(), standard.siege_join());
+        assert_eq!(before.workers_fit(), standard.workers_fit());
+        assert_eq!(before.conquest(), standard.conquest());
+        assert_eq!(before.war_tuning(), standard.war_tuning());
+        assert_eq!((before.army_fit(), before.camps(), before.strategy_net(), before.cs_gift_cap()), (true, true, true, true));
+        assert_eq!((before.next(), before.tall_real(), before.sharp(), before.wonder_race()), (false, false, false, 0));
+        assert_eq!((standard.next(), standard.wonder_race()), (true, 1), "the flags of `next-w`");
+        assert_eq!((Variant::NextW.next(), Variant::NextW.wonder_race()), (standard.next(), standard.wonder_race()));
+        assert_eq!(Variant::from_name("pre-next"), cfg!(feature = "experimental-ai").then_some(before));
+        assert_eq!(Variant::ALL[0], standard, "the game's AI first");
     }
 }
