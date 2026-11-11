@@ -439,6 +439,8 @@ pub struct Memory {
     /// `sharp`'s own (`sharp::Memory`): written after the rest, only when there is one, so the
     /// other variants' memory keeps its bytes.
     pub sharp: Option<sharp::Memory>,
+    /// `retake2`'s own (`retake::Memory`): a section before `sharp`'s, only when there is one.
+    pub retake: Option<crate::ai::retake::Memory>,
 }
 
 /// A review of the goals and of the cell's prices.
@@ -456,6 +458,8 @@ pub struct Review {
 const MEMORY_VERSION: u8 = 0x5B;
 /// The marker of `sharp`'s section at the memory's end (`Memory::sharp`).
 const SHARP_SECTION: u8 = 0x5C;
+/// The marker of `retake2`'s section (a length of two bytes, then its body) before `sharp`'s.
+const RETAKE_SECTION: u8 = 0x5D;
 
 struct Writer(Vec<u8>);
 
@@ -558,6 +562,12 @@ impl Memory {
             }
             None => w.0.push(0),
         }
+        if let Some(m) = &self.retake {
+            let body = m.encode();
+            w.0.push(RETAKE_SECTION);
+            w.0.extend_from_slice(&(body.len() as u16).to_le_bytes());
+            w.0.extend_from_slice(&body);
+        }
         if let Some(m) = &self.sharp {
             w.0.push(SHARP_SECTION);
             w.i64(m.ratio);
@@ -644,6 +654,16 @@ impl Memory {
         } else {
             None
         };
+        // `retake2`'s section: its marker, a length and its body; one that does not read is none.
+        let retake = if r.0.first() == Some(&RETAKE_SECTION) {
+            r.u8()?;
+            let len = usize::from(u16::from_le_bytes(r.take::<2>()?));
+            let (body, rest) = r.0.split_at_checked(len)?;
+            r.0 = rest;
+            crate::ai::retake::Memory::decode(body)
+        } else {
+            None
+        };
         // `sharp`'s section: its marker and two numbers, the memory's last 17 bytes.
         let sharp = if r.0.len() == 17 && r.0[0] == SHARP_SECTION {
             r.u8()?;
@@ -651,7 +671,7 @@ impl Memory {
         } else {
             None
         };
-        Some(Memory { held, survey, review, target, sharp })
+        Some(Memory { held, survey, review, target, sharp, retake })
     }
 }
 

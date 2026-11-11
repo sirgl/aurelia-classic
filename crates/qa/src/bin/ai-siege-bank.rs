@@ -935,6 +935,9 @@ struct Cap {
     tile: TileId,
     cols: Vec<String>,
     next_hash: u64,
+    /// The cities of `from` lost at this position (this one among them): what a seat that played the game would
+    /// hold in its memory as held at its last turn (`inject_memory`).
+    lost_here: Vec<TileId>,
 }
 
 fn read_caps(dir: &str, offsets: &std::ops::Range<u64>) -> Vec<Cap> {
@@ -947,7 +950,7 @@ fn read_caps(dir: &str, offsets: &std::ops::Range<u64>) -> Vec<Cap> {
                 continue;
             }
             let num = |i: usize| c[i].parse::<u64>().unwrap_or(0);
-            out.push(Cap { file: c[0].to_owned(), offset, seed: num(3), round: num(4) as u32, from: PlayerId(num(6) as u8), to: PlayerId(num(7) as u8), tile: TileId(num(9) as u32), cols: c.iter().map(|s| (*s).to_owned()).collect(), next_hash: u64::from_str_radix(c[22], 16).unwrap_or(0) });
+            out.push(Cap { file: c[0].to_owned(), offset, seed: num(3), round: num(4) as u32, from: PlayerId(num(6) as u8), to: PlayerId(num(7) as u8), tile: TileId(num(9) as u32), cols: c.iter().map(|s| (*s).to_owned()).collect(), next_hash: u64::from_str_radix(c[22], 16).unwrap_or(0), lost_here: Vec::new() });
         }
     }
     out
@@ -969,10 +972,28 @@ struct CapOutcome {
     next_hash: u64,
 }
 
+/// The positions are recorded in games of another variant, whose seats keep no memory of their cities: the
+/// memory a `retake2` seat that had played the game would hold at the position is its cities of its last turn,
+/// the ones it holds now and the ones it lost at this position. They are written into its memory as `retake2`
+/// writes them (`retake::Memory`), the section after the strategy memory; the other layers ignore the bytes.
+fn inject_memory(save: &mut classic_rules::persistence::SaveGameV1, game: &GameState, cap: &Cap) {
+    let mut held: Vec<TileId> = game.view().auth.cities().iter().filter(|(_, c)| c.owner == cap.from).map(|(_, c)| c.tile).collect();
+    held.extend(cap.lost_here.iter().copied());
+    held.sort();
+    held.dedup();
+    let Some(player) = save.ai.players.iter_mut().find(|p| p.player == cap.from.0) else { return };
+    let mut memory = classic_rules::ai::strategy_net::Memory::decode(&player.mind_memory);
+    memory.retake = Some(classic_rules::ai::retake::Memory { held, lost: Vec::new() });
+    player.mind_memory = memory.encode();
+}
+
 fn play_capture(rules: &CompiledRuleset, dir: &str, cap: &Cap, layer: &str, dice: Option<u64>, rounds: u32, trace: bool) -> Result<CapOutcome, String> {
     let bytes = std::fs::read(format!("{dir}/pos/{}", cap.file)).map_err(|e| format!("{}: {e}", cap.file))?;
-    let save = from_bytes(&bytes).map_err(|e| format!("{}: {e:?}", cap.file))?;
+    let mut save = from_bytes(&bytes).map_err(|e| format!("{}: {e:?}", cap.file))?;
     let mut game = decode(&save, rules).map_err(|e| format!("{}: {e:?}", cap.file))?;
+    if layer == "retake2" {
+        inject_memory(&mut save, &game, cap);
+    }
     if let Some(dice) = dice {
         game.reseed_streams(dice);
     }
@@ -1028,6 +1049,10 @@ fn cap_replay(args: &[String]) -> Result<(), String> {
     let out_path = flag(args, "--out").ok_or("--out")?;
     let trace = args.iter().any(|a| a == "--trace");
     let mut caps = read_caps(&dir, &offsets);
+    let groups: Vec<(String, PlayerId, TileId)> = caps.iter().map(|c| (c.file.clone(), c.from, c.tile)).collect();
+    for cap in caps.iter_mut() {
+        cap.lost_here = groups.iter().filter(|(f, p, _)| *f == cap.file && *p == cap.from).map(|(_, _, t)| *t).collect();
+    }
     if let Some(text) = flag(args, "--only") {
         caps.retain(|c| c.file.contains(&text) && c.tile.0.to_string() == flag(args, "--tile").unwrap_or_else(|| c.tile.0.to_string()));
     }

@@ -38,3 +38,44 @@ no memory, so nothing is added to the saved AI memory. The strategy itself is no
 
 Far units (more than two turns away) and the operations layer are not given the lost city (a retake by a mustered army);
 a lost city out of sight is not retaken.
+
+## `retake2`: the second iteration (review of 11 November)
+
+The review of `retake` found three things; `retake2` (`Variant::Retake2`, bench-only, `retake` itself unchanged) answers them.
+
+**The seat finds the lost city by its own memory.** The first iteration read the founder and the round of acquisition of
+the city from the kernel (`ObservedCity::original_owner`, `acquired_round`) and called them public. The human client shows
+neither, and the round told the AI that a city fell even where it did not see it. `retake2` reads neither. The seat keeps
+`ai::retake::Memory` in the strategy memory (`AiState::mind_memory`, `strategy_net::Memory::retake`): its cities at its last
+turn, and the ones that were gone at its next turn ("my city at tile T was taken in round R by player P"; the player is
+read from the city when the seat sees it, as a human does). An entry goes when the seat holds the city again, when a player
+other than the first taker holds it (a city that changed hands again is not this enemy's), and after the window
+(`operations::march_limit`). The health of the city and the garrison are read while the city is in sight, as before.
+
+Versioning: the memory is a section after the strategy memory (marker `0x5D`, a length, a body whose first byte is its own
+version). A variant that does not play `retake2` never writes it, so its memory keeps its bytes; a memory without the
+section (every older save) loads as no memory (a first turn finds nothing lost); a section of another version or length
+loads as no memory and the rest is read as before. The platform needs no change.
+
+**The guard test** (`retake::cases_remembered`) compares what the group can do against what stands there: the group's
+power after the strikes the city makes while the assault lasts (one strike a round, `city_strike_damage` at the group's
+mean strength, over the rounds the siege model needs) against the power of the captor's units in sight within four tiles
+of the city, times a margin (`GUARD_MARGIN_PERCENT`). Walls seen are in the health bar (above a city's base) and so in the
+siege model. The first iteration counted the captor's units within two tiles only.
+
+**Tests**: `tests/ai_retake.rs` (a case opens with the city's real health; not for a city out of sight, lost long ago or
+taken by a third player; peace refusal only while a case stands; the guard test refuses a heavily defended city; the
+memory's versions).
+
+## Fit
+
+The margin is the one constant fitted: the tuning positions (offsets 200-206, 355 positions, two dice, 8 rounds) replayed
+with a margin knob (removed at the freeze), margins 100, 150, 175, 200, 250, 300, 400, 800; the rule, set before the runs: the
+smallest margin with own units lost at most 1.0 above `war-pays` and failures that lose more than 5 units at most 2 points above
+it. 175 is the first to pass (+0.98 units, +2.0 points; 150: +1.20). Table (retaken within 8 rounds / own units lost / fail and >5 lost):
+
+| layer | all | captor units within 4 tiles >= 14 | < 14 |
+|---|---|---|---|
+| `war-pays` | 9.7 % / 2.53 / 8.0 % | 11.0 % / 3.08 / 13.0 % | 9.4 % / 2.39 / 6.7 % |
+| `retake` | 54.1 % / 3.95 / 10.4 % | 37.0 % / 5.39 / 17.8 % | 58.5 % / 3.57 / 8.5 % |
+| `retake2` | 40.3 % / 3.51 / 10.0 % | 22.6 % / 4.36 / 17.8 % | 44.9 % / 3.30 / 8.0 % |
