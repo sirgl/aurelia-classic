@@ -294,7 +294,7 @@ const MOVE_TO_STRIKE: i64 = 600;
 /// blow from there kills, captures or shoots a city (`MOVE_TO_STRIKE`; a
 /// blow from the spot wins a tie). No other move: the base mind and the
 /// scene's strikes walk. Returns the commands made.
-fn greedy(rules: &CompiledRuleset, game: &mut GameState, learner: PlayerId, enemy: PlayerId, target: Option<TileId>, units: &[UnitHandle]) -> u64 {
+pub(crate) fn greedy(rules: &CompiledRuleset, game: &mut GameState, learner: PlayerId, enemy: PlayerId, target: Option<TileId>, units: &[UnitHandle]) -> u64 {
     let mut made = 0;
     for _ in 0..GREEDY_BLOWS {
         let mut best: Option<(i64, Command)> = None;
@@ -443,7 +443,7 @@ fn prune(mut list: Vec<Listed>, k: usize) -> Vec<Listed> {
 /// A copy's combat stream for rollout `r` of a decision: a stream of its
 /// own, seeded from the real stream's state (no draw of the real game is
 /// seen) and `r`; the same for every candidate (common random numbers).
-fn reseed(game: &mut GameState, base: u64, r: u32) {
+pub(crate) fn reseed(game: &mut GameState, base: u64, r: u32) {
     let seed = mix(base ^ mix(u64::from(r) + 0x5ea2c4));
     game.world_mut().rng.combat = kernel::rng::StreamRng::new(seed);
 }

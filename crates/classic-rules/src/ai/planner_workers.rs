@@ -81,7 +81,9 @@ pub fn decide_worker(
     let fit = view.brief.workers;
     // `flee`: the reach of the hostile units first, a build under way too
     // (the most captured workers were waiting on their build).
-    if fit.flee && !on_own_city(view) && in_hostile_reach(view, tools.rules, unit.tile) {
+    // `field-craft`: a fighter of ours on the worker's tile takes the blow in its place.
+    let covered = view.brief.field_craft && crate::ai::field_craft::guarded(view, tools.rules, unit.tile);
+    if fit.flee && !on_own_city(view) && !covered && in_hostile_reach(view, tools.rules, unit.tile) {
         state.clear_task(unit.id);
         if unit.moves_left == 0 {
             return Decision::refuse(actor, Reason::Threatened);
@@ -602,7 +604,7 @@ fn flee_tile(view: &UnitView<'_, '_>, tools: &mut PlanTools<'_>) -> Option<TileI
     tiles
         .into_iter()
         .filter(|t| *t != unit.tile && can_stop(view, rules, *t))
-        .map(|t| (city(t), hostile_gap(view, rules, t), t))
+        .map(|t| (city(t) || (view.brief.field_craft && crate::ai::field_craft::guarded(view, rules, t)), hostile_gap(view, rules, t), t))
         .filter(|(city, gap, _)| *city || *gap > 0)
         .max_by_key(|(city, gap, t)| (*city, *gap, std::cmp::Reverse(t.0)))
         .map(|(_, _, t)| t)

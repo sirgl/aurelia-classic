@@ -194,7 +194,7 @@ fn prey(view: &crate::knowledge::view::PlayerView<'_>, rules: &CompiledRuleset, 
 
 /// What an improvement is worth to the raid that pillages it: the enemy's yields lost until a
 /// worker brings it back, and the gold the pillage brings (hundredths of points).
-fn improvement_value(prices: &Prices, rules: &CompiledRuleset, improvement: crate::ids::ImprovementId) -> (Centi, Centi) {
+pub(crate) fn improvement_value(prices: &Prices, rules: &CompiledRuleset, improvement: crate::ids::ImprovementId) -> (Centi, Centi) {
     let Some(def) = rules.improvements.get(improvement.0 as usize) else { return (0, 0) };
     let yields = [YieldKind::Food, YieldKind::Production, YieldKind::Gold, YieldKind::Science, YieldKind::Culture, YieldKind::Module(crate::classic::effects::ClassicYield::Faith)];
     let per_round: Centi = yields.iter().map(|k| prices.of_yield(*k) * i64::from(def.yields.of(*k))).sum();

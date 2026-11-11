@@ -685,6 +685,9 @@ pub enum Variant {
     /// (`TurnBrief::tactician_fit`, classic/docs/ai-tactician-fit.md). The mind plays `WarPays` in every
     /// other switch (`ClassicMind::new`).
     TacticianFit,
+    /// `Standard` with the field-craft fixes of the tactics exam (`TurnBrief::field_craft`): raids,
+    /// guarding, a ranged unit in a small fight. Bench-only (`experimental-ai`).
+    FieldCraft,
 }
 
 /// The net's base: the expert the end-to-end net learns from and the mind it
@@ -705,7 +708,7 @@ const NUDGED_CANDIDATES: u32 = 40;
 
 impl Variant {
     /// The game's AI first.
-    pub const ALL: [Variant; 138] = [
+    pub const ALL: [Variant; 139] = [
         Variant::Standard,
         Variant::PreCamps,
         Variant::PreWorkers,
@@ -844,6 +847,7 @@ impl Variant {
         Variant::Sharp,
         Variant::WarPays,
         Variant::TacticianFit,
+        Variant::FieldCraft,
     ];
 
     pub fn name(self) -> &'static str {
@@ -968,6 +972,7 @@ impl Variant {
             Variant::Sharp => "sharp",
             Variant::WarPays => "war-pays",
             Variant::TacticianFit => "tactician-fit",
+            Variant::FieldCraft => "field-craft",
             Variant::ArmyFit => "army-fit",
             Variant::Camps => "camps",
             Variant::ArmyCamps => "army-camps",
@@ -1001,7 +1006,7 @@ impl Variant {
         cfg!(feature = "experimental-ai")
             || !matches!(
                 self,
-                Variant::Net | Variant::UnitNet | Variant::Hybrid | Variant::SiteNet | Variant::ChoiceNet | Variant::ChoiceNetProduction | Variant::ChoiceNetResearch | Variant::StandardScripted | Variant::PreCsGifts | Variant::Sharp | Variant::TacticianFit
+                Variant::Net | Variant::UnitNet | Variant::Hybrid | Variant::SiteNet | Variant::ChoiceNet | Variant::ChoiceNetProduction | Variant::ChoiceNetResearch | Variant::StandardScripted | Variant::PreCsGifts | Variant::Sharp | Variant::TacticianFit | Variant::FieldCraft
             )
     }
 
@@ -1148,6 +1153,12 @@ impl Variant {
     /// `WarPays` in every other switch (`ClassicMind::new`).
     pub fn tactician_fit(self) -> bool {
         self == Variant::TacticianFit
+    }
+
+    /// The tactics exam's fixes (`TurnBrief::field_craft`): `FieldCraft` alone, which the mind plays as
+    /// `Standard` in every other switch (`ClassicMind::new`).
+    pub fn field_craft(self) -> bool {
+        self == Variant::FieldCraft
     }
 
     /// Its research, policies and choice among the allocator's best orders are the

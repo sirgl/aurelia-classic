@@ -12,6 +12,22 @@
 //! WIN RULES, fixed before the first run and not changed after seeing results:
 //! - T1a / T1b: every enemy unit dead with at least one of ours alive, within 10 rounds. T1a: one melee
 //!   + one ranged against two melee of the learner's melee kind; T1b: two melee + one ranged against three.
+//! - T1d (added 10 Nov after the first results; T1a/T1b unchanged): our melee + ranged hold the best defensive tile
+//!   the rules offer nearby (the highest `tile_defense_percent` within 3 tiles of a drawn centre; the melee unit
+//!   fortified at the start, the ranged unit on the best neighbouring tile away from the foes), two enemy melee units of
+//!   the same kind come at them (they hunt as in T1a). WIN: at least one of ours alive and, within 10 rounds, both
+//!   attackers dead or (at the limit) none of ours killed.
+//! - T1s (added 10 Nov, "seek"; T1a/T1b/T1d unchanged): the same pair starts on open ground (both tiles with no defence
+//!   bonus), two enemy melee units of the same kind come at them from 7-9 tiles away. Within reach of the pair (at most
+//!   SEEK_REACH rounds by the rules' step costs) lies at least one tile with a defence bonus and a free neighbour from
+//!   which a ranged unit is in range of that tile's surroundings; the foes need at least two rounds more than the pair to
+//!   reach the best such tile. Same WIN rule as T1d. Extra measures, taken at first contact (first round end with a foe
+//!   within 3 tiles of one of ours): `melee_on_def` (the melee unit stands on a tile with a defence bonus), `fire` (the
+//!   ranged unit is within its range of the nearest foe), `def_got` and `def_best` (defence percent of the tile held
+//!   against the best reachable one), `contact_round`.
+//! - T1k (added 10 Nov, "kill"): the T1s setup (open start, defensive ground in reach, two foes of the same kind
+//!   coming from 7-9 tiles) with the T1a WIN rule: both foes dead within 10 rounds and at least one of ours alive.
+//!   Surviving by keeping away does not win. A measurement, no gate. Same contact measures as T1s.
 //! - T2: the worker is alive and ours when 12 rounds end (or when every raider is dead).
 //! - T3: a city of the learner is founded within 14 rounds (the settler walks to a site that the rules
 //!   accept, 5-6 tiles from where it starts); measure also `settler_alive`.
@@ -46,6 +62,9 @@ use super::*;
 pub enum Sc {
     T1a,
     T1b,
+    T1d,
+    T1s,
+    T1k,
     T2,
     T3,
     T4,
@@ -57,12 +76,33 @@ pub enum Sc {
 }
 
 impl Sc {
-    pub const ALL: [Sc; 10] = [Sc::T1a, Sc::T1b, Sc::T2, Sc::T3, Sc::T4, Sc::T5, Sc::T5r, Sc::T5b, Sc::C1, Sc::C3];
+    /// The number a scene's draws are seeded with: the original scenes keep the numbers they had when the exam was
+    /// first run (adding scenes must not change their instances); T1k draws the instances of T1s.
+    fn seed_id(self) -> u64 {
+        match self {
+            Sc::T1a => 0,
+            Sc::T1b => 1,
+            Sc::T2 => 2,
+            Sc::T3 => 3,
+            Sc::T4 => 4,
+            Sc::T5 => 5,
+            Sc::T5r => 6,
+            Sc::T5b => 7,
+            Sc::C1 => 8,
+            Sc::C3 => 9,
+            Sc::T1d => 2,
+            Sc::T1s | Sc::T1k => 3,
+        }
+    }
+    pub const ALL: [Sc; 13] = [Sc::T1a, Sc::T1b, Sc::T1d, Sc::T1s, Sc::T1k, Sc::T2, Sc::T3, Sc::T4, Sc::T5, Sc::T5r, Sc::T5b, Sc::C1, Sc::C3];
 
     pub fn name(self) -> &'static str {
         match self {
             Sc::T1a => "t1a",
             Sc::T1b => "t1b",
+            Sc::T1d => "t1d",
+            Sc::T1s => "t1s",
+            Sc::T1k => "t1k",
             Sc::T2 => "t2",
             Sc::T3 => "t3",
             Sc::T4 => "t4",
@@ -81,7 +121,7 @@ impl Sc {
     /// The rounds a scene lasts.
     pub fn rounds(self) -> u32 {
         match self {
-            Sc::T1a | Sc::T1b => 10,
+            Sc::T1a | Sc::T1b | Sc::T1d | Sc::T1s | Sc::T1k => 10,
             Sc::T2 | Sc::T4 => 12,
             Sc::T3 | Sc::T5 | Sc::T5r | Sc::T5b => 14,
             Sc::C1 | Sc::C3 => 36,
@@ -326,6 +366,48 @@ pub struct Run {
     pub info: BTreeMap<String, String>,
     pub trace: Vec<String>,
     wounded_start: u32,
+    contact: BTreeMap<String, f64>,
+}
+
+/// How many rounds the pair may take to reach defensive ground in T1s: two, so that it has both the walk and a
+/// round to settle before any foe can arrive (the foes are placed at least SEEK_SPARE rounds later than that).
+const SEEK_REACH: u32 = 2;
+/// Rounds the foes need beyond ours to reach the best ground: the one round to spare of the brief, plus one for the
+/// unit to take its post.
+const SEEK_SPARE: u32 = 2;
+/// Start and foe tiles tried per instance before the instance counts as unbuilt.
+const SEEK_TRIES: usize = 40;
+
+/// Rounds a unit of `player` with `movement` points needs to reach each tile within `max_rounds`, by the rules'
+/// step costs (a step that takes all moves costs a whole round); the start tile is reached in 0 rounds.
+fn reach_rounds(game: &GameState, rules: &CompiledRuleset, player: PlayerId, from: TileId, movement: i32, max_rounds: u32) -> BTreeMap<TileId, u32> {
+    use kernel::navigation::cost::{step_cost, StepCost};
+    let auth = game.view().auth;
+    let round_points = (movement.max(1) as u32) * u32::from(kernel::world::unit::MOVE_DENOMINATOR);
+    let budget = round_points * max_rounds;
+    let mut best: BTreeMap<TileId, u32> = BTreeMap::new();
+    let mut heap = std::collections::BinaryHeap::new();
+    best.insert(from, 0);
+    heap.push(std::cmp::Reverse((0u32, from.0)));
+    while let Some(std::cmp::Reverse((cost, t))) = heap.pop() {
+        let t = TileId(t);
+        if best.get(&t).is_some_and(|&b| b < cost) {
+            continue;
+        }
+        for &n in auth.map().dimensions.neighbors(t).as_slice() {
+            let Some(step) = step_cost(auth, rules, player, t, n) else { continue };
+            let add = match step {
+                StepCost::Points(p) => p,
+                StepCost::AllMoves => round_points,
+            };
+            let next = cost + add.max(1);
+            if next <= budget && best.get(&n).is_none_or(|&b| next < b) {
+                best.insert(n, next);
+                heap.push(std::cmp::Reverse((next, n.0)));
+            }
+        }
+    }
+    best.into_iter().map(|(t, c)| (t, c.div_ceil(round_points))).collect()
 }
 
 /// What a built instance describes.
@@ -333,7 +415,8 @@ pub fn build(sc: Sc, rules: &CompiledRuleset, world: &World, control: bool) -> R
     let mut game = world.game.clone();
     let (learner, enemy) = (world.learner, world.enemy);
     let kinds_of = |p: PlayerId| world.kinds.get(&p).cloned().unwrap_or_default();
-    let v = world.vary ^ (sc as u64).wrapping_mul(0x9e37_79b9);
+    // T1k draws the very instances of T1s (only the win rule differs).
+    let v = world.vary ^ sc.seed_id().wrapping_mul(0x9e37_79b9);
     let (mine_k, theirs_k) = if matches!(sc, Sc::C1 | Sc::C3) {
         (drawn_kinds(rules, &kinds_of(learner), v ^ 0x1ea), drawn_kinds(rules, &kinds_of(enemy), v ^ 0xe1e))
     } else {
@@ -372,6 +455,7 @@ pub fn build(sc: Sc, rules: &CompiledRuleset, world: &World, control: bool) -> R
         lost_at_trigger: 0,
         trig_near: Vec::new(),
         min_dist: f64::MAX,
+        contact: BTreeMap::new(),
         founded: None,
         info: BTreeMap::new(),
         trace: Vec::new(),
@@ -402,9 +486,125 @@ pub fn build(sc: Sc, rules: &CompiledRuleset, world: &World, control: bool) -> R
             let at = game.view().auth.units().get(c0.h).map_or(own, |u| u.core.tile);
             let cleared = clear_enemy_near(&mut game, rules, enemy, at, 9, &keep);
             run.info.insert("cleared".into(), cleared.to_string());
+            // The ground of the fight (rules' own defence numbers, no terrain named): the best defence percent
+            // under each side's units at the start, and whether a river lies under a unit.
+            {
+                let auth = game.view().auth;
+                let def = |ps: &[Piece], side: PlayerId| ps.iter().filter_map(|p| auth.units().get(p.h).map(|u| classic_rules::combat::terrain::tile_defense_percent(auth, rules, u.core.tile, side))).max().unwrap_or(0);
+                let river = |ps: &[Piece]| ps.iter().any(|p| auth.units().get(p.h).is_some_and(|u| auth.map().river(u.core.tile)));
+                run.info.insert("def_mine".into(), def(&run.mine, learner).to_string());
+                run.info.insert("def_theirs".into(), def(&run.theirs, enemy).to_string());
+                run.info.insert("river_mine".into(), river(&run.mine).to_string());
+                run.info.insert("river_theirs".into(), river(&run.theirs).to_string());
+            }
             run.info.insert("kinds".into(), format!("{} + {} vs {} x{m}", name(rules, melee), name(rules, ranged), name(rules, melee)));
             reveal(&mut game, rules, learner, own, 10);
             reveal(&mut game, rules, enemy, own, 10);
+        }
+        Sc::T1d => {
+            let melee = *mine_k.get(&Arm::Melee).ok_or("no melee kind")?;
+            let ranged = *mine_k.get(&Arm::Ranged).ok_or("no ranged kind")?;
+            let strike = classic_rules::combat::city::CITY_ATTACK_RANGE;
+            let all_cities: Vec<TileId> = cities_of(&game, learner).into_iter().chain(cities_of(&game, enemy)).collect();
+            let land: Vec<TileId> = free_land(rules, &game, area).into_iter().filter(|&t| all_cities.iter().all(|c| dist(&game, t, *c) > strike)).collect();
+            let defence = |game: &GameState, t: TileId, side: PlayerId| {
+                let auth = game.view().auth;
+                classic_rules::combat::terrain::tile_defense_percent(auth, rules, t, side)
+            };
+            let centre = pick_free(land.clone(), v ^ 0xd1).ok_or("no free land")?;
+            let near: Vec<TileId> = land.iter().copied().filter(|&t| dist(&game, t, centre) <= 3).collect();
+            let best = near.iter().map(|&t| defence(&game, t, learner)).max().ok_or("no ground")?;
+            let held = pick_free(near.iter().copied().filter(|&t| defence(&game, t, learner) == best).collect(), v ^ 0xd2).ok_or("no ground")?;
+            let mut foes: Vec<TileId> = land.iter().copied().filter(|&t| dist(&game, t, held) == 4).collect();
+            foes.sort_by_key(|t| t.0);
+            shuffle(&mut foes, v ^ 0xd3);
+            let first = *foes.first().ok_or("no tile 4 from the held ground")?;
+            let second = foes.iter().copied().skip(1).find(|&t| dist(&game, t, first) <= 2).ok_or("no second foe tile")?;
+            let mut backs: Vec<TileId> = land.iter().copied().filter(|&t| dist(&game, t, held) == 1).collect();
+            // Beside or behind: the neighbour farthest from the foes, then the best ground.
+            backs.sort_by_key(|&t| (std::cmp::Reverse(dist(&game, t, first) + dist(&game, t, second)), std::cmp::Reverse(defence(&game, t, learner)), t.0));
+            let back = *backs.first().ok_or("no tile beside the held ground")?;
+            run.mine.push(spawn(&mut game, rules, learner, held, melee, "melee"));
+            run.mine.push(spawn(&mut game, rules, learner, back, ranged, "ranged"));
+            run.theirs.push(spawn(&mut game, rules, enemy, first, melee, "foe"));
+            run.theirs.push(spawn(&mut game, rules, enemy, second, melee, "foe"));
+            let keep: Vec<UnitHandle> = run.theirs.iter().map(|p| p.h).collect();
+            let cleared = clear_enemy_near(&mut game, rules, enemy, held, 9, &keep);
+            run.info.insert("cleared".into(), cleared.to_string());
+            // The units hold their ground from the start where the rules let them.
+            for p in run.mine.clone() {
+                let cmd = Command::Fortify { unit: p.h };
+                if game.accepts_order(rules, learner, &cmd) {
+                    let _ = game.execute(rules, cmd);
+                }
+            }
+            {
+                let auth = game.view().auth;
+                run.info.insert("def_mine".into(), defence(&game, held, learner).to_string());
+                run.info.insert("def_theirs".into(), defence(&game, first, enemy).max(defence(&game, second, enemy)).to_string());
+                run.info.insert("river_mine".into(), auth.map().river(held).to_string());
+                run.info.insert("river_theirs".into(), (auth.map().river(first) || auth.map().river(second)).to_string());
+            }
+            run.info.insert("kinds".into(), format!("{} + {} hold vs {} x2", name(rules, melee), name(rules, ranged), name(rules, melee)));
+            reveal(&mut game, rules, learner, held, 10);
+            reveal(&mut game, rules, enemy, held, 10);
+        }
+        Sc::T1s | Sc::T1k => {
+            let melee = *mine_k.get(&Arm::Melee).ok_or("no melee kind")?;
+            let ranged = *mine_k.get(&Arm::Ranged).ok_or("no ranged kind")?;
+            let strike = classic_rules::combat::city::CITY_ATTACK_RANGE;
+            let all_cities: Vec<TileId> = cities_of(&game, learner).into_iter().chain(cities_of(&game, enemy)).collect();
+            let land: Vec<TileId> = free_land(rules, &game, area).into_iter().filter(|&t| all_cities.iter().all(|c| dist(&game, t, *c) > strike)).collect();
+            let defence = |game: &GameState, t: TileId, side: PlayerId| {
+                let auth = game.view().auth;
+                classic_rules::combat::terrain::tile_defense_percent(auth, rules, t, side)
+            };
+            let move_of = |k: UnitKindId| i32::from(rules.units[k.0 as usize].movement.max(1));
+            let mut starts = land.iter().copied().filter(|&t| defence(&game, t, learner) == 0).collect::<Vec<_>>();
+            starts.sort_by_key(|t| t.0);
+            shuffle(&mut starts, v ^ 0x5e1);
+            let mut found = None;
+            for &start in starts.iter().take(SEEK_TRIES) {
+                let mine_reach = reach_rounds(&game, rules, learner, start, move_of(melee).min(move_of(ranged)), SEEK_REACH);
+                let grounds: Vec<TileId> = land
+                    .iter()
+                    .copied()
+                    .filter(|t| mine_reach.contains_key(t) && defence(&game, *t, learner) > 0)
+                    .filter(|&t| land.iter().any(|&b| b != t && b != start && dist(&game, b, t) == 1 && mine_reach.contains_key(&b)))
+                    .collect();
+                let Some(best) = grounds.iter().map(|&t| defence(&game, t, learner)).max() else { continue };
+                let ward = grounds.iter().copied().filter(|&t| defence(&game, t, learner) == best).min_by_key(|t| t.0).expect("a best ground");
+                let Some(back) = land.iter().copied().filter(|&b| dist(&game, b, start) == 1 && defence(&game, b, learner) == 0).min_by_key(|t| t.0) else { continue };
+                let mut foes: Vec<TileId> = land.iter().copied().filter(|&t| (7..=9).contains(&dist(&game, t, start))).collect();
+                foes.sort_by_key(|t| t.0);
+                shuffle(&mut foes, v ^ 0x5e2);
+                for &first in foes.iter().take(SEEK_TRIES) {
+                    let Some(second) = foes.iter().copied().find(|&t| t != first && dist(&game, t, first) <= 2) else { continue };
+                    let theirs_reach = reach_rounds(&game, rules, enemy, first, move_of(melee), 16);
+                    let (Some(mine_r), Some(their_r)) = (mine_reach.get(&ward), theirs_reach.get(&ward)) else { continue };
+                    if *their_r >= *mine_r + SEEK_SPARE {
+                        found = Some((start, back, first, second, best, grounds.len(), *mine_r, *their_r));
+                        break;
+                    }
+                }
+                if found.is_some() {
+                    break;
+                }
+            }
+            let (start, back, first, second, best, n_grounds, mine_r, their_r) = found.ok_or("no open start with defensive ground in reach")?;
+            run.mine.push(spawn(&mut game, rules, learner, start, melee, "melee"));
+            run.mine.push(spawn(&mut game, rules, learner, back, ranged, "ranged"));
+            run.theirs.push(spawn(&mut game, rules, enemy, first, melee, "foe"));
+            run.theirs.push(spawn(&mut game, rules, enemy, second, melee, "foe"));
+            let keep: Vec<UnitHandle> = run.theirs.iter().map(|p| p.h).collect();
+            let cleared = clear_enemy_near(&mut game, rules, enemy, start, 12, &keep);
+            run.info.insert("cleared".into(), cleared.to_string());
+            run.info.insert("grounds".into(), n_grounds.to_string());
+            run.info.insert("rounds_ours_foes".into(), format!("{mine_r}/{their_r}"));
+            run.contact.insert("def_best".into(), best as f64);
+            run.info.insert("kinds".into(), format!("{} + {} seek vs {} x2", name(rules, melee), name(rules, ranged), name(rules, melee)));
+            reveal(&mut game, rules, learner, start, 12);
+            reveal(&mut game, rules, enemy, start, 12);
         }
         Sc::T2 | Sc::T4 => {
             let worker = civil_kind(rules, false).ok_or("no worker kind")?;
@@ -686,7 +886,7 @@ impl Run {
         let auth = game.view().auth;
         let round = auth.turn().round;
         match self.sc {
-            Sc::T1a | Sc::T1b => {
+            Sc::T1a | Sc::T1b | Sc::T1d | Sc::T1s | Sc::T1k => {
                 // The foes hunt the nearest of our units (an engagement in the open, not a march on our city).
                 let mine = self.mine_alive(game);
                 for (r, rc) in self.theirs_alive(game) {
@@ -935,12 +1135,54 @@ impl Run {
         if self.sc == Sc::T3 && self.founded.is_none() && cities_of(game, self.learner).len() > self.cities0 {
             self.founded = Some(rel);
         }
+        if matches!(self.sc, Sc::T1d | Sc::T1s | Sc::T1k) && !self.contact.contains_key("seen_round") && !mine.is_empty() {
+            // First sight: the round end in which the learner's seat sees a foe, and the distance then.
+            let pv = game.player_view(rules, self.learner);
+            let seen = theirs.iter().filter(|(_, f)| pv.is_visible(f.tile)).filter_map(|(_, f)| mine.iter().map(|(_, m)| dist(game, m.tile, f.tile)).min()).min();
+            if let Some(d) = seen {
+                self.contact.insert("seen_round".into(), f64::from(rel));
+                self.contact.insert("seen_dist".into(), f64::from(d));
+            }
+        }
+        if matches!(self.sc, Sc::T1d | Sc::T1s | Sc::T1k) && !self.contact.contains_key("round") && !mine.is_empty() {
+            // First contact: a foe within 3 tiles of one of ours (one approach move from striking).
+            let near = theirs.iter().any(|(_, f)| mine.iter().any(|(_, m)| dist(game, m.tile, f.tile) <= 3));
+            if near {
+                let melee = mine.iter().find(|(p, _)| p.role == "melee");
+                let auth_now = game.view().auth;
+                let def = melee.map_or(0, |(_, c)| classic_rules::combat::terrain::tile_defense_percent(auth_now, rules, c.tile, self.learner));
+                let fire = mine.iter().find(|(p, _)| p.role == "ranged").is_some_and(|(_, c)| {
+                    classic_rules::ai::combat::ranged_range(rules, c.kind).is_some_and(|r| theirs.iter().any(|(_, f)| dist(game, c.tile, f.tile) <= r))
+                });
+                self.contact.insert("round".into(), f64::from(rel));
+                self.contact.insert("def_got".into(), def as f64);
+                self.contact.insert("melee_on_def".into(), f64::from(u8::from(def > 0)));
+                self.contact.insert("fire".into(), f64::from(u8::from(fire)));
+            }
+        }
         self.trace.push(self.line(rules, game, rel));
         // Over?
         let limit = rel >= self.sc.rounds();
         let alive_enemy = theirs.iter().filter(|(p, _)| p.role != "reinforcement").count();
         let over = match self.sc {
-            Sc::T1a | Sc::T1b => {
+            Sc::T1d | Sc::T1s => {
+                // WIN (fixed before the first run): at least one of ours alive, and by the round limit both
+                // attackers dead or none of ours killed.
+                let lost = self.mine.len() - mine.len();
+                if mine.is_empty() {
+                    self.win = Some(false);
+                    true
+                } else if theirs.is_empty() {
+                    self.win = Some(true);
+                    true
+                } else if limit {
+                    self.win = Some(lost == 0);
+                    true
+                } else {
+                    false
+                }
+            }
+            Sc::T1a | Sc::T1b | Sc::T1k => {
                 if !theirs.is_empty() && !mine.is_empty() && !limit {
                     false
                 } else if limit && !theirs.is_empty() {
@@ -1062,6 +1304,9 @@ impl Run {
         m.insert("units".to_owned(), self.mine.len() as f64);
         m.insert("lost".to_owned(), (self.mine.len() - mine.len()) as f64);
         m.insert("foes_left".to_owned(), theirs.len() as f64);
+        for (k, v) in &self.contact {
+            m.insert(if k == "round" { "contact_round".to_owned() } else { k.clone() }, *v);
+        }
         match self.sc {
             Sc::T2 | Sc::T4 => {
                 let workers = mine.iter().filter(|(p, _)| p.role == "worker").count();
@@ -1117,9 +1362,10 @@ pub struct Row {
 pub fn play(rules: &CompiledRuleset, mut game: GameState, mut run: Run, instance: usize, player: &str, live: bool) -> Result<Row, String> {
     let mind = |n: &str| ClassicBench::mind(n).ok_or_else(|| format!("no AI variant {n}"));
     let reference = player.starts_with("ref-").then_some(player);
+    let ceiling = player == CEILING;
     // `v2`: the big net's only weights on disk (read only), in process (`net:v2:FILE`); EXAM_V2 names another file.
     let v2 = format!("net:v2:{}", std::env::var("EXAM_V2").unwrap_or_else(|_| "/Users/roman.ivanov/civ/work/v2-gpu/data/C-cont.v2".to_owned()));
-    let base = if reference.is_some() { "standard" } else if player == "v2" { v2.as_str() } else { player };
+    let base = if reference.is_some() || ceiling { "standard" } else if player == "v2" { v2.as_str() } else { player };
     let nations = majors(&game);
     let mut seats = Vec::new();
     for p in &nations {
@@ -1140,6 +1386,7 @@ pub fn play(rules: &CompiledRuleset, mut game: GameState, mut run: Run, instance
     let mut over = false;
     let mut guard = 0;
     let mut raided: Option<u32> = None;
+    let mut searched: Option<u32> = None;
     while !game.is_over() && !over && guard < 200 {
         guard += 1;
         if reference.is_some() {
@@ -1150,6 +1397,10 @@ pub fn play(rules: &CompiledRuleset, mut game: GameState, mut run: Run, instance
             if game.view().auth.active_player() == run.enemy && raided != Some(now_round) {
                 raided = Some(now_round);
                 run.raiders_turn(rules, &mut game);
+            }
+            if ceiling && game.view().auth.active_player() == run.learner && searched != Some(now_round) && !game.is_over() {
+                searched = Some(now_round);
+                ceiling_turn(rules, &mut game, &run, &driver);
             }
             let stepped = driver.step(&mut game, rules);
             if dbg {
@@ -1192,4 +1443,183 @@ pub fn play(rules: &CompiledRuleset, mut game: GameState, mut run: Run, instance
     let (win, measures) = run.finish(&game);
     let round = game.view().auth.turn().round;
     Ok(Row { scene: run.sc.name().to_owned(), instance, player: player.to_owned(), win, rounds: round.saturating_sub(start), measures, info: run.info.clone(), trace: run.trace.clone() })
+}
+
+// ---------------------------------------------------------------------------
+// The ceiling of the duels (T1): the search teacher's idea on the exam's own scene
+
+/// The player `ceiling` (T1a / T1b only): `standard` on the learner's seat, but each learner turn the
+/// units are decided one at a time by the search teacher's method (`search.rs`): the candidates of a
+/// unit (every blow it can strike, a move to some of the tiles it reaches, standing), each played out
+/// in copies of the game (the unit's decision, the rest of the turn by the greedy blows of
+/// `search::greedy`, then `CEILING_DEPTH` round ends of `standard` on both seats), the combat stream
+/// reseeded per rollout (common random numbers; the real game's dice are never seen), and scored by
+/// the hit points left on both sides plus the win. The best candidate is played. It is the exam's
+/// "what is winnable" line for the duels: a bound of what a decision procedure that looks ahead gets
+/// with the same units, never read by the AI.
+pub const CEILING: &str = "ceiling";
+/// Rollouts of a candidate (combat seeds).
+const CEILING_ROLLOUTS: u32 = 3;
+/// Round ends a rollout plays after the decision.
+const CEILING_DEPTH: u32 = 2;
+/// Moves kept a decision: the nearest to a foe and the farthest (a retreat).
+const CEILING_NEAR: usize = 6;
+const CEILING_FAR: usize = 2;
+/// Decisions a unit a turn at most.
+const CEILING_PER_UNIT: u32 = 4;
+
+#[derive(Clone)]
+enum Pick {
+    Do(Command),
+    Stand,
+}
+
+fn ceiling_driver(rules: &CompiledRuleset, game: &GameState, run: &Run, saved: &kernel::persistence::ai::SavedAiStates) -> AiDriver<Classic, kernel::ai::seats::Seated<ClassicMind>> {
+    let mind = || ClassicBench::mind("standard").expect("standard");
+    let seats = majors(game).into_iter().map(|p| (p, mind())).collect();
+    let mut driver = AiDriver::<Classic, kernel::ai::seats::Seated<ClassicMind>>::with_mind(ClassicBench::settings(rules), Vec::new(), kernel::ai::seats::Seated::new(mind(), seats));
+    driver.set_trace_capacity(0);
+    let _ = run;
+    driver.load(saved, game.view().auth.map().tile_count(), rules).expect("the AI memory of the same game");
+    driver
+}
+
+/// The value of a position for the learner: the hit points left on each side as shares of their start,
+/// and the win.
+fn ceiling_value(game: &GameState, run: &Run) -> f64 {
+    let full = f64::from(kernel::world::unit::UNIT_MAX_HP);
+    let mine: f64 = run.mine_alive(game).iter().map(|(_, c)| f64::from(c.hp) / full).sum::<f64>() / run.mine.len().max(1) as f64;
+    let theirs: f64 = run.theirs_alive(game).iter().map(|(_, c)| f64::from(c.hp) / full).sum::<f64>() / run.theirs.len().max(1) as f64;
+    mine - theirs + if run.win == Some(true) { 2.0 } else { 0.0 }
+}
+
+fn stand(game: &mut GameState, h: UnitHandle) {
+    if let Some(core) = game.world_mut().units.get_mut_core(h) {
+        core.moves_left = 0;
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn ceiling_rollout(rules: &CompiledRuleset, game: &GameState, run: &Run, saved: &kernel::persistence::ai::SavedAiStates, seed: u64, r: u32, unit: UnitHandle, queue: &[UnitHandle], pick: &Pick) -> f64 {
+    let mut g = game.clone();
+    crate::search::reseed(&mut g, seed, r);
+    let mut sc = run.clone();
+    let mut rest: Vec<UnitHandle> = queue.to_vec();
+    match pick {
+        Pick::Do(cmd) => {
+            if g.execute(rules, cmd.clone()).is_err() {
+                return f64::NEG_INFINITY;
+            }
+            if !matches!(cmd, Command::MoveUnit { .. }) {
+                stand(&mut g, unit);
+                rest.retain(|h| *h != unit);
+            }
+        }
+        Pick::Stand => {
+            stand(&mut g, unit);
+            rest.retain(|h| *h != unit);
+        }
+    }
+    crate::search::greedy(rules, &mut g, sc.learner, sc.enemy, None, &rest);
+    let mut driver = ceiling_driver(rules, &g, &sc, saved);
+    let mut rounds = 0;
+    for _ in 0..100_000 {
+        match driver.step(&mut g, rules) {
+            kernel::ai::StepOutcome::Worked => {}
+            kernel::ai::StepOutcome::PlayerDone(p) => {
+                if g.view().auth.active_player() == sc.learner && p != sc.learner && !g.is_over() {
+                    let army: Vec<UnitHandle> = sc.mine.iter().map(|p| p.h).collect();
+                    crate::search::greedy(rules, &mut g, sc.learner, sc.enemy, None, &army);
+                }
+            }
+            kernel::ai::StepOutcome::RoundDone => {
+                rounds += 1;
+                drop(g.take_journal());
+                let over = sc.after_round(rules, &mut g, &mut driver);
+                if over || rounds >= CEILING_DEPTH || g.is_over() {
+                    break;
+                }
+                let army: Vec<UnitHandle> = sc.mine.iter().map(|p| p.h).collect();
+                crate::search::greedy(rules, &mut g, sc.learner, sc.enemy, None, &army);
+            }
+            kernel::ai::StepOutcome::Waiting => break,
+        }
+    }
+    ceiling_value(&g, &sc)
+}
+
+/// One learner turn of the ceiling player: decisions in the real game.
+fn ceiling_turn<P: AiMind<Classic>>(rules: &CompiledRuleset, game: &mut GameState, run: &Run, driver: &AiDriver<Classic, P>) {
+    let learner = run.learner;
+    let saved = driver.save();
+    let mut queue: Vec<UnitHandle> = run.mine_alive(game).into_iter().filter(|(_, c)| c.moves_left > 0).map(|(p, _)| p.h).collect();
+    let mut counts: BTreeMap<u32, u32> = BTreeMap::new();
+    for _ in 0..(CEILING_PER_UNIT as usize + 1) * run.mine.len().max(1) {
+        if game.is_over() {
+            break;
+        }
+        let Some(&unit) = queue.first() else { break };
+        let Some(me) = game.view().auth.units().get(unit).filter(|u| u.core.owner == learner).map(|u| *u.core) else {
+            queue.remove(0);
+            continue;
+        };
+        let n = counts.entry(me.id.0 as u32).or_insert(0);
+        if me.moves_left == 0 || *n >= CEILING_PER_UNIT {
+            queue.remove(0);
+            continue;
+        }
+        *n += 1;
+        // The candidates.
+        let foes: Vec<(UnitHandle, TileId)> = run.theirs_alive(game).iter().map(|(p, c)| (p.h, c.tile)).collect();
+        let mut picks: Vec<Pick> = vec![Pick::Stand];
+        let ranged = classic_rules::ai::combat::ranged_range(rules, me.kind).is_some();
+        for (fh, t) in &foes {
+            let cmd = if ranged { Command::RangedAttack { unit, target: *t } } else { Command::AttackUnit { attacker: unit, defender: *fh } };
+            if game.accepts_order(rules, learner, &cmd) {
+                picks.push(Pick::Do(cmd));
+            }
+        }
+        let hold = Command::Fortify { unit };
+        if game.accepts_order(rules, learner, &hold) {
+            picks.push(Pick::Do(hold));
+        }
+        let nearest = |game: &GameState, t: TileId| foes.iter().map(|(_, f)| dist(game, t, *f)).min().unwrap_or(0);
+        let mut tiles: Vec<(i32, u32)> = game
+            .player_view(rules, learner)
+            .own_reachable(unit)
+            .into_iter()
+            .filter(|(t, _)| *t != me.tile && game.view().auth.indexes().units_on(*t).is_empty())
+            .map(|(t, _)| (nearest(game, t), t.0))
+            .collect();
+        tiles.sort();
+        let mut chosen: Vec<u32> = tiles.iter().take(CEILING_NEAR).map(|(_, t)| *t).collect();
+        let far: Vec<u32> = tiles.iter().rev().take(CEILING_FAR).map(|(_, t)| *t).filter(|t| !chosen.contains(t)).collect();
+        chosen.extend(far);
+        for t in chosen {
+            picks.push(Pick::Do(Command::MoveUnit { unit, destination: TileId(t) }));
+        }
+        let seed = game.view().auth.rng().combat.state();
+        let mut best: Option<(f64, usize)> = None;
+        for (i, pick) in picks.iter().enumerate() {
+            let v = (0..CEILING_ROLLOUTS).map(|r| ceiling_rollout(rules, game, run, &saved, seed, r, unit, &queue, pick)).sum::<f64>() / f64::from(CEILING_ROLLOUTS);
+            if best.is_none_or(|b| v > b.0 + 1e-9) {
+                best = Some((v, i));
+            }
+        }
+        match best.map(|(_, i)| picks[i].clone()) {
+            Some(Pick::Do(cmd)) => {
+                let is_move = matches!(cmd, Command::MoveUnit { .. });
+                if game.execute(rules, cmd).is_err() {
+                    queue.remove(0);
+                } else if !is_move {
+                    stand(game, unit);
+                    queue.remove(0);
+                }
+            }
+            _ => {
+                stand(game, unit);
+                queue.remove(0);
+            }
+        }
+    }
 }

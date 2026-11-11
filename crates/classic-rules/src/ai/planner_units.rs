@@ -320,6 +320,31 @@ fn decide_military(
     if let Some(decision) = tactics::immediate(view, state, tools) {
         return decision;
     }
+    if view.brief.field_craft {
+        // The unit has its task before the field-craft rules ask what it is free for.
+        ensure_task(view, state, tools);
+        // A unit whose task has it wait (a forming operation's muster, an assault gathering) is
+        // asked after its task has had its say, unless it is already out on a sortie; any other free
+        // unit is asked first.
+        let waits = matches!(state.task_of(view.local.unit.id).map(|t| t.task), Some(UnitTask::Operation { .. } | UnitTask::Assault { .. })) && !crate::ai::field_craft::abroad(view);
+        if !waits {
+            if let Some(decision) = crate::ai::field_craft::sortie(view, state, tools) {
+                return decision;
+            }
+        }
+        // A sortie that pays comes first (its risk reads the fighters in sight); then the unit takes its ground.
+        if let Some(decision) = crate::ai::field_craft::stance(view, state, tools) {
+            return decision;
+        }
+        let decision = follow_task(view, state, tools);
+        let idle = decision.command.as_ref().is_none_or(|c| matches!(c, Command::Fortify { .. }));
+        if waits && idle {
+            if let Some(sortie) = crate::ai::field_craft::sortie(view, state, tools) {
+                return sortie;
+            }
+        }
+        return decision;
+    }
     follow_task(view, state, tools)
 }
 
@@ -912,4 +937,15 @@ pub fn approach_at(
         Some(path) if path.len() > 1 => step_on(view, tools.rules, &path, reason),
         _ => Decision::refuse(actor, Reason::Rally),
     }
+}
+
+/// The unit holds the garrison of `city` beyond what the city wants (the higher ids first), and the
+/// city is not in danger: a unit the city does not need (`field_craft::sortie`).
+pub(crate) fn spare_garrison(view: &UnitView<'_, '_>, state: &AiState, city: TileId) -> bool {
+    if view.brief.endangered(city) {
+        return false;
+    }
+    let unit = view.local.unit.id;
+    let senior = state.tasks().iter().filter(|t| t.task == UnitTask::Defend { city } && t.unit < unit).count();
+    senior >= garrison_target(view, state).max(1)
 }

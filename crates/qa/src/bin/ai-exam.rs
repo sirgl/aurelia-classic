@@ -3,6 +3,7 @@
 //! `ai-exam run --out DIR [--scenes t1a,t2,...] [--players standard,unit-net,hybrid,war-pays] [--instances 80]
 //!   [--offset 0] [--jobs 4] [--control]`
 //!   plays every (scene, instance, player) not yet in DIR/rows.jsonl; the references of a scene
+//!   [--set tune|accept|all] (tune: even instances, accept: odd, the acceptance set; default all)
 //!   (`ref-pillage`, `ref-press`) are played too unless --no-refs. Unbuildable instances go to DIR/unbuilt.jsonl.
 //! `ai-exam one --scene t2 --instance 17 --player unit-net [--offset 0] [--control]`
 //!   replays one instance with the trace on stderr, one line a round.
@@ -36,12 +37,14 @@ struct Opts {
     scene: Option<Sc>,
     instance: usize,
     player: String,
+    /// even: the tuning set, odd: the acceptance set (looked at once, after the freeze), all: both.
+    parity: Option<usize>,
 }
 
 fn opts() -> Result<Opts, String> {
     let mut args = std::env::args().skip(1);
     let cmd = args.next().ok_or("run | one")?;
-    let mut o = Opts { cmd, out: PathBuf::from("rows"), scenes: Sc::ALL.to_vec(), players: ["standard", "unit-net", "hybrid", "war-pays"].iter().map(|s| (*s).to_owned()).collect(), instances: 80, offset: 0, jobs: 4, control: false, refs: true, scene: None, instance: 0, player: "standard".to_owned() };
+    let mut o = Opts { cmd, out: PathBuf::from("rows"), scenes: Sc::ALL.to_vec(), players: ["standard", "unit-net", "hybrid", "war-pays"].iter().map(|s| (*s).to_owned()).collect(), instances: 80, offset: 0, jobs: 4, control: false, refs: true, scene: None, instance: 0, player: "standard".to_owned(), parity: None };
     while let Some(a) = args.next() {
         let mut value = || args.next().ok_or(format!("{a} needs a value"));
         match a.as_str() {
@@ -56,6 +59,14 @@ fn opts() -> Result<Opts, String> {
             "--scene" => o.scene = Some(Sc::parse(&value()?)?),
             "--instance" => o.instance = value()?.parse().map_err(|e| format!("{e}"))?,
             "--player" => o.player = value()?,
+            "--set" => {
+                o.parity = match value()?.as_str() {
+                    "tune" | "even" => Some(0),
+                    "accept" | "odd" => Some(1),
+                    "all" => None,
+                    other => return Err(format!("--set tune|accept|all, not {other}")),
+                }
+            }
             other => return Err(format!("unknown option {other}")),
         }
     }
@@ -95,6 +106,9 @@ fn real() -> Result<(), String> {
             let started = std::time::Instant::now();
             let count = std::sync::atomic::AtomicUsize::new(0);
             aurelia_qa::export::parallel(&indexes, o.jobs, |&i| {
+                if o.parity.is_some_and(|p| i % 2 != p) {
+                    return;
+                }
                 let players_of = |sc: Sc| -> Vec<String> {
                     let mut v = o.players.clone();
                     if o.refs {
