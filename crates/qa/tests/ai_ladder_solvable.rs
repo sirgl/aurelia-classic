@@ -52,7 +52,7 @@ fn an_unsolvable_scene_is_drawn_again_and_a_solvable_one_is_kept() {
     // scenes were 0 (no capture allowed), 2 (kept), 7 and 15 (drawn again, at attempts 1 and 6). On the new
     // worlds the teacher misses fewer scenes as drawn (10 of the first 200 scenes, the first of them 37), so
     // the scenes drawn again lie farther out: 40 and 37, again at attempts 1 and 6.
-    let jobs = selfplay::jobs(&on, 41);
+    let jobs = selfplay::jobs(&on, 49);
     // Scene 2 allows no first-turn capture (its ring short of the shots): not filtered, as without the flag.
     let open = selfplay::play(&rules, &on, &jobs[2]).unwrap();
     assert!(open.meta.ladder_draw.is_none());
