@@ -445,6 +445,8 @@ pub struct Memory {
     /// `sharp`'s own (`sharp::Memory`): written after the rest, only when there is one, so the
     /// other variants' memory keeps its bytes.
     pub sharp: Option<sharp::Memory>,
+    /// `retake2`'s own (`retake::Memory`): a section before `sharp`'s, only when there is one.
+    pub retake: Option<crate::ai::retake::Memory>,
 }
 
 /// A review of the goals and of the cell's prices.
@@ -465,6 +467,10 @@ const MEMORY_VERSION: u8 = 0x5B;
 /// marker (`section_len`).
 const SHARP_SECTION: u8 = 0x5C;
 const NEXT_SECTION: u8 = 0x5D;
+/// The marker of `retake2`'s section (a length of two bytes, then its body) before `sharp`'s. It was
+/// 0x5D on the retake line, a marker `next` took for its section on the thirteenth promotion's line:
+/// a mind with both sections (`next-war-retake`) needs two markers.
+const RETAKE_SECTION: u8 = 0x5E;
 
 /// The bytes of a section of `marker`: the marker and its numbers, eight bytes each (`next`'s:
 /// the rivals and the science victory's fit too, −1 for none).
@@ -578,6 +584,12 @@ impl Memory {
             }
             None => w.0.push(0),
         }
+        if let Some(m) = &self.retake {
+            let body = m.encode();
+            w.0.push(RETAKE_SECTION);
+            w.0.extend_from_slice(&(body.len() as u16).to_le_bytes());
+            w.0.extend_from_slice(&body);
+        }
         if let Some(m) = &self.sharp {
             let next = m.rivals.is_some() || m.fits.is_some();
             w.0.push(if next { NEXT_SECTION } else { SHARP_SECTION });
@@ -669,6 +681,16 @@ impl Memory {
         } else {
             None
         };
+        // `retake2`'s section: its marker, a length and its body; one that does not read is none.
+        let retake = if r.0.first() == Some(&RETAKE_SECTION) {
+            r.u8()?;
+            let len = usize::from(u16::from_le_bytes(r.take::<2>()?));
+            let (body, rest) = r.0.split_at_checked(len)?;
+            r.0 = rest;
+            crate::ai::retake::Memory::decode(body)
+        } else {
+            None
+        };
         // `sharp`'s section: its marker and numbers, the memory's last bytes (`section_len`).
         let sharp = match r.0.first().copied() {
             Some(marker) if section_len(marker) == Some(r.0.len()) => {
@@ -679,7 +701,7 @@ impl Memory {
             }
             _ => None,
         };
-        Some(Memory { held, survey, review, target, sharp })
+        Some(Memory { held, survey, review, target, sharp, retake })
     }
 }
 

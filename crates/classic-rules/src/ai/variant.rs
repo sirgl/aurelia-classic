@@ -90,7 +90,9 @@
 //! The war line (`WarPays` → `WarMuster` → `SiegeCall`, classic/docs/ai-war-pays.md) was built on
 //! `PreNext`'s switches (`WarOpen`, then `Standard`) and plays so; `NextWar` carries its flags onto
 //! the game's AI of the thirteenth promotion: the mind of `Standard` with the war of `SiegeCall`
-//! (`ClassicMind::new`; bench only, `experimental-ai`).
+//! (`ClassicMind::new`; bench only, `experimental-ai`). `Retake2` (classic/docs/ai-retake.md) is
+//! `SiegeCall` with the retake of a lost city and plays on `PreNext` as measured; `NextWarRetake`
+//! is `NextWar` with its retake flag: the mind of `Standard` with the war of `Retake2`.
 
 use crate::ai::grand_strategy::Stakes;
 use crate::ai::operations::WarGate;
@@ -762,6 +764,18 @@ pub enum Variant {
     /// onto the game's AI of the thirteenth promotion; `SiegeCall`, `WarMuster` and `WarPays`
     /// stay as measured, on `PreNext`. A bench-only candidate, `experimental-ai` only.
     NextWar,
+    /// `SiegeCall` whose seat answers the loss of a city at once: it finds the city by its own memory
+    /// (a city held at its last turn and gone now, taken by the player that holds it), reads the city's
+    /// health and the captor's units from sight, strikes with the units on the spot unless the captor's
+    /// units within four tiles and the city's strike outmatch them, and makes no peace while the retake
+    /// is expected (`TurnBrief::retake`, `ai::retake`). A bench-only candidate, `experimental-ai` only.
+    Retake2,
+    /// `NextWar` with the retake of `Retake2`: the mind of `Standard` (the flags of `NextW`) that
+    /// wars as `Retake2` does: the flags of `WarPays`, `WarMuster`, `SiegeCall` and the retake
+    /// (`TurnBrief::retake`) and the switches of `WarOpen` (`ClassicMind::new`). The retake line
+    /// carried over onto `NextWar`; `Retake2` stays as measured, on `PreNext`. A bench-only
+    /// candidate, `experimental-ai` only.
+    NextWarRetake,
 }
 
 /// The net's base: the expert the end-to-end net learns from and the mind it
@@ -782,7 +796,7 @@ const NUDGED_CANDIDATES: u32 = 40;
 
 impl Variant {
     /// The game's AI first.
-    pub const ALL: [Variant; 148] = [
+    pub const ALL: [Variant; 150] = [
         Variant::Standard,
         Variant::PreCamps,
         Variant::PreWorkers,
@@ -931,6 +945,8 @@ impl Variant {
         Variant::WarMuster,
         Variant::SiegeCall,
         Variant::NextWar,
+        Variant::Retake2,
+        Variant::NextWarRetake,
     ];
 
     pub fn name(self) -> &'static str {
@@ -1065,6 +1081,8 @@ impl Variant {
             Variant::WarMuster => "war-muster",
             Variant::SiegeCall => "siege-call",
             Variant::NextWar => "next-war",
+            Variant::Retake2 => "retake2",
+            Variant::NextWarRetake => "next-war-retake",
             Variant::ArmyFit => "army-fit",
             Variant::Camps => "camps",
             Variant::ArmyCamps => "army-camps",
@@ -1101,7 +1119,7 @@ impl Variant {
         cfg!(feature = "experimental-ai")
             || !matches!(
                 self,
-                Variant::Net | Variant::UnitNet | Variant::Hybrid | Variant::SiteNet | Variant::ChoiceNet | Variant::ChoiceNetProduction | Variant::ChoiceNetResearch | Variant::StandardScripted | Variant::PreCsGifts | Variant::Sharp | Variant::TallReal | Variant::Next | Variant::WonderCancel | Variant::WonderRace | Variant::NextW | Variant::NextRace | Variant::PreNext | Variant::TacticianFit | Variant::WarMuster | Variant::SiegeCall | Variant::NextWar
+                Variant::Net | Variant::UnitNet | Variant::Hybrid | Variant::SiteNet | Variant::ChoiceNet | Variant::ChoiceNetProduction | Variant::ChoiceNetResearch | Variant::StandardScripted | Variant::PreCsGifts | Variant::Sharp | Variant::TallReal | Variant::Next | Variant::WonderCancel | Variant::WonderRace | Variant::NextW | Variant::NextRace | Variant::PreNext | Variant::TacticianFit | Variant::WarMuster | Variant::SiegeCall | Variant::NextWar | Variant::Retake2 | Variant::NextWarRetake
             )
     }
 
@@ -1286,6 +1304,12 @@ impl Variant {
     /// in every other switch (`ClassicMind::new`).
     pub fn siege_call(self) -> bool {
         self == Variant::SiegeCall
+    }
+
+    /// The retake of a lost city (`TurnBrief::retake`): `Retake2`, which the mind plays as `SiegeCall`
+    /// in every other switch (`ClassicMind::new`).
+    pub fn retake2(self) -> bool {
+        self == Variant::Retake2
     }
 
     /// Its research, policies and choice among the allocator's best orders are the

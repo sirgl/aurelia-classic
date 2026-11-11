@@ -361,6 +361,15 @@ pub(crate) fn ensure_task(
 ) -> Option<UnitTask> {
     let unit = view.local.unit;
     let current = state.task_of(unit.id).map(|t| t.task);
+    // `retake`: a unit that strikes a lost city this turn is on its assault (`ai::retake`).
+    if let Some(target) = view.brief.retake_target_of(unit.id) {
+        if current != Some(UnitTask::Assault { target }) {
+            let task = UnitTask::Assault { target };
+            state.set_task(unit.id, task, view.brief.round);
+            tools.counters.tasks_assigned += 1;
+            return Some(task);
+        }
+    }
     if let Some(task) = current {
         if task_valid(view, state, tools.rules, task) {
             return Some(task);
@@ -384,10 +393,13 @@ fn task_valid(view: &UnitView<'_, '_>, state: &AiState, rules: &CompiledRuleset,
                 && !scout_wanted_instead(view, state)
                 && settler_waiting_here(view, state).is_none()
         }
-        UnitTask::Assault { target } => state
-            .relations()
-            .iter()
-            .any(|m| m.at_war && m.objective.is_some_and(|o| o.tile == target)),
+        UnitTask::Assault { target } => {
+            view.brief.is_retaken(target)
+                || state
+                    .relations()
+                    .iter()
+                    .any(|m| m.at_war && m.objective.is_some_and(|o| o.tile == target))
+        }
         UnitTask::Escort { ward } => escorted_settler_alive(view, state, ward),
         UnitTask::Heal { .. } => unit.hp < crate::world::unit::UNIT_MAX_HP,
         UnitTask::Operation { target } => state.operation(target).is_some(),

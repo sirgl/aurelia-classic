@@ -299,7 +299,8 @@ pub(crate) fn rounds_since(brief: &TurnBrief, round: Option<u32>) -> u32 {
 fn consider_peace(brief: &TurnBrief, state: &AiState, relation: &Relation) -> Option<Decision> {
     let memory = state.relation(relation.other)?;
     let age = rounds_since(brief, memory.last_change_round);
-    if age < MIN_WAR_ROUNDS {
+    // `retake`: no peace while a lost city is being retaken (`ai::retake`).
+    if age < MIN_WAR_ROUNDS || brief.retaking_from(relation.other) {
         return None;
     }
     let pointless = memory.objective.is_none() && memory.threat == 0;
