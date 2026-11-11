@@ -51,6 +51,9 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
+mod landless;
+pub use landless::{landless_scenes, LWorld};
+
 use classic_rules::Command;
 use kernel::ai::state::{ObjectiveKind, SeenCity, UnitTask, WarObjective};
 use kernel::ids::EntityId;
@@ -73,6 +76,14 @@ pub enum Sc {
     T5b,
     C1,
     C3,
+    /// The landless arenas (added 11 Nov; the older scenes are unchanged): a player with units, no city and no
+    /// settler (`landless.rs`). L1/L2: a city-state's city, force enough / not enough; L3a/L3b: the same against a
+    /// weak new city of a nation; L4: nothing to take, prey in reach.
+    L1,
+    L2,
+    L3a,
+    L3b,
+    L4,
 }
 
 impl Sc {
@@ -92,9 +103,19 @@ impl Sc {
             Sc::C3 => 9,
             Sc::T1d => 2,
             Sc::T1s | Sc::T1k => 3,
+            // The landless pairs share their world and target (their own numbers, no old scene's).
+            Sc::L1 | Sc::L2 => 10,
+            Sc::L3a | Sc::L3b => 11,
+            Sc::L4 => 12,
         }
     }
     pub const ALL: [Sc; 13] = [Sc::T1a, Sc::T1b, Sc::T1d, Sc::T1s, Sc::T1k, Sc::T2, Sc::T3, Sc::T4, Sc::T5, Sc::T5r, Sc::T5b, Sc::C1, Sc::C3];
+    /// The landless arenas (not in `ALL`: the old runs keep their default scenes).
+    pub const LANDLESS: [Sc; 5] = [Sc::L1, Sc::L2, Sc::L3a, Sc::L3b, Sc::L4];
+
+    pub fn is_landless(self) -> bool {
+        Sc::LANDLESS.contains(&self)
+    }
 
     pub fn name(self) -> &'static str {
         match self {
@@ -111,11 +132,16 @@ impl Sc {
             Sc::T5b => "t5b",
             Sc::C1 => "c1",
             Sc::C3 => "c3",
+            Sc::L1 => "l1",
+            Sc::L2 => "l2",
+            Sc::L3a => "l3a",
+            Sc::L3b => "l3b",
+            Sc::L4 => "l4",
         }
     }
 
     pub fn parse(text: &str) -> Result<Sc, String> {
-        Sc::ALL.into_iter().find(|s| s.name() == text).ok_or_else(|| format!("unknown scene {text} ({})", Sc::ALL.iter().map(|s| s.name()).collect::<Vec<_>>().join(", ")))
+        Sc::ALL.into_iter().chain(Sc::LANDLESS).find(|s| s.name() == text).ok_or_else(|| format!("unknown scene {text} ({})", Sc::ALL.iter().chain(&Sc::LANDLESS).map(|s| s.name()).collect::<Vec<_>>().join(", ")))
     }
 
     /// The rounds a scene lasts.
@@ -125,6 +151,7 @@ impl Sc {
             Sc::T2 | Sc::T4 => 12,
             Sc::T3 | Sc::T5 | Sc::T5r | Sc::T5b => 14,
             Sc::C1 | Sc::C3 => 36,
+            Sc::L1 | Sc::L2 | Sc::L3a | Sc::L3b | Sc::L4 => 30,
         }
     }
 
@@ -138,6 +165,8 @@ impl Sc {
         match self {
             Sc::T5 | Sc::T5r | Sc::T5b => &["ref-pillage"],
             Sc::C1 | Sc::C3 => &["ref-press"],
+            Sc::L1 | Sc::L2 | Sc::L3a | Sc::L3b => &["ref-takecity"],
+            Sc::L4 => &["ref-raid"],
             _ => &[],
         }
     }
@@ -369,6 +398,8 @@ pub struct Run {
     contact: BTreeMap<String, f64>,
     /// `ref-hold`: the tile the melee unit goes to and holds.
     hold: Option<TileId>,
+    /// The landless arenas' state (None in every other scene).
+    ls: Option<landless::Ls>,
 }
 
 /// How many rounds the pair may take to reach defensive ground in T1s: two, so that it has both the walk and a
@@ -428,46 +459,12 @@ pub fn build(sc: Sc, rules: &CompiledRuleset, world: &World, control: bool) -> R
     let far = battle::front_city(&game, learner, enemy).ok_or("the enemy has no city on the learner's land")?;
     let area = game.view().auth.map().land_area(far);
     let bit = |n: u64| (mix(v ^ n) & 1) == 1;
-    let mut run = Run {
-        sc,
-        learner,
-        enemy,
-        mine: Vec::new(),
-        theirs: Vec::new(),
-        start_round: game.view().auth.turn().round,
-        target: None,
-        aim_enemy: None,
-        aim_learner: None,
-        raid: None,
-        control,
-        over: false,
-        win: None,
-        cities0: cities_of(&game, learner).len(),
-        n0: 0,
-        imp: Vec::new(),
-        pillaged: BTreeSet::new(),
-        d0: 0.0,
-        set_out: None,
-        arrived: None,
-        near_first: 0,
-        near_plus2: 0,
-        taken: None,
-        trigger: None,
-        reinforce_kinds: Vec::new(),
-        lost_at_trigger: 0,
-        trig_near: Vec::new(),
-        min_dist: f64::MAX,
-        contact: BTreeMap::new(),
-        founded: None,
-        info: BTreeMap::new(),
-        trace: Vec::new(),
-        wounded_start: 0,
-        hold: None,
-    };
+    let mut run = Run::blank(sc, learner, enemy, game.view().auth.turn().round, cities_of(&game, learner).len(), control);
     run.info.insert("era".into(), game.view().auth.players().nation_era_of(learner, rules).to_string());
     run.info.insert("enemy_era".into(), game.view().auth.players().nation_era_of(enemy, rules).to_string());
     run.info.insert("world".into(), world.label.clone());
     match sc {
+        Sc::L1 | Sc::L2 | Sc::L3a | Sc::L3b | Sc::L4 => return Err("the landless scenes are built by landless_scenes".to_owned()),
         Sc::T1a | Sc::T1b => {
             let (n_melee, m) = if sc == Sc::T1a { (1, 2) } else { (2, 3) };
             let melee = *mine_k.get(&Arm::Melee).ok_or("no melee kind")?;
@@ -847,6 +844,47 @@ fn guard_kind_fast(mine: &BTreeMap<Arm, UnitKindId>) -> Option<UnitKindId> {
 }
 
 impl Run {
+    /// A scene with nothing set yet.
+    fn blank(sc: Sc, learner: PlayerId, enemy: PlayerId, start_round: u32, cities0: usize, control: bool) -> Run {
+        Run {
+            sc,
+            learner,
+            enemy,
+            mine: Vec::new(),
+            theirs: Vec::new(),
+            start_round,
+            target: None,
+            aim_enemy: None,
+            aim_learner: None,
+            raid: None,
+            control,
+            over: false,
+            win: None,
+            cities0,
+            n0: 0,
+            imp: Vec::new(),
+            pillaged: BTreeSet::new(),
+            d0: 0.0,
+            set_out: None,
+            arrived: None,
+            near_first: 0,
+            near_plus2: 0,
+            taken: None,
+            trigger: None,
+            reinforce_kinds: Vec::new(),
+            lost_at_trigger: 0,
+            trig_near: Vec::new(),
+            min_dist: f64::MAX,
+            contact: BTreeMap::new(),
+            founded: None,
+            info: BTreeMap::new(),
+            trace: Vec::new(),
+            wounded_start: 0,
+            hold: None,
+            ls: None,
+        }
+    }
+
     fn alive_h(&self, game: &GameState, p: &Piece, side: PlayerId) -> Option<kernel::world::unit::UnitCore> {
         game.view().auth.units().get(p.h).filter(|u| u.core.owner == side && u.core.id == p.id).map(|u| *u.core)
     }
@@ -1148,6 +1186,9 @@ impl Run {
     /// The scripted pillage reference at the learner's turn start (`ref-pillage`): each unit walks to
     /// the nearest unpillaged improvement of the enemy and pillages it. Returns commands made.
     pub fn reference_turn(&mut self, rules: &CompiledRuleset, game: &mut GameState) -> u64 {
+        if self.ls.is_some() {
+            return self.landless_reference(rules, game);
+        }
         let mut made = 0;
         if matches!(self.sc, Sc::C1 | Sc::C3) {
             return self.press_turn(rules, game);
@@ -1199,6 +1240,9 @@ impl Run {
 
     /// After a round: updates the measures, the trace line; whether the scene is over.
     pub fn after_round<P: AiMind<Classic>>(&mut self, rules: &CompiledRuleset, game: &mut GameState, driver: &mut AiDriver<Classic, P>) -> bool {
+        if self.ls.is_some() {
+            return self.after_round_landless(rules, game);
+        }
         let round = game.view().auth.turn().round;
         let rel = round.saturating_sub(self.start_round);
         let mine = self.mine_alive(game);
@@ -1279,6 +1323,7 @@ impl Run {
         let limit = rel >= self.sc.rounds();
         let alive_enemy = theirs.iter().filter(|(p, _)| p.role != "reinforcement").count();
         let over = match self.sc {
+            Sc::L1 | Sc::L2 | Sc::L3a | Sc::L3b | Sc::L4 => true,
             Sc::T1d | Sc::T1s => {
                 // WIN (fixed before the first run): at least one of ours alive, and by the round limit both
                 // attackers dead or none of ours killed.
@@ -1451,6 +1496,9 @@ impl Run {
             }
             _ => {}
         }
+        if self.ls.is_some() {
+            self.landless_measures(game, &mut m);
+        }
         (self.win, m)
     }
 }
@@ -1501,13 +1549,23 @@ pub fn play(rules: &CompiledRuleset, mut game: GameState, mut run: Run, instance
     let mut guard = 0;
     let mut raided: Option<u32> = None;
     let mut searched: Option<u32> = None;
+    // The landless arenas: the reference plays at the start of the learner's turn, whoever moves first.
+    let landless = run.ls.is_some();
+    let mut referred: Option<u32> = None;
+    if let Some(ls) = run.ls.as_mut() {
+        ls.reference = reference.map(str::to_owned);
+    }
     while !game.is_over() && !over && guard < 200 {
         guard += 1;
-        if reference.is_some() {
+        if reference.is_some() && !landless {
             run.reference_turn(rules, &mut game);
         }
         loop {
             let now_round = game.view().auth.turn().round;
+            if landless && reference.is_some() && game.view().auth.active_player() == run.learner && referred != Some(now_round) && !game.is_over() {
+                referred = Some(now_round);
+                run.reference_turn(rules, &mut game);
+            }
             if game.view().auth.active_player() == run.enemy && raided != Some(now_round) {
                 raided = Some(now_round);
                 run.raiders_turn(rules, &mut game);
@@ -1516,7 +1574,11 @@ pub fn play(rules: &CompiledRuleset, mut game: GameState, mut run: Run, instance
                 searched = Some(now_round);
                 ceiling_turn(rules, &mut game, &run, &driver);
             }
+            let watch = if landless { run.watch_before(&game) } else { None };
             let stepped = driver.step(&mut game, rules);
+            if let Some(w) = watch {
+                run.watch_after(&game, w);
+            }
             if dbg {
                 let now = run.mine_alive(&game).len();
                 if now < alive_before {

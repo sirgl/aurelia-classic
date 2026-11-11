@@ -25,6 +25,9 @@ use crate::bench::suite::{Match, Side, Suite};
 pub struct Pairing {
     pub baseline: String,
     pub candidate: String,
+    /// `--landless-seat`: the index of the major player whose settlers are removed at the start of each game
+    /// (`bench::landless`; None: no game is touched).
+    pub landless_seat: Option<usize>,
 }
 
 /// What one nation's seat did in one match.
@@ -94,6 +97,10 @@ pub struct Pace {
     /// before read none).
     #[serde(default)]
     pub parts: Vec<u32>,
+    /// The most parts the nation had built at once, installed or not (reports saved before
+    /// read 0): a ship built whole that the game did not end with was not installed.
+    #[serde(default)]
+    pub built: u32,
 }
 
 impl Pace {
@@ -128,6 +135,7 @@ impl Pace {
         while self.parts.len() < space.parts as usize {
             self.parts.push(round);
         }
+        self.built = self.built.max(space.built);
     }
 }
 
@@ -138,6 +146,8 @@ pub struct SpaceProgress {
     pub project_done: bool,
     /// Parts installed.
     pub parts: u32,
+    /// Parts installed and part units alive (built, not installed), at most the ship's.
+    pub built: u32,
 }
 
 /// What a nation won and lost in fights (the commands its module
@@ -301,6 +311,8 @@ pub struct MatchResult {
     /// The parts a spaceship needs (`BenchRules::SPACESHIP_PARTS`; 0: no
     /// science victory by a spaceship).
     pub space_parts: u32,
+    /// The landless seat's log (`--landless-seat`; None without).
+    pub landless: Option<crate::bench::landless::LandlessGame>,
 }
 
 impl MatchResult {
@@ -342,10 +354,21 @@ pub fn play_match<R: BenchRules>(rules: &CompiledRuleset<R::M>, suite: &Suite, g
     let label = game_match.label();
     let mut game = R::new_game_at(rules, &game_match.map, game_match.seed, suite.rounds, &suite.speed);
     let seats: Vec<(PlayerId, Side)> = majors(&game).into_iter().enumerate().map(|(i, p)| (p, game_match.seating.side(i))).collect();
+    let landless = match pairing.landless_seat {
+        None => None,
+        Some(seat) => {
+            let (player, _) = *seats.get(seat).ok_or_else(|| format!("--landless-seat {seat}: the game has {} seats", seats.len()))?;
+            Some((player, crate::bench::landless::strip(&mut game, rules, seat, player)))
+        }
+    };
     let mut driver = AiDriver::with_mind(R::settings(rules), Vec::new(), seated::<R>(&seats, pairing)?);
     driver.set_trace_capacity(0);
     driver.record_journal();
     let mut log = MatchLog::new(&seats, R::OPENING_ROUNDS);
+    log.landless = landless;
+    if crate::bench::rival::enabled() {
+        log.probe = Some(crate::bench::rival::RivalProbe::new(&seats));
+    }
     for seat in &mut log.seats {
         seat.leader = R::leader(&game, rules, seat.player);
     }
@@ -358,6 +381,13 @@ pub fn play_match<R: BenchRules>(rules: &CompiledRuleset<R::M>, suite: &Suite, g
         }
         play_round::<R>(&mut game, rules, &mut driver, &mut log, recorder.as_mut()).map_err(|e| format!("{label}: {e}"))?;
         log.after_round::<R>(&game, rules, &suite.checkpoints);
+        if let Some(probe) = log.probe.as_mut() {
+            probe.after_round::<R>(&game, rules, &suite.checkpoints, false);
+        }
+    }
+    if let Some(mut probe) = log.probe.take() {
+        probe.after_round::<R>(&game, rules, &suite.checkpoints, true);
+        probe.finish(&label, game_match.seed, &pairing.candidate, &pairing.baseline, round(&game));
     }
     if let Some(r) = recorder {
         let seated: &Seated<R::Mind> = driver.mind_mut();
@@ -409,6 +439,14 @@ fn play_round<R: BenchRules>(
             if let Some(r) = recorder.as_mut() {
                 r.turn_start(game, rules, game.view().auth.active_player());
             }
+            if let Some(probe) = log.probe.as_mut() {
+                probe.turn_start::<R>(game, rules, game.view().auth.active_player());
+            }
+        }
+        if ends_turn {
+            if let Some(probe) = log.probe.as_mut() {
+                probe.before_end::<R>(game, rules, game.view().auth.active_player());
+            }
         }
         let step_started = Instant::now();
         let outcome = driver.step(game, rules);
@@ -426,6 +464,9 @@ fn play_round<R: BenchRules>(
                 log.journal::<R>(game, player, &journal);
                 log.deliveries::<R>(game, &journal);
                 log.decisions::<R>(this_round, player, &journal);
+                if let Some(probe) = log.probe.as_mut() {
+                    probe.player_done::<R>(game, rules, player, &journal);
+                }
                 (turn_started, before, ending) = (now, after, std::time::Duration::ZERO);
             }
             StepOutcome::RoundDone => break,
@@ -472,6 +513,10 @@ struct MatchLog {
     wars: Vec<OpenWar>,
     /// Technologies each seat started with, by seat.
     start_techs: Vec<usize>,
+    /// The rival-model probe (`bench::rival`; on with `AURELIA_RIVAL_PROBE`).
+    probe: Option<crate::bench::rival::RivalProbe>,
+    /// The landless seat (`--landless-seat`): its player and its log.
+    landless: Option<(PlayerId, crate::bench::landless::LandlessGame)>,
 }
 
 impl MatchLog {
@@ -500,7 +545,7 @@ impl MatchLog {
                 pace: Pace::default(),
             })
             .collect();
-        Self { seats, round_ms: Vec::new(), wars: Vec::new(), start_techs: Vec::new() }
+        Self { seats, round_ms: Vec::new(), wars: Vec::new(), start_techs: Vec::new(), probe: None, landless: None }
     }
 
     fn seat(&mut self, player: PlayerId) -> Option<&mut SeatResult> {
@@ -661,6 +706,9 @@ impl MatchLog {
             }
         }
         self.end_wars(|w| out.contains(&w.declarer) || out.contains(&w.enemy), WarEnd::Elimination, now);
+        if let Some((player, log)) = self.landless.as_mut() {
+            log.after_round(game, *player, now);
+        }
     }
 
     /// The end: missing checkpoints take the end's standings, then the
@@ -678,6 +726,10 @@ impl MatchLog {
             seat.combat.held = game.view().auth.cities().iter().filter(|(_, c)| c.owner == player && c.original_owner != player).count() as u32;
         }
         rank(&mut self.seats);
+        let landless = self.landless.take().map(|(player, mut log)| {
+            log.founded = self.seats.iter().find(|s| s.player == player).is_some_and(|s| s.founded > 0);
+            log
+        });
         MatchResult {
             label,
             seed,
@@ -687,6 +739,7 @@ impl MatchLog {
             round_ms: self.round_ms,
             eras: era_names(rules),
             space_parts: R::spaceship_parts(rules),
+            landless,
         }
     }
 }

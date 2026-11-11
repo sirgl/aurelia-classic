@@ -180,6 +180,10 @@ pub struct Prices {
     /// What a citizen of the empire yields a turn, kept to the last round, at these prices
     /// (`citizen_yield`): the worth of a captured city's citizens under `SiegeFixes::yields`.
     pub citizen_yield: Centi,
+    /// What one delegate of a city-state alliance is worth toward the World Leader vote
+    /// (`city_states::delegate_worth`, `next` only; 0: the alliances are priced by their bonuses
+    /// alone).
+    pub delegate: Centi,
 }
 
 /// The spaceship parts an empire still has to build: the hammers of those
@@ -319,6 +323,7 @@ impl Prices {
             city_cap: None,
             gift_cap,
             citizen_yield: 0,
+            delegate: 0,
         };
         match model {
             PriceModel::Tiles => {
@@ -1614,6 +1619,7 @@ mod tests {
             city_cap: None,
             gift_cap: true,
             citizen_yield: 0,
+            delegate: 0,
         };
         let flat = prices.captured_city_unrest_flat(2);
         assert_eq!(flat, 5 * 2_700, "the flat price: five points at the price of a point");

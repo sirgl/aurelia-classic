@@ -361,6 +361,12 @@ pub const STYLES: [&str; 3] = ["tall", "wide", "conquest"];
 pub const AIMS: [&str; 4] = ["science", "culture", "domination", "diplomacy"];
 pub const POSTURES: [&str; 4] = ["peace", "defence", "prepare", "war"];
 
+/// The choices the code names, by their index in `STYLES` and `AIMS` (the test
+/// `the_named_choices_are_their_names` reads them back).
+pub const STYLE_TALL: usize = 0;
+pub const AIM_SCIENCE: usize = 0;
+pub const AIM_DIPLOMACY: usize = 3;
+
 pub const STYLE: [Neuron; 3] = [
     Neuron {
         name: "style_tall",

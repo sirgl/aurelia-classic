@@ -362,6 +362,16 @@ fn culture_chance(obs: &AIObservation<'_>, rounds_left: u32) -> Permille {
     reachable(rounds, rounds_left)
 }
 
+/// What one more delegate adds to the chance of the World Leader vote (`diplomacy_chance`'s
+/// step, permille): `REACHABLE_CHANCE` shared by the delegates the vote needs; 0 without a
+/// congress that counts them.
+pub fn delegate_chance(obs: &AIObservation<'_>) -> Permille {
+    match obs.congress.as_ref().filter(|c| c.needed > 0) {
+        Some(c) if obs.victories.enabled(VictoryKind::Diplomatic) => REACHABLE_CHANCE / i64::from(c.needed),
+        _ => 0,
+    }
+}
+
 /// World Leader: the United Nations sits, and our votes — our own and our
 /// city-state allies' — reach what it needs.
 fn diplomacy_chance(obs: &AIObservation<'_>) -> Permille {
@@ -690,6 +700,7 @@ mod tests {
             city_cap: None,
             gift_cap: true,
             citizen_yield: 0,
+            delegate: 0,
         };
         assert_eq!(on_path(prices, VictoryPath::Score), prices);
         assert_eq!(on_path(prices, VictoryPath::Science).science, 251 * 150 / 100);

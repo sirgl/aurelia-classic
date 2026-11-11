@@ -598,7 +598,7 @@ impl<'a> WorldTransaction<'a> {
     }
 
     /// The World Leader: elected with enough delegates and no tie; else
-    /// the two leading candidates gain two delegates for good.
+    /// the two leading candidates gain `LEADERS_BONUS_ON_FAIL` delegate each for good.
     fn leader_vote(
         &mut self,
         decided: Option<(u32, u16, bool)>,

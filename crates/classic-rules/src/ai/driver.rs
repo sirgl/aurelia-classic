@@ -59,8 +59,9 @@ pub struct ClassicMind {
     net: Option<Box<NetPlayer>>,
     /// A league opponent's book (`ai::books`): the mind plays `PrePuppet` with it.
     book: Option<Box<crate::ai::books::BookPlayer>>,
-    /// The variant by its name when the mind plays it as `PrePuppet`: a book, or
-    /// the alias `siege-walls`; None: `variant`.
+    /// The variant by its name when the mind plays it as another: a book or the alias
+    /// `siege-walls` as `PrePuppet`, the alias `next-w` as `Standard` (the thirteenth
+    /// promotion); None: `variant` (or the flags' variant, `variant()`).
     named: Option<Variant>,
     /// The siege of walled cities (`ai::siege_walls`): `standard` since the seventh
     /// promotion, its alias `siege-walls`, `net` on it, and the books.
@@ -74,7 +75,9 @@ pub struct ClassicMind {
     /// (`book_on`: `tall-book@standard`); None: the variant's.
     tall: Option<(crate::ai::tall::Tall, crate::ai::tall::BuildingOrder)>,
     /// `Variant::Sharp`: the mind plays `Standard` (`variant`) with the strategy net's sharp choice
-    /// and inputs (`TurnBrief::sharp`).
+    /// and inputs (`TurnBrief::sharp`). Set with the next three for the game's AI since the
+    /// thirteenth promotion (`Variant::Standard`, as `Variant::NextW`); `Variant::PreNext` plays
+    /// `Standard`'s switches without any of them.
     sharp: bool,
     /// `Variant::WarPays`: the mind plays `WarOpen` (`variant`) with the flag (`TurnBrief::war_pays`).
     pays: bool,
@@ -84,6 +87,18 @@ pub struct ClassicMind {
     field: bool,
     /// `Variant::RaidWar`: the mind plays `Standard` (`variant`) with the flag (`TurnBrief::raid_war`).
     raidw: bool,
+    /// `Variant::TallReal`: the mind plays `Sharp` (`sharp` set) whose tall style reaches for the
+    /// science victory (`TurnBrief::tall_real`, `ai::tall_real`).
+    tall_real: bool,
+    /// `Variant::Next`: the mind plays `TallReal` (`tall_real` set) with the review's fixes
+    /// (`TurnBrief::next`).
+    next: bool,
+    /// `Variant::WonderCancel` (1) and `WonderRace` (2): `Sharp` with the wonder-race switch
+    /// (`TurnBrief::wonder_race`, `ai::wonder_race`).
+    wonder_race: u8,
+    /// `Variant::Landless`: the mind plays `Standard` with the goal of a player without a city
+    /// (`TurnBrief::landless`).
+    landless: bool,
 }
 
 /// The environment variable that makes the game's AI another variant
@@ -112,14 +127,25 @@ impl Default for ClassicMind {
 impl ClassicMind {
     pub fn new(variant: Variant) -> Self {
         // `sharp` is `Standard` in every switch but its strategy net (`TurnBrief::sharp`).
-        let sharp = variant.sharp();
+        // `tall-real` is `sharp` with its tall play (`TurnBrief::tall_real`).
+        // `next` is `tall-real` with the review's fixes (`TurnBrief::next`).
+        // `standard` (since the thirteenth promotion) and its alias `next-w` are `next` with the
+        // wonder rule (`TurnBrief::wonder_race` = 1).
+        // `landless` is `Standard` in every switch but its own (`TurnBrief::landless`).
+        let landless = variant.landless();
+        let variant = if landless { Variant::Standard } else { variant };
+        let requested = variant;
+        let next = variant.next();
+        let tall_real = variant.tall_real() || next;
+        let wonder_race = variant.wonder_race();
+        let sharp = variant.sharp() || tall_real || wonder_race > 0;
         let variant = if sharp { Variant::Standard } else { variant };
         // `field-craft` is `Standard` in every switch but its own (`TurnBrief::field_craft`).
         let field = variant.field_craft();
-        let variant = if field { Variant::Standard } else { variant };
+        let variant = if field { Variant::PreNext } else { variant };
         // `raid-war` is `Standard` in every switch but its own (`TurnBrief::raid_war`).
         let raidw = variant.raid_war();
-        let variant = if raidw { Variant::Standard } else { variant };
+        let variant = if raidw { Variant::PreNext } else { variant };
         // `tactician-fit` is `WarPays` in every switch but its own (`TurnBrief::tactician_fit`).
         let fit = variant.tactician_fit();
         let variant = if fit { Variant::WarPays } else { variant };
@@ -143,7 +169,9 @@ impl ClassicMind {
         let walls = (book.is_some() || variant.siege_walls()).then(|| Box::new(crate::ai::siege_walls::SiegeWalls::new().joined(variant.siege_join())));
         let unciv = variant.unciv().any().then(|| Box::new(crate::ai::unciv::UncivMind::new(variant.unciv())));
         let variant = if named.is_some() { Variant::PrePuppet } else { variant };
-        Self { advisors, variant, genome: None, humans: Vec::new(), walks: Default::default(), choice: None, #[cfg(feature = "experimental-ai")] net, book, named, walls, conquest: None, unciv, tall: None, sharp, pays, fit, field, raidw }
+        // The alias `next-w` plays as `Standard` under its name.
+        let named = named.or((requested == Variant::NextW).then_some(requested));
+        Self { advisors, variant, genome: None, humans: Vec::new(), walks: Default::default(), choice: None, #[cfg(feature = "experimental-ai")] net, book, named, walls, conquest: None, unciv, tall: None, sharp, tall_real, next, wonder_race, pays, fit, field, raidw, landless }
     }
 
     /// A league book that may play on another base (`book_on`): a duel book
@@ -164,6 +192,9 @@ impl ClassicMind {
         if !Self::rebases(book) || Self::rebases(base) || base.net() || base.unciv().any() {
             return None;
         }
+        // A base gives its switches, not the flags of the game's AI since the thirteenth
+        // promotion: a book on `standard` plays on `pre-next`, as before the promotion.
+        let base = if base == Variant::Standard { Variant::PreNext } else { base };
         let peace = crate::ai::diplomacy::DiplomacyAdvisor { peace: book.peace_making() };
         let mut mind = if book.book().is_some() {
             // `new` plays the book on `PrePuppet`: the base and its siege are `base`'s instead.
@@ -186,7 +217,7 @@ impl ClassicMind {
         advisors.register(crate::classic::ClassicSystem::Diplomacy, Box::new(diplomacy));
         // The net plays on `NET_BASE`: its siege too.
         let walls = variant.siege_walls().then(|| Box::new(crate::ai::siege_walls::SiegeWalls::new().joined(variant.siege_join())));
-        Self { advisors, variant, genome: None, humans: Vec::new(), walks: Default::default(), choice: None, net: Some(Box::new(net)), book: None, named: None, walls, conquest: None, unciv: None, tall: None, sharp: false, pays: false, fit: false, field: false, raidw: false }
+        Self { advisors, variant, genome: None, humans: Vec::new(), walks: Default::default(), choice: None, net: Some(Box::new(net)), book: None, named: None, walls, conquest: None, unciv: None, tall: None, sharp: false, tall_real: false, next: false, wonder_race: 0, pays: false, fit: false, field: false, raidw: false, landless: false }
     }
 
     /// The net's part (`Variant::Net`), if any.
@@ -224,6 +255,25 @@ impl ClassicMind {
     }
 
     pub fn variant(&self) -> Variant {
+        if self.landless {
+            return Variant::Landless;
+        }
+        if self.next {
+            return match self.wonder_race {
+                // The game's AI since the thirteenth promotion, or its alias `next-w`.
+                1 => self.named.unwrap_or(Variant::Standard),
+                2 => Variant::NextRace,
+                _ => Variant::Next,
+            };
+        }
+        if self.tall_real {
+            return Variant::TallReal;
+        }
+        match self.wonder_race {
+            1 => return Variant::WonderCancel,
+            2 => return Variant::WonderRace,
+            _ => {}
+        }
         if self.sharp {
             return Variant::Sharp;
         }
@@ -642,6 +692,16 @@ impl ClassicMind {
         brief.tactician_fit = self.fit;
         brief.field_craft = self.field;
         brief.raid_war = self.raidw;
+        brief.landless = self.landless;
+        brief.tall_real = self.tall_real;
+        brief.next = self.next;
+        brief.wonder_race = self.wonder_race;
+        // `tall-real` finishes its spaceship by the space plan where the science victory fits the
+        // game (`victory::space_plan`, `ai::tall_real`), on every seat; `next` too: the plan on its
+        // tall seats only measured worse (pace against `sharp`, offsets 200+201: 65.7 % against
+        // 70.5 % on every seat).
+        let space_plan = self.tall_real && crate::ai::tall_real::science_game(observation, rules);
+        brief.space_finish |= space_plan;
         brief.met_eras = observation.view.met_eras();
         if brief.war_open {
             brief.scores = observation.view.race().scores;
@@ -667,7 +727,7 @@ impl ClassicMind {
             let mut prices = crate::ai::value::Prices::of_switches(observation, rules, self.variant.price_model(), self.variant.science_pricing(), self.variant.true_effects(), self.variant.cs_gift_cap());
             prices.unrest_steps = brief.war.unrest;
             prices.content_founding = self.variant.content_founding();
-            if self.variant.space_finish() {
+            if self.variant.space_finish() || space_plan {
                 prices.space = Some(crate::ai::value::SpaceDemand::of(observation, rules));
             }
             if brief.tall.plays() || brief.tall.book_cities() {
@@ -678,6 +738,10 @@ impl ClassicMind {
                 prices.city_cap = Some(target);
                 brief.tall_cities = Some(target);
                 brief.tall_sites = crate::ai::tall::turn_site_bonuses(observation, rules, brief.tall, prices.rounds_left);
+            }
+            // `next`: an alliance's delegates toward the World Leader vote count in its gifts.
+            if self.next {
+                prices.delegate = crate::ai::city_states::delegate_worth(observation);
             }
             if self.variant.sea_work() {
                 brief.sea_jobs = crate::ai::sea_work::sea_values(observation, &brief, rules, &prices);
@@ -723,6 +787,10 @@ impl ClassicMind {
                     p.city_cap = Some(plan.city_target);
                 }
                 brief.tall_cities = Some(plan.city_target);
+                // `tall-real`'s tall play orders the science buildings first (`tall::BuildingOrder::Science`).
+                if plan.intent.tall_real {
+                    brief.building_order = crate::ai::tall::BuildingOrder::Science;
+                }
                 brief.strategy = Some(std::sync::Arc::new(plan));
             }
         }
@@ -762,6 +830,8 @@ impl ClassicMind {
             None => self.decide(near, brief, state, tools),
         };
         let decision = self.variant.adjust(decision, brief);
+        // `tall-real`'s tall play founds no city beyond its target (`tall_real::adjust`).
+        let decision = if self.tall_real { crate::ai::tall_real::adjust(decision, brief) } else { decision };
         // The tall book on another base keeps exactly its cities (`book_on`).
         let decision = match (self.tall, self.named) {
             (Some(_), Some(book)) => book.adjust(decision, brief),
@@ -890,12 +960,14 @@ mod sharp_tests {
     use super::*;
 
     /// `sharp` is `Standard` in every switch but its strategy net: the mind plays `Standard` with
-    /// the flag (`TurnBrief::sharp`) and names itself `sharp`; no other variant has the flag.
+    /// the flag (`TurnBrief::sharp`) and names itself `sharp`; no other variant has the flag of its
+    /// own (the game's AI carries it since the thirteenth promotion,
+    /// `the_game_plays_next_w_and_pre_next_is_the_standard_before`).
     #[test]
     fn sharp_plays_standard_with_its_flag() {
         let mind = ClassicMind::new(Variant::Sharp);
         assert_eq!((mind.variant, mind.sharp, mind.variant()), (Variant::Standard, true, Variant::Sharp));
-        for v in [Variant::Standard, Variant::WarOpen, Variant::StrategyNet] {
+        for v in [Variant::PreNext, Variant::WarOpen, Variant::StrategyNet] {
             let other = ClassicMind::new(v);
             assert_eq!((other.variant(), other.sharp), (v, false));
         }
@@ -931,5 +1003,81 @@ mod sharp_tests {
         assert_eq!(Variant::from_name("tactician-fit"), cfg!(feature = "experimental-ai").then_some(Variant::TacticianFit));
         #[cfg(feature = "experimental-ai")]
         assert!(mind.unit_net_on() && !pays.unit_net_on() && !ClassicMind::new(Variant::Standard).unit_net_on());
+    }
+
+    /// `landless` is `Standard` in every switch (the flags of `next-w` included) but for its own flag
+    /// (`TurnBrief::landless`); no other variant has the flag, and `Standard` does not carry it.
+    #[test]
+    fn landless_plays_standard_with_its_flag() {
+        let flags = |m: &ClassicMind| (m.sharp, m.tall_real, m.next, m.wonder_race, m.pays, m.fit, m.field, m.raidw);
+        let (landless, standard) = (ClassicMind::new(Variant::Landless), ClassicMind::new(Variant::Standard));
+        assert_eq!((landless.variant, flags(&landless), landless.landless, landless.variant()), (Variant::Standard, flags(&standard), true, Variant::Landless));
+        assert!(!standard.landless && standard.variant() == Variant::Standard);
+        let flagged: Vec<Variant> = Variant::ALL.into_iter().filter(|v| v.landless()).collect();
+        assert_eq!(flagged, [Variant::Landless]);
+        assert_eq!(Variant::from_name("landless"), cfg!(feature = "experimental-ai").then_some(Variant::Landless));
+    }
+
+    /// `tall-real` is `sharp` with its tall play: the mind plays `Standard` with both flags and
+    /// names itself `tall-real`; no other variant has the flag.
+    #[test]
+    fn tall_real_plays_sharp_with_its_flag() {
+        let mind = ClassicMind::new(Variant::TallReal);
+        assert_eq!((mind.variant, mind.sharp, mind.tall_real, mind.variant()), (Variant::Standard, true, true, Variant::TallReal));
+        assert!(!ClassicMind::new(Variant::Sharp).tall_real);
+        let flagged: Vec<Variant> = Variant::ALL.into_iter().filter(|v| v.tall_real()).collect();
+        assert_eq!(flagged, [Variant::TallReal]);
+        assert_eq!(Variant::from_name("tall-real"), cfg!(feature = "experimental-ai").then_some(Variant::TallReal));
+    }
+
+    /// `next` is `tall-real` with the review's fixes: the mind plays `Standard` with the three
+    /// flags and names itself `next`; `tall-real` and `sharp` do not carry its flag.
+    #[test]
+    fn next_plays_tall_real_with_its_flag() {
+        let mind = ClassicMind::new(Variant::Next);
+        assert_eq!((mind.variant, mind.sharp, mind.tall_real, mind.next, mind.variant()), (Variant::Standard, true, true, true, Variant::Next));
+        assert!(!ClassicMind::new(Variant::TallReal).next && !ClassicMind::new(Variant::Sharp).next);
+        let flagged: Vec<Variant> = Variant::ALL.into_iter().filter(|v| v.next()).collect();
+        assert_eq!(flagged, [Variant::Standard, Variant::Next, Variant::NextW, Variant::NextRace]);
+        assert_eq!(Variant::from_name("next"), cfg!(feature = "experimental-ai").then_some(Variant::Next));
+    }
+
+    /// `next-race` is `next` with the wonder-race rule and price, `next-w` with the rule only:
+    /// they carry `next`'s flags and name themselves; `next` carries no wonder-race switch.
+    #[test]
+    fn next_w_is_next_with_the_wonder_race() {
+        for (variant, race) in [(Variant::Next, 0), (Variant::NextW, 1), (Variant::NextRace, 2)] {
+            let mind = ClassicMind::new(variant);
+            assert_eq!((mind.variant, mind.sharp, mind.tall_real, mind.next, mind.wonder_race, mind.variant()), (Variant::Standard, true, true, true, race, variant));
+        }
+        assert!(!ClassicMind::new(Variant::WonderRace).next);
+        assert_eq!(ClassicMind::new(Variant::WonderRace).variant(), Variant::WonderRace);
+        assert_eq!(Variant::from_name("next-race"), cfg!(feature = "experimental-ai").then_some(Variant::NextRace));
+        assert_eq!(Variant::from_name("next-w"), cfg!(feature = "experimental-ai").then_some(Variant::NextW));
+    }
+
+    /// The thirteenth promotion (11 November): the game's AI is the mind of `next-w` — `Standard`'s
+    /// switches with the flags of `sharp`, `tall-real`, `next` and the wonder rule — and names
+    /// itself `standard`; `next-w` stays as its alias with the same mind; `pre-next` is the standard
+    /// before it: `Standard`'s switches without a flag (bench only).
+    #[test]
+    fn the_game_plays_next_w_and_pre_next_is_the_standard_before() {
+        let flags = |m: &ClassicMind| (m.sharp, m.tall_real, m.next, m.wonder_race);
+        let (standard, alias, before) = (ClassicMind::new(Variant::Standard), ClassicMind::new(Variant::NextW), ClassicMind::new(Variant::PreNext));
+        assert_eq!((standard.variant, flags(&standard), standard.variant()), (Variant::Standard, (true, true, true, 1), Variant::Standard));
+        assert_eq!((alias.variant, flags(&alias), alias.variant()), (Variant::Standard, (true, true, true, 1), Variant::NextW));
+        assert_eq!((before.variant, flags(&before), before.variant()), (Variant::PreNext, (false, false, false, 0), Variant::PreNext));
+        assert_eq!(flags(&ClassicMind::default()), flags(&standard), "the game's AI");
+        // Every other variant keeps its flags: none but the line of `sharp` (the flags `new` reads).
+        let line = [Variant::Standard, Variant::NextW, Variant::Sharp, Variant::TallReal, Variant::Next, Variant::WonderCancel, Variant::WonderRace, Variant::NextRace];
+        for v in Variant::ALL.into_iter().filter(|v| !line.contains(v)) {
+            assert_eq!((v.sharp(), v.tall_real(), v.next(), v.wonder_race()), (false, false, false, 0), "{}", v.name());
+        }
+        // A book on `standard` plays on `pre-next`, as before the promotion.
+        let tall = ClassicMind::book_on(Variant::TallBook, Variant::Standard).unwrap();
+        assert_eq!((tall.variant, flags(&tall)), (Variant::PreNext, (false, false, false, 0)));
+        let duel = ClassicMind::book_on(Variant::RushSiege, Variant::Standard).unwrap();
+        assert_eq!((duel.variant, flags(&duel)), (Variant::PreNext, (false, false, false, 0)));
+        assert_eq!(Variant::from_name("pre-next"), cfg!(feature = "experimental-ai").then_some(Variant::PreNext));
     }
 }

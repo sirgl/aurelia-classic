@@ -70,6 +70,12 @@ pub struct Intent {
     /// The intent of `sharp` (`Net::sharp`): its prices follow the held choice and its cell runs on
     /// its own scale (`sharp::rows`, `CellPrices::sharp`).
     pub sharp: bool,
+    /// `tall-real`'s tall play (`ai::tall_real::plays`): the held style tall where the science
+    /// victory fits the game; its aim is science and its cities the rules' size model's.
+    pub tall_real: bool,
+    /// The tall play takes the science branch whole before anything else once it is open
+    /// (`heads::choose_policy`): `tall-real`'s only (`next` measured no gain from it).
+    pub science_first: bool,
 }
 
 /// Which net thinks: `standard`'s, with `war-open`'s window and terms (`open`), with `sharp`'s
@@ -283,7 +289,7 @@ pub fn intent_net(features: &[Milli; fe::N], held: Held, cities: u32, rounds_lef
     }
     let h = (h / ONE).clamp(weights::HORIZON_MIN, weights::HORIZON_MAX);
     let horizon = (h * i64::from(pace.max(1)) / 100).clamp(1, i64::from(rounds_left.max(1))) as u32;
-    Intent { concepts, style, aim, posture, style_pick, aim_pick, posture_pick, more_cities: more_cities as u32, horizon, locked: held.lock.is_some(), sharp: net.sharp }
+    Intent { concepts, style, aim, posture, style_pick, aim_pick, posture_pick, more_cities: more_cities as u32, horizon, locked: held.lock.is_some(), sharp: net.sharp, tall_real: false, science_first: false }
 }
 
 /// The 13 rows of the price layer: the 11 shares and the 2 gates.
@@ -454,8 +460,22 @@ pub struct Review {
 
 /// The memory's format version (the first byte).
 const MEMORY_VERSION: u8 = 0x5B;
-/// The marker of `sharp`'s section at the memory's end (`Memory::sharp`).
+/// The markers of `sharp`'s section at the memory's end (`Memory::sharp`): `sharp`'s two numbers,
+/// `next`'s four (`sharp::Memory::rivals` and `fits` too). The section's length follows from its
+/// marker (`section_len`).
 const SHARP_SECTION: u8 = 0x5C;
+const NEXT_SECTION: u8 = 0x5D;
+
+/// The bytes of a section of `marker`: the marker and its numbers, eight bytes each (`next`'s:
+/// the rivals and the science victory's fit too, −1 for none).
+fn section_len(marker: u8) -> Option<usize> {
+    let numbers = match marker {
+        SHARP_SECTION => 2,
+        NEXT_SECTION => 4,
+        _ => return None,
+    };
+    Some(1 + numbers * std::mem::size_of::<i64>())
+}
 
 struct Writer(Vec<u8>);
 
@@ -559,9 +579,14 @@ impl Memory {
             None => w.0.push(0),
         }
         if let Some(m) = &self.sharp {
-            w.0.push(SHARP_SECTION);
+            let next = m.rivals.is_some() || m.fits.is_some();
+            w.0.push(if next { NEXT_SECTION } else { SHARP_SECTION });
             w.i64(m.ratio);
             w.i64(m.trend);
+            if next {
+                w.i64(m.rivals.unwrap_or(-1));
+                w.i64(m.fits.map_or(-1, i64::from));
+            }
         }
         w.0
     }
@@ -644,12 +669,15 @@ impl Memory {
         } else {
             None
         };
-        // `sharp`'s section: its marker and two numbers, the memory's last 17 bytes.
-        let sharp = if r.0.len() == 17 && r.0[0] == SHARP_SECTION {
-            r.u8()?;
-            Some(sharp::Memory { ratio: r.i64()?, trend: r.i64()? })
-        } else {
-            None
+        // `sharp`'s section: its marker and numbers, the memory's last bytes (`section_len`).
+        let sharp = match r.0.first().copied() {
+            Some(marker) if section_len(marker) == Some(r.0.len()) => {
+                r.u8()?;
+                let (ratio, trend) = (r.i64()?, r.i64()?);
+                let (rivals, fits) = if marker == NEXT_SECTION { (Some(r.i64()?).filter(|n| *n >= 0), Some(r.i64()?).filter(|f| *f >= 0).map(|f| f == 1)) } else { (None, None) };
+                Some(sharp::Memory { ratio, trend, rivals, fits })
+            }
+            _ => None,
         };
         Some(Memory { held, survey, review, target, sharp })
     }
@@ -727,6 +755,30 @@ pub fn think(obs: &AIObservation<'_>, brief: &crate::ai::planner::TurnBrief, sta
     if let Some(from) = memory.held.style.filter(|s| *s != intent.style_pick) {
         trace::style_change(obs.player.0, round, from, &intent);
     }
+    // `tall-real`: a tall seat where the science victory fits the game aims at it
+    // (`ai::tall_real`); its city count is the rules' size model's.
+    // `next`: whether the science victory fits the seat's game, judged once at the lock
+    // (`tall_real::science_fits`) and kept in `sharp`'s memory.
+    let next_fit = brief.next;
+    let fits = if next_fit {
+        let held = memory.sharp.and_then(|m| m.fits);
+        let fits = held.or_else(|| lock.is_some().then(|| crate::ai::tall_real::science_fits(obs, rules, prices.rounds_left)));
+        if let Some(m) = memory.sharp.as_mut() {
+            m.fits = fits;
+        }
+        Some(fits)
+    } else {
+        None
+    };
+    if brief.tall_real && crate::ai::tall_real::plays(obs, rules, intent.style_pick, fits) {
+        intent.tall_real = true;
+        // `next` values the science branch by the net like any other: forcing it whole first
+        // measured no better (pace against `sharp`, offsets 200+201: 64.9 % without, 65.7 % with).
+        intent.science_first = !brief.next;
+        intent.aim_pick = weights::AIM_SCIENCE;
+        let target = crate::ai::tall_real::city_target(obs, rules, prices.rounds_left, next_fit);
+        intent.more_cities = target.saturating_sub(cities);
+    }
     memory.held = Held { style: Some(intent.style_pick), aim: Some(intent.aim_pick), posture: Some(intent.posture_pick), lock };
     let mut mult = price_mult(&intent);
     let at_war = situation[fe::AT_WAR] > 0;
@@ -758,11 +810,14 @@ pub fn think(obs: &AIObservation<'_>, brief: &crate::ai::planner::TurnBrief, sta
     // The rules' city model is the ceiling (`brief.tall_cities`: the count with
     // the most science per research cost); wide and conquest play may pass it.
     let mut city_target = cities + intent.more_cities;
-    if let Some(model) = brief.tall_cities {
+    if let Some(model) = brief.tall_cities.filter(|_| !intent.tall_real) {
         let allowance = (intent.style[1] * weights::CITY_CEILING_WIDE + intent.style[2] * weights::CITY_CEILING_CONQUEST) / ONE / ONE;
         city_target = city_target.min(model + allowance as u32).max(cities);
     }
     let plan = Plan { round, features: situation, intent, mult, goals: review.goals.clone(), target, city_target, growth: review.growth.clone(), war_open: brief.war_open };
     trace::turn(obs.player.0, &plan, review_due, rules);
+    if review_due {
+        trace::diplo(obs, state, &plan.intent);
+    }
     plan
 }

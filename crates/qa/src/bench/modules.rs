@@ -25,6 +25,13 @@ pub const SCRIPTED_EXPERT: &str = "standard-scripted";
 /// [`SCRIPTED_EXPERT`] as a variant.
 pub const SCRIPTED_EXPERT_VARIANT: Variant = Variant::StandardScripted;
 
+/// The target of a blow that may fall on a city (`BenchRules::city_blow`).
+#[derive(Debug, Clone, Copy)]
+pub enum CityBlow {
+    City(kernel::ids::CityHandle),
+    Tile(kernel::ids::TileId),
+}
+
 /// What a player has at one moment.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Standing {
@@ -166,6 +173,17 @@ pub trait BenchRules {
     /// A command that pillages a tile (counted in the combat record: the AI's raids).
     fn is_pillage(_command: &<Self::M as RulesModule>::Command) -> bool {
         false
+    }
+
+    /// The speed's pace percent and the production a turn of each of the player's cities (probe only).
+    fn order_inputs(_game: &GameState<Self::M>, _rules: &CompiledRuleset<Self::M>, _player: PlayerId) -> (u32, Vec<(kernel::ids::CityHandle, u32)>) {
+        (100, Vec::new())
+    }
+
+    /// What a command strikes when it is a blow on a city's tile: the city, or a tile (probe only,
+    /// `bench::rival`).
+    fn city_blow(_command: &<Self::M as RulesModule>::Command) -> Option<CityBlow> {
+        None
     }
 
     /// The original capitals of the player's rivals, by founder, and
@@ -469,9 +487,19 @@ impl BenchRules for ClassicBench {
         let victory = game.view().auth.module().victory();
         let prerequisites = classic_rules::ai::victory::prerequisite_projects(rules);
         let parts = classic_rules::world::victory::spaceship_parts(rules);
+        let kinds = classic_rules::ai::victory::part_kinds(rules);
+        let auth = game.view().auth;
+        let built = parts
+            .iter()
+            .map(|(p, needed)| {
+                let walking = auth.units().iter_cores().filter(|u| u.owner == player && kinds.iter().any(|(k, q, _)| *k == u.kind && q == p)).count() as u32;
+                (u32::from(victory.project_count(player, *p)) + walking).min(u32::from(*needed))
+            })
+            .sum();
         crate::bench::play::SpaceProgress {
             project_done: !prerequisites.is_empty() && prerequisites.iter().all(|p| victory.project_count(player, *p) > 0),
             parts: parts.iter().map(|(p, needed)| u32::from(victory.project_count(player, *p).min(*needed))).sum(),
+            built,
         }
     }
 
@@ -513,6 +541,19 @@ impl BenchRules for ClassicBench {
             .collect();
         capitals.sort();
         capitals
+    }
+
+    fn order_inputs(game: &GameState<Self::M>, rules: &CompiledRuleset<Self::M>, player: PlayerId) -> (u32, Vec<(kernel::ids::CityHandle, u32)>) {
+        let obs = game.ai_observation(rules, player);
+        (obs.speed.pace_percent, obs.own_cities.iter().map(|c| (c.handle, c.income.production.max(0) as u32)).collect())
+    }
+
+    fn city_blow(command: &classic_rules::Command) -> Option<CityBlow> {
+        match command {
+            classic_rules::Command::AttackCity { city, .. } => Some(CityBlow::City(*city)),
+            classic_rules::Command::RangedAttack { target, .. } => Some(CityBlow::Tile(*target)),
+            _ => None,
+        }
     }
 
     fn by_agreement(command: &classic_rules::Command) -> bool {

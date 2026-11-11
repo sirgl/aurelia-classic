@@ -97,6 +97,9 @@ pub fn vote_orders(obs: &AIObservation<'_>) -> Vec<Command> {
         }
         left -= delegates;
         let choice = if proposal.kind.elects() {
+            if proposal.kind == ResolutionKind::DiplomaticVictory {
+                crate::ai::strategy_net::trace::leader_vote(obs, delegates, info.delegates_left, info.needed, info.proposals.len());
+            }
             u32::from(obs.player.0)
         } else if supports(obs, proposal) {
             YES

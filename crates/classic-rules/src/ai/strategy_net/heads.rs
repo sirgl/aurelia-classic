@@ -247,7 +247,7 @@ pub fn choose_policy(model: &Model, rules: &CompiledRuleset, plan: &Plan, base: 
         // tall style's (peace) or the wide and conquest styles'.
         let case = if plan.intent.posture_pick >= 2 {
             IdeologyCase::AtWar
-        } else if plan.intent.style_pick == 0 {
+        } else if plan.intent.style_pick == super::weights::STYLE_TALL {
             IdeologyCase::AtPeace
         } else {
             IdeologyCase::Wide
@@ -275,6 +275,17 @@ pub fn choose_policy(model: &Model, rules: &CompiledRuleset, plan: &Plan, base: 
     }
     let branch_of = |p: PolicyId| rules.module.policies.get(usize::from(p.0)).and_then(|d| d.branch);
     let is_ideology = |b: PolicyBranchId| rules.module.policy_branches.get(usize::from(b.0)).is_some_and(|d| d.kind == crate::classic::content::PolicyBranchKind::Ideology);
+    // `tall-real` (`Intent::tall_real`): the science branch (a normal branch whose largest
+    // character is science), once open, is taken whole before anything else — the tenets and the
+    // other branches too: its percents multiply every city's science (the book's order,
+    // classic/docs/ai-science-audit.md).
+    if plan.intent.science_first {
+        let science = |b: PolicyBranchId| super::branches::is_normal(rules, b) && super::branches::dominant(&super::branches::character(rules, b)) == Some(super::weights::branch::ch::SCIENCE);
+        let pick = culture.adoptable.iter().copied().filter(|p| branch_of(*p).is_some_and(science)).max_by_key(|p| (worth(*p), std::cmp::Reverse(p.0)));
+        if let Some(policy) = pick {
+            return Some(PolicyChoice::Adopt(policy));
+        }
+    }
     // Started branches: the best adoptable policy, valued by the branch's rest.
     let mut started: Vec<(Milli, i64, PolicyId)> = Vec::new();
     let mut branches: Vec<PolicyBranchId> = culture.adoptable.iter().filter_map(|p| branch_of(*p)).collect();
@@ -341,7 +352,7 @@ pub fn choose_policy(model: &Model, rules: &CompiledRuleset, plan: &Plan, base: 
 /// culture waits for it.
 pub fn science_ahead(model: &Model, rules: &CompiledRuleset, plan: &Plan, culture: &Culture) -> bool {
     use super::branches::{character, dominant, is_normal};
-    if plan.intent.aim_pick != 0 || !model.branches.iter().any(|b| is_normal(rules, *b)) {
+    if plan.intent.aim_pick != super::weights::AIM_SCIENCE || !model.branches.iter().any(|b| is_normal(rules, *b)) {
         return false;
     }
     rules.module.policy_branches.iter().enumerate().any(|(i, d)| {

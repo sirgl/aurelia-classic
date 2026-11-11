@@ -74,6 +74,25 @@ pub fn gift_ceiling(allies_at: i32, lead: i32) -> i32 {
     allies_at + DECAY_POINTS * (lead + 1)
 }
 
+/// `next`: what one delegate is worth toward the World Leader vote, as the diplomatic victory is
+/// priced by the grand strategy: the prize of a victory (`grand_strategy::prize`, the whole game's
+/// score) times the chance one more delegate adds (`grand_strategy::delegate_chance`). 0 until
+/// the congress counts the delegates the vote needs.
+pub fn delegate_worth(obs: &AIObservation<'_>) -> crate::ai::value::Centi {
+    use crate::knowledge::public::PlayerQueries;
+    let chance = crate::ai::grand_strategy::delegate_chance(obs);
+    if chance == 0 {
+        return 0;
+    }
+    crate::ai::grand_strategy::prize(&obs.view.race(), obs) * chance / 1000
+}
+
+/// The delegates an alliance brings to the World Leader vote: the city-state's seat of the
+/// session that holds it (`systems::congress::SESSIONS`).
+fn ally_delegates() -> i64 {
+    crate::systems::congress::SESSIONS.iter().filter(|s| s.united_nations).map(|s| i64::from(s.city_state_delegates)).max().unwrap_or(0)
+}
+
 /// A gold gift and what it is worth (`priced_gifts`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct PricedGift {
@@ -88,8 +107,9 @@ pub struct PricedGift {
 /// is a project: the gold to raise the influence to the allies' threshold,
 /// then a point a round to hold it (influence falls a point a round), for
 /// the ally's and the friend's bonuses and the happiness of the ally's
-/// luxuries the empire lacks each round to the end. A gift is worth its
-/// share of the project's value per gold.
+/// luxuries the empire lacks each round to the end, and (`Prices::delegate`, `next`) its
+/// delegates toward the World Leader vote. A gift is worth its share of the project's value per
+/// gold.
 pub fn priced_gifts(obs: &AIObservation<'_>, prices: &crate::ai::value::Prices, gold: u32) -> Vec<PricedGift> {
     use crate::knowledge::public::PlayerQueries;
     let mut out = Vec::new();
@@ -121,7 +141,8 @@ pub fn priced_gifts(obs: &AIObservation<'_>, prices: &crate::ai::value::Prices, 
             let points = i64::from(crate::world::city_states::gold_gift_influence_at(&obs.speed, obs.round, size, invest, 0).max(1));
             let climb = i64::from((terms.allies_at - info.influence).max(0) + 1);
             let project_gold = (climb + rounds) * i64::from(size) / points;
-            let value = round * rounds * i64::from(size) / project_gold.max(1);
+            let votes = prices.delegate * ally_delegates();
+            let value = (round * rounds + votes) * i64::from(size) / project_gold.max(1);
             out.push(PricedGift { city_state: info.player, gold: size, value });
         }
     }

@@ -125,18 +125,28 @@ pub mod w {
     /// not with the empire's growth.
     pub const STYLE_EVENTS: [usize; 4] = [SPACE_OWN, SPACE_RIVAL, SCORE_TREND, RUNAWAY];
 
-    /// `sharp`'s weights, counted.
+    /// `sharp`'s weights, counted: the tables, `TALL_BIAS`, the three temperatures and
+    /// `PRICE_PICK`, and the six scales (`SCIENCE_ROUNDS`, `PRODUCTION_ROUNDS`, `CITIES_RATIO`,
+    /// `PARTS_SHARE`, `TREND_SCALE`, `RUNAWAY_SCALE`).
     pub fn count() -> usize {
-        CONCEPTS.len() + STYLE.len() + 1 + AIM.len() + HORIZON.len() + 4 + 6
+        const BIASES: usize = 1;
+        const CHOICE: usize = 3 + 1;
+        const SCALES: usize = 6;
+        CONCEPTS.len() + STYLE.len() + BIASES + AIM.len() + HORIZON.len() + CHOICE + SCALES
     }
 }
 
 /// What `sharp` keeps between turns beyond the net's memory (`Memory::sharp`): our score over the
-/// best rival's at the last survey and the trend it gave.
+/// best rival's at the last survey and the trend it gave; `next` also the rivals whose scores it
+/// knew then (`rivals`), so that meeting a new one is not read as a change of our score.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct Memory {
     pub ratio: Milli,
     pub trend: Milli,
+    pub rivals: Option<i64>,
+    /// `next`: whether the science victory fits the seat's game, judged at the style's lock
+    /// (`tall_real::science_fits`); None before it.
+    pub fits: Option<bool>,
 }
 
 /// A neuron with `sharp`'s terms of its index added before the activation.
@@ -193,7 +203,8 @@ pub fn rows(intent: &super::Intent) -> [Milli; 13] {
 /// (tuning traces, step 2).
 pub fn food_reference(model: &super::model::Model, prices: &super::cell::CellPrices, base: &super::Base) -> i64 {
     let half = prices.rounds_left / 2;
-    let yields: i64 = (1..6).map(|s| marginal(model, prices)[s] * half / 100 * prices.unit[s] / 1000).sum();
+    let more = marginal(model, prices);
+    let yields: i64 = (1..6).map(|s| more[s] * half / 100 * prices.unit[s] / 1000).sum();
     base.food * (prices.citizen + yields.max(0)) / base.citizen.max(1)
 }
 
@@ -336,7 +347,7 @@ pub fn survey(obs: &AIObservation<'_>, state: &AiState, survey: &mut super::feat
     let Some(capital) = super::features::capital_tile(obs) else { return };
     let is_major = |p: PlayerId| obs.relations.iter().any(|r| r.other == p && r.kind == PlayerKind::Major);
     let rivals: Vec<TileId> = state.seen_cities().iter().filter(|c| is_major(c.owner)).map(|c| c.tile).collect();
-    let near = nearest_by_land(obs, capital, &rivals).map_or(0, |d| super::layers::ramp(18 - i64::from(d), 0, 11));
+    let near = nearest_by_land(obs, capital, &rivals).map_or(0, super::features::rival_near);
     if let Some(at) = super::features::SURVEY_FEATURES.iter().position(|f| *f == fe::RIVAL_NEAR) {
         survey.values[at] = near;
     }
@@ -372,13 +383,18 @@ pub fn features(obs: &AIObservation<'_>, brief: &TurnBrief, rules: &CompiledRule
     let mut rivals: Vec<i64> = race.scores.iter().skip(1).map(|(_, s)| *s).collect();
     rivals.sort_unstable_by(|a, b| b.cmp(a));
     let ratio = rivals.first().map_or(ONE, |best| ours * ONE / (*best).max(1));
+    // `next`: the rivals whose scores we know; a survey that meets a new one starts the trend
+    // anew (steady), since the ratio then changed by whom we know, not by our play.
+    let known = brief.next.then_some(rivals.len() as i64);
     let trend = match memory {
         Some(m) if !survey_due => m.trend,
+        Some(m) if m.rivals != known => ONE / 2,
         Some(m) => unit(ONE / 2 + (ratio - m.ratio) * w::TREND_SCALE / ONE),
         None => ONE / 2,
     };
     if survey_due || memory.is_none() {
-        *memory = Some(Memory { ratio, trend });
+        let fits = memory.and_then(|m| m.fits);
+        *memory = Some(Memory { ratio, trend, rivals: known, fits });
     }
     out[fe::SCORE_TREND] = trend;
     out[fe::RUNAWAY] = match rivals.first() {

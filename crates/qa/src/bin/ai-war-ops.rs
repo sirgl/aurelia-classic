@@ -130,7 +130,7 @@ fn play(o: &Options) -> Result<(), String> {
         }
     };
     let matches: Vec<Match> = suite.maps.iter().flat_map(|map| o.seeds.clone().map(move |seed| Match { map: *map, seed, seating: Seating::All })).collect();
-    let pairing = Pairing { baseline: o.variant.clone(), candidate: o.variant.clone() };
+    let pairing = Pairing { baseline: o.variant.clone(), candidate: o.variant.clone(), landless_seat: None };
     let next = AtomicUsize::new(0);
     let rows: Mutex<Vec<(usize, Vec<Row>)>> = Mutex::new(Vec::new());
     let estimates: Mutex<Vec<(usize, String)>> = Mutex::new(Vec::new());

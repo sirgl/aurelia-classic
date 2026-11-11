@@ -320,6 +320,12 @@ fn decide_military(
     if let Some(decision) = tactics::immediate(view, state, tools) {
         return decision;
     }
+    // A player with units and no city gives them a goal (`ai::landless`); with a city it plays on.
+    if view.brief.landless {
+        if let Some(decision) = crate::ai::landless::decide(view, state, tools) {
+            return decision;
+        }
+    }
     if view.brief.field_craft {
         // The unit has its task before the field-craft rules ask what it is free for.
         ensure_task(view, state, tools);

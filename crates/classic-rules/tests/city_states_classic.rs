@@ -408,6 +408,65 @@ fn priced_gifts_stop_where_the_alliance_holds_past_the_next_gift() {
     assert!(offered(&game, true), "a quest for gold keeps the city-state a target");
 }
 
+/// `next`'s delegate price (`Prices::delegate`): an alliance's delegates toward the World Leader
+/// vote add to a gift's value, linearly in the price (the step from 0 to D equals the step from D
+/// to 2D, to the integer division's unit), and the price is 0 where no congress counts the
+/// delegates; a city-state held past the ceiling stays unoffered whatever the price (the delegate
+/// does not buy influence that would decay unused).
+#[test]
+fn priced_gifts_add_the_alliance_delegates_at_their_price() {
+    use classic_rules::ai::city_states::delegate_worth;
+    let (mut game, rules) = world("core:city-state/byblos");
+    game.debug_earn(P0, 1100);
+    game.debug_set_influence(&rules, CS, P0, 30);
+    let values = |game: &GameState, delegate: i64| {
+        let obs = game.ai_observation(&rules, P0);
+        let prices = Prices { delegate, ..Prices::of(&obs, &rules, PriceModel::Uses) };
+        priced_gifts(&obs, &prices, 500).into_iter().filter(|g| g.city_state == CS).map(|g| (g.gold, g.value)).collect::<Vec<_>>()
+    };
+    {
+        let obs = game.ai_observation(&rules, P0);
+        assert_eq!(delegate_worth(&obs), 0, "no congress counts the delegates in the ancient era");
+    }
+    // A price far above the bonuses' (a victory's prize is the whole game's score).
+    let price = 100_000;
+    let (none, one, two) = (values(&game, 0), values(&game, price), values(&game, 2 * price));
+    assert_eq!(none.len(), 2, "both gift sizes offered: {none:?}");
+    for ((a, b), c) in none.iter().zip(&one).zip(&two) {
+        assert_eq!((a.0, b.0), (b.0, c.0), "the same sizes in the same order");
+        assert!(b.1 > a.1, "the delegate adds to the gift's value: {a:?} -> {b:?}");
+        assert!(((c.1 - b.1) - (b.1 - a.1)).abs() <= 1, "linear in the price: {a:?} {b:?} {c:?}");
+    }
+    let ceiling = {
+        let obs = game.ai_observation(&rules, P0);
+        let prices = Prices::of(&obs, &rules, PriceModel::Uses);
+        gift_ceiling(60, gift_lead(&obs, prices.rounds_left))
+    };
+    game.debug_set_influence(&rules, CS, P0, ceiling);
+    assert!(values(&game, 2 * price).is_empty(), "past the ceiling no price buys a gift");
+}
+
+/// `next`'s delegate price is 0 until the World Congress exists (Printing Press) and positive
+/// once it counts the delegates the World Leader vote needs.
+#[test]
+fn a_delegate_is_worth_nothing_before_the_congress_and_something_after() {
+    use classic_rules::ai::city_states::delegate_worth;
+    let (mut game, rules) = world("core:city-state/byblos");
+    let worth = |game: &GameState| delegate_worth(&game.ai_observation(&rules, P0));
+    assert_eq!(worth(&game), 0, "no congress yet");
+    let press = rules.technologies.iter().position(|t| t.key == "core:tech/printing-press").unwrap();
+    game.debug_learn(&rules, P1, classic_rules::ids::TechId(press as u16));
+    for _ in 0..2 {
+        let round = game.view().auth.turn().round;
+        while game.view().auth.turn().round == round {
+            let active = game.view().auth.active_player();
+            game.execute(&rules, Command::EndTurn { player: active }).unwrap();
+        }
+    }
+    assert!(game.view().auth.module().congress().founded(), "the Printing Press founds the congress");
+    assert!(worth(&game) > 0, "the congress counts the delegates: {}", worth(&game));
+}
+
 /// A cultured friend adds 3 culture a turn to the player's pool (ancient
 /// era), an ally 3 more (the culture pool of track B).
 #[test]

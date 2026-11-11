@@ -209,8 +209,10 @@ fn rules_only() -> CompiledRuleset {
     compile_rules(core_rules()).unwrap()
 }
 
-/// The game's AI with the space plan: the capital busy with a building
-/// takes the project (the plain AI gives it to the idle weak city).
+/// The space plan: the capital busy with a building takes the project, with `space-finish` and
+/// with the game's AI since the thirteenth promotion (`standard` plays `next-w`, whose space plan
+/// runs where the science victory fits); the plain AI (`pre-next`, the standard before) gives it
+/// to the idle weak city.
 #[test]
 fn the_space_finish_ai_builds_the_project_in_the_strong_city() {
     let head = |variant: Variant| {
@@ -225,7 +227,48 @@ fn the_space_finish_ai_builds_the_project_in_the_strong_city() {
     };
     let (capital, _, project) = head(Variant::SpaceFinish);
     assert_eq!(capital, Some(project));
-    let (capital, weak, project) = head(Variant::Standard);
+    let (capital, weak, project) = head(Variant::PreNext);
     assert_ne!(capital, Some(project));
     assert_eq!(weak, Some(project));
+    let (capital, _, project) = head(Variant::Standard);
+    assert_eq!(capital, Some(project));
+}
+
+/// `tall-real` (`ai::tall_real`) plans its spaceship as `space-finish` does where the science
+/// victory fits the game: the capital busy with a building takes the project. Parts built and not
+/// installed by the end lost victories to the plain march order (tuning log, work/nets/tall).
+#[cfg(feature = "experimental-ai")]
+#[test]
+fn tall_real_plans_its_spaceship() {
+    let (mut game, rules, capital, _weak) = space_age(12);
+    let building = plain_building(&game, &rules, capital);
+    enqueue(&mut game, &rules, capital, building);
+    let mut driver = AiDriver::with_mind(AiSettings::for_rules(&rules, rules.default_difficulty()), vec![P1], ClassicMind::new(Variant::TallReal));
+    driver.run(&mut game, &rules, u32::MAX);
+    let first = game.view().auth.cities().get(capital).unwrap().queue.first().copied();
+    assert_eq!(first, Some(ProductionItem::Project(apollo(&rules))));
+}
+
+/// `next`'s fit at the lock (`tall_real::science_fits`): where every technology is known the
+/// science victory fits whenever it is enabled and the rounds left exceed the ship's; with the
+/// victory off, or with no more rounds than the ship takes, it does not; with all the
+/// technologies still to find it does not fit a handful of rounds past the ship.
+#[test]
+fn the_science_fit_follows_the_victory_the_rounds_and_the_technologies() {
+    use classic_rules::ai::grand_strategy::SPACESHIP_ROUNDS;
+    use classic_rules::ai::tall_real::science_fits;
+    let (mut game, rules, _, _) = space_age(1);
+    let ship = game.ai_observation(&rules, P0).speed.pace_rounds(SPACESHIP_ROUNDS);
+    let fits = |game: &GameState, left: u32| science_fits(&game.ai_observation(&rules, P0), &rules, left);
+    assert!(fits(&game, ship + 100), "every technology known, rounds to spare");
+    assert!(!fits(&game, ship), "no round left after the ship");
+    let options = game.view().auth.module().victory().options().with(classic_rules::world::victory::VictoryKind::Science, false);
+    game.debug_set_victory_options(options);
+    assert!(!fits(&game, ship + 100), "the science victory is off");
+    let rules = compile_rules(core_rules()).unwrap();
+    let mut fresh = GameState::new(&rules, GameConfig { players: 2, width: 30, height: 20, rng_seed: 5 });
+    fresh.debug_found_city(&rules, P0, tile(&fresh, 5, 5));
+    fresh.debug_found_city(&rules, P1, tile(&fresh, 25, 15));
+    let obs = fresh.ai_observation(&rules, P0);
+    assert!(!science_fits(&obs, &rules, ship + 5), "all technologies to find in five rounds");
 }

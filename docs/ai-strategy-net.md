@@ -153,6 +153,37 @@ strategy net is a separate step (the grounds' teacher tables would be measured a
 net's memory (AI state version `MIND_MEMORY_VERSION`); `ai_acceptance::leaders_aims_survive_save_and_load` plays on
 after a load hash for hash.
 
+## Promoted: next-w (the thirteenth promotion, 11 November)
+
+`standard` plays as the bench's `next-w`: the strategy net chooses sharply and sees more (`TurnBrief::sharp`,
+`strategy_net::sharp`: prices that follow the chosen style and aim, the leader's personality, the land and the
+neighbours, era-relative features, the distance to victory, the score's trend, a rival running away); a tall seat
+reaches for the science victory where it fits the game (`TurnBrief::tall_real`, `ai::tall_real`), the fit judged
+once at the style's lock from the beakers the spaceship's technologies need against what the empire earns by the end
+(`TurnBrief::next`, `tall_real::science_fits`), with the space plan on every seat where the victory fits; the
+delegates a city-state alliance brings toward the World Leader vote count in its gifts (`Prices::delegate`,
+`city_states::delegate_worth`); and a world wonder another nation has built is dropped from the queue and not
+hurry-bought (`TurnBrief::wonder_race` = 1, `ai::wonder_race`). These are flags of the mind (`ClassicMind::new`),
+set for `standard` and its alias `next-w`; no code of theirs is behind `experimental-ai`, so the game built without
+it plays them (`ai_experimental_off::the_game_without_the_feature_plays_next_w`).
+
+`pre-next` is the standard before it: every switch of `standard` without the flags, bench only (`experimental-ai`).
+Every variant described as `standard` with or without a change (`war-open`, `hybrid`, `unit-net`, `pre-cs-gifts`,
+`standard-scripted`, the `pre-*` chain, `nudged`, `one-city`, the candidates) and the old aliases (`strategy-net`
+among them) play their switches without the flags, as measured: on `pre-next`. `sharp`, `tall-real`, `next`,
+`wonder-cancel`, `wonder-race` and `next-race` keep their flags and play as measured; a book on `standard`
+(`book@standard`) plays on `pre-next`. The chance table of `next-race` and `wonder-race` is not the game's.
+
+Measured on the bench (pace, Quick, against the old `standard`; programme `work/nets`): `next-w` 83.2 % victory-weighted
+(80.6–85.8 %) on offsets 234–237 (800 games), the guard on the standard suite 73.0 % (68.8–77.0 %). The checks of the
+promotion (the new `standard` plays the games of the old `next-w`, `pre-next` those of the old `standard`, the other
+variants theirs, and the time of a turn) are in the lane's log; the smoke pin of `ai_bench` moves to the hash of the
+old `next-w` against itself.
+
+A save of the old `standard` loads into the new one: the strategy net's memory without `sharp`'s section decodes
+with none (`strategy_net::Memory::decode`), and the science victory's fit, judged at the style's lock, is judged on
+the first turn after the load instead.
+
 ## Not done
 
 - No training: the next step is fine-tuning by outcomes with a penalty for moving from the hand weights (the design page).

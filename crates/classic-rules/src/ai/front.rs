@@ -641,7 +641,7 @@ impl Front<'_, '_, '_> {
 
 /// A member of a siege group as the siege model sees it.
 #[derive(Debug, Clone, Copy)]
-pub(crate) struct Besieger {
+pub struct Besieger {
     pub ranged: bool,
     pub dealt: u16,
     pub taken: u16,
@@ -670,7 +670,7 @@ pub(crate) fn siege_rounds(group: &mut [Besieger], hp: u16, heal: u16) -> Option
 
 /// `siege_rounds` with the number of rounds the group may take (the tactical
 /// layer allows more to a group that is at the walls already).
-pub(crate) fn siege_rounds_within(group: &mut [Besieger], hp: u16, heal: u16, limit: u32) -> Option<u32> {
+pub fn siege_rounds_within(group: &mut [Besieger], hp: u16, heal: u16, limit: u32) -> Option<u32> {
     group.sort_by_key(|b| !b.ranged);
     let mut city = hp;
     for round in 1..=limit {

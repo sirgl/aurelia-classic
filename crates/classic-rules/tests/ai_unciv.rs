@@ -160,8 +160,9 @@ fn unciv_plays_whole_games_on_every_seat() {
 
 /// Unciv's modules inside `standard` (`std-unciv-*`, `ai::unciv::parts`), each on seat 0
 /// of a 4-nation game against `standard`: its family deciding but not played (dry) leaves
-/// the seat's game `standard`'s, command for command; played, the family changes the game
-/// and the rules refuse none of its orders.
+/// the seat's game its base's, command for command; played, the family changes the game
+/// and the rules refuse none of its orders. Their base is `standard`'s switches without the
+/// flags of `next-w`: `pre-next` since the thirteenth promotion (they stay as measured).
 #[test]
 fn unciv_modules_inside_standard_change_only_their_family() {
     use classic_rules::scenario::{generate_new_game, ScenarioConfig};
@@ -180,10 +181,10 @@ fn unciv_modules_inside_standard_change_only_their_family() {
         let rejected = driver.trace().entries().filter(|e| e.player == AI && matches!(e.outcome, Outcome::Rejected(_))).count();
         (applied, rejected)
     };
-    let (standard, _) = play(ClassicMind::new(Variant::Standard));
+    let (standard, _) = play(ClassicMind::new(Variant::PreNext));
     for v in Variant::ALL.into_iter().filter(|v| v.unciv().parts().any()) {
         let (dry, _) = play(ClassicMind::new(v).dry_unciv());
-        assert!(dry == standard, "{}: deciding but not played, the game is `standard`'s", v.name());
+        assert!(dry == standard, "{}: deciding but not played, the game is `pre-next`'s", v.name());
         let (played, rejected) = play(ClassicMind::new(v));
         assert_eq!(rejected, 0, "{}: the rules refuse none of the orders", v.name());
         assert!(played != standard, "{}: its family changes the game", v.name());

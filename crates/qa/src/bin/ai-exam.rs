@@ -8,6 +8,11 @@
 //! `ai-exam one --scene t2 --instance 17 --player unit-net [--offset 0] [--control]`
 //!   replays one instance with the trace on stderr, one line a round.
 //!
+//! `ai-exam show --scene l1 --instance 3`
+//!   builds one instance and prints what it is (the landless arenas' sanity check), plays nothing.
+//! The landless arenas (`--scenes l1,l2,l3a,l3b,l4`, not in the default scenes) are built apart from the old scenes
+//! (`grounds/exam/landless.rs`); a pair (l1/l2, l3a/l3b) shares its world and target.
+//!
 //! A measurement: it changes no rule and no AI.
 
 use std::io::Write;
@@ -15,7 +20,7 @@ use std::path::PathBuf;
 use std::sync::Mutex;
 
 use aurelia_qa::bench::modules::{BenchRules, ClassicBench};
-use aurelia_qa::grounds::exam::{build, build_world, jobs, play, Row, Sc};
+use aurelia_qa::grounds::exam::{build, build_world, jobs, landless_scenes, play, Row, Sc};
 
 fn main() {
     if let Err(e) = real() {
@@ -80,11 +85,31 @@ fn real() -> Result<(), String> {
         "one" => {
             let sc = o.scene.ok_or("--scene")?;
             let all = jobs(&rules, o.instance + 1, o.offset)?;
-            let world = build_world(&rules, &all[o.instance])?;
-            let (game, run) = build(sc, &rules, &world, o.control)?;
-            eprintln!("scene {} instance {} {}: {:?}", sc.name(), o.instance, world.label, run.info);
+            let (game, run) = if sc.is_landless() {
+                landless_scenes(&rules, &all[o.instance], &[sc]).into_iter().find(|(s, _)| *s == sc).ok_or("not built")?.1?
+            } else {
+                let world = build_world(&rules, &all[o.instance])?;
+                build(sc, &rules, &world, o.control)?
+            };
+            eprintln!("scene {} instance {}: {:?}", sc.name(), o.instance, run.info);
             let row = play(&rules, game, run, o.instance, &o.player, true)?;
             println!("{}", serde_json::to_string(&row).map_err(|e| e.to_string())?);
+            Ok(())
+        }
+        "show" => {
+            let sc = o.scene.ok_or("--scene")?;
+            let all = jobs(&rules, o.instance + 1, o.offset)?;
+            if !sc.is_landless() {
+                return Err("show is for the landless scenes".to_owned());
+            }
+            let built = landless_scenes(&rules, &all[o.instance], &[sc]).into_iter().find(|(s, _)| *s == sc).ok_or("not built")?.1;
+            let (_, run) = built?;
+            for (k, v) in &run.info {
+                println!("{k}: {v}");
+            }
+            if let Some(l) = run.trace.first() {
+                println!("{l}");
+            }
             Ok(())
         }
         "run" => {
@@ -124,17 +149,20 @@ fn real() -> Result<(), String> {
                     let line = serde_json::json!({"scene": format!("{}{suffix}", sc.name()), "instance": i, "error": e});
                     let _ = writeln!(unbuilt.lock().unwrap(), "{line}");
                 };
-                let world = match build_world(&rules, &all[i]) {
-                    Ok(w) => w,
-                    Err(e) => {
-                        for sc in scenes {
-                            log_unbuilt(sc, &format!("world: {e}"));
-                        }
-                        return;
+                let old: Vec<Sc> = scenes.iter().copied().filter(|sc| !sc.is_landless()).collect();
+                let landless: Vec<Sc> = scenes.iter().copied().filter(|sc| sc.is_landless()).collect();
+                let mut built: Vec<(Sc, Result<(classic_rules::GameState, aurelia_qa::grounds::exam::Run), String>)> = Vec::new();
+                if !old.is_empty() {
+                    match build_world(&rules, &all[i]) {
+                        Ok(world) => built.extend(old.iter().map(|sc| (*sc, build(*sc, &rules, &world, o.control)))),
+                        Err(e) => built.extend(old.iter().map(|sc| (*sc, Err(format!("world: {e}"))))),
                     }
-                };
-                for sc in scenes {
-                    let (game, run) = match build(sc, &rules, &world, o.control) {
+                }
+                if !landless.is_empty() {
+                    built.extend(landless_scenes(&rules, &all[i], &landless));
+                }
+                for (sc, made) in built {
+                    let (game, run) = match made {
                         Ok(x) => x,
                         Err(e) => {
                             log_unbuilt(sc, &e);

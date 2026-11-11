@@ -42,6 +42,10 @@ pub struct ScienceSummary {
     pub complete: BlockEstimate,
     /// The parts a spaceship needs (0: no science victory by a spaceship).
     pub parts_needed: u32,
+    /// Seats that had every part built at once and did not win by science: the ship built and
+    /// not installed by the end (and the seats of the side).
+    pub built_lost: u32,
+    pub seats: u32,
 }
 
 /// Technologies and science a turn at one checkpoint (None: the end).
@@ -95,6 +99,7 @@ impl ScienceSummary {
         let points: Vec<Option<u32>> = checkpoints.iter().map(|c| Some(*c)).chain([None]).collect();
         let progress = points.iter().enumerate().map(|(at, round)| science_at(side, &games, at, *round)).collect();
         let (mut project, mut project_round, mut parts, mut complete) = (Blocks::default(), Blocks::default(), Blocks::default(), Blocks::default());
+        let (mut built_lost, mut seats_counted) = (0u32, 0u32);
         let parts_needed = games.iter().map(|r| r.space_parts).max().unwrap_or(0);
         for r in &games {
             let seats = r.seats.iter().filter(|s| s.side == side);
@@ -104,6 +109,11 @@ impl ScienceSummary {
                     project_round.add(r.seed, f64::from(at));
                 }
                 parts.add(r.seed, seat.pace.parts.len() as f64);
+                seats_counted += 1;
+                let won_it = r.winner().is_some_and(|w| w.player == seat.player && w.victory == Some("science"));
+                if r.space_parts > 0 && seat.pace.built >= r.space_parts && !won_it {
+                    built_lost += 1;
+                }
             }
             let done = r.space_parts > 0 && seats.clone().any(|s| s.pace.parts.len() as u32 >= r.space_parts);
             complete.add(r.seed, f64::from(u8::from(done)));
@@ -118,6 +128,8 @@ impl ScienceSummary {
             parts: parts.estimate(),
             complete: complete.estimate(),
             parts_needed,
+            built_lost,
+            seats: seats_counted,
         }
     }
 
@@ -151,6 +163,7 @@ impl ScienceSummary {
                 self.parts_needed,
                 share(&self.complete)
             );
+            let _ = writeln!(out, "{variant}: seats with every part built and no science victory (built, not installed by the end): {} of {}\n", self.built_lost, self.seats);
         } else {
             out.push('\n');
         }
@@ -228,6 +241,7 @@ mod tests {
             round_ms: Vec::new(),
             eras: Vec::new(),
             space_parts: 6,
+            landless: None,
         }
     }
 
