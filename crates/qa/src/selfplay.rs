@@ -601,6 +601,7 @@ fn jobs_of(config: &Config, games: usize) -> Vec<Job> {
                 variant: "net".to_owned(),
                 speed: config.speed.clone(),
                 bare: false,
+                only_victory: String::new(),
             };
             let sample_seed = mix(mix(config.sample_seed ^ m.seed) ^ ((g as u64) << 24) ^ member as u64);
             Job { index, group: g, member, spec, sample_seed, start: None, ground: None }
