@@ -76,6 +76,22 @@ pub const MARCH_LIMIT: u32 = 20;
 pub fn march_limit(brief: &TurnBrief) -> u32 {
     if brief.war.march { WAR_WEARINESS_ROUNDS / 2 } else { MARCH_LIMIT }
 }
+/// The age at which a marching operation ends: `march_limit`; for `war-muster`
+/// (`TurnBrief::war_muster`) no later than the time its plan gave the march and the siege (the walk
+/// of `running_case`) with the siege estimate once and a half. The army is composed to take the city
+/// in `PLAN_SIEGE_ROUNDS` rounds of strikes; a siege that outlasts its estimate by half is not the
+/// one the army was planned for, and the operations that ran to `march_limit` lost 25 units each
+/// (median) for the 8 of 17 heavy losers of offset 200 that ended by it, while every operation that
+/// ended by taking its city had taken at most its planned time (`war-muster` before this rule,
+/// runs/ops/wm2-200.csv, wm3-200.csv).
+fn march_end(brief: &TurnBrief, operation: &Operation) -> u32 {
+    if !brief.war_muster {
+        return march_limit(brief);
+    }
+    let distance = brief.dims.distance(operation.muster, operation.target).unwrap_or(0).max(0) as u32;
+    let planned = (distance * 2).div_ceil(3) + 1 + SIEGE_ROUNDS_ESTIMATE + SIEGE_ROUNDS_ESTIMATE / 2;
+    planned.min(march_limit(brief))
+}
 /// Members beyond the need an operation takes while it forms.
 pub const EXTRA_MEMBERS: u32 = 2;
 /// Free units farther than this from the muster point are not recruited.
@@ -193,20 +209,27 @@ pub struct SiegeFixes {
     /// when it is behind (the time victory compares our score with the best other one; a war on a
     /// laggard feeds the bystanders; `war-open`).
     pub rank: bool,
+    /// With `loss`: the loss is the one measured on `war-pays`'s own operations
+    /// (`PAYS_LOSS_PERCENT`), not `war-open`'s (`war-pays`).
+    pub pays: bool,
 }
 
 impl SiegeFixes {
-    pub const NONE: SiegeFixes = SiegeFixes { assault: false, garrison: false, close: false, chance: false, recover: false, learned: false, priced: false, worth: false, asset: false, puppet: false, recovery: false, loss: false, yields: false, rank: false };
+    pub const NONE: SiegeFixes = SiegeFixes { assault: false, garrison: false, close: false, chance: false, recover: false, learned: false, priced: false, worth: false, asset: false, puppet: false, recovery: false, loss: false, yields: false, rank: false, pays: false };
     /// The five fixes of the `siege` variant.
-    pub const ALL: SiegeFixes = SiegeFixes { assault: true, garrison: true, close: true, chance: true, recover: true, learned: false, priced: false, worth: false, asset: false, puppet: false, recovery: false, loss: false, yields: false, rank: false };
+    pub const ALL: SiegeFixes = SiegeFixes { assault: true, garrison: true, close: true, chance: true, recover: true, learned: false, priced: false, worth: false, asset: false, puppet: false, recovery: false, loss: false, yields: false, rank: false, pays: false };
     /// The fixes of `war-fix` (classic/docs/ai-war-fix.md): the `siege` five with the learned
     /// chance in place of the siege model's, the capture priced by the rules, and a siege worth
     /// its city.
-    pub const WAR_FIX: SiegeFixes = SiegeFixes { assault: true, garrison: true, close: true, chance: false, recover: true, learned: true, priced: true, worth: true, asset: true, puppet: false, recovery: false, loss: false, yields: false, rank: false };
+    pub const WAR_FIX: SiegeFixes = SiegeFixes { assault: true, garrison: true, close: true, chance: false, recover: true, learned: true, priced: true, worth: true, asset: true, puppet: false, recovery: false, loss: false, yields: false, rank: false, pays: false };
     /// `war-open`'s (classic/docs/ai-war-open.md): `WAR_FIX` with the capture priced as the puppet
     /// the AI makes of it, its unrest for the rounds the empire takes to recover, its citizens
     /// yielding what the empire's do, and the army's loss as measured.
     pub const OPEN: SiegeFixes = SiegeFixes { puppet: true, recovery: true, loss: true, yields: true, rank: true, ..SiegeFixes::WAR_FIX };
+    /// `war-pays`' (classic/docs/ai-war-pays.md): `OPEN` with the loss measured on its own operations;
+    /// `rival_percent` gives it a flat `RIVAL_PERCENT` (`rank` bought twice the captures in the head to head and no
+    /// share: tuning offsets 200–209, paired +0.00, CI −1.35…+1.35).
+    pub const PAYS: SiegeFixes = SiegeFixes { pays: true, ..SiegeFixes::OPEN };
 }
 
 /// What a unit kind is to an operation's army: None for non-combat,
@@ -275,6 +298,11 @@ pub struct Arsenal {
     pub melee: Option<UnitKindId>,
     pub ranged: Option<UnitKindId>,
     pub siege: Option<UnitKindId>,
+    /// `siege-call`: the distance slots are ranged units while they can bring the city down (`CallFixes::ranged`).
+    pub ranged_first: bool,
+    /// Most escorts an army takes against the enemy's field power: `MAX_ESCORTS`; `siege-call` twice that
+    /// (`CallFixes::threat`: the units that reach the target during the siege are more than those near it now).
+    pub escort_cap: u8,
 }
 
 impl Arsenal {
@@ -283,6 +311,8 @@ impl Arsenal {
             melee: best_kind(brief, rules, ArmyRole::Melee),
             ranged: best_kind(brief, rules, ArmyRole::Ranged),
             siege: best_kind(brief, rules, ArmyRole::Siege),
+            ranged_first: brief.siege_call.ranged,
+            escort_cap: if brief.siege_call.threat { 2 * MAX_ESCORTS } else { MAX_ESCORTS },
         }
     }
 
@@ -297,6 +327,12 @@ impl Arsenal {
 
 fn best_kind(brief: &TurnBrief, rules: &CompiledRuleset, role: ArmyRole) -> Option<UnitKindId> {
     let mut best: Option<(u16, u32, UnitKindId)> = None;
+    // `siege-call` (`CallFixes::melee`): a melee kind by the fighting power it buys per hammer. Two units fight
+    // as the squares of their strengths (the exchange of blows each side lands scales with the strength ratio
+    // and each side's hit points drain in proportion), so strength squared over production cost ranks the
+    // kinds; the strongest kind alone (the game's choice) buys a spearman for the price of two warriors.
+    let by_cost = brief.siege_call.melee && role == ArmyRole::Melee;
+    let mut best_value = 0u64;
     for index in 0..rules.units.len() {
         let kind = UnitKindId(index as u16);
         if army_role(rules, kind) != Some(role) || !trainable(brief, rules, kind) {
@@ -304,6 +340,14 @@ fn best_kind(brief: &TurnBrief, rules: &CompiledRuleset, role: ArmyRole) -> Opti
         }
         let strength = role_strength(rules, kind, role);
         let cost = rules.units[index].cost;
+        if by_cost {
+            let value = u64::from(strength) * u64::from(strength) * 1000 / u64::from(cost.max(1));
+            if best.is_none() || value > best_value || (value == best_value && strength > best.map_or(0, |b| b.0)) {
+                best = Some((strength, cost, kind));
+                best_value = value;
+            }
+            continue;
+        }
         if best.is_none_or(|(s, c, _)| strength > s || (strength == s && cost < c)) {
             best = Some((strength, cost, kind));
         }
@@ -332,9 +376,12 @@ pub fn estimate_city(brief: &TurnBrief, rules: &CompiledRuleset, city: &SeenCity
     let techs = rules.technologies.len().max(1);
     let share = brief.techs.len().min(techs) * 100 / techs;
     let garrison = garrison.map_or(0, |k| i64::from(rules.units[k.0 as usize].strength) * 100 * 100 / CITY_STRENGTH_FROM_GARRISON_DIVISOR);
+    // `siege-call` (`CallFixes::walls`): the walls and strength the owner may have built by the technologies we
+    // know (the planning estimate assumed a city of 200 hit points; a walled one has 250).
+    let (extra_strength, extra_hp) = if brief.siege_call.walls { crate::ai::siege_walls::default_defence(brief, rules, city.population) } else { (0, 0) };
     CityEstimate {
-        strength: CITY_STRENGTH_BASE + i64::from(city.population) * CITY_STRENGTH_PER_POP + CITY_TECH_STRENGTH[share] + garrison,
-        hp: CITY_BASE_HIT_POINTS,
+        strength: CITY_STRENGTH_BASE + i64::from(city.population) * CITY_STRENGTH_PER_POP + CITY_TECH_STRENGTH[share] + garrison + extra_strength,
+        hp: CITY_BASE_HIT_POINTS.saturating_add(extra_hp),
         heal: CITY_HEAL_PER_TURN as u16,
     }
 }
@@ -390,9 +437,19 @@ pub fn composition(rules: &CompiledRuleset, arsenal: &Arsenal, city: &CityEstima
 /// a ranged kind (`TurnBrief::army_fit`: the field fights of the training grounds are won
 /// by armies about half ranged, classic/docs/ai-army.md).
 pub fn composition_by(rules: &CompiledRuleset, arsenal: &Arsenal, city: &CityEstimate, threat: u32, ranged_escorts: bool) -> Option<Composition> {
+    // `siege-call` (`CallFixes::ranged`): ranged units first; siege units only where an army of them cannot bring
+    // the city down within `MAX_ARMY` (the estimate shows ranged units cannot).
+    if arsenal.ranged_first && arsenal.ranged.is_some() && arsenal.siege.is_some() {
+        return composition_with(rules, arsenal, city, threat, ranged_escorts, ArmyRole::Ranged).or_else(|| composition_with(rules, arsenal, city, threat, ranged_escorts, ArmyRole::Siege));
+    }
+    let distance_role = if arsenal.siege.is_some() { ArmyRole::Siege } else { ArmyRole::Ranged };
+    composition_with(rules, arsenal, city, threat, ranged_escorts, distance_role)
+}
+
+/// `composition_by` with the distance role given.
+fn composition_with(rules: &CompiledRuleset, arsenal: &Arsenal, city: &CityEstimate, threat: u32, ranged_escorts: bool, distance_role: ArmyRole) -> Option<Composition> {
     let melee = arsenal.melee?;
     let melee_strike = strike(rules, melee, ArmyRole::Melee, city);
-    let distance_role = if arsenal.siege.is_some() { ArmyRole::Siege } else { ArmyRole::Ranged };
     let distance_strike = arsenal.kind(distance_role).map(|k| strike(rules, k, distance_role, city));
     let mut army = Composition { melee: 2, ..Composition::default() };
     if distance_strike.is_some() {
@@ -416,7 +473,7 @@ pub fn composition_by(rules: &CompiledRuleset, arsenal: &Arsenal, city: &CityEst
     // One escort per strength of our best melee unit in the enemy's field
     // power (strength × health) seen near us.
     let strength = u32::from(rules.units[melee.0 as usize].strength).max(1);
-    let escorts = threat.div_ceil(strength).min(u32::from(MAX_ESCORTS)) as u8;
+    let escorts = threat.div_ceil(strength).min(u32::from(arsenal.escort_cap)) as u8;
     if ranged_escorts && arsenal.ranged.is_some() {
         army.ranged += escorts;
     } else {
@@ -428,7 +485,7 @@ pub fn composition_by(rules: &CompiledRuleset, arsenal: &Arsenal, city: &CityEst
 /// One more unit for `army` as `composition` adds them: a distance unit while they are fewer
 /// than the melee units, else a melee unit.
 fn grow(army: &mut Composition, arsenal: &Arsenal) {
-    let distance_role = if arsenal.siege.is_some() { ArmyRole::Siege } else { ArmyRole::Ranged };
+    let distance_role = if arsenal.siege.is_some() && !(arsenal.ranged_first && arsenal.ranged.is_some()) { ArmyRole::Siege } else { ArmyRole::Ranged };
     if arsenal.kind(distance_role).is_some() && army.ranged + army.siege < army.melee {
         army.add(distance_role);
     } else {
@@ -520,23 +577,23 @@ impl<'a> Routes<'a> {
     /// (`STAGING_DISTANCE`), cheapest first — at peace the enemy's closed
     /// borders stop the walk there. None: the known way ends farther than
     /// `BORDER_REACH` (another landmass, or beyond the search budget).
-    pub fn stage(&mut self, kind: UnitKindId, from: TileId, target: TileId) -> Option<Stage> {
+    pub fn stage(&mut self, kind: UnitKindId, from: TileId, target: TileId, ring: i32, reach: i32) -> Option<Stage> {
         let map = KnownMap::of_kind(&self.view, kind);
         let dims = self.view.dimensions();
         let mut best: Option<(i32, u32, TileId)> = None;
         let mut visit = |tile: TileId, points: u32| {
             let distance = dims.distance(tile, target).unwrap_or(i32::MAX);
-            if distance < STAGING_DISTANCE {
+            if distance < ring {
                 return Visit::Continue;
             }
             if best.is_none_or(|b| (distance, points, tile) < b) {
                 best = Some((distance, points, tile));
             }
-            if distance == STAGING_DISTANCE { Visit::Stop } else { Visit::Continue }
+            if distance == ring { Visit::Stop } else { Visit::Continue }
         };
         let limit = DecisionBudget::default().search();
         explore(&map, from, &Blockers::new(Vec::new()), &mut self.scratch, limit, &mut self.stats, &mut visit);
-        let (distance, points, tile) = best.filter(|(d, _, _)| *d <= BORDER_REACH)?;
+        let (distance, points, tile) = best.filter(|(d, _, _)| *d <= reach)?;
         let moves = self.view.rules().units[kind.0 as usize].movement.max(1) * crate::world::unit::MOVE_DENOMINATOR;
         // The rest is the enemy's land, walked at war: two thirds of a tile
         // a round.
@@ -572,10 +629,11 @@ fn advance(brief: &TurnBrief, state: &mut AiState, rules: &CompiledRuleset, oper
     let age = brief.round.saturating_sub(operation.phase_round);
     let at_war = brief.at_war(operation.enemy);
     let form_limit = brief.speed.pace_rounds(if decisive { DECISIVE_FORM_LIMIT } else { FORM_LIMIT });
+    note_met(brief, operation);
     let over = match operation.phase {
         _ if !target_held(state, operation) => true,
         OperationPhase::Forming => age > form_limit,
-        OperationPhase::Marching => !at_war || age > march_limit(brief) || outmatched(brief, rules, operation, &members),
+        OperationPhase::Marching => !at_war || age > march_end(brief, operation) || outmatched(brief, rules, operation, &members),
     };
     if over {
         crate::ai::war_probe::note(|p| {
@@ -587,7 +645,7 @@ fn advance(brief: &TurnBrief, state: &mut AiState, rules: &CompiledRuleset, oper
                 EndCause::FormTimeout
             } else if !at_war {
                 EndCause::Peace
-            } else if age > march_limit(brief) {
+            } else if age > march_end(brief, operation) {
                 EndCause::MarchTimeout
             } else {
                 EndCause::Outmatched
@@ -598,6 +656,25 @@ fn advance(brief: &TurnBrief, state: &mut AiState, rules: &CompiledRuleset, oper
         return vec![Decision::refuse(Actor::Player, Reason::EndOperation)];
     }
     let ready = assembled(brief, rules, operation, &members, age) && !outmatched(brief, rules, operation, &members);
+    if operation.phase == OperationPhase::Forming {
+        crate::ai::war_probe::note(|p| {
+            p.forming.push(crate::ai::war_probe::FormingSample {
+                round: brief.round,
+                player: brief.player,
+                target: operation.target.0,
+                assembled: assembled(brief, rules, operation, &members, age),
+                outmatched: outmatched(brief, rules, operation, &members),
+                may_declare: at_war || may_declare(brief, state, operation),
+                members: members.len() as u32,
+                near: members.iter().filter(|u| brief.dims.distance(u.tile, operation.muster).is_some_and(|d| d <= MUSTER_RADIUS + 1)).count() as u32,
+                near_healthy: members.iter().filter(|u| u.hp >= HEAL_BELOW_HP && brief.dims.distance(u.tile, operation.muster).is_some_and(|d| d <= MUSTER_RADIUS + 1)).count() as u32,
+                wounded: members.iter().filter(|u| u.hp < HEAL_BELOW_HP).count() as u32,
+                distance_sum: members.iter().filter_map(|u| brief.dims.distance(u.tile, operation.muster)).sum::<i32>().max(0) as u32,
+                need: operation.need.total(),
+                muster_to_target: brief.dims.distance(operation.muster, operation.target).unwrap_or(-1),
+            })
+        });
+    }
     if operation.phase != OperationPhase::Forming || !ready {
         return Vec::new();
     }
@@ -609,6 +686,65 @@ fn advance(brief: &TurnBrief, state: &mut AiState, rules: &CompiledRuleset, oper
 fn outmatched(brief: &TurnBrief, rules: &CompiledRuleset, operation: &Operation, members: &[&UnitBrief]) -> bool {
     let ours: u32 = members.iter().map(|u| unit_power(rules, u.kind, u.hp)).sum();
     2 * defence(brief, operation.enemy, operation.target) > 3 * ours
+}
+
+/// What the seat's last attempt on a target showed (`CallFixes::threat`): the most enemy power it saw near
+/// the target while the operation lived. Kept in the mind's thread, not in the saved memory (the format of the
+/// saved AI memory does not change); it starts again when the round counter runs back (a new game).
+#[derive(Debug, Default)]
+struct Attempts {
+    round: u32,
+    met: std::collections::BTreeMap<(PlayerId, TileId), u32>,
+}
+
+thread_local! {
+    static ATTEMPTS: std::cell::RefCell<Attempts> = std::cell::RefCell::new(Attempts::default());
+}
+
+/// Notes the enemy power seen near the target of a running operation.
+fn note_met(brief: &TurnBrief, operation: &Operation) {
+    if !brief.siege_call.threat {
+        return;
+    }
+    let seen = defence(brief, operation.enemy, operation.target);
+    ATTEMPTS.with(|a| {
+        let mut a = a.borrow_mut();
+        if brief.round < a.round {
+            *a = Attempts::default();
+        }
+        a.round = brief.round;
+        let slot = a.met.entry((brief.player, operation.target)).or_insert(0);
+        *slot = (*slot).max(seen);
+    });
+}
+
+/// What the last attempt on `target` met there, unless the target is in sight now (the sighting is fresher
+/// than the memory: a defence gone shows as no defenders near the city).
+fn remembered_met(brief: &TurnBrief, state: &AiState, target: TileId) -> u32 {
+    if state.seen_cities().iter().any(|c| c.tile == target && c.last_seen_round == brief.round) {
+        return 0;
+    }
+    ATTEMPTS.with(|a| {
+        let a = a.borrow();
+        if brief.round < a.round { 0 } else { a.met.get(&(brief.player, target)).copied().unwrap_or(0) }
+    })
+}
+
+/// The enemy power the army for `target` is sized against: the relation's threat and the units in sight
+/// near the target; for `siege-call` (`CallFixes::threat`) the units in sight that can stand at the target
+/// before the siege is over: within `DEFENCE_RADIUS` plus what our own melee kind walks in the rounds the
+/// plan gives the siege (`PLAN_SIEGE_ROUNDS`), their movement being what ours is (the kinds of two nations
+/// of one era move alike); a sighting is the unit as seen at the start of this turn, so its age is nil
+/// and one out of sight is not counted.
+fn threat_to(brief: &TurnBrief, rules: &CompiledRuleset, state: &AiState, arsenal: &Arsenal, enemy: PlayerId, target: TileId) -> u32 {
+    let base = state.relation(enemy).map_or(0, |m| m.threat).max(defence(brief, enemy, target));
+    if !brief.siege_call.threat {
+        return base;
+    }
+    let walk = arsenal.melee.map_or(1, |k| i32::from(rules.units[k.0 as usize].movement.max(1)));
+    let reach = DEFENCE_RADIUS + walk * PLAN_SIEGE_ROUNDS as i32;
+    let coming: u32 = brief.sightings.iter().filter(|s| s.owner == enemy && s.military && brief.dims.distance(s.tile, target).is_some_and(|d| d <= reach)).map(|s| s.power).sum();
+    base.max(coming).max(remembered_met(brief, state, target))
 }
 
 /// Power of `enemy`'s military units the player sees within
@@ -624,12 +760,47 @@ fn assembled(brief: &TurnBrief, rules: &CompiledRuleset, operation: &Operation, 
     let dims = brief.dims;
     let present = members
         .iter()
-        .filter(|u| u.hp >= HEAL_BELOW_HP && dims.distance(u.tile, operation.muster).is_some_and(|d| d <= MUSTER_RADIUS + 1));
+        .filter(|u| u.hp >= HEAL_BELOW_HP && dims.distance(u.tile, operation.muster).is_some_and(|d| d <= muster_reach(brief, rules, u.kind)))
+        .filter(|u| !brief.siege_call.ready || strike_ready(brief, rules, operation, u));
     let present = composition_of(rules, present.map(|u| u.kind));
     if shortfall(operation.need, present).total() == 0 {
         return true;
     }
     age >= brief.speed.pace_rounds(FORM_PATIENCE) && present.melee > 0 && present.total() * 4 >= operation.need.total() * 3
+}
+
+/// `siege-call` (`CallFixes::ready`): the member can stand at the city's ring within two turns: its distance to
+/// the target is at most the ring plus two turns of its movement. The war is declared when the army the plan
+/// needs is all so placed, so that the first turn of the war is a march of one or two turns to a strike by
+/// everything, not a column strung out over the march that the defender sees coming and reinforces against.
+fn strike_ready(brief: &TurnBrief, rules: &CompiledRuleset, operation: &Operation, unit: &UnitBrief) -> bool {
+    // The members crowd around the muster point (one military unit a tile, none on the enemy's land at
+    // peace): `MUSTER_RADIUS` tiles of slack beyond the bound the muster point itself keeps (`Routes::stage`).
+    brief.dims.distance(unit.tile, operation.target).is_some_and(|d| d <= strike_bound(rules, unit.kind) + MUSTER_RADIUS)
+}
+
+/// The most tiles from the target a unit of `kind` is ready to strike from (`strike_ready`).
+pub fn strike_bound(rules: &CompiledRuleset, kind: UnitKindId) -> i32 {
+    STAGING_DISTANCE + READY_TURNS * i32::from(rules.units.get(kind.0 as usize).map_or(1, |d| d.movement.max(1)))
+}
+
+/// Turns the army may need to reach the ring after the declaration (`strike_ready`).
+pub const READY_TURNS: i32 = 2;
+
+/// How far from the muster point a member stands with the army: `MUSTER_RADIUS + 1`; for
+/// `war-muster` and `tactician-fit` (`TurnBrief::muster_fix`) one turn's march more, the unit's movement in tiles.
+/// The muster point lies on the staging ring at the enemy's border: at peace the tiles within
+/// `MUSTER_RADIUS` of it that are neither the enemy's land nor in the city's strike hold four or
+/// five units (one military unit a tile), so a twelve-unit army stood on average 4.8 tiles from it
+/// and four of its members within reach: 27 of 114 operations of `war-pays` (tuning offset 200)
+/// formed for their whole limit with 12.9 members against a need of 11.9 and never marched
+/// (classic/docs/ai-tactician-fit.md).
+fn muster_reach(brief: &TurnBrief, rules: &CompiledRuleset, kind: UnitKindId) -> i32 {
+    let base = MUSTER_RADIUS + 1;
+    if !brief.muster_fix {
+        return base;
+    }
+    base + i32::from(rules.units.get(kind.0 as usize).map_or(1, |d| d.movement.max(1)))
 }
 
 /// March: declare the war first when at peace (when allowed now), make the
@@ -756,10 +927,7 @@ fn start(brief: &TurnBrief, state: &mut AiState, rules: &CompiledRuleset, routes
     }
     let arsenal = Arsenal::of(brief, rules);
     let walker = arsenal.melee?;
-    // With `SiegeFixes::assault` the units on an assault are not free, but an operation may still
-    // take them (`assault_recruits`): its army counts them as the game's AI does.
-    let on_assault = |u: &&UnitBrief| brief.war.siege.assault && u.hp >= HEAL_BELOW_HP && army_role(rules, u.kind).is_some() && matches!(state.task_of(u.id).map(|t| t.task), Some(UnitTask::Assault { .. }));
-    let free = composition_of(rules, strike_units(brief, state, rules).chain(brief.units.iter().filter(on_assault)).map(|u| u.kind));
+    let free = counted_free(brief, state, rules);
     let mut candidates: Vec<Candidate> = targets(brief, state)
         .into_iter()
         .filter_map(|(city, horizon)| candidate(brief, state, rules, &arsenal, free, &city, horizon, gate))
@@ -769,7 +937,14 @@ fn start(brief: &TurnBrief, state: &mut AiState, rules: &CompiledRuleset, routes
     let considered = candidates.len();
     let mut chosen = None;
     for mut candidate in candidates.into_iter().take(MAX_ROUTE_CHECKS) {
-        let stage = routes.stage(walker, candidate.operation.muster, candidate.operation.target);
+        // `siege-call` (`CallFixes::ready`): the army musters one turn of its movement beyond the city's strike,
+        // where the city does not see it, and strikes from there within two turns (`strike_ready`).
+        let (ring, reach) = if brief.siege_call.ready {
+            (STAGING_DISTANCE + i32::from(rules.units[walker.0 as usize].movement.max(1)), strike_bound(rules, walker))
+        } else {
+            (STAGING_DISTANCE, BORDER_REACH)
+        };
+        let stage = routes.stage(walker, candidate.operation.muster, candidate.operation.target, ring, reach);
         let Some(stage) = stage else { continue };
         candidate.operation.muster = stage.tile;
         candidate.assemble += stage.walk;
@@ -811,6 +986,37 @@ fn start(brief: &TurnBrief, state: &mut AiState, rules: &CompiledRuleset, routes
     });
     state.start_operation(chosen.operation);
     Some(Decision::refuse(Actor::Player, Reason::FormOperation))
+}
+
+/// The army a new operation counts on: the units free for a strike. With `SiegeFixes::assault`
+/// the units on an assault are not free, but an operation may still take them
+/// (`assault_recruits`): its army counts them as the game's AI does. `start` and the strategist's
+/// look at the war machine (`outlook`) count the same units, so their verdicts agree.
+fn counted_free(brief: &TurnBrief, state: &AiState, rules: &CompiledRuleset) -> Composition {
+    let on_assault = |u: &&UnitBrief| brief.war.siege.assault && u.hp >= HEAL_BELOW_HP && army_role(rules, u.kind).is_some() && matches!(state.task_of(u.id).map(|t| t.task), Some(UnitTask::Assault { .. }));
+    let arsenal = Arsenal::of(brief, rules);
+    composition_of(rules, strike_units(brief, state, rules).chain(brief.units.iter().filter(on_assault)).filter(|u| current(brief, rules, &arsenal, u.kind)).map(|u| u.kind))
+}
+
+/// The share of the best trainable kind's strength a unit needs to fill a place of the army, percent:
+/// two thirds. The rules' generations of one role step by a third to a half of the strength (melee:
+/// 8, 11, 14, 16, 21), so a unit under two thirds of the best kind is a generation or more behind and
+/// deals the siege model a fraction of the damage the army was planned with (`composition` plans
+/// with the best kind). On offset 200 the operations that started with most places filled by
+/// existing units took a city in 15–30 % of the cases, those that built their army in 39–43 %
+/// (`war-pays`, classic/docs/ai-war-muster.md). Only `war-muster` (`TurnBrief::war_muster`).
+pub const CURRENT_PERCENT: i64 = 67;
+
+/// A unit of `kind` fills a place of an army: the army counts every unit with the strength the plan
+/// was made with, not any unit of the role (`CURRENT_PERCENT`). Without `TurnBrief::war_muster`
+/// every unit does.
+fn current(brief: &TurnBrief, rules: &CompiledRuleset, arsenal: &Arsenal, kind: UnitKindId) -> bool {
+    if !brief.war_muster {
+        return true;
+    }
+    let Some(role) = army_role(rules, kind) else { return true };
+    let Some(best) = arsenal.kind(role) else { return true };
+    i64::from(role_strength(rules, kind, role)) * 100 >= i64::from(role_strength(rules, best, role)) * CURRENT_PERCENT
 }
 
 /// A new operation or raid may start under `strategy`: not while defending; not while
@@ -876,8 +1082,13 @@ pub const LOSS_PERCENT: i64 = 50;
 /// of `war-open` (pace, Quick, seed offset 201; 124 % of those that marched, whose every unit on
 /// an assault of the target joins them, 15 % of those recalled or timed out before; `ai-war-ops`,
 /// classic/docs/ai-war-open.md). The operations of `war-fix-model`, mostly recalled before they
-/// march, lost 25 %; `LOSS_PERCENT` guessed half.
+/// march, lost 25 %; `LOSS_PERCENT` guessed half. TUNED: measured on build E2 of the lane, not on the frozen
+/// one, and it bypasses the genome's `LossPercent` knob.
 pub const OPEN_LOSS_PERCENT: i64 = 66;
+/// The same measured on `war-pays`'s own operations: 67.3 % of the need in 292 operations (pace, Quick,
+/// seeds 203001–204021 with `ai-war-ops`; 101 % of those that marched). A measured constant, not
+/// derived; re-measure it when the operations change.
+pub const PAYS_LOSS_PERCENT: i64 = 67;
 /// Share of the city's points taken from the rival that counts for us,
 /// percent: the time victory compares our score with the best other one.
 pub const RIVAL_PERCENT: i64 = 50;
@@ -951,7 +1162,7 @@ fn war_case_parts(prices: &Prices, stakes: &Stakes, rules: &CompiledRuleset, ars
     };
     let army = |c: Composition| [ArmyRole::Melee, ArmyRole::Ranged, ArmyRole::Siege].iter().map(|r| unit_cost(*r) * i64::from(c.of(*r))).sum::<i64>();
     let built = if fixes.asset { 0 } else { army(missing) * hammer } + i64::from(missing.total()) * upkeep;
-    let loss = if fixes.loss { OPEN_LOSS_PERCENT } else { crate::ai::genome::get(crate::ai::genome::Knob::LossPercent) };
+    let loss = if fixes.loss { if fixes.pays { PAYS_LOSS_PERCENT } else { OPEN_LOSS_PERCENT } } else { crate::ai::genome::get(crate::ai::genome::Knob::LossPercent) };
     let lost = army(need) * loss / 100 * hammer;
     let base = crate::ai::genome::get(crate::ai::genome::Knob::SuccessPercent);
     // The weapon the plan counts on (`strikes::armory`) gives the chance it gives and costs its
@@ -1299,7 +1510,7 @@ pub fn outlook(brief: &TurnBrief, state: &AiState, rules: &CompiledRuleset, pric
             continue;
         }
         let estimate = estimate_city(brief, rules, city, arsenal.melee);
-        let threat = state.relation(city.owner).map_or(0, |m| m.threat).max(defence(brief, city.owner, city.tile));
+        let threat = threat_to(brief, rules, state, &arsenal, city.owner, city.tile);
         let Some(need) = composition_by(rules, &arsenal, &estimate, threat, brief.army_fit) else { continue };
         let chance = open_chance(&chance_features(brief, state, rules, &arsenal, city, &estimate, need, None));
         let rounds = (distance as u32 * 2).div_ceil(3) + 1 + SIEGE_ROUNDS_ESTIMATE;
@@ -1313,8 +1524,9 @@ pub fn outlook(brief: &TurnBrief, state: &AiState, rules: &CompiledRuleset, pric
         (out.chance, out.relative, out.target, out.enemy) = (chance, relative, Some(city.tile), Some(city.owner));
     }
     if arsenal.melee.is_some() && brief.cities.len() >= 2 {
-        let free = composition_of(rules, strike_units(brief, state, rules).map(|u| u.kind));
-        out.pays = targets(brief, state).into_iter().any(|(city, horizon)| candidate(brief, state, rules, &arsenal, free, &city, horizon, WarGate::Value(prices, stakes)).is_some_and(|c| c.fits()));
+        // `war-pays`: the units `start` counts (`free_units`), so that the two verdicts agree.
+        let free = if brief.war_pays { counted_free(brief, state, rules) } else { composition_of(rules, strike_units(brief, state, rules).map(|u| u.kind)) };
+        out.pays = crate::ai::war_probe::muted(|| targets(brief, state).into_iter().any(|(city, horizon)| candidate(brief, state, rules, &arsenal, free, &city, horizon, WarGate::Value(prices, stakes)).is_some_and(|c| c.fits())));
     }
     let rival = out.enemy.or(nearest.map(|(_, p)| p));
     if let Some(rival) = rival {
@@ -1325,6 +1537,7 @@ pub fn outlook(brief: &TurnBrief, state: &AiState, rules: &CompiledRuleset, pric
 
 /// Army units a nation of these rules keeps a city, tenths: the AI's own army at a look for an
 /// operation is 14.35 units for 5.5 cities (classic/docs/ai-war-audit-current.md, `pace`).
+/// TUNED, not derived: the AI's own ratio applied to rivals, whose armies nothing tells.
 pub const ARMY_PER_CITY_TENTHS: u64 = 26;
 
 /// The military power of `rival` as the player can know it (`unit_power`): the largest of its
@@ -1385,7 +1598,7 @@ pub fn city_worth_ranked(prices: &Prices, population: u32, rounds: u32, rival: i
 pub fn rival_percent(brief: &TurnBrief, rival: PlayerId) -> i64 {
     let score = |p: PlayerId| brief.scores.iter().find(|(q, _)| *q == p).map(|(_, s)| *s);
     let (Some(ours), Some(theirs)) = (score(brief.player), score(rival)) else { return RIVAL_PERCENT };
-    if !brief.war.siege.rank {
+    if !brief.war.siege.rank || brief.war_pays {
         return RIVAL_PERCENT;
     }
     let best = brief.scores.iter().filter(|(p, _)| *p != brief.player).map(|(_, s)| *s).max().unwrap_or(0);
@@ -1431,6 +1644,21 @@ fn targets(brief: &TurnBrief, state: &AiState) -> Vec<(SeenCity, Horizon)> {
     out
 }
 
+/// `war-pays`: the odds an operation takes a city, read from the operations of `war-open` (pace,
+/// Quick, 300 games of the tuning seeds 200–202, classic/docs/ai-war-pays.md): those started in a war
+/// that was already running took a city of their enemy in 3 % of the cases (the first operation of the war
+/// ended recalled, outmatched or by peace, and the enemy stands armed), those started at peace against
+/// a city of at most `MAX_TARGET_POPULATION` citizens in about 29 %, against a larger one 9 %. Tuned
+/// constants, not derived ones.
+fn odds_are_good(city: &SeenCity, horizon: Horizon) -> bool {
+    matches!(horizon, Horizon::Peace) && i64::from(city.population) <= MAX_TARGET_POPULATION
+}
+
+/// The largest target `war-pays` starts an operation against, in citizens: a city of 9 or more
+/// held 8 % of the cases against 22–29 % for the smaller ones (it heals behind more walls and
+/// keeps a larger garrison). Tuned on the war-open operations of offsets 200–201.
+pub const MAX_TARGET_POPULATION: i64 = 8;
+
 #[allow(clippy::too_many_arguments)]
 fn candidate(
     brief: &TurnBrief,
@@ -1442,13 +1670,16 @@ fn candidate(
     horizon: Horizon,
     gate: WarGate<'_>,
 ) -> Option<Candidate> {
+    if brief.war_pays && !odds_are_good(city, horizon) {
+        return None;
+    }
     let muster = brief.nearest_city(brief.dims, city.tile)?;
     let distance = brief.dims.distance(muster.tile, city.tile)?;
     let decisive = gate.decisive(city.tile);
     if distance > if decisive { DECISIVE_RANGE } else { OBJECTIVE_RANGE } {
         return None;
     }
-    let threat = state.relation(city.owner).map_or(0, |m| m.threat).max(defence(brief, city.owner, city.tile));
+    let threat = threat_to(brief, rules, state, &arsenal, city.owner, city.tile);
     let estimate = estimate_city(brief, rules, city, arsenal.melee);
     // Before the route is known: the whole way at two thirds of a tile a
     // round (`start` replaces it by the staging tile's walk and strike).
@@ -1676,12 +1907,14 @@ fn recruit(brief: &TurnBrief, state: &mut AiState, rules: &CompiledRuleset, oper
     let target = operation.target;
     let mut have = composition_of(rules, members(brief, state, target).iter().map(|u| u.kind));
     let switching = if brief.war.siege.assault { assault_recruits(brief, state, rules, operation, gate) } else { Vec::new() };
+    let arsenal = Arsenal::of(brief, rules);
     let mut candidates: Vec<(i32, EntityId, UnitKindId)> = strike_units(brief, state, rules)
         .filter(|u| match operation.phase {
             OperationPhase::Forming => true,
             OperationPhase::Marching => state.task_of(u.id).map(|t| t.task) == Some(UnitTask::Assault { target }),
         })
         .chain(switching)
+        .filter(|u| current(brief, rules, &arsenal, u.kind))
         .map(|u| (dims.distance(u.tile, operation.muster).unwrap_or(i32::MAX), u.id, u.kind))
         .filter(|(d, _, _)| operation.phase == OperationPhase::Marching || *d <= range)
         .collect();
@@ -1784,7 +2017,7 @@ fn target_worth(brief: &TurnBrief, state: &AiState, rules: &CompiledRuleset, pri
     }
     let city = state.seen_cities().iter().find(|c| c.tile == target)?;
     let estimate = estimate_target(brief, rules, city);
-    let threat = state.relation(city.owner).map_or(0, |m| m.threat).max(defence(brief, city.owner, city.tile));
+    let threat = threat_to(brief, rules, state, &arsenal, city.owner, city.tile);
     let army = composition_by(rules, &arsenal, &estimate, threat, brief.army_fit)?;
     let distance = brief.nearest_city(brief.dims, target).and_then(|c| brief.dims.distance(c.tile, target)).unwrap_or(0).max(0) as u32;
     let rounds = (distance * 2).div_ceil(3) + 1 + SIEGE_ROUNDS_ESTIMATE;

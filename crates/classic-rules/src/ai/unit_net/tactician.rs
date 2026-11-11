@@ -10,7 +10,7 @@
 use super::commander::{unit_value, Op, Phase, Task, TurnPlan};
 use super::fields::{ch, fighter, mp, Picture, Theatre};
 use super::math::{mul, reach_chance, soft, ONE};
-use super::weights::{concept as kw, motive as mw, row, TABLE};
+use super::weights::{concept as kw, motive as mw, row};
 use super::{Milli, Prices};
 use crate::ai::battlefield::KindStats;
 use crate::ai::planner::{role_of, AiRole, Decision, UnitView};
@@ -319,7 +319,7 @@ fn flank(theatre: &Theatre<'_, '_>, rules: &CompiledRuleset, mover: EntityId, ti
 
 /// The motives of a candidate (design section 5) and its score by `row`.
 #[allow(clippy::too_many_arguments)]
-fn score(c: &mut Candidate, theatre: &Theatre<'_, '_>, rules: &CompiledRuleset, unit: &OwnUnit, role: Role, k: &Concepts, prices: &Prices, goal: Option<TileId>, cohesion: Option<&(Vec<Milli>, Vec<Milli>)>, flank_here: Milli, w: &[Milli; 14]) {
+fn score(c: &mut Candidate, theatre: &Theatre<'_, '_>, rules: &CompiledRuleset, unit: &OwnUnit, role: Role, k: &Concepts, prices: &Prices, goal: Option<TileId>, cohesion: Option<&(Vec<Milli>, Vec<Milli>)>, flank_here: Milli, w: &[Milli; 14], n: &super::fit::Numbers) {
     let hp_after = (i64::from(unit.hp) - c.taken).max(1);
     let melee = matches!(role, Role::Melee | Role::Mounted);
     let shooter = matches!(role, Role::Ranged | Role::Siege);
@@ -339,7 +339,7 @@ fn score(c: &mut Candidate, theatre: &Theatre<'_, '_>, rules: &CompiledRuleset, 
     let civilian = role == Role::Civilian;
     let ratio = if civilian { mul(ratio, super::weights::plan::CIVILIAN_DANGER) } else { ratio };
     let doomed = c.danger >= hp_after && c.p_take < ONE / 2 && c.p_kill < ONE / 2;
-    m[3] = -mul(mul((ratio - mw::SURVIVE_AT).max(0), prices.unit), prices.risk) - if doomed { mw::DOOM } else { 0 };
+    m[3] = -mul(mul((ratio - n.survive_at).max(0), prices.unit), prices.risk) - if doomed { n.doom } else { 0 };
     // m5 toward the operation's goal: turns closer.
     if let Some(goal) = goal {
         let moves = i64::from(rules.units.get(unit.kind.0 as usize).map_or(2, |d| d.movement.max(1)));
@@ -403,24 +403,24 @@ fn finish(c: &Candidate, unit: &OwnUnit, task: Option<Task>, plan: Option<&TurnP
 
 /// The assignment's worth for a candidate (m14): the plan's task done by it,
 /// or a step to the tile it is done from.
-fn assigned(c: &Candidate, unit: &OwnUnit, task: Option<Task>) -> Milli {
+fn assigned(c: &Candidate, unit: &OwnUnit, task: Option<Task>, n: &super::fit::Numbers) -> Milli {
     let Some(task) = task else { return 0 };
     match task {
         Task::Strike { target, from } | Task::Take { target, from } => {
             if c.kind == Kind::Strike && c.target == Some(target) && unit.tile == from {
-                mw::ASSIGNED
+                n.assigned
             } else if c.kind == Kind::Strike && c.target.is_none() && unit.tile == from {
                 // The set-up before the shot.
-                mw::ASSIGNED
+                n.assigned
             } else if c.kind == Kind::Move && c.dest == from {
-                mul(mw::ASSIGNED, mw::ASSIGNED_STEP)
+                mul(n.assigned, mw::ASSIGNED_STEP)
             } else {
                 0
             }
         }
         Task::Cover { tile, .. } => {
             let there = (c.kind == Kind::Move && c.dest == tile) || (matches!(c.kind, Kind::Hold | Kind::Fortify) && unit.tile == tile);
-            if there { mw::ASSIGNED } else { 0 }
+            if there { n.assigned } else { 0 }
         }
         Task::Withdraw => 0,
     }
@@ -439,7 +439,8 @@ pub fn decide(view: &UnitView<'_, '_>, rules: &CompiledRuleset, theatre: &Theatr
     let k = concepts(theatre, rules, &unit, role, others_shoot);
     let near_city = theatre.field.targets.iter().any(|t| t.is_city() && theatre.field.distance(t.tile, unit.tile) <= 3);
     let r = row_of(role, op, &k, task, near_city);
-    let w = &TABLE[r].w;
+    let n = super::fit::numbers(view.brief.tactician_fit);
+    let w = &n.table[r];
     let goal = match (op, role) {
         (Some(op), _) => Some(op.goal()),
         (None, _) => job,
@@ -452,9 +453,9 @@ pub fn decide(view: &UnitView<'_, '_>, rules: &CompiledRuleset, theatre: &Theatr
     let flank_here = if melee { flank(theatre, rules, unit.id, unit.tile) } else { 0 };
     let mut cands = candidates(view, theatre, rules, may_defer);
     for c in &mut cands {
-        c.assigned = assigned(c, &unit, task);
+        c.assigned = assigned(c, &unit, task, n);
         c.finish = finish(c, &unit, task, plan);
-        score(c, theatre, rules, &unit, role, &k, prices, goal, cohesion.as_ref(), flank_here, w);
+        score(c, theatre, rules, &unit, role, &k, prices, goal, cohesion.as_ref(), flank_here, w, n);
     }
     // The rule: no turn ends where the danger reaches the unit's health
     // unless the move takes or kills; such candidates go when another is left.

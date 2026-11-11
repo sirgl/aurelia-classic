@@ -161,8 +161,8 @@ fn play(o: &Options) -> Result<(), String> {
                     if std::env::var_os("WAR_OPS_RECALLS").is_some() {
                         for r in &probe.recalls {
                             eprintln!(
-                                "recall r{} p{} marching {} age {} life {} value {} expected {} net_saved {} saved {} threat {} guard {} planned {} attacker {} members {} nearest {} reaches {} missing {}/{}",
-                                r.round, r.player, r.marching, r.age, r.life, r.value, r.value_expected, r.net_saved, r.saved, r.threat, r.guard, r.planned, r.attacker, r.members, r.nearest_member, r.reaches, r.missing, r.need
+                                "recall r{} p{} marching {} age {} life {} value {} expected {} net_saved {} saved {} threat {} guard {} planned {} attacker {} members {} nearest {} reaches {} missing {}/{} gain {} cost {} start_value {} at_walls {} to_target {}",
+                                r.round, r.player, r.marching, r.age, r.life, r.value, r.value_expected, r.net_saved, r.saved, r.threat, r.guard, r.planned, r.attacker, r.members, r.nearest_member, r.reaches, r.missing, r.need, r.gain, r.cost, r.start_value.unwrap_or(0), r.at_walls, r.to_target
                             );
                         }
                     }

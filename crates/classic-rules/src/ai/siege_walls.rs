@@ -220,6 +220,202 @@ fn trace(player: PlayerId, round: u32, target: TileId, what: &str) {
 }
 
 // ---------------------------------------------------------------------------
+// The bench's view of a call at the walls (a probe; it changes no decision).
+
+/// What the seat sees and the model says at the walls of an operation's own city on one turn: the
+/// quantities the press / hold / withdraw call reads (`ai-siege-bank features`).
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct CallView {
+    pub round: u32,
+    pub target: u32,
+    /// The city is in sight.
+    pub seen: bool,
+    pub city_hp: i32,
+    pub cap: i32,
+    pub population: i32,
+    pub group: i32,
+    pub melee: i32,
+    pub ranged: i32,
+    pub siege: i32,
+    pub wounded: i32,
+    /// Hit points of the group (sum), and the members on their way (count and expected count in 4 rounds).
+    pub group_hp: i32,
+    pub awaited: i32,
+    pub awaited_in_4: f64,
+    /// Expected damage to the city this round by the shots that fire now, and by the melee blows that reach it.
+    pub fire: i32,
+    pub blows: i32,
+    /// The city's healing a round.
+    pub heal: i32,
+    /// The enemy's military units in sight on the city's tile and within three tiles of it, and their power
+    /// (strength × hit points / 100).
+    pub garrison: i32,
+    pub defenders: i32,
+    pub defender_power: i32,
+    /// Strikes a round on our units besides the city's own, and the city's expected strike on a member.
+    pub extra_hits: i32,
+    pub city_hit: i32,
+    pub engaged: bool,
+    pub now_capture: f64,
+    pub now_loss: f64,
+    pub now_value: f64,
+    pub soon: f64,
+    pub later_capture: f64,
+    pub later_value: f64,
+    pub wait: i32,
+    pub strike: bool,
+    pub choice: &'static str,
+}
+
+impl CallView {
+    pub const HEADER: &'static str = "round,target,seen,city_hp,cap,pop,group,melee,ranged,siege,wounded,group_hp,awaited,awaited_in_4,fire,blows,heal,garrison,defenders,defender_power,extra_hits,city_hit,engaged,now_capture,now_loss,now_value,soon,later_capture,later_value,wait,strike,choice";
+
+    pub fn csv(&self) -> String {
+        format!(
+            "{},{},{},{},{},{},{},{},{},{},{},{},{},{:.2},{},{},{},{},{},{},{},{},{},{:.3},{:.0},{:.0},{:.3},{:.3},{:.0},{},{},{}",
+            self.round, self.target, u8::from(self.seen), self.city_hp, self.cap, self.population, self.group, self.melee, self.ranged, self.siege, self.wounded, self.group_hp, self.awaited,
+            self.awaited_in_4, self.fire, self.blows, self.heal, self.garrison, self.defenders, self.defender_power, self.extra_hits, self.city_hit, u8::from(self.engaged), self.now_capture,
+            self.now_loss, self.now_value, self.soon, self.later_capture, self.later_value, self.wait, u8::from(self.strike), self.choice
+        )
+    }
+}
+
+thread_local! {
+    static CALLS: std::cell::RefCell<Option<Vec<CallView>>> = const { std::cell::RefCell::new(None) };
+}
+
+/// Starts recording the calls made on this thread (the bench).
+pub fn calls_begin() {
+    CALLS.with(|c| *c.borrow_mut() = Some(Vec::new()));
+}
+
+/// The calls recorded on this thread since `calls_begin`, and stops recording.
+pub fn calls_take() -> Vec<CallView> {
+    CALLS.with(|c| c.borrow_mut().take().unwrap_or_default())
+}
+
+fn calls_on() -> bool {
+    CALLS.with(|c| c.borrow().is_some())
+}
+
+// ---------------------------------------------------------------------------
+// `siege-call`: press, hold or withdraw, from what the seat sees.
+
+/// What the call reads, in whole numbers (hit points, tenths of a round): the seat's own group at the
+/// city, the city and the enemy in sight. Nothing but the previews and the sight (`evaluate`).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct Seen {
+    /// The city's hit points now.
+    pub city_hp: i32,
+    /// Damage a round of the shots that fire now, and of the melee blows that reach the walls (previews' expectation).
+    pub fire: i32,
+    pub blows: i32,
+    /// What the city heals back a round.
+    pub heal: i32,
+    /// The group's hit points, and those of the members on their way expected to stand with it within
+    /// `CALL_REINFORCE_ROUNDS` (`arrival` of each, times its hit points).
+    pub group_hp: i32,
+    pub reinforcement_hp: i32,
+    /// What the city's strike takes from a member a round, and the strikes besides it (the garrison's shooters).
+    pub hit: i32,
+    pub extra_hits: i32,
+}
+
+/// The call at the walls.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Verdict {
+    /// Strike (again) now, whatever the model's wait promises.
+    Press,
+    /// The model's own choice between a strike now and a wait on the ring.
+    Model,
+    /// Wait on the ring: the city is not worn down fast enough for the group to last.
+    Hold,
+    /// The city cannot fall: leave the walls (back to the ring, healing) and strike no more.
+    Withdraw,
+}
+
+/// Rounds, in tenths, the strikes now need to bring the city down: its hit points over the damage a round
+/// beyond what it heals back (a city that heals as much as is dealt is never brought down: `NEVER`).
+pub fn rounds_to_fall(s: &Seen) -> i32 {
+    let net = s.fire + s.blows - s.heal;
+    if net <= 0 {
+        return NEVER;
+    }
+    (s.city_hp * 10 / net).min(NEVER)
+}
+
+/// More rounds than any wait or siege lasts, in tenths.
+pub const NEVER: i32 = 9999;
+
+/// Rounds, in tenths, the group lasts under the city's strikes: its hit points (and the reinforcements') over
+/// what the city and its shooters take from a member a round.
+pub fn rounds_to_last(s: &Seen) -> i32 {
+    let per_round = (s.hit * (1 + s.extra_hits)).max(1);
+    ((s.group_hp + s.reinforcement_hp) * 10 / per_round).min(NEVER)
+}
+
+/// The thresholds of the call, fitted on the bank (`runs/tactic-call-fit.py`, offsets 200-206 of
+/// `runs/bank`, labels `runs/lab/calls.csv` + `muster.csv`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CallFit {
+    /// Press when the city falls within this many tenths of a round.
+    pub press: i32,
+    /// Hold when it takes longer than `press` and no longer than `withdraw`.
+    pub withdraw: i32,
+}
+
+/// Fitted on the bank (`runs/tactic-call-fit.py`, offsets 200-206 of `runs/bank`, 460 arrival positions, two
+/// reseeds each; held out 207-209, 196 positions). The labels: what the model's own call (`war-muster`) takes
+/// against pressing every round (`call-press`) and holding 2, 4 or 6 rounds first (`call-holdN`), same dice.
+/// Pressing took 37.9 % (held out 38.3 %) against the model's 34.0 % (36.0 %) at the same losses; every wait
+/// took less (24.0 %, 16.1 %, 10.9 %): the city heals back what a delayed strike would have taken and the
+/// reinforcement the model waits for is not there. A threshold on the rounds the strikes need (`rounds_to_fall`)
+/// did not beat pressing at every value (best held-out score at press <= 9999 = always), so `press` is the
+/// largest value and the only cut is the city the strikes cannot wear down at all (`withdraw`).
+pub const CALL: CallFit = CallFit { press: NEVER - 1, withdraw: NEVER - 1 };
+
+/// Rounds a member on its way is waited for in the call's count of the group's lasting.
+pub const CALL_REINFORCE_ROUNDS: u32 = 4;
+
+/// The call from what the seat sees: pressing pays when the city falls before the group is spent, waiting
+/// pays when the damage a round is not far below the city's healing and the group is not worn by the
+/// city's fire, withdrawing when the strikes cannot bring the city down at all in the time the group lasts.
+pub fn call(s: &Seen) -> Verdict {
+    call_with(&CALL, s)
+}
+
+pub fn call_with(fit: &CallFit, s: &Seen) -> Verdict {
+    let falls = rounds_to_fall(s);
+    if falls <= fit.press {
+        return Verdict::Press;
+    }
+    if falls > fit.withdraw {
+        return Verdict::Withdraw;
+    }
+    Verdict::Model
+}
+
+/// A call forced on every siege of this thread until a round (the bench's labels: what pressing, or holding, takes).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Call {
+    Press,
+    Hold,
+}
+
+thread_local! {
+    static FORCED: std::cell::Cell<Option<(Call, u32)>> = const { std::cell::Cell::new(None) };
+}
+
+/// Forces `call` on the sieges of this thread in the rounds before `until` (None: no call is forced).
+pub fn force_call(call: Option<(Call, u32)>) {
+    FORCED.with(|f| f.set(call));
+}
+
+fn forced(round: u32) -> Option<Call> {
+    FORCED.with(|f| f.get()).filter(|(_, until)| round < *until).map(|(c, _)| c)
+}
+
+// ---------------------------------------------------------------------------
 // The measured arrival of a member on its way.
 
 /// A member of the operation not in place to strike within a round — on its
@@ -1201,6 +1397,31 @@ fn evaluate(mind: u64, sight: &AIObservation<'_>, brief: &TurnBrief, state: &AiS
     // A city out of sight is valued by the player's estimate (no walls seen): it is
     // looked at first, then struck.
     let strike = observed.is_some() && acts && now.value > 0.0 && (now.value >= later.value || now.soon >= SURE_CAPTURE);
+    // `siege-call` (`CallFixes::call`): the call from what the seat sees (`call`).
+    let strike = if brief.siege_call.call {
+        let seen = Seen {
+            city_hp: i32::from(city_hp),
+            fire: (0..fighters.len()).filter(|i| fighters[*i].ranged && fighters[*i].ready == 0 && now_ok[*i]).map(|i| i32::from(fighters[i].dealt.1)).sum(),
+            blows: (0..fighters.len()).filter(|i| !fighters[*i].ranged && fighters[*i].ready <= 1 && ids[*i].1).map(|i| i32::from(fighters[i].dealt.1)).sum(),
+            heal: CITY_HEAL_PER_TURN as i32,
+            group_hp: group.iter().map(|u| i32::from(u.hp)).sum(),
+            reinforcement_hp: 0,
+            hit: 0,
+            extra_hits: i32::from(extra_hits),
+        };
+        match call(&seen) {
+            Verdict::Press => observed.is_some() && acts,
+            Verdict::Model => strike,
+            Verdict::Hold | Verdict::Withdraw => false,
+        }
+    } else {
+        strike
+    };
+    let strike = match forced(brief.round) {
+        Some(Call::Press) => observed.is_some() && acts,
+        Some(Call::Hold) => false,
+        None => strike,
+    };
     // A capture in reach: by the strike now, or after a wait the group survives to strike.
     let in_reach = now.capture >= MIN_CAPTURE || later.capture >= MIN_CAPTURE && later.value > 0.0;
     let choice = match (strike, engaged) {
@@ -1259,6 +1480,51 @@ fn evaluate(mind: u64, sight: &AIObservation<'_>, brief: &TurnBrief, state: &AiS
                 pred.join(",")
             );
         }
+    }
+    if own_way && calls_on() {
+        let in_group = |i: usize| ids[i].1;
+        let power = |u: &&crate::knowledge::observation::ObservedUnit| {
+            let def = &rules.units[u.kind.0 as usize];
+            i32::from(def.strength.max(def.ranged_strength)) * i32::from(u.hp) / 100
+        };
+        let enemy_near: Vec<&crate::knowledge::observation::ObservedUnit> =
+            sight.visible_foreign_units.iter().filter(|u| at_war(u.owner) && military(u.kind) && distance(u.tile, target) <= 3).collect();
+        let hits: Vec<i32> = (0..fighters.len()).filter(|i| in_group(*i)).map(|i| i32::from(fighters[i].city_hit.1)).collect();
+        let view = CallView {
+            round: brief.round,
+            target: target.0,
+            seen: observed.is_some(),
+            city_hp: i32::from(city_hp),
+            cap: i32::from(cap),
+            population: seen.population as i32,
+            group: group.len() as i32,
+            melee: group.iter().filter(|u| range(rules, u).is_none()).count() as i32,
+            ranged: group.iter().filter(|u| range(rules, u).is_some() && army_role(rules, u.kind) != Some(ArmyRole::Siege)).count() as i32,
+            siege: group.iter().filter(|u| army_role(rules, u.kind) == Some(ArmyRole::Siege)).count() as i32,
+            wounded: group.iter().filter(|u| u.hp < HEAL_BELOW_HP).count() as i32,
+            group_hp: group.iter().map(|u| i32::from(u.hp)).sum(),
+            awaited: awaited_n as i32,
+            awaited_in_4: ways.iter().flatten().map(|a| arrival(a, 4)).sum(),
+            fire: (0..fighters.len()).filter(|i| fighters[*i].ranged && fighters[*i].ready == 0 && now_ok[*i]).map(|i| i32::from(fighters[i].dealt.1)).sum(),
+            blows: (0..fighters.len()).filter(|i| !fighters[*i].ranged && fighters[*i].ready <= 1 && in_group(*i)).map(|i| i32::from(fighters[i].dealt.1)).sum(),
+            heal: CITY_HEAL_PER_TURN as i32,
+            garrison: enemy_near.iter().filter(|u| u.tile == target).count() as i32,
+            defenders: enemy_near.len() as i32,
+            defender_power: enemy_near.iter().map(power).sum(),
+            extra_hits: i32::from(extra_hits),
+            city_hit: if hits.is_empty() { 0 } else { hits.iter().sum::<i32>() / hits.len() as i32 },
+            engaged,
+            now_capture: now.capture,
+            now_loss: now.loss,
+            now_value: now.value,
+            soon: now.soon,
+            later_capture: later.capture,
+            later_value: later.value,
+            wait: wait as i32,
+            strike,
+            choice: choice.name(),
+        };
+        CALLS.with(|c| c.borrow_mut().as_mut().map(|v| v.push(view)));
     }
     let first_round = simulate(&striking(&rested, None).into_iter().filter(|f| f.ready == 0).collect::<Vec<_>>(), &city, 0, 1);
     // A city out of sight is neither valued by previews nor shot: the cheapest healthy

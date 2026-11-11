@@ -111,6 +111,30 @@ pub struct StartCheck {
     pub started: bool,
 }
 
+/// A forming operation at its player's turn (`operations::advance`): whether it may march.
+#[derive(Debug, Clone, Copy)]
+pub struct FormingSample {
+    pub round: u32,
+    pub player: PlayerId,
+    pub target: u32,
+    /// The army near the muster point covers the need (`operations::assembled`).
+    pub assembled: bool,
+    /// The defenders seen near the target are half as strong again as the members.
+    pub outmatched: bool,
+    /// At war with the target's owner already, or a war may be declared now.
+    pub may_declare: bool,
+    pub members: u32,
+    /// Members within `MUSTER_RADIUS + 1` of the muster point, those of them healthy, the wounded,
+    /// the sum of the members' distances to the muster point, the need, the muster's distance to
+    /// the target.
+    pub near: u32,
+    pub near_healthy: u32,
+    pub wounded: u32,
+    pub distance_sum: u32,
+    pub need: u32,
+    pub muster_to_target: i32,
+}
+
 /// An operation that ended.
 #[derive(Debug, Clone, Copy)]
 pub struct OperationEnd {
@@ -186,6 +210,9 @@ pub struct Recall {
     pub nearest_member: i32,
     /// The saving the same city would give without the army being able to arrive in time.
     pub reaches: bool,
+    /// Members within `DEFENCE_RADIUS` of the operation's target, and the nearest member's distance to it.
+    pub at_walls: u32,
+    pub to_target: i32,
 }
 
 /// A raid that formed, and what it did (`ai::raid`).
@@ -234,10 +261,23 @@ pub struct WarProbe {
     pub members: Vec<(u32, PlayerId, u32, bool, Vec<(u64, u32)>)>,
     /// The army units of every player that plans its operations, each turn: (round, player, ids).
     pub alive: Vec<(u32, PlayerId, Vec<u64>)>,
+    /// The forming operations, every turn they form.
+    pub forming: Vec<FormingSample>,
 }
 
 thread_local! {
     static PROBE: RefCell<WarProbe> = RefCell::new(WarProbe::default());
+    /// Notes are not recorded while a look that is no decision runs (`muted`).
+    static MUTED: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+/// Run `f` without recording: the strategist's look at the war machine (`operations::outlook`)
+/// prices the same cases as `start`, which records them; both recording doubled the estimates.
+pub(crate) fn muted<R>(f: impl FnOnce() -> R) -> R {
+    let before = MUTED.with(|m| m.replace(true));
+    let out = f();
+    MUTED.with(|m| m.set(before));
+    out
 }
 
 /// Switch the probe of this thread on (and clear it) or off.
@@ -263,7 +303,7 @@ pub fn on() -> bool {
 pub(crate) fn note(f: impl FnOnce(&mut WarProbe)) {
     PROBE.with(|p| {
         let mut p = p.borrow_mut();
-        if p.enabled {
+        if p.enabled && !MUTED.with(|m| m.get()) {
             f(&mut p);
         }
     });
