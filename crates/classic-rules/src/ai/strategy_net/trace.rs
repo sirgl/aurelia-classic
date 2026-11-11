@@ -246,3 +246,45 @@ pub fn production(player: u8, round: u32, city: u64, item: ProductionItem, alloc
         allocator.map_or("-".to_owned(), |a| item_name(rules, a))
     ));
 }
+
+/// The diplomatic race at a round of the United Nations (trace only, the measurements of the
+/// vote guard): our delegates, the known rivals', the vote's date, our gold and the alliances
+/// with our influence in each.
+pub fn watch(obs: &crate::knowledge::observation::AIObservation<'_>) {
+    if !enabled() {
+        return;
+    }
+    let Some(c) = obs.congress.as_ref().filter(|c| c.united_nations) else { return };
+    let own: Vec<String> = obs.city_states.iter().filter(|i| i.ally == Some(obs.player)).map(|i| format!("{}:{}", i.player.0, i.influence)).collect();
+    let all: Vec<String> = c.delegates.iter().map(|(p, d)| format!("{}:{d}", p.0)).collect();
+    push(format!(
+        "r{} p{} WATCH needed {} due {} in {} session {} | treasury {} income {} | delegates {} | allies {}",
+        obs.round,
+        obs.player.0,
+        c.needed,
+        c.leader_vote_next,
+        c.turns_until_session,
+        c.in_session,
+        obs.economy.treasury,
+        obs.economy.income.gold,
+        all.join(","),
+        if own.is_empty() { "-".to_owned() } else { own.join(",") }
+    ));
+}
+
+/// The tracker's readings of the rivals' roads to the victories (trace only, the vote guard):
+/// the diplomatic race (delegates, gap, chance), the original capitals held and the era against
+/// the spaceship's. The last two are readings, not acted on.
+pub fn readings(obs: &crate::knowledge::observation::AIObservation<'_>, rules: &CompiledRuleset) {
+    if !enabled() {
+        return;
+    }
+    let dipl = crate::ai::victory_watch::diplomatic(obs).map_or_else(
+        || "-".to_owned(),
+        |d| format!("needed {} in {} reach {} own {}/{} | {}", d.needed, d.rounds, d.reach, d.own.delegates, d.own.chance, d.rivals.iter().map(|r| format!("{}:{}/{}", r.rival.0, r.delegates, r.chance)).collect::<Vec<_>>().join(",")),
+    );
+    let others = crate::ai::victory_watch::others(obs, super::sharp::space_era(rules));
+    let dom: Vec<String> = others.iter().map(|o| format!("{}:{}/{}", o.rival.0, o.capitals_held, o.capitals_all)).collect();
+    let sci: Vec<String> = others.iter().map(|o| format!("{}:{}", o.rival.0, o.era_vs_space)).collect();
+    push(format!("r{} p{} READ diplomatic {} | domination {} | science {}", obs.round, obs.player.0, dipl, dom.join(","), sci.join(",")));
+}

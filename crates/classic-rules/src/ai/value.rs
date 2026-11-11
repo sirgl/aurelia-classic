@@ -184,6 +184,11 @@ pub struct Prices {
     /// (`city_states::delegate_worth`, `next` only; 0: the alliances are priced by their bonuses
     /// alone).
     pub delegate: Centi,
+    /// What losing the game to a rival's World Leader vote costs (`Variant::VoteGuard`: the prize
+    /// of `grand_strategy::prize`); an alliance of a rival that would otherwise win the vote is
+    /// worth the fall of its chance of that (`ai::victory_watch`). 0: the alliances of others are
+    /// left alone.
+    pub guard: Centi,
 }
 
 /// The spaceship parts an empire still has to build: the hammers of those
@@ -324,6 +329,7 @@ impl Prices {
             gift_cap,
             citizen_yield: 0,
             delegate: 0,
+            guard: 0,
         };
         match model {
             PriceModel::Tiles => {
@@ -1619,6 +1625,7 @@ mod tests {
             gift_cap: true,
             citizen_yield: 0,
             delegate: 0,
+            guard: 0,
         };
         let flat = prices.captured_city_unrest_flat(2);
         assert_eq!(flat, 5 * 2_700, "the flat price: five points at the price of a point");

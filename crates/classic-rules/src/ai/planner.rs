@@ -374,6 +374,9 @@ pub struct TurnBrief {
     pub tall_real: bool,
     /// `tall-real` with the review's fixes (`Variant::next`, `ai::tall_real`).
     pub next: bool,
+    /// The seat takes the alliances of a rival that would win the World Leader vote
+    /// (`Variant::vote_guard`, `ai::victory_watch`).
+    pub vote_guard: bool,
     /// The wonder-race switch (`Variant::wonder_race`): 0 off, 1 lost wonder orders are dropped, 2
     /// the wonder's price is the chance to finish it first (`ai::wonder_race`).
     pub wonder_race: u8,
@@ -503,6 +506,7 @@ impl TurnBrief {
             sharp: false,
             tall_real: false,
             next: false,
+            vote_guard: false,
             wonder_race: 0,
             tall: crate::ai::tall::Tall::Off,
             tall_cities: None,

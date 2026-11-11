@@ -78,6 +78,9 @@ pub struct Allocator {
     may_settle: bool,
     /// Gold the running operations keep for their army's upkeep.
     war_chest: u32,
+    /// The gold kept for the alliance of a rival that would win the World Leader vote
+    /// (`city_states::guard_chest`, `vote-guard`); only the gifts that take it may spend it.
+    guard_chest: u32,
     personality: Personality,
     /// A trade unit worth building, priced (`PriceModel::Uses`).
     trade: Option<TradeProspect>,
@@ -134,6 +137,7 @@ impl Allocator {
             jobs: if brief.effects.demand { finder_jobs(obs, brief, state, rules) } else { open_jobs(obs) },
             may_settle: may_settle(obs, brief, state, prices.model),
             war_chest: war_chest(obs, state) + state.war_plan.map_or(0, |plan| plan.chest),
+            guard_chest: crate::ai::city_states::guard_chest(obs, &prices),
             personality: brief.personality,
             sea: brief.sea_jobs.clone(),
             trade: match prices.model {
@@ -374,11 +378,13 @@ impl Allocator {
     /// a turn).
     pub(crate) fn spend_gold(&self, obs: &AIObservation<'_>, brief: &TurnBrief, empire: &Empire, rules: &CompiledRuleset) -> Vec<Decision> {
         let reserve = self.closing(emergency_reserve(obs, brief) + self.war_chest);
-        let mut spendable = obs.economy.treasury.saturating_sub(reserve);
+        let mut spendable = obs.economy.treasury.saturating_sub(reserve + self.guard_chest);
+        // What the gifts that take a rival's alliance may spend: the chest too.
+        let mut guard_room = obs.economy.treasury.saturating_sub(reserve);
         let mut offers = self.hurry_offers(obs, empire, rules);
         offers.extend(self.tile_offers(obs, spendable));
         if self.prices.model == PriceModel::Uses {
-            offers.extend(self.gift_offers(obs, spendable));
+            offers.extend(self.gift_offers(obs, guard_room.max(spendable)));
         }
         offers.sort_by_key(|o| (std::cmp::Reverse(o.ratio()), o.price, o.tie));
         let hurry_limit = obs.own_cities.len().div_ceil(3);
@@ -391,7 +397,8 @@ impl Allocator {
                 Command::GiftGold { .. } => (gifts < 1, Reason::GiftGold),
                 _ => (hurries < hurry_limit, Reason::Hurry),
             };
-            if !room || offer.price > spendable || income - offer.upkeep < 0 || offer.ratio() <= self.least_ratio() {
+            let purse = if offer.guard { guard_room } else { spendable };
+            if !room || offer.price > purse || income - offer.upkeep < 0 || offer.ratio() <= self.least_ratio() {
                 continue;
             }
             let bought = |d: &Decision| matches!(d.command, Some(Command::PurchaseTile { tile: t, .. }) if Some(t) == offer.tile());
@@ -403,7 +410,8 @@ impl Allocator {
                 continue;
             }
             income -= offer.upkeep;
-            spendable -= offer.price;
+            spendable = spendable.saturating_sub(offer.price);
+            guard_room = guard_room.saturating_sub(offer.price);
             match reason {
                 Reason::BuyTile => tiles += 1,
                 Reason::GiftGold => gifts += 1,
@@ -424,7 +432,7 @@ impl Allocator {
             .into_iter()
             .map(|gift| {
                 let command = Command::GiftGold { player: obs.player, city_state: gift.city_state, gold: gift.gold };
-                Offer { actor: Actor::Player, tie: u64::from(gift.city_state.0), price: gift.gold, value: gift.value, upkeep: 0, command }
+                Offer { actor: Actor::Player, tie: u64::from(gift.city_state.0), price: gift.gold, value: gift.value, upkeep: 0, command, guard: gift.contested }
             })
             .collect()
     }
@@ -462,7 +470,7 @@ impl Allocator {
             let freed = i64::from(cost.saturating_sub(city.production)) * hammer;
             let upkeep = crate::ai::planner_cities::item_upkeep(rules, item);
             let command = Command::HurryProduction { player: obs.player, city: city.handle };
-            out.push(Offer { actor: Actor::City(city.id), tie: city.id.0, price, value: saved + freed, upkeep, command });
+            out.push(Offer { actor: Actor::City(city.id), tie: city.id.0, price, value: saved + freed, upkeep, command, guard: false });
         }
         out
     }
@@ -495,7 +503,7 @@ impl Allocator {
                 }
                 let value = self.tile_value(obs, tile);
                 let command = Command::PurchaseTile { player: obs.player, city: city.handle, tile };
-                out.push(Offer { actor: Actor::City(city.id), tie: city.id.0, price, value, upkeep: 0, command });
+                out.push(Offer { actor: Actor::City(city.id), tie: city.id.0, price, value, upkeep: 0, command, guard: false });
             }
         }
         out
@@ -591,6 +599,8 @@ struct Offer {
     /// Gold a turn it costs once bought.
     upkeep: i32,
     command: Command,
+    /// A gift that takes a rival's alliance (`PricedGift::contested`): it may spend the guard's chest.
+    guard: bool,
 }
 
 impl Offer {

@@ -89,8 +89,102 @@ pub fn delegate_worth(obs: &AIObservation<'_>) -> crate::ai::value::Centi {
 
 /// The delegates an alliance brings to the World Leader vote: the city-state's seat of the
 /// session that holds it (`systems::congress::SESSIONS`).
-fn ally_delegates() -> i64 {
+pub(crate) fn ally_delegates() -> i64 {
     crate::systems::congress::SESSIONS.iter().filter(|s| s.united_nations).map(|s| i64::from(s.city_state_delegates)).max().unwrap_or(0)
+}
+
+/// The gold that raises an influence of `from` points to the alliance's threshold and one over
+/// it (the alliance is taken by strictly more), in gifts of the smallest size at the rules' price
+/// (`gold_gift_influence_at`, falling as the game goes on).
+pub fn alliance_gold(obs: &AIObservation<'_>, from: i32) -> u32 {
+    gold_for_points(obs, (ALLIES_THRESHOLD + 1 - from).max(0))
+}
+
+/// The gold that buys `points` of influence in gifts of the smallest size.
+pub fn gold_for_points(obs: &AIObservation<'_>, points: i32) -> u32 {
+    let per_gift = crate::world::city_states::gold_gift_influence_at(&obs.speed, obs.round, SMALL_GIFT, false, 0).max(1);
+    (points.max(0) as u32 * SMALL_GIFT).div_ceil(per_gift as u32)
+}
+
+/// Points of influence a seat aims above its estimate of a rival's influence in its ally when it
+/// takes the alliance in one lump (the winners' alliances hold 73 points at the median and 94 at the
+/// third quartile at the last round of the bench, against 80 for the seat's own: `runs/m1`).
+pub const LUMP_MARGIN: i32 = 10;
+
+/// An alliance of a rival that would win the World Leader vote, as the seat can take it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct GuardTarget {
+    pub city_state: crate::ids::PlayerId,
+    pub rival: crate::ids::PlayerId,
+    /// What taking it is worth (`victory_watch::Diplomatic::flip_worth`).
+    pub worth: crate::ai::value::Centi,
+    /// The influence of the rival we estimate and must pass.
+    pub beat: i32,
+    /// Our turns before the session that holds the vote opens.
+    pub rounds: u32,
+    /// The gold of one gift that takes it now, aimed `LUMP_MARGIN` above the estimate.
+    pub package: u32,
+    /// The gold is there by the vote and the gifts can climb that far (one gift a turn).
+    pub feasible: bool,
+}
+
+/// The smallest gift (in steps of 5 gold) that gives `points` of influence now.
+pub fn lump_gold(obs: &AIObservation<'_>, points: i32, invest: bool) -> u32 {
+    let gives = |g: u32| crate::world::city_states::gold_gift_influence_at(&obs.speed, obs.round, g, invest, 0);
+    let (mut lo, mut hi) = (1u32, 400_000u32);
+    if gives(hi) < points {
+        return hi;
+    }
+    while lo < hi {
+        let mid = lo + (hi - lo) / 2;
+        if gives(mid) >= points {
+            hi = mid;
+        } else {
+            lo = mid + 1;
+        }
+    }
+    lo.div_ceil(5) * 5
+}
+
+/// The alliances `prices.guard` makes worth buying: those of a rival whose chance to win the next
+/// World Leader vote one alliance lowers (`victory_watch`), at war with none. The rival's influence is not
+/// shown: it is taken to be what the seat's own alliances hold (they are held by the same economy), else
+/// the ceiling a seat tops an alliance up to, never below the alliance's threshold nor what the seat
+/// holds already. An alliance falls to strictly more influence.
+pub fn guard_targets(obs: &AIObservation<'_>, prices: &crate::ai::value::Prices) -> Vec<GuardTarget> {
+    use crate::knowledge::public::PlayerQueries;
+    if prices.guard <= 0 {
+        return Vec::new();
+    }
+    let Some(race) = crate::ai::victory_watch::diplomatic(obs) else { return Vec::new() };
+    let step = ally_delegates();
+    let lead = gift_lead(obs, prices.rounds_left);
+    let held: Vec<i32> = obs.city_states.iter().filter(|c| c.ally == Some(obs.player)).map(|c| c.influence).collect();
+    let income = i64::from(obs.economy.income.gold.max(0));
+    let mut out = Vec::new();
+    for info in &obs.city_states {
+        let Some(rival) = info.ally.filter(|a| *a != obs.player && !info.at_war) else { continue };
+        let worth = race.flip_worth(rival, prices.guard, step as i32);
+        let Some(terms) = obs.view.city_state_terms(info.player).filter(|_| worth > 0) else { continue };
+        let beat = if held.is_empty() { gift_ceiling(terms.allies_at, lead) } else { (held.iter().map(|v| i64::from(*v)).sum::<i64>() / held.len() as i64) as i32 }.max(terms.allies_at).max(info.influence);
+        let invest = info.quests.iter().any(|q| matches!(q, QuestKind::Invest));
+        let package = lump_gold(obs, (beat + LUMP_MARGIN + 1 - info.influence).max(1), invest);
+        // One gift a turn (`Allocator::spend_gold`), the largest of them at most, with the influence
+        // that falls a point a round until the vote.
+        let hold = i64::from(race.rounds);
+        let reach = i64::from(crate::world::city_states::gold_gift_influence_at(&obs.speed, obs.round, MEDIUM_GIFT, invest, 0).max(1)) * hold;
+        let climb = i64::from((beat + 1 - info.influence).max(0)) + hold;
+        let gold_by_then = i64::from(obs.economy.treasury) + income * (hold - 1).max(0);
+        let feasible = gold_by_then >= i64::from(package) && (race.rounds <= 1 || climb <= reach);
+        out.push(GuardTarget { city_state: info.player, rival, worth, beat, rounds: race.rounds, package, feasible });
+    }
+    out
+}
+
+/// The gold the treasury keeps for the alliance it can take most cheaply (the allocator's chest):
+/// 0 when no rival is in reach or none of its alliances can be paid by the vote.
+pub fn guard_chest(obs: &AIObservation<'_>, prices: &crate::ai::value::Prices) -> u32 {
+    guard_targets(obs, prices).iter().filter(|t| t.feasible).map(|t| t.package).min().unwrap_or(0)
 }
 
 /// A gold gift and what it is worth (`priced_gifts`).
@@ -99,6 +193,8 @@ pub struct PricedGift {
     pub city_state: crate::ids::PlayerId,
     pub gold: u32,
     pub value: crate::ai::value::Centi,
+    /// The gift takes an alliance from a rival that would win the World Leader vote (`vote-guard`).
+    pub contested: bool,
 }
 
 /// The gold gifts of the screen's sizes up to `gold` to city-states the
@@ -119,9 +215,13 @@ pub fn priced_gifts(obs: &AIObservation<'_>, prices: &crate::ai::value::Prices, 
     let cities = obs.own_cities.len().max(1) as i64;
     let rounds = i64::from(prices.rounds_left);
     let lead = gift_lead(obs, prices.rounds_left);
+    // `vote-guard`: the alliances of a rival that would win the World Leader vote, for sale at the price
+    // of the influence that takes them (`guard_targets`).
+    let targets = guard_targets(obs, prices);
     for info in &obs.city_states {
         let free = info.ally.is_none_or(|a| a == obs.player);
-        let Some(terms) = obs.view.city_state_terms(info.player).filter(|_| free && !info.at_war) else { continue };
+        let contest = targets.iter().find(|t| t.city_state == info.player);
+        let Some(terms) = obs.view.city_state_terms(info.player).filter(|_| (free || contest.is_some()) && !info.at_war) else { continue };
         let lacking: i32 = obs
             .view
             .tradeable_luxuries(info.player)
@@ -134,16 +234,32 @@ pub fn priced_gifts(obs: &AIObservation<'_>, prices: &crate::ai::value::Prices, 
         let invest = info.quests.iter().any(|q| matches!(q, QuestKind::Invest));
         // A quest for gold pays its influence for any gift (`Invest` only makes a gift worth more).
         let quest = info.quests.iter().any(|q| matches!(q, QuestKind::GiveGold { .. }));
-        if prices.gift_cap && !quest && info.influence >= gift_ceiling(terms.allies_at, lead) {
+        if contest.is_none() && prices.gift_cap && !quest && info.influence >= gift_ceiling(terms.allies_at, lead) {
             continue;
         }
+        let (target, hold, guard) = match contest {
+            Some(t) => {
+                if !t.feasible {
+                    continue;
+                }
+                // The last turn before the session opens: one lump that takes the alliance whole, or
+                // nothing (a gift that does not reach it is thrown away, and a rival answers a small one).
+                if t.rounds <= 1 {
+                    let votes = prices.delegate * ally_delegates() + t.worth;
+                    out.push(PricedGift { city_state: info.player, gold: t.package, value: round * rounds + votes, contested: true });
+                    continue;
+                }
+                (t.beat, i64::from(t.rounds), t.worth)
+            }
+            None => (terms.allies_at, rounds, 0),
+        };
         for size in [SMALL_GIFT, MEDIUM_GIFT].into_iter().filter(|g| *g <= gold) {
             let points = i64::from(crate::world::city_states::gold_gift_influence_at(&obs.speed, obs.round, size, invest, 0).max(1));
-            let climb = i64::from((terms.allies_at - info.influence).max(0) + 1);
-            let project_gold = (climb + rounds) * i64::from(size) / points;
-            let votes = prices.delegate * ally_delegates();
+            let climb = i64::from((target - info.influence).max(0) + 1);
+            let project_gold = (climb + hold) * i64::from(size) / points;
+            let votes = prices.delegate * ally_delegates() + guard;
             let value = (round * rounds + votes) * i64::from(size) / project_gold.max(1);
-            out.push(PricedGift { city_state: info.player, gold: size, value });
+            out.push(PricedGift { city_state: info.player, gold: size, value, contested: guard > 0 });
         }
     }
     out

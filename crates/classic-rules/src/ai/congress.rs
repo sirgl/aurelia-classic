@@ -172,6 +172,7 @@ impl crate::ai::system::SystemAdvisor for CongressAdvisor {
         input: &crate::ai::system::AdvisorInput<'_, '_>,
     ) -> Vec<crate::ai::system::Proposal> {
         let obs = input.observation;
+        crate::ai::strategy_net::trace::watch(obs);
         let weights = Weights::of(input.state.strategy.current);
         let mut out = crate::ai::combat::proposals(8, vote_orders(obs));
         out.extend(crate::ai::combat::proposals(6, proposal_orders(obs, input.rules, &weights)));
