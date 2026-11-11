@@ -205,7 +205,11 @@ fn every_book_issues_its_first_orders_in_a_fresh_game() {
 /// (seed 1 of the pangaea duel: the rival capital is on the same land).
 /// The bounds were measured against the standard the books are built on: since the
 /// thirteenth promotion that is `pre-next`, the rival here. Against the new `standard`
-/// the archer rush declares at round 190 (measured 11 November), the other two as before.
+/// the archer rush never launches on this seed (measured 11 November): the rival declares
+/// war first, at round 57, while the book has 4 of its 7 units staged at the border; the
+/// staged army dissolves and the book's window closes at round 63 (Build to Over). The
+/// declaration at round 190 is the seat's ordinary play, not the book's. Over 8 seeds the
+/// three rushes fail to launch in 8 of 24 games against `standard`, 5 of 24 against `pre-next`.
 #[test]
 fn the_rushes_declare_war_and_attack_by_a_bounded_round() {
     let rules = ClassicBench::rules();
