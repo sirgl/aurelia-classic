@@ -259,6 +259,9 @@ pub struct CityStateInfo {
     pub quests: Vec<crate::world::city_states::QuestKind>,
     /// The city-state's capital, when known.
     pub capital: Option<TileId>,
+    /// The capital as a city a spy can be sent to: its tile has been explored (the espionage screen
+    /// lists the known cities of the nations and city-states met).
+    pub capital_city: Option<CityHandle>,
 }
 
 /// Faith part of the observation.
@@ -358,7 +361,7 @@ impl<'a> AIObservation<'a> {
         };
         let city_states = {
             let _span = prof::span("nation5/obs city_states");
-            city_states_known(auth, rules, player)
+            city_states_known(auth, rules, player, &view)
         };
         let congress = {
             let _span = prof::span("nation5/obs congress");
@@ -799,7 +802,7 @@ fn relations(auth: &AuthWorld, view: &PlayerView<'_>, player: PlayerId) -> Vec<R
 
 
 /// The city-states `player` met (nations only; nothing for others).
-fn city_states_known(auth: &AuthWorld, rules: &CompiledRuleset, player: PlayerId) -> Vec<CityStateInfo> {
+fn city_states_known(auth: &AuthWorld, rules: &CompiledRuleset, player: PlayerId, view: &PlayerView<'_>) -> Vec<CityStateInfo> {
     use crate::world::city_states as cs;
     if !auth.players().is_major(player) {
         return Vec::new();
@@ -836,6 +839,12 @@ fn city_states_known(auth: &AuthWorld, rules: &CompiledRuleset, player: PlayerId
                 .first()
                 .and_then(|c| auth.cities().get(*c))
                 .map(|c| c.tile),
+            capital_city: auth
+                .indexes()
+                .cities_of(p)
+                .first()
+                .copied()
+                .filter(|c| auth.cities().get(*c).is_some_and(|core| view.is_known(core.tile))),
         })
         .collect()
 }

@@ -86,6 +86,16 @@ pub fn flips_in(obs: &AIObservation<'_>, rounds: u32) -> i64 {
     income * i64::from(rounds) / price
 }
 
+/// Alliances a rival can add in `rounds`: what our own economy would buy (`flips_in`: a rival's gold
+/// is not shown), and at least one alliance for every session interval the rounds span. The bench's
+/// mirror games show the leaders taking about one alliance a session interval whatever the economy
+/// of the seat that reads them (`runs/m1.md`), so a rival one alliance short is never out of reach.
+pub fn rival_flips(obs: &AIObservation<'_>, rounds: u32) -> i64 {
+    let interval = i64::from(kernel::rules::speeds::SpeedValues::scale(last_session().turns_between, obs.speed.pace_percent).max(1));
+    let floor = if rounds == 0 { 0 } else { (i64::from(rounds) + interval - 1) / interval };
+    flips_in(obs, rounds).max(floor)
+}
+
 /// The diplomatic race (None before the United Nations sits, with the vote open, or without
 /// the delegates' table).
 pub fn diplomatic(obs: &AIObservation<'_>) -> Option<Diplomatic> {
@@ -93,7 +103,7 @@ pub fn diplomatic(obs: &AIObservation<'_>) -> Option<Diplomatic> {
     let c = obs.congress.as_ref()?;
     // Alliances a rival can still take: the city-states we know, not its own.
     let known = obs.city_states.len() as i64;
-    let reach = flips_in(obs, rounds).min(known);
+    let reach = rival_flips(obs, rounds).min(known);
     let reading = |(rival, delegates): (PlayerId, u16)| {
         let gap = i32::from(c.needed) - i32::from(delegates);
         Reading { rival, delegates, gap, chance: chance_for(gap, reach) }
@@ -123,11 +133,11 @@ impl Diplomatic {
 }
 
 /// Dev switches of the vote guard's parts while they are tuned (`VG_STEP`, bits: 1 the alliances of
-/// a rival, 2 the host election); all on when unset. Gone with the freeze.
+/// a rival, 2 the host election, 4 the coups); all on when unset. Gone with the freeze.
 pub fn part(bit: u32) -> bool {
     use std::sync::OnceLock;
     static BITS: OnceLock<u32> = OnceLock::new();
-    *BITS.get_or_init(|| std::env::var("VG_STEP").ok().and_then(|v| v.parse().ok()).unwrap_or(3)) & bit != 0
+    *BITS.get_or_init(|| std::env::var("VG_STEP").ok().and_then(|v| v.parse().ok()).unwrap_or(7)) & bit != 0
 }
 
 /// Whom the seat votes for as host of the league (a `ChangeHost` election at a special session),
@@ -147,7 +157,7 @@ pub fn host_choice(obs: &AIObservation<'_>) -> Option<PlayerId> {
     }
     // Alliances it could still take before the leader vote: the ramp of the diplomatic race.
     let interval = kernel::rules::speeds::SpeedValues::scale(last_session().turns_between, obs.speed.pace_percent).max(1);
-    let reach = flips_in(obs, interval).min(obs.city_states.len() as i64);
+    let reach = rival_flips(obs, interval).min(obs.city_states.len() as i64);
     let delegates = c.delegates.iter().find(|(p, _)| *p == front)?.1;
     if chance_for(i32::from(c.needed) - i32::from(delegates), reach) == 0 {
         return None;
@@ -155,14 +165,49 @@ pub fn host_choice(obs: &AIObservation<'_>) -> Option<PlayerId> {
     c.delegates.iter().filter(|(p, _)| *p != front).max_by_key(|(p, d)| (*d, std::cmp::Reverse(p.0))).map(|(p, _)| *p)
 }
 
+/// A city-state allied to a rival whose alliance one fewer would lower its chance to win the next vote.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Contested {
+    pub city_state: PlayerId,
+    pub rival: PlayerId,
+    /// What taking it is worth (`Diplomatic::flip_worth`).
+    pub worth: Centi,
+}
+
+/// The alliances of the rivals that can win the next vote, dearest first, and our turns before the
+/// session that holds it opens. Empty while no rival can win (nothing else is computed then).
+pub fn contested(obs: &AIObservation<'_>) -> (Vec<Contested>, u32) {
+    let prize = prize_of_race(obs);
+    if prize <= 0 {
+        return (Vec::new(), 0);
+    }
+    let Some(race) = diplomatic(obs) else { return (Vec::new(), 0) };
+    let step = crate::ai::city_states::ally_delegates() as i32;
+    let mut out: Vec<Contested> = obs
+        .city_states
+        .iter()
+        .filter_map(|info| {
+            let rival = info.ally.filter(|a| *a != obs.player && !info.at_war)?;
+            let worth = race.flip_worth(rival, prize, step);
+            (worth > 0).then_some(Contested { city_state: info.player, rival, worth })
+        })
+        .collect();
+    out.sort_by_key(|c| (std::cmp::Reverse(c.worth), c.city_state.0));
+    (out, race.rounds)
+}
+
 /// What losing the game to a rival's vote costs the seat, in the measure of the allocator
 /// (`grand_strategy::prize`): 0 while no rival can win the next vote (no race, or every rival out
 /// of reach), so that nothing else is computed then.
 pub fn guard_prize(obs: &AIObservation<'_>) -> Centi {
-    use crate::knowledge::public::PlayerQueries;
     if !part(1) {
         return 0;
     }
+    prize_of_race(obs)
+}
+
+fn prize_of_race(obs: &AIObservation<'_>) -> Centi {
+    use crate::knowledge::public::PlayerQueries;
     let Some(race) = diplomatic(obs) else { return 0 };
     if race.rivals.iter().all(|r| r.chance == 0) {
         return 0;

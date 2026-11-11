@@ -10,6 +10,7 @@
 
 use classic_content::core::core_rules;
 use classic_rules::ai::city_states::{alliance_gold, priced_gifts};
+use classic_rules::ai::espionage::{guard_coup_orders, guard_placement_orders, placement_orders};
 use classic_rules::ai::value::{PriceModel, Prices};
 use classic_rules::ai::victory_watch::{chance_for, diplomatic, guard_prize, others};
 use classic_rules::ids::{PlayerId, TechId, TileId};
@@ -218,8 +219,8 @@ fn a_rival_far_from_the_threshold_is_left_alone() {
     assert_eq!(diplomatic(&obs).unwrap().of(P1).unwrap().gap, 3);
     assert_eq!(guard_prize(&obs), 0, "no rival in reach: nothing is priced");
     assert!(contested(&game, &rules, PRIZE).is_empty());
-    // One short of the threshold with no economy to make it up: out of reach as well.
-    let (mut game, rules) = scene(2, true);
+    // Two short of the threshold: a rival buys one alliance in the rounds left (`rival_flips`), not two.
+    let (mut game, rules) = scene(1, true);
     game.debug_earn(P0, 3000);
     assert!(contested(&game, &rules, PRIZE).is_empty());
     assert_eq!(chance_for(3, 0), 0);
@@ -309,4 +310,97 @@ fn the_vote_guard_seat_takes_influence_from_the_rival_and_the_standard_does_not(
     }
     // A gift of the smallest size reaches the rival's alliances; the plain AI never gifts them.
     assert!(gained[0] > 0 && gained[1] == 0, "vote-guard {} against standard {} points of influence", gained[0], gained[1]);
+}
+
+fn until_active(game: &mut GameState, rules: &CompiledRuleset, player: PlayerId) {
+    for _ in 0..8 {
+        let active = game.view().auth.active_player();
+        if active == player {
+            return;
+        }
+        game.execute(rules, Command::EndTurn { player: active }).unwrap();
+    }
+    panic!("{player:?} never became active");
+}
+
+/// P0 has explored the capitals of the city-states (the espionage screen lists known cities).
+fn explore_capitals(game: &mut GameState) {
+    let tiles: Vec<TileId> = (0..4u8).map(|i| game.view().auth.cities().get(game.view().auth.indexes().cities_of(cs(i))[0]).unwrap().tile).collect();
+    game.debug_reveal(P0, &tiles);
+}
+
+fn capital_of(game: &GameState, city_state: PlayerId) -> classic_rules::ids::CityHandle {
+    let auth = game.view().auth;
+    auth.indexes().cities_of(city_state)[0]
+}
+
+/// A spy without a post goes to the capital of a city-state a rival that can win the vote holds, ahead
+/// of the nations' cities where the plain AI sends it; with no rival in reach it goes where it always
+/// went.
+#[test]
+fn an_idle_spy_goes_to_the_rivals_ally() {
+    let (mut game, rules) = scene(3, true);
+    until_active(&mut game, &rules, P0);
+    // The fog: capitals never seen cannot be named, the spy goes where the plain AI sends it.
+    let obs = game.ai_observation(&rules, P0);
+    assert!(!obs.spies.is_empty(), "the Renaissance has come");
+    assert!(obs.city_states.iter().all(|c| c.capital_city.is_none()));
+    let caps: Vec<_> = (0..3).map(|i| capital_of(&game, cs(i))).collect();
+    assert!(guard_placement_orders(&obs, &rules).iter().all(|o| !matches!(o, Command::MoveSpy { city: Some(c), .. } if caps.contains(c))), "no unseen capital is named");
+    explore_capitals(&mut game);
+    let obs = game.ai_observation(&rules, P0);
+    let to = |orders: Vec<Command>| orders.into_iter().find_map(|o| match o {
+        Command::MoveSpy { city: Some(c), .. } => Some(c),
+        _ => None,
+    });
+    let allies: Vec<_> = (0..3).map(|i| capital_of(&game, cs(i))).collect();
+    let target = to(guard_placement_orders(&obs, &rules)).expect("an order");
+    assert!(allies.contains(&target), "to the capital of an ally of the rival");
+    assert_ne!(to(placement_orders(&obs, &rules)), Some(target), "the plain AI sends it to a nation's city");
+    // No rival in reach: the guard places as the plain AI does.
+    let (mut game, rules) = scene(0, true);
+    until_active(&mut game, &rules, P0);
+    explore_capitals(&mut game);
+    let obs = game.ai_observation(&rules, P0);
+    assert_eq!(to(guard_placement_orders(&obs, &rules)), to(placement_orders(&obs, &rules)));
+}
+
+/// A spy settled in a rival's ally stages the coup in the last rounds before the session opens and
+/// not before, and not on a hopeless chance.
+#[test]
+fn a_settled_spy_stages_the_coup_in_the_last_rounds() {
+    let (mut game, rules) = scene(3, true);
+    until_active(&mut game, &rules, P0);
+    explore_capitals(&mut game);
+    let target = capital_of(&game, cs(0));
+    game.execute(&rules, Command::MoveSpy { player: P0, spy: 0, city: Some(target), diplomat: false }).unwrap();
+    let reset = |game: &mut GameState| {
+        for i in 0..3 {
+            game.debug_set_influence(&rules, cs(i), P1, 80);
+            game.debug_set_influence(&rules, cs(i), P0, 40);
+        }
+    };
+    let mut seen = Vec::new();
+    for _ in 0..60 {
+        end_round(&mut game, &rules);
+        reset(&mut game);
+        until_active(&mut game, &rules, P0);
+        let obs = game.ai_observation(&rules, P0);
+        if obs.congress.as_ref().is_none_or(|c| c.in_session) {
+            break;
+        }
+        let rounds = classic_rules::ai::victory_watch::diplomatic(&obs).map_or(99, |d| d.rounds);
+        let established = obs.spies[0].coup_chance.is_some();
+        if established {
+            seen.push((rounds, !guard_coup_orders(&obs).is_empty()));
+        }
+    }
+    assert!(seen.iter().any(|(r, o)| *r <= 3 && *o), "the coup is ordered in the window: {seen:?}");
+    assert!(seen.iter().all(|(r, o)| *r <= 3 || !*o), "and not before: {seen:?}");
+    // A chance under the guard's minimum is not tried.
+    game.debug_set_influence(&rules, cs(0), P1, 140);
+    game.debug_set_influence(&rules, cs(0), P0, 0);
+    let obs = game.ai_observation(&rules, P0);
+    assert!(obs.spies[0].coup_chance.is_none_or(|c| c < classic_rules::ai::espionage::GUARD_COUP_MIN_CHANCE));
+    assert!(guard_coup_orders(&obs).is_empty());
 }
