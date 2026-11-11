@@ -1086,7 +1086,9 @@ mod sharp_tests {
         assert_eq!((open.variant(), open.pays), (Variant::WarOpen, false));
         let flagged: Vec<Variant> = Variant::ALL.into_iter().filter(|v| v.war_pays()).collect();
         assert_eq!(flagged, [Variant::WarPays]);
-        assert_eq!(Variant::from_name("war-pays"), Some(Variant::WarPays));
+        // An experimental war variant like the rest of its line (`Variant::compiled`; until stage 2 of
+        // `next-war` it was named in every build).
+        assert_eq!(Variant::from_name("war-pays"), cfg!(feature = "experimental-ai").then_some(Variant::WarPays));
         assert!(mind.variant.war_open() && !Variant::WarPays.war_open());
     }
 

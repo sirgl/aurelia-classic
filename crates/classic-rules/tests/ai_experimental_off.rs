@@ -51,7 +51,7 @@ fn the_variable_is_ignored_and_the_game_plays_standard() {
 
 #[test]
 fn the_nets_have_no_name_in_this_build() {
-    for name in ["net", "unit-net", "hybrid", "site-net", "choice-net", "choice-net-production", "choice-net-research", "standard-scripted", "sharp", "tall-real", "next", "next-w", "next-race", "wonder-cancel", "wonder-race", "pre-next"] {
+    for name in ["net", "unit-net", "hybrid", "site-net", "choice-net", "choice-net-production", "choice-net-research", "standard-scripted", "sharp", "tall-real", "next", "next-w", "next-race", "wonder-cancel", "wonder-race", "pre-next", "war-pays", "tactician-fit", "war-muster", "siege-call", "next-war", "retake2", "next-war-retake"] {
         assert_eq!(Variant::from_name(name), None, "{name}");
     }
     assert_eq!(Variant::from_name("standard"), Some(Variant::Standard));

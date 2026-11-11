@@ -1114,12 +1114,13 @@ impl Variant {
     /// strategy net's line (`Sharp` … `NextRace`). The strategy net is the game's since the twelfth
     /// promotion: `strategy-net`, its alias, is in every build. The play of `next-w` is the game's
     /// since the thirteenth: `Standard` carries its flags in every build (none of its code is
-    /// behind the feature); the name `next-w` stays the bench's.
+    /// behind the feature); the name `next-w` stays the bench's. The war line (`WarPays` …
+    /// `NextWarRetake`) is the bench's too.
     pub fn compiled(self) -> bool {
         cfg!(feature = "experimental-ai")
             || !matches!(
                 self,
-                Variant::Net | Variant::UnitNet | Variant::Hybrid | Variant::SiteNet | Variant::ChoiceNet | Variant::ChoiceNetProduction | Variant::ChoiceNetResearch | Variant::StandardScripted | Variant::PreCsGifts | Variant::Sharp | Variant::TallReal | Variant::Next | Variant::WonderCancel | Variant::WonderRace | Variant::NextW | Variant::NextRace | Variant::PreNext | Variant::TacticianFit | Variant::WarMuster | Variant::SiegeCall | Variant::NextWar | Variant::Retake2 | Variant::NextWarRetake
+                Variant::Net | Variant::UnitNet | Variant::Hybrid | Variant::SiteNet | Variant::ChoiceNet | Variant::ChoiceNetProduction | Variant::ChoiceNetResearch | Variant::StandardScripted | Variant::PreCsGifts | Variant::Sharp | Variant::TallReal | Variant::Next | Variant::WonderCancel | Variant::WonderRace | Variant::NextW | Variant::NextRace | Variant::PreNext | Variant::WarPays | Variant::TacticianFit | Variant::WarMuster | Variant::SiegeCall | Variant::NextWar | Variant::Retake2 | Variant::NextWarRetake
             )
     }
 
