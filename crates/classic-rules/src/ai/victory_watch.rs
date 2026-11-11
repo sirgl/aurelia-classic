@@ -12,10 +12,17 @@
 //! - **Domination, science** (readings only): the original capitals each nation holds as far as the
 //!   seat has seen them, and the era of each nation met against the spaceship's era.
 //!
+//! What the seat does with it (`Variant::VoteGuard` only): `city_states` takes alliances by gift, where
+//! each alliance of a nation is worth the fall of that rival's chance to win the vote plus the rise of
+//! the seat's own (`Diplomatic::flip_worth`); `espionage` sends spies to those city-states and stages a
+//! coup in the last rounds; `congress` votes the host election to the strongest nation but the
+//! front-runner (`host_choice`).
+//!
 //! The chance that a rival wins the vote is a ramp over its gap to the threshold: a rival at the
 //! threshold wins (every AI votes for itself), one short by `g` delegates wins if it can buy `g`
 //! alliances before the session opens. How many it can buy is the delegates the rounds left allow
-//! at the pace the seat's own economy pays an alliance (`flips_in`): an estimate from the rules'
+//! at the pace the seat's own economy pays an alliance (`flips_in`), and at least one alliance a session
+//! interval (`rival_flips`): an estimate from the rules'
 //! price of an alliance (`gold_gift_influence_at`) and the seat's income, since a rival's gold is
 //! not shown. Everything is a read of the observation: no state is kept between turns.
 
@@ -139,20 +146,9 @@ impl Diplomatic {
     /// What one more alliance of our own is worth toward winning the vote ourselves: the rise of our
     /// own chance, in the measure of `prize` (0 when we are out of reach or over the threshold).
     pub fn gain(&self, prize: Centi, step: i32) -> Centi {
-        if !part(8) {
-            return 0;
-        }
         let rise = chance_for(self.own.gap - step, self.reach) - chance_for(self.own.gap, self.reach);
         prize * rise / 1000
     }
-}
-
-/// Dev switches of the vote guard's parts while they are tuned (`VG_STEP`, bits: 1 the alliances of
-/// a rival, 2 the host election, 4 the coups, 8 our own win: the alliances of any nation are worth what they add to our own chance); all on when unset. Gone with the freeze.
-pub fn part(bit: u32) -> bool {
-    use std::sync::OnceLock;
-    static BITS: OnceLock<u32> = OnceLock::new();
-    *BITS.get_or_init(|| std::env::var("VG_STEP").ok().and_then(|v| v.parse().ok()).unwrap_or(15)) & bit != 0
 }
 
 /// Whom the seat votes for as host of the league (a `ChangeHost` election at a special session),
@@ -196,7 +192,7 @@ pub struct Contested {
 /// The alliances of the rivals that can win the next vote, dearest first, and our turns before the
 /// session that holds it opens. Empty while no rival can win (nothing else is computed then).
 pub fn contested(obs: &AIObservation<'_>) -> (Vec<Contested>, u32) {
-    let prize = prize_of_race(obs);
+    let prize = guard_prize(obs);
     if prize <= 0 {
         return (Vec::new(), 0);
     }
@@ -215,17 +211,10 @@ pub fn contested(obs: &AIObservation<'_>) -> (Vec<Contested>, u32) {
     (out, race.rounds)
 }
 
-/// What losing the game to a rival's vote costs the seat, in the measure of the allocator
-/// (`grand_strategy::prize`): 0 while no rival can win the next vote (no race, or every rival out
-/// of reach), so that nothing else is computed then.
+/// What the vote is worth to the seat, in the measure of the allocator (`grand_strategy::prize`): what
+/// losing the game to a rival costs, and the same for winning the vote itself. 0 while no rival can win
+/// the next vote and the seat is out of reach of it (no race), so that nothing else is computed then.
 pub fn guard_prize(obs: &AIObservation<'_>) -> Centi {
-    if !part(1) {
-        return 0;
-    }
-    prize_of_race(obs)
-}
-
-fn prize_of_race(obs: &AIObservation<'_>) -> Centi {
     use crate::knowledge::public::PlayerQueries;
     let Some(race) = diplomatic(obs) else { return 0 };
     // A rival that can win the vote, or the vote within our own reach (`Diplomatic::gain`).

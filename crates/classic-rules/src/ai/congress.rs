@@ -96,7 +96,7 @@ pub fn vote_orders_for(obs: &AIObservation<'_>, guard: bool) -> Vec<Command> {
     if !info.in_session || info.delegates_left == 0 || info.proposals.is_empty() {
         return Vec::new();
     }
-    let host = guard.then(|| crate::ai::victory_watch::part(2).then(|| crate::ai::victory_watch::host_choice(obs)).flatten()).flatten();
+    let host = guard.then(|| crate::ai::victory_watch::host_choice(obs)).flatten();
     if let (Some(host), Some(i)) = (host, info.proposals.iter().position(|p| p.kind == ResolutionKind::ChangeHost)) {
         if crate::ai::strategy_net::trace::enabled() {
             crate::ai::strategy_net::trace::push(format!("r{} p{} VOTE host denied: {} delegates to p{}", obs.round, obs.player.0, info.delegates_left, host.0));

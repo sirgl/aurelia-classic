@@ -246,7 +246,7 @@ impl crate::ai::system::SystemAdvisor for EspionageAdvisor {
         let obs = input.observation;
         let mut out = crate::ai::combat::proposals(9, steal_orders(obs));
         out.extend(crate::ai::combat::proposals(7, coup_orders(obs)));
-        if input.brief.vote_guard && crate::ai::victory_watch::part(4) {
+        if input.brief.vote_guard {
             let coups = guard_coup_orders(obs);
             let moves = guard_placement_orders(obs, input.rules);
             if crate::ai::strategy_net::trace::enabled() {
