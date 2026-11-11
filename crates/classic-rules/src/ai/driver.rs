@@ -719,7 +719,7 @@ impl ClassicMind {
         brief.muster_fix = self.fit || self.muster;
         brief.war_muster = self.muster;
         brief.retake = self.retake2;
-        brief.siege_call = if self.call { crate::ai::planner::CallFixes::from_env() } else { crate::ai::planner::CallFixes::NONE };
+        brief.siege_call = if self.call { crate::ai::planner::CallFixes::DEFAULT } else { crate::ai::planner::CallFixes::NONE };
         if self.retake2 {
             brief.retaking = crate::ai::retake::cases_remembered(observation, &brief, state, rules);
         }

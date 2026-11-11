@@ -221,8 +221,9 @@ pub struct UnitBrief {
 }
 
 /// The parts of `siege-call` (`Variant::SiegeCall`), each a class fix of the operations layer or of the call at the
-/// walls; the bench sets them with `SIEGE_CALL_ON` (a comma list of the names that are on; unset: `DEFAULT`).
-/// Only `siege-call` carries any.
+/// walls. The variants of the war line play `DEFAULT` (`ClassicMind::new`); the others carry none. The parts that
+/// are off stay in the code: an ablation edits `DEFAULT` (the rules read no environment for them; until stage 2
+/// of `next-war` the bench switched them with `SIEGE_CALL_ON`).
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct CallFixes {
     /// Declare the war only when the whole army can strike within two turns, and muster out of the city's strike.
@@ -244,24 +245,13 @@ impl CallFixes {
     pub const ALL: CallFixes = CallFixes { ready: true, ranged: true, melee: true, threat: true, call: true, walls: true };
     /// What `siege-call` plays: the fixes that measured better on the tuning offsets 200-202 (300 solo pace games,
     /// `runs/ops`): ranged units first and the press call. `ready` cut the losses and not the share, `melee` and
-    /// `threat` lowered both (see `LOG.md`); they stay in the code, off, for the bench to switch on.
+    /// `threat` lowered both (see `LOG.md`); they stay in the code, off, for an ablation to switch on.
     pub const DEFAULT: CallFixes = CallFixes { ready: false, ranged: true, melee: false, threat: false, call: true, walls: false };
 
     pub fn any(self) -> bool {
         self != Self::NONE
     }
 
-    /// `ALL`, or the names in `SIEGE_CALL_ON` (the bench's switch).
-    pub fn from_env() -> CallFixes {
-        static FIXES: std::sync::OnceLock<CallFixes> = std::sync::OnceLock::new();
-        *FIXES.get_or_init(|| match std::env::var("SIEGE_CALL_ON") {
-            Ok(list) => {
-                let on = |n: &str| list.split(',').any(|x| x.trim() == n);
-                CallFixes { ready: on("ready"), ranged: on("ranged"), melee: on("melee"), threat: on("threat"), call: on("call"), walls: on("walls") }
-            }
-            Err(_) => CallFixes::DEFAULT,
-        })
-    }
 }
 
 /// A foreign unit seen at the start of the turn.
