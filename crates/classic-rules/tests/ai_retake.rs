@@ -5,10 +5,18 @@
 
 use classic_content::core::core_rules;
 use classic_rules::ai::planner::TurnBrief;
+use classic_rules::ai::diplomacy::{DiplomacyAdvisor, ACCEPT_PEACE_AFTER_ROUNDS};
+use classic_rules::ai::planner::{PlanTools, UnitView};
+use classic_rules::ai::planner_map::MapScratch;
 use classic_rules::ai::retake::{self, Lost, Memory};
-use classic_rules::ai::state::AiState;
+use classic_rules::ai::state::{AiState, UnitTask};
 use classic_rules::ai::strategy_net;
+use classic_rules::ai::system::{AdvisorInput, SystemAdvisor};
+use classic_rules::ai::trace::{AiCounters, Reason};
+use classic_rules::ai::{tactics, AiSettings};
+use classic_rules::command::Command;
 use classic_rules::ids::{PlayerId, TerrainId, TileId, UnitKindId};
+use classic_rules::world::relations::DealItem;
 use classic_rules::math::HexCoord;
 use classic_rules::{compile_rules, ClassicGame, CompiledRuleset, GameConfig, GameState};
 
@@ -36,6 +44,8 @@ struct Scene {
     damage: u16,
     ours: Vec<(i32, i32)>,
     guards: Vec<(i32, i32)>,
+    /// Rounds the three players are at war before the city falls (0: the war is as old as the scene).
+    war_rounds: u32,
 }
 
 fn scene(rules: &CompiledRuleset, s: &Scene) -> GameState {
@@ -49,12 +59,18 @@ fn scene(rules: &CompiledRuleset, s: &Scene) -> GameState {
     game.debug_found_city(rules, US, tile(&game, 3, 10));
     game.debug_found_city(rules, THEM, tile(&game, 27, 10));
     game.debug_found_city(rules, THIRD, tile(&game, 27, 2));
-    let city = game.debug_found_city(rules, s.holder, tile(&game, CITY.0, CITY.1));
-    game.debug_set_city_damage(city, s.damage);
     for (a, b) in [(US, THEM), (US, THIRD), (THEM, THIRD)] {
         game.debug_meet(a, b);
         game.debug_force_war(rules, a, b);
     }
+    // The war ages before the city falls: the players end their turns, nothing else happens.
+    let start = game.view().auth.turn().round;
+    while game.view().auth.turn().round < start + s.war_rounds {
+        let active = game.view().auth.active_player();
+        game.execute(rules, Command::EndTurn { player: active }).unwrap();
+    }
+    let city = game.debug_found_city(rules, s.holder, tile(&game, CITY.0, CITY.1));
+    game.debug_set_city_damage(city, s.damage);
     let sword = unit_kind(rules, "swordsman");
     for (q, r) in &s.ours {
         game.debug_spawn_unit(rules, US, tile(&game, *q, *r), sword);
@@ -96,7 +112,7 @@ fn retaking(rules: &CompiledRuleset, game: &GameState, state: &mut AiState) -> (
 #[test]
 fn a_case_opens_when_the_seats_city_falls_in_sight_with_its_real_health() {
     let rules = compile_rules(core_rules()).unwrap();
-    let game = scene(&rules, &Scene { holder: THEM, damage: 190, ours: group(), guards: vec![] });
+    let game = scene(&rules, &Scene { holder: THEM, damage: 190, ours: group(), guards: vec![], war_rounds: 0 });
     let mut state = memory_of_the_last_turn(&game);
     let (_, cases) = retaking(&rules, &game, &mut state);
     assert_eq!(cases.len(), 1, "one case: the city");
@@ -116,7 +132,7 @@ fn a_case_opens_when_the_seats_city_falls_in_sight_with_its_real_health() {
 #[test]
 fn a_city_lost_out_of_sight_opens_no_case_and_names_no_taker() {
     let rules = compile_rules(core_rules()).unwrap();
-    let game = scene(&rules, &Scene { holder: THEM, damage: 190, ours: vec![(3, 11)], guards: vec![] });
+    let game = scene(&rules, &Scene { holder: THEM, damage: 190, ours: vec![(3, 11)], guards: vec![], war_rounds: 0 });
     let mut state = memory_of_the_last_turn(&game);
     let (_, cases) = retaking(&rules, &game, &mut state);
     assert!(cases.is_empty());
@@ -130,7 +146,7 @@ fn a_city_lost_out_of_sight_opens_no_case_and_names_no_taker() {
 #[test]
 fn a_city_taken_again_by_a_third_player_opens_no_case() {
     let rules = compile_rules(core_rules()).unwrap();
-    let game = scene(&rules, &Scene { holder: THIRD, damage: 190, ours: group(), guards: vec![] });
+    let game = scene(&rules, &Scene { holder: THIRD, damage: 190, ours: group(), guards: vec![], war_rounds: 0 });
     let mut state = memory_of_the_last_turn(&game);
     let city = tile(&game, CITY.0, CITY.1);
     let mut kept = strategy_net::Memory::decode(&state.mind_memory);
@@ -183,7 +199,7 @@ fn the_memory_keeps_a_lost_city_for_the_window_only_and_lets_it_go_when_it_chang
 #[test]
 fn the_peace_refusal_holds_only_while_the_case_stands() {
     let rules = compile_rules(core_rules()).unwrap();
-    let game = scene(&rules, &Scene { holder: THEM, damage: 190, ours: group(), guards: vec![] });
+    let game = scene(&rules, &Scene { holder: THEM, damage: 190, ours: group(), guards: vec![], war_rounds: 0 });
     let mut state = memory_of_the_last_turn(&game);
     let (brief, cases) = retaking(&rules, &game, &mut state);
     assert_eq!(cases.len(), 1);
@@ -191,13 +207,13 @@ fn the_peace_refusal_holds_only_while_the_case_stands() {
     assert!(!brief.retaking_from(THIRD), "none for the others");
     assert!(brief.is_retaken(tile(&game, CITY.0, CITY.1)));
     // The group is gone: no case, no refusal.
-    let game = scene(&rules, &Scene { holder: THEM, damage: 190, ours: vec![], guards: vec![] });
+    let game = scene(&rules, &Scene { holder: THEM, damage: 190, ours: vec![], guards: vec![], war_rounds: 0 });
     let mut state = memory_of_the_last_turn(&game);
     let (brief, cases) = retaking(&rules, &game, &mut state);
     assert!(cases.is_empty());
     assert!(!brief.retaking_from(THEM));
     // The city is ours again: nothing to retake.
-    let game = scene(&rules, &Scene { holder: US, damage: 0, ours: group(), guards: vec![] });
+    let game = scene(&rules, &Scene { holder: US, damage: 0, ours: group(), guards: vec![], war_rounds: 0 });
     let mut state = memory_of_the_last_turn(&game);
     let (brief, cases) = retaking(&rules, &game, &mut state);
     assert!(cases.is_empty());
@@ -210,7 +226,7 @@ fn the_peace_refusal_holds_only_while_the_case_stands() {
 #[test]
 fn the_guard_test_refuses_the_heavily_defended_case() {
     let rules = compile_rules(core_rules()).unwrap();
-    let alone = scene(&rules, &Scene { holder: THEM, damage: 190, ours: group(), guards: vec![(15, 10)] });
+    let alone = scene(&rules, &Scene { holder: THEM, damage: 190, ours: group(), guards: vec![(15, 10)], war_rounds: 0 });
     let seen = alone.ai_observation(&rules, US).visible_foreign_units.iter().filter(|u| u.owner == THEM).count();
     assert_eq!(seen, 1, "the captor's unit is in sight");
     let mut state = memory_of_the_last_turn(&alone);
@@ -218,7 +234,7 @@ fn the_guard_test_refuses_the_heavily_defended_case() {
     assert_eq!(cases.len(), 1, "one unit of the captor in the open is a fight the group takes");
 
     let guards = vec![(14, 10), (14, 9), (14, 11), (15, 9), (15, 10), (15, 11), (14, 8), (14, 12)];
-    let crowded = scene(&rules, &Scene { holder: THEM, damage: 190, ours: group(), guards });
+    let crowded = scene(&rules, &Scene { holder: THEM, damage: 190, ours: group(), guards, war_rounds: 0 });
     let obs = crowded.ai_observation(&rules, US);
     let in_sight = obs.visible_foreign_units.iter().filter(|u| u.owner == THEM).count();
     assert!(in_sight >= 6, "the test needs the guard in sight, {in_sight} seen");
@@ -264,3 +280,129 @@ fn the_memory_is_versioned_and_leaves_the_other_variants_bytes_alone() {
     assert_eq!(Memory::decode(&[]), None);
     assert_eq!(Memory::decode(&[1, 3]), None, "a truncated body");
 }
+
+/// The scene has been at war for `age` rounds (it is round `age`), and the seat's memory says the city was lost in
+/// `lost_round`. Returns the game, the seat's state and the cases.
+fn old_loss(rules: &CompiledRuleset, age: u32, lost_round: u32) -> (GameState, AiState, Vec<retake::Case>) {
+    let game = scene(rules, &Scene { holder: THEM, damage: 190, ours: group(), guards: vec![], war_rounds: age });
+    let mut state = memory_of_the_last_turn(&game);
+    let mut kept = strategy_net::Memory::decode(&state.mind_memory);
+    kept.retake = Some(Memory { held: vec![tile(&game, 3, 10)], lost: vec![Lost { tile: tile(&game, CITY.0, CITY.1), round: lost_round, captor: Some(THEM) }] });
+    state.mind_memory = kept.encode();
+    let (_, cases) = retaking(rules, &game, &mut state);
+    (game, state, cases)
+}
+
+/// A city lost long ago is no case, through `cases_remembered` and not only the memory: the same scene opens a
+/// case when the loss is recent, and none when it is older than the window; the memory lets the loss go.
+#[test]
+fn a_city_lost_long_ago_opens_no_case_through_cases_remembered() {
+    let rules = compile_rules(core_rules()).unwrap();
+    let age = WINDOW + 3;
+    // The scene's round is `age` (the rounds start at 0): a loss of this round is a case, one of round 1 is older than the window.
+    let (game, state, cases) = old_loss(&rules, age, age);
+    let round = game.view().auth.turn().round;
+    assert!(round > 1 + WINDOW, "the scene is past the window, round {round}");
+    assert_eq!(cases.len(), 1, "a loss of this very round is a case at round {round}");
+    assert_eq!(remembered(&state).lost.len(), 1);
+    let (_, state, cases) = old_loss(&rules, age, 1);
+    assert!(cases.is_empty(), "a loss in round 1 is older than the window of {WINDOW} rounds");
+    assert!(remembered(&state).lost.is_empty(), "the memory lets it go");
+}
+
+/// A captor unit the seat does not see does not count in the guard test: eight units around the city, all out of
+/// sight of the group, leave the case open; the same eight in sight (`the_guard_test_refuses_...`) close it.
+#[test]
+fn a_captor_unit_out_of_the_seats_sight_does_not_count_in_the_guard_test() {
+    let rules = compile_rules(core_rules()).unwrap();
+    // Every tile exactly four from the city and three or more from each unit of the group (which sees two tiles).
+    let probe = scene(&rules, &Scene { holder: THEM, damage: 190, ours: group(), guards: vec![], war_rounds: 0 });
+    let dims = probe.view().auth.map().dimensions;
+    let city = tile(&probe, CITY.0, CITY.1);
+    let guards: Vec<(i32, i32)> = (4..=20)
+        .flat_map(|q| (0..=19).map(move |r| (q, r)))
+        .filter(|(q, r)| dims.distance(tile(&probe, *q, *r), city) == Some(4))
+        .filter(|(q, r)| group().iter().all(|(gq, gr)| dims.distance(tile(&probe, *q, *r), tile(&probe, *gq, *gr)).is_some_and(|d| d >= 3)))
+        .collect();
+    assert!(guards.len() >= 8, "tiles for the guard, {}", guards.len());
+    let hidden = scene(&rules, &Scene { holder: THEM, damage: 190, ours: group(), guards: guards.clone(), war_rounds: 0 });
+    let obs = hidden.ai_observation(&rules, US);
+    let seen = obs.visible_foreign_units.iter().filter(|u| u.owner == THEM).count();
+    assert_eq!(seen, 0, "the captor's units are out of sight");
+    let mut state = memory_of_the_last_turn(&hidden);
+    let (_, cases) = retaking(&rules, &hidden, &mut state);
+    assert_eq!(cases.len(), 1, "what the seat does not see does not weigh against the group");
+}
+
+/// The holder's peace offer, once the war is old enough for the base game to take it, is refused while the case
+/// stands (the rewrite in `DiplomacyAdvisor`), and the normal answer, an acceptance, returns without the case.
+#[test]
+fn the_holders_peace_offer_is_refused_while_the_case_stands_and_accepted_after() {
+    let rules = compile_rules(core_rules()).unwrap();
+    let answer = |ours: Vec<(i32, i32)>| -> (bool, bool) {
+        let mut game = scene(&rules, &Scene { holder: THEM, damage: 190, ours, guards: vec![], war_rounds: ACCEPT_PEACE_AFTER_ROUNDS + 1 });
+        while game.view().auth.active_player() != THEM {
+            let active = game.view().auth.active_player();
+            game.execute(&rules, Command::EndTurn { player: active }).unwrap();
+        }
+        game.execute(&rules, Command::ProposeDeal { from: THEM, to: US, items: vec![(THEM, DealItem::Peace)] }).unwrap();
+        game.execute(&rules, Command::EndTurn { player: THEM }).unwrap();
+        while game.view().auth.active_player() != US {
+            let active = game.view().auth.active_player();
+            game.execute(&rules, Command::EndTurn { player: active }).unwrap();
+        }
+        let mut state = memory_of_the_last_turn(&game);
+        let obs = game.ai_observation(&rules, US);
+        assert!(obs.offers_to_us.iter().any(|o| o.from == THEM), "the offer stands");
+        let mut brief = TurnBrief::from_observation(&obs, &rules);
+        brief.retake = true;
+        let cases = retake::cases_remembered(&obs, &brief, &mut state, &rules);
+        brief.retaking = cases.clone();
+        let input = AdvisorInput { observation: &obs, brief: &brief, state: &state, rules: &rules };
+        let answers: Vec<bool> = DiplomacyAdvisor::default()
+            .start_of_turn(&input)
+            .into_iter()
+            .filter_map(|p| match p.command {
+                Command::RespondDeal { accept, .. } => Some(accept),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(answers.len(), 1, "one answer to the one offer");
+        (!cases.is_empty(), answers[0])
+    };
+    assert_eq!(answer(group()), (true, false), "a case stands: the peace is refused");
+    assert_eq!(answer(vec![]), (false, true), "no case: the base answer, an acceptance, returns");
+}
+
+/// A unit that is three tiles from a city being retaken and has no group of three within two tiles to wait for does not rally (the base
+/// game's wait for three units within two tiles, `tactics::siege_step`); for the same city not being retaken it does.
+#[test]
+fn a_unit_does_not_rally_for_a_city_that_is_being_retaken() {
+    let rules = compile_rules(core_rules()).unwrap();
+    // The city keeps more than the weak-city health, so the base game's wait applies to it.
+    let game = scene(&rules, &Scene { holder: THEM, damage: 120, ours: vec![(14, 10), (15, 10), (16, 10)], guards: vec![], war_rounds: 0 });
+    let city = tile(&game, CITY.0, CITY.1);
+    let mut state = memory_of_the_last_turn(&game);
+    let (brief, cases) = retaking(&rules, &game, &mut state);
+    assert_eq!(cases.len(), 1, "the scene is a case");
+    assert!(cases[0].hp > tactics::WEAK_CITY_HP, "the city stands at {} hit points", cases[0].hp);
+    let at = tile(&game, 15, 10);
+    let unit = brief.units.iter().find(|u| u.tile == at).map(|u| (u.handle, u.id)).unwrap();
+    let step = |brief: &TurnBrief| {
+        let (local, _) = game.ai_local_observation(&rules, US, unit.0, 5).unwrap();
+        let view = UnitView { local: &local, brief };
+        let settings = AiSettings::for_rules(&rules, rules.default_difficulty());
+        let (mut scratch, mut counters) = (MapScratch::default(), AiCounters::default());
+        let mut tools = PlanTools { rules: &rules, settings: &settings, scratch: &mut scratch, counters: &mut counters };
+        let mut state = AiState::new(US, 1);
+        state.set_task(unit.1, UnitTask::Assault { target: city }, 1);
+        tactics::assault_step(&view, &mut state, &mut tools, city)
+    };
+    let retaken = step(&brief);
+    assert_ne!(retaken.reason, Reason::Rally, "a city being retaken is struck at once: {retaken:?}");
+    let mut plain = brief.clone();
+    plain.retaking.clear();
+    let waiting = step(&plain);
+    assert_eq!(waiting.reason, Reason::Rally, "the same city not being retaken waits for its group: {waiting:?}");
+}
+
