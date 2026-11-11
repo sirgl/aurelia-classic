@@ -134,6 +134,7 @@ fn play(o: &Options) -> Result<(), String> {
     let next = AtomicUsize::new(0);
     let rows: Mutex<Vec<(usize, Vec<Row>)>> = Mutex::new(Vec::new());
     let estimates: Mutex<Vec<(usize, String)>> = Mutex::new(Vec::new());
+    let taken = AtomicUsize::new(0);
     let started = std::time::Instant::now();
     std::thread::scope(|scope| {
         for _ in 0..o.jobs.clamp(1, matches.len().max(1)) {
@@ -231,6 +232,8 @@ fn play(o: &Options) -> Result<(), String> {
                         });
                     }
                     eprintln!("{} {} operations, {:.0} s", game.label(), out.len(), started.elapsed().as_secs_f64());
+                    // The cities the AI seats captured in the game (each capture once, `war_probe::Probe::captures`).
+                    taken.fetch_add(probe.captures.len(), Ordering::Relaxed);
                     rows.lock().expect("rows").push((at, out));
                 }
             });
@@ -258,6 +261,8 @@ fn play(o: &Options) -> Result<(), String> {
         100.0 * wars_won as f64 / total.max(1) as f64,
         started.elapsed().as_secs_f64()
     );
+    let taken = taken.into_inner();
+    println!("{taken} cities captured in {} games ({:.2} a game)", matches.len(), taken as f64 / matches.len().max(1) as f64);
     if let Some(path) = &o.out {
         std::fs::File::create(path).and_then(|mut f| f.write_all(text.as_bytes())).map_err(|e| format!("{path}: {e}"))?;
         println!("wrote {path}");
