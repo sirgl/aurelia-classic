@@ -97,3 +97,16 @@ The solo gate fails by the selectivity this lane was asked for: with only the wa
 - The loss constant was not iterated: lowering it to the 52 % measured on the frozen build admits more operations and changes the build that was tuned.
 - Operations that take a city 29 % of the time still lose 6–7 units each; the first iteration measured the expected loss of an operation at about 100 points against a capture worth 20–60, and a capture rate of 29 % does not close that gap. Wars cannot pay until the operations take cities more often, or lose fewer units: tactics, which this lane does not touch.
 - Not measured: duels, Standard speed, a human opponent.
+
+## 8. `next-war`: the war line on the thirteenth promotion's standard (11 November)
+
+`war-pays`, `war-muster` and `siege-call` were built on the standard before the thirteenth promotion and
+play on it (`pre-next`'s switches, through `war-open`); their games are reproduced on the merged build
+(`--solo war-pays --suite pace --seed-offset 200` → `e1e478e1d69875e1`, `--solo siege-call --seed-offset 310`
+→ `d7022031cb5a8e13`, `--candidate siege-call --baseline pre-next --seed-offset 201` → `886deb531cd5ece2`,
+the war line's own binary against its `standard`). `next-war` is the game's AI of the thirteenth promotion
+(the flags of `next-w`) with the war of `siege-call`: its flags (`war_pays`, `muster_fix`, `war_muster`,
+`siege_call`) and the switches of `war-open` (`ClassicMind::new`). Nothing was tuned in the merge.
+On the tuning offset 200 (100 solo pace games) it starts 98 operations and 36 % take a city at 6.3 units
+lost an operation (`siege-call` on its own line: 89, 38 %, 6.25; the new `standard`: 9 operations, none
+took a city). The acceptance is in the lane's log (work/nets/next2/LOG.md).
