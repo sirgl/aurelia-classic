@@ -263,6 +263,9 @@ pub struct WarProbe {
     pub alive: Vec<(u32, PlayerId, Vec<u64>)>,
     /// The forming operations, every turn they form.
     pub forming: Vec<FormingSample>,
+    /// The retake cases a seat opened (`retake::cases_remembered`), one a turn and city:
+    /// (round, player, the city's tile, its holder, the units of the group).
+    pub retakes: Vec<(u32, PlayerId, u32, PlayerId, u32)>,
 }
 
 thread_local! {

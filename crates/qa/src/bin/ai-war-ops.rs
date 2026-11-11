@@ -33,6 +33,11 @@ use aurelia_qa::bench::play::{play_match, Pairing};
 use aurelia_qa::bench::suite::{Match, Seating, Suite};
 use classic_rules::ai::operations::{learned_chance, open_chance, CHANCE_FEATURES, CHANCE_N as N};
 use classic_rules::ai::war_probe;
+use classic_rules::ids::PlayerId;
+
+/// Rounds after a capture within which the former owner's capture of the same city counts as a retake
+/// (the window of the capture bank's replays, `ai-siege-bank cap-replay --rounds 8`).
+const RETAKE_WINDOW: u32 = 8;
 
 struct Options {
     variant: String,
@@ -135,6 +140,7 @@ fn play(o: &Options) -> Result<(), String> {
     let rows: Mutex<Vec<(usize, Vec<Row>)>> = Mutex::new(Vec::new());
     let estimates: Mutex<Vec<(usize, String)>> = Mutex::new(Vec::new());
     let taken = AtomicUsize::new(0);
+    let retake: Mutex<Vec<(usize, usize, usize, usize)>> = Mutex::new(Vec::new());
     let started = std::time::Instant::now();
     std::thread::scope(|scope| {
         for _ in 0..o.jobs.clamp(1, matches.len().max(1)) {
@@ -234,6 +240,20 @@ fn play(o: &Options) -> Result<(), String> {
                     eprintln!("{} {} operations, {:.0} s", game.label(), out.len(), started.elapsed().as_secs_f64());
                     // The cities the AI seats captured in the game (each capture once, `war_probe::Probe::captures`).
                     taken.fetch_add(probe.captures.len(), Ordering::Relaxed);
+                    // The retake (`retake2`, `next-war-retake`): the cases opened, and the cities a seat lost and
+                    // took back from the same captor within `RETAKE_WINDOW` rounds (any variant: from the captures).
+                    let mut cases: Vec<(PlayerId, u32)> = probe.retakes.iter().map(|(_, p, t, _, _)| (*p, *t)).collect();
+                    cases.sort();
+                    cases.dedup();
+                    let lost = probe.captures.iter().filter(|(_, _, _, from)| from.is_some()).count();
+                    let back = probe
+                        .captures
+                        .iter()
+                        .filter(|(r, captor, tile, from)| {
+                            from.is_some_and(|owner| probe.captures.iter().any(|(r2, p2, t2, f2)| *p2 == owner && t2 == tile && *f2 == Some(*captor) && *r2 > *r && *r2 <= *r + RETAKE_WINDOW))
+                        })
+                        .count();
+                    retake.lock().expect("retake").push((probe.retakes.len(), cases.len(), lost, back));
                     rows.lock().expect("rows").push((at, out));
                 }
             });
@@ -263,6 +283,15 @@ fn play(o: &Options) -> Result<(), String> {
     );
     let taken = taken.into_inner();
     println!("{taken} cities captured in {} games ({:.2} a game)", matches.len(), taken as f64 / matches.len().max(1) as f64);
+    let retake = retake.into_inner().map_err(|e| e.to_string())?;
+    let sum = |f: fn(&(usize, usize, usize, usize)) -> usize| retake.iter().map(f).sum::<usize>();
+    println!(
+        "retake: {} seat-turns with a case, {} cities with a case; {} of {} captures from a remembered owner taken back by it within {RETAKE_WINDOW} rounds",
+        sum(|r| r.0),
+        sum(|r| r.1),
+        sum(|r| r.3),
+        sum(|r| r.2)
+    );
     if let Some(path) = &o.out {
         std::fs::File::create(path).and_then(|mut f| f.write_all(text.as_bytes())).map_err(|e| format!("{path}: {e}"))?;
         println!("wrote {path}");

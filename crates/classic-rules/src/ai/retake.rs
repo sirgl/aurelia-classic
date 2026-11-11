@@ -285,6 +285,7 @@ pub fn cases_remembered(observation: &AIObservation<'_>, brief: &TurnBrief, stat
         if outmatched(own_power, group_hp, city_hit, rounds, guard_power, margin_percent()) {
             continue;
         }
+        crate::ai::war_probe::note(|p| p.retakes.push((brief.round, brief.player, city.tile.0, captor, group.len() as u32)));
         out.push(Case { tile: city.tile, enemy: captor, hp: city.hp, rounds, group: group.into_iter().map(|(id, _)| id).collect() });
     }
     out
