@@ -701,6 +701,7 @@ mod tests {
             gift_cap: true,
             citizen_yield: 0,
             delegate: 0,
+            guard: 0,
         };
         assert_eq!(on_path(prices, VictoryPath::Score), prices);
         assert_eq!(on_path(prices, VictoryPath::Science).science, 251 * 150 / 100);
