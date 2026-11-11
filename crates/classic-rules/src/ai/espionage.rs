@@ -244,8 +244,17 @@ impl crate::ai::system::SystemAdvisor for EspionageAdvisor {
         let mut out = crate::ai::combat::proposals(9, steal_orders(obs));
         out.extend(crate::ai::combat::proposals(7, coup_orders(obs)));
         if input.brief.vote_guard && crate::ai::victory_watch::part(4) {
-            out.extend(crate::ai::combat::proposals(10, guard_coup_orders(obs)));
-            out.extend(crate::ai::combat::proposals(5, guard_placement_orders(obs, input.rules)));
+            let coups = guard_coup_orders(obs);
+            let moves = guard_placement_orders(obs, input.rules);
+            if crate::ai::strategy_net::trace::enabled() {
+                let (cities, rounds) = guard_cities(obs);
+                if !cities.is_empty() {
+                    let spies: Vec<String> = obs.spies.iter().map(|s| format!("{}:{:?}@{:?}/{:?}", s.index, s.state, s.city.map(|c| c.index), s.coup_chance)).collect();
+                    crate::ai::strategy_net::trace::push(format!("r{} p{} COUP targets {} rounds {} | spies {} | coups {} moves {}", obs.round, obs.player.0, cities.len(), rounds, spies.join(","), coups.len(), moves.len()));
+                }
+            }
+            out.extend(crate::ai::combat::proposals(10, coups));
+            out.extend(crate::ai::combat::proposals(5, moves));
         } else {
             out.extend(crate::ai::combat::proposals(5, placement_orders(obs, input.rules)));
         }

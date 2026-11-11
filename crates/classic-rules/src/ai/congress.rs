@@ -98,6 +98,9 @@ pub fn vote_orders_for(obs: &AIObservation<'_>, guard: bool) -> Vec<Command> {
     }
     let host = guard.then(|| crate::ai::victory_watch::part(2).then(|| crate::ai::victory_watch::host_choice(obs)).flatten()).flatten();
     if let (Some(host), Some(i)) = (host, info.proposals.iter().position(|p| p.kind == ResolutionKind::ChangeHost)) {
+        if crate::ai::strategy_net::trace::enabled() {
+            crate::ai::strategy_net::trace::push(format!("r{} p{} VOTE host denied: {} delegates to p{}", obs.round, obs.player.0, info.delegates_left, host.0));
+        }
         // All the delegates on the host election, the rest abstain.
         return vec![Command::CastVotes { player: obs.player, proposal: i as u8, choice: u32::from(host.0), delegates: info.delegates_left }];
     }
