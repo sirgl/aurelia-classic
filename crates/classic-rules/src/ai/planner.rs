@@ -422,10 +422,8 @@ pub struct TurnBrief {
     pub muster_fix: bool,
     /// `war-muster` alone: the army's places are filled by current units only (`operations::current`).
     pub war_muster: bool,
-    /// `retake` (`Variant::retake`): the former owner of a lost city answers at once (`ai::retake`).
+    /// `retake2` (`Variant::retake2`): the former owner of a lost city answers at once (`ai::retake`).
     pub retake: bool,
-    /// `retake2` (`Variant::retake2`): the lost city is found by the seat's own memory (`ai::retake::Memory`).
-    pub retake2: bool,
     /// The lost cities the units on the spot retake this turn (`ai::retake`); empty without `retake`.
     pub retaking: Vec<crate::ai::retake::Case>,
     /// `siege-call` alone: the press / hold / withdraw call at the walls (`siege_walls::call`).
@@ -559,7 +557,6 @@ impl TurnBrief {
             muster_fix: false,
             war_muster: false,
             retake: false,
-            retake2: false,
             retaking: Vec::new(),
             siege_call: CallFixes::NONE,
             tall: crate::ai::tall::Tall::Off,

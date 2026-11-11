@@ -694,15 +694,11 @@ pub enum Variant {
     /// `WarMuster` with the press / hold / withdraw call at the walls made from what the seat sees
     /// (`TurnBrief::siege_call`, `siege_walls::call`). A bench-only candidate, `experimental-ai` only.
     SiegeCall,
-    /// `SiegeCall` whose former owner of a city just lost answers at once: it reads the lost city's
-    /// health and the captor's units from sight, strikes with the units on the spot and does not
-    /// make peace while the retake is expected (`TurnBrief::retake`, `ai::retake`). A bench-only
-    /// candidate, `experimental-ai` only.
-    Retake,
-    /// `Retake` whose seat finds the lost city by its own memory (a city it held at its last turn and
-    /// does not hold now, taken by the player that holds it) in place of the city banner's founder and
-    /// round, and whose guard test weighs the captor's units within four tiles and the city's strike
-    /// (`ai::retake`). A bench-only candidate, `experimental-ai` only.
+    /// `SiegeCall` whose seat answers the loss of a city at once: it finds the city by its own memory
+    /// (a city held at its last turn and gone now, taken by the player that holds it), reads the city's
+    /// health and the captor's units from sight, strikes with the units on the spot unless the captor's
+    /// units within four tiles and the city's strike outmatch them, and makes no peace while the retake
+    /// is expected (`TurnBrief::retake`, `ai::retake`). A bench-only candidate, `experimental-ai` only.
     Retake2,
 }
 
@@ -724,7 +720,7 @@ const NUDGED_CANDIDATES: u32 = 40;
 
 impl Variant {
     /// The game's AI first.
-    pub const ALL: [Variant; 142] = [
+    pub const ALL: [Variant; 141] = [
         Variant::Standard,
         Variant::PreCamps,
         Variant::PreWorkers,
@@ -865,7 +861,6 @@ impl Variant {
         Variant::TacticianFit,
         Variant::WarMuster,
         Variant::SiegeCall,
-        Variant::Retake,
         Variant::Retake2,
     ];
 
@@ -993,7 +988,6 @@ impl Variant {
             Variant::TacticianFit => "tactician-fit",
             Variant::WarMuster => "war-muster",
             Variant::SiegeCall => "siege-call",
-            Variant::Retake => "retake",
             Variant::Retake2 => "retake2",
             Variant::ArmyFit => "army-fit",
             Variant::Camps => "camps",
@@ -1028,7 +1022,7 @@ impl Variant {
         cfg!(feature = "experimental-ai")
             || !matches!(
                 self,
-                Variant::Net | Variant::UnitNet | Variant::Hybrid | Variant::SiteNet | Variant::ChoiceNet | Variant::ChoiceNetProduction | Variant::ChoiceNetResearch | Variant::StandardScripted | Variant::PreCsGifts | Variant::Sharp | Variant::TacticianFit | Variant::WarMuster | Variant::SiegeCall | Variant::Retake | Variant::Retake2
+                Variant::Net | Variant::UnitNet | Variant::Hybrid | Variant::SiteNet | Variant::ChoiceNet | Variant::ChoiceNetProduction | Variant::ChoiceNetResearch | Variant::StandardScripted | Variant::PreCsGifts | Variant::Sharp | Variant::TacticianFit | Variant::WarMuster | Variant::SiegeCall | Variant::Retake2
             )
     }
 
@@ -1189,13 +1183,8 @@ impl Variant {
         self == Variant::SiegeCall
     }
 
-    /// The retake of a lost city (`TurnBrief::retake`): `Retake`, which the mind plays as `SiegeCall`
+    /// The retake of a lost city (`TurnBrief::retake`): `Retake2`, which the mind plays as `SiegeCall`
     /// in every other switch (`ClassicMind::new`).
-    pub fn retake(self) -> bool {
-        self == Variant::Retake
-    }
-
-    /// `Retake2`, which the mind plays as `Retake` but for the memory and the guard test (`TurnBrief::retake2`).
     pub fn retake2(self) -> bool {
         self == Variant::Retake2
     }

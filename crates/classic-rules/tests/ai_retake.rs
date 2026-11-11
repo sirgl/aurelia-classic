@@ -86,7 +86,6 @@ fn retaking(rules: &CompiledRuleset, game: &GameState, state: &mut AiState) -> (
     let obs = game.ai_observation(rules, US);
     let mut brief = TurnBrief::from_observation(&obs, rules);
     brief.retake = true;
-    brief.retake2 = true;
     let cases = retake::cases_remembered(&obs, &brief, state, rules);
     brief.retaking = cases.clone();
     (brief, cases)

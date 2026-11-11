@@ -1,4 +1,4 @@
-# AI: the retake of a lost city (`retake`, bench-only)
+# AI: the retake of a lost city (`retake2`, bench-only)
 
 The question: does the defending AI understand whether it can retake a city it has just lost? Right after a
 capture the city has no defences of its own yet and stands at the health the siege left it.
@@ -18,7 +18,26 @@ Base rate on 490 captures of a major's city in the solo pace games of offsets 20
 former owner's next turn, 8 rounds replayed with every seat `war-pays`, two dice per position): the former owner
 holds the city again within 2 / 5 / 8 rounds in 8.3 / 9.2 / 9.5 % of the plays, and makes peace without it in 36 %.
 
-## What `retake` changes
+## What `retake2` changes
+
+See "The second iteration" below for the mechanism: a case is a city the seat held at its last turn and lost, found by
+the seat's own memory; the units on the spot assault it at once, and no peace is made with the holder while the case
+stands. The strategy itself is not changed: the case runs inside `Recover`.
+
+## Not done
+
+Far units (more than two turns away) and the operations layer are not given the lost city (a retake by a mustered army);
+a lost city out of sight is not retaken.
+
+## History: the first iteration (`retake`, removed from the tree)
+
+`retake` read the founder and the round of acquisition of the city from the kernel
+(`ObservedCity::original_owner`, `acquired_round`, platform `1e64d0e`). The human client shows neither, so the review
+(11 November) required the memory instead. `Variant::Retake` and the platform commit are removed (the platform revert is
+`a4b129a`); its numbers stand as history and reproduce from the frozen binaries `runs/bin-final/` of the lane: held-out
+offsets 207-209 retaken within 8 rounds 58.1 % against 8.9 % for `war-pays`, own units lost +1.30; whole games 51.4 %
+(offset 410), 51.8 % (411). What it did:
+
 
 `ai::retake`: a **case** is a city the player founded, held by an enemy at war, in sight, taken within the march
 limit. Its real health (the banner) and the strongest unit of the holder standing in it enter the estimate; the
@@ -34,12 +53,13 @@ within two rounds. Then
 The case reads only the city banner (`ObservedCity::original_owner`, `acquired_round`) and the units in sight; it keeps
 no memory, so nothing is added to the saved AI memory. The strategy itself is not changed: the case runs inside `Recover`.
 
-## Not done
+### Not done (first iteration)
 
 Far units (more than two turns away) and the operations layer are not given the lost city (a retake by a mustered army);
 a lost city out of sight is not retaken.
 
-## `retake2`: the second iteration (review of 11 November)
+
+## The second iteration (review of 11 November)
 
 The review of `retake` found three things; `retake2` (`Variant::Retake2`, bench-only, `retake` itself unchanged) answers them.
 

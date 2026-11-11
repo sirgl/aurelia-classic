@@ -84,9 +84,7 @@ pub struct ClassicMind {
     muster: bool,
     /// `Variant::SiegeCall`: `muster` with the call at the walls (`TurnBrief::siege_call`).
     call: bool,
-    /// `Variant::Retake`: `call` with the retake of a lost city (`TurnBrief::retake`).
-    retake: bool,
-    /// `Variant::Retake2`: `retake` with the seat's own memory of the city it lost (`TurnBrief::retake2`).
+    /// `Variant::Retake2`: `call` with the retake of a lost city (`TurnBrief::retake`).
     retake2: bool,
 }
 
@@ -123,10 +121,9 @@ impl ClassicMind {
         let variant = if fit { Variant::WarPays } else { variant };
         // `war-muster` is `WarPays` in every switch but the muster fix (`TurnBrief::muster_fix`).
         // `siege-call` is `WarMuster` with the call at the walls (`TurnBrief::siege_call`).
-        // `retake` is `SiegeCall` with the retake of a lost city (`TurnBrief::retake`).
+        // `retake2` is `SiegeCall` with the retake of a lost city (`TurnBrief::retake`).
         let retake2 = variant.retake2();
-        let retake = variant.retake() || retake2;
-        let call = variant.siege_call() || retake;
+        let call = variant.siege_call() || retake2;
         let muster = variant.war_muster() || call;
         let variant = if muster { Variant::WarPays } else { variant };
         // `war-pays` is `WarOpen` in every switch but its own (`TurnBrief::war_pays`).
@@ -149,7 +146,7 @@ impl ClassicMind {
         let walls = (book.is_some() || variant.siege_walls()).then(|| Box::new(crate::ai::siege_walls::SiegeWalls::new().joined(variant.siege_join())));
         let unciv = variant.unciv().any().then(|| Box::new(crate::ai::unciv::UncivMind::new(variant.unciv())));
         let variant = if named.is_some() { Variant::PrePuppet } else { variant };
-        Self { advisors, variant, genome: None, humans: Vec::new(), walks: Default::default(), choice: None, #[cfg(feature = "experimental-ai")] net, book, named, walls, conquest: None, unciv, tall: None, sharp, pays, fit, muster, call, retake, retake2 }
+        Self { advisors, variant, genome: None, humans: Vec::new(), walks: Default::default(), choice: None, #[cfg(feature = "experimental-ai")] net, book, named, walls, conquest: None, unciv, tall: None, sharp, pays, fit, muster, call, retake2 }
     }
 
     /// A league book that may play on another base (`book_on`): a duel book
@@ -192,7 +189,7 @@ impl ClassicMind {
         advisors.register(crate::classic::ClassicSystem::Diplomacy, Box::new(diplomacy));
         // The net plays on `NET_BASE`: its siege too.
         let walls = variant.siege_walls().then(|| Box::new(crate::ai::siege_walls::SiegeWalls::new().joined(variant.siege_join())));
-        Self { advisors, variant, genome: None, humans: Vec::new(), walks: Default::default(), choice: None, net: Some(Box::new(net)), book: None, named: None, walls, conquest: None, unciv: None, tall: None, sharp: false, pays: false, fit: false, muster: false, call: false, retake: false, retake2: false }
+        Self { advisors, variant, genome: None, humans: Vec::new(), walks: Default::default(), choice: None, net: Some(Box::new(net)), book: None, named: None, walls, conquest: None, unciv: None, tall: None, sharp: false, pays: false, fit: false, muster: false, call: false, retake2: false }
     }
 
     /// The net's part (`Variant::Net`), if any.
@@ -238,9 +235,6 @@ impl ClassicMind {
         }
         if self.retake2 {
             return Variant::Retake2;
-        }
-        if self.retake {
-            return Variant::Retake;
         }
         if self.call {
             return Variant::SiegeCall;
@@ -654,14 +648,11 @@ impl ClassicMind {
         brief.tactician_fit = self.fit;
         brief.muster_fix = self.fit || self.muster;
         brief.war_muster = self.muster;
-        brief.retake = self.retake;
+        brief.retake = self.retake2;
         brief.siege_call = if self.call { crate::ai::planner::CallFixes::from_env() } else { crate::ai::planner::CallFixes::NONE };
-        brief.retake2 = self.retake2;
-        brief.retaking = if self.retake2 {
-            crate::ai::retake::cases_remembered(observation, &brief, state, rules)
-        } else {
-            crate::ai::retake::cases(observation, &brief, state, rules)
-        };
+        if self.retake2 {
+            brief.retaking = crate::ai::retake::cases_remembered(observation, &brief, state, rules);
+        }
         brief.met_eras = observation.view.met_eras();
         if brief.war_open {
             brief.scores = observation.view.race().scores;
@@ -966,16 +957,16 @@ mod sharp_tests {
         assert!(!mind.unit_net_on());
     }
 
-    /// `retake` is `SiegeCall` with the retake of a lost city: the flag of no other variant, and a mind
-    /// that is not `retake` has no case (`TurnBrief::retaking` stays empty).
+    /// `retake2` is `SiegeCall` with the retake of a lost city: the flag of no other variant, and a mind
+    /// that is not `retake2` has no case (`TurnBrief::retaking` stays empty).
     #[test]
-    fn retake_plays_siege_call_with_the_retake_only() {
-        let mind = ClassicMind::new(Variant::Retake);
-        assert_eq!((mind.variant, mind.pays, mind.muster, mind.call, mind.retake, mind.variant()), (Variant::WarOpen, true, true, true, true, Variant::Retake));
-        let flagged: Vec<Variant> = Variant::ALL.into_iter().filter(|v| v.retake()).collect();
-        assert_eq!(flagged, [Variant::Retake]);
+    fn retake2_plays_siege_call_with_the_retake_only() {
+        let mind = ClassicMind::new(Variant::Retake2);
+        assert_eq!((mind.variant, mind.pays, mind.muster, mind.call, mind.retake2, mind.variant()), (Variant::WarOpen, true, true, true, true, Variant::Retake2));
+        let flagged: Vec<Variant> = Variant::ALL.into_iter().filter(|v| v.retake2()).collect();
+        assert_eq!(flagged, [Variant::Retake2]);
         let call = ClassicMind::new(Variant::SiegeCall);
-        assert!(call.call && !call.retake);
-        assert!(!ClassicMind::new(Variant::WarPays).retake);
+        assert!(call.call && !call.retake2);
+        assert!(!ClassicMind::new(Variant::WarPays).retake2);
     }
 }
