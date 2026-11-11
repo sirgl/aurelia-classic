@@ -209,8 +209,10 @@ fn rules_only() -> CompiledRuleset {
     compile_rules(core_rules()).unwrap()
 }
 
-/// The game's AI with the space plan: the capital busy with a building
-/// takes the project (the plain AI gives it to the idle weak city).
+/// The space plan: the capital busy with a building takes the project, with `space-finish` and
+/// with the game's AI since the thirteenth promotion (`standard` plays `next-w`, whose space plan
+/// runs where the science victory fits); the plain AI (`pre-next`, the standard before) gives it
+/// to the idle weak city.
 #[test]
 fn the_space_finish_ai_builds_the_project_in_the_strong_city() {
     let head = |variant: Variant| {
@@ -225,9 +227,11 @@ fn the_space_finish_ai_builds_the_project_in_the_strong_city() {
     };
     let (capital, _, project) = head(Variant::SpaceFinish);
     assert_eq!(capital, Some(project));
-    let (capital, weak, project) = head(Variant::Standard);
+    let (capital, weak, project) = head(Variant::PreNext);
     assert_ne!(capital, Some(project));
     assert_eq!(weak, Some(project));
+    let (capital, _, project) = head(Variant::Standard);
+    assert_eq!(capital, Some(project));
 }
 
 /// `tall-real` (`ai::tall_real`) plans its spaceship as `space-finish` does where the science
