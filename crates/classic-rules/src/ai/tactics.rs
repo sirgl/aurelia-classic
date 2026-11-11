@@ -485,7 +485,8 @@ fn siege_step(
         .map(|t| view.brief.round.saturating_sub(t.since_round))
         .unwrap_or(0);
     let gathered = group_near(view, target) + 1 >= SIEGE_GROUP;
-    if distance <= 3 && !gathered && city.hp > WEAK_CITY_HP && waited < RALLY_ROUNDS {
+    // A city being retaken is struck at once (`ai::retake`): its health is what the siege left.
+    if distance <= 3 && !gathered && city.hp > WEAK_CITY_HP && waited < RALLY_ROUNDS && !view.brief.is_retaken(target) {
         return Decision::refuse(actor, Reason::Rally);
     }
     approach(view, tools, target, Reason::Advance)

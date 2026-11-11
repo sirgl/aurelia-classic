@@ -546,7 +546,7 @@ pub fn idle_wars(brief: &TurnBrief, state: &AiState, decided: &[Decision]) -> Ve
     brief
         .relations
         .iter()
-        .filter(|r| r.at_war && !fought(r.other) && !ended(r.other))
+        .filter(|r| r.at_war && !fought(r.other) && !ended(r.other) && !brief.retaking_from(r.other))
         .filter(|r| rounds_since(brief, state.relation(r.other).and_then(|m| m.last_change_round)) >= MIN_WAR_ROUNDS)
         .map(|r| {
             let command = Command::MakePeace { player: brief.player, enemy: r.other };

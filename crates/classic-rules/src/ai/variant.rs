@@ -694,6 +694,11 @@ pub enum Variant {
     /// `WarMuster` with the press / hold / withdraw call at the walls made from what the seat sees
     /// (`TurnBrief::siege_call`, `siege_walls::call`). A bench-only candidate, `experimental-ai` only.
     SiegeCall,
+    /// `SiegeCall` whose former owner of a city just lost answers at once: it reads the lost city's
+    /// health and the captor's units from sight, strikes with the units on the spot and does not
+    /// make peace while the retake is expected (`TurnBrief::retake`, `ai::retake`). A bench-only
+    /// candidate, `experimental-ai` only.
+    Retake,
 }
 
 /// The net's base: the expert the end-to-end net learns from and the mind it
@@ -714,7 +719,7 @@ const NUDGED_CANDIDATES: u32 = 40;
 
 impl Variant {
     /// The game's AI first.
-    pub const ALL: [Variant; 140] = [
+    pub const ALL: [Variant; 141] = [
         Variant::Standard,
         Variant::PreCamps,
         Variant::PreWorkers,
@@ -855,6 +860,7 @@ impl Variant {
         Variant::TacticianFit,
         Variant::WarMuster,
         Variant::SiegeCall,
+        Variant::Retake,
     ];
 
     pub fn name(self) -> &'static str {
@@ -981,6 +987,7 @@ impl Variant {
             Variant::TacticianFit => "tactician-fit",
             Variant::WarMuster => "war-muster",
             Variant::SiegeCall => "siege-call",
+            Variant::Retake => "retake",
             Variant::ArmyFit => "army-fit",
             Variant::Camps => "camps",
             Variant::ArmyCamps => "army-camps",
@@ -1014,7 +1021,7 @@ impl Variant {
         cfg!(feature = "experimental-ai")
             || !matches!(
                 self,
-                Variant::Net | Variant::UnitNet | Variant::Hybrid | Variant::SiteNet | Variant::ChoiceNet | Variant::ChoiceNetProduction | Variant::ChoiceNetResearch | Variant::StandardScripted | Variant::PreCsGifts | Variant::Sharp | Variant::TacticianFit | Variant::WarMuster | Variant::SiegeCall
+                Variant::Net | Variant::UnitNet | Variant::Hybrid | Variant::SiteNet | Variant::ChoiceNet | Variant::ChoiceNetProduction | Variant::ChoiceNetResearch | Variant::StandardScripted | Variant::PreCsGifts | Variant::Sharp | Variant::TacticianFit | Variant::WarMuster | Variant::SiegeCall | Variant::Retake
             )
     }
 
@@ -1173,6 +1180,12 @@ impl Variant {
     /// in every other switch (`ClassicMind::new`).
     pub fn siege_call(self) -> bool {
         self == Variant::SiegeCall
+    }
+
+    /// The retake of a lost city (`TurnBrief::retake`): `Retake`, which the mind plays as `SiegeCall`
+    /// in every other switch (`ClassicMind::new`).
+    pub fn retake(self) -> bool {
+        self == Variant::Retake
     }
 
     /// Its research, policies and choice among the allocator's best orders are the
