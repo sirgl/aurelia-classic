@@ -83,6 +83,8 @@ fn main() {
         "record" => record(&args),
         "replay" => replay(&args),
         "features" => features(&args),
+        "cap-record" => cap_record(&args),
+        "cap-replay" => cap_replay(&args),
         other => Err(format!("unknown mode {other}")),
     };
     if let Err(e) = result {
@@ -772,4 +774,334 @@ fn features(args: &[String]) -> Result<(), String> {
     std::fs::File::create(&out_path).and_then(|mut f| f.write_all(text.as_bytes())).map_err(|e| format!("{out_path}: {e}"))?;
     println!("{} positions, {none} without a call, wrote {out_path}", positions.len());
     Ok(())
+}
+
+// ---- captures (the `retake` lane): a position at every capture of a major's city ----
+//
+// **cap-record** plays solo games of a variant and, whenever a city of a major changes owner, saves the
+// game (with the AI memory) at the start of the former owner's next turn and writes a row of what
+// both sides have at the city (`DIR/captures-K.csv`, saves in `DIR/pos`).
+// **cap-replay** plays every such position for N rounds with every seat under one layer and the dice
+// restarted from the position and the reseed number, and writes one row per position, layer and reseed.
+
+const CAP_HEADER: &str = "file,offset,map,seed,round,cap_round,from,to,to_major,tile,hp,max_hp,pop,own4_n,own4_power,own8_n,own8_power,cap_in_n,cap_adj_n,cap_adj_power,cap_near4_n,at_war,next_hash\n";
+
+struct Pending {
+    tile: TileId,
+    from: PlayerId,
+    to: PlayerId,
+    round: u32,
+}
+
+fn cities_snapshot(game: &GameState) -> BTreeMap<u32, PlayerId> {
+    game.view().auth.cities().iter().map(|(_, c)| (c.tile.0, c.owner)).collect()
+}
+
+/// `owner`'s military units on `tile` and within 1 of it (not on it): counts and power.
+fn units_at(game: &GameState, rules: &CompiledRuleset, owner: PlayerId, tile: TileId) -> (u32, u32, u32) {
+    let auth = &game.view().auth;
+    let dims = auth.map().dimensions;
+    let (mut on, mut adj, mut power) = (0, 0, 0);
+    for u in auth.units().iter_cores().filter(|u| u.owner == owner && army_role(rules, u.kind).is_some()) {
+        let d = dims.distance(u.tile, tile).unwrap_or(99);
+        if d <= 1 {
+            if d == 0 { on += 1 } else { adj += 1 }
+            let def = &rules.units[u.kind.0 as usize];
+            power += u32::from(def.strength.max(def.ranged_strength)) * u32::from(u.hp) / 100;
+        }
+    }
+    (on, adj, power)
+}
+
+fn cap_record(args: &[String]) -> Result<(), String> {
+    let variant = flag(args, "--variant").unwrap_or_else(|| "war-pays".into());
+    let suite = suite_of(args)?;
+    let offsets = range(&flag(args, "--offsets").unwrap_or_else(|| "200..201".into()))?;
+    let jobs: usize = flag(args, "--jobs").map_or(Ok(4), |j| j.parse().map_err(|e| format!("{e}")))?;
+    let dir = flag(args, "--dir").ok_or("--dir")?;
+    let limit: Option<usize> = flag(args, "--limit").map(|l| l.parse().map_err(|e| format!("{e}"))).transpose()?;
+    std::fs::create_dir_all(format!("{dir}/pos")).map_err(|e| e.to_string())?;
+    for offset in offsets {
+        let mut matches = suite.matches(Mode::Solo, offset);
+        if let Some(l) = limit {
+            matches.truncate(l);
+        }
+        let started = std::time::Instant::now();
+        let records = parallel(jobs, &matches, |rules, m| {
+            let r = cap_record_game(rules, &suite, m, offset, &variant, &dir);
+            eprintln!("{} {:.0} s", m.label(), started.elapsed().as_secs_f64());
+            r
+        });
+        let mut text = String::from(CAP_HEADER);
+        for r in records {
+            text.push_str(&r?);
+        }
+        std::fs::write(format!("{dir}/captures-{offset}.csv"), text).map_err(|e| e.to_string())?;
+        println!("offset {offset}: {} games, {:.0} s", matches.len(), started.elapsed().as_secs_f64());
+    }
+    Ok(())
+}
+
+fn cap_record_game(rules: &CompiledRuleset, suite: &Suite, m: &aurelia_qa::bench::suite::Match, offset: u64, variant: &str, dir: &str) -> Result<String, String> {
+    let mut game = ClassicBench::new_game_at(rules, &m.map, m.seed, suite.rounds, &suite.speed);
+    let mut driver: Driver = AiDriver::with_mind(ClassicBench::settings(rules), Vec::new(), Seated::new(mind(variant)?, Vec::new()));
+    driver.set_trace_capacity(0);
+    let map = m.map.script;
+    let mut owners = cities_snapshot(&game);
+    let mut pending: Vec<Pending> = Vec::new();
+    let mut rows: Vec<(u32, String)> = Vec::new(); // (save round, row without the hash)
+    let mut round_hash: BTreeMap<u32, u64> = BTreeMap::new();
+    let mut boundary = true;
+    let mut last_round = 0;
+    while !game.is_over() && round(&game) <= suite.rounds {
+        let now = round(&game);
+        if now != last_round {
+            last_round = now;
+            round_hash.insert(now, classic_rules::replay::hash::authoritative_hash(&game));
+            boundary = true;
+        }
+        if boundary {
+            boundary = false;
+            let active = game.view().auth.active_player();
+            let mut file: Option<String> = None;
+            let mut i = 0;
+            while i < pending.len() {
+                if pending[i].from != active {
+                    i += 1;
+                    continue;
+                }
+                let p = pending.remove(i);
+                if now + 9 > suite.rounds {
+                    continue;
+                }
+                let file = match &file {
+                    Some(f) => f.clone(),
+                    None => {
+                        let f = format!("cap-{offset}-{map}-{}-{now}-{}.save", m.seed, active.0);
+                        let mut save = encode(&game, rules);
+                        save.ai = driver.save();
+                        std::fs::write(format!("{dir}/pos/{f}"), to_bytes(&save)).map_err(|e| e.to_string())?;
+                        file = Some(f.clone());
+                        f
+                    }
+                };
+                let (hp, max_hp, pop) = city_at(&game, rules, p.tile).map_or((0, 0, 0), |(_, d, m, pop)| (m.saturating_sub(d), m, pop));
+                let (o4, o4p) = defenders(&game, rules, p.from, p.tile, 4);
+                let (o8, o8p) = defenders(&game, rules, p.from, p.tile, 8);
+                let (cin, cadj, cpow) = units_at(&game, rules, p.to, p.tile);
+                let (c4, _) = defenders(&game, rules, p.to, p.tile, 4);
+                let major = game.view().auth.players().is_major(p.to);
+                let war = game.view().auth.diplomacy().at_war(p.from, p.to);
+                rows.push((now, format!("{file},{offset},{map},{},{now},{},{},{},{},{},{hp},{max_hp},{pop},{o4},{o4p},{o8},{o8p},{cin},{cadj},{cpow},{c4},{}", m.seed, p.round, p.from.0, p.to.0, u8::from(major), p.tile.0, u8::from(war))));
+            }
+        }
+        match driver.step(&mut game, rules) {
+            StepOutcome::Worked => {}
+            StepOutcome::PlayerDone(_) => {
+                boundary = true;
+                let now_owners = cities_snapshot(&game);
+                let r = round(&game);
+                for (tile, owner) in &now_owners {
+                    if let Some(old) = owners.get(tile) {
+                        if old != owner && game.view().auth.players().is_major(*old) {
+                            pending.retain(|p| p.tile.0 != *tile);
+                            pending.push(Pending { tile: TileId(*tile), from: *old, to: *owner, round: r });
+                        }
+                    }
+                }
+                pending.retain(|p| now_owners.get(&p.tile.0) == Some(&p.to));
+                owners = now_owners;
+            }
+            StepOutcome::RoundDone => {}
+            StepOutcome::Waiting => break,
+        }
+    }
+    let mut out = String::new();
+    for (save_round, row) in rows {
+        let hash = round_hash.get(&(save_round + 1)).copied().unwrap_or(0);
+        out.push_str(&format!("{row},{hash:016x}\n"));
+    }
+    Ok(out)
+}
+
+#[derive(Debug, Clone)]
+struct Cap {
+    file: String,
+    offset: u64,
+    seed: u64,
+    round: u32,
+    from: PlayerId,
+    to: PlayerId,
+    tile: TileId,
+    cols: Vec<String>,
+    next_hash: u64,
+}
+
+fn read_caps(dir: &str, offsets: &std::ops::Range<u64>) -> Vec<Cap> {
+    let mut out = Vec::new();
+    for offset in offsets.clone() {
+        let Ok(text) = std::fs::read_to_string(format!("{dir}/captures-{offset}.csv")) else { continue };
+        for line in text.lines().skip(1) {
+            let c: Vec<&str> = line.split(',').collect();
+            if c.len() < 23 {
+                continue;
+            }
+            let num = |i: usize| c[i].parse::<u64>().unwrap_or(0);
+            out.push(Cap { file: c[0].to_owned(), offset, seed: num(3), round: num(4) as u32, from: PlayerId(num(6) as u8), to: PlayerId(num(7) as u8), tile: TileId(num(9) as u32), cols: c.iter().map(|s| (*s).to_owned()).collect(), next_hash: u64::from_str_radix(c[22], 16).unwrap_or(0) });
+        }
+    }
+    out
+}
+
+/// What one replay of a capture position gave.
+#[derive(Debug, Clone, Default)]
+struct CapOutcome {
+    /// Rounds after the save's round (0: the save's own round) at which the former owner held the city again.
+    retaken: Option<u32>,
+    /// The first end of a turn at which the two were at peace.
+    peace: Option<u32>,
+    lost_at_retake: u32,
+    lost_total: u32,
+    captor_lost: u32,
+    /// The captor's units that stood in or next to the city at the start / the former owner's units that ended in it.
+    final_owner: u8,
+    war_end: bool,
+    next_hash: u64,
+}
+
+fn play_capture(rules: &CompiledRuleset, dir: &str, cap: &Cap, layer: &str, dice: Option<u64>, rounds: u32, trace: bool) -> Result<CapOutcome, String> {
+    let bytes = std::fs::read(format!("{dir}/pos/{}", cap.file)).map_err(|e| format!("{}: {e}", cap.file))?;
+    let save = from_bytes(&bytes).map_err(|e| format!("{}: {e:?}", cap.file))?;
+    let mut game = decode(&save, rules).map_err(|e| format!("{}: {e:?}", cap.file))?;
+    if let Some(dice) = dice {
+        game.reseed_streams(dice);
+    }
+    let mut driver: Driver = AiDriver::with_mind(ClassicBench::settings(rules), Vec::new(), Seated::new(mind(layer)?, Vec::new()));
+    driver.set_trace_capacity(if trace { 200_000 } else { 0 });
+    driver.load(&save.ai, game.view().auth.map().tile_count(), rules).map_err(|e| format!("{}: memory {e:?}", cap.file))?;
+    let own = military_ids(&game, rules, cap.from);
+    let captor = military_ids(&game, rules, cap.to);
+    let mut out = CapOutcome::default();
+    let stop = cap.round + rounds;
+    let alive_count = |game: &GameState, ids: &[EntityId]| ids.iter().filter(|id| !game.view().auth.units().iter_cores().any(|u| u.id == **id)).count() as u32;
+    while !game.is_over() && round(&game) < stop {
+        match driver.step(&mut game, rules) {
+            StepOutcome::PlayerDone(p) => {
+                let r = round(&game) - cap.round;
+                if trace {
+                    trace_state(&game, rules, &driver, cap, p);
+                }
+                if out.peace.is_none() && !game.view().auth.diplomacy().at_war(cap.from, cap.to) {
+                    out.peace = Some(r);
+                }
+                if out.retaken.is_none() && city_at(&game, rules, cap.tile).is_some_and(|c| c.0 == cap.from) {
+                    out.retaken = Some(r);
+                    out.lost_at_retake = alive_count(&game, &own);
+                }
+            }
+            StepOutcome::Waiting => break,
+            _ => {}
+        }
+        if out.next_hash == 0 && round(&game) == cap.round + 1 {
+            out.next_hash = classic_rules::replay::hash::authoritative_hash(&game);
+        }
+    }
+    if trace {
+        for e in driver.trace().entries().filter(|e| e.player == cap.from) {
+            eprintln!("T {e}");
+        }
+    }
+    out.lost_total = alive_count(&game, &own);
+    out.captor_lost = alive_count(&game, &captor);
+    out.final_owner = city_at(&game, rules, cap.tile).map_or(255, |c| c.0 .0);
+    out.war_end = game.view().auth.diplomacy().at_war(cap.from, cap.to);
+    Ok(out)
+}
+
+fn cap_replay(args: &[String]) -> Result<(), String> {
+    let dir = flag(args, "--dir").ok_or("--dir")?;
+    let offsets = range(&flag(args, "--offsets").unwrap_or_else(|| "200..207".into()))?;
+    let layers: Vec<String> = flag(args, "--layers").unwrap_or_else(|| "war-pays".into()).split(',').map(str::to_owned).collect();
+    let reseeds: u32 = flag(args, "--reseeds").map_or(Ok(2), |r| r.parse().map_err(|e| format!("{e}")))?;
+    let rounds: u32 = flag(args, "--rounds").map_or(Ok(8), |r| r.parse().map_err(|e| format!("{e}")))?;
+    let jobs: usize = flag(args, "--jobs").map_or(Ok(3), |j| j.parse().map_err(|e| format!("{e}")))?;
+    let out_path = flag(args, "--out").ok_or("--out")?;
+    let trace = args.iter().any(|a| a == "--trace");
+    let mut caps = read_caps(&dir, &offsets);
+    if let Some(text) = flag(args, "--only") {
+        caps.retain(|c| c.file.contains(&text) && c.tile.0.to_string() == flag(args, "--tile").unwrap_or_else(|| c.tile.0.to_string()));
+    }
+    if let Some(sample) = flag(args, "--sample") {
+        let (k, n) = sample.split_once('/').ok_or("--sample K/N")?;
+        let (k, n): (u64, u64) = (k.parse().map_err(|e| format!("{e}"))?, n.parse().map_err(|e| format!("{e}"))?);
+        caps.retain(|c| mix(c.seed ^ u64::from(c.round) << 20 ^ u64::from(c.tile.0) << 40) % n == k);
+    }
+    let mut work: Vec<(usize, String, u32)> = Vec::new();
+    for i in 0..caps.len() {
+        for l in &layers {
+            for r in 0..reseeds.max(1) {
+                work.push((i, l.clone(), r));
+            }
+        }
+    }
+    let started = std::time::Instant::now();
+    let done = AtomicUsize::new(0);
+    let results = parallel(jobs, &work, |rules, (i, layer, r)| {
+        let cap = &caps[*i];
+        let dice = (reseeds > 0).then(|| mix(cap.seed ^ mix(u64::from(cap.round) << 32 ^ u64::from(cap.from.0) << 24 ^ u64::from(cap.tile.0) ^ mix(u64::from(*r) ^ 0xca9_7e))));
+        let o = play_capture(rules, &dir, cap, layer, dice, rounds, trace);
+        let n = done.fetch_add(1, Ordering::Relaxed) + 1;
+        if n % 50 == 0 {
+            eprintln!("{n}/{} {:.0} s", work.len(), started.elapsed().as_secs_f64());
+        }
+        o
+    });
+    let mut text = String::from("file,offset,tile,from,to,layer,reseed,retaken,peace,lost_at_retake,lost_total,captor_lost,final_owner,war_end,hash_ok\n");
+    let mut sums: BTreeMap<String, [f64; 9]> = BTreeMap::new();
+    for ((i, layer, r), o) in work.iter().zip(results) {
+        let cap = &caps[*i];
+        let o = o?;
+        let ok = reseeds == 0 && o.next_hash == cap.next_hash;
+        text.push_str(&format!("{},{},{},{},{},{layer},{r},{},{},{},{},{},{},{},{}\n", cap.file, cap.offset, cap.tile.0, cap.from.0, cap.to.0, o.retaken.map_or(-1, i64::from), o.peace.map_or(-1, i64::from), o.lost_at_retake, o.lost_total, o.captor_lost, o.final_owner, u8::from(o.war_end), u8::from(ok)));
+        let s = sums.entry(layer.clone()).or_default();
+        s[0] += 1.0;
+        for (k, n) in [(1, 2u32), (2, 5), (3, 8)] {
+            s[k] += f64::from(u8::from(o.retaken.is_some_and(|x| x < n)));
+        }
+        s[4] += f64::from(o.lost_total);
+        s[5] += f64::from(o.captor_lost);
+        s[6] += f64::from(u8::from(o.peace.is_some() && o.retaken.is_none()));
+        s[7] += f64::from(u8::from(ok));
+    }
+    std::fs::write(&out_path, text).map_err(|e| format!("{out_path}: {e}"))?;
+    println!("{} capture positions, {} plays, {:.0} s", caps.len(), work.len(), started.elapsed().as_secs_f64());
+    for (layer, s) in sums {
+        let n = s[0].max(1.0);
+        println!("{layer}: plays {}, retaken within 2: {:.1} %, 5: {:.1} %, 8: {:.1} %, own units lost {:.2}, captor lost {:.2}, peace without retake {:.1} %, hash ok {}", s[0], 100.0 * s[1] / n, 100.0 * s[2] / n, 100.0 * s[3] / n, s[4] / n, s[5] / n, 100.0 * s[6] / n, s[7]);
+    }
+    Ok(())
+}
+
+/// `--trace`: after the turn of `p`, the city and the units of both sides near it.
+fn trace_state(game: &GameState, rules: &CompiledRuleset, driver: &Driver, cap: &Cap, p: PlayerId) {
+    let auth = &game.view().auth;
+    let dims = auth.map().dimensions;
+    let city = city_at(game, rules, cap.tile);
+    let war = auth.diplomacy().at_war(cap.from, cap.to);
+    let mut line = format!("S r{} after P{} city owner {:?} hp {:?} war {war}", round(game), p.0, city.map(|c| c.0 .0), city.map(|c| c.2.saturating_sub(c.1)));
+    for (label, owner, radius) in [("own", cap.from, 6), ("captor", cap.to, 3)] {
+        let mut units: Vec<String> = auth
+            .units()
+            .iter_cores()
+            .filter(|u| u.owner == owner && army_role(rules, u.kind).is_some())
+            .filter_map(|u| dims.distance(u.tile, cap.tile).filter(|d| *d <= radius).map(|d| (d, u)))
+            .map(|(d, u)| {
+                let task = driver.states().get(owner).and_then(|s| s.task_of(u.id)).map(|t| format!("{:?}", t.task)).unwrap_or_default();
+                format!("{}@{d}:{}hp {}", rules.units[u.kind.0 as usize].key, u.hp, task)
+            })
+            .collect();
+        units.sort();
+        line.push_str(&format!("\n   {label}: {}", units.join("; ")));
+    }
+    eprintln!("{line}");
 }
