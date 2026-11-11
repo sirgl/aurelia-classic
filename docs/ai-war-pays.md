@@ -110,3 +110,20 @@ the war line's own binary against its `standard`). `next-war` is the game's AI o
 On the tuning offset 200 (100 solo pace games) it starts 98 operations and 36 % take a city at 6.3 units
 lost an operation (`siege-call` on its own line: 89, 38 %, 6.25; the new `standard`: 9 operations, none
 took a city). The acceptance is in the lane's log (work/nets/next2/LOG.md).
+
+## 9. `next-war-retake`: the retake of `retake2` on `next-war` (11 November)
+
+`retake2` (classic/docs/ai-retake.md) was built on `siege-call` (9965f26), the commit `next-war` merged; the retake
+line (7d543d7) is merged onto `next-war` whole. `retake2` keeps its own mind and plays on `pre-next` as measured.
+`next-war-retake` is `next-war` with the retake flag: the flags of `next-w` and the war of `retake2` (the flags of
+`war-pays`, `war-muster`, `siege-call`, the retake, the switches of `war-open`; `ClassicMind::new`). The retake memory
+section was renumbered from `0x5D` to `0x5E`: `next`'s section has `0x5D` since the thirteenth promotion, and a
+`next-war-retake` seat writes both.
+
+**Stage 1 review, closed here.** A test asserts that every switch of `next-war` and `next-war-retake` but the war's is
+`Standard`'s (`driver::sharp_tests::next_war_variants_are_standard_but_for_the_war`); `war-pays` is named only with
+`experimental-ai`, like the rest of its line (`Variant::compiled`; the test that pinned it in every build now pins it
+behind the feature); `SIEGE_CALL_ON` is gone: the war line plays `CallFixes::DEFAULT` and an ablation edits it.
+**Unreachable thresholds** (not changed): `siege_walls::CALL` sets both `press` and `withdraw` to `NEVER - 1`, so the
+call is always `Press` but for a city the strikes cannot bring down (`Withdraw`, which only skips the strike); `Model`
+and `Hold` are never returned by `call`. They stay as fitted (pressing beat every wait on the bank).

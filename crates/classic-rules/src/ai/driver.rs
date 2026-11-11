@@ -1076,6 +1076,40 @@ mod sharp_tests {
         assert_eq!(Variant::from_name("next-war"), cfg!(feature = "experimental-ai").then_some(Variant::NextWar));
     }
 
+    /// `next-war` and `next-war-retake` are the game's AI in everything but the war (the review of
+    /// stage 1): the mind's flags of `next-w`, the parts the mind builds (siege, peace, book, nets,
+    /// Unciv), and every switch the mind reads from its variant (`WarOpen` for them, `Standard` for
+    /// the game's AI) but the war's: `war_open` and the war case of `war_tuning`. The war flags
+    /// (`pays`, `fit`, `muster`, `call`, `retake2`) are the war line's. A switch that one of them
+    /// reads differently from `Standard` fails here (a new switch joins the list); the others
+    /// (`settings`, `adjust`, `war_gate`) read the variant's `base()`, `Standard`'s for `WarOpen`
+    /// through `scripted()`.
+    #[test]
+    fn next_war_variants_are_standard_but_for_the_war() {
+        macro_rules! read {
+            ($v:expr; $($f:ident),* $(,)?) => { vec![$((stringify!($f), format!("{:?}", $v.$f()))),*] };
+        }
+        let switches = |m: &ClassicMind| {
+            let v = m.variant;
+            let tuning = crate::ai::operations::WarTuning { siege: crate::ai::operations::SiegeFixes::NONE, ..v.war_tuning() };
+            let mut out = read!(v; allocates, operates, fights_as_front, has_leaders, defends, growth_policy, content_founding, true_effects, effect_checks, priced_stops, science_levers, tactical, danger_net, weak_fighter, fight_fix, siege_tactics, choice_mode, site_net, space_finish, unit_abilities, religion_fix, tall, building_order, price_model, sound_orders, checks_orders, strikes, carriers, landings, science_pricing, sea_work, air_arm, plans, peace_making, siege_walls, siege_join, workers_fit, conquest, army_fit, camps, trade_fit, no_idle_cities, scout_early, cs_gift_cap, strategy_net, unit_net, fog_march, unciv, net, book);
+            out.push(("war_tuning without the war case", format!("{tuning:?}")));
+            out.push(("flags of next-w", format!("{:?}", (m.sharp, m.tall_real, m.next, m.wonder_race))));
+            out.push(("parts", format!("{:?}", (m.walls.is_some(), m.unciv.is_some(), m.book.is_some(), m.tall, m.conquest, m.choice, m.genome.is_some()))));
+            #[cfg(feature = "experimental-ai")]
+            out.push(("nets", format!("{:?}", (m.net.is_some(), m.unit_net_on()))));
+            out
+        };
+        let standard = ClassicMind::new(Variant::Standard);
+        for v in [Variant::NextWar, Variant::NextWarRetake] {
+            let mind = ClassicMind::new(v);
+            for ((name, a), (_, b)) in switches(&mind).into_iter().zip(switches(&standard)) {
+                assert_eq!(a, b, "{}: {name}", v.name());
+            }
+            assert!(mind.variant.war_open() && !standard.variant.war_open() && mind.pays && mind.call && !standard.pays, "{}: the war is the war line's", v.name());
+        }
+    }
+
     /// `war-pays` is `WarOpen` in every switch but its own flag (`TurnBrief::war_pays`); no other
     /// variant has the flag, and `sharp` and `war-open` keep theirs.
     #[test]
