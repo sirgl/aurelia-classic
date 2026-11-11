@@ -409,10 +409,17 @@ impl<'a> WorldTransaction<'a> {
                 continue;
             };
             core.strike_made = false;
-            if core.resistance_turns > 0 {
+            let resisted = core.resistance_turns > 0;
+            if resisted {
                 core.resistance_turns -= 1;
             }
-            if core.status == CityStatus::Razing {
+            let ended = resisted && core.resistance_turns == 0;
+            let razing = core.status == CityStatus::Razing;
+            // The city gives nothing while it resists: when it stops, its yields are read again.
+            if ended {
+                self.journal.city_changes.push(CityChange::StatusChanged { city });
+            }
+            if razing {
                 self.burn_city(city, rules);
             }
         }

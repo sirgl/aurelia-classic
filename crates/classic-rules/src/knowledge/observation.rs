@@ -44,6 +44,8 @@ pub struct OwnCity {
     /// Hit points left (maximum minus damage).
     pub hp: u16,
     pub status: crate::world::city::CityStatus,
+    /// Turns of resistance left: the city gives nothing and takes no order meanwhile.
+    pub resistance: u16,
     pub queue: Vec<ProductionItem>,
     pub buildings: Vec<BuildingKindId>,
     pub worked: Vec<TileId>,
@@ -562,6 +564,7 @@ fn own_city(auth: &AuthWorld, rules: &CompiledRuleset, handle: CityHandle, core:
         damage: core.damage,
         hp: crate::combat::city::max_hit_points(auth, rules, core).saturating_sub(core.damage),
         status: core.status,
+        resistance: core.resistance_turns,
         queue: core.queue.clone(),
         buildings: core.buildings.clone(),
         worked,

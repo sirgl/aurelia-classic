@@ -113,3 +113,4 @@ classic.game.reasons.spy-no-such-spy = Kein solcher Spion
 classic.game.reasons.spy-nothing-to-steal = Nichts zu stehlen
 classic.game.reasons.not-enough-gold = Benötigt { NUMBER($price) } Gold, vorhanden { NUMBER($treasury) }
 classic.game.reasons.needs-technology = Benötigt Technologie: { $tech }
+classic.game.reasons.city-in-resistance = Die Stadt leistet noch { $n } Züge Widerstand: Sie produziert und verkauft nichts

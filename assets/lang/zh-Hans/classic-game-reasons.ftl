@@ -113,3 +113,4 @@ classic.game.reasons.spy-no-such-spy = 没有这名间谍
 classic.game.reasons.spy-nothing-to-steal = 没有可窃取的东西
 classic.game.reasons.not-enough-gold = 需要 { NUMBER($price) } 金币，现有 { NUMBER($treasury) }
 classic.game.reasons.needs-technology = 需要科技：{ $tech }
+classic.game.reasons.city-in-resistance = 城市还要抵抗 { $n } 回合：不能生产，也不能购买

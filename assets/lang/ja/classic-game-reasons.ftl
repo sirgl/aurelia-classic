@@ -113,3 +113,4 @@ classic.game.reasons.spy-no-such-spy = そのようなスパイはいません
 classic.game.reasons.spy-nothing-to-steal = 盗めるものがありません
 classic.game.reasons.not-enough-gold = ゴールドが { NUMBER($price) } 必要です（所持 { NUMBER($treasury) }）
 classic.game.reasons.needs-technology = 必要なテクノロジー：{ $tech }
+classic.game.reasons.city-in-resistance = 都市はあと { $n } ターン抵抗中です：生産も購入もできません

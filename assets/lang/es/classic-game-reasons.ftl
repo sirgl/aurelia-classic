@@ -113,3 +113,4 @@ classic.game.reasons.spy-no-such-spy = No existe ese espía
 classic.game.reasons.spy-nothing-to-steal = Nada que robar
 classic.game.reasons.not-enough-gold = Se necesitan { NUMBER($price) } de oro; tiene { NUMBER($treasury) }
 classic.game.reasons.needs-technology = Requiere la tecnología: { $tech }
+classic.game.reasons.city-in-resistance = La ciudad resiste { $n } turnos más: no produce ni vende nada

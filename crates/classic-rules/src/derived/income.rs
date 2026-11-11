@@ -60,6 +60,10 @@ pub struct PlayerIncome {
 
 /// Income of one city now.
 pub fn city_income(auth: &AuthWorld, rules: &CompiledRuleset, core: &CityCore) -> CityIncome {
+    // A city in resistance gives nothing and eats nothing (the kernel runs no step of its turn).
+    if core.resistance_turns > 0 {
+        return CityIncome::default();
+    }
     let yields = city_breakdown(auth, rules, core);
     let excess = crate::derived::happiness::excess_snapshot(auth, core.owner);
     let growth_percent = crate::derived::happiness::growth_percent(excess);

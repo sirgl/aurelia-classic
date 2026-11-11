@@ -652,6 +652,9 @@ fn golden_age_text(
 }
 
 fn growth_text(core: &CityCore, income: &CityIncome, threshold: u32) -> String {
+    if core.resistance_turns > 0 {
+        return tf!("classic.game.city.resistance", n = core.resistance_turns);
+    }
     if income.food_surplus < 0 {
         return tf!("classic.game.city.starving", n = income.food_surplus);
     }

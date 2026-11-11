@@ -112,3 +112,4 @@ classic.game.reasons.spy-no-such-spy = No such spy
 classic.game.reasons.spy-nothing-to-steal = Nothing to steal
 classic.game.reasons.not-enough-gold = Need { NUMBER($price) } gold, have { NUMBER($treasury) }
 classic.game.reasons.needs-technology = Needs technology: { $tech }
+classic.game.reasons.city-in-resistance = The city is in resistance for { $n } more turns: it produces and sells nothing

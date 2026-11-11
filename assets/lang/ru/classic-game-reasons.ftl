@@ -112,3 +112,4 @@ classic.game.reasons.spy-no-such-spy = Такого шпиона нет
 classic.game.reasons.spy-nothing-to-steal = Красть нечего
 classic.game.reasons.not-enough-gold = Нужно { NUMBER($price) } золота, есть { NUMBER($treasury) }
 classic.game.reasons.needs-technology = Нужна технология: { $tech }
+classic.game.reasons.city-in-resistance = Город в сопротивлении ещё { $n } ходов: он ничего не производит и ничего не продаёт

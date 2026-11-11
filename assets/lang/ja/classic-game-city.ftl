@@ -47,3 +47,4 @@ classic.game.city.row-faith = 信仰
 classic.game.city.row-defence = 防御
 classic.game.city.row-hit-points = 耐久力
 classic.game.city.no-effect = まだ効果なし
+classic.game.city.resistance = 抵抗中：残り { $n } ターン。終わるまで都市は何も生産せず、成長もしません。

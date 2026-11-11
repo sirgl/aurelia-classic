@@ -77,6 +77,7 @@ pub fn refusal(rules: &CompiledRuleset, refusal: Refusal) -> String {
         Refusal::OtherNation => t!("classic.game.reasons.other-nation").into(),
         Refusal::NotProducible => t!("classic.game.reasons.not-producible").into(),
         Refusal::ReplacedByUniqueUnit => t!("classic.game.reasons.replaced-by-unique-unit").into(),
+        Refusal::CityInResistance { turns } => tf!("classic.game.reasons.city-in-resistance", n = turns),
     }
 }
 
@@ -313,6 +314,7 @@ mod tests {
             Refusal::OtherNation,
             Refusal::NotProducible,
             Refusal::ReplacedByUniqueUnit,
+            Refusal::CityInResistance { turns: 3 },
         ];
         for item in all {
             let text = refusal(&rules, item);
