@@ -241,18 +241,26 @@ fn play(o: &Options) -> Result<(), String> {
                     // The cities the AI seats captured in the game (each capture once, `war_probe::Probe::captures`).
                     taken.fetch_add(probe.captures.len(), Ordering::Relaxed);
                     // The retake (`retake2`, `next-war-retake`): the cases opened, and the cities a seat lost and
-                    // took back from the same captor within `RETAKE_WINDOW` rounds (any variant: from the captures).
+                    // holds again within `RETAKE_WINDOW` rounds (any variant: from the cities at the end of each turn).
                     let mut cases: Vec<(PlayerId, u32)> = probe.retakes.iter().map(|(_, p, t, _, _)| (*p, *t)).collect();
                     cases.sort();
                     cases.dedup();
-                    let lost = probe.captures.iter().filter(|(_, _, _, from)| from.is_some()).count();
-                    let back = probe
-                        .captures
-                        .iter()
-                        .filter(|(r, captor, tile, from)| {
-                            from.is_some_and(|owner| probe.captures.iter().any(|(r2, p2, t2, f2)| *p2 == owner && t2 == tile && *f2 == Some(*captor) && *r2 > *r && *r2 <= *r + RETAKE_WINDOW))
-                        })
-                        .count();
+                    // A city a player held at the end of a turn and not at its next one was lost; it is taken back
+                    // when the player holds it again at the end of a turn within `RETAKE_WINDOW` rounds of the loss.
+                    let (mut lost, mut back) = (0, 0);
+                    let mut players: Vec<PlayerId> = probe.cities.iter().map(|(_, p, _)| *p).collect();
+                    players.sort();
+                    players.dedup();
+                    for player in players {
+                        let turns: Vec<&(u32, PlayerId, Vec<u32>)> = probe.cities.iter().filter(|(_, p, _)| *p == player).collect();
+                        for (at, pair) in turns.windows(2).enumerate() {
+                            for tile in pair[0].2.iter().filter(|t| !pair[1].2.contains(t)) {
+                                lost += 1;
+                                let since = pair[1].0;
+                                back += usize::from(turns[at + 1..].iter().take_while(|(r, _, _)| *r <= since + RETAKE_WINDOW).any(|(_, _, tiles)| tiles.contains(tile)));
+                            }
+                        }
+                    }
                     retake.lock().expect("retake").push((probe.retakes.len(), cases.len(), lost, back));
                     rows.lock().expect("rows").push((at, out));
                 }
@@ -286,7 +294,7 @@ fn play(o: &Options) -> Result<(), String> {
     let retake = retake.into_inner().map_err(|e| e.to_string())?;
     let sum = |f: fn(&(usize, usize, usize, usize)) -> usize| retake.iter().map(f).sum::<usize>();
     println!(
-        "retake: {} seat-turns with a case, {} cities with a case; {} of {} captures from a remembered owner taken back by it within {RETAKE_WINDOW} rounds",
+        "retake: {} seat-turns with a case, {} cities with a case; {} of {} cities lost by an AI seat held by it again within {RETAKE_WINDOW} rounds",
         sum(|r| r.0),
         sum(|r| r.1),
         sum(|r| r.3),
