@@ -823,7 +823,7 @@ fn the_memory_round_trips() {
     let i = intent(&great_land_no_room(), Held::default(), 1, 198, 67);
     let mut mult = price_mult(&i);
     let review = goals::review(&m, &rules, &i, &mut mult, &base(), 7, false);
-    let memory = Memory { held: Held { style: Some(0), aim: Some(1), posture: None, lock: Some(StyleLock { round: 13, situation: great_land_no_room() }) }, survey: None, review: Some(review), target: Some(TechId(5)), sharp: None };
+    let memory = Memory { held: Held { style: Some(0), aim: Some(1), posture: None, lock: Some(StyleLock { round: 13, situation: great_land_no_room() }) }, survey: None, review: Some(review), target: Some(TechId(5)), sharp: None, retake: None };
     assert_eq!(Memory::decode(&memory.encode()), memory);
     assert_eq!(Memory::decode(&[1, 2, 3]), Memory::default(), "another mind's bytes");
     // `sharp`'s section comes after the rest and only when there is one: the other variants'
@@ -842,6 +842,11 @@ fn the_memory_round_trips() {
     let bytes = next.encode();
     assert_eq!(bytes.len(), plain.len() + 1 + 4 * 8, "the marker and four numbers");
     assert_eq!(Memory::decode(&bytes[..bytes.len() - 1]).sharp, None, "a cut section is no section");
+    // `next-war-retake` writes `retake2`'s section before `next`'s: both read back (the two markers differ).
+    let retake = classic_rules::ai::retake::Memory { held: vec![classic_rules::ids::TileId(7)], lost: vec![classic_rules::ai::retake::Lost { tile: classic_rules::ids::TileId(4), round: 12, captor: None }] };
+    let both = Memory { retake: Some(retake), ..next.clone() };
+    assert_eq!(Memory::decode(&both.encode()), both);
+    assert_eq!(Memory::decode(&next.encode()).retake, None, "`next`'s section is not read as the retake's");
 }
 
 /// The net counts a few hundred hand weights.
