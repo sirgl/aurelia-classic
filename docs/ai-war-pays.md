@@ -127,3 +127,9 @@ behind the feature); `SIEGE_CALL_ON` is gone: the war line plays `CallFixes::DEF
 **Unreachable thresholds** (not changed): `siege_walls::CALL` sets both `press` and `withdraw` to `NEVER - 1`, so the
 call is always `Press` but for a city the strikes cannot bring down (`Withdraw`, which only skips the strike); `Model`
 and `Hold` are never returned by `call`. They stay as fitted (pressing beat every wait on the bank).
+
+**Does the retake fire on the new mind?** Tuning offset 200, 100 solo pace games (`ai-war-ops`, every seat one
+variant): `next-war-retake` opened a retake case in 146 seat-turns on 38 cities, and 30 of 82 cities lost by an AI seat
+were held by it again within 8 rounds; `next-war` 0 cases, 2 of 50. Operations 98 and 98, 37.8 % and 35.7 % took a city.
+No integration defect was found, so nothing was tuned: `next-war-retake` is frozen as merged. The acceptance is in the
+lane's log (work/nets/next2/LOG.md).
