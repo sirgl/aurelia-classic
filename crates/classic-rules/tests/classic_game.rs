@@ -166,10 +166,14 @@ use classic_rules::{compile_rules, Command, CompiledRuleset, GameState};
 //   nation: the script's Warrior orders of the Polynesian player (Maori Warrior replaces the
 //   Warrior) are refused, so its cities build other things: 0x1f920735c9735b24 ->
 //   0x60fd2fa148c59a53 (rounds 0x07d888bdc2e8e01d -> 0x5df7d92c18e33fc7), 787 commands.
+//   Lost orders (kernel, `OrderRemoved`): a wonder another city finishes takes its order out of every
+//   queue and nothing is burned, so the script's cities build on with the stock they kept (five
+//   removals of each of two wonders in this game): 0x60fd2fa148c59a53 -> 0xb8bc274ad3bea0e7
+//   (rounds 0x5df7d92c18e33fc7 -> 0x7f06b76920e811be), 787 -> 806 commands.
 /// Hash of the final state of the classic game.
-const CLASSIC_GAME_FINAL_HASH: u64 = 0x60fd2fa148c59a53;
+const CLASSIC_GAME_FINAL_HASH: u64 = 0xb8bc274ad3bea0e7;
 /// Fold of the per-round hashes of the classic game.
-const CLASSIC_GAME_ROUNDS_HASH: u64 = 0x5df7d92c18e33fc7;
+const CLASSIC_GAME_ROUNDS_HASH: u64 = 0x7f06b76920e811be;
 
 const ROUNDS: usize = 100;
 

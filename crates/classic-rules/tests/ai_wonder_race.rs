@@ -43,7 +43,9 @@ fn lost_race() -> (GameState, CompiledRuleset, CityHandle, CityHandle, CityHandl
         .expect("the rules have a world wonder both cities may order");
     drop(obs);
     game.execute(&rules, Command::EnqueueProduction { player: P0, city: a, item: ProductionItem::Building(wonder) }).unwrap();
-    game.debug_complete_building(&rules, rival, wonder);
+    // The wonder stands in the rival's city without the sweep a completion makes (the harness grant: the
+    // state of a save made before the kernel removed lost orders), so the order is still queued here.
+    game.debug_add_building(&rules, rival, wonder);
     (game, rules, a, b, rival, wonder)
 }
 

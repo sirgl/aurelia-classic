@@ -205,10 +205,13 @@ use classic_rules::{compile_rules, Command, CompiledRuleset, GameState};
 //   0x3d5f65f823084f43. The AI never queued a wonder twice: classic_game, the fuzz worlds and
 //   the bench pins are unchanged.
 
+//   Lost orders (kernel, `OrderRemoved`): two orders of a wonder another city finished leave their
+//   queues at once and keep the stock: 0xdd4968b2c2267399 -> 0x0916a68b5c7c30ff (rounds
+//   0x3d5f65f823084f43 -> 0xc50f37bb11d058d5).
 /// Hash of the final state of `core_game`.
-const CORE_GAME_FINAL_HASH: u64 = 0xdd4968b2c2267399;
+const CORE_GAME_FINAL_HASH: u64 = 0x0916a68b5c7c30ff;
 /// Fold of the per-round hashes of `core_game`.
-const CORE_GAME_ROUNDS_HASH: u64 = 0x3d5f65f823084f43;
+const CORE_GAME_ROUNDS_HASH: u64 = 0xc50f37bb11d058d5;
 
 const ROUNDS: usize = 120;
 
