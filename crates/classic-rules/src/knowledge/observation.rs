@@ -46,6 +46,9 @@ pub struct OwnCity {
     pub status: crate::world::city::CityStatus,
     /// Turns of resistance left: the city gives nothing and takes no order meanwhile.
     pub resistance: u16,
+    /// The income the city gives once its resistance has ended (`income` is zero while it lasts;
+    /// equal to `income` outside resistance): what a capture is worth.
+    pub income_open: CityIncome,
     pub queue: Vec<ProductionItem>,
     pub buildings: Vec<BuildingKindId>,
     pub worked: Vec<TileId>,
@@ -553,6 +556,8 @@ fn cities(
 
 fn own_city(auth: &AuthWorld, rules: &CompiledRuleset, handle: CityHandle, core: &CityCore) -> OwnCity {
     let worked = crate::derived::yields::city_work(auth, rules, core).tiles().collect();
+    let income = city_income(auth, rules, core);
+    let income_open = if core.resistance_turns > 0 { city_income(auth, rules, &CityCore { resistance_turns: 0, ..core.clone() }) } else { income };
     OwnCity {
         handle,
         id: core.id,
@@ -568,7 +573,8 @@ fn own_city(auth: &AuthWorld, rules: &CompiledRuleset, handle: CityHandle, core:
         queue: core.queue.clone(),
         buildings: core.buildings.clone(),
         worked,
-        income: city_income(auth, rules, core),
+        income,
+        income_open,
         citizens: core.citizens.clone(),
         process: core.economy.process,
     }

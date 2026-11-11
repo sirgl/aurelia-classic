@@ -26,8 +26,11 @@
 //!   no such building is open, the occupied unrest to the end. Less the research
 //!   and policy cost one more non-puppet city adds (`world_size::tech_cost_per_city`,
 //!   `policy_cost_per_city`): the share of the empire's beakers and culture it eats,
-//!   at the allocator's prices. Resistance stops no yield under these rules (it only
-//!   stops the city's strike): no term. The purchases an annexed city allows add
+//!   at the allocator's prices. A city in resistance gives nothing (no yield, no growth, no
+//!   order, no purchase) and strikes not: as many rounds as the citizens it keeps, for an
+//!   annexed city and, where `PUPPET_RESISTS` is on, for a puppet too. The yields the city
+//!   would give in those rounds are not counted (`worth`, from `OwnCity::income_open`), and
+//!   the exempting building starts when they end. The purchases an annexed city allows add
 //!   nothing: gold is already priced at its best use in the empire.
 //! - **raze** (only where the rules accept it: no original capital, no unique
 //!   luxury): no worth and no unrest after it burns; while it burns (a citizen a
@@ -108,18 +111,20 @@ pub fn priced_case(obs: &AIObservation<'_>, rules: &CompiledRuleset, prices: &Pr
     let mut prices = *prices;
     prices.excess = excess;
     let rounds = i64::from(prices.rounds_left.max(1));
-    let worth = worth(&prices, city);
+    let resistance = u32::from(city.resistance);
+    let worth_puppet = worth(&prices, city, if crate::world::PUPPET_RESISTS { resistance } else { 0 });
+    let worth_annex = worth(&prices, city, resistance);
     let (normal, occupied) = unrest_hundredths(&prices, city.population);
     let normal_cost = mood_cost(&prices, normal);
     let occupied_cost = mood_cost(&prices, occupied);
-    let puppet = worth - normal_cost;
+    let puppet = worth_puppet - normal_cost;
     let annex = obs.economy.may_annex.then(|| {
         let never = occupied_cost;
         let with = exemption(obs, rules, &prices, city).map(|(built, cost)| {
             let built = i64::from(built).min(rounds);
             (occupied_cost * built + normal_cost * (rounds - built)) / rounds + cost
         });
-        worth - with.map_or(never, |w| w.min(never)) - added_costs(obs, &prices)
+        worth_annex - with.map_or(never, |w| w.min(never)) - added_costs(obs, &prices)
     });
     let raze_command = Command::DecideCity { player: obs.player, city: city.handle, decision: CityDecision::Raze };
     let raze = obs.view.accepts(&raze_command).then(|| {
@@ -138,20 +143,21 @@ pub fn priced_case(obs: &AIObservation<'_>, rules: &CompiledRuleset, prices: &Pr
     Case { puppet, annex, raze, decision, unrest: ((hundredths + 99) / 100) as i32 }
 }
 
-/// The city's score and its yields now to the end at the allocator's prices
-/// (`Prices`: a yield a round kept to the last round).
-fn worth(prices: &Prices, city: &OwnCity) -> Centi {
+/// The city's score and its yields to the end at the allocator's prices (`Prices`: a yield
+/// a round kept to the last round), the yields starting `delay` rounds from now (the
+/// resistance, in which the city gives nothing).
+fn worth(prices: &Prices, city: &OwnCity, delay: u32) -> Centi {
     let score = prices.score;
     let citizens = i64::from(city.population.max(1));
     let points = score.city + score.land * (crate::ai::value::FIRST_RING + citizens) + score.citizen * citizens;
-    let income = &city.income;
+    let income = &city.income_open;
     let yields = prices.food * i64::from(income.food_surplus.max(0))
         + prices.production * i64::from(income.production.max(0))
         + prices.gold * i64::from(income.gold.max(0))
         + prices.science * i64::from(income.science.max(0))
         + prices.culture * i64::from(income.culture)
         + prices.faith * i64::from(income.faith);
-    points + yields
+    points + prices.later(yields, delay)
 }
 
 /// The unhappiness of the city kept as a normal city and as an occupied one,
@@ -186,13 +192,14 @@ fn exemption(obs: &AIObservation<'_>, rules: &CompiledRuleset, prices: &Prices, 
     let rounds = i64::from(prices.rounds_left.max(1));
     let hammer = prices.production / rounds;
     let gold = prices.gold;
-    let production = i64::from(city.income.production.max(1));
+    let production = i64::from(city.income_open.production.max(1));
+    let waiting = i64::from(city.resistance);
     exempting_buildings(rules)
         .filter(|kind| open_to(obs, rules, *kind))
         .map(|kind| {
             let def = &rules.buildings[kind.0 as usize];
             let cost = obs.view.own_production_cost(city.handle, ProductionItem::Building(kind)).unwrap_or(def.cost * obs.speed.production_percent / 100);
-            let built = (i64::from(cost) + production - 1) / production;
+            let built = (i64::from(cost) + production - 1) / production + waiting;
             let upkeep = gold * i64::from(def.maintenance) * (rounds - built.min(rounds)) / rounds;
             (built as u32, i64::from(cost) * hammer + upkeep)
         })

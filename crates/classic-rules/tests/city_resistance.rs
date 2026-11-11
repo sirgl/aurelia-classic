@@ -98,11 +98,35 @@ fn nothing_can_be_queued_or_bought_in_a_city_in_resistance() {
     assert_eq!(w.game.view().auth.players().treasury_of(P0), gold, "no gold is charged");
 }
 
+/// The number the player sees (`resistance_turns`) is the rounds in which the city still gives
+/// nothing, the current one included: a city with 3 gives nothing at the end of three of its
+/// owner's turns, the number falls 3, 2, 1, and the fourth end of turn runs the city.
+#[test]
+fn the_number_shown_is_the_rounds_the_city_still_gives_nothing() {
+    let mut w = World::new(GRASS, 3);
+    let kind = w.warrior();
+    {
+        let core = w.game.world_mut().cities.get_mut(w.city).unwrap();
+        core.queue = vec![ProductionItem::Unit(kind)];
+        core.production = 3;
+    }
+    for shown in [3u16, 2, 1] {
+        assert_eq!(w.core().resistance_turns, shown);
+        assert_eq!(city_income(w.game.view().auth, &w.rules, &w.core()), Default::default(), "{shown} left: nothing is given now");
+        w.end_turn();
+        assert_eq!(w.core().production, 3, "{shown} left: this turn's end gave nothing");
+    }
+    assert_eq!(w.core().resistance_turns, 0);
+    assert!(city_income(w.game.view().auth, &w.rules, &w.core()).production > 0, "the number shows 0: the city gives");
+    w.end_turn();
+    assert_ne!(w.core().production, 3, "the end of the first turn without resistance ran the city");
+}
+
 #[test]
 fn when_resistance_ends_everything_returns() {
-    // The same city with one turn of resistance left and with none: after one end of turn the
-    // resisting one has run its turn at once (the step of the owner's turn takes the last turn
-    // of resistance first), so the two cities are equal, and the cached yields are read again.
+    // The same city with one turn of resistance left and with none: the resisting one gives
+    // nothing at the end of this turn (it is the last of its rounds), the free one runs; at the
+    // end of the next turn the two have run alike, and the cached yields follow the end.
     let (mut a, mut b) = (World::new(GRASS, 1), World::new(GRASS, 0));
     let kind = a.warrior();
     for w in [&mut a, &mut b] {
@@ -112,10 +136,13 @@ fn when_resistance_ends_everything_returns() {
     }
     a.end_turn();
     b.end_turn();
-    let (ca, cb) = (a.core(), b.core());
-    assert_eq!((ca.population, ca.food_times100, ca.production), (cb.population, cb.food_times100, cb.production));
-    assert_eq!(ca.resistance_turns, 0);
-    let live = city_breakdown(a.game.view().auth, &a.rules, &ca).rates;
+    assert_eq!(a.core().production, 3, "the resisting city's last round gives nothing");
+    assert_ne!(b.core().production, 3);
+    assert_eq!(a.core().resistance_turns, 0);
+    a.end_turn();
+    b.end_turn();
+    let live = city_breakdown(a.game.view().auth, &a.rules, &a.core()).rates;
     assert!(live.food > 0);
     assert_eq!(a.game.derived().yields.of(a.city), Some(live), "the cached yields follow the end of resistance");
+    assert!(a.core().production > 3, "everything returned: the city builds again");
 }

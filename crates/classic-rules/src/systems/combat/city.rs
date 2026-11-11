@@ -18,6 +18,7 @@ use crate::classic::ClassicChange;
 use crate::transaction::journal::CityChange;
 use crate::transaction::transaction::WorldTransaction;
 use crate::world::city::{CityStatus, CityWrite};
+use crate::world::PUPPET_RESISTS;
 use crate::world::player::ClassicPlayers;
 
 /// Citizens a captured city loses: one plus one per this many citizens (a city
@@ -355,7 +356,7 @@ impl<'a> WorldTransaction<'a> {
             .get_mut(city)
             .ok_or(CommandError::UnknownCity)?;
         core.status = status;
-        if status == CityStatus::Puppet {
+        if status == CityStatus::Puppet && !PUPPET_RESISTS {
             core.resistance_turns = 0;
         }
         self.journal
@@ -397,10 +398,10 @@ impl<'a> WorldTransaction<'a> {
         Ok(())
     }
 
-    /// Start of the owner's turn for its cities (§4.2 and conquest): heal,
-    /// a new strike, one turn less of resistance, razing burns a citizen
-    /// (a city at 0 is removed). A decision still pending at the end of the
-    /// conqueror's turn becomes a puppet (`resolve_pending_decisions`).
+    /// The owner's turn for its cities (§4.2 and conquest): heal, a new strike, razing burns a
+    /// citizen (a city at 0 is removed). A decision still pending at the end of the
+    /// conqueror's turn becomes a puppet (`resolve_pending_decisions`); resistance counts down
+    /// after the cities have run (`tick_resistance`).
     pub(crate) fn conquest_and_city_heal(&mut self, owner: PlayerId, rules: &CompiledRuleset) {
         let cities = self.world.indexes.cities_of(owner).to_vec();
         for city in cities {
@@ -409,18 +410,30 @@ impl<'a> WorldTransaction<'a> {
                 continue;
             };
             core.strike_made = false;
-            let resisted = core.resistance_turns > 0;
-            if resisted {
-                core.resistance_turns -= 1;
-            }
-            let ended = resisted && core.resistance_turns == 0;
-            let razing = core.status == CityStatus::Razing;
-            // The city gives nothing while it resists: when it stops, its yields are read again.
-            if ended {
-                self.journal.city_changes.push(CityChange::StatusChanged { city });
-            }
-            if razing {
+            if core.status == CityStatus::Razing {
                 self.burn_city(city, rules);
+            }
+        }
+    }
+
+    /// The end of the owner's turn, after the cities have run (the kernel skipped a city in
+    /// resistance): one turn less of resistance. The turns are the rounds the city gives
+    /// nothing, the current one included: a city captured with 3 gives nothing at the end of
+    /// three of its owner's turns and runs the fourth, and the number the player sees is the
+    /// rounds still to go.
+    pub(crate) fn tick_resistance(&mut self, owner: PlayerId) {
+        let cities = self.world.indexes.cities_of(owner).to_vec();
+        for city in cities {
+            let Some(core) = self.world.cities.get_mut(city) else {
+                continue;
+            };
+            if core.resistance_turns == 0 {
+                continue;
+            }
+            core.resistance_turns -= 1;
+            // The city gives nothing while it resists: when it stops, its yields are read again.
+            if core.resistance_turns == 0 {
+                self.journal.city_changes.push(CityChange::StatusChanged { city });
             }
         }
     }
@@ -490,7 +503,9 @@ impl<'a> WorldTransaction<'a> {
             }
             if let Some(core) = self.world.cities.get_mut(city) {
                 core.status = CityStatus::Puppet;
-                core.resistance_turns = 0;
+                if !PUPPET_RESISTS {
+                    core.resistance_turns = 0;
+                }
             }
             self.journal
                 .city_changes
