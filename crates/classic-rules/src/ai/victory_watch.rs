@@ -125,19 +125,34 @@ impl Diplomatic {
     /// ourselves. 0 for a rival far from the threshold (beyond the ramp) and for one so far over it
     /// that one alliance does not bring it under. `step`: the delegates an alliance brings.
     pub fn flip_worth(&self, rival: PlayerId, prize: Centi, step: i32) -> Centi {
-        let Some(r) = self.of(rival) else { return 0 };
-        let fall = chance_for(r.gap, self.reach) - chance_for(r.gap + step, self.reach);
-        // The more we are ahead ourselves, the less its fall matters to us.
-        prize * fall / 1000 * (1000 - self.own.chance) / 1000
+        let defend = match self.of(rival) {
+            Some(r) => {
+                let fall = chance_for(r.gap, self.reach) - chance_for(r.gap + step, self.reach);
+                // The more we are ahead ourselves, the less its fall matters to us.
+                prize * fall / 1000 * (1000 - self.own.chance) / 1000
+            }
+            None => 0,
+        };
+        defend + self.gain(prize, step)
+    }
+
+    /// What one more alliance of our own is worth toward winning the vote ourselves: the rise of our
+    /// own chance, in the measure of `prize` (0 when we are out of reach or over the threshold).
+    pub fn gain(&self, prize: Centi, step: i32) -> Centi {
+        if !part(8) {
+            return 0;
+        }
+        let rise = chance_for(self.own.gap - step, self.reach) - chance_for(self.own.gap, self.reach);
+        prize * rise / 1000
     }
 }
 
 /// Dev switches of the vote guard's parts while they are tuned (`VG_STEP`, bits: 1 the alliances of
-/// a rival, 2 the host election, 4 the coups); all on when unset. Gone with the freeze.
+/// a rival, 2 the host election, 4 the coups, 8 our own win: the alliances of any nation are worth what they add to our own chance); all on when unset. Gone with the freeze.
 pub fn part(bit: u32) -> bool {
     use std::sync::OnceLock;
     static BITS: OnceLock<u32> = OnceLock::new();
-    *BITS.get_or_init(|| std::env::var("VG_STEP").ok().and_then(|v| v.parse().ok()).unwrap_or(7)) & bit != 0
+    *BITS.get_or_init(|| std::env::var("VG_STEP").ok().and_then(|v| v.parse().ok()).unwrap_or(15)) & bit != 0
 }
 
 /// Whom the seat votes for as host of the league (a `ChangeHost` election at a special session),
@@ -213,7 +228,9 @@ pub fn guard_prize(obs: &AIObservation<'_>) -> Centi {
 fn prize_of_race(obs: &AIObservation<'_>) -> Centi {
     use crate::knowledge::public::PlayerQueries;
     let Some(race) = diplomatic(obs) else { return 0 };
-    if race.rivals.iter().all(|r| r.chance == 0) {
+    // A rival that can win the vote, or the vote within our own reach (`Diplomatic::gain`).
+    let own_reach = race.gain(1000, crate::ai::city_states::ally_delegates() as i32) > 0;
+    if race.rivals.iter().all(|r| r.chance == 0) && !own_reach {
         return 0;
     }
     crate::ai::grand_strategy::prize(&obs.view.race(), obs)

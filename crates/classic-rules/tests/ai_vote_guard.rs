@@ -405,3 +405,27 @@ fn a_settled_spy_stages_the_coup_in_the_last_rounds() {
     assert!(obs.spies[0].coup_chance.is_none_or(|c| c < classic_rules::ai::espionage::GUARD_COUP_MIN_CHANCE));
     assert!(guard_coup_orders(&obs).is_empty());
 }
+
+/// A seat one alliance short of winning the vote itself values the alliance of any nation (not only of
+/// a rival that could win): taking one brings it up to the threshold. A seat far from the threshold
+/// does not.
+#[test]
+fn a_seat_near_the_threshold_values_any_alliance() {
+    let (mut game, rules) = scene(0, true);
+    for i in 0..3 {
+        game.debug_set_influence(&rules, cs(i), P0, 80);
+    }
+    game.debug_set_influence(&rules, cs(3), P2, 80);
+    game.debug_set_influence(&rules, cs(3), P0, 40);
+    let obs = game.ai_observation(&rules, P0);
+    let race = diplomatic(&obs).unwrap();
+    assert_eq!((race.own.delegates, race.own.gap), (4 + 3, 2));
+    assert!(race.rivals.iter().all(|r| r.chance == 0), "no rival can win: {:?}", race.rivals);
+    assert!(race.flip_worth(P2, PRIZE, 1) > 0, "the bystander's alliance is worth taking for the seat's own sake");
+    assert!(guard_prize(&obs) > 0);
+    // Far from the threshold (no alliances at all): nothing is priced.
+    let (game, rules) = scene(0, true);
+    let obs = game.ai_observation(&rules, P0);
+    assert_eq!(diplomatic(&obs).unwrap().flip_worth(P2, PRIZE, 1), 0);
+    assert_eq!(guard_prize(&obs), 0);
+}
