@@ -392,11 +392,12 @@ fn a_settled_spy_stages_the_coup_in_the_last_rounds() {
         let rounds = classic_rules::ai::victory_watch::diplomatic(&obs).map_or(99, |d| d.rounds);
         let established = obs.spies[0].coup_chance.is_some();
         if established {
-            seen.push((rounds, !guard_coup_orders(&obs).is_empty()));
+            let window = obs.speed.pace_rounds(classic_rules::ai::espionage::GUARD_COUP_WINDOW);
+            seen.push((rounds.saturating_sub(window), !guard_coup_orders(&obs).is_empty()));
         }
     }
-    assert!(seen.iter().any(|(r, o)| *r <= 3 && *o), "the coup is ordered in the window: {seen:?}");
-    assert!(seen.iter().all(|(r, o)| *r <= 3 || !*o), "and not before: {seen:?}");
+    assert!(seen.iter().any(|(r, o)| *r == 0 && *o), "the coup is ordered in the window: {seen:?}");
+    assert!(seen.iter().all(|(r, o)| *r == 0 || !*o), "and not before: {seen:?}");
     // A chance under the guard's minimum is not tried.
     game.debug_set_influence(&rules, cs(0), P1, 140);
     game.debug_set_influence(&rules, cs(0), P0, 0);

@@ -28,9 +28,9 @@ pub const COUP_MIN_CHANCE: i64 = 60;
 /// whole (the spy's owner takes the ally's influence, the ally loses 20).
 pub const GUARD_COUP_MIN_CHANCE: i64 = 30;
 
-/// Our turns before the session that holds the vote opens within which the guard stages its coups:
+/// Our turns (at Standard speed) before the session that holds the vote opens within which the guard stages its coups:
 /// late, so that the rival cannot buy the alliance back; the delegates are fixed when the session opens.
-pub const GUARD_COUP_WINDOW: u32 = 3;
+pub const GUARD_COUP_WINDOW: u32 = 4;
 
 /// One `StealTechnology` per victim with rights.
 pub fn steal_orders(obs: &AIObservation<'_>) -> Vec<Command> {
@@ -76,7 +76,7 @@ fn guard_cities(obs: &AIObservation<'_>) -> (Vec<(CityHandle, PlayerId)>, u32) {
 /// rounds before the session opens.
 pub fn guard_coup_orders(obs: &AIObservation<'_>) -> Vec<Command> {
     let (cities, rounds) = guard_cities(obs);
-    if cities.is_empty() || rounds > GUARD_COUP_WINDOW {
+    if cities.is_empty() || rounds > obs.speed.pace_rounds(GUARD_COUP_WINDOW) {
         return Vec::new();
     }
     obs.spies
@@ -150,8 +150,11 @@ pub fn counter_espionage_value(obs: &AIObservation<'_>, rules: &CompiledRuleset,
 fn movable(spy: &SpyInfo, slow: u32, guard: &[CityHandle]) -> bool {
     spy.state == SpyState::Unassigned
         || spy.theft_turns.is_some_and(|t| t > slow)
-        // The vote guard calls a spy that only rigs an election to a rival's ally.
-        || (!guard.is_empty() && spy.state == SpyState::RigElection && !spy.city.is_some_and(|c| guard.contains(&c)))
+        // The vote guard calls a spy that earns nothing now (home counter-intelligence, a watch on a
+        // nation with nothing to steal, an election rigged for a few points) to a rival's ally.
+        || (!guard.is_empty()
+            && matches!(spy.state, SpyState::RigElection | SpyState::CounterIntel | SpyState::Surveillance)
+            && !spy.city.is_some_and(|c| guard.contains(&c)))
 }
 
 /// Where an idle spy goes, best first.

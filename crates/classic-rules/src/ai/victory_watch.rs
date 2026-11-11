@@ -155,11 +155,15 @@ pub fn host_choice(obs: &AIObservation<'_>) -> Option<PlayerId> {
     if front == obs.player {
         return None;
     }
-    // Alliances it could still take before the leader vote: the ramp of the diplomatic race.
+    // With the host's seats (it holds them already, or the election gives them) and the alliances it could
+    // still take before the leader vote (two session intervals: the vote may be the second session on),
+    // could it win? The ramp of the diplomatic race.
     let interval = kernel::rules::speeds::SpeedValues::scale(last_session().turns_between, obs.speed.pace_percent).max(1);
-    let reach = rival_flips(obs, interval).min(obs.city_states.len() as i64);
+    let reach = rival_flips(obs, 2 * interval).min(obs.city_states.len() as i64);
+    let seats = last_session().host_delegates;
     let delegates = c.delegates.iter().find(|(p, _)| *p == front)?.1;
-    if chance_for(i32::from(c.needed) - i32::from(delegates), reach) == 0 {
+    let base = if c.host == Some(front) { delegates.saturating_sub(seats) } else { delegates };
+    if chance_for(i32::from(c.needed) - i32::from(base + seats), reach) == 0 {
         return None;
     }
     c.delegates.iter().filter(|(p, _)| *p != front).max_by_key(|(p, d)| (*d, std::cmp::Reverse(p.0))).map(|(p, _)| *p)
