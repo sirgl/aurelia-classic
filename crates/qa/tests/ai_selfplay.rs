@@ -323,7 +323,10 @@ fn the_start_round_jitters_per_group() {
 /// learner at round 300 make the science victory reachable by round 500.
 /// Eight scripted games of 300 rounds (Tiny, the standard suite) are the
 /// sources; `pre-war-fix` takes the best scientist with every technology of
-/// the closure, three `standard` play the others.
+/// the closure, three `pre-next` play the others: the standard this was measured on.
+/// Against the `standard` of the thirteenth promotion the learner wins by science in 2
+/// games of 8 (measured 11 November): the opponents win by diplomacy first, at rounds
+/// 343-455.
 #[test]
 fn given_space_techs_reach_the_science_victory() {
     let rules = ClassicBench::rules();
@@ -336,7 +339,7 @@ fn given_space_techs_reach_the_science_victory() {
         result.unwrap();
     }
     let from = FromLogs { give_space_techs: 1.0, ..FromLogs::read(&dir.join("logs"), &[], 300, 0, LearnerSeat::BestScience).unwrap() };
-    let config = Config { rounds: 500, group: 1, from: Some(from), learner_mind: Some("pre-war-fix".to_owned()), opponents: vec!["standard".to_owned()], ..config() };
+    let config = Config { rounds: 500, group: 1, from: Some(from), learner_mind: Some("pre-war-fix".to_owned()), opponents: vec!["pre-next".to_owned()], ..config() };
     let games = selfplay::jobs(&config, 8);
     let played: Vec<_> = aurelia_qa::export::parallel(&games, jobs, |job| selfplay::play(&rules, &config, job)).into_iter().map(Result::unwrap).collect();
     let mut won = Vec::new();

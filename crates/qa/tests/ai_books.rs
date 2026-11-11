@@ -203,11 +203,14 @@ fn every_book_issues_its_first_orders_in_a_fresh_game() {
 
 /// The rushes declare war and take the field in a duel by a bounded round
 /// (seed 1 of the pangaea duel: the rival capital is on the same land).
+/// The bounds were measured against the standard the books are built on: since the
+/// thirteenth promotion that is `pre-next`, the rival here. Against the new `standard`
+/// the archer rush declares at round 190 (measured 11 November), the other two as before.
 #[test]
 fn the_rushes_declare_war_and_attack_by_a_bounded_round() {
     let rules = ClassicBench::rules();
     for (name, by) in [("rush-siege", 90), ("rush-archer", 100), ("rush-sword", 105)] {
-        let (mut game, mut driver, seat) = duel(&rules, name, "pangaea", 1);
+        let (mut game, mut driver, seat) = duel_against(&rules, name, "pangaea", 1, "pre-next");
         let applied = play(&mut game, &rules, &mut driver, seat, by);
         trace(&mut driver, seat, name);
         if std::env::var_os("BOOK_TRACE").is_some() {
