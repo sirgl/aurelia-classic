@@ -30,3 +30,7 @@ classic.game.turn.won = Вы выиграли игру
 classic.game.turn.lost-to-another = Другая нация выиграла игру
 classic.game.turn.fell = Ваша нация пала
 classic.game.turn.nuclear-strike = Применено ядерное оружие: { $nation }. Все, кто знает эту державу, это запомнят.
+classic.game.turn.order-removed-wonder-built = { $city }: { $item } уже построено в другом городе. Заказ снят, накопленное производство сохранено.
+classic.game.turn.order-removed-national-wonder-built = { $city }: { $item } уже построено в другом вашем городе. Заказ снят, накопленное производство сохранено.
+classic.game.turn.order-removed-already-built = { $city }: { $item } уже есть в этом городе. Повторный заказ снят, накопленное производство сохранено.
+classic.game.turn.order-removed-blocked = { $city }: { $item } больше нельзя производить. Заказ снят, накопленное производство сохранено.
