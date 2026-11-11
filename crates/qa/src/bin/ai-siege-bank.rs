@@ -1103,5 +1103,15 @@ fn trace_state(game: &GameState, rules: &CompiledRuleset, driver: &Driver, cap: 
         units.sort();
         line.push_str(&format!("\n   {label}: {}", units.join("; ")));
     }
+    // The ring of the city: who stands on each tile next to it.
+    let ring: Vec<String> = (0..auth.map().tile_count() as u32)
+        .map(TileId)
+        .filter(|t| dims.distance(*t, cap.tile) == Some(1))
+        .map(|t| {
+            let on: Vec<String> = auth.units().iter_cores().filter(|u| u.tile == t).map(|u| format!("P{}:{}", u.owner.0, rules.units[u.kind.0 as usize].key.trim_start_matches("core:unit/"))).collect();
+            format!("{}[{}]", t.0, on.join(","))
+        })
+        .collect();
+    line.push_str(&format!("\n   ring: {}", ring.join(" ")));
     eprintln!("{line}");
 }

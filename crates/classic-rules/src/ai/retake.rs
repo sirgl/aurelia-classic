@@ -36,10 +36,10 @@ pub const RETAKE_ROUNDS: u32 = 2;
 /// outside answers a strike the same turn).
 const GUARD_RADIUS: i32 = 2;
 
-/// Bench-only knob (`RETAKE_<NAME>`), for the tuning.
-fn knob(name: &str, default: i64) -> i64 {
-    std::env::var(format!("RETAKE_{name}")).ok().and_then(|v| v.parse().ok()).unwrap_or(default)
-}
+/// A unit takes part when it strikes within this many of its own turns of walking (its movement a turn,
+/// then its range): the model counts `RETAKE_ROUNDS` rounds of strikes, and a unit that needs more turns
+/// to arrive strikes after the city healed or was reinforced.
+const TURNS: i32 = 2;
 
 /// A lost city the units on the spot can retake.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -82,16 +82,14 @@ pub fn cases(observation: &AIObservation<'_>, brief: &TurnBrief, state: &AiState
         let mut group: Vec<(EntityId, Besieger)> = Vec::new();
         let mut own_power = 0u32;
         for unit in &brief.units {
-            let Some(role) = army_role(rules, unit.kind) else { continue };
-            if unit.hp < HEAL_BELOW_HP || !free_for_retake(brief, state, unit.id) {
+            if army_role(rules, unit.kind).is_none() || unit.hp < HEAL_BELOW_HP || !free_for_retake(brief, state, unit.id) {
                 continue;
             }
             let Some(distance) = dims.distance(unit.tile, city.tile) else { continue };
             let def = &rules.units[unit.kind.0 as usize];
             let steps = i32::from(def.movement.max(1));
             let range = crate::ai::combat::ranged_range(rules, unit.kind).unwrap_or(1);
-            let _ = role;
-            if distance > knob("TURNS", 2) as i32 * steps + range {
+            if distance > TURNS * steps + range {
                 continue;
             }
             let Some(strike) = estimated_strike(rules, unit.kind, unit.hp, &estimate) else { continue };
@@ -99,7 +97,6 @@ pub fn cases(observation: &AIObservation<'_>, brief: &TurnBrief, state: &AiState
             group.push((unit.id, strike));
         }
         if group.is_empty() {
-            debug(brief, city.tile, "no unit within two turns");
             continue;
         }
         // The holder's units standing in the open next to the city.
@@ -107,19 +104,16 @@ pub fn cases(observation: &AIObservation<'_>, brief: &TurnBrief, state: &AiState
             .visible_foreign_units
             .iter()
             .filter(|u| u.owner == city.owner && u.tile != city.tile && army_role(rules, u.kind).is_some())
-            .filter(|u| dims.distance(u.tile, city.tile).is_some_and(|d| d <= knob("GUARD_RADIUS", i64::from(GUARD_RADIUS)) as i32))
+            .filter(|u| dims.distance(u.tile, city.tile).is_some_and(|d| d <= GUARD_RADIUS))
             .map(|u| unit_power(rules, u.kind, u.hp))
             .sum();
-        if guard_power as i64 * knob("GUARD_PERCENT", 100) > own_power as i64 * 100 {
-            debug(brief, city.tile, &format!("outmatched: guard {guard_power} against {own_power}"));
+        if guard_power > own_power {
             continue;
         }
         let mut besiegers: Vec<Besieger> = group.iter().map(|(_, b)| *b).collect();
-        let Some(rounds) = siege_rounds_within(&mut besiegers, estimate.hp, estimate.heal, knob("ROUNDS", i64::from(RETAKE_ROUNDS)) as u32) else {
-            debug(brief, city.tile, &format!("not within {RETAKE_ROUNDS} rounds: hp {} group {:?}", estimate.hp, besiegers));
+        let Some(rounds) = siege_rounds_within(&mut besiegers, estimate.hp, estimate.heal, RETAKE_ROUNDS) else {
             continue;
         };
-        debug(brief, city.tile, &format!("CASE rounds {rounds} hp {} group {}", estimate.hp, group.len()));
         out.push(Case { tile: city.tile, enemy: city.owner, hp: city.hp, rounds, group: group.into_iter().map(|(id, _)| id).collect() });
     }
     out
@@ -154,9 +148,3 @@ impl TurnBrief {
     }
 }
 
-/// Bench-only trace of the cases (`RETAKE_DEBUG`).
-fn debug(brief: &TurnBrief, tile: TileId, text: &str) {
-    if std::env::var_os("RETAKE_DEBUG").is_some() {
-        eprintln!("RT r{} P{} city {}: {text}", brief.round, brief.player.0, tile.0);
-    }
-}

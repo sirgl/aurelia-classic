@@ -954,4 +954,17 @@ mod sharp_tests {
         #[cfg(feature = "experimental-ai")]
         assert!(!mind.unit_net_on());
     }
+
+    /// `retake` is `SiegeCall` with the retake of a lost city: the flag of no other variant, and a mind
+    /// that is not `retake` has no case (`TurnBrief::retaking` stays empty).
+    #[test]
+    fn retake_plays_siege_call_with_the_retake_only() {
+        let mind = ClassicMind::new(Variant::Retake);
+        assert_eq!((mind.variant, mind.pays, mind.muster, mind.call, mind.retake, mind.variant()), (Variant::WarOpen, true, true, true, true, Variant::Retake));
+        let flagged: Vec<Variant> = Variant::ALL.into_iter().filter(|v| v.retake()).collect();
+        assert_eq!(flagged, [Variant::Retake]);
+        let call = ClassicMind::new(Variant::SiegeCall);
+        assert!(call.call && !call.retake);
+        assert!(!ClassicMind::new(Variant::WarPays).retake);
+    }
 }
