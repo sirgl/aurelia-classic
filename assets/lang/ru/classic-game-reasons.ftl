@@ -104,6 +104,7 @@ classic.game.reasons.deal-not-at-war = Войны нет
 classic.game.reasons.deal-cannot-declare-war = Эту войну объявить нельзя
 classic.game.reasons.deal-cannot-make-peace = Этот мир заключить нельзя
 classic.game.reasons.deal-peace-too-soon = Мир возможен только после 10 раундов войны
+classic.game.reasons.deal-peace-needs-consent = Мир с нацией — это сделка: предложите его, и мир наступит, если она согласится
 classic.game.reasons.spy-dead = Шпион убит, ждите нового
 classic.game.reasons.not-met = Вы не знакомы с владельцем
 classic.game.reasons.spy-occupied = Там уже сидит ваш шпион

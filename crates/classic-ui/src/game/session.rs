@@ -150,6 +150,7 @@ impl Session {
         self.notify_income(&records);
         self.notify_nuclear(&records);
         self.notify_lost_orders(&records);
+        self.notify_offers(&records);
         let observer = Observer::new(self.client.game.view(), &self.client.rules, self.me());
         let cues = derive(&observer, &records);
         self.presentation.push(cues);
@@ -344,10 +345,7 @@ impl Session {
             GameRequest::CityStrike(tile) => self.aim_city_strike(TileId(tile)),
             GameRequest::Research(tech) => self.choose_research(tech),
             GameRequest::Save | GameRequest::Load | GameRequest::Continue => {}
-            GameRequest::MakePeace(player) => self.diplomacy(Command::MakePeace {
-                player: self.me(),
-                enemy: PlayerId(player),
-            }),
+            GameRequest::MakePeace(player) => self.peace_request(PlayerId(player)),
             GameRequest::OpenBorders(player) => self.diplomacy(Command::OpenBorders {
                 host: self.me(),
                 guest: PlayerId(player),

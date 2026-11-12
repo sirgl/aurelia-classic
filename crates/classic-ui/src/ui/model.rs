@@ -186,7 +186,11 @@ pub struct Rival {
     pub name: String,
     pub at_war: bool,
     pub borders_open: bool,
+    /// The peace button: with a nation it offers peace (the nation answers), with a
+    /// city-state it makes it.
     pub peace: Availability,
+    /// The rival is a nation: the button offers peace instead of making it.
+    pub peace_by_offer: bool,
     pub open_borders: Availability,
 }
 

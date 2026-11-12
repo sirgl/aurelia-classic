@@ -10,6 +10,7 @@ classic.ui.screen-diplomacy.no-treaties = 条約なし
 classic.ui.screen-diplomacy.active-treaties = 有効な条約 { $n }件
 classic.ui.screen-diplomacy.more-treaties = ほか{ $n }件
 classic.ui.screen-diplomacy.make-peace = 講和する
+classic.ui.screen-diplomacy.offer-peace = 和平を提案
 classic.ui.screen-diplomacy.declare-war = 宣戦布告
 classic.ui.screen-diplomacy.denounce = 非難する
 classic.ui.screen-diplomacy.open-borders = 国境開放

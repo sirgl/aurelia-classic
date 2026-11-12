@@ -105,6 +105,7 @@ classic.game.reasons.deal-not-at-war = No están en guerra
 classic.game.reasons.deal-cannot-declare-war = No se puede declarar esta guerra
 classic.game.reasons.deal-cannot-make-peace = No se puede hacer esta paz
 classic.game.reasons.deal-peace-too-soon = La paz solo es posible tras 10 rondas de guerra
+classic.game.reasons.deal-peace-needs-consent = La paz con una nación es un acuerdo: ofrécela, y habrá paz si la acepta
 classic.game.reasons.spy-dead = El espía fue eliminado; espere a uno nuevo
 classic.game.reasons.not-met = No ha conocido al dueño
 classic.game.reasons.spy-occupied = Su espía ya está allí

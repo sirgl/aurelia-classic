@@ -105,6 +105,7 @@ classic.game.reasons.deal-not-at-war = 并未交战
 classic.game.reasons.deal-cannot-declare-war = 无法宣布这场战争
 classic.game.reasons.deal-cannot-make-peace = 无法缔结这份和平
 classic.game.reasons.deal-peace-too-soon = 开战满10回合后才能议和
+classic.game.reasons.deal-peace-needs-consent = 与国家的和平是一项交易：提出后，对方接受才会缔结和平
 classic.game.reasons.spy-dead = 间谍已被处决，请等待新的间谍
 classic.game.reasons.not-met = 你尚未与其所有者会面
 classic.game.reasons.spy-occupied = 你的间谍已在那里

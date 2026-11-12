@@ -104,6 +104,7 @@ classic.game.reasons.deal-not-at-war = Not at war
 classic.game.reasons.deal-cannot-declare-war = This war cannot be declared
 classic.game.reasons.deal-cannot-make-peace = This peace cannot be made
 classic.game.reasons.deal-peace-too-soon = Peace is possible only after 10 rounds of war
+classic.game.reasons.deal-peace-needs-consent = Peace with a nation is a deal: offer it, and it makes peace if it accepts
 classic.game.reasons.spy-dead = The spy was killed; wait for a new one
 classic.game.reasons.not-met = You have not met the owner
 classic.game.reasons.spy-occupied = Your spy is already there

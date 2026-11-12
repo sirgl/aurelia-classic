@@ -200,6 +200,7 @@ pub fn deal(block: DealBlock) -> &'static str {
         DealBlock::CannotDeclareWar => t!("classic.game.reasons.deal-cannot-declare-war"),
         DealBlock::CannotMakePeace => t!("classic.game.reasons.deal-cannot-make-peace"),
         DealBlock::PeaceTooSoon => t!("classic.game.reasons.deal-peace-too-soon"),
+        DealBlock::PeaceNeedsConsent => t!("classic.game.reasons.deal-peace-needs-consent"),
     }
 }
 

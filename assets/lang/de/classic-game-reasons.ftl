@@ -105,6 +105,7 @@ classic.game.reasons.deal-not-at-war = Nicht im Krieg
 classic.game.reasons.deal-cannot-declare-war = Dieser Krieg kann nicht erklärt werden
 classic.game.reasons.deal-cannot-make-peace = Dieser Frieden kann nicht geschlossen werden
 classic.game.reasons.deal-peace-too-soon = Frieden ist erst nach 10 Kriegsrunden möglich
+classic.game.reasons.deal-peace-needs-consent = Frieden mit einer Nation ist ein Abkommen: Bietet ihn an, und er gilt, wenn sie annimmt
 classic.game.reasons.spy-dead = Der Spion wurde getötet; warten Sie auf einen neuen
 classic.game.reasons.not-met = Sie sind dem Besitzer noch nicht begegnet
 classic.game.reasons.spy-occupied = Ihr Spion ist schon dort

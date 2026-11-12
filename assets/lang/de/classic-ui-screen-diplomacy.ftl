@@ -19,6 +19,7 @@ classic.ui.screen-diplomacy.active-treaties = { $n ->
 }
 classic.ui.screen-diplomacy.more-treaties = { $n } weitere
 classic.ui.screen-diplomacy.make-peace = Frieden schließen
+classic.ui.screen-diplomacy.offer-peace = Frieden anbieten
 classic.ui.screen-diplomacy.declare-war = Krieg erklären
 classic.ui.screen-diplomacy.denounce = Verurteilen
 classic.ui.screen-diplomacy.open-borders = Offene Grenzen

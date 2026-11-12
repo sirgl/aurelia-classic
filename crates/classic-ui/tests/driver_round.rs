@@ -293,9 +293,11 @@ fn ai_keeps_a_war_while_the_enemy_was_seen_recently() {
         assert!(obs.visible_foreign_units.is_empty());
         let contact = obs.relation(PlayerId(1)).expect("met").contact;
         assert!(contact.last_seen_round.is_some());
+        // With a nation the peace is offered (it must accept), never made alone.
+        let peace = classic_rules::world::relations::DealItem::Peace;
         diplomacy_commands(&obs)
             .iter()
-            .any(|c| matches!(c, Command::MakePeace { .. }))
+            .any(|c| matches!(c, Command::ProposeDeal { items, .. } if items.iter().any(|(_, i)| *i == peace)))
     };
     assert!(!wants_peace(&game), "seen this round: the war goes on");
     for _ in 0..PEACE_AFTER_UNSEEN_ROUNDS {

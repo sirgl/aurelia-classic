@@ -317,7 +317,8 @@ fn rival_row(ui: &mut egui::Ui, rival: &Rival, requests: &mut Vec<GameRequest>) 
             tf!("classic.ui.hud-game.rival-peace", name = rival.name.as_str())
         };
         ui.label(egui::RichText::new(line).color(color).size(12.0));
-        if rival.at_war && small_button(ui, t!("classic.ui.hud-game.make-peace"), &rival.peace, &mut reasons) {
+        let peace = if rival.peace_by_offer { t!("classic.ui.hud-game.offer-peace") } else { t!("classic.ui.hud-game.make-peace") };
+        if rival.at_war && small_button(ui, peace, &rival.peace, &mut reasons) {
             requests.push(GameRequest::MakePeace(rival.player));
         }
         if !rival.borders_open && small_button(ui, t!("classic.ui.hud-game.open-borders"), &rival.open_borders, &mut reasons) {

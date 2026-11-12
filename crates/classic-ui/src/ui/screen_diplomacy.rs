@@ -316,7 +316,8 @@ fn relation_buttons(ui: &mut egui::Ui, r: Rect, state: &mut ScreenState, card: &
         )
     };
     if card.at_war {
-        if ready_button(ui, slot(0), t!("classic.ui.screen-diplomacy.make-peace"), &card.make_peace) {
+        // The cards are nations: their peace is an offer they answer.
+        if ready_button(ui, slot(0), t!("classic.ui.screen-diplomacy.offer-peace"), &card.make_peace) {
             state.requests.push(GameRequest::MakePeace(card.player.0));
         }
     } else if ready_button(ui, slot(0), t!("classic.ui.screen-diplomacy.declare-war"), &card.declare_war) {

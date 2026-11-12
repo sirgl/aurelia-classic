@@ -52,6 +52,7 @@ classic.ui.hud-game.research-detail-stalled = { $stored }/{ $cost }  ·  нау�
 classic.ui.hud-game.rival-war = { $name } · война
 classic.ui.hud-game.rival-peace = { $name } · мир
 classic.ui.hud-game.make-peace = Заключить мир
+classic.ui.hud-game.offer-peace = Предложить мир
 classic.ui.hud-game.open-borders = Открытые границы
 classic.ui.hud-game.blocked-reason = { $action }: { $reason }
 classic.ui.hud-game.notice-line = Ход { $turn }  { $text }

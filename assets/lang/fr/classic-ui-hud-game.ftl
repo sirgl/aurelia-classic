@@ -44,6 +44,7 @@ classic.ui.hud-game.research-detail-stalled = { $stored }/{ $cost }  ·  pas enc
 classic.ui.hud-game.rival-war = { $name } · Guerre
 classic.ui.hud-game.rival-peace = { $name } · Paix
 classic.ui.hud-game.make-peace = Faire la paix
+classic.ui.hud-game.offer-peace = Proposer la paix
 classic.ui.hud-game.open-borders = Ouvrir les frontières
 classic.ui.hud-game.blocked-reason = { $action } : { $reason }
 classic.ui.hud-game.notice-line = T{ $turn }  { $text }

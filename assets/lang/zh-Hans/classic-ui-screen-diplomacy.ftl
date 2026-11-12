@@ -10,6 +10,7 @@ classic.ui.screen-diplomacy.no-treaties = 无条约
 classic.ui.screen-diplomacy.active-treaties = 生效条约 { $n } 项
 classic.ui.screen-diplomacy.more-treaties = 另有 { $n } 项
 classic.ui.screen-diplomacy.make-peace = 缔结和平
+classic.ui.screen-diplomacy.offer-peace = 提议和平
 classic.ui.screen-diplomacy.declare-war = 宣战
 classic.ui.screen-diplomacy.denounce = 谴责
 classic.ui.screen-diplomacy.open-borders = 开放边境
