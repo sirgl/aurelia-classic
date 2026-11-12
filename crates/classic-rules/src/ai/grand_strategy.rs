@@ -530,6 +530,11 @@ impl Stakes {
             stakes.add(last, true, value);
             return stakes;
         }
+        // No capital left to take (the seat holds every original capital it knows of, or none is known): nothing to
+        // weigh, and the attempts below would divide by zero.
+        if remaining.is_empty() {
+            return stakes;
+        }
         if path_of(state) == VictoryPath::Domination {
             let left = obs.victories.max_rounds.saturating_sub(obs.round);
             let now = domination_chance(&race, brief, left);

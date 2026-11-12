@@ -188,3 +188,33 @@ fn a_city_in_danger_puts_its_defence_first() {
     let (queue, _) = head_after_turn(Variant::Leaders);
     assert_eq!(queue.first(), Some(&worker), "{queue:?}");
 }
+
+/// A leader on the path to domination with no rival's capital in the race (here the only nation; on the siege arenas
+/// the attacker's rivals are city-states) has no capital left to weigh: `Stakes::of` returns its leanings and no stake
+/// (it divided the rounds left by the capitals left, zero).
+#[test]
+fn the_domination_stakes_with_no_capital_left_are_none() {
+    use classic_rules::ai::grand_strategy::{Stakes, VictoryPath};
+    use classic_rules::ai::planner::TurnBrief;
+    use classic_rules::ai::state::{AiState, Aim};
+    use classic_rules::knowledge::public::PlayerQueries;
+    use classic_rules::rules::content::Personality;
+    use classic_rules::world::victory::VictoryKind;
+    use classic_rules::ClassicGame;
+    let rules = compile_rules(core_rules()).unwrap();
+    let mut game = GameState::new(&rules, GameConfig { players: 1, width: 40, height: 20, rng_seed: 7 });
+    let tiles = game.view().auth.map().dimensions.tile_count() as u32;
+    let land: Vec<(TileId, TerrainId)> = (0..tiles).map(|t| (TileId(t), TerrainId(1))).collect();
+    game.debug_set_terrain_batch(&rules, &land);
+    let capital = game.view().auth.map().dimensions.to_tile(HexCoord { q: 10, r: 10 }).unwrap();
+    game.debug_found_city(&rules, AI, capital);
+    let obs = game.ai_observation(&rules, AI);
+    let race = obs.view.race();
+    assert!(obs.victories.enabled(VictoryKind::Domination));
+    assert!(race.capitals.iter().all(|c| c.holder == AI), "every capital is the seat's: {:?}", race.capitals);
+    let brief = TurnBrief::from_observation(&obs, &rules);
+    let mut state = AiState::new(AI, 1);
+    state.aim = Some(Aim { goal: VictoryPath::Domination.code(), since_round: 0 });
+    let stakes = Stakes::of(&obs, &brief, &state, &Personality::NEUTRAL);
+    assert!(stakes.capitals.is_empty() && stakes.unfound.is_empty(), "{stakes:?}");
+}
