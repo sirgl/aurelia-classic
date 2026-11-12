@@ -152,14 +152,18 @@ impl ClassicMind {
         let (flags, war) = match requested {
             Variant::NextWar => (Variant::Standard, Variant::SiegeCall),
             Variant::NextWarRetake => (Variant::Standard, Variant::Retake2),
+            // `next-x` (the joint build) is `next-war-retake` with the guard of `vote-guard` and the plan of
+            // `landless-plan` (both below).
+            Variant::NextX => (Variant::Standard, Variant::Retake2),
             _ => (requested, requested),
         };
+        let joint = requested == Variant::NextX;
         // `vote-guard` is `standard` (the flags of `next-w`) with the guard on.
-        let vote_guard = flags.vote_guard();
+        let vote_guard = flags.vote_guard() || joint;
         // `landless` is `Standard` in every switch but its own (`TurnBrief::landless`).
         let landless = flags.landless();
         // `landless-plan` likewise (`TurnBrief::landless_plan`).
-        let landless_plan = flags.landless_plan();
+        let landless_plan = flags.landless_plan() || joint;
         let flags = if landless || landless_plan { Variant::Standard } else { flags };
         let next = flags.next() || vote_guard;
         let tall_real = flags.tall_real() || next;
@@ -206,8 +210,9 @@ impl ClassicMind {
         let variant = if named.is_some() { Variant::PrePuppet } else { variant };
         // The alias `next-w` plays as `Standard` under its name, `next-war` as `Standard` with the
         // war of `siege-call` under its own, `next-war-retake` as `Standard` with the war of
-        // `retake2` under its own.
-        let named = named.or(matches!(requested, Variant::NextW | Variant::NextWar | Variant::NextWarRetake).then_some(requested));
+        // `retake2` under its own, `next-x` as `next-war-retake` with the guard and the landless
+        // plan under its own.
+        let named = named.or(matches!(requested, Variant::NextW | Variant::NextWar | Variant::NextWarRetake | Variant::NextX).then_some(requested));
         Self { advisors, variant, genome: None, humans: Vec::new(), walks: Default::default(), choice: None, #[cfg(feature = "experimental-ai")] net, book, named, walls, conquest: None, unciv, tall: None, sharp, tall_real, next, wonder_race, pays, fit, muster, call, retake2, vote_guard, field, raidw, landless, landless_plan, siege_mend: false }
     }
 
@@ -299,6 +304,10 @@ impl ClassicMind {
     }
 
     pub fn variant(&self) -> Variant {
+        // The joint build's candidate carries the flags below under its own name.
+        if self.named == Some(Variant::NextX) {
+            return Variant::NextX;
+        }
         if self.landless {
             return Variant::Landless;
         }
@@ -1084,6 +1093,26 @@ mod sharp_tests {
         assert_eq!(Variant::from_name("sharp"), cfg!(feature = "experimental-ai").then_some(Variant::Sharp));
     }
 
+    /// `next-x` (the joint build) is `next-war-retake` (the flags of `next-w`, the war of `retake2`) with the
+    /// guard of `vote-guard` and the plan of `landless-plan`, and none of the measured candidates beside them
+    /// (`landless`'s own goal, `field-craft`, `raid-war`, the unit net of `tactician-fit`); it names itself
+    /// `next-x`, and each accepted variant keeps its own mind.
+    #[test]
+    fn next_x_carries_every_accepted_flag() {
+        let next = |m: &ClassicMind| (m.sharp, m.tall_real, m.next, m.wonder_race);
+        let war = |m: &ClassicMind| (m.variant, m.pays, m.fit, m.muster, m.call, m.retake2);
+        let rest = |m: &ClassicMind| (m.vote_guard, m.landless, m.landless_plan, m.field, m.raidw, m.siege_mend);
+        let x = ClassicMind::new(Variant::NextX);
+        let (retake, guard, plan) = (ClassicMind::new(Variant::NextWarRetake), ClassicMind::new(Variant::VoteGuard), ClassicMind::new(Variant::LandlessPlan));
+        assert_eq!((next(&x), war(&x)), (next(&retake), war(&retake)));
+        assert_eq!(next(&x), next(&guard));
+        assert_eq!(next(&x), next(&plan));
+        assert_eq!(rest(&x), (true, false, true, false, false, false));
+        assert!(x.retakes() && guard.vote_guard && plan.landless_plan && !retake.vote_guard && !retake.landless_plan);
+        assert_eq!((x.variant(), retake.variant(), guard.variant(), plan.variant()), (Variant::NextX, Variant::NextWarRetake, Variant::VoteGuard, Variant::LandlessPlan));
+        assert_eq!(Variant::from_name("next-x"), cfg!(feature = "experimental-ai").then_some(Variant::NextX));
+    }
+
     /// `landless` is `Standard` in every switch (the flags of `next-w` included) but for its own flag
     /// (`TurnBrief::landless`); no other variant has the flag, and `Standard` does not carry it.
     #[test]
@@ -1207,7 +1236,7 @@ mod sharp_tests {
             out
         };
         let standard = ClassicMind::new(Variant::Standard);
-        for v in [Variant::NextWar, Variant::NextWarRetake] {
+        for v in [Variant::NextWar, Variant::NextWarRetake, Variant::NextX] {
             let mind = ClassicMind::new(v);
             for ((name, a), (_, b)) in switches(&mind).into_iter().zip(switches(&standard)) {
                 assert_eq!(a, b, "{}: {name}", v.name());

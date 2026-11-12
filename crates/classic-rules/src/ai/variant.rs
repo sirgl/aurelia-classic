@@ -95,6 +95,10 @@
 //! (`ClassicMind::new`; bench only, `experimental-ai`). `Retake2` (classic/docs/ai-retake.md) is
 //! `SiegeCall` with the retake of a lost city and plays on `PreNext` as measured; `NextWarRetake`
 //! is `NextWar` with its retake flag: the mind of `Standard` with the war of `Retake2`.
+//! `NextX` (the joint build of 12 November) is every AI line accepted on 11–12 November on one mind:
+//! the war of `NextWarRetake`, the guard of `VoteGuard` and the plan of `LandlessPlan`, with the
+//! rivals' inputs every variant reads at weight 0. A bench-only candidate; `Standard` is unchanged,
+//! and the transfer of `NextX` into it is a promotion of its own.
 
 use crate::ai::grand_strategy::Stakes;
 use crate::ai::operations::WarGate;
@@ -806,6 +810,20 @@ pub enum Variant {
     /// `landless` does, and keep out of a stronger enemy's reach. With a city, or a settler to found
     /// one, it plays exactly as `Standard`. For the bench's siege arenas, `experimental-ai` only.
     LandlessPlan,
+    /// The candidate of the joint build (12 November): every AI flag accepted on 11–12 November on
+    /// one mind (`ClassicMind::new`). `Standard` (the flags of `NextW`) with
+    /// - the war of `NextWarRetake`: the flags of `WarPays`, `WarMuster`, `SiegeCall` and the retake
+    ///   of a lost city with its fixes (a city retaken only when worth the units, one unit in one case,
+    ///   the surplus guard of a city in danger stays) on the switches of `WarOpen`
+    ///   (`TurnBrief::war_pays`, `muster_fix`, `war_muster`, `siege_call`, `retake`);
+    /// - the vote guard of `VoteGuard` (`TurnBrief::vote_guard`, `Prices::guard`);
+    /// - the goal of a player with no city and no settler given to the strategist, as `LandlessPlan`
+    ///   (`TurnBrief::landless_plan`, with the siege mends while it has no city:
+    ///   `TurnBrief::siege_mend`); `Landless`, the goal without the strategist, is replaced by it;
+    /// - the model of the rivals (`ai::rival_model`) as inputs of the strategy net at weight 0, which
+    ///   every variant reads.
+    /// A bench-only candidate, `experimental-ai` only; `Standard` does not change.
+    NextX,
 }
 
 /// The net's base: the expert the end-to-end net learns from and the mind it
@@ -826,7 +844,7 @@ const NUDGED_CANDIDATES: u32 = 40;
 
 impl Variant {
     /// The game's AI first.
-    pub const ALL: [Variant; 155] = [
+    pub const ALL: [Variant; 156] = [
         Variant::Standard,
         Variant::PreCamps,
         Variant::PreWorkers,
@@ -982,6 +1000,7 @@ impl Variant {
         Variant::RaidWar,
         Variant::Landless,
         Variant::LandlessPlan,
+        Variant::NextX,
     ];
 
     pub fn name(self) -> &'static str {
@@ -1123,6 +1142,7 @@ impl Variant {
             Variant::RaidWar => "raid-war",
             Variant::Landless => "landless",
             Variant::LandlessPlan => "landless-plan",
+            Variant::NextX => "next-x",
             Variant::ArmyFit => "army-fit",
             Variant::Camps => "camps",
             Variant::ArmyCamps => "army-camps",
@@ -1155,12 +1175,13 @@ impl Variant {
     /// promotion: `strategy-net`, its alias, is in every build. The play of `next-w` is the game's
     /// since the thirteenth: `Standard` carries its flags in every build (none of its code is
     /// behind the feature); the name `next-w` stays the bench's. The war line (`WarPays` …
-    /// `NextWarRetake`) is the bench's too.
+    /// `NextWarRetake`), the vote guard, the landless players and the joint build's `NextX` are the
+    /// bench's too.
     pub fn compiled(self) -> bool {
         cfg!(feature = "experimental-ai")
             || !matches!(
                 self,
-                Variant::Net | Variant::UnitNet | Variant::Hybrid | Variant::SiteNet | Variant::ChoiceNet | Variant::ChoiceNetProduction | Variant::ChoiceNetResearch | Variant::StandardScripted | Variant::PreCsGifts | Variant::Sharp | Variant::TallReal | Variant::Next | Variant::WonderCancel | Variant::WonderRace | Variant::NextW | Variant::NextRace | Variant::PreNext | Variant::WarPays | Variant::TacticianFit | Variant::WarMuster | Variant::SiegeCall | Variant::NextWar | Variant::Retake2 | Variant::NextWarRetake | Variant::VoteGuard | Variant::FieldCraft | Variant::RaidWar | Variant::Landless | Variant::LandlessPlan
+                Variant::Net | Variant::UnitNet | Variant::Hybrid | Variant::SiteNet | Variant::ChoiceNet | Variant::ChoiceNetProduction | Variant::ChoiceNetResearch | Variant::StandardScripted | Variant::PreCsGifts | Variant::Sharp | Variant::TallReal | Variant::Next | Variant::WonderCancel | Variant::WonderRace | Variant::NextW | Variant::NextRace | Variant::PreNext | Variant::WarPays | Variant::TacticianFit | Variant::WarMuster | Variant::SiegeCall | Variant::NextWar | Variant::Retake2 | Variant::NextWarRetake | Variant::VoteGuard | Variant::FieldCraft | Variant::RaidWar | Variant::Landless | Variant::LandlessPlan | Variant::NextX
             )
     }
 
