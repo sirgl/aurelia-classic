@@ -430,7 +430,7 @@ pub struct Memory {
     pub sharp: Option<sharp::Memory>,
     /// The samples of the rivals' screens (`ai::rival_model::Book`): written before `sharp`'s
     /// section behind its marker (`RIVAL_SECTION`), only when there is one.
-    pub rivals: crate::ai::rival_model::Book,
+    pub rival_book: crate::ai::rival_model::Book,
 }
 
 /// A review of the goals and of the cell's prices.
@@ -451,7 +451,7 @@ const MEMORY_VERSION: u8 = 0x5B;
 /// marker (`section_len`).
 const SHARP_SECTION: u8 = 0x5C;
 const NEXT_SECTION: u8 = 0x5D;
-/// The marker of the rivals' book (`Memory::rivals`), before `sharp`'s section.
+/// The marker of the rivals' book (`Memory::rival_book`), before `sharp`'s section.
 const RIVAL_SECTION: u8 = 0x5E;
 
 /// The bytes of a section of `marker`: the marker and its numbers, eight bytes each (`next`'s:
@@ -566,9 +566,9 @@ impl Memory {
             }
             None => w.0.push(0),
         }
-        if !self.rivals.samples.is_empty() {
+        if !self.rival_book.samples.is_empty() {
             w.0.push(RIVAL_SECTION);
-            self.rivals.encode(&mut w.0);
+            self.rival_book.encode(&mut w.0);
         }
         if let Some(m) = &self.sharp {
             let next = m.rivals.is_some() || m.fits.is_some();
@@ -662,11 +662,16 @@ impl Memory {
             None
         };
         // The rivals' book behind its marker.
-        let mut rivals = crate::ai::rival_model::Book::default();
+        let mut rival_book = crate::ai::rival_model::Book::default();
         if r.0.first() == Some(&RIVAL_SECTION) {
-            let (book, read) = crate::ai::rival_model::Book::decode(&r.0[1..])?;
-            rivals = book;
-            r.0 = &r.0[1 + read..];
+            // A cut or spoiled book is no book (like a cut `sharp` section): the rest of the memory stays.
+            match crate::ai::rival_model::Book::decode(&r.0[1..]) {
+                Some((book, read)) => {
+                    rival_book = book;
+                    r.0 = &r.0[1 + read..];
+                }
+                None => r.0 = &[],
+            }
         }
         // `sharp`'s section: its marker and numbers, the memory's last bytes (`section_len`).
         let sharp = match r.0.first().copied() {
@@ -678,7 +683,7 @@ impl Memory {
             }
             _ => None,
         };
-        Some(Memory { held, survey, review, target, sharp, rivals })
+        Some(Memory { held, survey, review, target, sharp, rival_book })
     }
 }
 
@@ -738,10 +743,10 @@ pub fn think(obs: &AIObservation<'_>, brief: &crate::ai::planner::TurnBrief, sta
     }
     // The model of the rivals from the public screens (`ai::rival_model`): inputs of every variant's
     // net, read with weight 0 (`weights::rival`); the book samples the screens for the trends.
-    let rivals = crate::ai::rival_model::estimate(obs, rules, &memory.rivals);
+    let rivals = crate::ai::rival_model::estimate(obs, rules, &memory.rival_book);
     features::rivals(&rivals, &mut situation);
-    if memory.rivals.due(round, pace) {
-        memory.rivals.record(obs.player, &rivals, pace);
+    if memory.rival_book.due(round, pace) {
+        memory.rival_book.record(obs.player, &rivals, pace);
     }
     let rounds_left = prices.rounds_left;
     let net = Net { open: brief.war_open, sharp: brief.sharp };

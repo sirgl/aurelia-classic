@@ -127,7 +127,7 @@ pub mod fe {
     pub const RIVAL_SCORE_TREND: usize = 62;
     pub const RIVAL_DOUBT: usize = 63;
     pub const RIVAL_DOMINATION: usize = 64;
-    pub const RIVAL_SPACE: usize = 65;
+    pub const RIVAL_TREE: usize = 65;
     pub const RIVAL_CULTURE: usize = 66;
     pub const RIVAL_DIPLOMACY: usize = 67;
     /// The first of them, in `Measure::ALL`'s order for the seven rows.
@@ -595,7 +595,7 @@ pub mod open {
 
 /// The inputs of the model of the rivals (`fe::RIVAL_*`, `ai::rival_model`) wired into the aims
 /// and the postures with weight 0: the net reads them and nothing changes. Every weight here is
-/// the next step's to learn from the games' outcomes (`rival/REPORT.md` of the branch names the
+/// the next step's to learn from the games' outcomes (`rivalnet/REPORT.md` of the branch names the
 /// ones to train first); none is written by hand.
 pub mod rival {
     use super::fe::*;
@@ -603,7 +603,7 @@ pub mod rival {
 
     /// Terms added to the aims' logits (science, culture, domination, diplomacy).
     pub const AIM: &[(usize, Term)] = &[
-        (0, f(RIVAL_SPACE, 0, "science: a rival nearer the end of the tree (race it or turn to another victory)")),
+        (0, f(RIVAL_TREE, 0, "science: a rival nearer the end of the tree (race it or turn to another victory)")),
         (0, f(RIVAL_SCIENCE, 0, "science: a rival researching faster")),
         (0, f(RIVAL_LITERACY, 0, "science: a rival knowing more of the tree")),
         (1, f(RIVAL_CULTURE, 0, "culture: a rival's culture already strong on us")),

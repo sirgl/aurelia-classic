@@ -88,7 +88,8 @@ pub struct Rival {
     /// Its score's change per `TREND_ROUNDS` paced rounds (None: no sample old enough).
     pub score_trend: Option<i64>,
     pub era: Option<u8>,
-    /// Original capitals it holds, as the seat has seen them.
+    /// The capitals of other nations it holds, as the seat has seen them (its own is not counted:
+    /// every nation holds that one, so a count with it would never be below one).
     pub capitals: u32,
     /// Its delegates on the Congress screen (None: no Congress).
     pub delegates: Option<u16>,
@@ -362,7 +363,7 @@ pub fn estimate(obs: &AIObservation<'_>, rules: &CompiledRuleset, book: &Book) -
                 score: *score,
                 score_trend: then(*player).map(|(_, before, _)| trend(*score, *before)),
                 era: public.eras.iter().find(|(p, _)| p == player).map(|(_, e)| *e),
-                capitals: capitals.iter().filter(|c| c.holder == *player).count() as u32,
+                capitals: capitals.iter().filter(|c| c.holder == *player && c.founder != *player).count() as u32,
                 delegates: congress.and_then(|c| c.delegates.iter().find(|(p, _)| p == player).map(|(_, d)| *d)),
                 influence_on_us: obs.tourism.influence.iter().find(|v| v.other == *player).map_or(0, |v| v.their_level.index()),
             }

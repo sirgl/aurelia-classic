@@ -94,7 +94,7 @@ fn n1_a_duel_not_met_gives_the_rows_exactly_and_nothing_else() {
         assert_eq!(inputs[fe::RIVAL_FIRST + m], share, "{:?}", Measure::ALL[m]);
     }
     assert_eq!(inputs[fe::RIVAL_DOUBT], 0, "exact");
-    assert!(inputs[fe::RIVAL_SPACE] > 0, "its technologies are known from the literacy");
+    assert!(inputs[fe::RIVAL_TREE] > 0, "its technologies are known from the literacy");
     for k in [fe::RIVAL_SCIENCE, fe::RIVAL_SCORE_TREND, fe::RIVAL_DOMINATION, fe::RIVAL_CULTURE, fe::RIVAL_DIPLOMACY] {
         assert_eq!(inputs[k], 0, "input {k} reads something no screen shows of a nation not met");
     }
@@ -183,11 +183,60 @@ fn the_book_rides_in_the_memory_with_sharps_section() {
     let book = Book { samples: vec![Sample { round: 12, nations: vec![(PlayerId(0), 40, 5), (PlayerId(3), 55, 7)] }, Sample { round: 17, nations: vec![(PlayerId(0), 44, 6)] }] };
     let plain = Memory { target: Some(TechId(4)), ..Default::default() };
     for sharp in [None, Some(sharp::Memory { ratio: 870, trend: 430, rivals: None, fits: None }), Some(sharp::Memory { ratio: 1, trend: 2, rivals: Some(3), fits: Some(true) })] {
-        let memory = Memory { rivals: book.clone(), sharp, ..plain.clone() };
+        let memory = Memory { rival_book: book.clone(), sharp, ..plain.clone() };
         assert_eq!(Memory::decode(&memory.encode()), memory);
-        let without = Memory { rivals: Book::default(), ..memory.clone() };
+        let without = Memory { rival_book: Book::default(), ..memory.clone() };
         assert_eq!(Memory::decode(&without.encode()), without, "no book, no section");
     }
+}
+
+/// The domination input counts the capitals of other nations a rival holds: its own capital, held
+/// by every nation, is not a conquest, so a meeting alone leaves the input at 0.
+#[test]
+fn the_domination_input_does_not_count_the_rivals_own_capital() {
+    use classic_rules::ai::strategy_net::features::rivals as net_inputs;
+    use classic_rules::ai::strategy_net::weights::fe;
+    let (mut game, rules) = world(3);
+    game.debug_meet(PlayerId(0), PlayerId(1));
+    let obs = game.ai_observation(&rules, PlayerId(0));
+    let mut model = estimate(&obs, &rules, &Book::default());
+    assert_eq!(model.rivals.len(), 1);
+    assert!(model.capitals_all >= 2, "the capitals of the nations are on the race screen");
+    assert_eq!(model.rivals[0].capitals, 0, "it holds its own only");
+    let mut inputs = [0; fe::N];
+    net_inputs(&model, &mut inputs);
+    assert_eq!(inputs[fe::RIVAL_DOMINATION], 0, "a meeting is no domination");
+    // Holding every other capital is the whole scale.
+    model.rivals[0].capitals = model.capitals_all - 1;
+    net_inputs(&model, &mut inputs);
+    assert_eq!(inputs[fe::RIVAL_DOMINATION], 1000);
+}
+
+/// A cut or spoiled book is an empty book; the rest of the memory (target, the old format without the
+/// section) survives, as a cut `sharp` section does.
+#[test]
+fn a_cut_book_leaves_the_rest_of_the_memory() {
+    use classic_rules::ai::rival_model::Sample;
+    use classic_rules::ai::strategy_net::Memory;
+    let book = Book { samples: vec![Sample { round: 12, nations: vec![(PlayerId(0), 40, 5), (PlayerId(3), 55, 7)] }, Sample { round: 17, nations: vec![(PlayerId(0), 44, 6)] }] };
+    let plain = Memory { target: Some(TechId(4)), ..Default::default() };
+    // The old save: no section at all.
+    let old = plain.encode();
+    assert_eq!(Memory::decode(&old), plain, "an old save loads");
+    // The book is the memory's tail here: cut it at every length.
+    let full = Memory { rival_book: book.clone(), ..plain.clone() }.encode();
+    assert!(full.len() > old.len() + 4);
+    for cut in old.len() + 1..full.len() {
+        let got = Memory::decode(&full[..cut]);
+        assert_eq!(got.target, Some(TechId(4)), "cut at {cut}: the target stays");
+        assert!(got.rival_book.samples.is_empty(), "cut at {cut}");
+    }
+    let got = Memory::decode(&full[..old.len() + 3]);
+    assert_eq!(got, plain, "a cut book is no book");
+    // A spoiled count with no samples behind it.
+    let mut spoiled = old.clone();
+    spoiled.extend_from_slice(&[0x5E, 200]);
+    assert_eq!(Memory::decode(&spoiled), plain, "a spoiled book is no book");
 }
 
 /// The game's AI keeps the book in its memory as it plays, and its net reads the model's inputs.
@@ -210,7 +259,7 @@ fn the_standard_ai_keeps_the_book() {
     let state = driver.states().get(PlayerId(0)).expect("an AI player");
     let memory = Memory::decode(&state.mind_memory);
     assert!(memory.target.is_some() || memory.survey.is_some(), "the net's memory decodes");
-    let rounds: Vec<u32> = memory.rivals.samples.iter().map(|s| s.round).collect();
+    let rounds: Vec<u32> = memory.rival_book.samples.iter().map(|s| s.round).collect();
     assert!(rounds.len() >= 3, "samples every 5 rounds: {rounds:?}");
-    assert!(memory.rivals.samples.iter().all(|s| s.nations.iter().any(|n| n.0 == PlayerId(0))), "the seat's own numbers in every sample");
+    assert!(memory.rival_book.samples.iter().all(|s| s.nations.iter().any(|n| n.0 == PlayerId(0))), "the seat's own numbers in every sample");
 }

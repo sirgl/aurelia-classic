@@ -487,6 +487,49 @@ mod tests {
         assert_eq!(session.overview_view().turn, view.turn + 1);
     }
 
+    /// The demographics rows count the living nations only: a city-state and the barbarians with
+    /// big cities are on no row, so the rows of a duel stay between the two nations.
+    #[test]
+    fn demographics_rows_hold_the_living_nations_only() {
+        use classic_rules::derived::standing::demographics;
+        use classic_rules::ids::PlayerId;
+        use classic_rules::rules::content::CityStateId;
+        use classic_rules::world::player::{ClassicKind, PlayerKind};
+        let prepared = prepare_match(MatchRequest { nation: "core:nation/rome".into(), seed: 20260928, size: MapSize::Medium, players: 4, water: 25 }).unwrap();
+        let mut session = Session::new(prepared.game, game_rules());
+        session.request(GameRequest::Unit(Action::FoundCity));
+        let me = session.me();
+        let (game, rules) = session.harness_game();
+        game.debug_set_player_kind(PlayerId(2), PlayerKind::Module(ClassicKind::CityState(CityStateId(0))));
+        game.debug_set_player_kind(PlayerId(3), PlayerKind::Module(ClassicKind::Barbarian));
+        let auth = game.view().auth;
+        let (capital, dims) = (auth.cities().iter().find(|(_, c)| c.owner == me).map(|(_, c)| c.tile).unwrap(), auth.map().dimensions);
+        let sites: Vec<_> = classic_rules::math::tiles_in_hex_radius(&dims, capital, 9)
+            .into_iter()
+            .filter(|t| {
+                dims.distance(capital, *t).unwrap_or(0) >= 4
+                    && classic_rules::navigation::cost::enter_cost_on_map(auth.map(), *t).is_some()
+                    && auth.map().owner(*t).flatten().is_none()
+            })
+            .collect();
+        let (first, second) = (sites[0], *sites.iter().find(|t| dims.distance(sites[0], **t).unwrap_or(0) >= 4).expect("a second site"));
+        for (p, site) in [(PlayerId(2), first), (PlayerId(3), second)] {
+            let city = game.debug_found_city(&rules, p, site);
+            game.debug_set_population(&rules, city, 9);
+        }
+        // The other nation: a city of its own, smaller than the others'.
+        let rival_site = sites.iter().copied().find(|t| dims.distance(first, *t).unwrap_or(0) >= 4 && dims.distance(second, *t).unwrap_or(0) >= 4).expect("a third site");
+        game.debug_found_city(&rules, PlayerId(1), rival_site);
+        let (mine, theirs) = (demographics(game.view().auth, &rules, game.view().derived, me), demographics(game.view().auth, &rules, game.view().derived, PlayerId(1)));
+        session.refresh_after_harness();
+        let view = session.overview_view();
+        assert_eq!(view.demographics.len(), 7);
+        for (row, (a, b)) in view.demographics.iter().zip(mine.iter().zip(theirs.iter())) {
+            assert!((1..=2).contains(&row.rank), "{}: rank {} among two nations", row.label, row.rank);
+            assert_eq!((row.best, row.worst), (a.value.max(b.value), a.value.min(b.value)), "{}: only the two nations", row.label);
+        }
+    }
+
     #[test]
     fn top_bar_breakdowns_add_up_to_the_core_income() {
         let mut session = founded_match();
