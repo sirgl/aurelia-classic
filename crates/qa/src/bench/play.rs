@@ -218,6 +218,17 @@ pub struct CombatRecord {
     pub gold_per_turn_deals: u32,
     #[serde(default)]
     pub gold_per_turn_broken: u32,
+    /// Its turns, those it ended with its happiness snapshot below the rebellion threshold
+    /// (`BenchRules::rebellious`), the risings of rebels against it and the rebels that rose
+    /// (`BenchRules::rebellions`; reports saved before read 0).
+    #[serde(default)]
+    pub turns: u32,
+    #[serde(default)]
+    pub rebel_turns: u32,
+    #[serde(default)]
+    pub rebellions: u32,
+    #[serde(default)]
+    pub rebels: u32,
 }
 
 /// What a command did to a player's deals (`BenchRules::deals`).
@@ -269,6 +280,10 @@ impl CombatRecord {
             cities_ceded: self.cities_ceded + other.cities_ceded,
             gold_per_turn_deals: self.gold_per_turn_deals + other.gold_per_turn_deals,
             gold_per_turn_broken: self.gold_per_turn_broken + other.gold_per_turn_broken,
+            turns: self.turns + other.turns,
+            rebel_turns: self.rebel_turns + other.rebel_turns,
+            rebellions: self.rebellions + other.rebellions,
+            rebels: self.rebels + other.rebels,
         }
     }
 
@@ -599,12 +614,23 @@ impl MatchLog {
     /// acting player's commands); `game` is the world after them.
     fn journal<R: BenchRules>(&mut self, game: &GameState<R::M>, rules: &CompiledRuleset<R::M>, player: PlayerId, applied: &[AppliedCommand<R::M>]) {
         let now = round(game);
+        let rebellious = R::rebellious(game, player);
+        self.record(player, |r| {
+            r.turns += 1;
+            r.rebel_turns += u32::from(rebellious);
+        });
         for command in applied {
             for (party, event) in R::deals(game, rules, &command.command, &command.changes) {
                 self.record(party, |r| match event {
                     DealEvent::CityCeded => r.cities_ceded += 1,
                     DealEvent::GoldPerTurn => r.gold_per_turn_deals += 1,
                     DealEvent::GoldPerTurnBroken => r.gold_per_turn_broken += 1,
+                });
+            }
+            for (party, rebels) in R::rebellions(&command.changes) {
+                self.record(party, |r| {
+                    r.rebellions += 1;
+                    r.rebels += rebels;
                 });
             }
             let founded = command.changes.city_changes.iter().filter(|c| matches!(c, CityChange::Founded(_))).count() as u32;

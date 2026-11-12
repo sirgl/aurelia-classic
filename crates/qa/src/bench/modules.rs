@@ -206,6 +206,18 @@ pub trait BenchRules {
         Vec::new()
     }
 
+    /// Risings of rebels in `changes`, each for the nation they rose against, with the rebels
+    /// that rose (none: the module has no rebels).
+    fn rebellions(_changes: &ChangeJournal<Self::M>) -> Vec<(PlayerId, u32)> {
+        Vec::new()
+    }
+
+    /// The player ended its turn below the rebellion threshold of happiness (never: the module
+    /// has none).
+    fn rebellious(_game: &GameState<Self::M>, _player: PlayerId) -> bool {
+        false
+    }
+
     /// Food each player's cities received from its other cities in the
     /// rounds `changes` closed (none: the module has no food routes).
     fn delivered(_game: &GameState<Self::M>, _changes: &ChangeJournal<Self::M>) -> Vec<(PlayerId, u64)> {
@@ -570,6 +582,25 @@ impl BenchRules for ClassicBench {
 
     fn by_agreement(command: &classic_rules::Command) -> bool {
         matches!(command, classic_rules::Command::RespondDeal { accept: true, .. })
+    }
+
+    /// `ClassicChange::RebelsRose`: the nation the rebels rose against, and how many.
+    fn rebellions(changes: &ChangeJournal<Self::M>) -> Vec<(PlayerId, u32)> {
+        changes
+            .module_changes
+            .iter()
+            .filter_map(|c| match *c {
+                classic_rules::classic::ClassicChange::RebelsRose { player, count, .. } => Some((player, u32::from(count))),
+                _ => None,
+            })
+            .collect()
+    }
+
+    /// The happiness snapshot of the player's last turn is at or below
+    /// `REBELLION_THRESHOLD` (-21).
+    fn rebellious(game: &GameState<Self::M>, player: PlayerId) -> bool {
+        use classic_rules::derived::happiness::{excess_snapshot, uprising_possible};
+        uprising_possible(excess_snapshot(game.view().auth, player))
     }
 
     /// Cities ceded by an accepted deal (the giver), gold per turn taken on by one (the payer:
