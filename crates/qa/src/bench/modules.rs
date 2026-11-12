@@ -227,8 +227,9 @@ pub const DAGGER_WINDOWS_ENV: &str = "AURELIA_NET_DAGGER_WINDOWS";
 pub trait MatchRecorder<R: BenchRules + ?Sized> {
     /// At every round's start.
     fn round_start(&mut self, game: &GameState<R::M>, rules: &CompiledRuleset<R::M>);
-    /// At the start of each player's turn (the world before its first command).
-    fn turn_start(&mut self, game: &GameState<R::M>, rules: &CompiledRuleset<R::M>, player: PlayerId);
+    /// At the start of each player's turn (the world before its first command), with the AI's
+    /// memory of every player as it stands then.
+    fn turn_start(&mut self, game: &GameState<R::M>, rules: &CompiledRuleset<R::M>, player: PlayerId, states: &kernel::ai::state::AiStates);
     /// At the end: the seats' minds (to take what they recorded).
     fn finish(self: Box<Self>, game: &GameState<R::M>, rules: &CompiledRuleset<R::M>, minds: &[&R::Mind]);
 }
@@ -254,7 +255,7 @@ impl MatchRecorder<ClassicBench> for DaggerRecorder {
         self.summaries.push((game.view().auth.turn().round, crate::export::round_summary(game, rules)));
     }
 
-    fn turn_start(&mut self, game: &GameState<classic_rules::classic::Classic>, rules: &CompiledRuleset<classic_rules::classic::Classic>, player: PlayerId) {
+    fn turn_start(&mut self, game: &GameState<classic_rules::classic::Classic>, rules: &CompiledRuleset<classic_rules::classic::Classic>, player: PlayerId, _states: &kernel::ai::state::AiStates) {
         if game.view().auth.players().is_major(player) {
             self.truths.insert((game.view().auth.turn().round, player.0), crate::export::truth_row(game, rules, player));
         }
@@ -404,6 +405,10 @@ impl BenchRules for ClassicBench {
     }
 
     fn recorder(name: &str, seed: u64) -> Option<Box<dyn MatchRecorder<Self>>> {
+        // The check of the model of the rivals (`bench::rival_net`, `AURELIA_RIVAL_NET`).
+        if let Some(check) = crate::bench::rival_net::RivalNetRecorder::new(name, seed) {
+            return Some(Box::new(check));
+        }
         let dir = std::env::var_os(classic_rules::ai::net_e2e::mind::DAGGER_ENV)?;
         let windows = std::env::var(DAGGER_WINDOWS_ENV).ok().filter(|w| !w.is_empty()).map(|w| {
             let (k, m) = w.split_once(':').unwrap_or_else(|| panic!("{DAGGER_WINDOWS_ENV}=K:M, not {w}"));

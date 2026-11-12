@@ -15,6 +15,7 @@ pub mod religion;
 pub mod research;
 pub mod resources;
 pub mod ruins;
+pub mod standing;
 pub mod state;
 pub mod tourism;
 pub mod trade;

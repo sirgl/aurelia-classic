@@ -248,8 +248,11 @@ pub fn intent_net(features: &[Milli; fe::N], held: Held, cities: u32, rounds_lef
     if net.sharp {
         aim_logits = sharpened(aim_logits, sharp::w::AIM, features, &concepts);
     }
+    // The model of the rivals (`weights::rival`, every weight 0 until trained).
+    let aim_logits = sharpened(aim_logits, weights::rival::AIM, features, &concepts);
     let aim = softmax(&temper4(<[Milli; 4]>::try_from(aim_logits).expect("four aims"), sharp::w::AIM_TEMPERATURE));
-    let posture = softmax(&temper4(<[Milli; 4]>::try_from(logits_of(&weights::POSTURE, extra_posture(weights::open::POSTURE), features, &concepts)).expect("four postures"), sharp::w::POSTURE_TEMPERATURE));
+    let posture_logits = sharpened(logits_of(&weights::POSTURE, extra_posture(weights::open::POSTURE), features, &concepts), weights::rival::POSTURE, features, &concepts);
+    let posture = softmax(&temper4(<[Milli; 4]>::try_from(posture_logits).expect("four postures"), sharp::w::POSTURE_TEMPERATURE));
     let style_pick = hold(&style, held.style, margin);
     let aim_pick = hold(&aim, held.aim, weights::HYSTERESIS);
     let posture_pick = hold(&posture, held.posture, weights::HYSTERESIS);
@@ -447,6 +450,9 @@ pub struct Memory {
     pub sharp: Option<sharp::Memory>,
     /// `retake2`'s own (`retake::Memory`): a section before `sharp`'s, only when there is one.
     pub retake: Option<crate::ai::retake::Memory>,
+    /// The samples of the rivals' screens (`ai::rival_model::Book`): written before `sharp`'s
+    /// section (after the retake's) behind its marker (`RIVAL_SECTION`), only when there is one.
+    pub rival_book: crate::ai::rival_model::Book,
 }
 
 /// A review of the goals and of the cell's prices.
@@ -471,6 +477,8 @@ const NEXT_SECTION: u8 = 0x5D;
 /// 0x5D on the retake line, a marker `next` took for its section on the thirteenth promotion's line:
 /// a mind with both sections (`next-war-retake`) needs two markers.
 const RETAKE_SECTION: u8 = 0x5E;
+/// The marker of the rivals' book (`Memory::rival_book`), after the retake's and before `sharp`'s section (0x5E was its marker on its own branch, which the retake line took first).
+const RIVAL_SECTION: u8 = 0x5F;
 
 /// The bytes of a section of `marker`: the marker and its numbers, eight bytes each (`next`'s:
 /// the rivals and the science victory's fit too, −1 for none).
@@ -590,6 +598,10 @@ impl Memory {
             w.0.extend_from_slice(&(body.len() as u16).to_le_bytes());
             w.0.extend_from_slice(&body);
         }
+        if !self.rival_book.samples.is_empty() {
+            w.0.push(RIVAL_SECTION);
+            self.rival_book.encode(&mut w.0);
+        }
         if let Some(m) = &self.sharp {
             let next = m.rivals.is_some() || m.fits.is_some();
             w.0.push(if next { NEXT_SECTION } else { SHARP_SECTION });
@@ -691,6 +703,18 @@ impl Memory {
         } else {
             None
         };
+        // The rivals' book behind its marker.
+        let mut rival_book = crate::ai::rival_model::Book::default();
+        if r.0.first() == Some(&RIVAL_SECTION) {
+            // A cut or spoiled book is no book (like a cut `sharp` section): the rest of the memory stays.
+            match crate::ai::rival_model::Book::decode(&r.0[1..]) {
+                Some((book, read)) => {
+                    rival_book = book;
+                    r.0 = &r.0[1 + read..];
+                }
+                None => r.0 = &[],
+            }
+        }
         // `sharp`'s section: its marker and numbers, the memory's last bytes (`section_len`).
         let sharp = match r.0.first().copied() {
             Some(marker) if section_len(marker) == Some(r.0.len()) => {
@@ -701,7 +725,7 @@ impl Memory {
             }
             _ => None,
         };
-        Some(Memory { held, survey, review, target, sharp, retake })
+        Some(Memory { held, survey, review, target, sharp, retake, rival_book })
     }
 }
 
@@ -758,6 +782,13 @@ pub fn think(obs: &AIObservation<'_>, brief: &crate::ai::planner::TurnBrief, sta
     if brief.sharp {
         // `sharp`: the features on scales that keep moving and its new inputs (`sharp::features`).
         sharp::features(obs, brief, rules, state, &mut memory.sharp, survey_due, &mut situation);
+    }
+    // The model of the rivals from the public screens (`ai::rival_model`): inputs of every variant's
+    // net, read with weight 0 (`weights::rival`); the book samples the screens for the trends.
+    let rivals = crate::ai::rival_model::estimate(obs, rules, &memory.rival_book);
+    features::rivals(&rivals, &mut situation);
+    if memory.rival_book.due(round, pace) {
+        memory.rival_book.record(obs.player, &rivals, pace);
     }
     let rounds_left = prices.rounds_left;
     let net = Net { open: brief.war_open, sharp: brief.sharp, pays: brief.war_pays };
@@ -838,6 +869,9 @@ pub fn think(obs: &AIObservation<'_>, brief: &crate::ai::planner::TurnBrief, sta
     }
     let plan = Plan { round, features: situation, intent, mult, goals: review.goals.clone(), target, city_target, growth: review.growth.clone(), war_open: brief.war_open };
     trace::turn(obs.player.0, &plan, review_due, rules);
+    if review_due {
+        trace::rivals(obs.player.0, &rivals);
+    }
     if review_due {
         trace::diplo(obs, state, &plan.intent);
     }

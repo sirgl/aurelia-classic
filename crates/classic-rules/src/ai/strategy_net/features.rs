@@ -353,3 +353,53 @@ pub fn situation(obs: &AIObservation<'_>, brief: &TurnBrief, rules: &CompiledRul
     out[BARBS] = unit(camps * 350 + raiders * 200);
     out
 }
+
+/// A rival's number over itself plus ours: 0.5 level, 1 theirs alone (negatives as 0).
+fn rival_share(theirs: i64, ours: i64) -> Milli {
+    let (theirs, ours) = (theirs.max(0), ours.max(0));
+    if theirs + ours == 0 {
+        ONE / 2
+    } else {
+        theirs * ONE / (theirs + ours)
+    }
+}
+
+/// The model of the rivals as layer 0's inputs (`fe::RIVAL_*`, `ai::rival_model`): on each row and
+/// each victory the strongest rival met, against ourselves; on the rows and the technologies the
+/// nation of a duel not met yet counts too (the rows show it exactly). All 0 while no rival is met
+/// and none is shown.
+pub fn rivals(model: &crate::ai::rival_model::Rivals, out: &mut [Milli; N]) {
+    use crate::ai::rival_model::MEASURES;
+    let rivals = &model.rivals;
+    let unmet = model.unmet.as_ref();
+    if rivals.is_empty() && unmet.is_none() {
+        return;
+    }
+    // Every nation the rows show: met, then the unmet one.
+    let rows: Vec<&[crate::ai::rival_model::Guess; MEASURES]> = rivals.iter().map(|r| &r.rows).chain(unmet.map(|u| &u.rows)).collect();
+    for m in 0..MEASURES {
+        out[RIVAL_FIRST + m] = rows.iter().map(|r| rival_share(r[m].value, model.own[m])).max().unwrap_or(0);
+    }
+    let doubts: Vec<Milli> = rows.iter().flat_map(|r| r.iter().map(|g| g.doubt())).collect();
+    out[RIVAL_DOUBT] = doubts.iter().sum::<Milli>() / doubts.len().max(1) as Milli;
+    let techs = rivals.iter().map(|r| r.techs.value).chain(unmet.map(|u| u.techs.value)).max().unwrap_or(0);
+    out[RIVAL_TREE] = unit(techs * ONE / model.techs_total.max(1));
+    if rivals.is_empty() {
+        // Science, score, capitals, culture and delegates are on no screen of a nation not met.
+        return;
+    }
+    out[RIVAL_SCIENCE] = rivals.iter().filter_map(|r| r.science).map(|s| rival_share(s, model.own_science)).max().unwrap_or(ONE / 2);
+    out[RIVAL_SCORE_TREND] = match model.own_trend {
+        Some(ours) => rivals.iter().filter_map(|r| r.score_trend).map(|t| rival_share(t, ours)).max().unwrap_or(ONE / 2),
+        None => ONE / 2,
+    };
+    // The capitals a rival can hold beside its own: every nation's but its own.
+    let all = i64::from(model.capitals_all.saturating_sub(1).max(1));
+    out[RIVAL_DOMINATION] = unit(rivals.iter().map(|r| i64::from(r.capitals)).max().unwrap_or(0) * ONE / all);
+    let embraced = i64::from(crate::derived::tourism::InfluenceLevel::Embraced.index().max(1));
+    out[RIVAL_CULTURE] = unit(rivals.iter().map(|r| i64::from(r.influence_on_us)).max().unwrap_or(0) * ONE / embraced);
+    out[RIVAL_DIPLOMACY] = match model.delegates_needed {
+        Some(needed) if needed > 0 => unit(rivals.iter().filter_map(|r| r.delegates).map(i64::from).max().unwrap_or(0) * ONE / i64::from(needed)),
+        _ => 0,
+    };
+}

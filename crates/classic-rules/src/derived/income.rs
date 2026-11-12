@@ -112,6 +112,24 @@ pub fn player_income(auth: &AuthWorld, rules: &CompiledRuleset, player: PlayerId
     player_income_from(auth, rules, player, &incomes)
 }
 
+/// The gold of `player_income(..).gold`, from the cities' yields the derived state keeps
+/// (`DerivedWorld::yields`, the same `city_breakdown` rates) instead of a breakdown of every city:
+/// the demographics' GNP row asks it for every nation in every observation. A city with an empty
+/// queue adds its process gold (`city_income`), which reads the city's production rate only (an
+/// empty queue builds no food-made unit).
+pub fn gold_now(auth: &AuthWorld, rules: &CompiledRuleset, derived: &crate::derived::DerivedWorld, player: PlayerId) -> i32 {
+    let mut sum = 0;
+    for h in auth.indexes().cities_of(player) {
+        let Some(core) = auth.cities().get(*h) else { continue };
+        let rates = derived.yields.of(*h).unwrap_or_default();
+        sum += rates.gold;
+        if core.queue.is_empty() {
+            sum += crate::systems::processes::process_yield(core.economy.process, rates.production).0;
+        }
+    }
+    player_gold(auth, rules, player, sum) - crate::derived::maintenance::upkeep(auth, rules, player).net_cost()
+}
+
 /// Player income from its cities' incomes (already computed by the caller).
 pub fn player_income_from(
     auth: &AuthWorld,

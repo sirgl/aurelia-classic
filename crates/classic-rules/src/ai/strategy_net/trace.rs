@@ -288,3 +288,51 @@ pub fn readings(obs: &crate::knowledge::observation::AIObservation<'_>, rules: &
     let sci: Vec<String> = others.iter().map(|o| format!("{}:{}", o.rival.0, o.era_vs_space)).collect();
     push(format!("r{} p{} READ diplomatic {} | domination {} | science {}", obs.round, obs.player.0, dipl, dom.join(","), sci.join(",")));
 }
+
+/// The model of the rivals at a review (`ai::rival_model`): per rival met each row's guess with its
+/// range, the technologies, the science, the score's trend and the victories (trace only).
+pub fn rivals(player: u8, model: &crate::ai::rival_model::Rivals) {
+    if !enabled() {
+        return;
+    }
+    const ROWS: [&str; 7] = ["pop", "crop", "goods", "gnp", "lit", "land", "soldiers"];
+    let guess = |g: &crate::ai::rival_model::Guess| if g.lo == g.hi { g.value.to_string() } else { format!("{}[{}…{}]", g.value, g.lo, g.hi) };
+    let opt = |v: Option<i64>| v.map_or("-".to_owned(), |v| v.to_string());
+    let rivals: Vec<String> = model
+        .rivals
+        .iter()
+        .map(|r| {
+            let rows: Vec<String> = ROWS.iter().zip(&r.rows).map(|(n, g)| format!("{n} {}", guess(g))).collect();
+            format!(
+                "p{}: {} | techs {} sci {} | score {} trend {} | era {} capitals {} delegates {} culture-on-us {}",
+                r.player.0,
+                rows.join(" "),
+                guess(&r.techs),
+                opt(r.science),
+                r.score,
+                opt(r.score_trend),
+                r.era.map_or("-".to_owned(), |e| e.to_string()),
+                r.capitals,
+                r.delegates.map_or("-".to_owned(), |d| d.to_string()),
+                r.influence_on_us
+            )
+        })
+        .chain(model.unmet.iter().map(|u| {
+            let rows: Vec<String> = ROWS.iter().zip(&u.rows).map(|(n, g)| format!("{n} {}", guess(g))).collect();
+            format!("unmet: {} | techs {}", rows.join(" "), guess(&u.techs))
+        }))
+        .collect();
+    let own: Vec<String> = ROWS.iter().zip(&model.own).map(|(n, v)| format!("{n} {v}")).collect();
+    push(format!(
+        "r{} p{} RIVALS living {} | own {} sci {} techs {} score {} trend {} | {}",
+        model.round,
+        player,
+        model.living,
+        own.join(" "),
+        model.own_science,
+        model.own_techs,
+        model.own_score,
+        opt(model.own_trend),
+        rivals.join(" || ")
+    ));
+}
