@@ -47,10 +47,25 @@ classic.game.diplomacy.fact-we-denounced = Вы осудили их
 classic.game.diplomacy.fact-they-denounced = Они осудили вас
 classic.game.diplomacy.fact-warmonger = Вы помните их воинственность ({ $n })
 classic.game.diplomacy.quantity-gold-now = { NUMBER($n) } золота сразу
-classic.game.diplomacy.quantity-gold-per-turn = { NUMBER($n) } золота за ход
+classic.game.diplomacy.quantity-gold-per-turn = { $n ->
+    [one] { NUMBER($n) } золото
+    [few] { NUMBER($n) } золота
+    [many] { NUMBER($n) } золота
+   *[other] { NUMBER($n) } золота
+} за ход
 classic.game.diplomacy.quantity-resource = { $n } × { $name }
-classic.game.diplomacy.notice-deal-broken-theirs = { $name }: не удалось заплатить { NUMBER($gold) } золота за ход — сделка разорвана
-classic.game.diplomacy.notice-deal-broken-ours = Вам не удалось заплатить { NUMBER($gold) } золота за ход ({ $name }): сделка разорвана, и вам это запомнят
+classic.game.diplomacy.notice-deal-broken-theirs = { $name }: не удалось заплатить { $gold ->
+    [one] { NUMBER($gold) } золото
+    [few] { NUMBER($gold) } золота
+    [many] { NUMBER($gold) } золота
+   *[other] { NUMBER($gold) } золота
+} за ход — сделка разорвана
+classic.game.diplomacy.notice-deal-broken-ours = Вам не удалось заплатить { $gold ->
+    [one] { NUMBER($gold) } золото
+    [few] { NUMBER($gold) } золота
+    [many] { NUMBER($gold) } золота
+   *[other] { NUMBER($gold) } золота
+} за ход ({ $name }): сделка разорвана, и вам это запомнят
 classic.game.diplomacy.confirm-war-title = Объявить войну: { $name }?
 classic.game.diplomacy.confirm-attack-line = Сейчас у вас мир с этой нацией ({ $name }). Эта атака объявляет войну: все нации, знающие вас, запомнят агрессию, а все сделки с ней прекратятся.
 classic.game.diplomacy.confirm-war-line = Все нации, знающие вас, запомнят агрессию, а все сделки с этой нацией ({ $name }) прекратятся.

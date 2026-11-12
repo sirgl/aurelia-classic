@@ -57,6 +57,7 @@ impl Session {
             return;
         }
         self.city_state_open = None;
+        self.confirm = None;
         let before = self.snapshot();
         if let Err(error) = self.driver.end_human_turn(&mut self.client) {
             self.message = Some(names::reason(self.rules(), &error));
@@ -131,6 +132,7 @@ impl Session {
         self.revision += 1;
         self.skipped.clear();
         self.targeting = None;
+        self.confirm = None;
         self.message = None;
         self.report_changes(before);
         self.report_outcome();

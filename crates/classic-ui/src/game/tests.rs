@@ -1260,40 +1260,46 @@ fn the_rival_list_has_no_barbarians() {
     assert_ne!(rivals[1].name, session.player_name(PlayerId(0)));
 }
 
+/// A session of seed 7 with a unit of ours and a unit of nation 2 (at peace, met, in sight)
+/// side by side; the second is the target of the strike.
+fn strike_scene() -> (Session, (classic_rules::ids::UnitHandle, TileId)) {
+    use classic_rules::ids::UnitKindId;
+    use classic_rules::math::tiles_in_hex_radius;
+    let mut session = new_match(7);
+    let rules = session.rules().clone();
+    let fighter = rules
+        .units
+        .iter()
+        .enumerate()
+        .filter(|(_, u)| !u.unbuildable && u.cost > 0 && u.strength > 0 && u.ranged_strength == 0 && u.required_resources.is_empty() && u.nation.is_none())
+        .min_by_key(|(_, u)| u.cost)
+        .map(|(i, _)| UnitKindId(i as u16))
+        .expect("a melee unit in the rules");
+    let (mine, theirs) = {
+        let (game, rules) = session.harness_game();
+        let own = game.view().auth.indexes().units_of(PlayerId(0))[0];
+        let start = game.view().auth.units().get(own).unwrap().core.tile;
+        let dims = game.view().auth.map().dimensions;
+        let land = |t: &TileId| classic_rules::navigation::cost::enter_cost_on_map(game.view().auth.map(), *t).is_some() && game.view().auth.indexes().units_on(*t).is_empty();
+        let ring: Vec<TileId> = tiles_in_hex_radius(&dims, start, 3).into_iter().filter(|t| *t != start).filter(land).collect();
+        let a = ring[0];
+        let b = ring.iter().copied().find(|t| dims.distance(a, *t) == Some(1) && land(t)).expect("land beside");
+        game.debug_meet(PlayerId(0), PlayerId(2));
+        game.debug_reveal(PlayerId(0), &tiles_in_hex_radius(&dims, start, 5));
+        (game.debug_spawn_unit(&rules, PlayerId(0), a, fighter), (game.debug_spawn_unit(&rules, PlayerId(2), b, fighter), b))
+    };
+    session.refresh_after_harness();
+    session.select_unit(mine);
+    (session, theirs)
+}
+
 /// A strike at a unit of a nation at peace waits for the player's yes (the right click):
 /// nothing happens until then; no and Esc keep the peace; yes declares the war and strikes.
 #[test]
 fn a_strike_at_a_nation_at_peace_waits_for_the_yes() {
     use classic_rules::ids::UnitKindId;
     use classic_rules::math::tiles_in_hex_radius;
-    let setup = || {
-        let mut session = new_match(7);
-        let rules = session.rules().clone();
-        let fighter = rules
-            .units
-            .iter()
-            .enumerate()
-            .filter(|(_, u)| !u.unbuildable && u.cost > 0 && u.strength > 0 && u.ranged_strength == 0 && u.required_resources.is_empty() && u.nation.is_none())
-            .min_by_key(|(_, u)| u.cost)
-            .map(|(i, _)| UnitKindId(i as u16))
-            .expect("a melee unit in the rules");
-        let (mine, theirs) = {
-            let (game, rules) = session.harness_game();
-            let own = game.view().auth.indexes().units_of(PlayerId(0))[0];
-            let start = game.view().auth.units().get(own).unwrap().core.tile;
-            let dims = game.view().auth.map().dimensions;
-            let land = |t: &TileId| classic_rules::navigation::cost::enter_cost_on_map(game.view().auth.map(), *t).is_some() && game.view().auth.indexes().units_on(*t).is_empty();
-            let ring: Vec<TileId> = tiles_in_hex_radius(&dims, start, 3).into_iter().filter(|t| *t != start).filter(land).collect();
-            let a = ring[0];
-            let b = ring.iter().copied().find(|t| dims.distance(a, *t) == Some(1) && land(t)).expect("land beside");
-            game.debug_meet(PlayerId(0), PlayerId(2));
-            game.debug_reveal(PlayerId(0), &tiles_in_hex_radius(&dims, start, 5));
-            (game.debug_spawn_unit(&rules, PlayerId(0), a, fighter), (game.debug_spawn_unit(&rules, PlayerId(2), b, fighter), b))
-        };
-        session.refresh_after_harness();
-        session.select_unit(mine);
-        (session, theirs)
-    };
+    let setup = strike_scene;
     let at_war = |session: &Session| session.game().view().auth.diplomacy().at_war(PlayerId(0), PlayerId(2));
 
     let (mut session, (_, target)) = setup();
@@ -1394,4 +1400,77 @@ fn a_deal_broken_by_an_unpaid_gold_per_turn_is_told() {
     let told: Vec<String> = session.hud_model(None).notices.into_iter().map(|n| n.text).collect();
     assert!(told.contains(&format!("{name} could not pay 7 gold per turn: the deal is broken")), "{told:?}");
     assert!(told.contains(&format!("You could not pay {name} 7 gold per turn: the deal is broken, and they will remember it")), "{told:?}");
+}
+
+/// The card owns the input: the end of the turn (Enter) does not pass it, a click on the map or
+/// any other request is a no, the end of the turn by the API drops it, and a yes that comes
+/// when the strike is no longer legal declares no war.
+#[test]
+fn the_war_card_is_dropped_by_other_input_and_a_stale_yes_declares_nothing() {
+    let at_war = |session: &Session| session.game().view().auth.diplomacy().at_war(PlayerId(0), PlayerId(2));
+    let ask = |session: &mut Session, target: TileId| {
+        session.click(Some(target), MapButton::Secondary);
+        assert!(session.hud_model(None).confirm.is_some(), "the card asks first");
+    };
+
+    // Enter: the end-of-turn request waits for the answer, the card stays.
+    let (mut session, (_, target)) = strike_scene();
+    ask(&mut session, target);
+    let before = session.world_hash();
+    session.request(GameRequest::EndTurn);
+    assert!(session.hud_model(None).confirm.is_some(), "the card stays");
+    assert_eq!(session.world_hash(), before, "the turn did not end");
+    assert!(!session.turn_running());
+
+    // A click on the map and a hotkey are a no.
+    let (mut session, (_, target)) = strike_scene();
+    ask(&mut session, target);
+    session.click(Some(target), MapButton::Primary);
+    assert!(session.hud_model(None).confirm.is_none(), "a click drops the card");
+    assert!(!at_war(&session));
+    ask(&mut session, target);
+    session.request(GameRequest::Unit(Action::Fortify));
+    assert!(session.hud_model(None).confirm.is_none(), "a hotkey drops the card");
+    assert!(!at_war(&session));
+
+    // The end of the turn, by whatever way, drops the card; the old yes then does nothing.
+    let (mut session, (_, target)) = strike_scene();
+    ask(&mut session, target);
+    session.end_turn();
+    assert!(session.hud_model(None).confirm.is_none(), "the end of the turn drops the card");
+    session.request(GameRequest::Confirm(true));
+    assert!(!at_war(&session), "a yes to a dropped card is nothing");
+
+    // The target is gone before the yes: no war without a strike.
+    let (mut session, (defender, target)) = strike_scene();
+    ask(&mut session, target);
+    {
+        let (game, rules) = session.harness_game();
+        game.debug_remove_unit(&rules, defender);
+    }
+    session.refresh_after_harness();
+    session.request(GameRequest::Confirm(true));
+    assert!(!at_war(&session), "the strike is no longer legal: the peace holds");
+    assert!(session.hud_model(None).confirm.is_none());
+}
+
+/// The Russian notice declines the gold by the number ("1 золото", "2 золота", "5 золота",
+/// "21 золото"), as the other notices of the game decline what they count.
+#[test]
+fn the_unpaid_gold_notice_declines_by_the_number_in_russian() {
+    use classic_rules::classic::ClassicChange;
+    use classic_rules::transaction::journal::{AppliedCommand, ChangeJournal};
+    let mut session = new_match(7);
+    let rival = PlayerId(2);
+    for (gold, words) in [(1, "1 золото за ход"), (2, "2 золота за ход"), (5, "5 золота за ход"), (11, "11 золота за ход"), (21, "21 золото за ход")] {
+        let mut journal = ChangeJournal::default();
+        journal.module_changes.push(ClassicChange::DealBroken { debtor: rival, creditor: session.me(), gold });
+        let record = AppliedCommand { command: classic_rules::Command::EndTurn { player: rival }, changes: journal };
+        let told = i18n::with_language("ru", || {
+            session.notices.clear();
+            session.notify_offers(&[record]);
+            session.hud_model(None).notices.into_iter().map(|n| n.text).collect::<Vec<_>>()
+        });
+        assert!(told.iter().any(|t| t.contains(words)), "{gold}: {told:?}");
+    }
 }

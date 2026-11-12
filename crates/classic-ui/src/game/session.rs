@@ -347,6 +347,14 @@ impl Session {
             self.message = Some(ai_turns_message().into());
             return;
         }
+        if self.confirm.is_some() && !matches!(request, GameRequest::Confirm(_)) {
+            // The card owns the input (`super::confirm`): the end of the turn waits for the
+            // answer; any other request is a no to it.
+            if matches!(request, GameRequest::EndTurn) {
+                return;
+            }
+            self.confirm = None;
+        }
         match request {
             GameRequest::Unit(action) => self.order(action),
             GameRequest::EndTurn => self.end_turn(),
@@ -406,6 +414,10 @@ impl Session {
     }
 
     pub fn click(&mut self, tile: Option<TileId>, button: MapButton) {
+        if self.confirm.take().is_some() {
+            // A click on the map beside the card is a no, and does nothing else.
+            return;
+        }
         let Some(tile) = tile else {
             self.client.selection = Selection::None;
             self.targeting = None;

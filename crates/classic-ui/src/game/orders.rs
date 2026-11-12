@@ -620,7 +620,7 @@ impl Session {
 
     /// At peace the core rejects attacks before checking range. Ask it on a copy at war,
     /// so a war is declared only when the strike that follows is legal.
-    fn legal_after_war(&mut self, enemy: PlayerId, command: &Command) -> Result<(), CommandError> {
+    pub(super) fn legal_after_war(&mut self, enemy: PlayerId, command: &Command) -> Result<(), CommandError> {
         let mut probe = self.client.game.clone();
         let war = Command::DeclareWar {
             player: self.me(),

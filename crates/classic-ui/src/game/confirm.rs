@@ -85,6 +85,17 @@ impl Session {
         if !yes {
             return;
         }
+        // The yes is to what the card showed: the world may have moved since (a unit gone, the
+        // target out of reach, the war already declared), and a war without its strike, or a
+        // refused one, must not follow from an old yes.
+        let allowed = match &what {
+            Confirmation::Attack { enemy, strike } => self.legal_after_war(*enemy, strike),
+            other => self.check(&other.command(self.me())),
+        };
+        if let Err(error) = allowed {
+            self.message = Some(names::reason(self.rules(), &error));
+            return;
+        }
         match what {
             Confirmation::Attack { enemy, strike } => self.declare_war_and_strike(enemy, strike),
             Confirmation::War(enemy) => self.declare_war(enemy),
