@@ -28,7 +28,8 @@ impl Measure {
     pub const ALL: [Measure; 7] = [Measure::Population, Measure::Crop, Measure::Goods, Measure::Gnp, Measure::Literacy, Measure::Land, Measure::Soldiers];
 }
 
-/// A demographics row: the player's value, its rank (1 = best) and the range of the living nations.
+/// A demographics row: the player's value, its rank (1 = best) and the range of the living nations
+/// (`average`: their sum over their count, truncated toward zero).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Demographic {
     pub measure: Measure,
@@ -39,10 +40,12 @@ pub struct Demographic {
     pub worst: i64,
 }
 
-/// The demographics of `me`: one row per measure, ranked among every living player of the game
-/// (the screen counts them all, met or not).
+/// The demographics of `me`: one row per measure, ranked among every living nation of the game
+/// (the screen counts them all, met or not; city-states and the barbarians are not nations and are
+/// not counted, as on the victory screen's culture row, `tourism::nations_needed_for_cultural_victory`).
+/// With two nations alive the rival's value is the row's best or worst, whichever is not ours.
 pub fn demographics(auth: &AuthWorld, rules: &CompiledRuleset, derived: &DerivedWorld, me: PlayerId) -> Vec<Demographic> {
-    let players: Vec<PlayerId> = (0..auth.players().count() as u8).map(PlayerId).filter(|p| auth.players().is_alive(*p)).collect();
+    let players: Vec<PlayerId> = (0..auth.players().count() as u8).map(PlayerId).filter(|p| auth.players().is_alive(*p) && auth.players().is_major(*p)).collect();
     let mut land = vec![0i64; auth.players().count()];
     for t in 0..auth.map().tile_count() as u32 {
         if let Some(Some(owner)) = auth.map().owner(TileId(t)) {

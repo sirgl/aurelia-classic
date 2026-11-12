@@ -420,7 +420,7 @@ fn play_round<R: BenchRules>(
         let ends_turn = driver.phase() == DriverPhase::PlayerEnd;
         if driver.phase() == DriverPhase::Observe {
             if let Some(r) = recorder.as_mut() {
-                r.turn_start(game, rules, game.view().auth.active_player());
+                r.turn_start(game, rules, game.view().auth.active_player(), driver.states());
             }
             if let Some(probe) = log.probe.as_mut() {
                 probe.turn_start::<R>(game, rules, game.view().auth.active_player());

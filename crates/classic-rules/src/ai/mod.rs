@@ -115,6 +115,7 @@ pub mod tourism;
 pub mod trade;
 pub mod unciv;
 pub mod unit_abilities;
+pub mod rival_model;
 pub mod victory_watch;
 pub mod war_probe;
 pub use kernel::ai::{state, AiPlayers};

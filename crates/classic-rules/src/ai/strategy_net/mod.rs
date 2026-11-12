@@ -228,8 +228,11 @@ pub fn intent_net(features: &[Milli; fe::N], held: Held, cities: u32, rounds_lef
     if net.sharp {
         aim_logits = sharpened(aim_logits, sharp::w::AIM, features, &concepts);
     }
+    // The model of the rivals (`weights::rival`, every weight 0 until trained).
+    let aim_logits = sharpened(aim_logits, weights::rival::AIM, features, &concepts);
     let aim = softmax(&temper4(<[Milli; 4]>::try_from(aim_logits).expect("four aims"), sharp::w::AIM_TEMPERATURE));
-    let posture = softmax(&temper4(<[Milli; 4]>::try_from(logits_of(&weights::POSTURE, extra(weights::open::POSTURE), features, &concepts)).expect("four postures"), sharp::w::POSTURE_TEMPERATURE));
+    let posture_logits = sharpened(logits_of(&weights::POSTURE, extra(weights::open::POSTURE), features, &concepts), weights::rival::POSTURE, features, &concepts);
+    let posture = softmax(&temper4(<[Milli; 4]>::try_from(posture_logits).expect("four postures"), sharp::w::POSTURE_TEMPERATURE));
     let style_pick = hold(&style, held.style, margin);
     let aim_pick = hold(&aim, held.aim, weights::HYSTERESIS);
     let posture_pick = hold(&posture, held.posture, weights::HYSTERESIS);
@@ -425,6 +428,9 @@ pub struct Memory {
     /// `sharp`'s own (`sharp::Memory`): written after the rest, only when there is one, so the
     /// other variants' memory keeps its bytes.
     pub sharp: Option<sharp::Memory>,
+    /// The samples of the rivals' screens (`ai::rival_model::Book`): written before `sharp`'s
+    /// section behind its marker (`RIVAL_SECTION`), only when there is one.
+    pub rivals: crate::ai::rival_model::Book,
 }
 
 /// A review of the goals and of the cell's prices.
@@ -445,6 +451,8 @@ const MEMORY_VERSION: u8 = 0x5B;
 /// marker (`section_len`).
 const SHARP_SECTION: u8 = 0x5C;
 const NEXT_SECTION: u8 = 0x5D;
+/// The marker of the rivals' book (`Memory::rivals`), before `sharp`'s section.
+const RIVAL_SECTION: u8 = 0x5E;
 
 /// The bytes of a section of `marker`: the marker and its numbers, eight bytes each (`next`'s:
 /// the rivals and the science victory's fit too, −1 for none).
@@ -558,6 +566,10 @@ impl Memory {
             }
             None => w.0.push(0),
         }
+        if !self.rivals.samples.is_empty() {
+            w.0.push(RIVAL_SECTION);
+            self.rivals.encode(&mut w.0);
+        }
         if let Some(m) = &self.sharp {
             let next = m.rivals.is_some() || m.fits.is_some();
             w.0.push(if next { NEXT_SECTION } else { SHARP_SECTION });
@@ -649,6 +661,13 @@ impl Memory {
         } else {
             None
         };
+        // The rivals' book behind its marker.
+        let mut rivals = crate::ai::rival_model::Book::default();
+        if r.0.first() == Some(&RIVAL_SECTION) {
+            let (book, read) = crate::ai::rival_model::Book::decode(&r.0[1..])?;
+            rivals = book;
+            r.0 = &r.0[1 + read..];
+        }
         // `sharp`'s section: its marker and numbers, the memory's last bytes (`section_len`).
         let sharp = match r.0.first().copied() {
             Some(marker) if section_len(marker) == Some(r.0.len()) => {
@@ -659,7 +678,7 @@ impl Memory {
             }
             _ => None,
         };
-        Some(Memory { held, survey, review, target, sharp })
+        Some(Memory { held, survey, review, target, sharp, rivals })
     }
 }
 
@@ -716,6 +735,13 @@ pub fn think(obs: &AIObservation<'_>, brief: &crate::ai::planner::TurnBrief, sta
     if brief.sharp {
         // `sharp`: the features on scales that keep moving and its new inputs (`sharp::features`).
         sharp::features(obs, brief, rules, state, &mut memory.sharp, survey_due, &mut situation);
+    }
+    // The model of the rivals from the public screens (`ai::rival_model`): inputs of every variant's
+    // net, read with weight 0 (`weights::rival`); the book samples the screens for the trends.
+    let rivals = crate::ai::rival_model::estimate(obs, rules, &memory.rivals);
+    features::rivals(&rivals, &mut situation);
+    if memory.rivals.due(round, pace) {
+        memory.rivals.record(obs.player, &rivals, pace);
     }
     let rounds_left = prices.rounds_left;
     let net = Net { open: brief.war_open, sharp: brief.sharp };
@@ -796,6 +822,9 @@ pub fn think(obs: &AIObservation<'_>, brief: &crate::ai::planner::TurnBrief, sta
     }
     let plan = Plan { round, features: situation, intent, mult, goals: review.goals.clone(), target, city_target, growth: review.growth.clone(), war_open: brief.war_open };
     trace::turn(obs.player.0, &plan, review_due, rules);
+    if review_due {
+        trace::rivals(obs.player.0, &rivals);
+    }
     if review_due {
         trace::diplo(obs, state, &plan.intent);
     }

@@ -114,7 +114,25 @@ pub mod fe {
     pub const SPACE_RIVAL: usize = 51;
     pub const SCORE_TREND: usize = 52;
     pub const RUNAWAY: usize = 53;
-    pub const N: usize = 54;
+    /// The model of the rivals (`ai::rival_model`, `features::rivals`), every variant's: read by
+    /// no neuron yet (`rival`: every weight 0), the inputs of the next step's training.
+    pub const RIVAL_POPULATION: usize = 54;
+    pub const RIVAL_CROP: usize = 55;
+    pub const RIVAL_GOODS: usize = 56;
+    pub const RIVAL_GNP: usize = 57;
+    pub const RIVAL_LITERACY: usize = 58;
+    pub const RIVAL_LAND: usize = 59;
+    pub const RIVAL_SOLDIERS: usize = 60;
+    pub const RIVAL_SCIENCE: usize = 61;
+    pub const RIVAL_SCORE_TREND: usize = 62;
+    pub const RIVAL_DOUBT: usize = 63;
+    pub const RIVAL_DOMINATION: usize = 64;
+    pub const RIVAL_SPACE: usize = 65;
+    pub const RIVAL_CULTURE: usize = 66;
+    pub const RIVAL_DIPLOMACY: usize = 67;
+    /// The first of them, in `Measure::ALL`'s order for the seven rows.
+    pub const RIVAL_FIRST: usize = RIVAL_POPULATION;
+    pub const N: usize = 68;
     /// The features every variant's net reads: the memory keeps these of a style's lock
     /// (`Memory::encode`), `war-open`'s are events of the turn (`open::STYLE_EVENTS`).
     pub const BASE_N: usize = 46;
@@ -176,6 +194,20 @@ pub const FEATURES: [(&str, &str); fe::N] = [
     ("space_rival", "sharp: the era of the most advanced rival met over the spaceship's era"),
     ("score_trend", "sharp: our score over the best rival's, its change since the last survey: −0.1 → 0, none 0.5, +0.1 → 1"),
     ("runaway", "sharp: the best rival's score over the next best nation's, ours included: +50 % → 1 (0 while we lead)"),
+    ("rival_population", "rivals: the largest population guessed of a rival met over it plus ours (0.5: level; 0: none met)"),
+    ("rival_crop", "rivals: the same for the food (the demographics' crop)"),
+    ("rival_goods", "rivals: the same for the production (goods)"),
+    ("rival_gnp", "rivals: the same for the gold income (GNP, negatives as 0)"),
+    ("rival_literacy", "rivals: the same for the share of the technologies known (literacy)"),
+    ("rival_land", "rivals: the same for the tiles owned (land)"),
+    ("rival_soldiers", "rivals: the same for the military units (soldiers)"),
+    ("rival_science", "rivals: the largest science guessed (beakers a round from its technologies of the last 30 rounds) over it plus ours (0.5 unknown)"),
+    ("rival_score_trend", "rivals: the fastest score gain of a rival over it plus ours, per 30 rounds (0.5 unknown or level)"),
+    ("rival_doubt", "rivals: the mean width of the ranges the rows leave a rival over their size (0: exact, a duel)"),
+    ("rival_domination", "rivals: the most original capitals a rival holds as seen over all of them"),
+    ("rival_space", "rivals: the most technologies guessed of a rival over the rules' technologies"),
+    ("rival_culture", "rivals: the strongest influence of a rival's culture on us over Embraced"),
+    ("rival_diplomacy", "rivals: the most delegates of a rival over the World Leader's need (0: no Congress)"),
 ];
 
 // ---- layer 1: concepts ----
@@ -556,6 +588,44 @@ pub mod open {
     /// `war-open`'s weights: the window's terms and bias, the intent's terms.
     pub fn count() -> usize {
         WINDOW.terms.len() + 1 + STYLE.len() + AIM.len() + POSTURE.len()
+    }
+}
+
+// ---- rival-net: the model of the rivals as inputs, every weight 0 ----
+
+/// The inputs of the model of the rivals (`fe::RIVAL_*`, `ai::rival_model`) wired into the aims
+/// and the postures with weight 0: the net reads them and nothing changes. Every weight here is
+/// the next step's to learn from the games' outcomes (`rival/REPORT.md` of the branch names the
+/// ones to train first); none is written by hand.
+pub mod rival {
+    use super::fe::*;
+    use super::{f, Term};
+
+    /// Terms added to the aims' logits (science, culture, domination, diplomacy).
+    pub const AIM: &[(usize, Term)] = &[
+        (0, f(RIVAL_SPACE, 0, "science: a rival nearer the end of the tree (race it or turn to another victory)")),
+        (0, f(RIVAL_SCIENCE, 0, "science: a rival researching faster")),
+        (0, f(RIVAL_LITERACY, 0, "science: a rival knowing more of the tree")),
+        (1, f(RIVAL_CULTURE, 0, "culture: a rival's culture already strong on us")),
+        (2, f(RIVAL_DOMINATION, 0, "domination: a rival holding capitals")),
+        (2, f(RIVAL_SOLDIERS, 0, "domination: a rival's army against ours")),
+        (2, f(RIVAL_LAND, 0, "domination: a rival's land to take")),
+        (3, f(RIVAL_DIPLOMACY, 0, "diplomacy: a rival near the World Leader's votes")),
+        (3, f(RIVAL_GNP, 0, "diplomacy: a rival's gold buys city-states")),
+        (0, f(RIVAL_POPULATION, 0, "science: a rival's citizens are its beakers")),
+        (0, f(RIVAL_CROP, 0, "science: a rival's food is its growth")),
+    ];
+    /// Terms added to the postures' logits (peace, defence, prepare, war).
+    pub const POSTURE: &[(usize, Term)] = &[
+        (1, f(RIVAL_SOLDIERS, 0, "defence: a rival's army larger than ours")),
+        (2, f(RIVAL_GOODS, 0, "prepare: a rival's production builds armies")),
+        (2, f(RIVAL_SCORE_TREND, 0, "prepare: a rival running away")),
+        (0, f(RIVAL_DOUBT, 0, "peace: the rivals known only as ranges")),
+    ];
+
+    /// The rival terms (all 0 now).
+    pub fn count() -> usize {
+        AIM.len() + POSTURE.len()
     }
 }
 

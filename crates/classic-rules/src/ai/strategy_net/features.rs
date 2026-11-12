@@ -353,3 +353,42 @@ pub fn situation(obs: &AIObservation<'_>, brief: &TurnBrief, rules: &CompiledRul
     out[BARBS] = unit(camps * 350 + raiders * 200);
     out
 }
+
+/// A rival's number over itself plus ours: 0.5 level, 1 theirs alone (negatives as 0).
+fn rival_share(theirs: i64, ours: i64) -> Milli {
+    let (theirs, ours) = (theirs.max(0), ours.max(0));
+    if theirs + ours == 0 {
+        ONE / 2
+    } else {
+        theirs * ONE / (theirs + ours)
+    }
+}
+
+/// The model of the rivals as layer 0's inputs (`fe::RIVAL_*`, `ai::rival_model`): on each row and
+/// each victory the strongest rival met, against ourselves. All 0 while no rival is met.
+pub fn rivals(model: &crate::ai::rival_model::Rivals, out: &mut [Milli; N]) {
+    use crate::ai::rival_model::MEASURES;
+    let rivals = &model.rivals;
+    if rivals.is_empty() {
+        return;
+    }
+    for m in 0..MEASURES {
+        out[RIVAL_FIRST + m] = rivals.iter().map(|r| rival_share(r.rows[m].value, model.own[m])).max().unwrap_or(0);
+    }
+    out[RIVAL_SCIENCE] = rivals.iter().filter_map(|r| r.science).map(|s| rival_share(s, model.own_science)).max().unwrap_or(ONE / 2);
+    out[RIVAL_SCORE_TREND] = match model.own_trend {
+        Some(ours) => rivals.iter().filter_map(|r| r.score_trend).map(|t| rival_share(t, ours)).max().unwrap_or(ONE / 2),
+        None => ONE / 2,
+    };
+    let doubts: Vec<Milli> = rivals.iter().flat_map(|r| r.rows.iter().map(|g| g.doubt())).collect();
+    out[RIVAL_DOUBT] = doubts.iter().sum::<Milli>() / doubts.len().max(1) as Milli;
+    let all = i64::from(model.capitals_all.max(1));
+    out[RIVAL_DOMINATION] = unit(rivals.iter().map(|r| i64::from(r.capitals)).max().unwrap_or(0) * ONE / all);
+    out[RIVAL_SPACE] = unit(rivals.iter().map(|r| r.techs.value).max().unwrap_or(0) * ONE / model.techs_total.max(1));
+    let embraced = i64::from(crate::derived::tourism::InfluenceLevel::Embraced.index().max(1));
+    out[RIVAL_CULTURE] = unit(rivals.iter().map(|r| i64::from(r.influence_on_us)).max().unwrap_or(0) * ONE / embraced);
+    out[RIVAL_DIPLOMACY] = match model.delegates_needed {
+        Some(needed) if needed > 0 => unit(rivals.iter().filter_map(|r| r.delegates).map(i64::from).max().unwrap_or(0) * ONE / i64::from(needed)),
+        _ => 0,
+    };
+}
