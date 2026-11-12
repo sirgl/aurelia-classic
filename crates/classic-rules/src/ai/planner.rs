@@ -386,6 +386,17 @@ pub struct TurnBrief {
     /// The city the units of a `landless-plan` player with no city and no settler take, and its
     /// owner (`ai::landless::goal`, set at the start of the turn; None in every other state).
     pub landless_goal: Option<(TileId, PlayerId)>,
+    /// The siege layer's mends found on the siege arenas of `landless-plan` (`ai::siege_walls`: a member at its
+    /// post is in place and its walk to the walls is its known path; a city out of sight is the one remembered,
+    /// healed by the rules' rate since; `ai::operations`: a landless operation whose target, now seen, the units
+    /// on hand do not take ends before more of them die). On while `landless_planned` (so `standard` and
+    /// `landless-plan` with a city play move for move as before), or for a mind made `ClassicMind::mended`
+    /// (the tests of an army with cities). Off everywhere else.
+    pub siege_mend: bool,
+    /// With `siege_mend`, a `landless-plan` player with no city and no settler: the target of its operation, in sight
+    /// this turn and not at war yet, that the units on hand do not take by the estimate of `ai::landless` (`landless::takes`; the
+    /// operation ends, a new goal is chosen). None in every other state.
+    pub landless_untaken: Option<TileId>,
     /// Its tall style reaches for the science victory (`Variant::tall_real`, `ai::tall_real`).
     pub tall_real: bool,
     /// `tall-real` with the review's fixes (`Variant::next`, `ai::tall_real`).
@@ -524,6 +535,8 @@ impl TurnBrief {
             landless: false,
             landless_plan: false,
             landless_goal: None,
+            siege_mend: false,
+            landless_untaken: None,
             tall_real: false,
             next: false,
             wonder_race: 0,

@@ -130,6 +130,17 @@ fn a_member_far_away_does_not_hold_the_group() {
     assert!(probe.declarations.iter().any(|d| d.1 == AI && d.2 == FOE), "the war was declared: {:?}", probe.declarations);
 }
 
+/// The whole chain to the capture with melee units only (`TurnBrief::siege_mend`): eight warriors take the empty city
+/// that heals 20 a round (a blow of a warrior costs it 36 of its 100 hit points and deals 25). The siege's model has each member on its post in place and its walk to the walls its path,
+/// the blows a round as many as the free tiles next to the walls (`ai::siege_walls`).
+#[test]
+fn a_melee_army_takes_the_city_through_the_siege() {
+    let mut scene = scene(8, (8, 12), false);
+    let foe_tile = scene.tile(15, 10);
+    play(&mut scene, Variant::LandlessPlan, 20);
+    assert_eq!(scene.owner_of_city(foe_tile), Some(AI), "the city is taken");
+}
+
 /// `standard` in the same state gives its units nothing to do: no goal, no operation, no war.
 #[test]
 fn standard_without_a_city_starts_no_war() {

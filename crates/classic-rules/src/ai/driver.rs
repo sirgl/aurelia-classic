@@ -102,6 +102,8 @@ pub struct ClassicMind {
     /// `Variant::LandlessPlan`: the mind plays `Standard` with the goal of a player without a city
     /// given to its strategist (`TurnBrief::landless_plan`).
     landless_plan: bool,
+    /// The siege layer's mends on every turn, cities or not (`TurnBrief::siege_mend`, `mended`): the tests' switch.
+    siege_mend: bool,
 }
 
 /// The environment variable that makes the game's AI another variant
@@ -176,7 +178,7 @@ impl ClassicMind {
         let variant = if named.is_some() { Variant::PrePuppet } else { variant };
         // The alias `next-w` plays as `Standard` under its name.
         let named = named.or((requested == Variant::NextW).then_some(requested));
-        Self { advisors, variant, genome: None, humans: Vec::new(), walks: Default::default(), choice: None, #[cfg(feature = "experimental-ai")] net, book, named, walls, conquest: None, unciv, tall: None, sharp, tall_real, next, wonder_race, pays, fit, field, raidw, landless, landless_plan }
+        Self { advisors, variant, genome: None, humans: Vec::new(), walks: Default::default(), choice: None, #[cfg(feature = "experimental-ai")] net, book, named, walls, conquest: None, unciv, tall: None, sharp, tall_real, next, wonder_race, pays, fit, field, raidw, landless, landless_plan, siege_mend: false }
     }
 
     /// A league book that may play on another base (`book_on`): a duel book
@@ -222,7 +224,7 @@ impl ClassicMind {
         advisors.register(crate::classic::ClassicSystem::Diplomacy, Box::new(diplomacy));
         // The net plays on `NET_BASE`: its siege too.
         let walls = variant.siege_walls().then(|| Box::new(crate::ai::siege_walls::SiegeWalls::new().joined(variant.siege_join())));
-        Self { advisors, variant, genome: None, humans: Vec::new(), walks: Default::default(), choice: None, net: Some(Box::new(net)), book: None, named: None, walls, conquest: None, unciv: None, tall: None, sharp: false, tall_real: false, next: false, wonder_race: 0, pays: false, fit: false, field: false, raidw: false, landless: false, landless_plan: false }
+        Self { advisors, variant, genome: None, humans: Vec::new(), walks: Default::default(), choice: None, net: Some(Box::new(net)), book: None, named: None, walls, conquest: None, unciv: None, tall: None, sharp: false, tall_real: false, next: false, wonder_race: 0, pays: false, fit: false, field: false, raidw: false, landless: false, landless_plan: false, siege_mend: false }
     }
 
     /// The net's part (`Variant::Net`), if any.
@@ -251,6 +253,13 @@ impl ClassicMind {
             unciv.set_dry();
         }
         self
+    }
+
+    /// This mind with the siege layer's mends on every turn, with cities or without (`TurnBrief::siege_mend`): the
+    /// tests that the mends hold for an army with cities, and a later measure of them for `standard`. No variant
+    /// plays it.
+    pub fn mended(self) -> Self {
+        Self { siege_mend: true, ..self }
     }
 
     /// The mind of `variant` deciding with the knobs of `genome` (dev-only,
@@ -408,7 +417,24 @@ impl AiMind<Classic> for ClassicMind {
         if start.brief.landless_planned() && state.operations().is_empty() {
             // A player with units and no city: the city its units take is the strategist's target (`ai::landless`;
             // `operations::start` looks for one only while no operation runs).
-            start.brief.landless_goal = crate::ai::landless::goal(sight, &start.brief, state, rules);
+            // `TurnBrief::siege_mend`: not a city its siege saw it could not take.
+            let beyond = match &self.walls {
+                Some(walls) if start.brief.siege_mend => walls.beyond_reach(&start.brief),
+                _ => Vec::new(),
+            };
+            start.brief.landless_goal = crate::ai::landless::goal(sight, &start.brief, state, rules, &beyond);
+        }
+        if start.brief.siege_mend && start.brief.landless_planned() {
+            // The target of its operation seen now is weighed again on what the player sees: before its war by the goal's
+            // estimate (`ai::landless::takes`), at war by the siege's (`SiegeWalls::beyond_reach`).
+            let beyond = self.walls.as_ref().map(|w| w.beyond_reach(&start.brief)).unwrap_or_default();
+            let brief = &start.brief;
+            let seen = |t: crate::ids::TileId| sight.visible_foreign_cities.iter().any(|c| c.tile == t);
+            start.brief.landless_untaken = state
+                .operations()
+                .iter()
+                .find(|o| if brief.at_war(o.enemy) { beyond.contains(&o.target) } else { seen(o.target) && !crate::ai::landless::takes(sight, brief, state, rules, o.target) })
+                .map(|o| o.target);
         }
         let _span = prof::span("classic/operations_plan");
         let mut decisions = operations::plan(&start.brief, state, rules, &mut routes, gate);
@@ -712,6 +738,7 @@ impl ClassicMind {
             // with no city takes a city-state's city as well, and its strategist must see that war (`operations`).
             brief.relations = observation.relations.iter().filter(|r| r.kind != PlayerKind::Module(ClassicKind::Barbarian)).copied().collect();
         }
+        brief.siege_mend = self.siege_mend || brief.landless_planned();
         brief.tall_real = self.tall_real;
         brief.next = self.next;
         brief.wonder_race = self.wonder_race;

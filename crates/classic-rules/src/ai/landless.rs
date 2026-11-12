@@ -134,11 +134,18 @@ impl<'s, 'g> Seen<'s, 'g> {
 
 /// `landless-plan`: the city the player's units take (the choice of `take_city`, on the turn's observation), and
 /// its owner; None when they take none. The strategist's operation takes it (`operations::start`).
-pub fn goal(obs: &AIObservation<'_>, brief: &TurnBrief, state: &AiState, rules: &CompiledRuleset) -> Option<(TileId, PlayerId)> {
+pub fn goal(obs: &AIObservation<'_>, brief: &TurnBrief, state: &AiState, rules: &CompiledRuleset, beyond: &[TileId]) -> Option<(TileId, PlayerId)> {
     let seen = Seen::of_turn(obs, brief);
-    let (_, target) = targets(&seen, state, rules, true).into_iter().next()?;
+    // `TurnBrief::siege_mend`: not a city the siege saw its units could not take (`SiegeWalls::beyond_reach`).
+    let (_, target) = targets(&seen, state, rules, true).into_iter().find(|(_, t)| !beyond.contains(&t.tile))?;
     crate::ai::war_probe::note(|p| p.landless_goals.push((brief.round, brief.player, target.tile.0)));
     Some((target.tile, target.owner))
+}
+
+/// `TurnBrief::siege_mend` (`landless_untaken`): the units on hand take the city at `tile` by the estimate of `goal`
+/// on the turn's observation (what the player sees of it now: its population, bar and garrison, and the war's margin).
+pub fn takes(obs: &AIObservation<'_>, brief: &TurnBrief, state: &AiState, rules: &CompiledRuleset, tile: TileId) -> bool {
+    targets(&Seen::of_turn(obs, brief), state, rules, true).iter().any(|(_, t)| t.tile == tile)
 }
 
 fn dist(view: &UnitView<'_, '_>, a: TileId, b: TileId) -> i32 {

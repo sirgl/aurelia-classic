@@ -25,6 +25,9 @@ pub enum EndCause {
     Outmatched,
     /// Its army was worth more at a city in danger (`ai::defence`).
     Recalled,
+    /// `TurnBrief::siege_mend`: the target of a player with no city, in sight now, is not one its units on hand take
+    /// (`ai::landless::takes`).
+    Untaken,
 }
 
 /// One evaluation of a candidate target under `WarGate::Value`.

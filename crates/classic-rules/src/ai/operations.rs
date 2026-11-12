@@ -579,8 +579,10 @@ fn advance(brief: &TurnBrief, state: &mut AiState, rules: &CompiledRuleset, oper
     let age = brief.round.saturating_sub(operation.phase_round);
     let at_war = brief.at_war(operation.enemy);
     let form_limit = brief.speed.pace_rounds(if decisive { DECISIVE_FORM_LIMIT } else { FORM_LIMIT });
+    let untaken = brief.landless_untaken == Some(operation.target);
     let over = match operation.phase {
         _ if !target_held(state, operation) => true,
+        _ if untaken => true,
         OperationPhase::Forming => age > form_limit,
         OperationPhase::Marching => !at_war || age > march_limit(brief) || outmatched(brief, rules, operation, &members),
     };
@@ -590,6 +592,8 @@ fn advance(brief: &TurnBrief, state: &mut AiState, rules: &CompiledRuleset, oper
             let marching = operation.phase == OperationPhase::Marching;
             let cause = if !target_held(state, operation) {
                 if brief.cities.iter().any(|c| c.tile == operation.target) { EndCause::Captured } else { EndCause::TargetGone }
+            } else if untaken {
+                EndCause::Untaken
             } else if !marching {
                 EndCause::FormTimeout
             } else if !at_war {
