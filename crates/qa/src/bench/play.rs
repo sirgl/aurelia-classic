@@ -727,6 +727,13 @@ impl MatchLog {
         }
         rank(&mut self.seats);
         let landless = self.landless.take().map(|(player, mut log)| {
+            if std::env::var_os("AURELIA_LANDLESS_TRACE").is_some() {
+                let c = self.seats.iter().find(|s| s.player == player).map(|s| (s.combat, s.founded, s.eliminated));
+                eprintln!("LLGAME {label} seed {seed} seat {c:?}");
+                for l in &log.trace {
+                    eprintln!("LLROUND {seed} {l}");
+                }
+            }
             log.founded = self.seats.iter().find(|s| s.player == player).is_some_and(|s| s.founded > 0);
             log
         });

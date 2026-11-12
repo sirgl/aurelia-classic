@@ -3,6 +3,7 @@
 //! `ai-exam run --out DIR [--scenes t1a,t2,...] [--players standard,unit-net,hybrid,war-pays] [--instances 80]
 //!   [--offset 0] [--jobs 4] [--control]`
 //!   plays every (scene, instance, player) not yet in DIR/rows.jsonl; the references of a scene
+//!   [--from N] (skip instances below N: `--from 201 --instances 321` plays 201..=320)
 //!   [--set tune|accept|all] (tune: even instances, accept: odd, the acceptance set; default all)
 //!   (`ref-pillage`, `ref-press`) are played too unless --no-refs. Unbuildable instances go to DIR/unbuilt.jsonl.
 //! `ai-exam one --scene t2 --instance 17 --player unit-net [--offset 0] [--control]`
@@ -35,6 +36,8 @@ struct Opts {
     scenes: Vec<Sc>,
     players: Vec<String>,
     instances: usize,
+    /// Instances below this index are skipped (`--from 201 --instances 321` plays 201..=320).
+    from: usize,
     offset: u64,
     jobs: usize,
     control: bool,
@@ -49,7 +52,7 @@ struct Opts {
 fn opts() -> Result<Opts, String> {
     let mut args = std::env::args().skip(1);
     let cmd = args.next().ok_or("run | one")?;
-    let mut o = Opts { cmd, out: PathBuf::from("rows"), scenes: Sc::ALL.to_vec(), players: ["standard", "unit-net", "hybrid", "war-pays"].iter().map(|s| (*s).to_owned()).collect(), instances: 80, offset: 0, jobs: 4, control: false, refs: true, scene: None, instance: 0, player: "standard".to_owned(), parity: None };
+    let mut o = Opts { cmd, out: PathBuf::from("rows"), scenes: Sc::ALL.to_vec(), players: ["standard", "unit-net", "hybrid", "war-pays"].iter().map(|s| (*s).to_owned()).collect(), instances: 80, from: 0, offset: 0, jobs: 4, control: false, refs: true, scene: None, instance: 0, player: "standard".to_owned(), parity: None };
     while let Some(a) = args.next() {
         let mut value = || args.next().ok_or(format!("{a} needs a value"));
         match a.as_str() {
@@ -57,6 +60,7 @@ fn opts() -> Result<Opts, String> {
             "--scenes" => o.scenes = value()?.split(',').map(Sc::parse).collect::<Result<_, _>>()?,
             "--players" => o.players = value()?.split(',').map(str::to_owned).collect(),
             "--instances" => o.instances = value()?.parse().map_err(|e| format!("{e}"))?,
+            "--from" => o.from = value()?.parse().map_err(|e| format!("{e}"))?,
             "--offset" => o.offset = value()?.parse().map_err(|e| format!("{e}"))?,
             "--jobs" => o.jobs = value()?.parse().map_err(|e| format!("{e}"))?,
             "--control" => o.control = true,
@@ -131,7 +135,7 @@ fn real() -> Result<(), String> {
             let started = std::time::Instant::now();
             let count = std::sync::atomic::AtomicUsize::new(0);
             aurelia_qa::export::parallel(&indexes, o.jobs, |&i| {
-                if o.parity.is_some_and(|p| i % 2 != p) {
+                if i < o.from || o.parity.is_some_and(|p| i % 2 != p) {
                     return;
                 }
                 let players_of = |sc: Sc| -> Vec<String> {

@@ -69,6 +69,8 @@ pub(super) struct Ls {
     declared: bool,
     struck: bool,
     taken: Option<u32>,
+    /// The round (relative) the scene's own target city was taken (the first version's win).
+    taken_target: Option<u32>,
     pill0: BTreeSet<TileId>,
     pillaged: BTreeSet<TileId>,
     captured: BTreeSet<EntityId>,
@@ -369,7 +371,7 @@ impl Estimate {
 /// target, in nobody's borders, 3 tiles from every city, from which the slowest unit (`move_pts`) reaches one of
 /// `goals` (on a copy where the war is on) within MAX_ARRIVE rounds. Returns the tiles, the rounds, the distance.
 #[allow(clippy::too_many_arguments)]
-fn muster(rules: &CompiledRuleset, base: &GameState, learner: PlayerId, owner: PlayerId, targets: &[TileId], goals: &[TileId], n: usize, move_pts: i32, v: u64) -> Result<(Vec<TileId>, u32, i32), String> {
+fn muster(rules: &CompiledRuleset, base: &GameState, learner: PlayerId, owner: PlayerId, targets: &[TileId], goals: &[TileId], min_goals: usize, n: usize, move_pts: i32, v: u64) -> Result<(Vec<TileId>, u32, i32), String> {
     let area = base.view().auth.map().land_area(targets[0]);
     let mut war = base.clone();
     apply(&mut war, rules, &Op::Meet { a: learner.0, b: owner.0 });
@@ -390,6 +392,12 @@ fn muster(rules: &CompiledRuleset, base: &GameState, learner: PlayerId, owner: P
             continue;
         }
         let reach = reach_rounds(&war, rules, learner, s0, move_pts, MAX_ARRIVE + 2);
+        // Audit fix (landless2): the sides must be reachable and free (a ring tile behind the garrison, or across water,
+        // is a side only on paper: l1 #10 had four land sides and the army could stand on two).
+        let open = goals.iter().filter(|g| base.view().auth.indexes().units_on(**g).is_empty() && reach.get(*g).is_some_and(|r| *r <= MAX_ARRIVE)).count();
+        if open < min_goals {
+            continue;
+        }
         let Some(arrive) = goals.iter().filter_map(|g| reach.get(g)).min().copied().filter(|r| *r <= MAX_ARRIVE) else { continue };
         let mut tiles = vec![s0];
         tiles.extend(rest.into_iter().take(n - 1));
@@ -562,7 +570,7 @@ fn build_take(rules: &CompiledRuleset, world: &LWorld, nation: bool) -> Result<(
             let half = est.units(mh, dh);
             let slowest = full.iter().map(|k| move_of(rules, *k)).min().unwrap_or(1);
             let goals = strikes_from(&base, city);
-            let (tiles, arrive, d0) = muster(rules, &base, l, owner, &[city], &goals, full.len(), slowest, v)?;
+            let (tiles, arrive, d0) = muster(rules, &base, l, owner, &[city], &goals, MIN_SIDES, full.len(), slowest, v)?;
             Ok((est, full, half, tiles, arrive, d0, r_min, r_full))
         })();
         let (est, full, half, tiles, arrive, d0, r_min, r_full) = match tried {
@@ -671,7 +679,7 @@ fn build_raid(rules: &CompiledRuleset, world: &LWorld) -> Result<(Sc, GameState,
     let pill = guard_kind_fast(&mine_k).ok_or("no fast or melee kind")?;
     let n = 2 + usize::from(bit(4));
     let units = vec![pill; n];
-    let (muster_tiles, arrive, d0) = muster(rules, base, l, o, &tiles, &tiles, n, move_of(rules, pill), v)?;
+    let (muster_tiles, arrive, d0) = muster(rules, base, l, o, &tiles, &tiles, 1, n, move_of(rules, pill), v)?;
     // Nothing to take: the estimate says this force takes no city within 12 rounds (and none is next to the muster).
     let mut taking = None;
     for c in (0..auth.players().count() as u8).flat_map(|p| cities_of(base, PlayerId(p))) {
@@ -742,16 +750,24 @@ impl Run {
     /// After it: a war that began in the learner's turn is its declaration; damage to the target city is its strike.
     pub(super) fn watch_after(&mut self, game: &GameState, w: Watch) {
         let war = self.at_war_with_foe(game);
-        let damaged = self.city_tile().and_then(|t| game.view().auth.indexes().city_on_tile(t).and_then(|h| game.view().auth.cities().get(h)).map(|c| (c.owner, c.damage)));
-        let learner = self.learner;
+        let target = self.city_tile();
+        // Audit fix (landless2): a strike on ANY city of the target's owner, or owning any city, is an attack on a city
+        // (the first version watched the target city only: a group that went for the owner's other city, which is
+        // what a player does when it is the nearer one, counted as not having attacked).
+        let (hit, owns) = {
+            let auth = game.view().auth;
+            let hit = auth.cities().iter().any(|(_, c)| {
+                let is_target = target.is_some_and(|t| auth.indexes().city_on_tile(t).and_then(|h| auth.cities().get(h)).is_some_and(|x| x.tile == c.tile));
+                c.owner == self.enemy && c.damage > if is_target { self.ls.as_ref().map_or(0, |l| l.damage0) } else { 0 }
+            });
+            (hit, !auth.indexes().cities_of(self.learner).is_empty())
+        };
         let Some(ls) = self.ls.as_mut() else { return };
         if w.learner_turn && war && !w.war {
             ls.declared = true;
         }
-        if let Some((owner, damage)) = damaged {
-            if self.sc != Sc::L4 && (damage > ls.damage0 || owner == learner) {
-                ls.struck = true;
-            }
+        if self.sc != Sc::L4 && (hit || owns) {
+            ls.struck = true;
         }
     }
 
@@ -760,15 +776,16 @@ impl Run {
         let round = game.view().auth.turn().round;
         let rel = round.saturating_sub(self.start_round);
         let learner = self.learner;
-        let city = self.city_tile();
         let alive = game.view().auth.players().is_alive(learner);
-        let (pill_now, civilians, owns): (Vec<TileId>, Vec<EntityId>, bool) = {
+        let (pill_now, civilians, owns, owns_target): (Vec<TileId>, Vec<EntityId>, bool, bool) = {
             let auth = game.view().auth;
             let map = auth.map();
             let pill_now: Vec<TileId> = (0..map.tile_count() as u32).map(TileId).filter(|t| map.pillaged(*t)).collect();
             let civilians: Vec<EntityId> = auth.indexes().units_of(learner).iter().filter_map(|h| auth.units().get(*h)).filter(|u| rules.is_civilian(u.core.kind)).map(|u| u.core.id).collect();
-            let owns = city.is_some_and(|t| auth.indexes().city_on_tile(t).and_then(|h| auth.cities().get(h)).is_some_and(|c| c.owner == learner));
-            (pill_now, civilians, owns)
+            // Audit fix: any city of the learner is a city taken (not only the scene's target).
+            let owns = !auth.indexes().cities_of(learner).is_empty();
+            let owns_target = self.target.is_some_and(|t| auth.indexes().city_on_tile(t).and_then(|h| auth.cities().get(h)).is_some_and(|c| c.owner == learner));
+            (pill_now, civilians, owns, owns_target)
         };
         let sc = self.sc;
         if let Some(ls) = self.ls.as_mut() {
@@ -778,6 +795,9 @@ impl Run {
                 }
             }
             ls.captured.extend(civilians);
+            if owns_target && ls.taken_target.is_none() {
+                ls.taken_target = Some(rel);
+            }
             if owns && sc != Sc::L4 && ls.taken.is_none() {
                 ls.taken = Some(rel);
                 ls.struck = true;
@@ -809,8 +829,12 @@ impl Run {
         m.insert("eliminated".into(), b(!alive));
         m.insert("declared".into(), b(ls.declared));
         m.insert("struck".into(), b(ls.struck));
-        m.insert("attacked_city".into(), b(ls.declared || ls.struck));
+        // Audit fix: attacking the city is a strike on it; a war declared on its owner for other prey (a worker, a
+        // settler) is not (`declared` stays as a measure of its own, the first version OR-ed the two).
+        m.insert("attacked_city".into(), b(ls.struck));
+        m.insert("attacked_or_declared".into(), b(ls.declared || ls.struck));
         m.insert("taken".into(), ls.taken.map_or(-1.0, f64::from));
+        m.insert("taken_target".into(), ls.taken_target.map_or(-1.0, f64::from));
         m.insert("at_war_end".into(), b(self.at_war_with_foe(game)));
         if self.sc == Sc::L4 {
             let (p, c) = (ls.pillaged.len(), ls.captured.len());
@@ -940,7 +964,12 @@ impl Run {
                 if c.moves_left == 0 {
                     continue;
                 }
-                let imp: Vec<TileId> = self.imp.iter().copied().filter(|&t| !game.view().auth.map().pillaged(t) && matches!(game.view().auth.map().improvement(t), Some(Some(_)))).collect();
+                // Audit fix: the reference sees what the learner sees (a tile it knows, a unit in sight), as the AI under
+                // test does; the first version read the whole map (a settler beyond every sight, tiles never explored).
+                let imp: Vec<TileId> = {
+                    let pv = game.player_view(rules, self.learner);
+                    self.imp.iter().copied().filter(|&t| pv.tile(t).snapshot().is_some() && !game.view().auth.map().pillaged(t) && matches!(game.view().auth.map().improvement(t), Some(Some(_)))).collect()
+                };
                 if imp.contains(&c.tile) {
                     let cmd = Command::Pillage { unit: p.h };
                     if game.accepts_order(rules, self.learner, &cmd) && game.execute(rules, cmd).is_ok() {
@@ -951,10 +980,11 @@ impl Run {
                 // The nearest civilian of the other side.
                 let prey: Option<(UnitHandle, TileId)> = {
                     let auth = game.view().auth;
+                    let pv = game.player_view(rules, self.learner);
                     auth.indexes()
                         .units_of(self.enemy)
                         .iter()
-                        .filter_map(|h| auth.units().get(*h).map(|u| (*h, u.core.tile, u.core.kind)))
+                        .filter_map(|h| auth.units().get(*h).filter(|u| pv.sees_unit(&u.core)).map(|u| (*h, u.core.tile, u.core.kind)))
                         .filter(|(_, _, k)| rules.is_civilian(*k))
                         .map(|(h, t, _)| (h, t))
                         .min_by_key(|(_, t)| (dist(game, c.tile, *t), t.0))

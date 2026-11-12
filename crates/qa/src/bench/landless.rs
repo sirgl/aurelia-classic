@@ -25,6 +25,8 @@ pub struct LandlessGame {
     pub owned: [Option<bool>; 2],
     /// The seat founded or took a city at some time (a city of its own founding: `SeatResult::founded`).
     pub founded: bool,
+    /// Diagnostic lines of the seat per round (only with AURELIA_LANDLESS_TRACE set).
+    pub trace: Vec<String>,
 }
 
 /// Removes the founders of `player` unless they are all it has. Returns the log of the game.
@@ -53,6 +55,12 @@ pub fn strip<M: RulesModule>(game: &mut GameState<M>, rules: &CompiledRuleset<M>
 impl LandlessGame {
     /// After a round: whether the seat owns a city at the end of a checked round.
     pub fn after_round<M: RulesModule>(&mut self, game: &GameState<M>, player: PlayerId, now: u32) {
+        if std::env::var_os("AURELIA_LANDLESS_TRACE").is_some() {
+            let auth = game.view().auth;
+            let units: Vec<String> = auth.indexes().units_of(player).iter().filter_map(|h| auth.units().get(*h)).map(|u| format!("k{}@{}h{}", u.core.kind.0, u.core.tile.0, u.core.hp)).collect();
+            let wars: Vec<u8> = (0..auth.players().count() as u8).filter(|p| PlayerId(*p) != player && auth.diplomacy().at_war(player, PlayerId(*p))).collect();
+            self.trace.push(format!("r{now} units [{}] wars {:?}", units.join(" "), wars));
+        }
         if let Some(at) = CHECK_ROUNDS.iter().position(|r| *r == now) {
             self.owned[at] = Some(!game.view().auth.indexes().cities_of(player).is_empty());
         }

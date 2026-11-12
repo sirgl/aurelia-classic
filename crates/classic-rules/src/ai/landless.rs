@@ -24,6 +24,13 @@
 //!    dearer than on a city-state (its army hunts us).
 //! 3. Otherwise the planners' own business (scouting finds the cities of 1).
 //!
+//! Second iteration (12 Nov): the walk goes to the nearest tile next to the city the unit HAS A PATH to (a tile
+//! behind the garrison or across water stopped the whole group for good); the group declares when three
+//! quarters of it stand within `GATHER_RADIUS` of the city (units without a free tile next to it follow when
+//! the war is on); a nation's closed border sends the units to the nearest gathering tile outside it, not to
+//! a declaration eight tiles away; a war on a nation is priced at one unit (the fighters near the prey are
+//! priced already) and the last unit at twice the first iteration's price.
+//!
 //! No content is named; fog of war is respected (only seen units, remembered cities and known tiles).
 
 use crate::ai::front::{siege_rounds_within, Besieger};
@@ -50,10 +57,11 @@ pub const TAKE_ROUNDS: u32 = 5;
 pub const STRENGTH_MARGIN_PERCENT: i64 = 125;
 
 /// The price of the player's last unit in units of its own price: its death is elimination.
-pub const LAST_UNIT_PRICE: i64 = 12;
+pub const LAST_UNIT_PRICE: i64 = 24;
+
 
 /// A war on a nation, in units of a unit's price: the nation's army hunts the player's units.
-pub const MAJOR_WAR_PRICE: i64 = 4;
+pub const MAJOR_WAR_PRICE: i64 = 1;
 
 /// Danger of a tile for the price of the trip: per hostile fighter within `NEAR` tiles, percent of a unit's
 /// price; a city that strikes the tile counts as `CITY_FIGHTERS` fighters.
@@ -67,7 +75,7 @@ const KNOWN_RADIUS: i32 = 12;
 const ASSUMED_POPULATION: u32 = 2;
 
 /// Tiles from the city within which a unit counts as gathered at its border.
-const GATHER_RADIUS: i32 = 8;
+const GATHER_RADIUS: i32 = 3;
 
 /// Rounds of walking a free unit looks ahead for prey.
 const PREY_ROUNDS: i32 = 5;
@@ -182,7 +190,8 @@ fn targets(view: &UnitView<'_, '_>, state: &AiState, tools: &PlanTools<'_>) -> V
         let war = at_war(view, owner);
         let margin = if war { 100 } else { STRENGTH_MARGIN_PERCENT };
         let estimate = city_estimate(view, tools, tile, population, margin);
-        let Some(rounds) = siege_estimate(view, tools, &estimate, if war { TAKE_ROUNDS + 3 } else { TAKE_ROUNDS }, |_| true) else { continue };
+        let rounds_opt = siege_estimate(view, tools, &estimate, if war { TAKE_ROUNDS + 3 } else { TAKE_ROUNDS }, |_| true);
+        let Some(rounds) = rounds_opt else { continue };
         let walk = view.brief.units.iter().filter(|u| u.role == AiRole::Military).map(|u| (dist(view, u.tile, tile) + movement(tools, u.kind) - 1) / movement(tools, u.kind)).max().unwrap_or(0);
         out.push((i64::from(rounds) + i64::from(walk), Target { tile, owner, estimate }));
     }
@@ -199,18 +208,65 @@ fn ready_group_takes(view: &UnitView<'_, '_>, tools: &PlanTools<'_>, target: &Ta
     siege_estimate(view, tools, &target.estimate, TAKE_ROUNDS, ready).is_some()
 }
 
-/// The tile next to the city (or, for a shooter, within its range) the unit walks to: the nearest it may stop on.
-/// A foreign city cannot be walked into, so the goal of the walk is never the city's own tile.
-fn staging(view: &UnitView<'_, '_>, tools: &PlanTools<'_>, city: TileId) -> Option<TileId> {
+/// The tiles next to the city (or, for a shooter, within its range) the unit may walk to, the nearest first: the
+/// ones it may stop on. A foreign city cannot be walked into, so the goal of the walk is never the city's own tile.
+/// Whether the unit can get to one (a lake, a mountain, a river without a crossing) is the walk's answer, see
+/// `walk_to_staging`.
+fn staging(view: &UnitView<'_, '_>, tools: &PlanTools<'_>, city: TileId) -> Vec<TileId> {
     let unit = view.local.unit;
     let dims = view.local.view.dimensions();
     let range = crate::ai::combat::ranged_range(tools.rules, unit.kind).unwrap_or(1).max(1);
     let (lo, hi) = if range > 1 { (2, range) } else { (1, 1) };
-    crate::math::tiles_in_hex_radius(&dims, city, hi)
+    let mut out: Vec<TileId> = crate::math::tiles_in_hex_radius(&dims, city, hi)
         .into_iter()
         .filter(|t| dist(view, *t, city) >= lo && view.local.view.tile(*t).snapshot().is_some())
         .filter(|t| *t == unit.tile || crate::ai::planner_units::can_stop(view, tools.rules, *t))
-        .min_by_key(|t| (dist(view, unit.tile, *t), *t))
+        .collect();
+    out.sort_by_key(|t| (dist(view, unit.tile, *t), *t));
+    out
+}
+
+/// One step toward the nearest staging tile the unit has a path to; None when it has no path to any (or stands on
+/// one). The decision may be a refusal (the way is blocked for now): the caller decides what that means.
+fn walk_to_staging(view: &UnitView<'_, '_>, tools: &mut PlanTools<'_>, city: TileId) -> Option<Decision> {
+    let unit = view.local.unit;
+    let candidates = staging(view, tools, city);
+    let tried_none = candidates.is_empty();
+    for goal in candidates {
+        if goal == unit.tile {
+            return None;
+        }
+        let step = move_along(view, tools, goal, Reason::Raid);
+        if matches!(step.reason, Reason::NoPath | Reason::PathOverBudget) {
+            continue;
+        }
+        return Some(step);
+    }
+    // Candidates, but no way to any of them (a nation's closed border, water): the walk is stopped.
+    (!tried_none).then(|| Decision::refuse(Actor::Unit(unit.id), Reason::NoPath))
+}
+
+/// One step toward the tile nearest the city, within `GATHER_RADIUS` of it and nearer than the unit stands, that the
+/// unit has a path to (the border of a nation closes the tiles next to the city at peace). None when the unit
+/// stands as near as it can get.
+fn walk_to_gather(view: &UnitView<'_, '_>, tools: &mut PlanTools<'_>, city: TileId) -> Option<Decision> {
+    let unit = view.local.unit;
+    let here = dist(view, unit.tile, city);
+    let radius = GATHER_RADIUS;
+    let dims = view.local.view.dimensions();
+    let mut tiles: Vec<TileId> = crate::math::tiles_in_hex_radius(&dims, city, radius)
+        .into_iter()
+        .filter(|t| dist(view, *t, city) >= 2 && dist(view, *t, city) < here && view.local.view.tile(*t).snapshot().is_some() && crate::ai::planner_units::can_stop(view, tools.rules, *t))
+        .collect();
+    tiles.sort_by_key(|t| (dist(view, *t, city), dist(view, unit.tile, *t), *t));
+    for goal in tiles {
+        let step = move_along(view, tools, goal, Reason::Raid);
+        if matches!(step.reason, Reason::NoPath | Reason::PathOverBudget) {
+            continue;
+        }
+        return Some(step);
+    }
+    None
 }
 
 /// The lowest id of the group declares, so that one order is given.
@@ -224,10 +280,7 @@ pub fn decide(view: &UnitView<'_, '_>, state: &AiState, tools: &mut PlanTools<'_
     if !active(view, tools) {
         return None;
     }
-    if let Some(decision) = take_city(view, state, tools) {
-        return Some(decision);
-    }
-    harm(view, tools)
+    take_city(view, state, tools).or_else(|| harm(view, tools))
 }
 
 fn take_city(view: &UnitView<'_, '_>, state: &AiState, tools: &mut PlanTools<'_>) -> Option<Decision> {
@@ -236,7 +289,14 @@ fn take_city(view: &UnitView<'_, '_>, state: &AiState, tools: &mut PlanTools<'_>
     let actor = Actor::Unit(unit.id);
     if !at_war(view, target.owner) {
         // At peace: walk up to the city; declare when every member can strike this turn.
-        if ready_group_takes(view, tools, &target) {
+        // The group is gathered when three quarters of it stand within `GATHER_RADIUS` of the city (its units
+        // that stand farther follow when the war is on): the group as a whole takes the city, that is what made it
+        // the target, and the units that cannot find a tile next to the city (they are taken by the others) are no
+        // reason to wait for ever.
+        let gather = GATHER_RADIUS;
+        let military = view.brief.units.iter().filter(|u| u.role == AiRole::Military).count();
+        let gathered = view.brief.units.iter().filter(|u| u.role == AiRole::Military && dist(view, u.tile, target.tile) <= gather).count();
+        if ready_group_takes(view, tools, &target) || gathered * 4 >= military * 3 {
             if !declares_for_group(view) {
                 return Some(crate::ai::planner_units::hold(view, Reason::Idle));
             }
@@ -251,16 +311,22 @@ fn take_city(view: &UnitView<'_, '_>, state: &AiState, tools: &mut PlanTools<'_>
             // Ready: wait for the others where it stands.
             return Some(crate::ai::planner_units::hold(view, Reason::Idle));
         }
-        let Some(goal) = staging(view, tools, target.tile).filter(|g| *g != unit.tile) else {
+        let Some(step) = walk_to_staging(view, tools, target.tile) else {
             return Some(crate::ai::planner_units::hold(view, Reason::Idle));
         };
-        let step = move_along(view, tools, goal, Reason::Raid);
         if step.command.is_some() {
             return Some(step);
         }
-        // The walk is stopped: a nation's land is closed at peace. When most of the group stands at the border
-        // (the group takes the city: it is the target), the war is declared and the walk goes on.
-        let near: Vec<_> = view.brief.units.iter().filter(|u| u.role == AiRole::Military && dist(view, u.tile, target.tile) <= GATHER_RADIUS).collect();
+        // The walk is stopped: a nation's land is closed at peace. The unit goes as near as the border lets it
+        // (the gathering tiles, outside the city's strike), and when most of the group stands there (the group
+        // takes the city: it is the target), the war is declared and the walk goes on.
+        if let Some(step) = walk_to_gather(view, tools, target.tile) {
+            if step.command.is_some() {
+                return Some(step);
+            }
+        }
+        let gather = GATHER_RADIUS;
+        let near: Vec<_> = view.brief.units.iter().filter(|u| u.role == AiRole::Military && dist(view, u.tile, target.tile) <= gather).collect();
         let military = view.brief.units.iter().filter(|u| u.role == AiRole::Military).count();
         if victim(view, target.owner) == Some(Victim::Nation) && near.len() * 4 >= military * 3 && near.iter().all(|u| u.id >= unit.id) {
             let command = Command::DeclareWar { player: view.local.player, enemy: target.owner };
@@ -279,11 +345,7 @@ fn take_city(view: &UnitView<'_, '_>, state: &AiState, tools: &mut PlanTools<'_>
             return Some(Decision::act(actor, Reason::AttackCity, command));
         }
     }
-    let goal = staging(view, tools, target.tile)?;
-    if goal == unit.tile {
-        return None;
-    }
-    let step = move_along(view, tools, goal, Reason::Raid);
+    let step = walk_to_staging(view, tools, target.tile)?;
     step.command.is_some().then_some(step)
 }
 
