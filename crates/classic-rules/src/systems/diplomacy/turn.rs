@@ -1,15 +1,17 @@
 //! The diplomacy step of a player's end turn (after Science): gold per
-//! turn it owes, research agreements (accumulate, pay out at the end),
+//! turn it owes (a payment it cannot make breaks the deal), research agreements (accumulate, pay out at the end),
 //! open borders that expire, offers to it that lapse, the decay of its
 //! warmonger memory.
 
 use crate::ids::PlayerId;
 use crate::rules::CompiledRuleset;
 use crate::systems::diplomacy::{
-    warmonger_era_percent, MEDIAN_TECH_PERCENT, RESEARCH_AGREEMENT_POOL_DIVISOR, WARMONGER_DECAY,
+    warmonger_era_percent, MEDIAN_TECH_PERCENT, RESEARCH_AGREEMENT_POOL_DIVISOR, WARMONGER_ATTACKED_WEIGHT,
+    WARMONGER_DECAY,
 };
 use crate::transaction::transaction::WorldTransaction;
 use crate::world::relations::TradeFlow;
+use crate::classic::ClassicChange;
 
 impl<'a> WorldTransaction<'a> {
     /// `science`: the player's science of this turn (research agreements
@@ -24,7 +26,7 @@ impl<'a> WorldTransaction<'a> {
             return;
         }
         let round = self.world.turn.round;
-        self.pay_gold_per_turn(player, round);
+        self.pay_gold_per_turn(player, round, rules);
         self.research_agreements(player, science.max(0) as u32, round, rules);
         self.expire_open_borders(player, round, rules);
         self.decay_warmonger(player, rules);
@@ -35,8 +37,12 @@ impl<'a> WorldTransaction<'a> {
         relations.trades.retain(|t| round < t.until);
     }
 
-    fn pay_gold_per_turn(&mut self, player: PlayerId, round: u32) {
-        let owed: Vec<(PlayerId, u32)> = self
+    /// Every gold-per-turn trade the player owes is paid in full from its treasury (this turn's
+    /// income is in it: the Gold step runs before). A payment the treasury cannot make in full
+    /// is not made at all and breaks the deal (`break_deal`), as in the original game, where a
+    /// deal the payer can no longer honour is cancelled.
+    fn pay_gold_per_turn(&mut self, player: PlayerId, round: u32, rules: &CompiledRuleset) {
+        let owed: Vec<(PlayerId, u32, u32)> = self
             .world
             .module
             .relations
@@ -44,14 +50,42 @@ impl<'a> WorldTransaction<'a> {
             .iter()
             .filter(|t| t.from == player && round < t.until)
             .filter_map(|t| match t.flow {
-                TradeFlow::GoldPerTurn(gold) => Some((t.to, gold)),
+                TradeFlow::GoldPerTurn(gold) => Some((t.to, gold, t.until)),
                 TradeFlow::Resource { .. } => None,
             })
             .collect();
-        for (to, gold) in owed {
-            let missing = self.world.players.drain(player, gold);
-            self.world.players.earn(to, gold - missing);
+        for (to, gold, until) in owed {
+            let running = self.world.module.relations.trades.iter().any(|t| {
+                (t.from, t.to, t.until, t.flow) == (player, to, until, TradeFlow::GoldPerTurn(gold))
+            });
+            if !running {
+                continue;
+            }
+            if self.world.players.spend(player, gold) {
+                self.world.players.earn(to, gold);
+            } else {
+                self.break_deal(player, to, until, gold, rules);
+            }
         }
+    }
+
+    /// `debtor` did not pay `gold` it owes `creditor` this turn: every trade of their deal ends
+    /// (both ways: the trades of one accepted deal are the pair's that end at the same round,
+    /// `deals::add_trade`), the creditor is told (`ClassicChange::DealBroken`) and remembers
+    /// it. The memory is the one the rules keep of a player's breaches, the warmonger memory
+    /// (`systems::diplomacy`; the AI reads it as trust, `ai::diplomacy::trusted`): a broken
+    /// deal weighs what a declaration of war weighs (`WARMONGER_ATTACKED_WEIGHT`, scaled by the
+    /// game's era), but only in the memory of the one it wronged.
+    pub(crate) fn break_deal(&mut self, debtor: PlayerId, creditor: PlayerId, until: u32, gold: u32, rules: &CompiledRuleset) {
+        let pair = |a: PlayerId, b: PlayerId| (a, b) == (debtor, creditor) || (a, b) == (creditor, debtor);
+        self.world.module.relations.trades.retain(|t| !(pair(t.from, t.to) && t.until == until));
+        self.journal.module_changes.push(ClassicChange::DealBroken { debtor, creditor, gold });
+        if self.world.players.is_major(creditor) && self.world.players.is_alive(creditor) {
+            let weight = WARMONGER_ATTACKED_WEIGHT * warmonger_era_percent(self.world, rules) / 100;
+            self.change_warmonger(creditor, debtor, weight);
+        }
+        self.relations_changed(debtor);
+        self.relations_changed(creditor);
     }
 
     /// Accumulate this turn's science for every running agreement; at the

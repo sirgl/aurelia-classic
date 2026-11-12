@@ -10,7 +10,7 @@
 //! relations are written on both halves.
 
 use crate::ids::{CityHandle, PlayerId, ResourceId};
-pub use crate::systems::diplomacy::deals::{peace_needs_a_deal, DealBlock};
+pub use crate::systems::diplomacy::deals::{gold_income, peace_needs_a_deal, DealBlock};
 
 /// One item of a deal and the side that gives it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

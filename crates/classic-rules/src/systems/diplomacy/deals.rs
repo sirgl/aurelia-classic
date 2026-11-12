@@ -65,6 +65,14 @@ pub fn resource_available(
     crate::derived::resources::resource_ledger(auth, rules, player).tradeable(resource)
 }
 
+/// The gold a turn `player`'s income can carry in a new gold-per-turn deal: its income with the
+/// gold per turn it already pays (less) and receives (more) by running deals. The trade
+/// screen's check (`DealBlock::NotEnoughIncome`) and the AI read the same number.
+pub fn gold_income(auth: &AuthWorld, rules: &CompiledRuleset, player: PlayerId) -> i32 {
+    let income = crate::derived::income::player_income(auth, rules, player).gold;
+    income + auth.module().relations().gold_per_turn(player, auth.turn().round)
+}
+
 /// Why an item cannot pass in a deal. `reason` is the rule text of logs and tests; a screen
 /// words each reason once from the type.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -215,7 +223,9 @@ pub fn item_problem(
             if at_war && !peace_in_deal {
                 return Some(DealBlock::AtWar);
             }
-            let income = crate::derived::income::player_income(auth, rules, giver).gold;
+            // What the giver's income can carry: its gold a turn with the gold per turn it
+            // already pays and receives by deals (the original game's net income).
+            let income = gold_income(auth, rules, giver);
             if gold == 0 || gold as i32 > income.max(0) {
                 return Some(DealBlock::NotEnoughIncome);
             }
