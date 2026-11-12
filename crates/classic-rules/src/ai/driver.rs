@@ -97,6 +97,9 @@ pub struct ClassicMind {
     call: bool,
     /// `Variant::Retake2`: `call` with the retake of a lost city (`TurnBrief::retake`).
     retake2: bool,
+    /// `Variant::VoteGuard`: the mind plays `Standard` (`next-w`'s flags set) and takes the alliances
+    /// of a rival that would win the World Leader vote (`TurnBrief::vote_guard`, `ai::victory_watch`).
+    vote_guard: bool,
 }
 
 /// The environment variable that makes the game's AI another variant
@@ -139,9 +142,11 @@ impl ClassicMind {
             Variant::NextWarRetake => (Variant::Standard, Variant::Retake2),
             _ => (requested, requested),
         };
-        let next = flags.next();
+        // `vote-guard` is `standard` (the flags of `next-w`) with the guard on.
+        let vote_guard = flags.vote_guard();
+        let next = flags.next() || vote_guard;
         let tall_real = flags.tall_real() || next;
-        let wonder_race = flags.wonder_race();
+        let wonder_race = flags.wonder_race().max(u8::from(vote_guard));
         let sharp = flags.sharp() || tall_real || wonder_race > 0;
         // `tactician-fit` is `WarPays` in every switch but its own (`TurnBrief::tactician_fit`).
         let fit = war.tactician_fit();
@@ -180,7 +185,7 @@ impl ClassicMind {
         // war of `siege-call` under its own, `next-war-retake` as `Standard` with the war of
         // `retake2` under its own.
         let named = named.or(matches!(requested, Variant::NextW | Variant::NextWar | Variant::NextWarRetake).then_some(requested));
-        Self { advisors, variant, genome: None, humans: Vec::new(), walks: Default::default(), choice: None, #[cfg(feature = "experimental-ai")] net, book, named, walls, conquest: None, unciv, tall: None, sharp, tall_real, next, wonder_race, pays, fit, muster, call, retake2 }
+        Self { advisors, variant, genome: None, humans: Vec::new(), walks: Default::default(), choice: None, #[cfg(feature = "experimental-ai")] net, book, named, walls, conquest: None, unciv, tall: None, sharp, tall_real, next, wonder_race, pays, fit, muster, call, retake2, vote_guard }
     }
 
     /// A league book that may play on another base (`book_on`): a duel book
@@ -226,7 +231,7 @@ impl ClassicMind {
         advisors.register(crate::classic::ClassicSystem::Diplomacy, Box::new(crate::ai::diplomacy::DiplomacyAdvisor { embassies: variant.values_embassies() }));
         // The net plays on `NET_BASE`: its siege too.
         let walls = variant.siege_walls().then(|| Box::new(crate::ai::siege_walls::SiegeWalls::new().joined(variant.siege_join())));
-        Self { advisors, variant, genome: None, humans: Vec::new(), walks: Default::default(), choice: None, net: Some(Box::new(net)), book: None, named: None, walls, conquest: None, unciv: None, tall: None, sharp: false, tall_real: false, next: false, wonder_race: 0, pays: false, fit: false, muster: false, call: false, retake2: false }
+        Self { advisors, variant, genome: None, humans: Vec::new(), walks: Default::default(), choice: None, net: Some(Box::new(net)), book: None, named: None, walls, conquest: None, unciv: None, tall: None, sharp: false, tall_real: false, next: false, wonder_race: 0, pays: false, fit: false, muster: false, call: false, retake2: false, vote_guard: false }
     }
 
     /// The net's part (`Variant::Net`), if any.
@@ -264,6 +269,9 @@ impl ClassicMind {
     }
 
     pub fn variant(&self) -> Variant {
+        if self.vote_guard {
+            return Variant::VoteGuard;
+        }
         if self.next {
             return match self.wonder_race {
                 // The game's AI since the thirteenth promotion, or its alias `next-w`.
@@ -705,6 +713,7 @@ impl ClassicMind {
         brief.sharp = self.sharp;
         brief.tall_real = self.tall_real;
         brief.next = self.next;
+        brief.vote_guard = self.vote_guard;
         brief.wonder_race = self.wonder_race;
         // `tall-real` finishes its spaceship by the space plan where the science victory fits the
         // game (`victory::space_plan`, `ai::tall_real`), on every seat; `next` too: the plan on its
@@ -758,6 +767,13 @@ impl ClassicMind {
             // `next`: an alliance's delegates toward the World Leader vote count in its gifts.
             if self.next {
                 prices.delegate = crate::ai::city_states::delegate_worth(observation);
+            }
+            // `vote-guard`: what losing the game to a rival's vote costs, once a rival can win it.
+            if self.vote_guard {
+                prices.guard = crate::ai::victory_watch::guard_prize(observation);
+                if observation.round % 10 == 0 {
+                    crate::ai::strategy_net::trace::readings(observation, rules);
+                }
             }
             if self.variant.sea_work() {
                 brief.sea_jobs = crate::ai::sea_work::sea_values(observation, &brief, rules, &prices);

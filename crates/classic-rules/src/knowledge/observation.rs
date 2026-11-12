@@ -214,6 +214,13 @@ pub struct CongressInfo {
     pub delegates_left: u16,
     /// Delegates the World Leader needs.
     pub needed: u16,
+    /// The delegates of the nation and of every nation it has met, as the Congress screen counts
+    /// them (`systems::congress::delegates`: the session's seats, the host, the city-state allies,
+    /// the delegates of failed leader votes), in id order. A nation not met is not listed.
+    pub delegates: Vec<(PlayerId, u16)>,
+    /// The next session elects the World Leader (the league's calendar: the vote comes at every
+    /// second session of the United Nations, the first of them is the host's election).
+    pub leader_vote_next: bool,
     /// World Congress projects under way (the project panel).
     pub projects: Vec<ProjectInfo>,
     /// World Congress projects that may be proposed now.
@@ -257,6 +264,9 @@ pub struct CityStateInfo {
     pub quests: Vec<crate::world::city_states::QuestKind>,
     /// The city-state's capital, when known.
     pub capital: Option<TileId>,
+    /// The capital as a city a spy can be sent to: its tile has been explored (the espionage screen
+    /// lists the known cities of the nations and city-states met).
+    pub capital_city: Option<CityHandle>,
 }
 
 /// Faith part of the observation.
@@ -356,11 +366,11 @@ impl<'a> AIObservation<'a> {
         };
         let city_states = {
             let _span = prof::span("nation5/obs city_states");
-            city_states_known(auth, rules, player)
+            city_states_known(auth, rules, player, &view)
         };
         let congress = {
             let _span = prof::span("nation5/obs congress");
-            congress_info(auth, rules, player)
+            congress_info(auth, rules, player, &relations)
         };
         let _spies_span = prof::span("nation5/obs spies+steal");
         let observation = Self {
@@ -801,7 +811,7 @@ fn relations(auth: &AuthWorld, view: &PlayerView<'_>, player: PlayerId) -> Vec<R
 
 
 /// The city-states `player` met (nations only; nothing for others).
-fn city_states_known(auth: &AuthWorld, rules: &CompiledRuleset, player: PlayerId) -> Vec<CityStateInfo> {
+fn city_states_known(auth: &AuthWorld, rules: &CompiledRuleset, player: PlayerId, view: &PlayerView<'_>) -> Vec<CityStateInfo> {
     use crate::world::city_states as cs;
     if !auth.players().is_major(player) {
         return Vec::new();
@@ -838,11 +848,17 @@ fn city_states_known(auth: &AuthWorld, rules: &CompiledRuleset, player: PlayerId
                 .first()
                 .and_then(|c| auth.cities().get(*c))
                 .map(|c| c.tile),
+            capital_city: auth
+                .indexes()
+                .cities_of(p)
+                .first()
+                .copied()
+                .filter(|c| auth.cities().get(*c).is_some_and(|core| view.is_known(core.tile))),
         })
         .collect()
 }
 
-fn congress_info(auth: &AuthWorld, rules: &CompiledRuleset, player: PlayerId) -> Option<CongressInfo> {
+fn congress_info(auth: &AuthWorld, rules: &CompiledRuleset, player: PlayerId, relations: &[Relation]) -> Option<CongressInfo> {
     let c = auth.module().congress();
     if !c.founded() || !auth.players().is_major(player) {
         return None;
@@ -858,12 +874,28 @@ fn congress_info(auth: &AuthWorld, rules: &CompiledRuleset, player: PlayerId) ->
         active: c.active().to_vec(),
         delegates_left: c.delegates_left(player),
         needed: crate::systems::congress::votes_needed(auth),
+        delegates: met_delegates(auth, rules, player, relations),
+        leader_vote_next: c.united_nations() && c.leader_vote_due(),
         projects: project_infos(auth, rules, player),
         proposable_projects: (0..rules.module.projects.len())
             .map(|i| crate::rules::content::ProjectId(i as u16))
             .filter(|p| crate::systems::league_projects::project_problem(auth, rules, *p).is_none())
             .collect(),
     })
+}
+
+/// The delegates of `player` and of the nations it has met (the Congress screen's table), counted
+/// once the United Nations sits (before it no vote depends on them).
+fn met_delegates(auth: &AuthWorld, rules: &CompiledRuleset, player: PlayerId, relations: &[Relation]) -> Vec<(PlayerId, u16)> {
+    if !auth.module().congress().united_nations() {
+        return Vec::new();
+    }
+    let mut out: Vec<(PlayerId, u16)> = std::iter::once(player)
+        .chain(relations.iter().map(|r| r.other).filter(|p| auth.players().is_major(*p)))
+        .map(|p| (p, crate::systems::congress::delegates(auth, rules, p)))
+        .collect();
+    out.sort_by_key(|(p, _)| p.0);
+    out
 }
 
 fn project_infos(auth: &AuthWorld, rules: &CompiledRuleset, player: PlayerId) -> Vec<ProjectInfo> {

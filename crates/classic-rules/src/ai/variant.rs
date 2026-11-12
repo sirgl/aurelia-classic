@@ -778,6 +778,15 @@ pub enum Variant {
     /// carried over onto `NextWar`; `Retake2` stays as measured, on `PreNext`. A bench-only
     /// candidate, `experimental-ai` only.
     NextWarRetake,
+    /// `Standard` (`NextW`'s play) that watches its rivals' road to the World Leader vote and takes
+    /// an alliance from a rival that would win it (`ai::victory_watch`, `TurnBrief::vote_guard`,
+    /// `Prices::guard`): the delegates of a rival's alliance are worth the fall of its chance to win
+    /// the vote, at the price of the influence that takes the alliance. When a rival is within reach
+    /// of the vote it also spends its spies on coups against that rival's allies
+    /// (`espionage::GUARD_COUP_MIN_CHANCE`, `GUARD_COUP_WINDOW`) and gives its delegates to the
+    /// host election against the leader (`victory_watch::host_choice`, `congress::vote_orders_for`).
+    /// Every other switch is `Standard`'s. A candidate, `experimental-ai` only.
+    VoteGuard,
 }
 
 /// The net's base: the expert the end-to-end net learns from and the mind it
@@ -798,7 +807,7 @@ const NUDGED_CANDIDATES: u32 = 40;
 
 impl Variant {
     /// The game's AI first.
-    pub const ALL: [Variant; 150] = [
+    pub const ALL: [Variant; 151] = [
         Variant::Standard,
         Variant::PreCamps,
         Variant::PreWorkers,
@@ -949,6 +958,7 @@ impl Variant {
         Variant::NextWar,
         Variant::Retake2,
         Variant::NextWarRetake,
+        Variant::VoteGuard,
     ];
 
     pub fn name(self) -> &'static str {
@@ -1085,6 +1095,7 @@ impl Variant {
             Variant::NextWar => "next-war",
             Variant::Retake2 => "retake2",
             Variant::NextWarRetake => "next-war-retake",
+            Variant::VoteGuard => "vote-guard",
             Variant::ArmyFit => "army-fit",
             Variant::Camps => "camps",
             Variant::ArmyCamps => "army-camps",
@@ -1122,7 +1133,7 @@ impl Variant {
         cfg!(feature = "experimental-ai")
             || !matches!(
                 self,
-                Variant::Net | Variant::UnitNet | Variant::Hybrid | Variant::SiteNet | Variant::ChoiceNet | Variant::ChoiceNetProduction | Variant::ChoiceNetResearch | Variant::StandardScripted | Variant::PreCsGifts | Variant::Sharp | Variant::TallReal | Variant::Next | Variant::WonderCancel | Variant::WonderRace | Variant::NextW | Variant::NextRace | Variant::PreNext | Variant::WarPays | Variant::TacticianFit | Variant::WarMuster | Variant::SiegeCall | Variant::NextWar | Variant::Retake2 | Variant::NextWarRetake
+                Variant::Net | Variant::UnitNet | Variant::Hybrid | Variant::SiteNet | Variant::ChoiceNet | Variant::ChoiceNetProduction | Variant::ChoiceNetResearch | Variant::StandardScripted | Variant::PreCsGifts | Variant::Sharp | Variant::TallReal | Variant::Next | Variant::WonderCancel | Variant::WonderRace | Variant::NextW | Variant::NextRace | Variant::PreNext | Variant::WarPays | Variant::TacticianFit | Variant::WarMuster | Variant::SiegeCall | Variant::NextWar | Variant::Retake2 | Variant::NextWarRetake | Variant::VoteGuard
             )
     }
 
@@ -1259,6 +1270,12 @@ impl Variant {
     /// mind plays as `Standard` in every other switch (`ClassicMind::new`).
     pub fn sharp(self) -> bool {
         self == Variant::Sharp
+    }
+
+    /// The vote guard (`TurnBrief::vote_guard`): `VoteGuard` alone, which the mind plays as `NextW`
+    /// (`ClassicMind::new`) with the guard on.
+    pub fn vote_guard(self) -> bool {
+        self == Variant::VoteGuard
     }
 
     /// The wonder-race switch (`TurnBrief::wonder_race`): 1 drops lost wonder orders, 2 prices a
