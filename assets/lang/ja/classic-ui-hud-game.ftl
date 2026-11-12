@@ -33,6 +33,7 @@ classic.ui.hud-game.rival-war = { $name } · 戦争
 classic.ui.hud-game.rival-peace = { $name } · 平和
 classic.ui.hud-game.make-peace = 講和する
 classic.ui.hud-game.offer-peace = 和平を提案
+classic.ui.hud-game.offer-peace-gold = { NUMBER($price) }ゴールドで和平
 classic.ui.hud-game.open-borders = 国境開放
 classic.ui.hud-game.blocked-reason = { $action }：{ $reason }
 classic.ui.hud-game.notice-line = T{ $turn }  { $text }

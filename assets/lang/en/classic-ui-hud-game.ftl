@@ -49,6 +49,7 @@ classic.ui.hud-game.rival-war = { $name } · War
 classic.ui.hud-game.rival-peace = { $name } · Peace
 classic.ui.hud-game.make-peace = Make peace
 classic.ui.hud-game.offer-peace = Offer peace
+classic.ui.hud-game.offer-peace-gold = Peace for { NUMBER($price) } gold
 classic.ui.hud-game.open-borders = Open borders
 classic.ui.hud-game.blocked-reason = { $action }: { $reason }
 

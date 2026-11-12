@@ -87,3 +87,27 @@ fn a_wrong_command_names_the_round_it_diverged_in() {
     };
     assert_eq!(round, WRONG);
 }
+
+/// A journal written before peace between nations became a deal both accept (command layout 1)
+/// may hold a `MakePeace` between two nations that the rules now refuse. It is not played to
+/// a silent divergence in the middle: the replay names its layout at once, in the words the
+/// command line and a bug report show.
+#[test]
+fn a_journal_of_the_old_command_layout_is_refused_by_name() {
+    use classic_rules::classic::Classic;
+    use kernel::replay::codec::CommandCodec;
+    use kernel::replay::journal::JournalHeader;
+
+    let r = recorded();
+    let journal = [r.head.clone(), r.tail.clone()].concat();
+    let (header, _) = JournalHeader::read(&journal).expect("a journal");
+    assert_eq!(header.command_codec, Classic::COMMAND_CODEC_VERSION);
+    assert!(Classic::COMMAND_CODEC_VERSION >= 2, "version 1 is the layout before the consent rule");
+    let old = JournalHeader { command_codec: 1, ..header.clone() };
+    let records = &journal[header.to_bytes().len()..];
+    let old_journal = [old.to_bytes(), records.to_vec()].concat();
+    let refused = replay(&r.save, &old_journal, &r.rules).err().expect("an old journal is refused");
+    assert_eq!(refused, ReplayError::OtherCommands { journal: 1, current: Classic::COMMAND_CODEC_VERSION });
+    assert_eq!(refused.to_string(), format!("the journal has command layout 1, this build reads {}", Classic::COMMAND_CODEC_VERSION));
+    replay(&r.save, &journal, &r.rules).expect("the current layout replays");
+}

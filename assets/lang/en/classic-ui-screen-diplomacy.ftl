@@ -17,8 +17,8 @@ classic.ui.screen-diplomacy.active-treaties = { $n ->
    *[other] { $n } active treaties
 }
 classic.ui.screen-diplomacy.more-treaties = { $n } more
-classic.ui.screen-diplomacy.make-peace = Make peace
 classic.ui.screen-diplomacy.offer-peace = Offer peace
+classic.ui.screen-diplomacy.offer-peace-gold = Offer peace for { NUMBER($price) } gold
 classic.ui.screen-diplomacy.declare-war = Declare war
 classic.ui.screen-diplomacy.denounce = Denounce
 classic.ui.screen-diplomacy.open-borders = Open borders

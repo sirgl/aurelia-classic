@@ -456,8 +456,31 @@ fn diplomacy_lists_only_known_rivals_and_offers_peace() {
     session.request(GameRequest::EndTurn);
     let auth = session.game().view().auth;
     assert!(auth.diplomacy().at_war(PlayerId(0), PlayerId(2)), "{:?}", texts(&mut session));
-    assert!(texts(&mut session).contains(&format!("{name} refused peace: the war goes on")), "{:?}", texts(&mut session));
-    assert_eq!(session.rivals()[0].peace, Availability::Ready, "a new offer may follow");
+    // The refusal says why and what the AI asks (the estimate it decided by): the human began this
+    // war, so the AI remembers it as an aggressor and wants gold for the peace.
+    let ask = session.rivals()[0].peace_ask.clone().expect("the refusal named a price");
+    assert!(ask.price > 0);
+    let told = texts(&mut session);
+    let wanted = format!("{name} refuses peace. They remember you as an aggressor: peace costs {} gold.", ask.price);
+    assert!(told.contains(&wanted), "{told:?}");
+    assert_eq!(ask.reason, format!("They remember you as an aggressor: peace costs {} gold.", ask.price));
+    assert_eq!(session.rivals()[0].peace, Availability::Ready, "a new white offer may follow");
+    assert_eq!(session.diplomacy_view().nations[0].peace_ask, Some(ask.clone()), "the card names it too");
+    // Short of the gold, the button says so; with the gold, it offers the white peace with that gold
+    // and the AI takes it.
+    assert_eq!(ask.offer, Availability::Blocked("Not enough gold".into()), "a new empire cannot pay");
+    session.harness_game().0.debug_earn(PlayerId(0), 5_000);
+    session.refresh_after_harness();
+    let ask = session.rivals()[0].peace_ask.clone().expect("the price stands");
+    assert_eq!(ask.offer, Availability::Ready, "the human can pay now");
+    session.request(GameRequest::PeaceForGold(2));
+    let (peace, gold) = (classic_rules::world::relations::DealItem::Peace, classic_rules::world::relations::DealItem::Gold(ask.price));
+    let outgoing = session.diplomacy_view().outgoing;
+    assert!(outgoing.iter().any(|d| d.partner == PlayerId(2) && d.items.contains(&(PlayerId(0), peace)) && d.items.contains(&(PlayerId(0), gold))), "{outgoing:?}");
+    assert!(texts(&mut session).contains(&format!("Peace offered to {name} for {} gold: they answer on their turn", ask.price)), "{:?}", texts(&mut session));
+    session.request(GameRequest::EndTurn);
+    assert!(!session.game().view().auth.diplomacy().at_war(PlayerId(0), PlayerId(2)), "{:?}", texts(&mut session));
+    assert!(session.rivals()[0].peace_ask.is_none(), "peace: nothing more to ask");
 }
 
 /// The AI offers peace to the human (`ai::peace::peace_offers`): a notice says so, the offer

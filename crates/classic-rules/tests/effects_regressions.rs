@@ -69,7 +69,7 @@ fn a_luxury_given_in_a_deal_moves_its_happiness() {
     ] {
         let id = game.view().auth.module().relations().next_offer_id();
         game.execute(&rules, Command::ProposeDeal { from: P0, to: P1, items }).unwrap();
-        game.execute(&rules, Command::RespondDeal { player: P1, offer: id, accept: true }).unwrap();
+        game.execute(&rules, Command::RespondDeal { player: P1, offer: id, accept: true, why: classic_rules::world::relations::PeaceRefusal::Unsaid }).unwrap();
     }
     assert!(luxuries(&game, P0) > mine, "the import counts (getNumResourceAvailable)");
     assert!(luxuries(&game, P1) < theirs, "the only copy was given away");

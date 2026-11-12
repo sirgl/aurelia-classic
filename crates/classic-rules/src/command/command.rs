@@ -277,6 +277,8 @@ pub enum Command {
         player: PlayerId,
         offer: u32,
         accept: bool,
+        /// Why a refusal of peace is one (see `PeaceRefusal`); `Unsaid` for anything else.
+        why: crate::world::relations::PeaceRefusal,
     },
     /// Propose a resolution (or its repeal) for the next session of the
     /// World Congress; `choice` is a player or a resource id (0: none).

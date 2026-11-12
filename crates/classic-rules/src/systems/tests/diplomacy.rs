@@ -119,7 +119,7 @@ fn peace_ends_war_and_attack_gate() {
     let offer = game.view().auth.module().relations().next_offer_id();
     game.execute(&rules, peace).unwrap();
     assert!(game.view().auth.diplomacy().at_war(PlayerId(0), PlayerId(1)), "an offer is no peace");
-    game.execute(&rules, Command::RespondDeal { player: PlayerId(1), offer, accept: true }).unwrap();
+    game.execute(&rules, Command::RespondDeal { player: PlayerId(1), offer, accept: true, why: crate::world::relations::PeaceRefusal::Unsaid }).unwrap();
     assert!(!game
         .view()
         .auth

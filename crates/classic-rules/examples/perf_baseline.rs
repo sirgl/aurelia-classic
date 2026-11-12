@@ -863,7 +863,7 @@ fn run_suite() -> Vec<Case> {
             wall_ms: ms(t0.elapsed()) / hturns.max(1) as f64,
             wall_only: true,
         });
-        // diplomacy.peace: DoW + peace + grants (validate + commit + journal).
+        // diplomacy.peace: peace offer + its acceptance + grants (validate + commit + journal).
         // Its own mini-world: both alive (one city each), no contact.
         let mut mini4 = GameState::new(
             &crules,
@@ -882,27 +882,41 @@ fn run_suite() -> Vec<Case> {
         };
         mini4.debug_found_city(&crules, PlayerId(0), t4(3, 3));
         mini4.debug_found_city(&crules, PlayerId(1), t4(12, 12));
-        // War needs contact; a peace treaty forbids a new war for 10
-        // rounds (M4 diplomacy): every pass starts from the met world.
+        // War needs contact; peace with a nation is a deal it accepts, and only after the ten
+        // rounds a war lasts at least. The war is made and aged once; every pass starts from
+        // that world and times the offer, its acceptance and the next treaty.
         mini4.debug_meet(PlayerId(0), PlayerId(1));
+        let mut aged = mini4.clone();
+        aged
+            .execute(&crules, classic_rules::Command::DeclareWar { player: PlayerId(0), enemy: PlayerId(1) })
+            .unwrap();
+        for _ in 0..classic_rules::MIN_WAR_ROUNDS_BEFORE_PEACE {
+            for player in [PlayerId(0), PlayerId(1)] {
+                aged.execute(&crules, classic_rules::Command::EndTurn { player }).unwrap();
+            }
+        }
         let mut peace_time = std::time::Duration::ZERO;
         for _ in 0..20 {
-            let mut world = mini4.clone();
+            let mut world = aged.clone();
             let t0 = Instant::now();
-            let war = classic_rules::Command::DeclareWar {
-                player: PlayerId(0),
-                enemy: PlayerId(1),
+            let offer = world.view().auth.module().relations().next_offer_id();
+            let propose = classic_rules::Command::ProposeDeal {
+                from: PlayerId(0),
+                to: PlayerId(1),
+                items: vec![(PlayerId(0), classic_rules::world::relations::DealItem::Peace)],
             };
-            let peace = classic_rules::Command::MakePeace {
-                player: PlayerId(0),
-                enemy: PlayerId(1),
+            let accept = classic_rules::Command::RespondDeal {
+                player: PlayerId(1),
+                offer,
+                accept: true,
+                why: classic_rules::world::relations::PeaceRefusal::Unsaid,
             };
             let borders = classic_rules::Command::OpenBorders {
                 host: PlayerId(0),
                 guest: PlayerId(1),
             };
-            black_box(world.execute(&crules, war).unwrap());
-            black_box(world.execute(&crules, peace).unwrap());
+            black_box(world.execute(&crules, propose).unwrap());
+            black_box(world.execute(&crules, accept).unwrap());
             black_box(world.execute(&crules, borders).is_ok());
             peace_time += t0.elapsed();
         }

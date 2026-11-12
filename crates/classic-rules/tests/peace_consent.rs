@@ -14,7 +14,7 @@ use classic_rules::ids::{PlayerId, TerrainId, TileId, UnitHandle, UnitKindId};
 use classic_rules::math::HexCoord;
 use classic_rules::rules::content::CityStateId;
 use classic_rules::world::player::{ClassicKind, PlayerKind};
-use classic_rules::world::relations::{DealBlock, DealItem};
+use classic_rules::world::relations::{DealBlock, DealItem, PeaceRefusal};
 use classic_rules::{compile_rules, ClassicGame, Command, CompiledRuleset, GameConfig, GameState, MIN_WAR_ROUNDS_BEFORE_PEACE};
 use kernel::ai::driver::AiDriver;
 
@@ -110,11 +110,11 @@ fn peace_with_a_nation_is_a_deal_it_accepts() {
     let first = next_offer(&game);
     game.execute(&rules, white_peace(P0, P1)).unwrap();
     assert!(at_war(&game, P0, P1), "an offer is no peace");
-    game.execute(&rules, Command::RespondDeal { player: P1, offer: first, accept: false }).unwrap();
+    game.execute(&rules, Command::RespondDeal { player: P1, offer: first, accept: false, why: PeaceRefusal::Unsaid }).unwrap();
     assert!(at_war(&game, P0, P1), "refused: the war goes on");
     let second = next_offer(&game);
     game.execute(&rules, white_peace(P0, P1)).unwrap();
-    game.execute(&rules, Command::RespondDeal { player: P1, offer: second, accept: true }).unwrap();
+    game.execute(&rules, Command::RespondDeal { player: P1, offer: second, accept: true, why: PeaceRefusal::Unsaid }).unwrap();
     assert!(!at_war(&game, P0, P1), "accepted: peace");
     let round = game.view().auth.turn().round;
     assert!(game.view().auth.module().relations().peace_treaty_until(P0, P1) > round, "with its treaty");
@@ -133,7 +133,7 @@ fn between_two_humans_the_offer_waits_for_the_answer() {
     let waiting = game.ai_observation(&rules, P1).offers_to_us.iter().any(|o| o.id == offer && o.from == P0);
     assert!(waiting, "the receiver sees the offer on its turn");
     assert!(at_war(&game, P0, P1), "nothing happens without the answer");
-    game.execute(&rules, Command::RespondDeal { player: P1, offer, accept: true }).unwrap();
+    game.execute(&rules, Command::RespondDeal { player: P1, offer, accept: true, why: PeaceRefusal::Unsaid }).unwrap();
     assert!(!at_war(&game, P0, P1));
 }
 
@@ -176,14 +176,14 @@ fn nobody_signs_a_peace_for_a_third_nation() {
     game.execute(&rules, deal).expect("peace with a city-state in a deal");
 }
 
-/// The AI's answer to white peace offered by the enemy (a human) on the AI's turn: what it
-/// accepted, if it answered.
-fn answer(game: &mut GameState, rules: &CompiledRuleset, ai: PlayerId, enemy: PlayerId, prepare: impl FnOnce(&mut GameState, &mut AiDriver<classic_rules::classic::Classic, ClassicMind>)) -> Option<bool> {
+/// The AI's answer to `items` offered by the enemy (a human) on the AI's turn: what it
+/// answered (accepted or not) and what it said (`PeaceRefusal`), if it answered.
+fn ask(game: &mut GameState, rules: &CompiledRuleset, ai: PlayerId, enemy: PlayerId, items: Vec<(PlayerId, DealItem)>, prepare: impl FnOnce(&mut GameState, &mut AiDriver<classic_rules::classic::Classic, ClassicMind>)) -> Option<(bool, PeaceRefusal)> {
     while game.view().auth.active_player() != enemy {
         let active = game.view().auth.active_player();
         game.execute(rules, Command::EndTurn { player: active }).unwrap();
     }
-    game.execute(rules, white_peace(enemy, ai)).unwrap();
+    game.execute(rules, Command::ProposeDeal { from: enemy, to: ai, items }).unwrap();
     let settings = AiSettings::for_rules(rules, rules.default_difficulty());
     let humans: Vec<PlayerId> = [P0, P1, P2].into_iter().filter(|p| *p != ai).collect();
     let mut driver = AiDriver::with_mind(settings, humans, ClassicMind::new(Variant::Standard));
@@ -195,10 +195,46 @@ fn answer(game: &mut GameState, rules: &CompiledRuleset, ai: PlayerId, enemy: Pl
     }
     driver.run(game, rules, u32::MAX);
     let answer = driver.trace().entries().find_map(|e| match e.command {
-        Some(Command::RespondDeal { accept, .. }) => Some(accept),
+        Some(Command::RespondDeal { accept, why, .. }) => Some((accept, why)),
         _ => None,
     });
     answer
+}
+
+/// The AI's answer to white peace offered by the enemy (a human) on the AI's turn: what it
+/// accepted, if it answered.
+fn answer(game: &mut GameState, rules: &CompiledRuleset, ai: PlayerId, enemy: PlayerId, prepare: impl FnOnce(&mut GameState, &mut AiDriver<classic_rules::classic::Classic, ClassicMind>)) -> Option<bool> {
+    ask(game, rules, ai, enemy, vec![(enemy, DealItem::Peace)], prepare).map(|(accept, _)| accept)
+}
+
+/// P0 (the AI) has an army of an operation next to the city of six of P1 (the human): it is
+/// winning the war.
+fn winning_war(rules: &CompiledRuleset) -> (GameState, impl FnOnce(&mut GameState, &mut AiDriver<classic_rules::classic::Classic, ClassicMind>)) {
+    let mut game = old_war(rules);
+    let army: Vec<UnitHandle> = [9, 10, 11].into_iter().map(|r| spawn(&mut game, rules, P0, 12, r, "core:unit/swordsman")).collect();
+    let seen: Vec<TileId> = (8..=18).flat_map(|q| (6..=14).map(move |r| (q, r))).map(|(q, r)| tile(&game, q, r)).collect();
+    game.debug_reveal(P0, &seen);
+    let (target, muster) = (tile(&game, 13, 10), tile(&game, 5, 10));
+    let members: Vec<_> = army.iter().map(|u| game.view().auth.units().get(*u).unwrap().core.id).collect();
+    let prepare = move |game: &mut GameState, driver: &mut AiDriver<classic_rules::classic::Classic, ClassicMind>| {
+        let round = game.view().auth.turn().round;
+        let memory = driver.state_mut(P0, round);
+        // The army is the operation's (without its members the AI prices the army it still lacks).
+        for unit in members {
+            memory.set_task(unit, UnitTask::Operation { target }, round);
+        }
+        memory.see_city(SeenCity { tile: target, owner: P1, population: 6, last_seen_round: round });
+        memory.start_operation(Operation {
+            target,
+            enemy: P1,
+            muster,
+            need: Composition { melee: 3, ranged: 0, siege: 0 },
+            phase: OperationPhase::Marching,
+            since_round: round,
+            phase_round: round,
+        });
+    };
+    (game, prepare)
 }
 
 /// Q2 of the program: the AI values the peace (`ai::peace::Negotiation`). Winning — its army of
@@ -208,30 +244,8 @@ fn answer(game: &mut GameState, rules: &CompiledRuleset, ai: PlayerId, enemy: Pl
 fn the_ai_refuses_peace_when_winning_and_takes_it_when_losing() {
     let rules = compile_rules(core_rules()).unwrap();
     let winning = {
-        let mut game = old_war(&rules);
-        let army: Vec<UnitHandle> = [9, 10, 11].into_iter().map(|r| spawn(&mut game, &rules, P0, 12, r, "core:unit/swordsman")).collect();
-        let seen: Vec<TileId> = (8..=18).flat_map(|q| (6..=14).map(move |r| (q, r))).map(|(q, r)| tile(&game, q, r)).collect();
-        game.debug_reveal(P0, &seen);
-        answer(&mut game, &rules, P0, P1, |game, driver| {
-            let round = game.view().auth.turn().round;
-            let (target, muster) = (tile(game, 13, 10), tile(game, 5, 10));
-            let members: Vec<_> = army.iter().map(|u| game.view().auth.units().get(*u).unwrap().core.id).collect();
-            let memory = driver.state_mut(P0, round);
-            // The army is the operation's (without its members the AI prices the army it still lacks).
-            for unit in members {
-                memory.set_task(unit, UnitTask::Operation { target }, round);
-            }
-            memory.see_city(SeenCity { tile: target, owner: P1, population: 6, last_seen_round: round });
-            memory.start_operation(Operation {
-                target,
-                enemy: P1,
-                muster,
-                need: Composition { melee: 3, ranged: 0, siege: 0 },
-                phase: OperationPhase::Marching,
-                since_round: round,
-                phase_round: round,
-            });
-        })
+        let (mut game, prepare) = winning_war(&rules);
+        answer(&mut game, &rules, P0, P1, prepare)
     };
     let losing = {
         let mut game = old_war(&rules);
@@ -282,3 +296,62 @@ fn every_ai_offers_peace_to_a_nation_and_never_makes_it_alone() {
     assert!(silent.is_empty(), "no peace offered by {silent:?}");
 }
 
+
+/// P1 (the human) began the war on P0 (the AI) and the ten rounds have passed.
+fn war_begun_by_the_enemy(rules: &CompiledRuleset) -> GameState {
+    let mut game = world(rules, false);
+    while game.view().auth.active_player() != P1 {
+        let active = game.view().auth.active_player();
+        game.execute(rules, Command::EndTurn { player: active }).unwrap();
+    }
+    game.execute(rules, Command::DeclareWar { player: P1, enemy: P0 }).unwrap();
+    let until = game.view().auth.turn().round + MIN_WAR_ROUNDS_BEFORE_PEACE;
+    while game.view().auth.turn().round < until {
+        let active = game.view().auth.active_player();
+        game.execute(rules, Command::EndTurn { player: active }).unwrap();
+    }
+    game
+}
+
+/// A refusal says why and what the peace costs, from the very estimate the answer is made by:
+/// an AI that is winning says so, one that remembers the enemy as an aggressor says that; the
+/// price is the gold at which the same AI takes the same peace, and a gold less it still
+/// refuses. An acceptance says nothing.
+#[test]
+fn a_refusal_of_peace_says_why_and_what_the_peace_costs() {
+    let rules = compile_rules(core_rules()).unwrap();
+    let (mut game, prepare) = winning_war(&rules);
+    let winning = ask(&mut game, &rules, P0, P1, vec![(P1, DealItem::Peace)], prepare);
+    let Some((false, PeaceRefusal::Winning { price })) = winning else { panic!("a winning AI says so: {winning:?}") };
+    assert!(price > 0);
+
+    let mut game = war_begun_by_the_enemy(&rules);
+    let aggressor = ask(&mut game, &rules, P0, P1, vec![(P1, DealItem::Peace)], |_, _| {});
+    let Some((false, PeaceRefusal::Aggressor { price })) = aggressor else { panic!("an aggressor is told so: {aggressor:?}") };
+    assert!(price > 1, "{price}");
+
+    // The price is the gold at which the same AI takes the peace.
+    let treasury = game.view().auth.players().treasury_of(P1);
+    assert!(treasury >= price, "the human can pay {price}: has {treasury}");
+    let paid = |gold: u32| {
+        let mut game = war_begun_by_the_enemy(&rules);
+        ask(&mut game, &rules, P0, P1, vec![(P1, DealItem::Peace), (P1, DealItem::Gold(gold))], |_, _| {})
+    };
+    assert_eq!(paid(price), Some((true, PeaceRefusal::Unsaid)), "the quoted price buys the peace");
+    assert!(matches!(paid(price - 1), Some((false, PeaceRefusal::Aggressor { .. }))), "a gold less does not");
+
+    let mut game = old_war(&rules);
+    let idle = ask(&mut game, &rules, P0, P1, vec![(P1, DealItem::Peace)], |_, _| {});
+    assert_eq!(idle, Some((true, PeaceRefusal::Unsaid)), "an acceptance says nothing");
+}
+
+/// A refusal of a deal whose peace alone would pass blames the terms, not the war.
+#[test]
+fn a_refusal_of_dear_terms_blames_the_terms() {
+    let rules = compile_rules(core_rules()).unwrap();
+    let mut game = old_war(&rules);
+    let treasury = game.view().auth.players().treasury_of(P0);
+    let terms = vec![(P1, DealItem::Peace), (P0, DealItem::Gold(treasury.max(1)))];
+    let answer = ask(&mut game, &rules, P0, P1, terms, |_, _| {});
+    assert_eq!(answer, Some((false, PeaceRefusal::Terms)));
+}

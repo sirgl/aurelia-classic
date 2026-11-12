@@ -493,7 +493,7 @@ fn respond_to_offers(d: &Diplomat<'_, '_>, out: &mut Vec<Decision>) {
     let obs = d.obs;
     for offer in &obs.offers_to_us {
         let accept = acceptability(d, offer.from, &offer.items) >= 0;
-        let command = Command::RespondDeal { player: obs.player, offer: offer.id, accept };
+        let command = Command::RespondDeal { player: obs.player, offer: offer.id, accept, why: crate::world::relations::PeaceRefusal::Unsaid };
         if obs.view.accepts(&command) {
             out.push(act(command, if accept { Reason::AcceptDeal } else { Reason::RefuseDeal }));
         }

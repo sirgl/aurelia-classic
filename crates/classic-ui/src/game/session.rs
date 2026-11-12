@@ -61,6 +61,9 @@ pub struct Session {
     pub(super) ruins_later: Option<TileId>,
     /// The city-state whose card is open over the map (from its banner, or the City-States screen). UI-only.
     pub(super) city_state_open: Option<PlayerId>,
+    /// What each nation that refused the player's peace asks for it, as it said (`PeaceRefusal`).
+    /// UI-only: the next refusal replaces it, an accepted peace removes it.
+    pub(super) peace_asks: Vec<(PlayerId, classic_rules::world::relations::PeaceRefusal)>,
 }
 
 impl Session {
@@ -132,6 +135,7 @@ impl Session {
             cache: Default::default(),
             ruins_later: None,
             city_state_open: None,
+            peace_asks: Vec::new(),
         };
         if observer.is_none() {
             session.select_next_idle_unit();
@@ -346,6 +350,7 @@ impl Session {
             GameRequest::Research(tech) => self.choose_research(tech),
             GameRequest::Save | GameRequest::Load | GameRequest::Continue => {}
             GameRequest::MakePeace(player) => self.peace_request(PlayerId(player)),
+            GameRequest::PeaceForGold(player) => self.peace_for_gold_request(PlayerId(player)),
             GameRequest::OpenBorders(player) => self.diplomacy(Command::OpenBorders {
                 host: self.me(),
                 guest: PlayerId(player),
@@ -699,6 +704,7 @@ impl Session {
         self.skipped.clear();
         self.sleeping.clear();
         self.notices.clear();
+        self.peace_asks.clear();
         self.message = None;
         self.path_cache = None;
         self.revision += 1;

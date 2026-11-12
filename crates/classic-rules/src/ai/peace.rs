@@ -35,7 +35,7 @@ use crate::knowledge::observation::AIObservation;
 use crate::knowledge::public::PlayerQueries;
 use crate::rules::CompiledRuleset;
 use crate::world::player::PlayerKind;
-use crate::world::relations::{DealItem, DealOffer};
+use crate::world::relations::{DealItem, DealOffer, PeaceRefusal};
 
 /// What going on with a war against one enemy promises the player.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -203,6 +203,29 @@ impl<'i, 'o, 'a> Negotiation<'i, 'o, 'a> {
         self.value(offer.from, &offer.items) >= 0
     }
 
+    /// The answer to `offer` and, for a refused offer that makes peace, why and what the peace
+    /// itself costs in gold. All of it comes from the value the decision is made by (`value`):
+    /// the war's prospect, the aggressor's price, the terms. The price is the gold that makes
+    /// the white peace a yes (`gold_for` of what it is short), whatever else the offer holds;
+    /// the reason is the larger of the war's prospect and the aggressor's price; when the white
+    /// peace would pass, the terms asked besides it are what is refused.
+    pub fn answer(&self, offer: &DealOffer) -> (bool, PeaceRefusal) {
+        let value = self.value(offer.from, &offer.items);
+        let makes_peace = offer.items.iter().any(|(_, item)| *item == DealItem::Peace);
+        if value >= 0 || !makes_peace {
+            return (value >= 0, PeaceRefusal::Unsaid);
+        }
+        let white = self.value(offer.from, &[(offer.from, DealItem::Peace)]);
+        if white >= 0 {
+            return (false, PeaceRefusal::Terms);
+        }
+        let price = self.gold_for(-white);
+        let going_on = self.prospect(offer.from).value(&self.stakes).max(0);
+        let aggressor = self.obs().relation(offer.from).map_or(0, |r| crate::ai::infamy::peace_price(r.warmonger));
+        let why = if aggressor > going_on { PeaceRefusal::Aggressor { price } } else { PeaceRefusal::Winning { price } };
+        (false, why)
+    }
+
     /// The peace the player offers `enemy`: it asks the most the enemy
     /// would give by its estimate, never less than going on is worth to
     /// itself — gold one way or the other, white peace at zero. Gold the
@@ -251,7 +274,10 @@ pub fn answer_offers(input: &AdvisorInput<'_, '_>) -> Vec<Command> {
     let negotiation = Negotiation::new(input);
     obs.offers_to_us
         .iter()
-        .map(|offer| Command::RespondDeal { player: obs.player, offer: offer.id, accept: negotiation.accepts(offer) })
+        .map(|offer| {
+            let (accept, why) = negotiation.answer(offer);
+            Command::RespondDeal { player: obs.player, offer: offer.id, accept, why }
+        })
         .collect()
 }
 

@@ -115,6 +115,7 @@ fn deal(
             player: to,
             offer: id,
             accept: true,
+            why: classic_rules::world::relations::PeaceRefusal::Unsaid,
         },
     )
     .unwrap();

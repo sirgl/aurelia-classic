@@ -309,7 +309,7 @@ fn scientific_revolution_raises_the_research_agreement_payout() {
             w.until_active(P0);
             let id = w.game.view().auth.module().relations().next_offer_id();
             w.exec(Command::ProposeDeal { from: P0, to: P1, items }).unwrap();
-            w.exec(Command::RespondDeal { player: P1, offer: id, accept: true }).unwrap();
+            w.exec(Command::RespondDeal { player: P1, offer: id, accept: true, why: classic_rules::world::relations::PeaceRefusal::Unsaid }).unwrap();
         }
         let mut pooled = 0;
         for _ in 0..40 {
@@ -512,7 +512,7 @@ fn sweden_and_its_friends_gain_great_people_from_friendship() {
     w.until_active(P0);
     let id = w.game.view().auth.module().relations().next_offer_id();
     w.exec(Command::ProposeDeal { from: P0, to: P1, items: vec![(P0, DealItem::Friendship)] }).unwrap();
-    w.exec(Command::RespondDeal { player: P1, offer: id, accept: true }).unwrap();
+    w.exec(Command::RespondDeal { player: P1, offer: id, accept: true, why: classic_rules::world::relations::PeaceRefusal::Unsaid }).unwrap();
     let auth = w.game.view().auth;
     assert_eq!(friendship_rate(auth, &w.rules, P0), 10);
     assert_eq!(friendship_rate(auth, &w.rules, P1), 10, "Sweden's friend gains too");

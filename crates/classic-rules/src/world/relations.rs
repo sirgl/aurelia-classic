@@ -66,6 +66,22 @@ pub struct DealOffer {
     pub expires: u32,
 }
 
+/// Why an offer that makes peace was refused, and what would turn the refusal into a yes.
+/// The one who answers sets it (the AI states the very estimate it decided by, `ai::peace`),
+/// the proposer is told. The rules do not read it: it never changes an answer.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+pub enum PeaceRefusal {
+    /// Nothing said: an acceptance, a human's answer, an offer without peace.
+    #[default]
+    Unsaid,
+    /// The answerer remembers the proposer as an aggressor; the white peace is for `price` gold.
+    Aggressor { price: u32 },
+    /// The answerer is winning the war; the white peace is for `price` gold.
+    Winning { price: u32 },
+    /// The peace alone would pass; what the offer asks of the answerer besides it is too much.
+    Terms,
+}
+
 /// A running trade item of an accepted deal.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct OngoingTrade {

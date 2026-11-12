@@ -240,6 +240,7 @@ pub fn validate(
             player,
             offer,
             accept,
+            ..
         } => diplomacy::validate_respond_deal(state, rules, player, offer, accept),
         Command::ProposeResolution {
             player,

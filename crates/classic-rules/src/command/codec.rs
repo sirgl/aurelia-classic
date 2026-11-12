@@ -11,13 +11,16 @@ use crate::derived::great_people::GreatPersonAction;
 use crate::ids::{BeliefId, PolicyId};
 use crate::systems::ruins::Reward;
 use crate::world::congress::ResolutionKind;
-use crate::world::relations::DealItem;
+use crate::world::relations::{DealItem, PeaceRefusal};
 use crate::world::trade::RouteKind;
 
 use super::command::{CityDecision, Command};
 
 impl CommandCodec for Classic {
-    const COMMAND_CODEC_VERSION: u32 = 1;
+    /// 2: `RespondDeal` carries the refusal's reason (`PeaceRefusal`); peace between two nations is a
+    /// deal both accept, so a journal of version 1 may hold a `MakePeace` between nations that
+    /// no longer replays: it is refused as another layout, not diverged silently.
+    const COMMAND_CODEC_VERSION: u32 = 2;
 }
 
 kernel::command_ids!(PolicyId, BeliefId, PolicyBranchId, ReligionId);
@@ -66,7 +69,7 @@ kernel::command_field!(Command {
     40 => Airlift { unit, city },
     41 => Denounce { player, target },
     42 => ProposeDeal { from, to, items },
-    43 => RespondDeal { player, offer, accept },
+    43 => RespondDeal { player, offer, accept, why },
     44 => ProposeResolution { player, kind, choice, repeal },
     45 => CastVotes { player, proposal, choice, delegates },
     46 => MoveSpy { player, spy, city, diplomat },
@@ -142,6 +145,13 @@ kernel::command_field!(DealItem {
     9 => Peace {},
     10 => ThirdPartyWar(player),
     11 => ThirdPartyPeace(player),
+});
+
+kernel::command_field!(PeaceRefusal {
+    0 => Unsaid {},
+    1 => Aggressor { price },
+    2 => Winning { price },
+    3 => Terms {},
 });
 
 kernel::command_field!(ResolutionKind {

@@ -89,6 +89,16 @@ pub struct DiplomacyView {
     pub offers: Vec<OfferCard>,
 }
 
+/// What a nation that refused the player's peace said: why, and the gold it asks for the peace.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PeaceAsk {
+    pub price: u32,
+    /// "They are winning this war: peace costs 40 gold."
+    pub reason: String,
+    /// The offer of the peace for that gold: ready, or why the player cannot make it now.
+    pub offer: Availability,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NationCard {
     pub player: PlayerId,
@@ -104,6 +114,8 @@ pub struct NationCard {
     pub gold: u32,
     pub declare_war: Availability,
     pub make_peace: Availability,
+    /// The nation refused the player's peace and said why and what it asks.
+    pub peace_ask: Option<PeaceAsk>,
     pub denounce: Availability,
     pub open_borders: Availability,
     /// What the player may give, what the other side may give, what binds both.
