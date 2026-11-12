@@ -559,11 +559,17 @@ impl BenchRules for ClassicBench {
     }
 
     /// Cities ceded by an accepted deal (the giver), gold per turn taken on by one (the payer:
-    /// a gold-per-turn trade of the pair that runs the speed's whole deal from this round).
+    /// a gold-per-turn trade of the pair that runs the speed's whole deal from this round), and
+    /// deals broken by an unpaid gold per turn (the debtor, `ClassicChange::DealBroken`).
     fn deals(game: &GameState<Self::M>, rules: &CompiledRuleset<Self::M>, command: &classic_rules::Command, changes: &ChangeJournal<Self::M>) -> Vec<(PlayerId, crate::bench::play::DealEvent)> {
         use crate::bench::play::DealEvent;
         use classic_rules::classic::ClassicChange;
         let mut out = Vec::new();
+        for change in &changes.module_changes {
+            if let ClassicChange::DealBroken { debtor, .. } = *change {
+                out.push((debtor, DealEvent::GoldPerTurnBroken));
+            }
+        }
         if !matches!(command, classic_rules::Command::RespondDeal { accept: true, .. }) {
             return out;
         }
