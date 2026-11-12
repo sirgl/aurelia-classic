@@ -343,9 +343,9 @@ impl Session {
         items.extend(self.resource_items());
         let view = self.game().player_view(self.rules(), self.me());
         let auth = self.game().view().auth;
-        let income = classic_rules::derived::income::player_income(auth, self.rules(), giver)
-            .gold
-            .max(0) as u32;
+        // The gold a turn the giver's income still carries with its running deals: the rules'
+        // own limit (`DealBlock::NotEnoughIncome`).
+        let income = classic_rules::world::relations::gold_income(auth, self.rules(), giver).max(0) as u32;
         let resources = classic_rules::derived::resources::resource_ledger(auth, self.rules(), giver);
         let mut out = Vec::new();
         for (index, item) in items.into_iter().enumerate() {
