@@ -23,6 +23,7 @@
 //! | tourism         | CreateGreatWork, WriteTreatise, PerformConcert, SwitchIdeology (turn: influence, public opinion; FreeGreatWork on completion) | PolicyAdopted (switch), GreatWorksChanged |
 //! | ruins           | — (a unit enters Ancient Ruins)  | tile ImprovementBuilt, RuinsExplored |
 //! | barbarians      | — (a unit enters a camp; a kill in a camp) | tile ImprovementBuilt, CampCleared, CampUnitConverted |
+//! | revolts         | — (turn: rebels of a very unhappy nation) | Created, RebelsRose        |
 //! | trade           | EstablishTradeRoute, ChangeTradeHome, PlunderTradeRoute (turn: values, moves, finished routes; war, a city changing hands or razed ends routes) | TradeChanged, Created/Destroyed |
 //! | archaeology     | Excavate, ChooseArchaeology (turn, in Tourism: sites appear, digs advance); battles record history | ResourceSet, ImprovementBuilt |
 //! | improvements    | BuildImprovement/Road, Chop      | ImprovementBuilt/RoadBuilt/...   |
@@ -38,6 +39,7 @@ pub(crate) mod airlift;
 pub(crate) mod paradrop;
 pub(crate) mod archaeology;
 pub(crate) mod barbarians;
+pub(crate) mod revolts;
 pub(crate) mod cargo;
 pub(crate) mod city_states;
 pub(crate) mod combat;

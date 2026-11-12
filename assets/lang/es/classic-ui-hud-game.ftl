@@ -66,3 +66,6 @@ classic.ui.hud-game.see-results = Ver los resultados
 ## city-state card over the map
 classic.ui.hud-game.city-state-gold = Tesoro: { $gold } de oro
 classic.ui.hud-game.city-state-close = Cerrar (Esc)
+
+classic.ui.hud-game.rebels-ahead = Por debajo de { $threshold } de felicidad se alzan rebeldes en sus tierras: faltan { NUMBER($left) } de descontento
+classic.ui.hud-game.rebels-now = Felicidad por debajo de { $threshold }: cada pocos turnos se alzan rebeldes en sus tierras

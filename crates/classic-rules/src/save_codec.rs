@@ -31,8 +31,13 @@ use crate::persistence::SaveGameV1;
 /// missionary lost in rival land; 22: the deposits and cities each player
 /// last saw (the kernel's knowledge sections, `SIGHTINGS_SINCE`); 23: the
 /// game's speed (the kernel's economy section, `SPEED_SINCE`; older saves
-/// play at Standard).
-pub const CODEC_VERSION: u32 = 23;
+/// play at Standard); 24: the rebellion countdowns of the barbarian section
+/// (`REVOLTS_SINCE`; older saves have none running).
+pub const CODEC_VERSION: u32 = 24;
+
+/// The codec version whose barbarian section gained the rebellion
+/// countdowns; older saves read none.
+const REVOLTS_SINCE: u32 = 24;
 
 /// The codec version whose religious unit record gained `strength_lost`;
 /// older saves read it as nothing lost.
@@ -102,6 +107,7 @@ impl Field for SavedBarbarians {
         self.released.put(out);
         self.cleared.put(out);
         self.rng.put(out);
+        self.revolts.put(out);
     }
     fn take(r: &mut Reader<'_>) -> Result<Self, CodecError> {
         Ok(Self {
@@ -110,6 +116,7 @@ impl Field for SavedBarbarians {
             released: Field::take(r)?,
             cleared: Field::take(r)?,
             rng: Field::take(r)?,
+            revolts: r.since(REVOLTS_SINCE)?,
         })
     }
 }

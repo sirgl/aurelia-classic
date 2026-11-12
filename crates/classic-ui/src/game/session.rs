@@ -154,6 +154,7 @@ impl Session {
         }
         self.notify_ruins(&records);
         self.notify_camp(&records);
+        self.notify_rebels(&records);
         self.notify_income(&records);
         self.notify_nuclear(&records);
         self.notify_lost_orders(&records);

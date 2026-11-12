@@ -27,3 +27,5 @@ classic.game.wonder.found = Найдено природное чудо: { $name 
 classic.game.wonder.found-with = Найдено природное чудо: { $name }: { $parts }
 classic.game.wonder.gold-first = +{ NUMBER($n) } золота (первым нашли вы)
 classic.game.wonder.happiness = +{ NUMBER($n) } счастья
+
+classic.game.rebels.rose = Сильное недовольство: у города { $city } поднялись мятежники ({ NUMBER($count) } × { $unit })

@@ -54,3 +54,6 @@ classic.ui.hud-game.see-results = 結果を見る
 ## city-state card over the map
 classic.ui.hud-game.city-state-gold = 国庫: { $gold } ゴールド
 classic.ui.hud-game.city-state-close = 閉じる (Esc)
+
+classic.ui.hud-game.rebels-ahead = 幸福度が{ $threshold }を下回ると領内で反乱軍が蜂起します：あと不満{ NUMBER($left) }
+classic.ui.hud-game.rebels-now = 幸福度が{ $threshold }未満：数ターンごとに領内で反乱軍が蜂起します

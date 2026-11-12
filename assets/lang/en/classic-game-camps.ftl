@@ -1,4 +1,4 @@
-# Game layer: the notices of a cleared barbarian camp (game/camps.rs), of income taken by a kill or by force, and of a natural wonder found (game/income.rs).
+# Game layer: the notices of a cleared barbarian camp and of rebels (game/camps.rs), of income taken by a kill or by force, and of a natural wonder found (game/income.rs).
 
 classic.game.camp.cleared = Barbarian camp cleared: +{ NUMBER($gold) } gold
 classic.game.camp.cleared-joined = Barbarian camp cleared: +{ NUMBER($gold) } gold; a barbarian joined you (+{ NUMBER($joined) } gold)
@@ -27,3 +27,5 @@ classic.game.wonder.found = Natural wonder found: { $name }
 classic.game.wonder.found-with = Natural wonder found: { $name }: { $parts }
 classic.game.wonder.gold-first = +{ NUMBER($n) } gold (first to find it)
 classic.game.wonder.happiness = +{ NUMBER($n) } happiness
+
+classic.game.rebels.rose = Very high unhappiness: rebels rose near { $city } ({ NUMBER($count) } × { $unit })

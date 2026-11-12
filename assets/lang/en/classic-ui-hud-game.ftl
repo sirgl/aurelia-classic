@@ -78,3 +78,6 @@ classic.ui.hud-game.see-results = See the results
 ## city-state card over the map
 classic.ui.hud-game.city-state-gold = Treasury: { $gold } gold
 classic.ui.hud-game.city-state-close = Close (Esc)
+
+classic.ui.hud-game.rebels-ahead = Below { $threshold } happiness rebels rise in your land: { NUMBER($left) } unhappiness to go
+classic.ui.hud-game.rebels-now = Below { $threshold } happiness: rebels rise in your land every few turns
