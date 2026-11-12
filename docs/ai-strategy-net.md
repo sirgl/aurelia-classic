@@ -184,6 +184,22 @@ A save of the old `standard` loads into the new one: the strategy net's memory w
 with none (`strategy_net::Memory::decode`), and the science victory's fit, judged at the style's lock, is judged on
 the first turn after the load instead.
 
+## Candidate: vote-guard (12 November)
+
+`vote-guard` is `standard` that watches its rivals' road to the World Leader vote (`ai::victory_watch`,
+`TurnBrief::vote_guard`) from what the congress screen shows: the delegates of every met rival, the count needed
+and the rounds to the vote (`CongressInfo`, `met_delegates`). Against a rival that would win it, it uses the cheap
+levers of the rules: gifts to that rival's city-state allies priced with its own gain (`Prices::guard`,
+`city_states::guard_targets`), coups by its spies (`espionage::GUARD_COUP_MIN_CHANCE`, `GUARD_COUP_WINDOW`) and its
+delegates in the host election (`victory_watch::host_choice`). Outbidding with gold is out of reach (an alliance
+costs 1.3–3.5 thousand gold; the richest rival seat holds a median of 796). Bench only, `experimental-ai`.
+
+Measured (pace, Quick; programme `work/nets`): against `standard` 60.4 % victory-weighted on offsets 460–463
+(800 games) and 58.3 % on the reviewer's 475–476; `standard`'s diplomatic victories fall to 1.3 % of its seats from
+6.25 % in its mirror. With every seat a guard, fewer games end in a real victory (0.795 of `standard`'s mirror on
+475–476): about 44 % of the stopped diplomatic victories become science victories, the rest reach the time limit.
+The turn's time is `standard`'s. The constants were tuned on `standard`'s mirror, not against people.
+
 ## Not done
 
 - No training: the next step is fine-tuning by outcomes with a penalty for moving from the hand weights (the design page).

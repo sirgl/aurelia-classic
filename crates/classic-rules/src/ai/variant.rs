@@ -737,8 +737,11 @@ pub enum Variant {
     /// `Standard` (`NextW`'s play) that watches its rivals' road to the World Leader vote and takes
     /// an alliance from a rival that would win it (`ai::victory_watch`, `TurnBrief::vote_guard`,
     /// `Prices::guard`): the delegates of a rival's alliance are worth the fall of its chance to win
-    /// the vote, at the price of the influence that takes the alliance. Every other switch is
-    /// `Standard`'s. A candidate, `experimental-ai` only.
+    /// the vote, at the price of the influence that takes the alliance. When a rival is within reach
+    /// of the vote it also spends its spies on coups against that rival's allies
+    /// (`espionage::GUARD_COUP_MIN_CHANCE`, `GUARD_COUP_WINDOW`) and gives its delegates to the
+    /// host election against the leader (`victory_watch::host_choice`, `congress::vote_orders_for`).
+    /// Every other switch is `Standard`'s. A candidate, `experimental-ai` only.
     VoteGuard,
 }
 
