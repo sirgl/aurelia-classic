@@ -63,6 +63,72 @@ fn a_duel_gives_the_rival_exactly_beside_city_states_and_barbarians() {
     assert!(worst_population > 0, "the barbarians (no city) are not the worst population");
 }
 
+/// N1: in a duel, before the meeting, the seven rows give the other nation exactly (beside a
+/// city-state and the barbarians), its technologies come from its literacy, and nothing else of it
+/// is read: no name, score, era, victory progress, science or trend; the net's inputs take the
+/// rows and the technologies, and none of the rest. The meeting turns it into a rival met, whose
+/// rows are the same numbers.
+#[test]
+fn n1_a_duel_not_met_gives_the_rows_exactly_and_nothing_else() {
+    use classic_rules::ai::strategy_net::features::rivals as net_inputs;
+    use classic_rules::ai::strategy_net::weights::fe;
+    let (mut game, rules) = world(4);
+    game.debug_set_player_kind(PlayerId(2), PlayerKind::Module(ClassicKind::CityState(CityStateId(0))));
+    game.debug_set_player_kind(PlayerId(3), PlayerKind::Module(ClassicKind::Barbarian));
+    let obs = game.ai_observation(&rules, PlayerId(0));
+    assert!(obs.public.scores.iter().all(|(p, _)| *p == PlayerId(0)), "the score list does not show a nation not met");
+    let model = estimate(&obs, &rules, &Book::default());
+    assert_eq!(model.living, 2);
+    assert!(model.rivals.is_empty(), "no rival is met: no name, score, era, capitals, delegates, influence");
+    let unmet = model.unmet.as_ref().expect("the rows show the one other nation");
+    let real = truth(&game, &rules, PlayerId(1));
+    for (i, g) in unmet.rows.iter().enumerate() {
+        assert_eq!(*g, Guess::exact(real[i]), "{:?}", Measure::ALL[i]);
+    }
+    assert_eq!(unmet.techs, Guess::exact(game.view().auth.players().techs_of(PlayerId(1)).len() as i64));
+    // The inputs: the seven rows, the doubt and the technologies; the other seven stay 0.
+    let mut inputs = [0; fe::N];
+    net_inputs(&model, &mut inputs);
+    for m in 0..MEASURES {
+        let share = if real[m].max(0) + model.own[m].max(0) == 0 { 500 } else { real[m].max(0) * 1000 / (real[m].max(0) + model.own[m].max(0)) };
+        assert_eq!(inputs[fe::RIVAL_FIRST + m], share, "{:?}", Measure::ALL[m]);
+    }
+    assert_eq!(inputs[fe::RIVAL_DOUBT], 0, "exact");
+    assert!(inputs[fe::RIVAL_SPACE] > 0, "its technologies are known from the literacy");
+    for k in [fe::RIVAL_SCIENCE, fe::RIVAL_SCORE_TREND, fe::RIVAL_DOMINATION, fe::RIVAL_CULTURE, fe::RIVAL_DIPLOMACY] {
+        assert_eq!(inputs[k], 0, "input {k} reads something no screen shows of a nation not met");
+    }
+    // What no screen shows does not move the model: its treasury, nor the capitals it holds.
+    game.debug_earn(PlayerId(1), 5_000);
+    let after = estimate(&game.ai_observation(&rules, PlayerId(0)), &rules, &Book::default());
+    assert_eq!(after, model, "treasuries are on no screen");
+    // The meeting: the same rows, now with a name.
+    game.debug_meet(PlayerId(0), PlayerId(1));
+    let met = estimate(&game.ai_observation(&rules, PlayerId(0)), &rules, &Book::default());
+    assert!(met.unmet.is_none());
+    assert_eq!(met.rivals[0].rows, unmet.rows);
+    assert_eq!(met.rivals[0].techs, unmet.techs);
+}
+
+/// N1: with more than two nations alive a nation not met is never shown by itself, only inside the
+/// ranges of the rows, met or not.
+#[test]
+fn n1_more_nations_not_met_stay_in_the_range() {
+    use classic_rules::ai::strategy_net::features::rivals as net_inputs;
+    use classic_rules::ai::strategy_net::weights::fe;
+    let (mut game, rules) = world(5);
+    let none = estimate(&game.ai_observation(&rules, PlayerId(0)), &rules, &Book::default());
+    assert!(none.rivals.is_empty() && none.unmet.is_none(), "five nations, none met: nothing exact to tell");
+    let mut inputs = [0; fe::N];
+    net_inputs(&none, &mut inputs);
+    assert!(inputs.iter().all(|v| *v == 0), "no rival met and none shown: no input");
+    game.debug_meet(PlayerId(0), PlayerId(1));
+    let one = estimate(&game.ai_observation(&rules, PlayerId(0)), &rules, &Book::default());
+    assert!(one.unmet.is_none());
+    assert_eq!(one.rivals.len(), 1);
+    assert!(one.rivals[0].rows.iter().any(|g| g.lo < g.hi), "the nations not met widen the range");
+}
+
 /// M1: only nations met are estimated, and what no screen shows (a treasury, met or not) does
 /// not move the estimate; a nation not met moves it only through the rows' range, as on the screen.
 #[test]

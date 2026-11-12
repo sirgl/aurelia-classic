@@ -317,6 +317,10 @@ pub fn rivals(player: u8, model: &crate::ai::rival_model::Rivals) {
                 r.influence_on_us
             )
         })
+        .chain(model.unmet.iter().map(|u| {
+            let rows: Vec<String> = ROWS.iter().zip(&u.rows).map(|(n, g)| format!("{n} {}", guess(g))).collect();
+            format!("unmet: {} | techs {}", rows.join(" "), guess(&u.techs))
+        }))
         .collect();
     let own: Vec<String> = ROWS.iter().zip(&model.own).map(|(n, v)| format!("{n} {v}")).collect();
     push(format!(

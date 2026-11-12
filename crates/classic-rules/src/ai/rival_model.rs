@@ -5,7 +5,10 @@
 //! What is read: the score list, the demographics rows, the victory rows, the eras, the original
 //! capitals as seen (`PublicScreens`), the Congress screen's delegates (`CongressInfo::delegates`)
 //! and the culture screen's influence of each nation on the seat (`InfluenceView::their_level`).
-//! Nothing else of the world: a nation not met has no estimate, and no hidden number is read.
+//! Nothing else of the world. A nation not met has no estimate of its own, only what the rows
+//! show of every living nation, met or not: with two nations alive (a duel) the rival's rows are
+//! exact before the meeting (`Unmet`); it has no name, score, era, victory progress or trend, which
+//! no screen shows. With more nations the unmet only widen the range of the rows (`row`).
 //!
 //! - **Demographics rows** (population, crop, goods, GNP, literacy, land, soldiers). A row gives the
 //!   seat's own value, its rank, and the best, average and worst of the `n` living nations, met or
@@ -93,6 +96,16 @@ pub struct Rival {
     pub influence_on_us: u8,
 }
 
+/// The one nation of a duel not met yet: only what its rows show (the demographics count every
+/// living nation). No name, score, era, science, capitals, delegates or influence.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Unmet {
+    /// Its value of each demographics row (`Measure::ALL`'s order): exact.
+    pub rows: [Guess; MEASURES],
+    /// Technologies it knows, from its literacy.
+    pub techs: Guess,
+}
+
 /// The seat's model of its rivals in a turn.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct Rivals {
@@ -111,6 +124,8 @@ pub struct Rivals {
     pub delegates_needed: Option<u16>,
     /// Every living nation met, by id.
     pub rivals: Vec<Rival>,
+    /// The only other nation of a duel when it is not met (None: met, or more than two nations).
+    pub unmet: Option<Unmet>,
 }
 
 impl Rivals {
@@ -353,6 +368,15 @@ pub fn estimate(obs: &AIObservation<'_>, rules: &CompiledRuleset, book: &Book) -
             }
         })
         .collect();
+    // A duel before the meeting: the rows show the one other nation exactly.
+    let unmet = (living == 2 && met.is_empty()).then(|| {
+        let alone = [(me, 0)];
+        let rows: [Guess; MEASURES] = std::array::from_fn(|i| match public.row(Measure::ALL[i]) {
+            Some(d) => row(d, living, &alone)[0],
+            None => Guess::default(),
+        });
+        Unmet { rows, techs: techs_of_literacy(&rows[literacy], total) }
+    });
     Rivals {
         round,
         living,
@@ -365,6 +389,7 @@ pub fn estimate(obs: &AIObservation<'_>, rules: &CompiledRuleset, book: &Book) -
         capitals_all: capitals.len() as u32,
         delegates_needed: congress.map(|c| c.needed),
         rivals,
+        unmet,
     }
 }
 

@@ -2,7 +2,8 @@
 //! `EVERY_ENV` rounds, at the start of each nation's turn, the seat's estimate of every rival it
 //! has met (from its observation and the book its strategy net keeps in its memory, so the very
 //! numbers its net reads this turn) beside the rival's true numbers from the world. One CSV line
-//! per seat and rival; on when `AURELIA_RIVAL_NET` names a file (lines are appended, the header
+//! per seat and rival (in a duel not yet met: the one other nation, `unmet` 1, only its rows and
+//! technologies, which are all the seat can tell of it); on when `AURELIA_RIVAL_NET` names a file (lines are appended, the header
 //! when the file is new). Reads only: the result hash of a match does not move.
 
 use std::io::Write;
@@ -56,7 +57,7 @@ fn header() -> String {
             cols.push(format!("{r}_{c}"));
         }
     }
-    for c in ["techs_e", "techs_lo", "techs_hi", "techs_t", "techs_own", "sci_e", "sci_t", "sci_own", "score_e", "score_t", "trend_e", "trend_own", "cap_e", "cap_t", "cap_all", "del_e", "del_t", "del_need", "cul_e", "cul_t", "cul_need"] {
+    for c in ["techs_e", "techs_lo", "techs_hi", "techs_t", "techs_own", "sci_e", "sci_t", "sci_own", "score_e", "score_t", "trend_e", "trend_own", "cap_e", "cap_t", "cap_all", "del_e", "del_t", "del_need", "cul_e", "cul_t", "cul_need", "unmet"] {
         cols.push(c.to_owned());
     }
     cols.join(",")
@@ -145,8 +146,45 @@ impl MatchRecorder<ClassicBench> for RivalNetRecorder {
                 r.influence_on_us.to_string(),
                 classic_rules::derived::tourism::influential_on(auth, p).to_string(),
                 needed.to_string(),
+                "0".to_owned(),
             ]);
             self.lines.push(cols.join(","));
+        }
+        // A duel before the meeting: the one other nation, by its rows.
+        if let Some(u) = &model.unmet {
+            let others: Vec<PlayerId> = (0..auth.players().count() as u8).map(PlayerId).filter(|p| *p != player && auth.players().is_major(*p) && auth.players().is_alive(*p)).collect();
+            if let [p] = others[..] {
+                let truth = demographics(auth, rules, view.derived, p);
+                let mine = &obs.public.demographics;
+                let mut cols = vec![
+                    self.name.clone(),
+                    self.seed.to_string(),
+                    round.to_string(),
+                    player.0.to_string(),
+                    p.0.to_string(),
+                    model.living.to_string(),
+                    "0".to_owned(),
+                    seat_era.to_string(),
+                    era_of(rules, auth.players().techs_of(p)).to_string(),
+                ];
+                for (m, measure) in Measure::ALL.iter().enumerate() {
+                    let g = u.rows[m];
+                    let t = truth.iter().find(|d| d.measure == *measure).map_or(0, |d| d.value);
+                    let mean = mine.iter().find(|d| d.measure == *measure).and_then(|d| others_mean(d, model.living));
+                    cols.extend([g.value.to_string(), g.lo.to_string(), g.hi.to_string(), opt(mean), t.to_string(), model.own[m].to_string()]);
+                }
+                cols.extend([
+                    u.techs.value.to_string(),
+                    u.techs.lo.to_string(),
+                    u.techs.hi.to_string(),
+                    auth.players().techs_of(p).len().to_string(),
+                    model.own_techs.to_string(),
+                ]);
+                // Science, score, trend, capitals, delegates, culture: nothing is read of it.
+                cols.extend(std::iter::repeat_n(String::new(), 16));
+                cols.push("1".to_owned());
+                self.lines.push(cols.join(","));
+            }
         }
     }
 
