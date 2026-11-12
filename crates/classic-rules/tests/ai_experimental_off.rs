@@ -18,8 +18,10 @@ use classic_rules::{compile_rules, CompiledRuleset};
 /// `experimental-ai`: `AiDriver::with_mind(.., ClassicMind::new(Variant::NextW))` on the same
 /// scenario, fasttest profile. The same source gave `next` d6d1ff4775d9b115 and the old
 /// `standard` f9dde2e4e6e3d10c (`OLD_STANDARD_120`) after 120 rounds: the 120 rounds tell `next-w`
-/// from both.
-const NEXT_W_120: u64 = 0x5667_b774_e7b9_2618;
+/// from both. Re-pinned for deals by value (rules/deals, 12 November: luxury swaps answered by what
+/// the kinds give): `NextW` with the feature gives c13fb8a6f3dfced8 on this source, as the build
+/// without it.
+const NEXT_W_120: u64 = 0xc13f_b8a6_f3df_ced8;
 /// The same game after 120 rounds played by the old `standard` (now `pre-next`), same source.
 const OLD_STANDARD_120: u64 = 0xf9dd_e2e4_e6e3_d10c;
 
@@ -79,7 +81,8 @@ fn the_game_without_the_feature_plays_next_w() {
 /// removes lost orders). The 4-seat game above has no city-states, so it never reaches the
 /// gifts to city-states or the world congress's votes (the delegate price): this one does (the
 /// trace below counts them).
-const CITY_STATES_NEXT_W: u64 = 0x9ef8_30ba_d18c_e60c;
+/// Re-pinned for deals by value (rules/deals, 12 November), equal with the feature on (`NextW`).
+const CITY_STATES_NEXT_W: u64 = 0x4801_023c_cf98_5f74;
 const CITY_STATES_ROUNDS: usize = 400;
 
 /// The longer case of the promotion's review: city-states, gifts and votes are played in the game
