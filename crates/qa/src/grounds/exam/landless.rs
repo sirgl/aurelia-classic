@@ -27,6 +27,25 @@
 //!   improved tiles of the other nation round one of its cities, one of them outside every city's strike (as T5), 1-2 of its workers on its land, one of its settlers. No win. Measures
 //!   `harm` = tiles pillaged (ever, any tile) + civilians captured (distinct civilians the learner owns at a round
 //!   end), `eliminated`.
+//!
+//! SIEGE ARENAS (added 12 Nov for `landless-plan`, before their first run; the scenes above unchanged): the same world,
+//! the learner with no city and no settler, the army spawned as in L1 (the estimate's smallest army that takes the city
+//! in `ENOUGH_ROUNDS`, plus `MARGIN`, of the strongest generic kinds the other nation could build, distance units when
+//! there are any).
+//! - S1 (36 rounds): a city-state's city 8-12 tiles from the army (L1: 4-9), its garrison and units left as they are.
+//!   WIN: L owns a city when the scene ends.
+//! - S2a / S2b (30 rounds, one world and target): a fresh city of the other nation as L3a. At the end of the round in
+//!   which L is first at war with the city's owner, a reinforcement of the owner is put on the free land 1-2 tiles from
+//!   the city (seen by whoever sees those tiles): S2a two melee units of the army's melee kind (the city can still be
+//!   taken), S2b twice the army, of its kinds, the first unit in the city (it cannot). S2a WIN: L owns a city at the end. S2b: no
+//!   win; `withdrew` = the reinforcement came, at least three quarters of L's units alive when it came are alive at the
+//!   end and each of them stands out of the city's strike (farther than `CITY_ATTACK_RANGE`); -1 when it never came.
+//! Measures of every arena: `taken` (round, -1), `lost` (units), `withdrew`, `trigger` (round of the reinforcement, -1),
+//! and the G1 trace (`goal_chosen`, `goal_led`, `operations`).
+//! REFERENCE `ref-siege`: `ref-takecity` (gather 3 tiles out, declare when all are there or none gets nearer, then every
+//! unit attacks the city or walks at it), and at war, when the military units of the city's owner it SEES within 3
+//! tiles of the city (`sees_unit`) are half as strong again as its own units (strength x health, as the operations'
+//! `outmatched`), every unit walks away from the city instead, to 5 tiles. `ref-takecity` is played beside it.
 
 use super::*;
 
@@ -76,6 +95,16 @@ pub(super) struct Ls {
     captured: BTreeSet<EntityId>,
     /// The learner's moves left in a round are not tracked: the rounds in which it had a unit alive.
     eliminated: Option<u32>,
+    /// `landless-plan` (G1 trace, added 12 Nov): the cities `ai::landless::goal` chose (first round each), the
+    /// operations the learner's strategist started (target, first round seen), from the war probe and the AI memory.
+    goals: Vec<(TileId, u32)>,
+    ops: Vec<(TileId, u32)>,
+    /// The operations of the learner at the last round end, as a trace note.
+    ops_note: String,
+    /// S2a / S2b: the reinforcement's kinds, the round (relative) it came, the learner's units alive then.
+    reinforce: Vec<UnitKindId>,
+    trigger: Option<u32>,
+    alive_at_trigger: Vec<EntityId>,
 }
 
 /// The learner's state before one step of the driver (`Run::watch_before`).
@@ -189,12 +218,16 @@ enum Family {
     CityState,
     Nation,
     Raid,
+    SiegeCityState,
+    SiegeNation,
 }
 
 fn family_of(sc: Sc) -> Family {
     match sc {
         Sc::L1 | Sc::L2 => Family::CityState,
         Sc::L3a | Sc::L3b => Family::Nation,
+        Sc::S1 => Family::SiegeCityState,
+        Sc::S2a | Sc::S2b => Family::SiegeNation,
         _ => Family::Raid,
     }
 }
@@ -204,8 +237,8 @@ fn family_of(sc: Sc) -> Family {
 pub fn landless_scenes(rules: &CompiledRuleset, job: &crate::selfplay::Job, wanted: &[Sc]) -> Vec<(Sc, Result<(GameState, Run), String>)> {
     let mut out: Vec<(Sc, Result<(GameState, Run), String>)> = Vec::new();
     let mut worlds: [Vec<Option<Result<LWorld, String>>>; 2] = [Vec::new(), Vec::new()];
-    for fam in [Family::CityState, Family::Nation, Family::Raid] {
-        let scs: Vec<Sc> = Sc::LANDLESS.into_iter().filter(|s| family_of(*s) == fam && wanted.contains(s)).collect();
+    for fam in [Family::CityState, Family::Nation, Family::Raid, Family::SiegeCityState, Family::SiegeNation] {
+        let scs: Vec<Sc> = Sc::LANDLESS.into_iter().chain(Sc::SIEGE).filter(|s| family_of(*s) == fam && wanted.contains(s)).collect();
         if scs.is_empty() {
             continue;
         }
@@ -227,6 +260,8 @@ pub fn landless_scenes(rules: &CompiledRuleset, job: &crate::selfplay::Job, want
             };
             let built = match fam {
                 Family::Raid => build_raid(rules, world).map(|x| vec![x]),
+                Family::SiegeCityState => build_siege(rules, world, false),
+                Family::SiegeNation => build_siege(rules, world, true),
                 f => build_take(rules, world, f == Family::Nation).map(|(a, b)| vec![a, b]),
             };
             match built {
@@ -372,6 +407,12 @@ impl Estimate {
 /// `goals` (on a copy where the war is on) within MAX_ARRIVE rounds. Returns the tiles, the rounds, the distance.
 #[allow(clippy::too_many_arguments)]
 fn muster(rules: &CompiledRuleset, base: &GameState, learner: PlayerId, owner: PlayerId, targets: &[TileId], goals: &[TileId], min_goals: usize, n: usize, move_pts: i32, v: u64) -> Result<(Vec<TileId>, u32, i32), String> {
+    muster_in(rules, base, learner, owner, targets, goals, min_goals, n, move_pts, v, 6..=9, MAX_ARRIVE)
+}
+
+/// `muster` with the band of distances from the nearest target and the most rounds to arrive.
+#[allow(clippy::too_many_arguments)]
+fn muster_in(rules: &CompiledRuleset, base: &GameState, learner: PlayerId, owner: PlayerId, targets: &[TileId], goals: &[TileId], min_goals: usize, n: usize, move_pts: i32, v: u64, band: std::ops::RangeInclusive<i32>, max_arrive: u32) -> Result<(Vec<TileId>, u32, i32), String> {
     let area = base.view().auth.map().land_area(targets[0]);
     let mut war = base.clone();
     apply(&mut war, rules, &Op::Meet { a: learner.0, b: owner.0 });
@@ -382,7 +423,7 @@ fn muster(rules: &CompiledRuleset, base: &GameState, learner: PlayerId, owner: P
         auth.map().land_area(t) == area && owner_of(base, t).is_none() && auth.indexes().units_on(t).is_empty() && auth.indexes().city_on_tile(t).is_none() && battle::standable(rules, base, t) && all_cities.iter().all(|c| dist(base, *c, t) >= 3)
     };
     let near = |t: TileId| targets.iter().map(|g| dist(base, t, *g)).min().unwrap_or(i32::MAX);
-    let mut cands: Vec<TileId> = (0..base.view().auth.map().tile_count() as u32).map(TileId).filter(|&t| (6..=9).contains(&near(t)) && free(t)).collect();
+    let mut cands: Vec<TileId> = (0..base.view().auth.map().tile_count() as u32).map(TileId).filter(|&t| band.contains(&near(t)) && free(t)).collect();
     cands.sort_by_key(|t| t.0);
     shuffle(&mut cands, v ^ 0x3a5);
     for &s0 in cands.iter().take(14) {
@@ -391,14 +432,14 @@ fn muster(rules: &CompiledRuleset, base: &GameState, learner: PlayerId, owner: P
         if rest.len() + 1 < n {
             continue;
         }
-        let reach = reach_rounds(&war, rules, learner, s0, move_pts, MAX_ARRIVE + 2);
+        let reach = reach_rounds(&war, rules, learner, s0, move_pts, max_arrive + 2);
         // Audit fix (landless2): the sides must be reachable and free (a ring tile behind the garrison, or across water,
         // is a side only on paper: l1 #10 had four land sides and the army could stand on two).
-        let open = goals.iter().filter(|g| base.view().auth.indexes().units_on(**g).is_empty() && reach.get(*g).is_some_and(|r| *r <= MAX_ARRIVE)).count();
+        let open = goals.iter().filter(|g| base.view().auth.indexes().units_on(**g).is_empty() && reach.get(*g).is_some_and(|r| *r <= max_arrive)).count();
         if open < min_goals {
             continue;
         }
-        let Some(arrive) = goals.iter().filter_map(|g| reach.get(g)).min().copied().filter(|r| *r <= MAX_ARRIVE) else { continue };
+        let Some(arrive) = goals.iter().filter_map(|g| reach.get(g)).min().copied().filter(|r| *r <= max_arrive) else { continue };
         let mut tiles = vec![s0];
         tiles.extend(rest.into_iter().take(n - 1));
         return Ok((tiles, arrive, near(s0)));
@@ -478,13 +519,9 @@ fn counts(rules: &CompiledRuleset, units: &[UnitKindId]) -> String {
     by.into_iter().map(|(n, c)| format!("{n} x{c}")).collect::<Vec<_>>().join(", ")
 }
 
-/// L1 + L2 (or L3a + L3b): one city, two armies.
-fn build_take(rules: &CompiledRuleset, world: &LWorld, nation: bool) -> Result<((Sc, GameState, Run), (Sc, GameState, Run)), String> {
-    let (sc_full, sc_half) = if nation { (Sc::L3a, Sc::L3b) } else { (Sc::L1, Sc::L2) };
-    let v = world.vary ^ sc_full.seed_id().wrapping_mul(0x9e37_79b9);
-    let mine_k = battle::best_kinds(rules, &world.kinds);
-    let l = world.learner;
-    // The candidate targets.
+/// The candidate targets of a take arena: a fresh city of the other nation founded by the harness on a free tile (up to
+/// four), or the city-states' cities (up to six), each with the world it stands in (`build_take`, `build_siege`).
+fn take_targets(rules: &CompiledRuleset, world: &LWorld, nation: bool, v: u64) -> Result<Vec<(TileId, PlayerId, GameState)>, String> {
     let mut targets: Vec<(TileId, PlayerId, GameState)> = Vec::new();
     if nation {
         let o = world.other;
@@ -525,6 +562,16 @@ fn build_take(rules: &CompiledRuleset, world: &LWorld, nation: bool) -> Result<(
         shuffle(&mut cs, v ^ 0x51);
         targets = cs.into_iter().take(6).map(|(t, p)| (t, p, world.game.clone())).collect();
     }
+    Ok(targets)
+}
+
+/// L1 + L2 (or L3a + L3b): one city, two armies.
+fn build_take(rules: &CompiledRuleset, world: &LWorld, nation: bool) -> Result<((Sc, GameState, Run), (Sc, GameState, Run)), String> {
+    let (sc_full, sc_half) = if nation { (Sc::L3a, Sc::L3b) } else { (Sc::L1, Sc::L2) };
+    let v = world.vary ^ sc_full.seed_id().wrapping_mul(0x9e37_79b9);
+    let mine_k = battle::best_kinds(rules, &world.kinds);
+    let l = world.learner;
+    let targets = take_targets(rules, world, nation, v)?;
     if targets.is_empty() {
         return Err("no city to take".to_owned());
     }
@@ -604,6 +651,82 @@ fn build_take(rules: &CompiledRuleset, world: &LWorld, nation: bool) -> Result<(
         let b = pair.pop().expect("two scenes");
         let a = pair.pop().expect("two scenes");
         return Ok((a, b));
+    }
+    Err(last)
+}
+
+/// S1 (a city-state's city, 8-12 tiles away) or S2a + S2b (a fresh city of the other nation, with the reinforcement
+/// each gets at its war): the army the estimate takes the city with, plus `MARGIN`, as L1 and L3a.
+fn build_siege(rules: &CompiledRuleset, world: &LWorld, nation: bool) -> Result<Vec<(Sc, GameState, Run)>, String> {
+    let first = if nation { Sc::S2a } else { Sc::S1 };
+    let v = world.vary ^ first.seed_id().wrapping_mul(0x9e37_79b9);
+    let mine_k = battle::best_kinds(rules, &world.kinds);
+    let l = world.learner;
+    let targets = take_targets(rules, world, nation, v)?;
+    if targets.is_empty() {
+        return Err("no city to take".to_owned());
+    }
+    let band = if nation { 6..=9 } else { 8..=12 };
+    let max_arrive = if nation { MAX_ARRIVE } else { MAX_ARRIVE + 4 };
+    let mut last = String::from("no target");
+    for (city, owner, base) in targets {
+        let tried = (|| -> Result<_, String> {
+            let open = strikes_from(&base, city).into_iter().filter(|t| base.view().auth.map().land_area(*t) == base.view().auth.map().land_area(city) && battle::standable(rules, &base, *t)).count();
+            if open < MIN_SIDES {
+                return Err(format!("the city has {open} open sides, {MIN_SIDES} needed"));
+            }
+            let est = Estimate::of(rules, &base, l, city, &mine_k)?;
+            let (m, d) = est.smallest(ENOUGH_ROUNDS)?;
+            let (mut mf, mut df) = (m, d);
+            for _ in 0..MARGIN {
+                if est.distance.is_some() && df < mf { df += 1 } else { mf += 1 }
+            }
+            if mf > MAX_MELEE {
+                return Err(format!("{mf} melee units to take the city in {ENOUGH_ROUNDS} rounds, only {MAX_MELEE} fit round it"));
+            }
+            let full = est.units(mf, df);
+            let slowest = full.iter().map(|k| move_of(rules, *k)).min().unwrap_or(1);
+            let goals = strikes_from(&base, city);
+            let (tiles, arrive, d0) = muster_in(rules, &base, l, owner, &[city], &goals, MIN_SIDES, full.len(), slowest, v, band.clone(), max_arrive)?;
+            Ok((est, full, tiles, arrive, d0))
+        })();
+        let (est, full, tiles, arrive, d0) = match tried {
+            Ok(x) => x,
+            Err(e) => {
+                last = e;
+                continue;
+            }
+        };
+        let scenes: Vec<(Sc, Vec<UnitKindId>)> = if nation {
+            let small = vec![est.melee_kind; 2];
+            // Twice the army, of its kinds (the first in the city): half as strong again and more than the army, which the
+            // operations' `outmatched` and the reference's retreat both read as a fight lost.
+            let mut big: Vec<UnitKindId> = full.iter().chain(full.iter()).copied().collect();
+            big.sort_by_key(|k| (army_role(rules, *k) != Some(ArmyRole::Melee), k.0));
+            vec![(Sc::S2a, small), (Sc::S2b, big)]
+        } else {
+            vec![(Sc::S1, Vec::new())]
+        };
+        let mut out = Vec::new();
+        for (sc, reinforce) in scenes {
+            let mut game = base.clone();
+            let mut run = stage(rules, world, &mut game, sc, owner, city, &full, &tiles[..full.len()], d0 + 3)?;
+            run.ls = Some(Ls { damage0: game.view().auth.indexes().city_on_tile(city).and_then(|h| game.view().auth.cities().get(h)).map_or(0, |c| c.damage), pill0: pillaged_now(&game), reinforce: reinforce.clone(), ..Ls::default() });
+            describe(rules, world, &game, &mut run, owner, if nation { "siege-nation" } else { "siege-city-state" });
+            run.info.insert("kinds".into(), counts(rules, &full));
+            run.info.insert("army".into(), full.len().to_string());
+            run.info.insert("reinforcement".into(), counts(rules, &reinforce));
+            run.info.insert("est_rounds_this".into(), {
+                let (mm, dd) = (full.iter().filter(|k| **k == est.melee_kind).count(), full.iter().filter(|k| Some(**k) == est.dist_kind && **k != est.melee_kind).count());
+                est.rounds(mm, dd, 12).map_or("none".into(), |r| r.to_string())
+            });
+            run.info.insert("melee_strike".into(), format!("{}/{}", est.melee.dealt, est.melee.taken));
+            run.info.insert("distance_strike".into(), est.distance.map_or(String::new(), |b| b.dealt.to_string()));
+            run.info.insert("arrive_rounds".into(), arrive.to_string());
+            run.d0 = run.mean_dist(&game);
+            out.push((sc, game, run));
+        }
+        return Ok(out);
     }
     Err(last)
 }
@@ -733,6 +856,45 @@ fn build_raid(rules: &CompiledRuleset, world: &LWorld) -> Result<(Sc, GameState,
 // Playing
 
 impl Run {
+    /// After the learner's round (G1 trace): the goals and operation starts the war probe recorded for the learner, and
+    /// the operations its AI memory holds now (target, phase, members).
+    pub(super) fn note_operations(&mut self, probe: &classic_rules::ai::war_probe::WarProbe, state: Option<&kernel::ai::state::AiState>) {
+        let rel = |r: u32| r.saturating_sub(self.start_round);
+        let learner = self.learner;
+        let start_round = self.start_round;
+        let Some(ls) = self.ls.as_mut() else { return };
+        for &(round, player, tile) in &probe.landless_goals {
+            if player == learner && !ls.goals.iter().any(|(t, _)| t.0 == tile) {
+                ls.goals.push((TileId(tile), round.saturating_sub(start_round)));
+            }
+        }
+        for &(round, player, tile) in &probe.landless_starts {
+            if player == learner && !ls.ops.iter().any(|(t, _)| t.0 == tile) {
+                ls.ops.push((TileId(tile), round.saturating_sub(start_round)));
+            }
+        }
+        let mut note = Vec::new();
+        if let Some(state) = state {
+            for o in state.operations() {
+                if !ls.ops.iter().any(|(t, _)| *t == o.target) {
+                    ls.ops.push((o.target, rel(o.since_round)));
+                }
+                let members = state.tasks().iter().filter(|t| t.task == UnitTask::Operation { target: o.target }).count();
+                note.push(format!("op@{} p{} {:?} since r+{} m{} need{}", o.target.0, o.enemy.0, o.phase, rel(o.phase_round), members, o.need.total()));
+            }
+            let war: Vec<String> = state.relations().iter().filter(|m| m.at_war).map(|m| format!("war p{}{}", m.other.0, m.objective.map_or(String::new(), |o| format!(" obj@{}", o.tile.0)))).collect();
+            note.extend(war);
+            note.push(format!("strategy {:?}", state.strategy.current));
+        }
+        for e in probe.ends.iter().filter(|e| e.player == learner) {
+            note.push(format!("ended@{} {:?} age{}", e.target, e.cause, e.age));
+        }
+        for f in probe.forming.iter().filter(|f| f.player == learner) {
+            note.push(format!("forming assembled={} outmatched={} may_declare={} near_healthy={}/{} wounded={}", f.assembled, f.outmatched, f.may_declare, f.near_healthy, f.need, f.wounded));
+        }
+        ls.ops_note = note.join("; ");
+    }
+
     fn city_tile(&self) -> Option<TileId> {
         self.target
     }
@@ -806,14 +968,40 @@ impl Run {
                 ls.eliminated = Some(rel);
             }
         }
-        let line = self.line(rules, game, rel);
+        // S2a / S2b: the reinforcement at the end of the round in which the learner is first at war with the owner.
+        if matches!(sc, Sc::S2a | Sc::S2b) && alive && self.at_war_with_foe(game) && self.ls.as_ref().is_some_and(|l| l.trigger.is_none()) {
+            if let Some(target) = self.target {
+                let mine: Vec<EntityId> = self.mine_alive(game).iter().map(|(p, _)| p.id).collect();
+                let free: Vec<TileId> = free_land(rules, game, game.view().auth.map().land_area(target));
+                let mut ring: Vec<TileId> = free.into_iter().filter(|&t| (1..=2).contains(&dist(game, t, target))).collect();
+                ring.sort_by_key(|&t| (dist(game, t, target), t.0));
+                let kinds = self.ls.as_ref().map(|l| l.reinforce.clone()).unwrap_or_default();
+                // S2b: the first unit of the reinforcement goes into the city (its garrison), the rest round it.
+                let garrisoned = game.view().auth.indexes().units_on(target).is_empty();
+                if sc == Sc::S2b && garrisoned {
+                    ring.insert(0, target);
+                }
+                for (k, t) in kinds.iter().zip(ring) {
+                    self.theirs.push(spawn(game, rules, self.enemy, t, *k, "reinforcement"));
+                }
+                if let Some(ls) = self.ls.as_mut() {
+                    ls.trigger = Some(rel);
+                    ls.alive_at_trigger = mine;
+                }
+            }
+        }
+        let mut line = self.line(rules, game, rel);
+        if let Some(ls) = self.ls.as_ref().filter(|l| !l.ops_note.is_empty()) {
+            line.push_str(" | ");
+            line.push_str(&ls.ops_note);
+        }
         self.trace.push(line);
         let taken = self.ls.as_ref().is_some_and(|l| l.taken.is_some());
         let limit = rel >= self.sc.rounds();
         let over = !alive || limit || (taken && self.sc != Sc::L4);
         if over {
             self.win = match self.sc {
-                Sc::L1 | Sc::L3a => Some(taken),
+                Sc::L1 | Sc::L3a | Sc::S1 | Sc::S2a => Some(taken),
                 _ => None,
             };
         }
@@ -836,6 +1024,26 @@ impl Run {
         m.insert("taken".into(), ls.taken.map_or(-1.0, f64::from));
         m.insert("taken_target".into(), ls.taken_target.map_or(-1.0, f64::from));
         m.insert("at_war_end".into(), b(self.at_war_with_foe(game)));
+        // G1 (landless-plan): a goal was chosen; the first goal's city was the target of an operation the strategist
+        // started; the number of operations; the city taken was an operation's target.
+        m.insert("goal_chosen".into(), b(!ls.goals.is_empty()));
+        m.insert("goal_led".into(), b(ls.goals.first().is_some_and(|(g, _)| ls.ops.iter().any(|(t, _)| t == g))));
+        m.insert("goals_led_share".into(), if ls.goals.is_empty() { -1.0 } else { ls.goals.iter().filter(|(g, _)| ls.ops.iter().any(|(t, _)| t == g)).count() as f64 / ls.goals.len() as f64 });
+        m.insert("operations".into(), ls.ops.len() as f64);
+        m.insert("goal_round".into(), ls.goals.first().map_or(-1.0, |(_, r)| f64::from(*r)));
+        m.insert("op_round".into(), ls.ops.first().map_or(-1.0, |(_, r)| f64::from(*r)));
+        let owned: Vec<TileId> = cities_of(game, self.learner);
+        m.insert("taken_by_op".into(), b(owned.iter().any(|c| ls.ops.iter().any(|(t, _)| t == c))));
+        if Sc::SIEGE.contains(&self.sc) {
+            // The siege arenas: the reinforcement's round, and whether the army withdrew from it (S2b's measure).
+            m.insert("trigger".into(), ls.trigger.map_or(-1.0, f64::from));
+            let withdrew = ls.trigger.map(|_| {
+                let alive: Vec<(Piece, kernel::world::unit::UnitCore)> = self.mine_alive(game).into_iter().filter(|(p, _)| ls.alive_at_trigger.contains(&p.id)).collect();
+                let out = self.target.is_some_and(|t| alive.iter().all(|(_, c)| dist(game, c.tile, t) > classic_rules::combat::city::CITY_ATTACK_RANGE));
+                alive.len() * 4 >= ls.alive_at_trigger.len() * 3 && out && !alive.is_empty()
+            });
+            m.insert("withdrew".into(), withdrew.map_or(-1.0, |w| b(w)));
+        }
         if self.sc == Sc::L4 {
             let (p, c) = (ls.pillaged.len(), ls.captured.len());
             m.insert("pillaged".into(), p as f64);
@@ -855,6 +1063,7 @@ impl Run {
         let name = self.ls.as_ref().and_then(|l| l.reference.clone()).unwrap_or_default();
         let made = match name.as_str() {
             "ref-raid" => self.raid_turn(rules, game),
+            "ref-siege" => self.siege_turn(rules, game),
             _ => self.takecity_turn(rules, game),
         };
         for (p, _) in self.mine_alive(game) {
@@ -950,6 +1159,57 @@ impl Run {
             }
         }
         made
+    }
+
+    /// `ref-siege`: `ref-takecity`, but at war, when the owner's military units it sees within 3 tiles of the city are
+    /// half as strong again as its own (strength x health), every unit walks away from the city (to 5 tiles) instead.
+    fn siege_turn(&mut self, rules: &CompiledRuleset, game: &mut GameState) -> u64 {
+        let Some(target) = self.target else { return 0 };
+        if !self.at_war_with_foe(game) || !self.outmatched_seen(rules, game, target) {
+            return self.takecity_turn(rules, game);
+        }
+        let mut made = 0;
+        for _ in 0..3 {
+            for (p, c) in self.mine_alive(game) {
+                if c.moves_left == 0 || dist(game, c.tile, target) >= 5 {
+                    continue;
+                }
+                let here = dist(game, c.tile, target);
+                let mut tiles: Vec<TileId> = game
+                    .player_view(rules, self.learner)
+                    .own_reachable(p.h)
+                    .into_iter()
+                    .map(|(t, _)| t)
+                    .filter(|t| *t != c.tile && game.view().auth.indexes().units_on(*t).is_empty() && game.view().auth.indexes().city_on_tile(*t).is_none() && dist(game, *t, target) > here)
+                    .collect();
+                tiles.sort_by_key(|&t| (std::cmp::Reverse(dist(game, t, target)), t.0));
+                for t in tiles.into_iter().take(8) {
+                    let cmd = Command::MoveUnit { unit: p.h, destination: t };
+                    if game.accepts_order(rules, self.learner, &cmd) && game.execute(rules, cmd).is_ok() {
+                        made += 1;
+                        break;
+                    }
+                }
+            }
+        }
+        made
+    }
+
+    /// The owner's military units the learner sees within 3 tiles of `target` are half as strong again as its own.
+    fn outmatched_seen(&self, rules: &CompiledRuleset, game: &GameState, target: TileId) -> bool {
+        let power = |kind: UnitKindId, hp: u16| u64::from(classic_rules::ai::planner::unit_power(rules, kind, hp));
+        let ours: u64 = self.mine_alive(game).iter().map(|(_, c)| power(c.kind, c.hp)).sum();
+        let pv = game.player_view(rules, self.learner);
+        let auth = game.view().auth;
+        let theirs: u64 = auth
+            .indexes()
+            .units_of(self.enemy)
+            .iter()
+            .filter_map(|h| auth.units().get(*h))
+            .filter(|u| pv.sees_unit(&u.core) && !rules.is_civilian(u.core.kind) && dist(game, u.core.tile, target) <= 3)
+            .map(|u| power(u.core.kind, u.core.hp))
+            .sum();
+        2 * theirs > 3 * ours
     }
 
     /// `ref-raid`: declares war on the owner of the prey at once; melee units capture the nearest civilian (attack

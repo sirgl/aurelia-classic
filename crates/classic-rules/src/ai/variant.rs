@@ -754,6 +754,13 @@ pub enum Variant {
     /// does the harm that pays (captures civilians, pillages). With a city, or a settler to found
     /// one, it plays exactly as `Standard`. A candidate, `experimental-ai` only.
     Landless,
+    /// `Landless` through the empire's own strategist: while it has no city and no settler, the
+    /// city `ai::landless` finds the units on hand take is the target of an ordinary operation
+    /// (`operations::start`: muster, declaration, march, the front's siege), the strategy is the
+    /// war's (`planner_strategy::desired_strategy`); with nothing to take its units do the harm
+    /// `landless` does, and keep out of a stronger enemy's reach. With a city, or a settler to found
+    /// one, it plays exactly as `Standard`. For the bench's siege arenas, `experimental-ai` only.
+    LandlessPlan,
 }
 
 /// The net's base: the expert the end-to-end net learns from and the mind it
@@ -774,7 +781,7 @@ const NUDGED_CANDIDATES: u32 = 40;
 
 impl Variant {
     /// The game's AI first.
-    pub const ALL: [Variant; 148] = [
+    pub const ALL: [Variant; 149] = [
         Variant::Standard,
         Variant::PreCamps,
         Variant::PreWorkers,
@@ -923,6 +930,7 @@ impl Variant {
         Variant::NextRace,
         Variant::PreNext,
         Variant::Landless,
+        Variant::LandlessPlan,
     ];
 
     pub fn name(self) -> &'static str {
@@ -1057,6 +1065,7 @@ impl Variant {
             Variant::NextRace => "next-race",
             Variant::PreNext => "pre-next",
             Variant::Landless => "landless",
+            Variant::LandlessPlan => "landless-plan",
             Variant::ArmyFit => "army-fit",
             Variant::Camps => "camps",
             Variant::ArmyCamps => "army-camps",
@@ -1093,7 +1102,7 @@ impl Variant {
         cfg!(feature = "experimental-ai")
             || !matches!(
                 self,
-                Variant::Net | Variant::UnitNet | Variant::Hybrid | Variant::SiteNet | Variant::ChoiceNet | Variant::ChoiceNetProduction | Variant::ChoiceNetResearch | Variant::StandardScripted | Variant::PreCsGifts | Variant::Sharp | Variant::TacticianFit | Variant::FieldCraft | Variant::RaidWar | Variant::TallReal | Variant::Next | Variant::WonderCancel | Variant::WonderRace | Variant::NextW | Variant::NextRace | Variant::PreNext | Variant::Landless
+                Variant::Net | Variant::UnitNet | Variant::Hybrid | Variant::SiteNet | Variant::ChoiceNet | Variant::ChoiceNetProduction | Variant::ChoiceNetResearch | Variant::StandardScripted | Variant::PreCsGifts | Variant::Sharp | Variant::TacticianFit | Variant::FieldCraft | Variant::RaidWar | Variant::TallReal | Variant::Next | Variant::WonderCancel | Variant::WonderRace | Variant::NextW | Variant::NextRace | Variant::PreNext | Variant::Landless | Variant::LandlessPlan
             )
     }
 
@@ -1120,7 +1129,7 @@ impl Variant {
             // `Standard` before the thirteenth promotion: its switches without the flags of `next-w`.
             Variant::PreNext => Variant::Standard,
             // `Standard` but while it has no city and no settler (`landless`).
-            Variant::Landless => Variant::Standard,
+            Variant::Landless | Variant::LandlessPlan => Variant::Standard,
             // `Standard` but for their tactical and operations layer (`unit_net`) and the
             // hybrid's strategy net.
             Variant::UnitNet | Variant::Hybrid => Variant::Standard,
@@ -1286,6 +1295,13 @@ impl Variant {
     /// alone, which the mind plays as `Standard` in every switch (`ClassicMind::new`).
     pub fn landless(self) -> bool {
         self == Variant::Landless
+    }
+
+    /// The goal of a player with units and no city through the empire's strategist
+    /// (`TurnBrief::landless_plan`, `ai::landless`, `operations::start`): `LandlessPlan` alone, which
+    /// the mind plays as `Standard` in every switch (`ClassicMind::new`).
+    pub fn landless_plan(self) -> bool {
+        self == Variant::LandlessPlan
     }
 
     /// Its research, policies and choice among the allocator's best orders are the

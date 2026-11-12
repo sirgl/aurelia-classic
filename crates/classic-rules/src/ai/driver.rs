@@ -99,6 +99,9 @@ pub struct ClassicMind {
     /// `Variant::Landless`: the mind plays `Standard` with the goal of a player without a city
     /// (`TurnBrief::landless`).
     landless: bool,
+    /// `Variant::LandlessPlan`: the mind plays `Standard` with the goal of a player without a city
+    /// given to its strategist (`TurnBrief::landless_plan`).
+    landless_plan: bool,
 }
 
 /// The environment variable that makes the game's AI another variant
@@ -133,7 +136,9 @@ impl ClassicMind {
         // wonder rule (`TurnBrief::wonder_race` = 1).
         // `landless` is `Standard` in every switch but its own (`TurnBrief::landless`).
         let landless = variant.landless();
-        let variant = if landless { Variant::Standard } else { variant };
+        // `landless-plan` likewise (`TurnBrief::landless_plan`).
+        let landless_plan = variant.landless_plan();
+        let variant = if landless || landless_plan { Variant::Standard } else { variant };
         let requested = variant;
         let next = variant.next();
         let tall_real = variant.tall_real() || next;
@@ -171,7 +176,7 @@ impl ClassicMind {
         let variant = if named.is_some() { Variant::PrePuppet } else { variant };
         // The alias `next-w` plays as `Standard` under its name.
         let named = named.or((requested == Variant::NextW).then_some(requested));
-        Self { advisors, variant, genome: None, humans: Vec::new(), walks: Default::default(), choice: None, #[cfg(feature = "experimental-ai")] net, book, named, walls, conquest: None, unciv, tall: None, sharp, tall_real, next, wonder_race, pays, fit, field, raidw, landless }
+        Self { advisors, variant, genome: None, humans: Vec::new(), walks: Default::default(), choice: None, #[cfg(feature = "experimental-ai")] net, book, named, walls, conquest: None, unciv, tall: None, sharp, tall_real, next, wonder_race, pays, fit, field, raidw, landless, landless_plan }
     }
 
     /// A league book that may play on another base (`book_on`): a duel book
@@ -217,7 +222,7 @@ impl ClassicMind {
         advisors.register(crate::classic::ClassicSystem::Diplomacy, Box::new(diplomacy));
         // The net plays on `NET_BASE`: its siege too.
         let walls = variant.siege_walls().then(|| Box::new(crate::ai::siege_walls::SiegeWalls::new().joined(variant.siege_join())));
-        Self { advisors, variant, genome: None, humans: Vec::new(), walks: Default::default(), choice: None, net: Some(Box::new(net)), book: None, named: None, walls, conquest: None, unciv: None, tall: None, sharp: false, tall_real: false, next: false, wonder_race: 0, pays: false, fit: false, field: false, raidw: false, landless: false }
+        Self { advisors, variant, genome: None, humans: Vec::new(), walks: Default::default(), choice: None, net: Some(Box::new(net)), book: None, named: None, walls, conquest: None, unciv: None, tall: None, sharp: false, tall_real: false, next: false, wonder_race: 0, pays: false, fit: false, field: false, raidw: false, landless: false, landless_plan: false }
     }
 
     /// The net's part (`Variant::Net`), if any.
@@ -257,6 +262,9 @@ impl ClassicMind {
     pub fn variant(&self) -> Variant {
         if self.landless {
             return Variant::Landless;
+        }
+        if self.landless_plan {
+            return Variant::LandlessPlan;
         }
         if self.next {
             return match self.wonder_race {
@@ -397,6 +405,11 @@ impl AiMind<Classic> for ClassicMind {
         let gate = self.variant.war_gate(start.brief.prices.as_ref(), &stakes);
         // A book's attack is its own operation: `standard` starts none while it plays.
         let gate = if self.book.as_ref().is_some_and(|b| b.holds_war(sight.player)) { operations::WarGate::Never } else { gate };
+        if start.brief.landless_planned() && state.operations().is_empty() {
+            // A player with units and no city: the city its units take is the strategist's target (`ai::landless`;
+            // `operations::start` looks for one only while no operation runs).
+            start.brief.landless_goal = crate::ai::landless::goal(sight, &start.brief, state, rules);
+        }
         let _span = prof::span("classic/operations_plan");
         let mut decisions = operations::plan(&start.brief, state, rules, &mut routes, gate);
         if let Some(book) = &self.book {
@@ -693,6 +706,12 @@ impl ClassicMind {
         brief.field_craft = self.field;
         brief.raid_war = self.raidw;
         brief.landless = self.landless;
+        brief.landless_plan = self.landless_plan;
+        if brief.landless_planned() {
+            // The brief's relations are the nations' (city-states have their own system, `ai::system`): a player
+            // with no city takes a city-state's city as well, and its strategist must see that war (`operations`).
+            brief.relations = observation.relations.iter().filter(|r| r.kind != PlayerKind::Module(ClassicKind::Barbarian)).copied().collect();
+        }
         brief.tall_real = self.tall_real;
         brief.next = self.next;
         brief.wonder_race = self.wonder_race;
@@ -1016,6 +1035,12 @@ mod sharp_tests {
         let flagged: Vec<Variant> = Variant::ALL.into_iter().filter(|v| v.landless()).collect();
         assert_eq!(flagged, [Variant::Landless]);
         assert_eq!(Variant::from_name("landless"), cfg!(feature = "experimental-ai").then_some(Variant::Landless));
+        let plan = ClassicMind::new(Variant::LandlessPlan);
+        assert_eq!((plan.variant, flags(&plan), plan.landless, plan.landless_plan, plan.variant()), (Variant::Standard, flags(&standard), false, true, Variant::LandlessPlan));
+        assert!(!standard.landless_plan);
+        let planned: Vec<Variant> = Variant::ALL.into_iter().filter(|v| v.landless_plan()).collect();
+        assert_eq!(planned, [Variant::LandlessPlan]);
+        assert_eq!(Variant::from_name("landless-plan"), cfg!(feature = "experimental-ai").then_some(Variant::LandlessPlan));
     }
 
     /// `tall-real` is `sharp` with its tall play: the mind plays `Standard` with both flags and

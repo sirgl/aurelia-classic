@@ -31,6 +31,12 @@
 //! a declaration eight tiles away; a war on a nation is priced at one unit (the fighters near the prey are
 //! priced already) and the last unit at twice the first iteration's price.
 //!
+//! `landless-plan` (`TurnBrief::landless_plan`, 12 Nov): the choice of 1 (`goal`, the same estimate on the turn's
+//! observation) is the target of the empire's own operation (`operations::start`): the strategist musters the units
+//! on hand, declares, marches and the front besieges, as an empire's army. This module then decides only for a
+//! player with no operation: the harm of 2, else a unit keeps out of the reach of a stronger enemy it sees
+//! (`withdraw`; an empire's units go home, this player has none).
+//!
 //! No content is named; fog of war is respected (only seen units, remembered cities and known tiles).
 
 use crate::ai::front::{siege_rounds_within, Besieger};
@@ -38,7 +44,10 @@ use crate::ai::operations::{army_role, estimate_city, estimated_strike, CityEsti
 use crate::ai::state::ArmyRole;
 use crate::ai::trace::{Actor, Reason};
 use crate::knowledge::public::PlayerQueries;
-use crate::ai::planner::{role_of, AiRole, Decision, PlanTools, UnitView};
+use crate::ai::planner::{role_of, AiRole, Decision, PlanTools, TurnBrief, UnitView};
+use crate::knowledge::observation::{AIObservation, ObservedCity, ObservedUnit, Relation};
+use crate::knowledge::view::PlayerView;
+use crate::rules::CompiledRuleset;
 use crate::ai::planner_units::move_along;
 use crate::ai::state::AiState;
 use crate::combat::city::{CITY_HEAL_PER_TURN, CITY_STRENGTH_FROM_GARRISON_DIVISOR};
@@ -72,7 +81,7 @@ const CITY_FIGHTERS: i64 = 3;
 /// How far from its units the player looks for cities on the map it knows, and the population it assumes
 /// for one it has not seen (the margin on the strength covers the rest).
 const KNOWN_RADIUS: i32 = 12;
-const ASSUMED_POPULATION: u32 = 2;
+pub const ASSUMED_POPULATION: u32 = 2;
 
 /// Tiles from the city within which a unit counts as gathered at its border.
 const GATHER_RADIUS: i32 = 3;
@@ -80,9 +89,56 @@ const GATHER_RADIUS: i32 = 3;
 /// Rounds of walking a free unit looks ahead for prey.
 const PREY_ROUNDS: i32 = 5;
 
-/// The behaviour is on: the mind plays `landless`, the player has no city and no unit that founds one.
+/// The behaviour is on: the mind plays `landless` (or `landless-plan`), the player has no city and no unit that
+/// founds one.
 pub fn active(view: &UnitView<'_, '_>, tools: &PlanTools<'_>) -> bool {
-    view.brief.landless && view.brief.cities.is_empty() && !view.brief.units.iter().any(|u| tools.rules.units[u.kind.0 as usize].founder)
+    (view.brief.landless || view.brief.landless_plan) && view.brief.cities.is_empty() && !view.brief.units.iter().any(|u| tools.rules.units[u.kind.0 as usize].founder)
+}
+
+/// What the player sees and knows when it chooses a city: a unit's observation (`landless`) or the turn's
+/// (`landless-plan`, `goal`). The same fields in both: units and cities of others in sight, the known map, the
+/// relations.
+struct Seen<'s, 'g> {
+    brief: &'s TurnBrief,
+    view: &'s PlayerView<'g>,
+    cities: &'s [ObservedCity],
+    units: &'s [ObservedUnit],
+    relations: &'s [Relation],
+}
+
+impl<'s, 'g> Seen<'s, 'g> {
+    fn of_unit(view: &'s UnitView<'s, 'g>) -> Self {
+        Seen { brief: view.brief, view: &view.local.view, cities: &view.local.foreign_cities, units: &view.local.foreign_units, relations: &view.local.relations }
+    }
+
+    fn of_turn(obs: &'s AIObservation<'g>, brief: &'s TurnBrief) -> Self {
+        Seen { brief, view: &obs.view, cities: &obs.visible_foreign_cities, units: &obs.visible_foreign_units, relations: &obs.relations }
+    }
+
+    fn dist(&self, a: TileId, b: TileId) -> i32 {
+        self.view.dimensions().distance(a, b).unwrap_or(i32::MAX / 2)
+    }
+
+    fn relation(&self, owner: PlayerId) -> Option<&Relation> {
+        self.relations.iter().find(|r| r.other == owner)
+    }
+
+    fn at_war(&self, owner: PlayerId) -> bool {
+        self.relation(owner).is_some_and(|r| r.at_war)
+    }
+
+    fn victim(&self, owner: PlayerId) -> Option<Victim> {
+        victim_of(self.relation(owner)?)
+    }
+}
+
+/// `landless-plan`: the city the player's units take (the choice of `take_city`, on the turn's observation), and
+/// its owner; None when they take none. The strategist's operation takes it (`operations::start`).
+pub fn goal(obs: &AIObservation<'_>, brief: &TurnBrief, state: &AiState, rules: &CompiledRuleset) -> Option<(TileId, PlayerId)> {
+    let seen = Seen::of_turn(obs, brief);
+    let (_, target) = targets(&seen, state, rules, true).into_iter().next()?;
+    crate::ai::war_probe::note(|p| p.landless_goals.push((brief.round, brief.player, target.tile.0)));
+    Some((target.tile, target.owner))
 }
 
 fn dist(view: &UnitView<'_, '_>, a: TileId, b: TileId) -> i32 {
@@ -99,7 +155,11 @@ fn at_war(view: &UnitView<'_, '_>, owner: PlayerId) -> bool {
 
 /// Whose city or land may be the target of a war: nations and city-states met, not the barbarians.
 fn victim(view: &UnitView<'_, '_>, owner: PlayerId) -> Option<Victim> {
-    match view.local.relation(owner)?.kind {
+    victim_of(view.local.relation(owner)?)
+}
+
+fn victim_of(relation: &Relation) -> Option<Victim> {
+    match relation.kind {
         PlayerKind::Major => Some(Victim::Nation),
         PlayerKind::Module(ClassicKind::CityState(_)) => Some(Victim::CityState),
         PlayerKind::Module(ClassicKind::Barbarian) => None,
@@ -119,14 +179,12 @@ struct Target {
     estimate: CityEstimate,
 }
 
-fn city_estimate(view: &UnitView<'_, '_>, tools: &PlanTools<'_>, tile: TileId, population: u32, margin: i64) -> CityEstimate {
-    let rules = tools.rules;
-    let seen = crate::ai::state::SeenCity { tile, owner: view.local.player, population, last_seen_round: view.brief.round };
-    let mut estimate = estimate_city(view.brief, rules, &seen, None);
+fn city_estimate(sight: &Seen<'_, '_>, rules: &CompiledRuleset, tile: TileId, population: u32, margin: i64) -> CityEstimate {
+    let seen = crate::ai::state::SeenCity { tile, owner: sight.brief.player, population, last_seen_round: sight.brief.round };
+    let mut estimate = estimate_city(sight.brief, rules, &seen, None);
     // The garrison on the city's tile, as seen now.
-    let garrison: i64 = view
-        .local
-        .foreign_units
+    let garrison: i64 = sight
+        .units
         .iter()
         .filter(|u| u.tile == tile && role_of(rules, u.kind) == AiRole::Military)
         .map(|u| i64::from(rules.units[u.kind.0 as usize].strength) * 100 * i64::from(u.hp) / 100 * 100 / CITY_STRENGTH_FROM_GARRISON_DIVISOR)
@@ -134,7 +192,7 @@ fn city_estimate(view: &UnitView<'_, '_>, tools: &PlanTools<'_>, tile: TileId, p
         .unwrap_or(0);
     estimate.strength = (estimate.strength + garrison) * margin / 100;
     // The bar of the city when it is in sight.
-    if let Some(city) = view.local.foreign_cities.iter().find(|c| c.tile == tile) {
+    if let Some(city) = sight.cities.iter().find(|c| c.tile == tile) {
         estimate.hp = city.hp.max(1);
     } else {
         estimate.hp = CITY_BASE_HIT_POINTS;
@@ -145,11 +203,10 @@ fn city_estimate(view: &UnitView<'_, '_>, tools: &PlanTools<'_>, tile: TileId, p
 
 /// Rounds the military units of the player take to take the city, None when they do not within `limit`
 /// or have no melee unit to enter it.
-fn siege_estimate(view: &UnitView<'_, '_>, tools: &PlanTools<'_>, estimate: &CityEstimate, limit: u32, only: impl Fn(&crate::ai::planner::UnitBrief) -> bool) -> Option<u32> {
-    let rules = tools.rules;
+fn siege_estimate(brief: &TurnBrief, rules: &CompiledRuleset, estimate: &CityEstimate, limit: u32, only: impl Fn(&crate::ai::planner::UnitBrief) -> bool) -> Option<u32> {
     let mut group: Vec<Besieger> = Vec::new();
     let mut melee = false;
-    for u in view.brief.units.iter().filter(|u| u.role == AiRole::Military && only(u)) {
+    for u in brief.units.iter().filter(|u| u.role == AiRole::Military && only(u)) {
         if let Some(b) = estimated_strike(rules, u.kind, u.hp, estimate) {
             melee |= army_role(rules, u.kind) == Some(ArmyRole::Melee);
             group.push(b);
@@ -162,20 +219,20 @@ fn siege_estimate(view: &UnitView<'_, '_>, tools: &PlanTools<'_>, estimate: &Cit
 }
 
 /// The cities the player knows (what it remembers and what it sees now) that its units take.
-fn targets(view: &UnitView<'_, '_>, state: &AiState, tools: &PlanTools<'_>) -> Vec<(i64, Target)> {
+fn targets(view: &Seen<'_, '_>, state: &AiState, rules: &CompiledRuleset, map_known: bool) -> Vec<(i64, Target)> {
     let mut cities: Vec<(TileId, PlayerId, u32)> = state.seen_cities().iter().map(|c| (c.tile, c.owner, c.population)).collect();
-    for c in &view.local.foreign_cities {
+    for c in view.cities {
         cities.retain(|(t, _, _)| *t != c.tile);
         cities.push((c.tile, c.owner, c.population));
     }
     // The cities on the map the player knows (explored, not in sight now): the population is not known.
-    let dims = view.local.view.dimensions();
-    for u in view.brief.units.iter().filter(|u| u.role == AiRole::Military) {
+    let dims = view.view.dimensions();
+    for u in view.brief.units.iter().filter(|u| u.role == AiRole::Military && map_known) {
         for tile in crate::math::tiles_in_hex_radius(&dims, u.tile, KNOWN_RADIUS) {
             if cities.iter().any(|(t, _, _)| *t == tile) {
                 continue;
             }
-            if let Some(snapshot) = view.local.view.tile(tile).snapshot() {
+            if let Some(snapshot) = view.view.tile(tile).snapshot() {
                 if let (true, Some(owner)) = (snapshot.city, snapshot.owner) {
                     cities.push((tile, owner, ASSUMED_POPULATION));
                 }
@@ -184,15 +241,16 @@ fn targets(view: &UnitView<'_, '_>, state: &AiState, tools: &PlanTools<'_>) -> V
     }
     let mut out = Vec::new();
     for (tile, owner, population) in cities {
-        if victim(view, owner).is_none() {
+        if view.victim(owner).is_none() {
             continue;
         }
-        let war = at_war(view, owner);
+        let war = view.at_war(owner);
         let margin = if war { 100 } else { STRENGTH_MARGIN_PERCENT };
-        let estimate = city_estimate(view, tools, tile, population, margin);
-        let rounds_opt = siege_estimate(view, tools, &estimate, if war { TAKE_ROUNDS + 3 } else { TAKE_ROUNDS }, |_| true);
+        let estimate = city_estimate(view, rules, tile, population, margin);
+        let rounds_opt = siege_estimate(view.brief, rules, &estimate, if war { TAKE_ROUNDS + 3 } else { TAKE_ROUNDS }, |_| true);
         let Some(rounds) = rounds_opt else { continue };
-        let walk = view.brief.units.iter().filter(|u| u.role == AiRole::Military).map(|u| (dist(view, u.tile, tile) + movement(tools, u.kind) - 1) / movement(tools, u.kind)).max().unwrap_or(0);
+        let moves = |kind: crate::ids::UnitKindId| i32::from(rules.units[kind.0 as usize].movement.max(1));
+        let walk = view.brief.units.iter().filter(|u| u.role == AiRole::Military).map(|u| (view.dist(u.tile, tile) + moves(u.kind) - 1) / moves(u.kind)).max().unwrap_or(0);
         out.push((i64::from(rounds) + i64::from(walk), Target { tile, owner, estimate }));
     }
     out.sort_by_key(|(cost, t)| (*cost, t.tile));
@@ -205,7 +263,7 @@ fn ready_group_takes(view: &UnitView<'_, '_>, tools: &PlanTools<'_>, target: &Ta
         let range = crate::ai::combat::ranged_range(tools.rules, u.kind);
         dist(view, u.tile, target.tile) <= movement(tools, u.kind) + range.unwrap_or(1) - i32::from(range.is_none())
     };
-    siege_estimate(view, tools, &target.estimate, TAKE_ROUNDS, ready).is_some()
+    siege_estimate(view.brief, tools.rules, &target.estimate, TAKE_ROUNDS, ready).is_some()
 }
 
 /// The tiles next to the city (or, for a shooter, within its range) the unit may walk to, the nearest first: the
@@ -280,12 +338,60 @@ pub fn decide(view: &UnitView<'_, '_>, state: &AiState, tools: &mut PlanTools<'_
     if !active(view, tools) {
         return None;
     }
+    if view.brief.landless_plan {
+        // The strategist's operation has the units while it runs (`goal`, `operations::start`).
+        if !state.operations().is_empty() {
+            return None;
+        }
+        return harm(view, tools).or_else(|| withdraw(view, tools));
+    }
     take_city(view, state, tools).or_else(|| harm(view, tools))
+}
+
+/// Hostile fighters this close to a unit with nothing to do make it step away (`withdraw`).
+const WITHDRAW_RADIUS: i32 = NEAR;
+
+/// `landless-plan`: a military unit with nothing to take and no harm worth doing, that sees a fighter of a player
+/// at war with it within `WITHDRAW_RADIUS` (or stands in the strike of such a player's city), steps to the tile
+/// within its move that lies farthest from them (the nearest of them counts; then the shorter move). An empire's
+/// unit goes home when its operation is called off; this player has no home, and the army is its life. None when
+/// no tile is farther than where it stands.
+fn withdraw(view: &UnitView<'_, '_>, tools: &PlanTools<'_>) -> Option<Decision> {
+    let rules = tools.rules;
+    let unit = view.local.unit;
+    if role_of(rules, unit.kind) != AiRole::Military {
+        return None;
+    }
+    let fighters: Vec<TileId> = view.local.foreign_units.iter().filter(|f| role_of(rules, f.kind) == AiRole::Military && at_war(view, f.owner)).map(|f| f.tile).collect();
+    let cities: Vec<TileId> = view.local.foreign_cities.iter().filter(|c| at_war(view, c.owner)).map(|c| c.tile).collect();
+    // Distance to the danger: the nearest fighter, or a city's strike as one tile nearer than it is.
+    let danger = |tile: TileId| -> i32 {
+        let f = fighters.iter().map(|t| dist(view, tile, *t)).min().unwrap_or(i32::MAX / 2);
+        let c = cities.iter().map(|t| dist(view, tile, *t) - crate::combat::city::CITY_ATTACK_RANGE + 1).min().unwrap_or(i32::MAX / 2);
+        f.min(c)
+    };
+    let here = danger(unit.tile);
+    if here > WITHDRAW_RADIUS {
+        return None;
+    }
+    let best = view
+        .local
+        .view
+        .own_reachable(unit.handle)
+        .into_iter()
+        .filter(|(t, _)| *t != unit.tile && crate::ai::planner_units::can_stop(view, rules, *t))
+        .map(|(t, _)| (danger(t), -dist(view, unit.tile, t), std::cmp::Reverse(t)))
+        .max()?;
+    if best.0 <= here {
+        return None;
+    }
+    let command = Command::MoveUnit { unit: unit.handle, destination: best.2 .0 };
+    view.local.view.accepts(&command).then(|| Decision::act(Actor::Unit(unit.id), Reason::Retreat, command))
 }
 
 fn take_city(view: &UnitView<'_, '_>, state: &AiState, tools: &mut PlanTools<'_>) -> Option<Decision> {
     let unit = view.local.unit;
-    let (_, target) = targets(view, state, tools).into_iter().next()?;
+    let (_, target) = targets(&Seen::of_unit(view), state, tools.rules, true).into_iter().next()?;
     let actor = Actor::Unit(unit.id);
     if !at_war(view, target.owner) {
         // At peace: walk up to the city; declare when every member can strike this turn.

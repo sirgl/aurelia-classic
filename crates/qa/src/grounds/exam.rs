@@ -84,6 +84,13 @@ pub enum Sc {
     L3a,
     L3b,
     L4,
+    /// The siege arenas without a city for the attacker (added 12 Nov, `landless-plan`; the older scenes unchanged,
+    /// `landless.rs`): S1 an army marches 8-12 tiles on a city-state's city; S2a / S2b an army enough for a weak new
+    /// city of a nation, and when the war is declared a reinforcement comes to the city: S2a a small one (the city
+    /// can still be taken), S2b twice the army, the first unit in the city (it cannot: the army should withdraw).
+    S1,
+    S2a,
+    S2b,
 }
 
 impl Sc {
@@ -107,14 +114,18 @@ impl Sc {
             Sc::L1 | Sc::L2 => 10,
             Sc::L3a | Sc::L3b => 11,
             Sc::L4 => 12,
+            Sc::S1 => 13,
+            Sc::S2a | Sc::S2b => 14,
         }
     }
     pub const ALL: [Sc; 13] = [Sc::T1a, Sc::T1b, Sc::T1d, Sc::T1s, Sc::T1k, Sc::T2, Sc::T3, Sc::T4, Sc::T5, Sc::T5r, Sc::T5b, Sc::C1, Sc::C3];
     /// The landless arenas (not in `ALL`: the old runs keep their default scenes).
     pub const LANDLESS: [Sc; 5] = [Sc::L1, Sc::L2, Sc::L3a, Sc::L3b, Sc::L4];
+    /// The siege arenas without a city (built by `landless_scenes` too).
+    pub const SIEGE: [Sc; 3] = [Sc::S1, Sc::S2a, Sc::S2b];
 
     pub fn is_landless(self) -> bool {
-        Sc::LANDLESS.contains(&self)
+        Sc::LANDLESS.contains(&self) || Sc::SIEGE.contains(&self)
     }
 
     pub fn name(self) -> &'static str {
@@ -137,11 +148,14 @@ impl Sc {
             Sc::L3a => "l3a",
             Sc::L3b => "l3b",
             Sc::L4 => "l4",
+            Sc::S1 => "s1",
+            Sc::S2a => "s2a",
+            Sc::S2b => "s2b",
         }
     }
 
     pub fn parse(text: &str) -> Result<Sc, String> {
-        Sc::ALL.into_iter().chain(Sc::LANDLESS).find(|s| s.name() == text).ok_or_else(|| format!("unknown scene {text} ({})", Sc::ALL.iter().chain(&Sc::LANDLESS).map(|s| s.name()).collect::<Vec<_>>().join(", ")))
+        Sc::ALL.into_iter().chain(Sc::LANDLESS).chain(Sc::SIEGE).find(|s| s.name() == text).ok_or_else(|| format!("unknown scene {text} ({})", Sc::ALL.iter().chain(&Sc::LANDLESS).chain(&Sc::SIEGE).map(|s| s.name()).collect::<Vec<_>>().join(", ")))
     }
 
     /// The rounds a scene lasts.
@@ -152,6 +166,8 @@ impl Sc {
             Sc::T3 | Sc::T5 | Sc::T5r | Sc::T5b => 14,
             Sc::C1 | Sc::C3 => 36,
             Sc::L1 | Sc::L2 | Sc::L3a | Sc::L3b | Sc::L4 => 30,
+            Sc::S1 => 36,
+            Sc::S2a | Sc::S2b => 30,
         }
     }
 
@@ -167,6 +183,7 @@ impl Sc {
             Sc::C1 | Sc::C3 => &["ref-press"],
             Sc::L1 | Sc::L2 | Sc::L3a | Sc::L3b => &["ref-takecity"],
             Sc::L4 => &["ref-raid"],
+            Sc::S1 | Sc::S2a | Sc::S2b => &["ref-siege", "ref-takecity"],
             _ => &[],
         }
     }
@@ -464,7 +481,7 @@ pub fn build(sc: Sc, rules: &CompiledRuleset, world: &World, control: bool) -> R
     run.info.insert("enemy_era".into(), game.view().auth.players().nation_era_of(enemy, rules).to_string());
     run.info.insert("world".into(), world.label.clone());
     match sc {
-        Sc::L1 | Sc::L2 | Sc::L3a | Sc::L3b | Sc::L4 => return Err("the landless scenes are built by landless_scenes".to_owned()),
+        Sc::L1 | Sc::L2 | Sc::L3a | Sc::L3b | Sc::L4 | Sc::S1 | Sc::S2a | Sc::S2b => return Err("the landless scenes are built by landless_scenes".to_owned()),
         Sc::T1a | Sc::T1b => {
             let (n_melee, m) = if sc == Sc::T1a { (1, 2) } else { (2, 3) };
             let melee = *mine_k.get(&Arm::Melee).ok_or("no melee kind")?;
@@ -1323,7 +1340,7 @@ impl Run {
         let limit = rel >= self.sc.rounds();
         let alive_enemy = theirs.iter().filter(|(p, _)| p.role != "reinforcement").count();
         let over = match self.sc {
-            Sc::L1 | Sc::L2 | Sc::L3a | Sc::L3b | Sc::L4 => true,
+            Sc::L1 | Sc::L2 | Sc::L3a | Sc::L3b | Sc::L4 | Sc::S1 | Sc::S2a | Sc::S2b => true,
             Sc::T1d | Sc::T1s => {
                 // WIN (fixed before the first run): at least one of ours alive, and by the round limit both
                 // attackers dead or none of ours killed.
@@ -1555,6 +1572,11 @@ pub fn play(rules: &CompiledRuleset, mut game: GameState, mut run: Run, instance
     if let Some(ls) = run.ls.as_mut() {
         ls.reference = reference.map(str::to_owned);
     }
+    // The landless arenas read the war probe of this thread (G1: the strategist's goals and operations; a probe only
+    // records, no decision reads it).
+    if landless {
+        classic_rules::ai::war_probe::enable(true);
+    }
     while !game.is_over() && !over && guard < 200 {
         guard += 1;
         if reference.is_some() && !landless {
@@ -1604,6 +1626,10 @@ pub fn play(rules: &CompiledRuleset, mut game: GameState, mut run: Run, instance
                 eprintln!("DEBUG r{r} {:?} {:?} {:?} {:?}", e.actor, e.reason, e.command, e.outcome);
             }
         }
+        if landless {
+            let probe = classic_rules::ai::war_probe::take();
+            run.note_operations(&probe, driver.states().get(run.learner));
+        }
         over = run.after_round(rules, &mut game, &mut driver);
         if live {
             if let Some(l) = run.trace.last() {
@@ -1615,6 +1641,9 @@ pub fn play(rules: &CompiledRuleset, mut game: GameState, mut run: Run, instance
                 run.renew_reference(&mut driver, &game, r);
             }
         }
+    }
+    if landless {
+        classic_rules::ai::war_probe::enable(false);
     }
     let (win, measures) = run.finish(&game);
     let round = game.view().auth.turn().round;

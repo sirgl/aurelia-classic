@@ -260,6 +260,12 @@ pub struct WarProbe {
     pub alive: Vec<(u32, PlayerId, Vec<u64>)>,
     /// The forming operations, every turn they form.
     pub forming: Vec<FormingSample>,
+    /// `landless-plan`: the city `ai::landless::goal` chose for a player with no city, each turn it chose
+    /// one: (round, player, target tile).
+    pub landless_goals: Vec<(u32, PlayerId, u32)>,
+    /// `landless-plan`: the operations started on such a goal (`operations::start_landless`): (round,
+    /// player, target tile).
+    pub landless_starts: Vec<(u32, PlayerId, u32)>,
 }
 
 thread_local! {

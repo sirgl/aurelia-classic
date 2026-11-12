@@ -321,7 +321,7 @@ fn decide_military(
         return decision;
     }
     // A player with units and no city gives them a goal (`ai::landless`); with a city it plays on.
-    if view.brief.landless {
+    if view.brief.landless || view.brief.landless_plan {
         if let Some(decision) = crate::ai::landless::decide(view, state, tools) {
             return decision;
         }
@@ -422,10 +422,9 @@ fn task_valid(view: &UnitView<'_, '_>, state: &AiState, rules: &CompiledRuleset,
                 && !scout_wanted_instead(view, state)
                 && settler_waiting_here(view, state).is_none()
         }
-        UnitTask::Assault { target } => state
-            .relations()
-            .iter()
-            .any(|m| m.at_war && m.objective.is_some_and(|o| o.tile == target)),
+        UnitTask::Assault { target } => {
+            state.relations().iter().any(|m| m.at_war && m.objective.is_some_and(|o| o.tile == target)) && assault_backed(view, state, target)
+        }
         UnitTask::Escort { ward } => escorted_settler_alive(view, state, ward),
         UnitTask::Heal { .. } => unit.hp < crate::world::unit::UNIT_MAX_HP,
         UnitTask::Operation { target } => state.operation(target).is_some(),
@@ -550,7 +549,7 @@ fn assign_military_task(
     if let Some(city) = ungarrisoned_city(view, state) {
         return Some(UnitTask::Defend { city });
     }
-    if let Some(target) = assault_objective(state) {
+    if let Some(target) = assault_objective(state).filter(|t| assault_backed(view, state, *t)) {
         return Some(UnitTask::Assault { target });
     }
     if let Some(ward) = unescorted_settler(view, state) {
@@ -588,6 +587,13 @@ fn ungarrisoned_city(view: &UnitView<'_, '_>, state: &AiState) -> Option<TileId>
         .filter(|c| state.holders(Reservation::Garrison(c.tile), Some(unit.id)) < target)
         .min_by_key(|c| (dims.distance(c.tile, unit.tile).unwrap_or(i32::MAX), c.id))
         .map(|c| c.tile)
+}
+
+/// A player with no city and no settler (`TurnBrief::landless_planned`) assaults a city only beside the
+/// operation on it: its army is that operation, and when the operation is called off (outmatched, timed out) there
+/// is no home to fall back to and no second army. True in every other state.
+fn assault_backed(view: &UnitView<'_, '_>, state: &AiState, target: TileId) -> bool {
+    !view.brief.landless_planned() || state.operation(target).is_some()
 }
 
 fn assault_objective(state: &AiState) -> Option<TileId> {

@@ -1152,6 +1152,10 @@ fn evaluate(mind: u64, sight: &AIObservation<'_>, brief: &TurnBrief, state: &AiS
         let defence = i64::from(def.strength.max(1)) * 100 * (100 + ground(at)) / 100;
         f.city_hit = city_hit(strength, defence);
     }
+    // A player with no city and no settler (`TurnBrief::landless_planned`) buys its first city with the army it has:
+    // without a city the army has no future of its own, so the capture is worth the city and the group (the losses
+    // are weighed against both). Every other player: the city's worth.
+    let value = if brief.landless_planned() { value + fighters.iter().map(|f| f.worth).sum::<i32>() } else { value };
     let city = CityModel { hp: city_hp, cap, heal: CITY_HEAL_PER_TURN as u16, value, time_cost, extra_hits };
 
     // Strike now: the shooters that fire this turn (or step in and set up for the
@@ -1459,7 +1463,9 @@ fn own_part(view: &UnitView<'_, '_>, tools: &mut PlanTools<'_>, plan: &mut Plan,
         // down for the next blow of the strike and leaves its striker able to fight on.
         let wears = |t: TileId| {
             plan.capture > 0.0
-                && pv.attack_preview_from(unit.handle, t, city.tile).is_some_and(|p| p.to_defender.1 > 0 && unit.hp.saturating_sub(p.to_attacker.2) >= crate::ai::front::STRIKE_KEEPS_HP)
+                // A player with no city (`TurnBrief::landless_planned`) has no reinforcement and no home to heal in: its
+                // striker keeps the hit points to fight on by the blow's expected damage, not by its worst.
+                && pv.attack_preview_from(unit.handle, t, city.tile).is_some_and(|p| p.to_defender.1 > 0 && unit.hp.saturating_sub(if view.brief.landless_planned() { p.to_attacker.1 } else { p.to_attacker.2 }) >= crate::ai::front::STRIKE_KEEPS_HP)
         };
         if let Some((_, tile)) = best.filter(|(ev, t)| *ev > 0.0 || wears(*t)) {
             if tile != unit.tile {

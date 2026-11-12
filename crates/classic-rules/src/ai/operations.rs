@@ -698,7 +698,9 @@ fn launch(brief: &TurnBrief, state: &mut AiState, operation: &Operation, at_war:
 /// last peace with this player.
 fn may_declare(brief: &TurnBrief, state: &AiState, operation: &Operation) -> bool {
     let last = state.relation(operation.enemy).and_then(|m| m.last_change_round);
-    brief.round >= brief.speed.game_round(EARLIEST_WAR_ROUND)
+    // The early peace is for an empire's growth: a player with no city has none (`landless-plan`).
+    let season = brief.landless_planned() || brief.round >= brief.speed.game_round(EARLIEST_WAR_ROUND);
+    season
         && !brief.relations.iter().any(|r| r.at_war)
         && rounds_since(brief, last) >= brief.speed.pace_rounds(PEACE_COOLDOWN_ROUNDS)
 }
@@ -788,6 +790,9 @@ fn start(brief: &TurnBrief, state: &mut AiState, rules: &CompiledRuleset, routes
     if matches!(gate, WarGate::Never) {
         return None;
     }
+    if brief.landless_planned() {
+        return start_landless(brief, state, rules, routes);
+    }
     let ready = in_season(brief)
         && brief.cities.len() >= 2
         && brief.round + brief.speed.pace_rounds(PREPARE_ROUNDS) >= brief.speed.game_round(EARLIEST_WAR_ROUND)
@@ -852,13 +857,67 @@ fn start(brief: &TurnBrief, state: &mut AiState, rules: &CompiledRuleset, routes
     Some(Decision::refuse(Actor::Player, Reason::FormOperation))
 }
 
+/// The operation of a `landless-plan` player with no city and no settler (`TurnBrief::landless_planned`):
+/// its target is the city `ai::landless::goal` says the units on hand take, its army those units (no
+/// city builds more: the need is the army an empire would plan, `composition_by`, as far as the units on
+/// hand go, and every free unit joins, `recruit`), its muster point the staging tile the route of
+/// its melee kind finds from the unit nearest the target (`Routes::stage`, as an empire's from its nearest
+/// city). It starts in any round (no season, no war chest, no case: nothing is built, and a city is all such a
+/// player can win), but not when the defenders seen at the target outmatch the army already (`outmatched`: it
+/// would end at once). From here the operation is an empire's: `advance`, `launch`, `recruit`, the members'
+/// steps, the siege (`ai::siege_walls`, `ai::front`).
+fn start_landless(brief: &TurnBrief, state: &mut AiState, rules: &CompiledRuleset, routes: &mut Routes<'_>) -> Option<Decision> {
+    let (target, enemy) = brief.landless_goal?;
+    let free: Vec<&UnitBrief> = counted_free_units(brief, state, rules).collect();
+    let have = composition_of(rules, free.iter().map(|u| u.kind));
+    if have.melee == 0 {
+        return None;
+    }
+    // The army an empire would plan for the city (`composition_by`), of the kinds on hand, as far as the units on
+    // hand go: the rest join as the operation's extra members, and a unit lost or hurt on the way does not hold the
+    // muster for ever.
+    let strongest = |role: ArmyRole| free.iter().filter(|u| army_role(rules, u.kind) == Some(role)).map(|u| u.kind).max_by_key(|k| (role_strength(rules, *k, role), std::cmp::Reverse(k.0)));
+    let arsenal = Arsenal { melee: strongest(ArmyRole::Melee), ranged: strongest(ArmyRole::Ranged), siege: strongest(ArmyRole::Siege) };
+    let population = state.seen_cities().iter().find(|c| c.tile == target).map_or(crate::ai::landless::ASSUMED_POPULATION, |c| c.population);
+    let city = SeenCity { tile: target, owner: enemy, population, last_seen_round: brief.round };
+    let estimate = estimate_city(brief, rules, &city, arsenal.melee);
+    let threat = state.relation(enemy).map_or(0, |m| m.threat).max(defence(brief, enemy, target));
+    let need = match composition_by(rules, &arsenal, &estimate, threat, brief.army_fit) {
+        Some(plan) => {
+            let siege = plan.siege.min(have.siege);
+            let distance = (plan.ranged + plan.siege).min(have.ranged + have.siege);
+            Composition { melee: plan.melee.min(have.melee), ranged: distance - siege, siege }
+        }
+        None => have,
+    };
+    let walker = free.iter().filter(|u| army_role(rules, u.kind) == Some(ArmyRole::Melee)).min_by_key(|u| (brief.dims.distance(u.tile, target).unwrap_or(i32::MAX), u.id))?;
+    let from = free.iter().min_by_key(|u| (brief.dims.distance(u.tile, target).unwrap_or(i32::MAX), u.id))?.tile;
+    let operation = Operation { target, enemy, muster: from, need, phase: OperationPhase::Forming, since_round: brief.round, phase_round: brief.round };
+    if outmatched(brief, rules, &operation, &free) {
+        return None;
+    }
+    let stage = routes.stage(walker.kind, from, target)?;
+    if !state.seen_cities().iter().any(|c| c.tile == target && c.owner == enemy) {
+        // A city of the known map not in sight: remembered as `landless` estimated it.
+        state.see_city(SeenCity { tile: target, owner: enemy, population: crate::ai::landless::ASSUMED_POPULATION, last_seen_round: brief.round });
+    }
+    crate::ai::war_probe::note(|p| p.landless_starts.push((brief.round, brief.player, target.0)));
+    state.start_operation(Operation { muster: stage.tile, ..operation });
+    Some(Decision::refuse(Actor::Player, Reason::FormOperation))
+}
+
+/// The units `counted_free` counts.
+fn counted_free_units<'b>(brief: &'b TurnBrief, state: &'b AiState, rules: &'b CompiledRuleset) -> impl Iterator<Item = &'b UnitBrief> {
+    let on_assault = move |u: &&UnitBrief| brief.war.siege.assault && u.hp >= HEAL_BELOW_HP && army_role(rules, u.kind).is_some() && matches!(state.task_of(u.id).map(|t| t.task), Some(UnitTask::Assault { .. }));
+    strike_units(brief, state, rules).chain(brief.units.iter().filter(on_assault))
+}
+
 /// The army a new operation counts on: the units free for a strike. With `SiegeFixes::assault`
 /// the units on an assault are not free, but an operation may still take them
 /// (`assault_recruits`): its army counts them as the game's AI does. `start` and the strategist's
 /// look at the war machine (`outlook`) count the same units, so their verdicts agree.
 fn counted_free(brief: &TurnBrief, state: &AiState, rules: &CompiledRuleset) -> Composition {
-    let on_assault = |u: &&UnitBrief| brief.war.siege.assault && u.hp >= HEAL_BELOW_HP && army_role(rules, u.kind).is_some() && matches!(state.task_of(u.id).map(|t| t.task), Some(UnitTask::Assault { .. }));
-    composition_of(rules, strike_units(brief, state, rules).chain(brief.units.iter().filter(on_assault)).map(|u| u.kind))
+    composition_of(rules, counted_free_units(brief, state, rules).map(|u| u.kind))
 }
 
 /// A new operation or raid may start under `strategy`: not while defending; not while
@@ -1244,6 +1303,12 @@ pub fn running_case(brief: &TurnBrief, state: &AiState, rules: &CompiledRuleset,
     let chance = model_chance(brief, state, rules, &arsenal, city, &estimate_target(brief, rules, city), operation.need, Some(operation.since_round));
     let mut case = war_case(prices, stakes, rules, &arsenal, city, operation.need, missing, rounds, crate::ai::strikes::on_hand_best(&brief.armory), chance, brief.war.siege, rival_percent(brief, city.owner));
     case.gain += infamy_bonus(brief, enemy);
+    if brief.landless_planned() {
+        // A player with no city (`TurnBrief::landless_planned`): the army has no future without the city it marches
+        // on, so going on is worth the army's own price beside the capture (a peace leaves it nothing to win).
+        let hammer = prices.production / i64::from(prices.rounds_left.max(1));
+        case.gain += members(brief, state, operation.target).iter().map(|u| i64::from(rules.units[u.kind.0 as usize].cost) * hammer).sum::<i64>();
+    }
     Some(case)
 }
 
@@ -1762,7 +1827,8 @@ fn recruit(brief: &TurnBrief, state: &mut AiState, rules: &CompiledRuleset, oper
     let task = UnitTask::Operation { target };
     for (_, unit, kind) in candidates {
         let Some(role) = army_role(rules, kind) else { continue };
-        if operation.phase == OperationPhase::Forming && !wanted(operation.need, have, role) {
+        // A player with no city takes every free unit into its operation: no city wants one, and the army is all it has.
+        if operation.phase == OperationPhase::Forming && !wanted(operation.need, have, role) && !brief.landless_planned() {
             continue;
         }
         have.add(role);

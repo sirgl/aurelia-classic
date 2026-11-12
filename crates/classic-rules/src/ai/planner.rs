@@ -380,6 +380,12 @@ pub struct TurnBrief {
     pub raid_war: bool,
     /// `landless` (`Variant::landless`): the goal of a player with units and no city (`ai::landless`).
     pub landless: bool,
+    /// `landless-plan` (`Variant::landless_plan`): the same goal, given to the empire's strategist
+    /// (`ai::landless::goal`, `operations::start`).
+    pub landless_plan: bool,
+    /// The city the units of a `landless-plan` player with no city and no settler take, and its
+    /// owner (`ai::landless::goal`, set at the start of the turn; None in every other state).
+    pub landless_goal: Option<(TileId, PlayerId)>,
     /// Its tall style reaches for the science victory (`Variant::tall_real`, `ai::tall_real`).
     pub tall_real: bool,
     /// `tall-real` with the review's fixes (`Variant::next`, `ai::tall_real`).
@@ -516,6 +522,8 @@ impl TurnBrief {
             field_craft: false,
             raid_war: false,
             landless: false,
+            landless_plan: false,
+            landless_goal: None,
             tall_real: false,
             next: false,
             wonder_race: 0,
@@ -551,6 +559,12 @@ impl TurnBrief {
     /// The own city on `tile` is in danger this turn (`ai::defence`).
     pub fn endangered(&self, tile: TileId) -> bool {
         self.defence.as_ref().is_some_and(|watch| watch.danger(tile).is_some())
+    }
+
+    /// `landless-plan` plays the state it is for: the player has no city and no unit that founds
+    /// one (`ai::landless`). False for every other variant, and whenever the player has a city.
+    pub fn landless_planned(&self) -> bool {
+        self.landless_plan && self.cities.is_empty() && !self.units.iter().any(|u| u.role == AiRole::Settler)
     }
 
     pub fn count_role(&self, role: AiRole) -> usize {
