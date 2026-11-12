@@ -166,6 +166,8 @@ pub struct AIObservation<'a> {
     pub city_states: Vec<CityStateInfo>,
     /// The World Congress as its screen shows it (None: not founded).
     pub congress: Option<CongressInfo>,
+    /// The public screens: scores, demographics, victory rows, wonder news (`PublicScreens`).
+    pub public: PublicScreens,
     /// Our spies (the espionage overview).
     pub spies: Vec<SpyInfo>,
     /// Victims we hold steal rights on, with what may be stolen.
@@ -175,6 +177,59 @@ pub struct AIObservation<'a> {
     /// The game's speed (the setup screen): the AI's horizons and gates in
     /// rounds read it (`SpeedValues::pace_rounds`, `game_round`).
     pub speed: kernel::rules::speeds::SpeedValues,
+}
+
+/// What the player's public screens show about the world: the score list and the capitals of the
+/// victory screen, the demographics, the victory rows, the era announcements and the news of the
+/// wonders built. The same figures the interface shows (`derived::standing` is the one computation of
+/// the demographics and the victory rows; `PlayerQueries::race`, `wonder_news` and `met_eras` the
+/// rest). A nation not met appears nowhere but in the range of a demographics row, as on the screen;
+/// the screens give no rival's own value of a row, so none is here.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PublicScreens {
+    /// The score list: the player first, then every nation it met, by id.
+    pub scores: Vec<(PlayerId, i64)>,
+    /// The original capitals the domination row counts, with their holders as far as seen.
+    pub capitals: Vec<crate::knowledge::public::CapitalStanding>,
+    /// The demographics rows (the player's value, rank, the range of the living nations).
+    pub demographics: Vec<crate::derived::standing::Demographic>,
+    /// The victory rows (the player's own progress on each kind).
+    pub victory: Vec<crate::derived::standing::VictoryProgress>,
+    /// The era of every living nation met.
+    pub eras: Vec<(PlayerId, u8)>,
+    /// Every world wonder built, with its builder where met (the announcement).
+    pub wonders: Vec<crate::knowledge::public::WonderNews>,
+}
+
+impl PublicScreens {
+    /// The row of a measure.
+    pub fn row(&self, measure: crate::derived::standing::Measure) -> Option<&crate::derived::standing::Demographic> {
+        self.demographics.iter().find(|d| d.measure == measure)
+    }
+
+    /// The row of a kind of victory.
+    pub fn progress(&self, kind: crate::world::victory::VictoryKind) -> Option<&crate::derived::standing::VictoryProgress> {
+        self.victory.iter().find(|v| v.kind == kind)
+    }
+
+    /// The score of a nation on the list (the player's own included).
+    pub fn score_of(&self, player: PlayerId) -> Option<i64> {
+        self.scores.iter().find(|(p, _)| *p == player).map(|(_, s)| *s)
+    }
+}
+
+/// The public screens of `player` (the interface's overview, victory and news screens).
+pub fn public_screens(auth: &AuthWorld, derived: &DerivedWorld, rules: &CompiledRuleset, view: &PlayerView<'_>, player: PlayerId) -> PublicScreens {
+    use crate::knowledge::public::PlayerQueries;
+    let race = view.race();
+    PublicScreens {
+        scores: race.scores,
+        capitals: race.capitals,
+        demographics: crate::derived::standing::demographics(auth, rules, derived, player),
+        victory: crate::derived::standing::victory_progress(auth, rules, player),
+        eras: view.met_eras(),
+        wonders: view.wonder_news(),
+    }
 }
 
 /// One of our spies as the espionage overview shows it.
@@ -367,6 +422,10 @@ impl<'a> AIObservation<'a> {
             let _span = prof::span("nation5/obs congress");
             congress_info(auth, rules, player, &relations)
         };
+        let public = {
+            let _span = prof::span("nation5/obs public");
+            public_screens(auth, derived, rules, &view, player)
+        };
         let _spies_span = prof::span("nation5/obs spies+steal");
         let observation = Self {
             player,
@@ -394,6 +453,7 @@ impl<'a> AIObservation<'a> {
             built_wonders,
             city_states,
             congress,
+            public,
             spies: spies_of(auth, player),
             steal: steal_rights(auth, rules, player),
             victories: auth.module().victory().options(),

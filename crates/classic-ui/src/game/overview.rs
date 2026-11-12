@@ -2,7 +2,7 @@
 //! banners and the top-bar breakdowns. Every number is a core query
 //! (`city_income`, `player_income`, `maintenance::upkeep`, `unit_modifiers`); views
 //! of the whole empire are rebuilt only when the game changed (`revision`).
-use classic_rules::derived::income::{city_income, player_income, player_income_from, speed_growth_threshold, CityIncome};
+use classic_rules::derived::income::{city_income, player_income_from, speed_growth_threshold, CityIncome};
 use classic_rules::derived::maintenance::{upkeep, Upkeep};
 use classic_rules::effects::unit::{unit_modifiers, CombatRole};
 use classic_rules::ids::{PlayerId, TileId};
@@ -307,74 +307,25 @@ impl Session {
     }
 
     fn demographics(&self) -> Vec<DemographicRow> {
-        let auth = self.game().view().auth;
-        let rules = self.rules();
-        let players: Vec<PlayerId> = (0..auth.players().count() as u8)
-            .map(PlayerId)
-            .filter(|p| auth.players().is_alive(*p))
-            .collect();
-        let mut land = vec![0i64; auth.players().count()];
-        for t in 0..auth.map().tile_count() as u32 {
-            if let Some(Some(owner)) = auth.map().owner(TileId(t)) {
-                if let Some(count) = land.get_mut(owner.0 as usize) {
-                    *count += 1;
-                }
-            }
-        }
-        let techs = rules.technologies.len().max(1) as i64;
-        let derived = &self.game().view().derived.yields;
-        let food = |p: PlayerId| derived.of_player(p).food as i64;
-        let production = |p: PlayerId| derived.of_player(p).production as i64;
-        let measures: [Measure<'_>; 7] = [
-            (t!("classic.game.overview.demo-population"), t!("classic.game.overview.demo-population-unit"), Box::new(|p| population(auth, p))),
-            (t!("classic.game.overview.demo-crop"), t!("classic.game.overview.demo-crop-unit"), Box::new(food)),
-            (t!("classic.game.overview.demo-goods"), t!("classic.game.overview.demo-goods-unit"), Box::new(production)),
-            (t!("classic.game.overview.demo-gnp"), t!("classic.game.overview.demo-gnp-unit"), Box::new(|p| player_income(auth, rules, p).gold as i64)),
-            (t!("classic.game.overview.demo-literacy"), t!("classic.game.overview.demo-literacy-unit"), Box::new(|p| auth.players().techs_of(p).len() as i64 * 100 / techs)),
-            (t!("classic.game.overview.demo-land"), t!("classic.game.overview.demo-land-unit"), Box::new(|p| land.get(p.0 as usize).copied().unwrap_or(0))),
-            (t!("classic.game.overview.demo-soldiers"), t!("classic.game.overview.demo-soldiers-unit"), Box::new(|p| soldiers(auth, rules, p))),
-        ];
-        measures
-            .iter()
-            .map(|(label, unit, measure)| demographic(label, unit, &players, self.me(), measure.as_ref()))
+        use classic_rules::derived::standing::{demographics, Measure};
+        let view = self.game().view();
+        demographics(view.auth, self.rules(), view.derived, self.me())
+            .into_iter()
+            .map(|d| {
+                let (label, unit) = match d.measure {
+                    Measure::Population => (t!("classic.game.overview.demo-population"), t!("classic.game.overview.demo-population-unit")),
+                    Measure::Crop => (t!("classic.game.overview.demo-crop"), t!("classic.game.overview.demo-crop-unit")),
+                    Measure::Goods => (t!("classic.game.overview.demo-goods"), t!("classic.game.overview.demo-goods-unit")),
+                    Measure::Gnp => (t!("classic.game.overview.demo-gnp"), t!("classic.game.overview.demo-gnp-unit")),
+                    Measure::Literacy => (t!("classic.game.overview.demo-literacy"), t!("classic.game.overview.demo-literacy-unit")),
+                    Measure::Land => (t!("classic.game.overview.demo-land"), t!("classic.game.overview.demo-land-unit")),
+                    Measure::Soldiers => (t!("classic.game.overview.demo-soldiers"), t!("classic.game.overview.demo-soldiers-unit")),
+                };
+                DemographicRow { label, unit, value: d.value, rank: d.rank, best: d.best, average: d.average, worst: d.worst }
+            })
             .collect()
     }
-
-
 }
-
-fn population(auth: &classic_rules::world::state::AuthWorld, p: PlayerId) -> i64 {
-    let cities = auth.indexes().cities_of(p);
-    cities.iter().filter_map(|c| auth.cities().get(*c)).map(|c| c.population as i64).sum()
-}
-
-fn soldiers(auth: &classic_rules::world::state::AuthWorld, rules: &classic_rules::CompiledRuleset, p: PlayerId) -> i64 {
-    let units = auth.indexes().units_of(p);
-    units
-        .iter()
-        .filter_map(|u| auth.units().get(*u))
-        .filter(|u| !rules.is_civilian(u.core.kind))
-        .count() as i64
-}
-
-fn demographic(
-    label: &'static str,
-    unit: &'static str,
-    players: &[PlayerId],
-    me: PlayerId,
-    measure: &dyn Fn(PlayerId) -> i64,
-) -> DemographicRow {
-    let values: Vec<(PlayerId, i64)> = players.iter().map(|p| (*p, measure(*p))).collect();
-    let mine = values.iter().find(|(p, _)| *p == me).map(|(_, v)| *v).unwrap_or(0);
-    let rank = 1 + values.iter().filter(|(_, v)| *v > mine).count();
-    let best = values.iter().map(|(_, v)| *v).max().unwrap_or(0);
-    let worst = values.iter().map(|(_, v)| *v).min().unwrap_or(0);
-    let average = values.iter().map(|(_, v)| *v).sum::<i64>() / values.len().max(1) as i64;
-    DemographicRow { label, unit, value: mine, rank, best, average, worst }
-}
-
-/// A demographics measure: label, unit and the value of a player.
-type Measure<'a> = (&'static str, &'static str, Box<dyn Fn(PlayerId) -> i64 + 'a>);
 
 /// City incomes of the player with the player's totals.
 struct EmpireIncome {
