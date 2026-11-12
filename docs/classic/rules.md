@@ -476,7 +476,7 @@ Every `pub const` of the rule code, by system. Value as written in the code; mea
 | `OFFER_ROUNDS` | `1` | An offer waits this many rounds for its answer. | own value | `deals.rs` |
 | `EMBASSY_REVEAL_RADIUS` | `2` | An embassy reveals the tiles this close to the host's capital (our rule: public descriptions name the capital and the tiles around it, no number). | own value (source not recorded) | `deals.rs` |
 | `ALL` | `[ DealBlock::NotOurDeal, DealBlock::GoldNeedsFriendship, DealBlock::NotEnoughGold, Deal...` |  | own value (source not recorded) | `deals.rs` |
-| `MIN_WAR_ROUNDS_BEFORE_PEACE` | `10` | Rounds a war between two nations lasts before either may end it: no peace deal and no `MakePeace` until then (the original game's ten turns). | own value (source not recorded) | `deals.rs` |
+| `MIN_WAR_ROUNDS_BEFORE_PEACE` | `10` | Rounds a war between two nations lasts before either may end it: no peace deal until then (the original game's ten turns). | own value (source not recorded) | `deals.rs` |
 | `DEAL_DURATION` | `30` | Rounds a timed deal lasts at Standard speed: gold per turn, resources, open borders, defensive pacts, research agreements (another speed: `deal_duration`). | Unciv: Speeds.json (Gods & Kings ruleset), Standard dealDuration; equal | `mod.rs` |
 | `PEACE_DURATION` | `10` | Rounds after a peace treaty during which no new war may start, at Standard speed (another speed: `peace_duration`). | Unciv: Speeds.json, Standard peaceDealDuration; equal | `mod.rs` |
 | `RELATIONSHIP_DURATION` | `30` | Rounds a declaration of friendship or a denunciation lasts. | Unciv: logic/nation/diplomacy/DiplomacyManager.kt (both flags set to 30 turns, not scaled by speed); equal | `mod.rs` |
@@ -902,7 +902,7 @@ Tuning numbers of the computer players (`classic/crates/classic-rules/src/ai`). 
 | Name | Value | Meaning | Source | File |
 |---|---|---|---|---|
 | `FRIENDSHIP_MIN_CONTACT_ROUNDS` | `20` | No friendship before this many rounds of contact (Standard speed; × the speed's pace); own value, unverified. | own value (unverified) | `diplomacy.rs` |
-| `ACCEPT_PEACE_AFTER_ROUNDS` | `crate::systems::diplomacy::deals::MIN_WAR_ROUNDS_BEFORE_PEACE` | The AI accepts a peace (and proposes one to a rival in the diplomacy advisor) only after this many rounds of war. | own value (source not recorded) | `diplomacy.rs` |
+| `ACCEPT_PEACE_AFTER_ROUNDS` | `crate::systems::diplomacy::deals::MIN_WAR_ROUNDS_BEFORE_PEACE` | The plain proposals (`proposals`) offer peace to a rival only after twice this many rounds of war. | own value (source not recorded) | `diplomacy.rs` |
 | `DISTRUST_WARMONGER` | `100` | Warmonger memory above which the AI distrusts (no friendship, pacts). | own value (source not recorded) | `diplomacy.rs` |
 | `DENOUNCE_WARMONGER` | `250` | Warmonger memory above which the AI denounces. | own value (source not recorded) | `diplomacy.rs` |
 | `RECENT_WAR_ROUNDS` | `30` | No friendly deal with a former enemy for this many rounds after the peace treaty ends. | own value (source not recorded) | `diplomacy.rs` |
@@ -1062,7 +1062,7 @@ Tuning numbers of the computer players (`classic/crates/classic-rules/src/ai`). 
 
 | Name | Value | Meaning | Source | File |
 |---|---|---|---|---|
-| `PEACE_AFTER_UNSEEN_ROUNDS` | `5` | Rounds without sight of an enemy after which the AI makes peace. | own value (source not recorded) | `greedy.rs` |
+| `PEACE_AFTER_UNSEEN_ROUNDS` | `5` | Rounds without sight of an enemy after which the AI ends the war: it offers peace to a nation and makes it with a city-state. | own value (source not recorded) | `greedy.rs` |
 
 ### `improvements.rs`
 

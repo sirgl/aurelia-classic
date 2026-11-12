@@ -78,6 +78,10 @@ pub enum ClassicChange {
     /// Treaties, embassies, friendships, deals or offers of the player
     /// changed (no derived system reads them).
     RelationsChanged { player: PlayerId },
+    /// `to` answered the offer of `from`: accepted it or refused it; `peace` tells that the
+    /// offer made peace between them (the proposer's screen tells the answer; no derived
+    /// system reads it).
+    OfferAnswered { from: PlayerId, to: PlayerId, accepted: bool, peace: bool },
     /// The city took `damage` hit points in a fight (melee, a ranged or air
     /// attack, a nuke). No derived system reads city damage; the
     /// presentation shows the number on the city.
@@ -102,6 +106,7 @@ impl ModuleChange for ClassicChange {
             | ClassicChange::NaturalWonderFound { .. }
             | ClassicChange::WonderYield { .. }
             | ClassicChange::RelationsChanged { .. }
+            | ClassicChange::OfferAnswered { .. }
             | ClassicChange::CityDamaged { .. } => {
                 StaleYields::Nothing
             }

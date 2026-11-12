@@ -193,7 +193,6 @@ mod tests {
             assert_eq!(variant.weak_fighter(), Some(fighter));
             assert_eq!(variant.price_model(), Variant::Standard.price_model());
             assert_eq!(variant.science_pricing(), Variant::Standard.science_pricing());
-            assert_eq!(variant.peace_making(), Variant::Standard.peace_making());
             assert!(!variant.tactical() && !variant.danger_net());
         }
         assert_eq!(Variant::ALL.iter().filter(|v| v.weak_fighter().is_some()).count(), controls.len());

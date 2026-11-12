@@ -296,7 +296,12 @@ pub(crate) fn rounds_since(brief: &TurnBrief, round: Option<u32>) -> u32 {
     }
 }
 
+/// Peace alone in a war with a city-state; with a nation peace is a deal
+/// (`ai::peace`), the rules refuse it alone.
 fn consider_peace(brief: &TurnBrief, state: &AiState, relation: &Relation) -> Option<Decision> {
+    if relation.kind == crate::world::player::PlayerKind::Major {
+        return None;
+    }
     let memory = state.relation(relation.other)?;
     let age = rounds_since(brief, memory.last_change_round);
     if age < MIN_WAR_ROUNDS {

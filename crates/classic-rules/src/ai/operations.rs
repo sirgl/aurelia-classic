@@ -479,9 +479,10 @@ pub fn plan(brief: &TurnBrief, state: &mut AiState, rules: &CompiledRuleset, rou
     out
 }
 
-/// Peace in every war old enough that no operation fights (the war was for
-/// an operation that ended, or the enemy's cities are out of reach) and
-/// that `decided` does not end already.
+/// Peace in every war with a city-state old enough that no operation fights
+/// (the war was for an operation that ended, or the enemy's cities are out of
+/// reach) and that `decided` does not end already. A war with a nation ends by
+/// a deal (`ai::peace`): the rules refuse peace alone with it.
 pub fn idle_wars(brief: &TurnBrief, state: &AiState, decided: &[Decision]) -> Vec<Decision> {
     let raided = crate::ai::raid::enemies(state);
     let fought = |enemy: PlayerId| state.operations().iter().any(|o| o.enemy == enemy) || raided.contains(&enemy);
@@ -489,7 +490,7 @@ pub fn idle_wars(brief: &TurnBrief, state: &AiState, decided: &[Decision]) -> Ve
     brief
         .relations
         .iter()
-        .filter(|r| r.at_war && !fought(r.other) && !ended(r.other))
+        .filter(|r| r.at_war && r.kind != crate::world::player::PlayerKind::Major && !fought(r.other) && !ended(r.other))
         .filter(|r| rounds_since(brief, state.relation(r.other).and_then(|m| m.last_change_round)) >= MIN_WAR_ROUNDS)
         .map(|r| {
             let command = Command::MakePeace { player: brief.player, enemy: r.other };

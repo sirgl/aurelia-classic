@@ -91,6 +91,12 @@ fn rounds(game: &mut GameState, rules: &CompiledRuleset, n: u32) {
     until_active(game, rules, P0);
 }
 
+/// The game's AI for every player but `humans`.
+fn ai_driver(rules: &CompiledRuleset, humans: Vec<PlayerId>) -> kernel::ai::driver::AiDriver<classic_rules::classic::Classic, classic_rules::ai::driver::ClassicMind> {
+    let settings = classic_rules::ai::AiSettings::for_rules(rules, rules.default_difficulty());
+    kernel::ai::driver::AiDriver::with_mind(settings, humans, classic_rules::ai::driver::ClassicMind::new(classic_rules::ai::variant::Variant::Standard))
+}
+
 /// Propose from the active player and accept as the receiver.
 fn deal(
     game: &mut GameState,
@@ -136,13 +142,12 @@ fn war_needs_contact_and_peace_blocks_war_for_ten_rounds() {
     assert!(game.execute(&rules, war.clone()).is_err(), "not met");
     let (mut game, rules) = three_nations();
     game.execute(&rules, war.clone()).unwrap();
-    let peace = Command::MakePeace {
-        player: P0,
-        enemy: P1,
-    };
-    assert!(game.execute(&rules, peace.clone()).is_err(), "a young war cannot end");
+    let peace = vec![(P0, DealItem::Peace)];
+    let young = Command::ProposeDeal { from: P0, to: P1, items: peace.clone() };
+    assert!(game.execute(&rules, young).is_err(), "a young war cannot end");
     rounds(&mut game, &rules, 10);
-    game.execute(&rules, peace).unwrap();
+    deal(&mut game, &rules, P0, P1, peace);
+    assert!(!game.view().auth.diplomacy().at_war(P0, P1));
     assert!(game.execute(&rules, war.clone()).is_err(), "peace treaty");
     rounds(&mut game, &rules, 10);
     assert!(
@@ -350,19 +355,13 @@ fn ai_exchanges_embassies_and_answers_offers() {
     for cmd in offers {
         game.execute(&rules, cmd).unwrap();
     }
-    for p in [P1, P2] {
-        let answers =
-            classic_rules::ai::diplomacy::answer_offers(&game.ai_observation(&rules, p), &rules);
-        assert!(
-            answers
-                .iter()
-                .all(|c| matches!(c, Command::RespondDeal { accept: true, .. })),
-            "{answers:?}"
-        );
-        for cmd in answers {
-            game.execute(&rules, cmd).unwrap();
-        }
-    }
+    // The AI of the others answers on its turn (`ai::peace::answer_offers`).
+    game.execute(&rules, Command::EndTurn { player: P0 }).unwrap();
+    let mut driver = ai_driver(&rules, vec![P0]);
+    driver.set_trace_capacity(10_000);
+    driver.run(&mut game, &rules, u32::MAX);
+    let answers: Vec<bool> = driver.trace().entries().filter_map(|e| match e.command { Some(Command::RespondDeal { accept, .. }) => Some(accept), _ => None }).collect();
+    assert!(answers.len() >= 2 && answers.iter().all(|a| *a), "{answers:?}");
     let r = game.view().auth.module().relations();
     assert!(r.has_embassy(P0, P1) && r.has_embassy(P1, P0));
 }
