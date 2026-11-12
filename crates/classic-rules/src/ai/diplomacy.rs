@@ -296,7 +296,15 @@ impl crate::ai::system::SystemAdvisor for DiplomacyAdvisor {
         if obs.view.own_kind() != PlayerKind::Major {
             return Vec::new();
         }
-        let mut out = crate::ai::combat::proposals(40, crate::ai::peace::answer_offers(input));
+        // `retake`: a peace offered by the holder of a city being retaken is refused (`ai::retake`).
+        let answers = crate::ai::peace::answer_offers(input)
+            .into_iter()
+            .map(|c| match c {
+                Command::RespondDeal { player, offer, accept: true, why } if obs.offers_to_us.iter().any(|o| o.id == offer && input.brief.retaking_from(o.from) && o.items.iter().any(|(_, i)| *i == DealItem::Peace)) => Command::RespondDeal { player, offer, accept: false, why },
+                other => other,
+            })
+            .collect::<Vec<_>>();
+        let mut out = crate::ai::combat::proposals(40, answers);
         let my_round = (obs.round + u32::from(obs.player.0)) % PROPOSAL_INTERVAL == 0;
         if my_round {
             let deals: Vec<Command> = proposals_priced(obs, input.rules, agreement_prices(input))
@@ -311,7 +319,9 @@ impl crate::ai::system::SystemAdvisor for DiplomacyAdvisor {
             if self.embassies {
                 out.extend(crate::ai::combat::proposals(5, crate::ai::peace::embassy_offers(input, &asked)));
             }
-            out.extend(crate::ai::combat::proposals(5, crate::ai::peace::peace_offers(input)));
+            // `retake`: no peace is offered to the holder of a city being retaken.
+            let peace = crate::ai::peace::peace_offers(input).into_iter().filter(|c| !matches!(c, Command::ProposeDeal { to, .. } if input.brief.retaking_from(*to)));
+            out.extend(crate::ai::combat::proposals(5, peace.collect::<Vec<_>>()));
             out.extend(crate::ai::combat::proposals(5, denunciations(obs)));
         }
         out

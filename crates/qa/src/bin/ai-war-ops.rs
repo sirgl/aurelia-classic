@@ -33,6 +33,11 @@ use aurelia_qa::bench::play::{play_match, Pairing};
 use aurelia_qa::bench::suite::{Match, Seating, Suite};
 use classic_rules::ai::operations::{learned_chance, open_chance, CHANCE_FEATURES, CHANCE_N as N};
 use classic_rules::ai::war_probe;
+use classic_rules::ids::PlayerId;
+
+/// Rounds after a capture within which the former owner's capture of the same city counts as a retake
+/// (the window of the capture bank's replays, `ai-siege-bank cap-replay --rounds 8`).
+const RETAKE_WINDOW: u32 = 8;
 
 struct Options {
     variant: String,
@@ -134,6 +139,8 @@ fn play(o: &Options) -> Result<(), String> {
     let next = AtomicUsize::new(0);
     let rows: Mutex<Vec<(usize, Vec<Row>)>> = Mutex::new(Vec::new());
     let estimates: Mutex<Vec<(usize, String)>> = Mutex::new(Vec::new());
+    let taken = AtomicUsize::new(0);
+    let retake: Mutex<Vec<(usize, usize, usize, usize)>> = Mutex::new(Vec::new());
     let started = std::time::Instant::now();
     std::thread::scope(|scope| {
         for _ in 0..o.jobs.clamp(1, matches.len().max(1)) {
@@ -161,8 +168,8 @@ fn play(o: &Options) -> Result<(), String> {
                     if std::env::var_os("WAR_OPS_RECALLS").is_some() {
                         for r in &probe.recalls {
                             eprintln!(
-                                "recall r{} p{} marching {} age {} life {} value {} expected {} net_saved {} saved {} threat {} guard {} planned {} attacker {} members {} nearest {} reaches {} missing {}/{}",
-                                r.round, r.player, r.marching, r.age, r.life, r.value, r.value_expected, r.net_saved, r.saved, r.threat, r.guard, r.planned, r.attacker, r.members, r.nearest_member, r.reaches, r.missing, r.need
+                                "recall r{} p{} marching {} age {} life {} value {} expected {} net_saved {} saved {} threat {} guard {} planned {} attacker {} members {} nearest {} reaches {} missing {}/{} gain {} cost {} start_value {} at_walls {} to_target {}",
+                                r.round, r.player, r.marching, r.age, r.life, r.value, r.value_expected, r.net_saved, r.saved, r.threat, r.guard, r.planned, r.attacker, r.members, r.nearest_member, r.reaches, r.missing, r.need, r.gain, r.cost, r.start_value.unwrap_or(0), r.at_walls, r.to_target
                             );
                         }
                     }
@@ -231,6 +238,30 @@ fn play(o: &Options) -> Result<(), String> {
                         });
                     }
                     eprintln!("{} {} operations, {:.0} s", game.label(), out.len(), started.elapsed().as_secs_f64());
+                    // The cities the AI seats captured in the game (each capture once, `war_probe::Probe::captures`).
+                    taken.fetch_add(probe.captures.len(), Ordering::Relaxed);
+                    // The retake (`retake2`, `next-war-retake`): the cases opened, and the cities a seat lost and
+                    // holds again within `RETAKE_WINDOW` rounds (any variant: from the cities at the end of each turn).
+                    let mut cases: Vec<(PlayerId, u32)> = probe.retakes.iter().map(|(_, p, t, _, _)| (*p, *t)).collect();
+                    cases.sort();
+                    cases.dedup();
+                    // A city a player held at the end of a turn and not at its next one was lost; it is taken back
+                    // when the player holds it again at the end of a turn within `RETAKE_WINDOW` rounds of the loss.
+                    let (mut lost, mut back) = (0, 0);
+                    let mut players: Vec<PlayerId> = probe.cities.iter().map(|(_, p, _)| *p).collect();
+                    players.sort();
+                    players.dedup();
+                    for player in players {
+                        let turns: Vec<&(u32, PlayerId, Vec<u32>)> = probe.cities.iter().filter(|(_, p, _)| *p == player).collect();
+                        for (at, pair) in turns.windows(2).enumerate() {
+                            for tile in pair[0].2.iter().filter(|t| !pair[1].2.contains(t)) {
+                                lost += 1;
+                                let since = pair[1].0;
+                                back += usize::from(turns[at + 1..].iter().take_while(|(r, _, _)| *r <= since + RETAKE_WINDOW).any(|(_, _, tiles)| tiles.contains(tile)));
+                            }
+                        }
+                    }
+                    retake.lock().expect("retake").push((probe.retakes.len(), cases.len(), lost, back));
                     rows.lock().expect("rows").push((at, out));
                 }
             });
@@ -257,6 +288,17 @@ fn play(o: &Options) -> Result<(), String> {
         100.0 * captured as f64 / total.max(1) as f64,
         100.0 * wars_won as f64 / total.max(1) as f64,
         started.elapsed().as_secs_f64()
+    );
+    let taken = taken.into_inner();
+    println!("{taken} cities captured in {} games ({:.2} a game)", matches.len(), taken as f64 / matches.len().max(1) as f64);
+    let retake = retake.into_inner().map_err(|e| e.to_string())?;
+    let sum = |f: fn(&(usize, usize, usize, usize)) -> usize| retake.iter().map(f).sum::<usize>();
+    println!(
+        "retake: {} seat-turns with a case, {} cities with a case; {} of {} cities lost by an AI seat held by it again within {RETAKE_WINDOW} rounds",
+        sum(|r| r.0),
+        sum(|r| r.1),
+        sum(|r| r.3),
+        sum(|r| r.2)
     );
     if let Some(path) = &o.out {
         std::fs::File::create(path).and_then(|mut f| f.write_all(text.as_bytes())).map_err(|e| format!("{path}: {e}"))?;

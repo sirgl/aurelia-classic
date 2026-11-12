@@ -87,6 +87,16 @@ pub struct ClassicMind {
     /// `Variant::WonderCancel` (1) and `WonderRace` (2): `Sharp` with the wonder-race switch
     /// (`TurnBrief::wonder_race`, `ai::wonder_race`).
     wonder_race: u8,
+    /// `Variant::WarPays`: the mind plays `WarOpen` (`variant`) with the flag (`TurnBrief::war_pays`).
+    pays: bool,
+    /// `Variant::TacticianFit`: `pays` with the flag (`TurnBrief::tactician_fit`).
+    fit: bool,
+    /// `Variant::WarMuster`: `pays` with the muster fix (`TurnBrief::muster_fix`), scripted tactics.
+    muster: bool,
+    /// `Variant::SiegeCall`: `muster` with the call at the walls (`TurnBrief::siege_call`).
+    call: bool,
+    /// `Variant::Retake2`: `call` with the retake of a lost city (`TurnBrief::retake`).
+    retake2: bool,
 }
 
 /// The environment variable that makes the game's AI another variant
@@ -119,12 +129,37 @@ impl ClassicMind {
         // `next` is `tall-real` with the review's fixes (`TurnBrief::next`).
         // `standard` (since the thirteenth promotion) and its alias `next-w` are `next` with the
         // wonder rule (`TurnBrief::wonder_race` = 1).
+        // `next-war` is `standard` (the flags of `next-w` below) with the war of `siege-call` (its
+        // flags and the switches of `WarOpen`, the variant `siege-call` plays).
         let requested = variant;
-        let next = variant.next();
-        let tall_real = variant.tall_real() || next;
-        let wonder_race = variant.wonder_race();
-        let sharp = variant.sharp() || tall_real || wonder_race > 0;
-        let variant = if sharp { Variant::Standard } else { variant };
+        // `next-war-retake` is `next-war` with the retake of `retake2` (its flag on top of the war of
+        // `siege-call`).
+        let (flags, war) = match requested {
+            Variant::NextWar => (Variant::Standard, Variant::SiegeCall),
+            Variant::NextWarRetake => (Variant::Standard, Variant::Retake2),
+            _ => (requested, requested),
+        };
+        let next = flags.next();
+        let tall_real = flags.tall_real() || next;
+        let wonder_race = flags.wonder_race();
+        let sharp = flags.sharp() || tall_real || wonder_race > 0;
+        // `tactician-fit` is `WarPays` in every switch but its own (`TurnBrief::tactician_fit`).
+        let fit = war.tactician_fit();
+        // `war-muster` is `WarPays` in every switch but the muster fix (`TurnBrief::muster_fix`).
+        // `siege-call` is `WarMuster` with the call at the walls (`TurnBrief::siege_call`).
+        // `retake2` is `SiegeCall` with the retake of a lost city (`TurnBrief::retake`).
+        let retake2 = war.retake2();
+        let call = war.siege_call() || retake2;
+        let muster = war.war_muster() || call;
+        // `war-pays` is `WarOpen` in every switch but its own (`TurnBrief::war_pays`).
+        let pays = war.war_pays() || fit || muster;
+        let variant = if pays {
+            Variant::WarOpen
+        } else if sharp {
+            Variant::Standard
+        } else {
+            variant
+        };
         let mut advisors = AdvisorRegistry::default();
         // Every mind makes peace with a nation by a deal it values (`ai::peace`): the rules allow
         // no other. The alias `siege-walls` asks for embassies as `PrePuppet` (the standard of
@@ -141,9 +176,11 @@ impl ClassicMind {
         let walls = (book.is_some() || variant.siege_walls()).then(|| Box::new(crate::ai::siege_walls::SiegeWalls::new().joined(variant.siege_join())));
         let unciv = variant.unciv().any().then(|| Box::new(crate::ai::unciv::UncivMind::new(variant.unciv())));
         let variant = if named.is_some() { Variant::PrePuppet } else { variant };
-        // The alias `next-w` plays as `Standard` under its name.
-        let named = named.or((requested == Variant::NextW).then_some(requested));
-        Self { advisors, variant, genome: None, humans: Vec::new(), walks: Default::default(), choice: None, #[cfg(feature = "experimental-ai")] net, book, named, walls, conquest: None, unciv, tall: None, sharp, tall_real, next, wonder_race }
+        // The alias `next-w` plays as `Standard` under its name, `next-war` as `Standard` with the
+        // war of `siege-call` under its own, `next-war-retake` as `Standard` with the war of
+        // `retake2` under its own.
+        let named = named.or(matches!(requested, Variant::NextW | Variant::NextWar | Variant::NextWarRetake).then_some(requested));
+        Self { advisors, variant, genome: None, humans: Vec::new(), walks: Default::default(), choice: None, #[cfg(feature = "experimental-ai")] net, book, named, walls, conquest: None, unciv, tall: None, sharp, tall_real, next, wonder_race, pays, fit, muster, call, retake2 }
     }
 
     /// A league book that may play on another base (`book_on`): a duel book
@@ -189,7 +226,7 @@ impl ClassicMind {
         advisors.register(crate::classic::ClassicSystem::Diplomacy, Box::new(crate::ai::diplomacy::DiplomacyAdvisor { embassies: variant.values_embassies() }));
         // The net plays on `NET_BASE`: its siege too.
         let walls = variant.siege_walls().then(|| Box::new(crate::ai::siege_walls::SiegeWalls::new().joined(variant.siege_join())));
-        Self { advisors, variant, genome: None, humans: Vec::new(), walks: Default::default(), choice: None, net: Some(Box::new(net)), book: None, named: None, walls, conquest: None, unciv: None, tall: None, sharp: false, tall_real: false, next: false, wonder_race: 0 }
+        Self { advisors, variant, genome: None, humans: Vec::new(), walks: Default::default(), choice: None, net: Some(Box::new(net)), book: None, named: None, walls, conquest: None, unciv: None, tall: None, sharp: false, tall_real: false, next: false, wonder_race: 0, pays: false, fit: false, muster: false, call: false, retake2: false }
     }
 
     /// The net's part (`Variant::Net`), if any.
@@ -246,7 +283,36 @@ impl ClassicMind {
         if self.sharp {
             return Variant::Sharp;
         }
+        if self.fit {
+            return Variant::TacticianFit;
+        }
+        if self.retake2 {
+            return Variant::Retake2;
+        }
+        if self.call {
+            return Variant::SiegeCall;
+        }
+        if self.muster {
+            return Variant::WarMuster;
+        }
+        if self.pays {
+            return Variant::WarPays;
+        }
         self.named.unwrap_or(self.variant)
+    }
+
+    /// The mind retakes a lost city (`TurnBrief::retake`, `ai::retake`): `retake2` and
+    /// `next-war-retake`.
+    pub fn retakes(&self) -> bool {
+        self.retake2
+    }
+
+    /// Its tactical and operations layer is the unit net's: `unit-net`, `hybrid`, and
+    /// `tactician-fit` (`TurnBrief::tactician_fit`: the unit net with its fitted numbers,
+    /// `unit_net::fit`).
+    #[cfg(feature = "experimental-ai")]
+    fn unit_net_on(&self) -> bool {
+        self.variant.unit_net() || self.fit
     }
 
     /// A league opponent's book, if any (`ai::books`).
@@ -285,7 +351,7 @@ impl AiMind<Classic> for ClassicMind {
     ) -> Option<LocalObservation<'g>> {
         let mut radius = settings.budget.local_radius;
         #[cfg(feature = "experimental-ai")]
-        if self.variant.unit_net() {
+        if self.unit_net_on() {
             // The unit net's tactician and its "who is next" see the whole theatre (`ai::unit_net`).
             radius = radius.max(crate::ai::unit_net::weights::fields::SIGHT);
         }
@@ -369,7 +435,7 @@ impl AiMind<Classic> for ClassicMind {
             start.opening.retain(|d| !unciv.replaces(rules, &sight.own_units, d));
         }
         #[cfg(feature = "experimental-ai")]
-        if self.variant.unit_net() {
+        if self.unit_net_on() {
             // The commander's turn (`ai::unit_net`): its operations, orders and plan; the
             // tactician moves and strikes with the units of its theatres, not the advisors.
             let _span = prof::span("classic/unit_net_begin");
@@ -614,6 +680,9 @@ impl ClassicMind {
         brief.landings = self.variant.landings();
         brief.carriers = self.variant.carriers();
         brief.war = self.variant.war_tuning();
+        if self.pays {
+            brief.war.siege = crate::ai::operations::SiegeFixes::PAYS;
+        }
         brief.growth_policy = self.variant.growth_policy();
         brief.humans = self.humans.clone();
         if brief.checks_orders {
@@ -643,6 +712,12 @@ impl ClassicMind {
         // 70.5 % on every seat).
         let space_plan = self.tall_real && crate::ai::tall_real::science_game(observation, rules);
         brief.space_finish |= space_plan;
+        brief.war_pays = self.pays;
+        brief.tactician_fit = self.fit;
+        brief.muster_fix = self.fit || self.muster;
+        brief.war_muster = self.muster;
+        brief.retake = self.retake2;
+        brief.siege_call = if self.call { crate::ai::planner::CallFixes::DEFAULT } else { crate::ai::planner::CallFixes::NONE };
         brief.met_eras = observation.view.met_eras();
         if brief.war_open {
             brief.scores = observation.view.race().scores;
@@ -696,6 +771,12 @@ impl ClassicMind {
         } else {
             Stakes::neutral()
         };
+        // The lost cities worth retaking, by the turn's prices and stakes (the value of a city is the strategist's,
+        // `retake::pays`). Before the defence answers its dangers, as the retake always was: the defence sends the
+        // free units to guards (measured: the retaking falls from 40 to 22 percent of the positions when it comes first).
+        if self.retake2 {
+            brief.retaking = crate::ai::retake::cases_remembered(observation, &brief, state, rules, &stakes);
+        }
         let mut defended = Vec::new();
         if self.variant.defends() && major {
             let _span = prof::span("classic/defence_watch_respond");
@@ -712,7 +793,7 @@ impl ClassicMind {
                 let _span = prof::span("classic/strategy_net");
                 // `hybrid` keeps the unit net's memory beside the strategy net's (`unit_net::memory`).
                 #[cfg(feature = "experimental-ai")]
-                let unit_part = if self.variant.unit_net() {
+                let unit_part = if self.unit_net_on() {
                     let (strategy, unit) = crate::ai::unit_net::memory::split(&state.mind_memory);
                     state.mind_memory = strategy;
                     Some(unit)
@@ -974,5 +1055,129 @@ mod sharp_tests {
         let duel = ClassicMind::book_on(Variant::RushSiege, Variant::Standard).unwrap();
         assert_eq!((duel.variant, flags(&duel)), (Variant::PreNext, (false, false, false, 0)));
         assert_eq!(Variant::from_name("pre-next"), cfg!(feature = "experimental-ai").then_some(Variant::PreNext));
+    }
+
+    /// `next-war` is the game's AI (the flags of `next-w`) with the war of `siege-call`: its flags
+    /// and the switches of `WarOpen`, as `siege-call` plays them; it names itself `next-war`, and
+    /// `siege-call` keeps its own mind (no flag of `next-w`: it plays on `pre-next`).
+    #[test]
+    fn next_war_is_standard_with_the_war_of_siege_call() {
+        let next = |m: &ClassicMind| (m.sharp, m.tall_real, m.next, m.wonder_race);
+        let war = |m: &ClassicMind| (m.variant, m.pays, m.fit, m.muster, m.call);
+        let (mind, standard, call) = (ClassicMind::new(Variant::NextWar), ClassicMind::new(Variant::Standard), ClassicMind::new(Variant::SiegeCall));
+        assert_eq!(next(&mind), next(&standard));
+        assert_eq!(war(&mind), war(&call));
+        assert_eq!(war(&call), (Variant::WarOpen, true, false, true, true));
+        assert_eq!(next(&call), (false, false, false, 0));
+        assert_eq!((mind.variant(), call.variant(), standard.variant()), (Variant::NextWar, Variant::SiegeCall, Variant::Standard));
+        assert_eq!(Variant::from_name("next-war"), cfg!(feature = "experimental-ai").then_some(Variant::NextWar));
+    }
+
+    /// `next-war` and `next-war-retake` are the game's AI in everything but the war (the review of
+    /// stage 1): the mind's flags of `next-w`, the parts the mind builds (siege, peace, book, nets,
+    /// Unciv), and every switch the mind reads from its variant (`WarOpen` for them, `Standard` for
+    /// the game's AI) but the war's: `war_open` and the war case of `war_tuning`. The war flags
+    /// (`pays`, `fit`, `muster`, `call`, `retake2`) are the war line's. A switch that one of them
+    /// reads differently from `Standard` fails here (a new switch joins the list); the others
+    /// (`settings`, `adjust`, `war_gate`) read the variant's `base()`, `Standard`'s for `WarOpen`
+    /// through `scripted()`.
+    #[test]
+    fn next_war_variants_are_standard_but_for_the_war() {
+        macro_rules! read {
+            ($v:expr; $($f:ident),* $(,)?) => { vec![$((stringify!($f), format!("{:?}", $v.$f()))),*] };
+        }
+        let switches = |m: &ClassicMind| {
+            let v = m.variant;
+            let tuning = crate::ai::operations::WarTuning { siege: crate::ai::operations::SiegeFixes::NONE, ..v.war_tuning() };
+            let mut out = read!(v; allocates, operates, fights_as_front, has_leaders, defends, growth_policy, content_founding, true_effects, effect_checks, priced_stops, science_levers, tactical, danger_net, weak_fighter, fight_fix, siege_tactics, choice_mode, site_net, space_finish, unit_abilities, religion_fix, tall, building_order, price_model, sound_orders, checks_orders, strikes, carriers, landings, science_pricing, sea_work, air_arm, plans, values_embassies, siege_walls, siege_join, workers_fit, conquest, army_fit, camps, trade_fit, no_idle_cities, scout_early, cs_gift_cap, strategy_net, unit_net, fog_march, unciv, net, book);
+            out.push(("war_tuning without the war case", format!("{tuning:?}")));
+            out.push(("flags of next-w", format!("{:?}", (m.sharp, m.tall_real, m.next, m.wonder_race))));
+            out.push(("parts", format!("{:?}", (m.walls.is_some(), m.unciv.is_some(), m.book.is_some(), m.tall, m.conquest, m.choice, m.genome.is_some()))));
+            #[cfg(feature = "experimental-ai")]
+            out.push(("nets", format!("{:?}", (m.net.is_some(), m.unit_net_on()))));
+            out
+        };
+        let standard = ClassicMind::new(Variant::Standard);
+        for v in [Variant::NextWar, Variant::NextWarRetake] {
+            let mind = ClassicMind::new(v);
+            for ((name, a), (_, b)) in switches(&mind).into_iter().zip(switches(&standard)) {
+                assert_eq!(a, b, "{}: {name}", v.name());
+            }
+            assert!(mind.variant.war_open() && !standard.variant.war_open() && mind.pays && mind.call && !standard.pays, "{}: the war is the war line's", v.name());
+        }
+    }
+
+    /// `war-pays` is `WarOpen` in every switch but its own flag (`TurnBrief::war_pays`); no other
+    /// variant has the flag, and `sharp` and `war-open` keep theirs.
+    #[test]
+    fn war_pays_plays_war_open_with_its_flag() {
+        let mind = ClassicMind::new(Variant::WarPays);
+        assert_eq!((mind.variant, mind.pays, mind.sharp, mind.variant()), (Variant::WarOpen, true, false, Variant::WarPays));
+        let open = ClassicMind::new(Variant::WarOpen);
+        assert_eq!((open.variant(), open.pays), (Variant::WarOpen, false));
+        let flagged: Vec<Variant> = Variant::ALL.into_iter().filter(|v| v.war_pays()).collect();
+        assert_eq!(flagged, [Variant::WarPays]);
+        // An experimental war variant like the rest of its line (`Variant::compiled`; until stage 2 of
+        // `next-war` it was named in every build).
+        assert_eq!(Variant::from_name("war-pays"), cfg!(feature = "experimental-ai").then_some(Variant::WarPays));
+        assert!(mind.variant.war_open() && !Variant::WarPays.war_open());
+    }
+
+    /// `tactician-fit` is `WarPays` in every switch but its own flag (`TurnBrief::tactician_fit`); no
+    /// other variant has the flag, and `war-pays` keeps its own.
+    #[test]
+    fn tactician_fit_plays_war_pays_with_its_flag() {
+        let mind = ClassicMind::new(Variant::TacticianFit);
+        assert_eq!((mind.variant, mind.pays, mind.fit, mind.sharp, mind.variant()), (Variant::WarOpen, true, true, false, Variant::TacticianFit));
+        let pays = ClassicMind::new(Variant::WarPays);
+        assert_eq!((pays.variant(), pays.fit), (Variant::WarPays, false));
+        let flagged: Vec<Variant> = Variant::ALL.into_iter().filter(|v| v.tactician_fit()).collect();
+        assert_eq!(flagged, [Variant::TacticianFit]);
+        assert_eq!(Variant::from_name("tactician-fit"), cfg!(feature = "experimental-ai").then_some(Variant::TacticianFit));
+        #[cfg(feature = "experimental-ai")]
+        assert!(mind.unit_net_on() && !pays.unit_net_on() && !ClassicMind::new(Variant::Standard).unit_net_on());
+    }
+
+    /// `war-muster` is `WarPays` with the muster fix and the scripted tactics: no unit net, no
+    /// `tactician_fit` flag; no other variant has the muster flag but it and `tactician-fit`.
+    #[test]
+    fn war_muster_plays_war_pays_with_the_muster_fix_only() {
+        let mind = ClassicMind::new(Variant::WarMuster);
+        assert_eq!((mind.variant, mind.pays, mind.fit, mind.muster, mind.variant()), (Variant::WarOpen, true, false, true, Variant::WarMuster));
+        let flagged: Vec<Variant> = Variant::ALL.into_iter().filter(|v| v.war_muster()).collect();
+        assert_eq!(flagged, [Variant::WarMuster]);
+        assert!(!ClassicMind::new(Variant::WarPays).muster);
+        #[cfg(feature = "experimental-ai")]
+        assert!(!mind.unit_net_on());
+    }
+
+    /// `retake2` is `SiegeCall` with the retake of a lost city: the flag of no other variant, and a mind
+    /// that is not `retake2` has no case (`TurnBrief::retaking` stays empty).
+    #[test]
+    fn retake2_plays_siege_call_with_the_retake_only() {
+        let mind = ClassicMind::new(Variant::Retake2);
+        assert_eq!((mind.variant, mind.pays, mind.muster, mind.call, mind.retake2, mind.variant()), (Variant::WarOpen, true, true, true, true, Variant::Retake2));
+        let flagged: Vec<Variant> = Variant::ALL.into_iter().filter(|v| v.retake2()).collect();
+        assert_eq!(flagged, [Variant::Retake2]);
+        let call = ClassicMind::new(Variant::SiegeCall);
+        assert!(call.call && !call.retake2);
+        assert!(!ClassicMind::new(Variant::WarPays).retake2);
+    }
+
+    /// `next-war-retake` is `next-war` (the flags of `next-w` and the war of `siege-call`) with the
+    /// retake of `retake2`; it names itself `next-war-retake`, and `retake2` keeps its own mind (no
+    /// flag of `next-w`: it plays on `pre-next`).
+    #[test]
+    fn next_war_retake_is_next_war_with_the_retake_of_retake2() {
+        let next = |m: &ClassicMind| (m.sharp, m.tall_real, m.next, m.wonder_race);
+        let war = |m: &ClassicMind| (m.variant, m.pays, m.fit, m.muster, m.call, m.retake2);
+        let (mind, next_war, retake) = (ClassicMind::new(Variant::NextWarRetake), ClassicMind::new(Variant::NextWar), ClassicMind::new(Variant::Retake2));
+        assert_eq!(next(&mind), next(&next_war));
+        assert_eq!(war(&mind), war(&retake));
+        assert_eq!(war(&next_war), (Variant::WarOpen, true, false, true, true, false));
+        assert_eq!(next(&retake), (false, false, false, 0));
+        assert!(mind.retakes() && retake.retakes() && !next_war.retakes());
+        assert_eq!((mind.variant(), retake.variant()), (Variant::NextWarRetake, Variant::Retake2));
+        assert_eq!(Variant::from_name("next-war-retake"), cfg!(feature = "experimental-ai").then_some(Variant::NextWarRetake));
     }
 }

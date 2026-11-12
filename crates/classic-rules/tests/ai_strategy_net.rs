@@ -249,12 +249,34 @@ fn war_open_opens_a_window_in_any_era() {
     let quiet = intent_of(&none, Held::default(), 6, 120, 67, true);
     assert!(quiet.concepts[kc::STRIKE_WINDOW] < 100, "{:?}", quiet.concepts);
     assert_eq!(quiet.posture_pick, 0, "peace: {:?}", quiet.posture);
-    // A good opportunity whose war case does not pay: the window stays below what turns the
-    // posture (0.2 here), and the posture at peace.
+    // A good opportunity whose war case does not pay: `war-open` counts `PAYS` as a term, so the
+    // window stays below 0.4 (it was loosened from 0.1 in the first iteration) and the posture at
+    // peace; `war-pays` makes it a condition (`war_pays_needs_a_war_that_pays`).
     let unpaid: Vec<(usize, i64)> = late.iter().copied().filter(|(f, _)| *f != fe::PAYS).collect();
     let shut = intent_of(&neutral(&unpaid), Held::default(), 6, 120, 67, true);
     assert!(shut.concepts[kc::STRIKE_WINDOW] < 400, "{:?}", shut.concepts);
     assert_eq!(shut.posture_pick, 0, "peace: {:?}", shut.posture);
+}
+
+/// Scenario 3b' (`war-pays`): `PAYS` is a condition of the window of any era, not a term: with the
+/// same opportunity and strength and no war that pays the window is the early one's (shut late in
+/// the game), with it the same as `war-open`'s.
+#[test]
+fn war_pays_needs_a_war_that_pays() {
+    use classic_rules::ai::strategy_net::{intent_of, intent_pays};
+    let late = [(fe::ERA, 700), (fe::PROGRESS, 600), (fe::RIVAL_NEAR, 600), (fe::RIVAL_KNOWN, 1000), (fe::OPPORTUNITY, 600), (fe::STRENGTH, 650), (fe::PAYS, 1000)];
+    let with = neutral(&late);
+    let pays = intent_pays(&with, Held::default(), 6, 120, 67);
+    assert_eq!(pays.concepts, intent_of(&with, Held::default(), 6, 120, 67, true).concepts, "with a war that pays it is war-open's");
+    assert!(pays.concepts[kc::STRIKE_WINDOW] > 500 && pays.posture_pick == 2, "{:?}", pays.concepts);
+    let unpaid: Vec<(usize, i64)> = late.iter().copied().filter(|(f, _)| *f != fe::PAYS).collect();
+    // The strongest unpaid case: a full opportunity, a won army, an era ahead.
+    let best = neutral(&[(fe::ERA, 700), (fe::PROGRESS, 600), (fe::RIVAL_NEAR, 600), (fe::RIVAL_KNOWN, 1000), (fe::OPPORTUNITY, 1000), (fe::STRENGTH, 1000), (fe::TECH_LEAD, 1000)]);
+    for f in [neutral(&unpaid), best] {
+        let shut = intent_pays(&f, Held::default(), 6, 120, 67);
+        assert!(shut.concepts[kc::STRIKE_WINDOW] < 100, "{:?}", shut.concepts);
+        assert_eq!(shut.posture_pick, 0, "peace: {:?}", shut.posture);
+    }
 }
 
 /// Scenario 3c (`war-open`): an operation the war machine forms holds the posture in prepare,
@@ -267,6 +289,20 @@ fn war_open_prepares_the_operation_the_war_machine_forms() {
     assert_eq!(open.posture_pick, 2, "prepare: {:?}", open.posture);
     assert!(price_mult(&open)[pd::MILITARY] > 1000, "the army is priced up while it forms");
     assert_eq!(intent(&f, Held::default(), 5, 150, 67).posture_pick, 0);
+}
+
+/// Scenario 3d (`war-pays`): an operation the war machine forms does not tilt the posture or the
+/// military price (it cost `war-open` about a point of share, tuning offsets 200–209), and the
+/// opportunity does not move the style: the net of `war-pays` reads the war machine only through
+/// the window a war that pays opens.
+#[test]
+fn war_pays_does_not_tilt_the_posture_for_a_forming_operation() {
+    use classic_rules::ai::strategy_net::intent_pays;
+    let f = neutral(&[(fe::ERA, 500), (fe::PROGRESS, 500), (fe::RIVAL_KNOWN, 1000), (fe::OP_FORMING, 1000), (fe::STRENGTH, 500), (fe::OPPORTUNITY, 900)]);
+    let pays = intent_pays(&f, Held::default(), 5, 150, 67);
+    assert_eq!(pays.posture_pick, 0, "peace: {:?}", pays.posture);
+    assert_eq!(price_mult(&pays)[pd::MILITARY], price_mult(&intent(&f, Held::default(), 5, 150, 67))[pd::MILITARY], "the military price is the game's");
+    assert_eq!(pays.style, intent(&f, Held::default(), 5, 150, 67).style, "the opportunity does not move the style");
 }
 
 /// Scenario 4: The same nation without a rival in reach: no window.
@@ -787,7 +823,7 @@ fn the_memory_round_trips() {
     let i = intent(&great_land_no_room(), Held::default(), 1, 198, 67);
     let mut mult = price_mult(&i);
     let review = goals::review(&m, &rules, &i, &mut mult, &base(), 7, false);
-    let memory = Memory { held: Held { style: Some(0), aim: Some(1), posture: None, lock: Some(StyleLock { round: 13, situation: great_land_no_room() }) }, survey: None, review: Some(review), target: Some(TechId(5)), sharp: None };
+    let memory = Memory { held: Held { style: Some(0), aim: Some(1), posture: None, lock: Some(StyleLock { round: 13, situation: great_land_no_room() }) }, survey: None, review: Some(review), target: Some(TechId(5)), sharp: None, retake: None };
     assert_eq!(Memory::decode(&memory.encode()), memory);
     assert_eq!(Memory::decode(&[1, 2, 3]), Memory::default(), "another mind's bytes");
     // `sharp`'s section comes after the rest and only when there is one: the other variants'
@@ -806,6 +842,11 @@ fn the_memory_round_trips() {
     let bytes = next.encode();
     assert_eq!(bytes.len(), plain.len() + 1 + 4 * 8, "the marker and four numbers");
     assert_eq!(Memory::decode(&bytes[..bytes.len() - 1]).sharp, None, "a cut section is no section");
+    // `next-war-retake` writes `retake2`'s section before `next`'s: both read back (the two markers differ).
+    let retake = classic_rules::ai::retake::Memory { held: vec![classic_rules::ids::TileId(7)], lost: vec![classic_rules::ai::retake::Lost { tile: classic_rules::ids::TileId(4), round: 12, captor: None }] };
+    let both = Memory { retake: Some(retake), ..next.clone() };
+    assert_eq!(Memory::decode(&both.encode()), both);
+    assert_eq!(Memory::decode(&next.encode()).retake, None, "`next`'s section is not read as the retake's");
 }
 
 /// The net counts a few hundred hand weights.
@@ -1026,7 +1067,7 @@ fn sharp_prices_follow_the_held_choice() {
     use classic_rules::ai::strategy_net::{intent_net, Net};
     let f = great_land_no_room();
     let blend = intent(&f, Held::default(), 1, 198, 67);
-    let sharp = intent_net(&f, Held::default(), 1, 198, 67, Net { open: false, sharp: true });
+    let sharp = intent_net(&f, Held::default(), 1, 198, 67, Net { open: false, sharp: true, pays: false });
     assert_eq!(blend.style_pick, 0, "tall: {:?}", blend.style);
     assert_eq!(sharp.style_pick, 0, "tall: {:?}", sharp.style);
     assert!(sharp.style[0] > blend.style[0], "a sharper share: {:?} against {:?}", sharp.style, blend.style);
@@ -1050,7 +1091,7 @@ fn sharp_the_leader_moves_the_style() {
     };
     let scholar = with(&[(fe::T_EXPANSION, 400), (fe::T_SCIENCE, 900), (fe::T_WONDERS, 600)]);
     let settler = with(&[(fe::T_EXPANSION, 900), (fe::T_SCIENCE, 400), (fe::T_WONDERS, 400)]);
-    let net = Net { open: false, sharp: true };
+    let net = Net { open: false, sharp: true, pays: false };
     let (s, w) = (intent_net(&scholar, Held::default(), 1, 198, 67, net), intent_net(&settler, Held::default(), 1, 198, 67, net));
     assert_eq!(s.style_pick, 0, "the scholar plays tall: {:?}", s.style);
     assert_eq!(w.style_pick, 1, "the settler plays wide: {:?}", w.style);

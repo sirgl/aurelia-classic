@@ -252,6 +252,7 @@ pub fn operations(brief: &TurnBrief, state: &mut AiState, rules: &CompiledRulese
 /// hysteresis, and the phase.
 fn head(brief: &TurnBrief, rules: &CompiledRuleset, op: &mut Op, prices: &Prices, forming: bool, seen_city: &crate::ai::state::SeenCity) {
     let dims = brief.dims;
+    let n = super::fit::numbers(brief.tactician_fit);
     let members: Vec<&crate::ai::planner::UnitBrief> = op.members.iter().filter_map(|id| brief.units.iter().find(|u| u.id == *id)).collect();
     let turns = |u: &crate::ai::planner::UnitBrief| -> i64 {
         let moves = rules.units.get(u.kind.0 as usize).map_or(2, |d| i64::from(d.movement.max(1)));
@@ -264,7 +265,7 @@ fn head(brief: &TurnBrief, rules: &CompiledRuleset, op: &mut Op, prices: &Prices
     // melee unit, the rules' base health): strength × health / 100, the unit's power.
     let estimate = crate::ai::operations::estimate_target(brief, rules, seen_city);
     let city_power = estimate.strength / 100 * i64::from(estimate.hp) / 100;
-    let need = (city_power * (100 + ow::CITY_DEFENCE_PERCENT) / 100 + defenders).max(1);
+    let need = (city_power * (100 + n.city_defence_percent) / 100 + defenders).max(1);
     let ready: i64 = members.iter().filter(|u| turns(u) <= ow::READY_TURNS).map(|u| power(rules, u.kind, u.hp)).sum();
     let all: i64 = members.iter().map(|u| power(rules, u.kind, u.hp)).sum();
     op.readiness = ready * ONE / need;
@@ -273,7 +274,7 @@ fn head(brief: &TurnBrief, rules: &CompiledRuleset, op: &mut Op, prices: &Prices
     let their_fire = (city_power / 2 + defenders).max(1);
     let r = op.readiness;
     op.rho = our_fire * ONE / their_fire * r / ONE * r / ONE;
-    op.p_take = sigmoid((op.rho - ow::TAKE_AT) * ONE / ow::TAKE_WIDTH);
+    op.p_take = sigmoid((op.rho - n.take_at) * ONE / n.take_width);
     let siege_turns = (need * 2 / our_fire.max(1)).clamp(1, ow::MAX_SIEGE_TURNS);
     let losses = their_fire * siege_turns * ONE / 100;
     let city = mul(prices.city, city_value(seen_city.population));
@@ -283,8 +284,8 @@ fn head(brief: &TurnBrief, rules: &CompiledRuleset, op: &mut Op, prices: &Prices
     let attack = gain - loss_cost;
     // Waiting: the members a turn away join (readiness with all), less a third of a city.
     let r_next = all * ONE / need;
-    let p_next = sigmoid((our_fire.max(all) * ONE / their_fire * r_next / ONE * r_next / ONE - ow::TAKE_AT) * ONE / ow::TAKE_WIDTH);
-    let wait = mul(city, p_next) - loss_cost - mul(city, ow::WAIT_COST) / 1;
+    let p_next = sigmoid((our_fire.max(all) * ONE / their_fire * r_next / ONE * r_next / ONE - n.take_at) * ONE / n.take_width);
+    let wait = mul(city, p_next) - loss_cost - mul(city, n.wait_cost) / 1;
     let hold_v = -mul(prices.unit, their_fire * ONE / 100);
     let retreat = -mul(prices.unit, their_fire * ONE / 200);
     op.options = [attack, wait, hold_v, retreat];
@@ -301,8 +302,8 @@ fn head(brief: &TurnBrief, rules: &CompiledRuleset, op: &mut Op, prices: &Prices
         match (old, choice) {
             (Phase::Retreat, _) => Phase::Retreat,
             // Assault turns to retreat when the losses pass 1.5 × the gain.
-            (Phase::Assault, _) if loss_cost * ONE > gain.max(1) * ow::RETREAT_RATIO || choice == 3 => Phase::Retreat,
-            (Phase::Gather, _) if op.readiness >= ow::READY || brief.round.saturating_sub(op.since) >= brief.speed.pace_rounds(ow::GATHER_DEADLINE) => {
+            (Phase::Assault, _) if loss_cost * ONE > gain.max(1) * n.retreat_ratio || choice == 3 => Phase::Retreat,
+            (Phase::Gather, _) if op.readiness >= n.ready || brief.round.saturating_sub(op.since) >= brief.speed.pace_rounds(ow::GATHER_DEADLINE) => {
                 if near <= ow::ASSAULT_TURNS { Phase::Assault } else { Phase::Approach }
             }
             (Phase::Gather, _) => Phase::Gather,

@@ -186,6 +186,45 @@ pub fn watch(obs: &AIObservation<'_>, brief: &TurnBrief, state: &AiState, rules:
     Watch { dangers, defender }
 }
 
+/// An own city with hostile power near it, as `watch` finds it (same sight, same radius, same hostility).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct Threat {
+    pub city: TileId,
+    /// Hostile power within `THREAT_RADIUS`.
+    pub threat: u32,
+    /// The city and the own military units within `GUARD_RADIUS` (`Danger::guard`).
+    pub guard: u32,
+}
+
+/// The threats `watch` will find this turn, without its valuation: the retake looks before `watch` is made
+/// and has no `brief.defence` yet. None without the turn's prices, as `watch`.
+pub(crate) fn threats(obs: &AIObservation<'_>, brief: &TurnBrief, rules: &CompiledRuleset) -> Vec<Threat> {
+    if brief.prices.is_none() {
+        return Vec::new();
+    }
+    let hostile = hostile_units(obs, rules);
+    if hostile.is_empty() {
+        return Vec::new();
+    }
+    let mut out = Vec::new();
+    for city in &obs.own_cities {
+        let near = |tile: TileId, radius: i32| brief.dims.distance(tile, city.tile).is_some_and(|d| d <= radius);
+        let threat: u32 = hostile.iter().filter(|h| near(h.tile, THREAT_RADIUS)).map(|h| h.power).sum();
+        if threat == 0 {
+            continue;
+        }
+        let military = brief.units.iter().filter(|u| u.role == AiRole::Military);
+        let guard = city_power(brief, rules, city) + military.filter(|u| near(u.tile, GUARD_RADIUS)).map(|u| power(rules, u)).sum::<u32>();
+        out.push(Threat { city: city.tile, threat, guard });
+    }
+    out
+}
+
+/// The unit's weight in a guard (`Danger::guard`).
+pub(crate) fn guard_power(rules: &CompiledRuleset, unit: &UnitBrief) -> u32 {
+    power(rules, unit)
+}
+
 /// A hostile military unit as the defence weighs it.
 struct Hostile {
     tile: TileId,
@@ -345,7 +384,7 @@ fn recall(obs: &AIObservation<'_>, brief: &TurnBrief, state: &mut AiState, rules
         } else {
             watch.dangers.iter().map(|d| d.saving(d.planned, army)).max().unwrap_or(0)
         };
-        if saved > value.max(0) {
+        if saved > value.max(0) && !stays_at_the_walls(brief, state, &operation, watch, army) {
             crate::ai::war_probe::note(|p| {
                 let marching = operation.phase == crate::ai::state::OperationPhase::Marching;
                 let age = brief.round.saturating_sub(operation.phase_round);
@@ -392,6 +431,8 @@ fn recall(obs: &AIObservation<'_>, brief: &TurnBrief, state: &mut AiState, rules
                     at_muster: best.is_some_and(|d| d.city == operation.muster),
                     nearest_member: nearest,
                     reaches: nearest >= 0 && nearest <= RESPONSE_ROUNDS as i32 * 2,
+                    at_walls: mine.iter().filter(|u| brief.dims.distance(u.tile, operation.target).is_some_and(|d| d <= operations::DEFENCE_RADIUS)).count() as u32,
+                    to_target: mine.iter().filter_map(|u| brief.dims.distance(u.tile, operation.target)).min().unwrap_or(-1),
                 });
                 p.ends.push(crate::ai::war_probe::OperationEnd { round: brief.round, player: brief.player, enemy: operation.enemy, cause: crate::ai::war_probe::EndCause::Recalled, marching, age, target: operation.target.0 });
             });
@@ -400,6 +441,26 @@ fn recall(obs: &AIObservation<'_>, brief: &TurnBrief, state: &mut AiState, rules
         }
     }
     out
+}
+
+/// `war-muster` (`TurnBrief::war_muster`): a marching army with half of its members or more inside
+/// the strike zone of its target (`operations::DEFENCE_RADIUS`) leaves only for a city whose planned
+/// guard is below the threat. Its retreat from the walls costs what the siege has done, which the
+/// operation's value (the chance of its start, `operations::running_value`) does not see, while the
+/// saving is the loss curve's smooth step even for a city whose guard already meets the threat: of 41
+/// recalls of marching armies without a capture (`war-muster` before this rule, offset 200,
+/// runs/ops/wm1e-200.err) 30 had members at the walls and about half of them a guard at or above the
+/// threat.
+fn stays_at_the_walls(brief: &TurnBrief, state: &AiState, operation: &crate::ai::state::Operation, watch: &Watch, army: u32) -> bool {
+    if !brief.war_muster || operation.phase != crate::ai::state::OperationPhase::Marching {
+        return false;
+    }
+    let members = operations::members(brief, state, operation.target);
+    let at_walls = members.iter().filter(|u| brief.dims.distance(u.tile, operation.target).is_some_and(|d| d <= operations::DEFENCE_RADIUS)).count();
+    if at_walls * 2 < members.len() {
+        return false;
+    }
+    watch.dangers.iter().max_by_key(|d| d.saving(d.planned, army)).is_some_and(|d| d.threat <= d.planned)
 }
 
 /// What the members of `operation` would save at the most at a city in danger, as `assign` would

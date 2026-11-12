@@ -81,6 +81,12 @@ impl BarbarianState {
         &self.rng
     }
 
+    /// Harness-only: the stream restarted (`ClassicGame::reseed_streams`).
+    #[cfg(any(test, feature = "harness"))]
+    pub(crate) fn reseed(&mut self, rng: StreamRng) {
+        self.rng = rng;
+    }
+
     pub fn released(&self) -> bool {
         self.released
     }

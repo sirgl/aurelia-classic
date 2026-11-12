@@ -784,6 +784,7 @@ impl crate::ai::system::SystemAdvisor for MilitaryAdvisor {
                 let from = input.state.seen_cities().iter().find(|c| c.tile == city.tile && c.owner != obs.player).map(|c| c.owner);
                 p.captures.push((input.brief.round, obs.player, city.tile.0, from));
             }
+            p.cities.push((input.brief.round, obs.player, obs.own_cities.iter().map(|c| c.tile.0).collect()));
         });
         let mut out = proposals(30, crate::ai::conquest::decisions(obs, input.rules, input.brief.prices.as_ref(), input.brief.conquest));
         let promotions = if input.brief.fight.promo == Promotions::Priced {

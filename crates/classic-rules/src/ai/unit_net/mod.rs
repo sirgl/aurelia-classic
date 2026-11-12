@@ -23,6 +23,7 @@
 
 pub mod commander;
 pub mod fields;
+pub mod fit;
 pub mod math;
 pub mod memory;
 pub mod tactician;
@@ -119,7 +120,12 @@ impl UnitNetTurn {
 pub fn begin(sight: &AIObservation<'_>, brief: &TurnBrief, state: &mut AiState, rules: &CompiledRuleset) -> UnitNetTurn {
     let (strategy, own) = memory::split(&state.mind_memory);
     let mut memo = memory::UnitMemory::decode(&own);
-    let prices = Prices::of_posture(posture(brief, state));
+    let mut prices = Prices::of_posture(posture(brief, state));
+    if brief.tactician_fit && prices.posture == 3 {
+        // `tactician-fit`: the war posture's prices are fitted (`fit`).
+        let [kill, city, damage, unit, risk] = fit::numbers(true).war;
+        prices = Prices { kill, city, damage, unit, risk, ..prices };
+    }
     let ops = commander::operations(brief, state, rules, &mut memo, &prices);
     state.mind_memory = memory::join(&strategy, &memo.encode());
     let orders = commander::orders(brief, &ops);

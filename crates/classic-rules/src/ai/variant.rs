@@ -89,6 +89,12 @@
 //! i.e. on `PreNext`, the standard before it (bench only, `experimental-ai`). `NextW` stays as an
 //! alias that plays as `Standard`; `Sharp`, `TallReal`, `Next`, `WonderCancel`, `WonderRace` and
 //! `NextRace` stay as measured.
+//! The war line (`WarPays` → `WarMuster` → `SiegeCall`, classic/docs/ai-war-pays.md) was built on
+//! `PreNext`'s switches (`WarOpen`, then `Standard`) and plays so; `NextWar` carries its flags onto
+//! the game's AI of the thirteenth promotion: the mind of `Standard` with the war of `SiegeCall`
+//! (`ClassicMind::new`; bench only, `experimental-ai`). `Retake2` (classic/docs/ai-retake.md) is
+//! `SiegeCall` with the retake of a lost city and plays on `PreNext` as measured; `NextWarRetake`
+//! is `NextWar` with its retake flag: the mind of `Standard` with the war of `Retake2`.
 
 use crate::ai::grand_strategy::Stakes;
 use crate::ai::operations::WarGate;
@@ -736,6 +742,42 @@ pub enum Variant {
     /// change play on (`Sharp` and its line add their flags to it). Kept for the bench
     /// (`experimental-ai` only).
     PreNext,
+    /// `WarOpen` with the lane's second iteration (`TurnBrief::war_pays`, classic/docs/ai-war-pays.md): the
+    /// strike window needs a war that pays, wars are started only on the odds measured, and a war that
+    /// has stopped paying is ended. The mind plays `WarOpen` in every other switch (`ClassicMind::new`).
+    WarPays,
+    /// `WarPays` with the tactical layer of its operations fitted on real siege positions
+    /// (`TurnBrief::tactician_fit`, classic/docs/ai-tactician-fit.md). The mind plays `WarPays` in every
+    /// other switch (`ClassicMind::new`).
+    TacticianFit,
+    /// `WarPays` whose operations count an army as gathered when its members stand within the muster
+    /// radius plus their own movement (`TurnBrief::muster_fix`, `operations::muster_reach`), with the
+    /// scripted tactics (no unit net). The muster fix of `TacticianFit` measured alone
+    /// (classic/docs/ai-war-muster.md). The mind plays `WarPays` in every other switch
+    /// (`ClassicMind::new`). A bench-only candidate, `experimental-ai` only.
+    WarMuster,
+    /// `WarMuster` with the press / hold / withdraw call at the walls made from what the seat sees
+    /// (`TurnBrief::siege_call`, `siege_walls::call`). A bench-only candidate, `experimental-ai` only.
+    SiegeCall,
+    /// `Standard` (the play of `NextW`: its flags `sharp`, `tall_real`, `next` and the wonder rule)
+    /// that wars as `SiegeCall` does: the flags of `WarPays`, `WarMuster` and `SiegeCall`
+    /// (`TurnBrief::war_pays`, `muster_fix`, `war_muster`, `siege_call`) and the switches of
+    /// `WarOpen`, the variant `SiegeCall` plays (`ClassicMind::new`). The war line carried over
+    /// onto the game's AI of the thirteenth promotion; `SiegeCall`, `WarMuster` and `WarPays`
+    /// stay as measured, on `PreNext`. A bench-only candidate, `experimental-ai` only.
+    NextWar,
+    /// `SiegeCall` whose seat answers the loss of a city at once: it finds the city by its own memory
+    /// (a city held at its last turn and gone now, taken by the player that holds it), reads the city's
+    /// health and the captor's units from sight, strikes with the units on the spot unless the captor's
+    /// units within four tiles and the city's strike outmatch them, and makes no peace while the retake
+    /// is expected (`TurnBrief::retake`, `ai::retake`). A bench-only candidate, `experimental-ai` only.
+    Retake2,
+    /// `NextWar` with the retake of `Retake2`: the mind of `Standard` (the flags of `NextW`) that
+    /// wars as `Retake2` does: the flags of `WarPays`, `WarMuster`, `SiegeCall` and the retake
+    /// (`TurnBrief::retake`) and the switches of `WarOpen` (`ClassicMind::new`). The retake line
+    /// carried over onto `NextWar`; `Retake2` stays as measured, on `PreNext`. A bench-only
+    /// candidate, `experimental-ai` only.
+    NextWarRetake,
 }
 
 /// The net's base: the expert the end-to-end net learns from and the mind it
@@ -756,7 +798,7 @@ const NUDGED_CANDIDATES: u32 = 40;
 
 impl Variant {
     /// The game's AI first.
-    pub const ALL: [Variant; 143] = [
+    pub const ALL: [Variant; 150] = [
         Variant::Standard,
         Variant::PreCamps,
         Variant::PreWorkers,
@@ -900,6 +942,13 @@ impl Variant {
         Variant::NextW,
         Variant::NextRace,
         Variant::PreNext,
+        Variant::WarPays,
+        Variant::TacticianFit,
+        Variant::WarMuster,
+        Variant::SiegeCall,
+        Variant::NextWar,
+        Variant::Retake2,
+        Variant::NextWarRetake,
     ];
 
     pub fn name(self) -> &'static str {
@@ -1029,6 +1078,13 @@ impl Variant {
             Variant::NextW => "next-w",
             Variant::NextRace => "next-race",
             Variant::PreNext => "pre-next",
+            Variant::WarPays => "war-pays",
+            Variant::TacticianFit => "tactician-fit",
+            Variant::WarMuster => "war-muster",
+            Variant::SiegeCall => "siege-call",
+            Variant::NextWar => "next-war",
+            Variant::Retake2 => "retake2",
+            Variant::NextWarRetake => "next-war-retake",
             Variant::ArmyFit => "army-fit",
             Variant::Camps => "camps",
             Variant::ArmyCamps => "army-camps",
@@ -1060,12 +1116,13 @@ impl Variant {
     /// strategy net's line (`Sharp` … `NextRace`). The strategy net is the game's since the twelfth
     /// promotion: `strategy-net`, its alias, is in every build. The play of `next-w` is the game's
     /// since the thirteenth: `Standard` carries its flags in every build (none of its code is
-    /// behind the feature); the name `next-w` stays the bench's.
+    /// behind the feature); the name `next-w` stays the bench's. The war line (`WarPays` …
+    /// `NextWarRetake`) is the bench's too.
     pub fn compiled(self) -> bool {
         cfg!(feature = "experimental-ai")
             || !matches!(
                 self,
-                Variant::Net | Variant::UnitNet | Variant::Hybrid | Variant::SiteNet | Variant::ChoiceNet | Variant::ChoiceNetProduction | Variant::ChoiceNetResearch | Variant::StandardScripted | Variant::PreCsGifts | Variant::Sharp | Variant::TallReal | Variant::Next | Variant::WonderCancel | Variant::WonderRace | Variant::NextW | Variant::NextRace | Variant::PreNext
+                Variant::Net | Variant::UnitNet | Variant::Hybrid | Variant::SiteNet | Variant::ChoiceNet | Variant::ChoiceNetProduction | Variant::ChoiceNetResearch | Variant::StandardScripted | Variant::PreCsGifts | Variant::Sharp | Variant::TallReal | Variant::Next | Variant::WonderCancel | Variant::WonderRace | Variant::NextW | Variant::NextRace | Variant::PreNext | Variant::WarPays | Variant::TacticianFit | Variant::WarMuster | Variant::SiegeCall | Variant::NextWar | Variant::Retake2 | Variant::NextWarRetake
             )
     }
 
@@ -1226,6 +1283,36 @@ impl Variant {
     /// (`ClassicMind::new`); the game's AI since the thirteenth promotion, as `NextW`.
     pub fn next(self) -> bool {
         matches!(self, Variant::Standard | Variant::Next | Variant::NextW | Variant::NextRace)
+    }
+
+    /// The second iteration of the war lane (`TurnBrief::war_pays`): `WarPays` alone, which the mind
+    /// plays as `WarOpen` in every other switch (`ClassicMind::new`).
+    pub fn war_pays(self) -> bool {
+        self == Variant::WarPays
+    }
+
+    /// The tactic lane (`TurnBrief::tactician_fit`): `TacticianFit` alone, which the mind plays as
+    /// `WarPays` in every other switch (`ClassicMind::new`).
+    pub fn tactician_fit(self) -> bool {
+        self == Variant::TacticianFit
+    }
+
+    /// The muster fix alone (`TurnBrief::muster_fix`): `WarMuster`, which the mind plays as `WarPays`
+    /// in every other switch (`ClassicMind::new`).
+    pub fn war_muster(self) -> bool {
+        self == Variant::WarMuster
+    }
+
+    /// The call at the walls (`TurnBrief::siege_call`): `SiegeCall`, which the mind plays as `WarMuster`
+    /// in every other switch (`ClassicMind::new`).
+    pub fn siege_call(self) -> bool {
+        self == Variant::SiegeCall
+    }
+
+    /// The retake of a lost city (`TurnBrief::retake`): `Retake2`, which the mind plays as `SiegeCall`
+    /// in every other switch (`ClassicMind::new`).
+    pub fn retake2(self) -> bool {
+        self == Variant::Retake2
     }
 
     /// Its research, policies and choice among the allocator's best orders are the

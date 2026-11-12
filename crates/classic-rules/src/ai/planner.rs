@@ -220,6 +220,40 @@ pub struct UnitBrief {
     pub hp: u16,
 }
 
+/// The parts of `siege-call` (`Variant::SiegeCall`), each a class fix of the operations layer or of the call at the
+/// walls. The variants of the war line play `DEFAULT` (`ClassicMind::new`); the others carry none. The parts that
+/// are off stay in the code: an ablation edits `DEFAULT` (the rules read no environment for them; until stage 2
+/// of `next-war` the bench switched them with `SIEGE_CALL_ON`).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct CallFixes {
+    /// Declare the war only when the whole army can strike within two turns, and muster out of the city's strike.
+    pub ready: bool,
+    /// Distance units are ranged by default; siege units only where ranged units cannot bring the city down.
+    pub ranged: bool,
+    /// The melee kind is chosen by strength squared per production cost.
+    pub melee: bool,
+    /// The army is sized against the enemy units that can reach the target during the siege.
+    pub threat: bool,
+    /// The press / hold / withdraw call at the walls (`siege_walls::call`).
+    pub call: bool,
+    /// The planning estimate of a city carries the defence its owner can have built (`siege_walls::default_defence`).
+    pub walls: bool,
+}
+
+impl CallFixes {
+    pub const NONE: CallFixes = CallFixes { ready: false, ranged: false, melee: false, threat: false, call: false, walls: false };
+    pub const ALL: CallFixes = CallFixes { ready: true, ranged: true, melee: true, threat: true, call: true, walls: true };
+    /// What `siege-call` plays: the fixes that measured better on the tuning offsets 200-202 (300 solo pace games,
+    /// `runs/ops`): ranged units first and the press call. `ready` cut the losses and not the share, `melee` and
+    /// `threat` lowered both (see `LOG.md`); they stay in the code, off, for an ablation to switch on.
+    pub const DEFAULT: CallFixes = CallFixes { ready: false, ranged: true, melee: false, threat: false, call: true, walls: false };
+
+    pub fn any(self) -> bool {
+        self != Self::NONE
+    }
+
+}
+
 /// A foreign unit seen at the start of the turn.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Sighting {
@@ -377,6 +411,20 @@ pub struct TurnBrief {
     /// The wonder-race switch (`Variant::wonder_race`): 0 off, 1 lost wonder orders are dropped, 2
     /// the wonder's price is the chance to finish it first (`ai::wonder_race`).
     pub wonder_race: u8,
+    /// `war-pays` (`Variant::war_pays`): `war_open` and the second iteration's selective wars.
+    pub war_pays: bool,
+    /// `tactician-fit` (`Variant::tactician_fit`): `war_pays` with the fitted tactical layer.
+    pub tactician_fit: bool,
+    /// `war-muster` and `tactician-fit`: an army is gathered within the muster radius plus its own movement.
+    pub muster_fix: bool,
+    /// `war-muster` alone: the army's places are filled by current units only (`operations::current`).
+    pub war_muster: bool,
+    /// `retake2` (`Variant::retake2`): the former owner of a lost city answers at once (`ai::retake`).
+    pub retake: bool,
+    /// The lost cities the units on the spot retake this turn (`ai::retake`); empty without `retake`.
+    pub retaking: Vec<crate::ai::retake::Case>,
+    /// `siege-call` alone: the press / hold / withdraw call at the walls (`siege_walls::call`).
+    pub siege_call: CallFixes,
     /// The tall play the variant carries (`ai::tall`, `Variant::tall`), the
     /// cities it keeps and what a site meeting a science building's condition
     /// adds (`tall::turn_site_bonuses`); Off, None and empty for the others.
@@ -504,6 +552,13 @@ impl TurnBrief {
             tall_real: false,
             next: false,
             wonder_race: 0,
+            war_pays: false,
+            tactician_fit: false,
+            muster_fix: false,
+            war_muster: false,
+            retake: false,
+            retaking: Vec::new(),
+            siege_call: CallFixes::NONE,
             tall: crate::ai::tall::Tall::Off,
             tall_cities: None,
             tall_sites: Vec::new(),

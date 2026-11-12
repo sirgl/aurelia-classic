@@ -100,6 +100,7 @@ pub mod policy_branches;
 pub mod promo_fit;
 pub mod religion;
 pub mod religion_fix;
+pub mod retake;
 pub mod roles;
 pub mod science_levers;
 pub mod scouting;
