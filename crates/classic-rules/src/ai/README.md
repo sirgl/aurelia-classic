@@ -132,7 +132,7 @@ interface shows a human player (`attack_preview`, `city_strike_damage`,
 | `AiDriver` stops | when `GameState::is_over()` (a victory nobody continued after) |
 | `MilitaryAdvisor::start_of_turn` | `city_strikes` (priority 30), `stance_orders` (25), `ranged_orders` (20) — before the units move |
 | `MilitaryAdvisor::end_of_turn` | `conquest_decisions` (30), `promotion_choices` (10), `upgrade_orders(obs, UPGRADE_RESERVE)` (5) |
-| `DiplomacyAdvisor::start_of_turn` | nations only: `answer_offers` (40); every `PROPOSAL_INTERVAL` rounds (staggered by player) `proposals` without peace items, under `PriceModel::Uses` `luxury_swaps`, and `denunciations` (5); war and peace stay with `planner_strategy` |
+| `DiplomacyAdvisor::start_of_turn` | nations only: `peace::answer_offers` (40), every offer by its value; every `PROPOSAL_INTERVAL` rounds (staggered by player) `proposals` without peace items, under `PriceModel::Uses` `luxury_swaps`, `denunciations`, `peace::peace_offers` to every nation at war with us (5) and, for the leaders, `peace::embassy_offers` (5); peace with a nation is only ever a deal both accept, `planner_strategy` and `operations::idle_wars` make peace alone only with city-states |
 | `ai/tactics.rs` (`immediate`, `siege_step`) | ranged units never charge: they set up (`must_set_up_first`) and shoot the target `combat::best_shot` rates best within `combat::ranged_range`; in a siege they stop at their range. Melee units attack only targets the rules allow (`attack_preview`) and while `OwnUnit::can_attack` |
 | `AiDriver::observe` (`ai/driver.rs`) | the barbarian player plays `barbarians::barbarian_orders` (no strategy, no cities, no per-unit planning); a city-state skips the strategy (no war or peace of its own) |
 | `TurnBrief::relations` (`ai/planner.rs`) | nations only: barbarians (always at war) and city-states do not enter war and peace planning |
@@ -158,9 +158,9 @@ interface shows a human player (`attack_preview`, `city_strike_damage`,
 
 | function | returns | when to call |
 |---|---|---|
-| `accepts(obs, rules, offer)` | whether the sum of item values for us is not negative (gold and luxuries at face value, peace only after `MIN_WAR_ROUNDS` of war, wars against third parties never) | answering offers |
-| `answer_offers(obs, rules)` | `RespondDeal` for every offer addressed to us | at the start of the turn |
-| `proposals(obs, rules)` | one `ProposeDeal` per trusted nation, in this order: embassy exchange, friendship after `FRIENDSHIP_MIN_CONTACT_ROUNDS` rounds of contact, a research agreement when affordable, mutual open borders, a defensive pact; peace after two `MIN_WAR_ROUNDS` of war | every few turns |
+| `peace::answer_offers(input)` | `RespondDeal` for every offer addressed to us: accepted when its value for us is not negative (`peace::Negotiation::value`: gold and goods at the price of gold, peace as the war's prospect given up plus the price of an aggressor); a refused offer of peace carries `PeaceRefusal` from the same value (`Negotiation::answer`): the war is being won, the enemy is an aggressor, or the terms are dear, and the gold the white peace would cost | at the start of the turn |
+| `peace::peace_offers(input)` | `ProposeDeal` with peace to every nation at war with us that has no offer waiting: white peace, or gold either way at the estimate of both sides (`Negotiation::peace_offer`) | every `PROPOSAL_INTERVAL` rounds |
+| `proposals(obs, rules)` | one `ProposeDeal` per trusted nation, in this order: embassy exchange, friendship after `FRIENDSHIP_MIN_CONTACT_ROUNDS` rounds of contact, a research agreement when affordable, mutual open borders, a defensive pact; peace after two `MIN_WAR_ROUNDS` of war (the advisor drops these: peace is `peace::peace_offers`) | every few turns |
 | `denunciations(obs)` | `Denounce` for nations whose warmonger memory passed `DENOUNCE_WARMONGER` | every few turns |
 
 ## Barbarians — `ai/barbarians.rs`

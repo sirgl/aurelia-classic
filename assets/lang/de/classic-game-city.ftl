@@ -56,3 +56,4 @@ classic.game.city.row-faith = Glaube
 classic.game.city.row-defence = Verteidigung
 classic.game.city.row-hit-points = Trefferpunkte
 classic.game.city.no-effect = Noch keine Wirkung
+classic.game.city.resistance = Widerstand: noch { $n } Züge. Die Stadt produziert nichts und wächst nicht, bis er endet.

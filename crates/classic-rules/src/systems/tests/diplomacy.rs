@@ -98,10 +98,16 @@ fn peace_ends_war_and_attack_gate() {
     )
     .unwrap();
     assert!(game.execute(&rules, strike.clone()).is_ok());
-    // A young war cannot be ended: ten rounds first (the original game's rule).
-    let peace = Command::MakePeace {
+    // A young war cannot be ended: ten rounds first (the original game's rule). Between
+    // nations peace is a deal the other side accepts, never one side's `MakePeace`.
+    let alone = Command::MakePeace {
         player: PlayerId(0),
         enemy: PlayerId(1),
+    };
+    let peace = Command::ProposeDeal {
+        from: PlayerId(0),
+        to: PlayerId(1),
+        items: vec![(PlayerId(0), crate::world::relations::DealItem::Peace)],
     };
     assert!(game.execute(&rules, peace.clone()).is_err(), "peace in the first rounds of a war");
     for _ in 0..crate::systems::diplomacy::deals::MIN_WAR_ROUNDS_BEFORE_PEACE {
@@ -109,7 +115,11 @@ fn peace_ends_war_and_attack_gate() {
             game.execute(&rules, Command::EndTurn { player }).unwrap();
         }
     }
+    assert!(game.execute(&rules, alone).is_err(), "peace alone with a nation");
+    let offer = game.view().auth.module().relations().next_offer_id();
     game.execute(&rules, peace).unwrap();
+    assert!(game.view().auth.diplomacy().at_war(PlayerId(0), PlayerId(1)), "an offer is no peace");
+    game.execute(&rules, Command::RespondDeal { player: PlayerId(1), offer, accept: true, why: crate::world::relations::PeaceRefusal::Unsaid }).unwrap();
     assert!(!game
         .view()
         .auth

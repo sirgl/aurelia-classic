@@ -199,7 +199,8 @@ pub(crate) fn plan_cities_with(
         // Unciv's `trainSettler` decides the settlers (`ai::unciv::parts`).
         empire.settler_target = 0;
     }
-    let mut cities: Vec<&OwnCity> = obs.own_cities.iter().collect();
+    // A city in resistance takes no order (the rules refuse every one): it is not planned.
+    let mut cities: Vec<&OwnCity> = obs.own_cities.iter().filter(|c| c.resistance == 0).collect();
     cities.sort_by_key(|c| (std::cmp::Reverse(c.income.production), c.id));
     let mut out = Vec::new();
     let hurried = match allocator {

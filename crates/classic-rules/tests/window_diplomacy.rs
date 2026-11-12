@@ -90,6 +90,7 @@ fn a_seat_cannot_answer_an_offer_made_to_another_seat() {
         player,
         offer: id,
         accept: true,
+        why: classic_rules::world::relations::PeaceRefusal::Unsaid,
     };
     // Seat 2 (a bystander) and seat 0 (the proposer) both try to accept for seat 1.
     for thief in [P2, P0] {

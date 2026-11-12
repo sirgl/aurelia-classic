@@ -795,13 +795,13 @@ impl TournamentReport {
 /// The wars each side declared, by how they ended, and their mean length
 /// in rounds.
 fn wars_table(sides: &[(&SideSummary, CombatRecord)], out: &mut String) {
-    let _ = writeln!(out, "| side | variant | wars declared | peace by deal | peace alone | elimination | running at the end | mean rounds | median rounds |");
-    let _ = writeln!(out, "|---|---|---:|---:|---:|---:|---:|---:|---:|");
+    let _ = writeln!(out, "| side | variant | wars declared | peace by deal | peace alone | elimination | running at the end | mean rounds | median rounds | longer than {} rounds |", crate::bench::play::LONG_WAR_ROUNDS);
+    let _ = writeln!(out, "|---|---|---:|---:|---:|---:|---:|---:|---:|---:|");
     for (s, c) in sides {
         let mean = f64::from(c.war_rounds) / f64::from(c.wars.max(1));
         let _ = writeln!(
             out,
-            "| {:?} | {} | {} | {} | {} | {} | {} | {mean:.1} | {} |",
+            "| {:?} | {} | {} | {} | {} | {} | {} | {mean:.1} | {} | {} |",
             s.side,
             s.variant,
             c.wars,
@@ -809,7 +809,8 @@ fn wars_table(sides: &[(&SideSummary, CombatRecord)], out: &mut String) {
             c.peace_alone,
             c.eliminated,
             c.at_the_end,
-            c.median_war().map_or_else(|| "-".to_owned(), |(lo, hi)| format!("{lo}-{hi}"))
+            c.median_war().map_or_else(|| "-".to_owned(), |(lo, hi)| format!("{lo}-{hi}")),
+            c.long_wars
         );
     }
     out.push('\n');

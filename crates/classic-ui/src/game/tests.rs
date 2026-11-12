@@ -414,7 +414,7 @@ fn enqueue_requests_reach_the_core_queue() {
 }
 
 #[test]
-fn diplomacy_lists_only_known_rivals_and_makes_peace() {
+fn diplomacy_lists_only_known_rivals_and_offers_peace() {
     let mut session = new_match(7);
     let unseen: Vec<u8> = session.rivals().iter().map(|r| r.player).collect();
     assert!(unseen.is_empty(), "no contact at the start: {unseen:?}");
@@ -438,10 +438,103 @@ fn diplomacy_lists_only_known_rivals_and_makes_peace() {
     }
     session.replace_game(game);
     let rivals = session.rivals();
-    assert!(rivals[0].at_war && rivals[0].peace == Availability::Ready);
+    assert!(rivals[0].at_war && rivals[0].peace == Availability::Ready && rivals[0].peace_by_offer);
+    // A nation's peace is an offer it answers on its turn (classic/docs/classic/rules.md).
     session.request(GameRequest::MakePeace(2));
     let auth = session.game().view().auth;
-    assert!(!auth.diplomacy().at_war(PlayerId(0), PlayerId(2)));
+    assert!(auth.diplomacy().at_war(PlayerId(0), PlayerId(2)), "the offer is no peace yet");
+    let peace = classic_rules::world::relations::DealItem::Peace;
+    assert!(session.diplomacy_view().outgoing.iter().any(|d| d.partner == PlayerId(2) && d.items.contains(&(PlayerId(0), peace))));
+    let name = session.rivals()[0].name.clone();
+    let texts = |session: &mut Session| session.hud_model(None).notices.into_iter().map(|n| n.text).collect::<Vec<_>>();
+    assert!(texts(&mut session).contains(&format!("Peace offered to {name}: they answer on their turn")), "{:?}", texts(&mut session));
+    let waiting = Availability::Blocked("Peace offered: waiting for the answer".into());
+    assert_eq!(session.rivals()[0].peace, waiting, "one offer at a time");
+    assert_eq!(session.diplomacy_view().nations[0].make_peace, waiting);
+    // The AI answers on its turn by its own value of the peace (`ai::peace`): the human attacked
+    // it unprovoked, and white peace with an aggressor is not enough (`ai::infamy::peace_price`).
+    session.request(GameRequest::EndTurn);
+    let auth = session.game().view().auth;
+    assert!(auth.diplomacy().at_war(PlayerId(0), PlayerId(2)), "{:?}", texts(&mut session));
+    // The refusal says why and what the AI asks (the estimate it decided by): the human began this
+    // war, so the AI remembers it as an aggressor and wants gold for the peace.
+    let ask = session.rivals()[0].peace_ask.clone().expect("the refusal named a price");
+    assert!(ask.price > 0);
+    let told = texts(&mut session);
+    let wanted = format!("{name} refuses peace. They remember you as an aggressor: peace costs {} gold.", ask.price);
+    assert!(told.contains(&wanted), "{told:?}");
+    assert_eq!(ask.reason, format!("They remember you as an aggressor: peace costs {} gold.", ask.price));
+    assert_eq!(session.rivals()[0].peace, Availability::Ready, "a new white offer may follow");
+    assert_eq!(session.diplomacy_view().nations[0].peace_ask, Some(ask.clone()), "the card names it too");
+    // Short of the gold, the button says so; with the gold, it offers the white peace with that gold
+    // and the AI takes it.
+    assert_eq!(ask.offer, Availability::Blocked("Not enough gold".into()), "a new empire cannot pay");
+    session.harness_game().0.debug_earn(PlayerId(0), 5_000);
+    session.refresh_after_harness();
+    let ask = session.rivals()[0].peace_ask.clone().expect("the price stands");
+    assert_eq!(ask.offer, Availability::Ready, "the human can pay now");
+    session.request(GameRequest::PeaceForGold(2));
+    let (peace, gold) = (classic_rules::world::relations::DealItem::Peace, classic_rules::world::relations::DealItem::Gold(ask.price));
+    let outgoing = session.diplomacy_view().outgoing;
+    assert!(outgoing.iter().any(|d| d.partner == PlayerId(2) && d.items.contains(&(PlayerId(0), peace)) && d.items.contains(&(PlayerId(0), gold))), "{outgoing:?}");
+    assert!(texts(&mut session).contains(&format!("Peace offered to {name} for {} gold: they answer on their turn", ask.price)), "{:?}", texts(&mut session));
+    session.request(GameRequest::EndTurn);
+    assert!(!session.game().view().auth.diplomacy().at_war(PlayerId(0), PlayerId(2)), "{:?}", texts(&mut session));
+    assert!(session.rivals()[0].peace_ask.is_none(), "peace: nothing more to ask");
+}
+
+/// The AI offers peace to the human (`ai::peace::peace_offers`): a notice says so, the offer
+/// waits on the diplomacy screen with its peace line, and the human answers it there: refused,
+/// the war goes on; accepted, it ends.
+#[test]
+fn the_ai_offers_peace_and_the_human_answers_it() {
+    let answer = |accept: bool| {
+        let mut session = new_match(7);
+        let mut game = session.game().clone();
+        game.debug_meet(PlayerId(0), PlayerId(2));
+        game.execute(&game_rules(), classic_rules::Command::DeclareWar { player: PlayerId(0), enemy: PlayerId(2) }).unwrap();
+        for _ in 0..classic_rules::MIN_WAR_ROUNDS_BEFORE_PEACE {
+            for player in 0..3 {
+                game.execute(&game_rules(), classic_rules::Command::EndTurn { player: PlayerId(player) }).unwrap();
+            }
+        }
+        session.replace_game(game);
+        let name = session.rivals()[0].name.clone();
+        // The AI proposes on its proposal rounds (`diplomacy::PROPOSAL_INTERVAL`).
+        let mut offer = None;
+        for _ in 0..=classic_rules::ai::diplomacy::PROPOSAL_INTERVAL {
+            session.request(GameRequest::EndTurn);
+            offer = session.diplomacy_view().offers.into_iter().find(|o| o.from == name);
+            if offer.is_some() {
+                break;
+            }
+        }
+        let offer = offer.expect("the AI offered peace");
+        assert!(offer.lines.iter().any(|l| l.contains("Peace")), "{:?}", offer.lines);
+        let notices: Vec<String> = session.hud_model(None).notices.into_iter().map(|n| n.text).collect();
+        assert!(notices.contains(&format!("{name} offers peace: answer on the Diplomacy screen")), "{notices:?}");
+        session.request(GameRequest::RespondDeal { offer: offer.id, accept });
+        session.game().view().auth.diplomacy().at_war(PlayerId(0), PlayerId(2))
+    };
+    assert!(answer(false), "refused: the war goes on");
+    assert!(!answer(true), "accepted: peace");
+}
+
+/// A city-state's peace stays the player's act: the button makes it at once.
+#[test]
+fn peace_with_a_city_state_is_made_by_the_button() {
+    let mut session = new_match(7);
+    let (game, rules) = session.harness_game();
+    let city_state = classic_rules::rules::content::CityStateId(0);
+    let kind = classic_rules::world::player::PlayerKind::Module(classic_rules::world::player::ClassicKind::CityState(city_state));
+    game.debug_set_player_kind(PlayerId(2), kind);
+    game.debug_meet(PlayerId(0), PlayerId(2));
+    game.execute(&rules, classic_rules::Command::DeclareWar { player: PlayerId(0), enemy: PlayerId(2) }).unwrap();
+    session.refresh_after_harness();
+    let rival = session.rivals().into_iter().find(|r| r.player == 2).expect("the city-state");
+    assert!(rival.at_war && !rival.peace_by_offer && rival.peace == Availability::Ready);
+    session.request(GameRequest::MakePeace(2));
+    assert!(!session.game().view().auth.diplomacy().at_war(PlayerId(0), PlayerId(2)));
 }
 
 /// The Civics screen shows the real branches and costs; unlocking a branch through the

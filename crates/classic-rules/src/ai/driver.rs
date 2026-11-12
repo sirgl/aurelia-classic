@@ -15,7 +15,6 @@ use crate::ai::genome::Genome;
 use crate::ai::net_e2e::mind::NetPlayer;
 use crate::ai::grand_strategy::{self, Stakes};
 use crate::ai::operations;
-use crate::ai::peace::PeaceMaking;
 use crate::ai::planner::{self, Decision, PlanTools, TurnBrief, UnitView};
 use crate::ai::state::AiState;
 use crate::ai::system::{AdvisorRegistry, Moment};
@@ -127,12 +126,11 @@ impl ClassicMind {
         let sharp = variant.sharp() || tall_real || wonder_race > 0;
         let variant = if sharp { Variant::Standard } else { variant };
         let mut advisors = AdvisorRegistry::default();
-        // The alias `siege-walls` plays as `PrePuppet` (the standard of the seventh promotion) in
-        // everything, its peace too (before the seventh promotion it made peace as a variant
-        // without leaders: `PeaceMaking::Alone`).
-        let peace = if variant == Variant::SiegeWalls { Variant::PrePuppet } else { variant }.peace_making();
-        let diplomacy = crate::ai::diplomacy::DiplomacyAdvisor { peace };
-        advisors.register(crate::classic::ClassicSystem::Diplomacy, Box::new(diplomacy));
+        // Every mind makes peace with a nation by a deal it values (`ai::peace`): the rules allow
+        // no other. The alias `siege-walls` asks for embassies as `PrePuppet` (the standard of
+        // the seventh promotion) does.
+        let embassies = if variant == Variant::SiegeWalls { Variant::PrePuppet } else { variant }.values_embassies();
+        advisors.register(crate::classic::ClassicSystem::Diplomacy, Box::new(crate::ai::diplomacy::DiplomacyAdvisor { embassies }));
         #[cfg(feature = "experimental-ai")]
         let net = variant.net().then(|| Box::new(NetPlayer::from_env().unwrap_or_else(|e| panic!("{e}"))));
         let book = variant.book().map(|b| Box::new(crate::ai::books::BookPlayer::new(b)));
@@ -159,8 +157,9 @@ impl ClassicMind {
     /// `base`, its siege (`Variant::siege_join`) and its decision of a captured city, with
     /// the book on top: a duel book's plan (`ai::books`) or the tall book's cities, policies,
     /// sites and building order (`Tall::Book`). The diplomacy stays the book's own, as
-    /// measured. The books as measured are `book@pre-puppet` for a duel book (`new`) and
-    /// `tall-book@pre-tall`. None: `book` is no league book, or `base` is one, the net or
+    /// measured (its embassies; peace is every mind's, `ai::peace`). The books as measured
+    /// are `book@pre-puppet` for a duel book (`new`) and `tall-book@pre-tall`. None: `book` is
+    /// no league book, or `base` is one, the net or
     /// Unciv's AI.
     pub fn book_on(book: Variant, base: Variant) -> Option<Self> {
         if !Self::rebases(book) || Self::rebases(base) || base.net() || base.unciv().any() {
@@ -169,7 +168,7 @@ impl ClassicMind {
         // A base gives its switches, not the flags of the game's AI since the thirteenth
         // promotion: a book on `standard` plays on `pre-next`, as before the promotion.
         let base = if base == Variant::Standard { Variant::PreNext } else { base };
-        let peace = crate::ai::diplomacy::DiplomacyAdvisor { peace: book.peace_making() };
+        let embassies = crate::ai::diplomacy::DiplomacyAdvisor { embassies: book.values_embassies() };
         let mut mind = if book.book().is_some() {
             // `new` plays the book on `PrePuppet`: the base and its siege are `base`'s instead.
             let walls = crate::ai::siege_walls::SiegeWalls::new().joined(base.siege_join());
@@ -177,7 +176,7 @@ impl ClassicMind {
         } else {
             Self { named: Some(book), tall: Some((book.tall(), book.building_order())), ..Self::new(base) }
         };
-        mind.advisors.register(crate::classic::ClassicSystem::Diplomacy, Box::new(peace));
+        mind.advisors.register(crate::classic::ClassicSystem::Diplomacy, Box::new(embassies));
         Some(mind)
     }
 
@@ -187,8 +186,7 @@ impl ClassicMind {
     #[cfg(feature = "experimental-ai")]
     pub fn with_net(variant: Variant, net: NetPlayer) -> Self {
         let mut advisors = AdvisorRegistry::default();
-        let diplomacy = crate::ai::diplomacy::DiplomacyAdvisor { peace: variant.peace_making() };
-        advisors.register(crate::classic::ClassicSystem::Diplomacy, Box::new(diplomacy));
+        advisors.register(crate::classic::ClassicSystem::Diplomacy, Box::new(crate::ai::diplomacy::DiplomacyAdvisor { embassies: variant.values_embassies() }));
         // The net plays on `NET_BASE`: its siege too.
         let walls = variant.siege_walls().then(|| Box::new(crate::ai::siege_walls::SiegeWalls::new().joined(variant.siege_join())));
         Self { advisors, variant, genome: None, humans: Vec::new(), walks: Default::default(), choice: None, net: Some(Box::new(net)), book: None, named: None, walls, conquest: None, unciv: None, tall: None, sharp: false, tall_real: false, next: false, wonder_race: 0 }
@@ -422,7 +420,7 @@ impl AiMind<Classic> for ClassicMind {
             return Vec::new();
         }
         let mut out = if self.variant.operates() {
-            operations_strategic(brief, state, rules, self.variant.peace_making())
+            operations_strategic(brief, state, rules)
         } else {
             planner::plan_strategic(brief, state, rules)
         };
@@ -836,14 +834,10 @@ impl ClassicMind {
 /// The strategic phase of an AI with operations: the strategy review,
 /// diplomacy without its wars (the operations, planned at the start of the
 /// turn, declare them), peace in wars no operation fights, research (by
-/// value per beaker when the allocator prices the turn). An AI that makes
-/// peace by deal makes it alone only with city-states.
-fn operations_strategic(brief: &TurnBrief, state: &mut AiState, rules: &CompiledRuleset, peace: PeaceMaking) -> Vec<Decision> {
+/// value per beaker when the allocator prices the turn). Peace alone only
+/// with a city-state: with a nation it is a deal (`ai::peace`).
+fn operations_strategic(brief: &TurnBrief, state: &mut AiState, rules: &CompiledRuleset) -> Vec<Decision> {
     use crate::ai::{planner_research, planner_strategy};
-    let alone = |decision: &Decision| match (peace, &decision.command) {
-        (PeaceMaking::ByDeal, Some(Command::MakePeace { enemy, .. })) => brief.relation(*enemy).is_none_or(|r| r.kind != PlayerKind::Major),
-        _ => true,
-    };
     let mut out = Vec::new();
     {
         let _span = prof::span("classic/strategy_review");
@@ -851,12 +845,12 @@ fn operations_strategic(brief: &TurnBrief, state: &mut AiState, rules: &Compiled
     }
     {
         let _span = prof::span("classic/diplomacy_relations");
-        out.extend(planner_strategy::plan_relations(brief, state, brief.dims).into_iter().filter(alone));
+        out.extend(planner_strategy::plan_relations(brief, state, brief.dims));
     }
     {
         let _span = prof::span("classic/idle_wars_peace");
         let peace = operations::idle_wars(brief, state, &out);
-        out.extend(peace.into_iter().filter(alone));
+        out.extend(peace);
     }
     let _span = prof::span("classic/research_choice");
     let research = match &brief.prices {

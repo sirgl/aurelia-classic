@@ -31,7 +31,7 @@
 //! | 22 | Resolution | Congress | M | boosts run out, then the World Congress (once a round) |
 //! | 23 | Resolution | Faith | M | the cities' faith and the Great Prophet roll; no known dependency |
 //! | 24 | Resolution | WorkerJobs | K | builds progress last: improvements count from the next turn |
-//! | 25 | End | ConquestDecisions | M | an undecided captured city becomes a puppet |
+//! | 25 | End | ConquestDecisions | M | an undecided captured city becomes a puppet; resistance is one turn shorter |
 //! | 26 | End | TimedEffects | K | charged after every step that read them |
 //! | 27 | End | Victory | M | tested on the final state of the turn |
 //!
@@ -178,7 +178,10 @@ pub(crate) fn run_step(tx: &mut WorldTransaction<'_>, step: ClassicStep, input: 
             tx.congress_turn(rules)
         }
         M::Faith => tx.collect_faith(player, ledger.module_yield, rules),
-        M::ConquestDecisions => tx.resolve_pending_decisions(player),
+        M::ConquestDecisions => {
+            tx.resolve_pending_decisions(player);
+            tx.tick_resistance(player);
+        }
         M::Victory => tx.test_victories(rules),
     }
 }

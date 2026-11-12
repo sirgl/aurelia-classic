@@ -186,7 +186,13 @@ pub struct Rival {
     pub name: String,
     pub at_war: bool,
     pub borders_open: bool,
+    /// The peace button: with a nation it offers peace (the nation answers), with a
+    /// city-state it makes it.
     pub peace: Availability,
+    /// The rival is a nation: the button offers peace instead of making it.
+    pub peace_by_offer: bool,
+    /// The nation refused the player's peace and said what it asks.
+    pub peace_ask: Option<PeaceAsk>,
     pub open_borders: Availability,
 }
 
@@ -589,6 +595,8 @@ pub enum GameRequest {
     /// Load the newest save, autosave or quick save.
     Continue,
     MakePeace(u8),
+    /// Offer the nation the peace for the gold it asked when it refused (`PeaceAsk`).
+    PeaceForGold(u8),
     OpenBorders(u8),
     UnlockBranch(PolicyBranchId),
     AdoptPolicy(PolicyId),

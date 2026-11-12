@@ -187,6 +187,10 @@ pub struct CombatRecord {
     /// last one takes the longer ones): the median war of the acceptance.
     #[serde(default)]
     pub war_lengths: [u32; WAR_BUCKETS],
+    /// Its wars that lasted more than [`LONG_WAR_ROUNDS`] (to their end or to the end of
+    /// the game; reports saved before read 0).
+    #[serde(default)]
+    pub long_wars: u32,
     /// Cities it holds at the end that another player founded: the captures it kept
     /// (reports saved before read 0).
     #[serde(default)]
@@ -204,6 +208,9 @@ pub struct CombatRecord {
 /// The width of a bucket of `war_lengths`, in rounds, and their count.
 pub const WAR_BUCKET: u32 = 2;
 pub const WAR_BUCKETS: usize = 32;
+/// A war longer than this many rounds is a long one (`CombatRecord::long_wars`): the
+/// peace-consent rule must not leave wars that never end (rules/peace-consent, Q3).
+pub const LONG_WAR_ROUNDS: u32 = 100;
 
 impl CombatRecord {
     pub fn add(self, other: CombatRecord) -> CombatRecord {
@@ -222,6 +229,7 @@ impl CombatRecord {
             at_the_end: self.at_the_end + other.at_the_end,
             war_rounds: self.war_rounds + other.war_rounds,
             war_lengths: std::array::from_fn(|i| self.war_lengths[i] + other.war_lengths[i]),
+            long_wars: self.long_wars + other.long_wars,
             held: self.held + other.held,
             capital_taken: match (self.capital_taken, other.capital_taken) {
                 (Some(a), Some(b)) => Some(a.min(b)),
@@ -255,6 +263,7 @@ impl CombatRecord {
         };
         *count += 1;
         self.war_rounds += rounds;
+        self.long_wars += u32::from(rounds > LONG_WAR_ROUNDS);
         self.war_lengths[(rounds / WAR_BUCKET).min(WAR_BUCKETS as u32 - 1) as usize] += 1;
     }
 }

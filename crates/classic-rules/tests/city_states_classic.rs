@@ -292,6 +292,27 @@ fn clearing_the_quest_camp_pays_fifty_influence() {
     assert!(game.view().auth.module().city_states().quests().is_empty());
 }
 
+/// A deal «peace with the city-state» is bound by the same rule as the peace itself: not while
+/// the city-state's ally is at war with the one who gives it.
+#[test]
+fn nobody_gives_peace_with_a_city_state_whose_ally_is_at_war_with_them() {
+    use classic_rules::world::relations::{DealBlock, DealItem};
+    let (mut game, rules) = world("core:city-state/byblos");
+    game.debug_set_influence(&rules, CS, P0, 70);
+    until_active(&mut game, &rules, P1);
+    game.execute(&rules, Command::DeclareWar { player: P1, enemy: P0 }).unwrap();
+    assert!(game.view().auth.diplomacy().at_war(CS, P1), "the city-state follows its ally");
+    let deal = Command::ProposeDeal { from: P1, to: P0, items: vec![(P1, DealItem::ThirdPartyPeace(CS))] };
+    let refused = game.execute(&rules, deal).unwrap_err();
+    assert_eq!(refused, classic_rules::command::CommandError::RuleViolation(DealBlock::CannotMakePeace.reason().into()));
+    // A city-state without such an ally can be given peace in a deal, as before.
+    let (mut game, rules) = world("core:city-state/byblos");
+    until_active(&mut game, &rules, P1);
+    game.execute(&rules, Command::DeclareWar { player: P1, enemy: CS }).unwrap();
+    let deal = Command::ProposeDeal { from: P1, to: P0, items: vec![(P1, DealItem::ThirdPartyPeace(CS))] };
+    game.execute(&rules, deal).expect("peace with a free city-state in a deal");
+}
+
 #[test]
 fn war_on_a_city_state_and_the_allys_wars() {
     let (mut game, rules) = world("core:city-state/byblos");

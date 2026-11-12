@@ -28,3 +28,7 @@ classic.game.turn.won = You won the game
 classic.game.turn.lost-to-another = Another nation won the game
 classic.game.turn.fell = Your nation fell
 classic.game.turn.nuclear-strike = { $nation } used a nuclear weapon. The nations that have met them will remember it.
+classic.game.turn.order-removed-wonder-built = { $city }: { $item } was finished in another city. The order was removed; the production you had stored is kept.
+classic.game.turn.order-removed-national-wonder-built = { $city }: { $item } was finished in another of your cities. The order was removed; the production you had stored is kept.
+classic.game.turn.order-removed-already-built = { $city }: { $item } already stands here. The duplicate order was removed; the production you had stored is kept.
+classic.game.turn.order-removed-blocked = { $city }: { $item } can no longer be produced. The order was removed; the production you had stored is kept.

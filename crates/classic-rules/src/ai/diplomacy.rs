@@ -1,10 +1,9 @@
-//! Minimal diplomacy decisions over `AIObservation` (M4 track C): answers
-//! to deal offers, proposals (embassies, friendship, research agreements,
-//! pacts, open borders, peace), denunciations. Values are a plain gold
+//! Minimal diplomacy decisions over `AIObservation` (M4 track C): proposals
+//! (embassies, friendship, research agreements, pacts, open borders, peace),
+//! denunciations; the answers to offers and the peace offers are `ai::peace`'s. Values are a plain gold
 //! scale; the relation data is the public diplomacy of the observation
 //! and the AI's own warmonger memory.
 
-use crate::ai::peace::PeaceMaking;
 use crate::ai::value::Prices;
 use crate::knowledge::public::PlayerQueries;
 use crate::command::Command;
@@ -12,15 +11,14 @@ use crate::ids::PlayerId;
 use crate::knowledge::observation::{AIObservation, Relation};
 use crate::rules::CompiledRuleset;
 use crate::world::player::PlayerKind;
-use crate::world::relations::{DealItem, DealOffer};
+use crate::world::relations::DealItem;
 
 /// No friendship before this many rounds of contact (Standard speed; × the
 /// speed's pace); own value, unverified.
 pub const FRIENDSHIP_MIN_CONTACT_ROUNDS: u32 = 20;
-/// The AI accepts a peace (and proposes one to a rival in the diplomacy
-/// advisor) only after this many rounds of war. Not the length a war lasts
-/// in the game's strategy: that is `planner_strategy::MIN_WAR_ROUNDS`, which
-/// is longer (the strategy's own `MakePeace` waits for it; the pair is
+/// The plain proposals (`proposals`) offer peace to a rival only after twice
+/// this many rounds of war. Not the length a war lasts in the game's strategy:
+/// that is `planner_strategy::MIN_WAR_ROUNDS`, which is longer (the pair is
 /// fixed by the test `peace_is_accepted_before_the_strategy_asks_for_it`).
 pub const ACCEPT_PEACE_AFTER_ROUNDS: u32 = crate::systems::diplomacy::deals::MIN_WAR_ROUNDS_BEFORE_PEACE;
 /// Warmonger memory above which the AI distrusts (no friendship, pacts).
@@ -45,21 +43,11 @@ pub(crate) fn trusted(round: u32, r: &Relation) -> bool {
 }
 
 /// Gold value of an item for the AI receiving it (`receiving`) or giving it.
-pub(crate) fn item_value(
-    obs: &AIObservation<'_>,
-    rules: &CompiledRuleset,
-    other: PlayerId,
-    item: DealItem,
-    receiving: bool,
-) -> i64 {
-    item_value_priced(obs, rules, None, other, item, receiving)
-}
-
-/// `item_value`, a research agreement priced by the beakers the rules pay
-/// for it when `agreements` gives the turn's prices (`ScienceLevers::
-/// agreements`, `science_levers::agreement_gold`): what the pool of the
-/// smaller of the two sciences pays at the end, at the beaker's price in
-/// gold, less the gold it costs. Without them a flat 100.
+/// A research agreement is priced by the beakers the rules pay for it when
+/// `agreements` gives the turn's prices (`ScienceLevers::agreements`,
+/// `science_levers::agreement_gold`): what the pool of the smaller of the two
+/// sciences pays at the end, at the beaker's price in gold, less the gold it
+/// costs. Without them a flat 100.
 pub(crate) fn item_value_priced(
     obs: &AIObservation<'_>,
     rules: &CompiledRuleset,
@@ -118,17 +106,10 @@ pub(crate) fn item_value_priced(
                 -1000
             }
         }
-        DealItem::Peace => peace_value(obs, other),
+        // Peace is valued by what the war promises (`ai::peace::Negotiation::value`).
+        DealItem::Peace => 0,
         DealItem::ThirdPartyWar(_) => -1000,
         DealItem::ThirdPartyPeace(_) => 0,
-    }
-}
-
-/// The AI takes peace after `ACCEPT_PEACE_AFTER_ROUNDS` of war.
-fn peace_value(obs: &AIObservation<'_>, other: PlayerId) -> i64 {
-    match relation(obs, other) {
-        Some(r) if r.at_war && obs.round >= r.war_since + ACCEPT_PEACE_AFTER_ROUNDS => 100,
-        _ => -1000,
     }
 }
 
@@ -142,29 +123,6 @@ fn research_cost(obs: &AIObservation<'_>, rules: &CompiledRuleset) -> u32 {
         .filter_map(|e| rules.eras.get(e.0 as usize))
         .max_by_key(|e| e.index);
     era.map(|e| e.research_agreement_cost).unwrap_or(100)
-}
-
-/// Accept an offer when its value for the AI is not negative.
-pub fn accepts(obs: &AIObservation<'_>, rules: &CompiledRuleset, offer: &DealOffer) -> bool {
-    let other = offer.from;
-    let mut value = 0i64;
-    for (giver, item) in &offer.items {
-        let receiving = *giver != obs.player || item.is_mutual();
-        value += item_value(obs, rules, other, *item, receiving);
-    }
-    value >= 0
-}
-
-/// Answers to every offer addressed to the AI.
-pub fn answer_offers(obs: &AIObservation<'_>, rules: &CompiledRuleset) -> Vec<Command> {
-    obs.offers_to_us
-        .iter()
-        .map(|offer| Command::RespondDeal {
-            player: obs.player,
-            offer: offer.id,
-            accept: accepts(obs, rules, offer),
-        })
-        .collect()
 }
 
 /// Proposals to met nations: embassy exchange, then friendship after
@@ -320,13 +278,13 @@ pub const PROPOSAL_INTERVAL: u32 = 5;
 
 /// The diplomacy system's advisor (`ai::system`): answers every offer at
 /// the start of the turn; every PROPOSAL_INTERVAL rounds proposes deals and
-/// denounces warmongers. How wars with nations end is `peace`'s:
-/// alone, the strategy planner's (`planner_strategy`, `operations`), and no
-/// peace is proposed here; by deal, every answer and every peace offer is
-/// valued (`ai::peace`).
+/// denounces warmongers. Wars with nations end by deals only (the rules
+/// refuse peace alone with a nation): every answer and every peace offer is
+/// valued (`ai::peace`). `embassies`: it also asks for the embassies whose
+/// capital it values (`ai::peace::embassy_offers`, `Variant::values_embassies`).
 #[derive(Debug, Clone, Copy, Default)]
 pub struct DiplomacyAdvisor {
-    pub peace: PeaceMaking,
+    pub embassies: bool,
 }
 
 impl crate::ai::system::SystemAdvisor for DiplomacyAdvisor {
@@ -338,11 +296,7 @@ impl crate::ai::system::SystemAdvisor for DiplomacyAdvisor {
         if obs.view.own_kind() != PlayerKind::Major {
             return Vec::new();
         }
-        let answers = match self.peace {
-            PeaceMaking::Alone => answer_offers(obs, input.rules),
-            PeaceMaking::ByDeal => crate::ai::peace::answer_offers(input),
-        };
-        let mut out = crate::ai::combat::proposals(40, answers);
+        let mut out = crate::ai::combat::proposals(40, crate::ai::peace::answer_offers(input));
         let my_round = (obs.round + u32::from(obs.player.0)) % PROPOSAL_INTERVAL == 0;
         if my_round {
             let deals: Vec<Command> = proposals_priced(obs, input.rules, agreement_prices(input))
@@ -354,10 +308,10 @@ impl crate::ai::system::SystemAdvisor for DiplomacyAdvisor {
             let asked: Vec<PlayerId> = deals.iter().chain(&swaps).filter_map(partner).collect();
             out.extend(crate::ai::combat::proposals(5, deals));
             out.extend(crate::ai::combat::proposals(5, swaps));
-            if self.peace == PeaceMaking::ByDeal {
+            if self.embassies {
                 out.extend(crate::ai::combat::proposals(5, crate::ai::peace::embassy_offers(input, &asked)));
-                out.extend(crate::ai::combat::proposals(5, crate::ai::peace::peace_offers(input)));
             }
+            out.extend(crate::ai::combat::proposals(5, crate::ai::peace::peace_offers(input)));
             out.extend(crate::ai::combat::proposals(5, denunciations(obs)));
         }
         out

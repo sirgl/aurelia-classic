@@ -47,3 +47,4 @@ classic.game.city.row-faith = 信仰
 classic.game.city.row-defence = 防御
 classic.game.city.row-hit-points = 生命值
 classic.game.city.no-effect = 暂无效果
+classic.game.city.resistance = 抵抗中：还剩 { $n } 回合。结束前城市不生产任何东西，也不增长。

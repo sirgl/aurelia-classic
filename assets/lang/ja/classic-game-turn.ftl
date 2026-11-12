@@ -26,3 +26,7 @@ classic.game.turn.won = ゲームに勝利しました
 classic.game.turn.lost-to-another = 他の国家がゲームに勝利しました
 classic.game.turn.fell = あなたの国家は滅亡しました
 classic.game.turn.nuclear-strike = { $nation }が核兵器を使用しました。接触したすべての文明がそれを記憶します。
+classic.game.turn.order-removed-wonder-built = { $city }：{ $item }は別の都市で完成しました。生産指示を取り消しました。蓄積した生産力はそのまま保持されます。
+classic.game.turn.order-removed-national-wonder-built = { $city }：{ $item }はあなたの別の都市で完成しました。生産指示を取り消しました。蓄積した生産力はそのまま保持されます。
+classic.game.turn.order-removed-already-built = { $city }：{ $item }はすでにこの都市にあります。重複した生産指示を取り消しました。蓄積した生産力はそのまま保持されます。
+classic.game.turn.order-removed-blocked = { $city }：{ $item }はもう生産できません。生産指示を取り消しました。蓄積した生産力はそのまま保持されます。

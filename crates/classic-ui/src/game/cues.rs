@@ -522,6 +522,9 @@ fn city_cues(observer: &Observer<'_>, record: &AppliedCommand) -> Vec<(Cue, bool
                 let wonder = observer.rules.buildings.get(building.0 as usize).is_some_and(|b| b.wonder);
                 (city, CityCue::Built { wonder })
             }
+            // A removed order is told by the session's notices, filtered by owner
+            // (`game/lost_orders.rs`), not by a map cue.
+            CityChange::OrderRemoved { .. } => continue,
             _ => continue,
         };
         let Some(core) = observer.game.auth.cities().get(city) else {

@@ -61,3 +61,4 @@ classic.game.city.row-faith = Вера
 classic.game.city.row-defence = Защита
 classic.game.city.row-hit-points = Здоровье
 classic.game.city.no-effect = Пока без эффекта
+classic.game.city.resistance = Сопротивление: ещё ходов — { $n }. Город ничего не производит и не растёт, пока оно не кончится.

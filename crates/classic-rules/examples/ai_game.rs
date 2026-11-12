@@ -1,6 +1,6 @@
 //! Headless AI game on the BNW ruleset: every player is an AI, the driver
 //! runs the rounds, the world is validated as it goes. Prints per player:
-//! cities, population, techs, units by role, wars and peaces, and the
+//! cities, population, techs, units by role, wars, peace offers and peaces, and the
 //! totals of the decision trace.
 //!
 //! `cargo run --release -p classic-rules --example ai_game -- [rounds] [seed] [players] [width] [height]`
@@ -128,6 +128,12 @@ fn print_players(
             .iter()
             .filter(|c| matches!(c, Command::DeclareWar { player: p, .. } if *p == player))
             .count();
+        // Peace with a nation is a deal both sign (`ai::peace`): the offers are counted; the
+        // peaces made alone are those with city-states.
+        let peace_offers = log
+            .iter()
+            .filter(|c| matches!(c, Command::ProposeDeal { from, items, .. } if *from == player && items.iter().any(|(_, i)| *i == classic_rules::world::relations::DealItem::Peace)))
+            .count();
         let peaces = log
             .iter()
             .filter(|c| matches!(c, Command::MakePeace { player: p, .. } if *p == player))
@@ -140,7 +146,7 @@ fn print_players(
             })
             .count();
         println!(
-            "P{p} alive={} cities={} peak={} pop={population} buildings={buildings} techs={} gold={} settlers={} workers={} military={} improvements={improvements} wars_declared={wars} peaces={peaces}",
+            "P{p} alive={} cities={} peak={} pop={population} buildings={buildings} techs={} gold={} settlers={} workers={} military={} improvements={improvements} wars_declared={wars} peace_offers={peace_offers} peaces_alone={peaces}",
             auth.players().is_alive(player),
             cities.len(),
             states.get(player).map(|s| s.strategy.peak_cities).unwrap_or(0),

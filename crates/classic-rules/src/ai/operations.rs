@@ -479,9 +479,10 @@ pub fn plan(brief: &TurnBrief, state: &mut AiState, rules: &CompiledRuleset, rou
     out
 }
 
-/// Peace in every war old enough that no operation fights (the war was for
-/// an operation that ended, or the enemy's cities are out of reach) and
-/// that `decided` does not end already.
+/// Peace in every war with a city-state old enough that no operation fights
+/// (the war was for an operation that ended, or the enemy's cities are out of
+/// reach) and that `decided` does not end already. A war with a nation ends by
+/// a deal (`ai::peace`): the rules refuse peace alone with it.
 pub fn idle_wars(brief: &TurnBrief, state: &AiState, decided: &[Decision]) -> Vec<Decision> {
     let raided = crate::ai::raid::enemies(state);
     let fought = |enemy: PlayerId| state.operations().iter().any(|o| o.enemy == enemy) || raided.contains(&enemy);
@@ -489,7 +490,7 @@ pub fn idle_wars(brief: &TurnBrief, state: &AiState, decided: &[Decision]) -> Ve
     brief
         .relations
         .iter()
-        .filter(|r| r.at_war && !fought(r.other) && !ended(r.other))
+        .filter(|r| r.at_war && r.kind != crate::world::player::PlayerKind::Major && !fought(r.other) && !ended(r.other))
         .filter(|r| rounds_since(brief, state.relation(r.other).and_then(|m| m.last_change_round)) >= MIN_WAR_ROUNDS)
         .map(|r| {
             let command = Command::MakePeace { player: brief.player, enemy: r.other };
@@ -1196,9 +1197,9 @@ pub fn running_case(brief: &TurnBrief, state: &AiState, rules: &CompiledRuleset,
 
 /// The score a captured city of `population` brings by the rules (`SiegeFixes::priced`):
 /// the rules' capture leaves it fewer citizens (`captured_population`); the AI keeps a city of
-/// `ANNEX_POPULATION` and more annexed, the rest as puppets (`combat::conquest_decisions`); an
-/// annexed city yields nothing while its resistance lasts (as many rounds as its citizens), a
-/// puppet has none; its unrest is the rules' for a puppet or an annexed city
+/// `ANNEX_POPULATION` and more annexed, the rest as puppets (`combat::conquest_decisions`); a
+/// city in resistance gives nothing while it lasts (as many rounds as its citizens; an annexed
+/// city always, a puppet where `PUPPET_RESISTS` is on and otherwise not at all); its unrest is the rules' for a puppet or an annexed city
 /// (`Prices::captured_city_unrest_hundredths`), priced by what it changes for the empire: the
 /// drift of every point and each mood the empire crosses (`Prices::captured_city_unrest_steps`),
 /// not every point at the price of a point in the deficit the empire lives in. With `puppet`
@@ -1224,7 +1225,7 @@ pub fn captured_parts(prices: &Prices, population: u32, rounds: u32, puppet: boo
 pub fn captured_parts_by(prices: &Prices, population: u32, rounds: u32, fixes: SiegeFixes, rival: i64) -> (Centi, Centi) {
     let kept = crate::systems::combat::city::captured_population(population.max(1), 0);
     let annexed = !fixes.puppet && kept >= crate::ai::combat::ANNEX_POPULATION;
-    let resistance = if annexed { kept } else { 0 };
+    let resistance = if annexed || crate::world::PUPPET_RESISTS { kept } else { 0 };
     let unrest = if fixes.recovery { prices.kept_city_unrest_recovering(kept, annexed) } else { prices.kept_city_unrest_steps(kept, annexed) };
     let worth = match (fixes.yields, fixes.rank) {
         (true, true) => city_worth_ranked(prices, kept, rounds + resistance, rival),

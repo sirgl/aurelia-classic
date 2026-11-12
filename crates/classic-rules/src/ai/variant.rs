@@ -28,8 +28,10 @@
 //! the technologies it buys open (`SciencePricing::Reach`; named `reach`
 //! until it became the game's AI); `AllocatorEcon2` and `LeadersEcon2` are `Allocator` and `Leaders`
 //! with those prices. `AllocatorPeace` is `Allocator` without new wars,
-//! the control of its wars; `LeadersAlone` is `Leaders` without peace by
-//! value, its control. The instruments of the bench itself are built on
+//! the control of its wars; `LeadersAlone` was `Leaders` without peace by
+//! value, its control (since peace with a nation needs its consent every
+//! variant makes it by a deal, so it plays as `Leaders` except that it does not
+//! ask for the embassies the leaders value: `values_embassies`). The instruments of the bench itself are built on
 //! `Standard`: `Nudged` plays as well but differently (the noise floor),
 //! `OneCity` is known to be weaker (the bench sees a difference).
 //!
@@ -90,7 +92,6 @@
 
 use crate::ai::grand_strategy::Stakes;
 use crate::ai::operations::WarGate;
-use crate::ai::peace::PeaceMaking;
 use crate::ai::planner::{AiSettings, Decision, TurnBrief};
 use crate::ai::trace::Reason;
 use crate::ai::value::{PriceModel, Prices, SciencePricing};
@@ -202,8 +203,9 @@ pub enum Variant {
     /// personality neutral it plays as `Allocator` but for captures that
     /// win the game and how its wars end.
     Leaders,
-    /// `Leaders` who end their wars alone, as `Allocator` does (`Leaders`
-    /// before step 6): the control of peace by value.
+    /// `Leaders` who ended their wars alone, as `Allocator` did (`Leaders`
+    /// before step 6): the control of peace by value. The rules no longer
+    /// allow peace alone with a nation: it plays as `Leaders`.
     LeadersAlone,
     /// `Leaders` with the prices of `AllocatorEcon2`.
     LeadersEcon2,
@@ -1731,16 +1733,12 @@ impl Variant {
         this == Variant::Planner
     }
 
-    /// How it ends its wars with nations: the leaders by deals they
-    /// value (`ai::peace`), their control and the variants before them
-    /// alone.
-    pub fn peace_making(self) -> PeaceMaking {
+    /// It asks for the embassies whose capital it values (`ai::peace::embassy_offers`): the
+    /// leaders, not their control and the variants before them. (Until peace with a nation
+    /// needed its consent this switch also chose peace by deal; every variant makes it so now.)
+    pub fn values_embassies(self) -> bool {
         let this = self.base();
-        if self.has_leaders() && this != Variant::LeadersAlone {
-            PeaceMaking::ByDeal
-        } else {
-            PeaceMaking::Alone
-        }
+        self.has_leaders() && this != Variant::LeadersAlone
     }
 
     /// How its operations are admitted; `prices` are the allocator's,
@@ -1788,7 +1786,7 @@ mod tests {
         let crate_only = (v.allocates(), v.operates(), v.fights_as_front(), v.has_leaders(), v.defends());
         let public = (v.growth_policy(), v.content_founding(), v.true_effects(), v.effect_checks(), v.priced_stops(), v.science_levers(), v.war_tuning(), v.tactical(), v.danger_net(), v.weak_fighter(), v.fight_fix(), v.siege_tactics());
         let more = (v.choice_mode(), v.site_net(), v.space_finish(), v.unit_abilities(), v.religion_fix(), v.tall(), v.building_order(), v.price_model(), v.sound_orders(), v.checks_orders(), v.strikes(), v.carriers());
-        let rest = (v.landings(), v.science_pricing(), v.sea_work(), v.air_arm(), v.plans(), v.peace_making(), v.siege_walls());
+        let rest = (v.landings(), v.science_pricing(), v.sea_work(), v.air_arm(), v.plans(), v.values_embassies(), v.siege_walls());
         format!("{crate_only:?} {public:?} {more:?} {rest:?}")
     }
 

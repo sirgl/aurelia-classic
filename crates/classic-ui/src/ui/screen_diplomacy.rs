@@ -315,8 +315,17 @@ fn relation_buttons(ui: &mut egui::Ui, r: Rect, state: &mut ScreenState, card: &
             vec2(width, r.height()),
         )
     };
-    if card.at_war {
-        if ready_button(ui, slot(0), t!("classic.ui.screen-diplomacy.make-peace"), &card.make_peace) {
+    if let Some(ask) = card.peace_ask.as_ref().filter(|_| card.at_war) {
+        // The nation refused and named its price: that offer is the card's button, its words
+        // stand under the row.
+        let label = tf!("classic.ui.screen-diplomacy.offer-peace-gold", price = ask.price);
+        if ready_button(ui, slot(0), &label, &ask.offer) {
+            state.requests.push(GameRequest::PeaceForGold(card.player.0));
+        }
+        text(ui.painter(), pos2(r.left(), r.bottom() + 3.0), &ask.reason, 11.0, WAR);
+    } else if card.at_war {
+        // The cards are nations: their peace is an offer they answer.
+        if ready_button(ui, slot(0), t!("classic.ui.screen-diplomacy.offer-peace"), &card.make_peace) {
             state.requests.push(GameRequest::MakePeace(card.player.0));
         }
     } else if ready_button(ui, slot(0), t!("classic.ui.screen-diplomacy.declare-war"), &card.declare_war) {
@@ -643,6 +652,7 @@ mod overflow_tests {
                 gold: 100,
                 declare_war: Availability::Ready,
                 make_peace: Availability::Ready,
+                peace_ask: None,
                 denounce: Availability::Ready,
                 open_borders: Availability::Ready,
                 ours: vec![],

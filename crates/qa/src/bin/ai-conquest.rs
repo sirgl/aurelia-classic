@@ -485,7 +485,7 @@ fn give_city(o: &Options, game: &mut Game, rules: &Rules, giver: PlayerId, taker
     .ok_or("no city but the capital")?;
     let offer = auth.module().relations().next_offer_id();
     game.execute(rules, Command::ProposeDeal { from: giver, to: taker, items: vec![(giver, DealItem::City(city))] }).map_err(|e| format!("propose: {e:?}"))?;
-    game.execute(rules, Command::RespondDeal { player: taker, offer, accept: true }).map_err(|e| format!("respond: {e:?}"))?;
+    game.execute(rules, Command::RespondDeal { player: taker, offer, accept: true, why: classic_rules::world::relations::PeaceRefusal::Unsaid }).map_err(|e| format!("respond: {e:?}"))?;
     if game.view().auth.cities().get(city).map(|c| c.owner) != Some(taker) {
         return Err("the deal did not move the city".into());
     }

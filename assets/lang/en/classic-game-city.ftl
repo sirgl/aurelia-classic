@@ -55,3 +55,4 @@ classic.game.city.row-faith = Faith
 classic.game.city.row-defence = Defence
 classic.game.city.row-hit-points = Hit points
 classic.game.city.no-effect = No effect yet
+classic.game.city.resistance = In resistance: { $n } turns left. The city produces nothing and grows no more until it ends.

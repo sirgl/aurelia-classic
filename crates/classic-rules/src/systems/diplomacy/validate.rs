@@ -3,7 +3,7 @@
 use crate::command::{CommandError, ResolvedCommand};
 use crate::ids::PlayerId;
 use crate::rules::CompiledRuleset;
-use crate::systems::diplomacy::deals::offer_problem;
+use crate::systems::diplomacy::deals::{offer_problem, peace_needs_a_deal, DealBlock};
 use crate::systems::diplomacy::has_met;
 use crate::world::relations::DealItem;
 use crate::world::state::GameView;
@@ -48,6 +48,8 @@ pub(crate) fn validate_declare_war(
     Ok(ResolvedCommand::DeclareWar { player, enemy })
 }
 
+/// Peace with a city-state (§5.2): one side's act. Between two nations it is
+/// refused: their peace is a deal (`deals::peace_needs_a_deal`).
 pub(crate) fn validate_make_peace(
     view: GameView<'_>,
     player: PlayerId,
@@ -61,8 +63,10 @@ pub(crate) fn validate_make_peace(
     if auth.players().is_barbarian(player) || auth.players().is_barbarian(enemy) {
         return Err(violation("no peace with barbarians"));
     }
-    if crate::systems::diplomacy::deals::peace_too_early(auth, player, enemy) {
-        return Err(violation("peace needs 10 rounds of war"));
+    // Between nations peace is a deal with the peace item that the other side accepts
+    // (`ProposeDeal`, `RespondDeal`); the deal holds the ten rounds of war.
+    if peace_needs_a_deal(auth, player, enemy) {
+        return Err(violation(DealBlock::PeaceNeedsConsent.reason()));
     }
     if crate::systems::city_states::peace_blocked(auth, player, enemy) {
         return Err(violation("the city-state's ally is at war with you"));

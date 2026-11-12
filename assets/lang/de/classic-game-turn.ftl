@@ -29,3 +29,7 @@ classic.game.turn.won = Sie haben das Spiel gewonnen
 classic.game.turn.lost-to-another = Eine andere Nation hat das Spiel gewonnen
 classic.game.turn.fell = Ihre Nation ist gefallen
 classic.game.turn.nuclear-strike = { $nation } hat eine Atomwaffe eingesetzt. Die Zivilisationen, die sie kennen, werden es nicht vergessen.
+classic.game.turn.order-removed-wonder-built = { $city }: { $item } wurde in einer anderen Stadt fertiggestellt. Der Auftrag wurde entfernt; die gesammelte Produktion bleibt erhalten.
+classic.game.turn.order-removed-national-wonder-built = { $city }: { $item } wurde in einer anderen Ihrer Städte fertiggestellt. Der Auftrag wurde entfernt; die gesammelte Produktion bleibt erhalten.
+classic.game.turn.order-removed-already-built = { $city }: { $item } steht hier bereits. Der doppelte Auftrag wurde entfernt; die gesammelte Produktion bleibt erhalten.
+classic.game.turn.order-removed-blocked = { $city }: { $item } kann nicht mehr hergestellt werden. Der Auftrag wurde entfernt; die gesammelte Produktion bleibt erhalten.

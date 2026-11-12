@@ -106,3 +106,29 @@ fn a_spy_has_its_nations_name_in_the_screen_the_notice_and_the_city_banner() {
     let banner = session.hud_extras(None).banners.into_iter().find(|b| b.tile == city_tile).expect("banner");
     assert_eq!(banner.visitors, [first]);
 }
+
+#[test]
+fn a_city_in_resistance_says_so_and_how_long_and_blocks_production_and_buying() {
+    let mut session = session(20260928);
+    found_capital(&mut session);
+    let (handle, tile) = {
+        let (handle, core) = session.game().view().auth.cities().iter().next().map(|(h, c)| (h, c.clone())).unwrap();
+        (handle, core.tile)
+    };
+    session.harness_game().0.world_mut().cities.get_mut(handle).unwrap().resistance_turns = 3;
+    session.select_city_at(tile);
+    let view = session.city_view().unwrap();
+    assert_eq!(view.growth, "In resistance: 3 turns left. The city produces nothing and grows no more until it ends.");
+    let reason = "The city is in resistance for 3 more turns: it produces and sells nothing";
+    let option = view.options.iter().find(|o| matches!(o.availability, Availability::Blocked(_))).expect("an option");
+    assert!(view.options.iter().all(|o| blocked(&o.availability) == reason), "{:?}", option.availability);
+    assert_eq!(view.production_per_turn, 0);
+    // Every language the game has says it, without a missing key.
+    for lang in ["ru", "de", "fr", "es", "ja", "zh-Hans"] {
+        i18n::with_language(lang, || {
+            let view = session.city_view().unwrap();
+            assert!(!view.growth.starts_with("classic."), "{lang}: {}", view.growth);
+            assert!(view.options.iter().all(|o| !blocked(&o.availability).starts_with("classic.")), "{lang}");
+        });
+    }
+}

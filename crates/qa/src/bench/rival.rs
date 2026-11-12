@@ -108,6 +108,13 @@ pub struct WonderTally {
     /// Lost orders the rules burned: the head was consumed without a reward, the cost destroyed.
     pub burned: u32,
     pub burned_hammers: u64,
+    /// Lost orders the rules took out of the queue themselves (`CityChange::OrderRemoved`, nothing
+    /// spent): the stock of the city when they did.
+    pub removed: u32,
+    pub removed_stock: u64,
+    /// Every removal of the seat's cities by item and reason: [world wonder, national wonder,
+    /// duplicate, blocked] (`OrderRemoval`), any item.
+    pub removed_by_reason: [u32; 4],
     /// Lost orders the seat dropped before the head was consumed: the stock stays in the city.
     pub redirected: u32,
     pub redirected_stock: u64,
@@ -437,6 +444,26 @@ impl RivalProbe {
                         self.completed::<R>(game, rules, city, building);
                     }
                 }
+            }
+        }
+        // Orders the rules removed in this player's commands (whoever owns them): nothing was spent.
+        for command in applied {
+            for change in &command.changes.city_changes {
+                let CityChange::OrderRemoved { city, owner, item, reason } = *change else { continue };
+                if let Some(tally) = self.tally.get_mut(&owner.0) {
+                    tally.removed_by_reason[reason as usize] += 1;
+                }
+                let ProductionItem::Building(building) = item else { continue };
+                let Some(order) = self.orders.remove(&(city, building)) else { continue };
+                let stock = auth.cities().get(city).map_or(0, |c| c.production);
+                let tally = self.tally.get_mut(&order.owner.0).expect("seat");
+                tally.removed += 1;
+                tally.removed_stock += u64::from(stock);
+                if order.lost.is_none() {
+                    tally.cancelled += 1;
+                }
+                self.order_log[order.rec].outcome = "removed";
+                self.order_log[order.rec].closed = now;
             }
         }
         // Orders of the player that left the queue in the end of the turn.

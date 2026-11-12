@@ -1,16 +1,16 @@
-//! Peace by value (M6.2 step 6, classic/docs/ai-leaders.md "Peace by value"): the
-//! leaders (`leaders` and the game's AI, `standard`) end a war with a
-//! nation only by a peace deal, and value the deal in the
+//! Peace by value (M6.2 step 6, classic/docs/ai-leaders.md "Peace by value"): every AI
+//! ends a war with a nation only by a peace deal, and values the deal in the
 //! allocator's measure — hundredths of points of the score, a capital's
-//! share of a victory included (`Stakes`).
+//! share of a victory included (`Stakes`). It answers every offer addressed to
+//! it so (`answer_offers`), a human's too.
 //!
-//! Why: the AI before it (`allocator`) walks out of any war it does not
-//! fight 15 rounds after it began (`Command::MakePeace` needs nobody's
-//! consent in these rules), so a victim ends a siege before it can
-//! succeed, and nobody pays or asks anything for peace. Peace between
-//! nations is a deal both sides accept (classic/docs/classic/rules.md); here
-//! each side takes peace when going on with the war is worth less to it than
-//! the terms.
+//! Why: peace between nations is a deal the other side accepts
+//! (classic/docs/classic/rules.md; the rules refuse `Command::MakePeace` between
+//! two nations since 12 November). Before, the AI without leaders (`allocator`)
+//! walked out of any war it did not fight 15 rounds after it began, so a victim
+//! ended a siege before it could succeed, and nobody paid or asked anything for
+//! peace. Here each side takes peace when going on with the war is worth less to
+//! it than the terms.
 //!
 //! What a war promises (`WarProspect`): our operation against the enemy —
 //! its chance times what its capture brings, less the army it still costs
@@ -35,20 +35,7 @@ use crate::knowledge::observation::AIObservation;
 use crate::knowledge::public::PlayerQueries;
 use crate::rules::CompiledRuleset;
 use crate::world::player::PlayerKind;
-use crate::world::relations::{DealItem, DealOffer};
-
-/// How an AI ends its wars with nations.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub enum PeaceMaking {
-    /// By its own `MakePeace` when its strategy says so (the game's AI:
-    /// a war no operation fights ends after `planner_strategy::MIN_WAR_ROUNDS`);
-    /// it accepts any peace offered after `diplomacy::ACCEPT_PEACE_AFTER_ROUNDS`.
-    #[default]
-    Alone,
-    /// By a peace deal both sides value (this module); `MakePeace` only
-    /// with city-states.
-    ByDeal,
-}
+use crate::world::relations::{DealItem, DealOffer, PeaceRefusal};
 
 /// What going on with a war against one enemy promises the player.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -158,7 +145,7 @@ impl<'i, 'o, 'a> Negotiation<'i, 'o, 'a> {
     /// price of gold; a city by what it brings or costs; peace by giving up
     /// the war's prospect; an embassy we receive by the capital it reveals
     /// (`found`) on top of the advisor's scale; the rest by the advisor's
-    /// gold scale (`diplomacy::item_value`) at the price of gold. Peace
+    /// gold scale (`diplomacy::item_value_priced`) at the price of gold. Peace
     /// counts once, however many sides give it.
     pub fn value(&self, other: PlayerId, items: &[(PlayerId, DealItem)]) -> Centi {
         let me = self.obs().player;
@@ -187,7 +174,7 @@ impl<'i, 'o, 'a> Negotiation<'i, 'o, 'a> {
         peace + terms
     }
 
-    /// An item by the advisor's gold scale (`diplomacy::item_value`) at
+    /// An item by the advisor's gold scale (`diplomacy::item_value_priced`) at
     /// the price of gold.
     fn scale(&self, other: PlayerId, item: DealItem, receiving: bool) -> Centi {
         let agreements = crate::ai::diplomacy::agreement_prices(self.input);
@@ -214,6 +201,29 @@ impl<'i, 'o, 'a> Negotiation<'i, 'o, 'a> {
 
     pub fn accepts(&self, offer: &DealOffer) -> bool {
         self.value(offer.from, &offer.items) >= 0
+    }
+
+    /// The answer to `offer` and, for a refused offer that makes peace, why and what the peace
+    /// itself costs in gold. All of it comes from the value the decision is made by (`value`):
+    /// the war's prospect, the aggressor's price, the terms. The price is the gold that makes
+    /// the white peace a yes (`gold_for` of what it is short), whatever else the offer holds;
+    /// the reason is the larger of the war's prospect and the aggressor's price; when the white
+    /// peace would pass, the terms asked besides it are what is refused.
+    pub fn answer(&self, offer: &DealOffer) -> (bool, PeaceRefusal) {
+        let value = self.value(offer.from, &offer.items);
+        let makes_peace = offer.items.iter().any(|(_, item)| *item == DealItem::Peace);
+        if value >= 0 || !makes_peace {
+            return (value >= 0, PeaceRefusal::Unsaid);
+        }
+        let white = self.value(offer.from, &[(offer.from, DealItem::Peace)]);
+        if white >= 0 {
+            return (false, PeaceRefusal::Terms);
+        }
+        let price = self.gold_for(-white);
+        let going_on = self.prospect(offer.from).value(&self.stakes).max(0);
+        let aggressor = self.obs().relation(offer.from).map_or(0, |r| crate::ai::infamy::peace_price(r.warmonger));
+        let why = if aggressor > going_on { PeaceRefusal::Aggressor { price } } else { PeaceRefusal::Winning { price } };
+        (false, why)
     }
 
     /// The peace the player offers `enemy`: it asks the most the enemy
@@ -264,7 +274,10 @@ pub fn answer_offers(input: &AdvisorInput<'_, '_>) -> Vec<Command> {
     let negotiation = Negotiation::new(input);
     obs.offers_to_us
         .iter()
-        .map(|offer| Command::RespondDeal { player: obs.player, offer: offer.id, accept: negotiation.accepts(offer) })
+        .map(|offer| {
+            let (accept, why) = negotiation.answer(offer);
+            Command::RespondDeal { player: obs.player, offer: offer.id, accept, why }
+        })
         .collect()
 }
 

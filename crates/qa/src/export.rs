@@ -62,6 +62,10 @@ pub struct LogSpec {
     /// size's city-states and normal barbarians, as before).
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub bare: bool,
+    /// Only this victory and the time victory are on (`spec::victory_name`:
+    /// `science`; empty, and absent in older logs: every victory is on).
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub only_victory: String,
 }
 
 impl LogSpec {
@@ -79,6 +83,10 @@ impl LogSpec {
         if self.bare {
             spec.city_states = 0;
             spec.barbarians = classic_rules::world::barbarians::BarbarianMode::None;
+        }
+        if !self.only_victory.is_empty() {
+            let kind = crate::spec::victory_from_name(&self.only_victory).ok_or_else(|| format!("unknown victory {}", self.only_victory))?;
+            spec = spec.only_victory(kind);
         }
         Ok(spec)
     }
@@ -112,6 +120,7 @@ pub fn suite_specs_with(suite: &Suite, games: usize, offset: u64, rounds: Option
                 variant: variant.name().to_owned(),
                 speed: String::new(),
                 bare: false,
+                only_victory: String::new(),
             });
         }
         at += 1;
@@ -1499,6 +1508,7 @@ pub fn meta_json(shard: &Shard, rules: &CompiledRuleset) -> serde_json::Value {
         variant: String::new(),
         speed: String::new(),
         bare: false,
+        only_victory: String::new(),
     });
     serde_json::json!({
         "format": encode::FORMAT,

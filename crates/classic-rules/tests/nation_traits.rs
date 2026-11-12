@@ -250,7 +250,7 @@ fn netherlands_keep_half_a_traded_luxury() {
         let id = game.view().auth.module().relations().next_offer_id();
         let items = vec![(P0, DealItem::Resource { resource: silk, amount: 1 })];
         game.execute(&rules, Command::ProposeDeal { from: P0, to: P1, items }).unwrap();
-        game.execute(&rules, Command::RespondDeal { player: P1, offer: id, accept: true }).unwrap();
+        game.execute(&rules, Command::RespondDeal { player: P1, offer: id, accept: true, why: classic_rules::world::relations::PeaceRefusal::Unsaid }).unwrap();
         game.validate(&rules).unwrap();
         (before, (luxuries(&game, P0), luxuries(&game, P1)))
     };

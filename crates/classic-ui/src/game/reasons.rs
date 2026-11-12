@@ -77,6 +77,7 @@ pub fn refusal(rules: &CompiledRuleset, refusal: Refusal) -> String {
         Refusal::OtherNation => t!("classic.game.reasons.other-nation").into(),
         Refusal::NotProducible => t!("classic.game.reasons.not-producible").into(),
         Refusal::ReplacedByUniqueUnit => t!("classic.game.reasons.replaced-by-unique-unit").into(),
+        Refusal::CityInResistance { turns } => tf!("classic.game.reasons.city-in-resistance", n = turns),
     }
 }
 
@@ -199,6 +200,7 @@ pub fn deal(block: DealBlock) -> &'static str {
         DealBlock::CannotDeclareWar => t!("classic.game.reasons.deal-cannot-declare-war"),
         DealBlock::CannotMakePeace => t!("classic.game.reasons.deal-cannot-make-peace"),
         DealBlock::PeaceTooSoon => t!("classic.game.reasons.deal-peace-too-soon"),
+        DealBlock::PeaceNeedsConsent => t!("classic.game.reasons.deal-peace-needs-consent"),
     }
 }
 
@@ -313,6 +315,7 @@ mod tests {
             Refusal::OtherNation,
             Refusal::NotProducible,
             Refusal::ReplacedByUniqueUnit,
+            Refusal::CityInResistance { turns: 3 },
         ];
         for item in all {
             let text = refusal(&rules, item);

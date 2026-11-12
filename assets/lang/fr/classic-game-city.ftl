@@ -56,3 +56,4 @@ classic.game.city.row-faith = Foi
 classic.game.city.row-defence = Défense
 classic.game.city.row-hit-points = Points de vie
 classic.game.city.no-effect = Aucun effet pour l'instant
+classic.game.city.resistance = Résistance : encore { $n } tours. La ville ne produit rien et ne grandit pas tant qu'elle dure.

@@ -97,10 +97,13 @@ pub enum DealBlock {
     CannotDeclareWar,
     CannotMakePeace,
     PeaceTooSoon,
+    /// Peace between two nations is a deal the other side accepts, never one
+    /// side's act (`peace_needs_a_deal`).
+    PeaceNeedsConsent,
 }
 
 impl DealBlock {
-    pub const ALL: [DealBlock; 27] = [
+    pub const ALL: [DealBlock; 28] = [
         DealBlock::NotOurDeal,
         DealBlock::GoldNeedsFriendship,
         DealBlock::NotEnoughGold,
@@ -128,6 +131,7 @@ impl DealBlock {
         DealBlock::CannotDeclareWar,
         DealBlock::CannotMakePeace,
         DealBlock::PeaceTooSoon,
+        DealBlock::PeaceNeedsConsent,
     ];
 
     pub fn reason(self) -> &'static str {
@@ -159,13 +163,21 @@ impl DealBlock {
             DealBlock::CannotDeclareWar => "cannot declare that war",
             DealBlock::CannotMakePeace => "cannot make that peace",
             DealBlock::PeaceTooSoon => "peace needs 10 rounds of war",
+            DealBlock::PeaceNeedsConsent => "peace with a nation needs its consent",
         }
     }
 }
 
-/// Rounds a war between two nations lasts before either may end it: no peace deal and no `MakePeace` until then
+/// Rounds a war between two nations lasts before either may end it: no peace deal until then
 /// (the original game's ten turns). Wars with city-states and barbarians are not held.
 pub const MIN_WAR_ROUNDS_BEFORE_PEACE: u32 = 10;
+
+/// Peace between `a` and `b` is a deal one offers and the other accepts
+/// (classic/docs/classic/rules.md): both are nations. With a city-state either
+/// side makes it alone, as in the original game.
+pub fn peace_needs_a_deal(auth: &AuthWorld, a: PlayerId, b: PlayerId) -> bool {
+    auth.players().is_major(a) && auth.players().is_major(b)
+}
 
 /// The war between `a` and `b` is younger than `MIN_WAR_ROUNDS_BEFORE_PEACE` rounds.
 pub fn peace_too_early(auth: &AuthWorld, a: PlayerId, b: PlayerId) -> bool {
@@ -316,10 +328,14 @@ pub fn item_problem(
             }
         }
         DealItem::ThirdPartyPeace(third) => {
+            // A nation's consent is its own: two players cannot sign a peace for a third nation.
             let ok = third != giver
                 && third != receiver
                 && d.at_war(giver, third)
-                && has_met(auth, receiver, third);
+                && has_met(auth, receiver, third)
+                && !peace_needs_a_deal(auth, giver, third)
+                // As the peace itself with a city-state: not while its ally is at war with the giver.
+                && !crate::systems::city_states::peace_blocked(auth, giver, third);
             if !ok {
                 return Some(DealBlock::CannotMakePeace);
             }
@@ -399,6 +415,8 @@ impl<'a> WorldTransaction<'a> {
         }
         let offer = self.world.module.relations.offers.remove(position);
         self.relations_changed(offer.from);
+        let peace = offer.items.iter().any(|(_, i)| *i == DealItem::Peace);
+        self.journal.module_changes.push(crate::classic::ClassicChange::OfferAnswered { from: offer.from, to: offer.to, accepted: accept, peace });
         if !accept {
             return Ok(());
         }

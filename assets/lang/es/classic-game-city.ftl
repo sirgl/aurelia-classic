@@ -56,3 +56,4 @@ classic.game.city.row-faith = Fe
 classic.game.city.row-defence = Defensa
 classic.game.city.row-hit-points = Puntos de vida
 classic.game.city.no-effect = Aún sin efecto
+classic.game.city.resistance = Resistencia: quedan { $n } turnos. La ciudad no produce nada ni crece hasta que termine.

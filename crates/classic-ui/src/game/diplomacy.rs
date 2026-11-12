@@ -10,13 +10,13 @@ use classic_rules::ids::PlayerId;
 use classic_rules::knowledge::observation::Relation;
 use classic_rules::rules::content::ResourceClass;
 use classic_rules::world::player::PlayerKind;
-use classic_rules::world::relations::{DealItem, DealOffer};
+use classic_rules::world::relations::{DealItem, DealOffer, PeaceRefusal};
 use classic_rules::Command;
 use i18n::{t, tf};
 
 use super::session::{availability_of, Session};
 use crate::ui::model::{
-    NationCard, DealOption, DiplomacyView, GameRequest, NoticeKind, OfferCard, Rival,
+    NationCard, PeaceAsk, DealOption, DiplomacyView, GameRequest, NoticeKind, OfferCard, Rival,
 };
 use classic_rules::world::player::ClassicPlayers;
 
@@ -71,17 +71,157 @@ impl Session {
             diplomacy.at_war(me, player),
             diplomacy.grants_entry(me, player),
         );
-        let peace = Command::MakePeace {
-            player: me,
-            enemy: player,
-        };
         Rival {
             player: player.0,
             name: self.player_name(player),
             at_war,
             borders_open,
-            peace: self.availability(&peace),
+            peace: self.peace_availability(player),
+            peace_by_offer: self.peace_by_offer(player),
+            peace_ask: self.peace_ask(player),
             open_borders: self.open_borders_availability(me, player),
+        }
+    }
+
+    /// Peace with `other` is a deal it answers (a nation), not the player's act (a city-state).
+    fn peace_by_offer(&self, other: PlayerId) -> bool {
+        classic_rules::world::relations::peace_needs_a_deal(self.game().view().auth, self.me(), other)
+    }
+
+    /// What the peace button sends: an offer of white peace to a nation (it makes peace when the
+    /// nation accepts), peace itself with a city-state.
+    fn peace_command(&self, other: PlayerId) -> Command {
+        let me = self.me();
+        if self.peace_by_offer(other) {
+            Command::ProposeDeal { from: me, to: other, items: vec![(me, DealItem::Peace)] }
+        } else {
+            Command::MakePeace { player: me, enemy: other }
+        }
+    }
+
+    /// An offer of peace of the player's waits for `other`'s answer.
+    fn peace_offered(&self, other: PlayerId) -> bool {
+        let me = self.me();
+        let offers = self.game().view().auth.module().relations().offers();
+        offers.iter().any(|o| o.from == me && o.to == other && o.items.iter().any(|(_, i)| *i == DealItem::Peace))
+    }
+
+    /// What `other` said when it refused the player's peace, if it is still at war with the
+    /// player and asked gold for it.
+    pub(super) fn peace_ask(&mut self, other: PlayerId) -> Option<PeaceAsk> {
+        let (price, reason) = match self.peace_asks.iter().find(|(p, _)| *p == other)?.1 {
+            PeaceRefusal::Aggressor { price } => (price, tf!("classic.game.diplomacy.ask-aggressor", price = price)),
+            PeaceRefusal::Winning { price } => (price, tf!("classic.game.diplomacy.ask-winning", price = price)),
+            PeaceRefusal::Unsaid | PeaceRefusal::Terms => return None,
+        };
+        let me = self.me();
+        if !self.game().view().auth.diplomacy().at_war(me, other) {
+            return None;
+        }
+        let offer = if self.peace_offered(other) {
+            Availability::Blocked(t!("classic.game.diplomacy.peace-waiting").into())
+        } else {
+            self.availability(&Self::peace_for_gold(me, other, price))
+        };
+        Some(PeaceAsk { price, reason, offer })
+    }
+
+    /// The white peace with `gold` the player gives for it.
+    fn peace_for_gold(me: PlayerId, other: PlayerId, gold: u32) -> Command {
+        Command::ProposeDeal { from: me, to: other, items: vec![(me, DealItem::Peace), (me, DealItem::Gold(gold))] }
+    }
+
+    /// The button "peace for N gold": the offer of the peace with the gold the nation asked.
+    pub(super) fn peace_for_gold_request(&mut self, other: PlayerId) {
+        let Some(ask) = self.peace_ask(other) else { return };
+        if let Availability::Blocked(reason) = ask.offer {
+            self.message = Some(reason);
+            return;
+        }
+        let command = Self::peace_for_gold(self.me(), other, ask.price);
+        let text = tf!("classic.game.diplomacy.notice-peace-offered-gold", name = self.player_name(other), price = ask.price);
+        if self.submit(command) {
+            self.notify(NoticeKind::Diplomacy, text);
+        }
+    }
+
+    fn peace_availability(&mut self, other: PlayerId) -> Availability {
+        if self.peace_offered(other) {
+            return Availability::Blocked(t!("classic.game.diplomacy.peace-waiting").into());
+        }
+        let command = self.peace_command(other);
+        self.availability(&command)
+    }
+
+    /// The peace button: the offer to a nation (the notice says it waits for the answer) or the
+    /// peace with a city-state.
+    pub(super) fn peace_request(&mut self, other: PlayerId) {
+        if let Availability::Blocked(reason) = self.peace_availability(other) {
+            self.message = Some(reason);
+            return;
+        }
+        let name = self.player_name(other);
+        let command = self.peace_command(other);
+        let text = match command {
+            Command::ProposeDeal { .. } => tf!("classic.game.diplomacy.notice-peace-offered", name = name),
+            _ => tf!("classic.game.diplomacy.notice-peace", name = name),
+        };
+        if self.submit(command) {
+            self.notify(NoticeKind::Diplomacy, text);
+        }
+    }
+
+    /// Notices of the deals in `records` that concern the player: the answer to its offer
+    /// (`ClassicChange::OfferAnswered`) and an offer of peace addressed to it, which waits on
+    /// the diplomacy screen.
+    pub(super) fn notify_offers(&mut self, records: &[classic_rules::transaction::journal::AppliedCommand]) {
+        let me = self.me();
+        if self.game().view().auth.settings().is_ai(me) {
+            return;
+        }
+        for record in records {
+            if let Command::ProposeDeal { from, to, items } = &record.command {
+                if *to == me && items.iter().any(|(_, i)| *i == DealItem::Peace) {
+                    let text = tf!("classic.game.diplomacy.notice-peace-proposed", name = self.player_name(*from));
+                    self.notify(NoticeKind::Diplomacy, text);
+                }
+            }
+            for change in &record.changes.module_changes {
+                let classic_rules::classic::ClassicChange::OfferAnswered { from, to, accepted, peace } = *change else { continue };
+                if from != me {
+                    continue;
+                }
+                let name = self.player_name(to);
+                let why = match &record.command {
+                    Command::RespondDeal { why, .. } => *why,
+                    _ => PeaceRefusal::Unsaid,
+                };
+                self.peace_asks.retain(|(p, _)| *p != to);
+                if peace && !accepted && why != PeaceRefusal::Unsaid {
+                    self.peace_asks.push((to, why));
+                }
+                let text = match (peace, accepted) {
+                    (true, true) => tf!("classic.game.diplomacy.notice-peace-accepted", name = name),
+                    (true, false) => match why {
+                        PeaceRefusal::Unsaid => tf!("classic.game.diplomacy.notice-peace-refused", name = name),
+                        PeaceRefusal::Aggressor { price } => {
+                            let reason = tf!("classic.game.diplomacy.ask-aggressor", price = price);
+                            tf!("classic.game.diplomacy.notice-peace-refused-why", name = name, reason = reason)
+                        }
+                        PeaceRefusal::Winning { price } => {
+                            let reason = tf!("classic.game.diplomacy.ask-winning", price = price);
+                            tf!("classic.game.diplomacy.notice-peace-refused-why", name = name, reason = reason)
+                        }
+                        PeaceRefusal::Terms => {
+                            let reason = t!("classic.game.diplomacy.ask-terms");
+                            tf!("classic.game.diplomacy.notice-peace-refused-why", name = name, reason = reason)
+                        }
+                    },
+                    (false, true) => tf!("classic.game.diplomacy.notice-offer-accepted", name = name),
+                    (false, false) => tf!("classic.game.diplomacy.notice-offer-refused", name = name),
+                };
+                self.notify(NoticeKind::Diplomacy, text);
+            }
         }
     }
 
@@ -163,10 +303,8 @@ impl Session {
                 player: me,
                 enemy: other,
             }),
-            make_peace: self.availability(&Command::MakePeace {
-                player: me,
-                enemy: other,
-            }),
+            make_peace: self.peace_availability(other),
+            peace_ask: self.peace_ask(other),
             denounce: self.availability(&Command::Denounce {
                 player: me,
                 target: other,
@@ -321,9 +459,6 @@ impl Session {
 
     pub(super) fn diplomacy(&mut self, command: Command) {
         let text = match &command {
-            Command::MakePeace { enemy, .. } => {
-                tf!("classic.game.diplomacy.notice-peace", name = self.player_name(*enemy))
-            }
             Command::OpenBorders { guest, .. } => {
                 tf!("classic.game.diplomacy.notice-borders", name = self.player_name(*guest))
             }
@@ -359,6 +494,7 @@ impl Session {
                     player: me,
                     offer,
                     accept,
+                    why: classic_rules::world::relations::PeaceRefusal::Unsaid,
                 },
                 if accept {
                     t!("classic.game.diplomacy.notice-accepted")
@@ -437,5 +573,136 @@ mod offer_label_tests {
             assert_eq!(offer_quantity_label(DealItem::Resource { resource: classic_rules::ids::ResourceId(3), amount }, "Iron"), format!("{amount} × Iron"));
         }
         assert_eq!(offer_quantity_label(DealItem::OpenBorders, "Open borders"), "Open borders");
+    }
+}
+
+#[cfg(test)]
+mod peace_tests {
+    use classic_rules::classic::ClassicChange;
+    use classic_rules::transaction::journal::{AppliedCommand, ChangeJournal};
+
+    use super::*;
+    use crate::ui::screens::{game_rules, prepare_match, MapSize, MatchRequest};
+
+    fn session_at_war() -> Session {
+        let request = MatchRequest { nation: "core:nation/rome".into(), seed: 7, size: MapSize::Small, players: 3, water: 25 };
+        let mut session = Session::new(prepare_match(request).expect("world").game, game_rules());
+        let (game, rules) = session.harness_game();
+        game.debug_meet(PlayerId(0), PlayerId(2));
+        game.execute(&rules, Command::DeclareWar { player: PlayerId(0), enemy: PlayerId(2) }).unwrap();
+        session.refresh_after_harness();
+        session
+    }
+
+    fn texts(session: &mut Session) -> Vec<String> {
+        session.hud_model(None).notices.into_iter().map(|n| n.text).collect()
+    }
+
+    /// The answer to the player's offer and an offer of peace to it become notices, each in
+    /// its own words, in every language of the game (no key shows instead of a text); the
+    /// answers between other players are not told.
+    #[test]
+    fn answers_and_offers_of_peace_are_told_in_every_language() {
+        let mut session = session_at_war();
+        let (me, rival) = (session.me(), PlayerId(2));
+        let answered = |from: PlayerId, to: PlayerId, accepted: bool, peace: bool| {
+            let mut journal = ChangeJournal::default();
+            journal.module_changes.push(ClassicChange::OfferAnswered { from, to, accepted, peace });
+            AppliedCommand { command: Command::RespondDeal { player: to, offer: 0, accept: accepted, why: classic_rules::world::relations::PeaceRefusal::Unsaid }, changes: journal }
+        };
+        let proposed = AppliedCommand { command: Command::ProposeDeal { from: rival, to: me, items: vec![(rival, DealItem::Peace)] }, changes: ChangeJournal::default() };
+        let records = vec![
+            answered(me, rival, true, true),
+            answered(me, rival, false, true),
+            answered(me, rival, true, false),
+            answered(me, rival, false, false),
+            answered(rival, me, true, true),
+            answered(PlayerId(1), rival, false, true),
+            proposed,
+        ];
+        for lang in ["en", "ru", "de", "fr", "es", "ja", "zh-Hans"] {
+            let told = i18n::with_language(lang, || {
+                session.notices.clear();
+                session.notify_offers(&records);
+                texts(&mut session)
+            });
+            assert_eq!(told.len(), 5, "{lang}: four answers to our offers and one offer: {told:?}");
+            let mut distinct = told.clone();
+            distinct.sort();
+            distinct.dedup();
+            assert_eq!(distinct.len(), 5, "{lang}: {told:?}");
+            assert!(told.iter().all(|t| !t.contains("classic.")), "{lang}: {told:?}");
+        }
+        session.notices.clear();
+        session.notify_offers(&records);
+        let name = session.player_name(rival);
+        let told = texts(&mut session);
+        assert!(told.contains(&format!("{name} refused peace: the war goes on")), "{told:?}");
+        assert!(told.contains(&format!("{name} offers peace: answer on the Diplomacy screen")), "{told:?}");
+    }
+
+    /// A refusal of peace tells why and the price in every language of the game (no key shows
+    /// instead of a text, the price is in the text), keeps the price for the button "peace for
+    /// N gold", and an acceptance, a plain refusal and a refusal of the terms keep none.
+    #[test]
+    fn a_refusal_of_peace_tells_why_and_names_the_price_in_every_language() {
+        let mut session = session_at_war();
+        let (me, rival) = (session.me(), PlayerId(2));
+        let refused = |why: PeaceRefusal| {
+            let mut journal = ChangeJournal::default();
+            journal.module_changes.push(ClassicChange::OfferAnswered { from: me, to: rival, accepted: false, peace: true });
+            AppliedCommand { command: Command::RespondDeal { player: rival, offer: 0, accept: false, why }, changes: journal }
+        };
+        let cases = [
+            (PeaceRefusal::Aggressor { price: 37 }, Some("37")),
+            (PeaceRefusal::Winning { price: 41 }, Some("41")),
+            (PeaceRefusal::Terms, None),
+            (PeaceRefusal::Unsaid, None),
+        ];
+        for lang in ["en", "ru", "de", "fr", "es", "ja", "zh-Hans"] {
+            let mut told = Vec::new();
+            i18n::with_language(lang, || {
+                for (why, price) in cases {
+                    session.notices.clear();
+                    session.notify_offers(&[refused(why)]);
+                    let text = texts(&mut session).pop().expect("a notice");
+                    assert!(!text.contains("classic."), "{lang}: {text}");
+                    if let Some(price) = price {
+                        assert!(text.contains(price), "{lang}: the price in {text}");
+                        let ask = session.peace_ask(rival).expect("the price is kept");
+                        assert!(ask.reason.contains(price) && !ask.reason.contains("classic."), "{lang}: {}", ask.reason);
+                        let label = tf!("classic.ui.screen-diplomacy.offer-peace-gold", price = ask.price);
+                        let small = tf!("classic.ui.hud-game.offer-peace-gold", price = ask.price);
+                        assert!(label.contains(price) && small.contains(price) && !label.contains("classic.") && !small.contains("classic."), "{lang}: {label} / {small}");
+                    } else {
+                        assert!(session.peace_ask(rival).is_none(), "{lang}: no price to keep");
+                    }
+                    told.push(text);
+                }
+            });
+            told.sort();
+            told.dedup();
+            assert_eq!(told.len(), 4, "{lang}: four different words: {told:?}");
+        }
+        session.notices.clear();
+        session.notify_offers(&[refused(PeaceRefusal::Winning { price: 41 })]);
+        let name = session.player_name(rival);
+        assert_eq!(texts(&mut session), vec![format!("{name} refuses peace. They are winning this war: peace costs 41 gold.")]);
+    }
+
+    /// `MakePeace` with a nation is refused with the consent reason, worded in every language;
+    /// the button sends the offer instead.
+    #[test]
+    fn peace_alone_with_a_nation_is_refused_with_its_reason() {
+        let mut session = session_at_war();
+        let command = Command::MakePeace { player: session.me(), enemy: PlayerId(2) };
+        for lang in ["en", "ru", "de", "fr", "es", "ja", "zh-Hans"] {
+            let blocked = i18n::with_language(lang, || session.availability(&command));
+            let Availability::Blocked(reason) = blocked else { panic!("{lang}: allowed") };
+            assert!(!reason.contains("classic.") && !reason.contains("needs its consent"), "{lang}: {reason}");
+        }
+        let Availability::Blocked(reason) = session.availability(&command) else { unreachable!() };
+        assert_eq!(reason, "Peace with a nation is a deal: offer it, and it makes peace if it accepts");
+        assert!(matches!(session.peace_command(PlayerId(2)), Command::ProposeDeal { .. }));
     }
 }

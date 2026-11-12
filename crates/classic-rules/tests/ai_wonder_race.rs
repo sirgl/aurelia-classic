@@ -1,7 +1,7 @@
 //! The wonder race (`ai::wonder_race`, variants `next-w` and `next-race`): a world wonder
 //! another nation has built is dropped from the queue with the city's stock kept, and its lost
-//! head is not hurry-bought. The rules burn the stock of a lost head when it reaches the cost
-//! (`kernel` `lost_wonder_race`); nothing purges the queues.
+//! head is not hurry-bought. The kernel also removes a lost order by itself at the drain
+//! (`OrderRemoved`), so a stale order costs nothing whichever AI plays.
 
 use classic_content::core::core_rules;
 use classic_rules::ai::driver::ClassicMind;
@@ -43,7 +43,9 @@ fn lost_race() -> (GameState, CompiledRuleset, CityHandle, CityHandle, CityHandl
         .expect("the rules have a world wonder both cities may order");
     drop(obs);
     game.execute(&rules, Command::EnqueueProduction { player: P0, city: a, item: ProductionItem::Building(wonder) }).unwrap();
-    game.debug_complete_building(&rules, rival, wonder);
+    // The wonder stands in the rival's city without the sweep a completion makes (the harness grant: the
+    // state of a save made before the kernel removed lost orders), so the order is still queued here.
+    game.debug_add_building(&rules, rival, wonder);
     (game, rules, a, b, rival, wonder)
 }
 
@@ -99,19 +101,55 @@ fn clearing_a_queue_keeps_the_stock() {
     assert_eq!(stock(&game), before);
 }
 
-/// The AI of `next-w` and `next-race` drops the lost wonder from the queue holding it, and so does
-/// the game's AI since the thirteenth promotion (`standard` plays `next-w`); the plain AI
-/// (`pre-next`, the standard before it) leaves it there to burn the stock.
+/// A lost order is gone from the queue whichever AI plays the seat (`pre-next`, the standard before
+/// it, `standard`, `next-w`, `next-race`): the plain AI leaves it and the rules remove it at the
+/// owner's drain, and the record names
+/// the city, the owner, the wonder and `WonderBuilt`; nothing is spent (the stock is not lower and
+/// no gold or hurry goes to the lost head); the AI sends no order or hurry for it.
 #[cfg(feature = "experimental-ai")]
 #[test]
-fn the_wonder_race_ai_drops_a_lost_order_and_the_plain_ai_keeps_it() {
-    for (variant, drops) in [(Variant::PreNext, false), (Variant::Standard, true), (Variant::NextW, true), (Variant::NextRace, true)] {
+fn the_rules_remove_a_lost_order_for_every_ai_and_nothing_is_spent() {
+    use kernel::ai::Advance;
+    use classic_rules::transaction::journal::{CityChange, OrderRemoval};
+    // The fixture is the stale state of an old save, in which the wonder-race AIs see the lost head and
+    // drop it themselves before the drain; the plain AI does not, so the rules remove it and say so.
+    for (variant, ai_drops_it) in [(Variant::PreNext, false), (Variant::Standard, true), (Variant::NextW, true), (Variant::NextRace, true)] {
         let (mut game, rules, a, b, _, wonder) = lost_race();
+        let stock_before = game.ai_observation(&rules, P0).own_cities.iter().find(|c| c.handle == a).unwrap().production;
+        let item = ProductionItem::Building(wonder);
         let mut driver = AiDriver::with_mind(AiSettings::for_rules(&rules, rules.default_difficulty()), vec![P1], ClassicMind::new(variant));
-        driver.run(&mut game, &rules, u32::MAX);
-        let held = queue(&game, a).contains(&ProductionItem::Building(wonder));
-        assert_eq!(held, !drops, "{variant:?}");
-        assert!(!queue(&game, b).contains(&ProductionItem::Building(wonder)));
+        driver.configure_game(&mut game);
+        let mut removals = Vec::new();
+        let mut sent_for_it = 0;
+        loop {
+            match driver.advance(&game, &rules) {
+                Advance::Worked => {}
+                Advance::Command(command) | Advance::EndTurn(command) => {
+                    if matches!(&command, Command::HurryProduction { city, .. } if city == &a)
+                        || matches!(&command, Command::EnqueueProduction { item: queued, .. } if *queued == item)
+                    {
+                        sent_for_it += 1;
+                    }
+                    let result = game.execute(&rules, command);
+                    if let Ok(done) = &result {
+                        for change in &done.changes().city_changes {
+                            if let CityChange::OrderRemoved { city, owner, item, reason } = *change {
+                                removals.push((city, owner, item, reason));
+                            }
+                        }
+                    }
+                    driver.executed(result);
+                }
+                Advance::RoundDone | Advance::Waiting => break,
+            }
+        }
+        let record = vec![(a, P0, item, OrderRemoval::WonderBuilt)];
+        assert_eq!(removals, if ai_drops_it { vec![] } else { record }, "{variant:?}: the rules' record exactly when the AI left the order");
+        assert!(!queue(&game, a).contains(&item), "{variant:?}: the order is gone");
+        assert!(!queue(&game, b).contains(&item));
+        let stock_after = game.ai_observation(&rules, P0).own_cities.iter().find(|c| c.handle == a).unwrap().production;
+        assert!(stock_after >= stock_before, "{variant:?}: nothing was spent ({stock_before} -> {stock_after})");
+        assert_eq!(sent_for_it, 0, "{variant:?}: the AI buys nothing and orders no lost wonder");
     }
 }
 

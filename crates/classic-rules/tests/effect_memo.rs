@@ -287,6 +287,7 @@ fn every_kind_of_change_reaches_the_next_answer() {
             player: P1,
             offer: id,
             accept: true,
+            why: classic_rules::world::relations::PeaceRefusal::Unsaid,
         },
     )
     .unwrap();

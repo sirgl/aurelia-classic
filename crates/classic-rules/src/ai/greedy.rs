@@ -142,13 +142,13 @@ pub fn war_declarations(obs: &AIObservation<'_>) -> Vec<Command> {
         .collect()
 }
 
-/// Rounds without sight of an enemy after which the AI makes peace.
+/// Rounds without sight of an enemy after which the AI ends the war: it offers peace to a nation and makes it with a city-state.
 pub const PEACE_AFTER_UNSEEN_ROUNDS: u32 = 5;
 
 /// AI diplomacy for one turn, from the contact memory of the observation
 /// (never from the truth): a war with a player not seen for
 /// PEACE_AFTER_UNSEEN_ROUNDS rounds (or never seen) ends in peace with open
-/// borders; a met player at peace gets open borders. The memory keeps one
+/// borders (a nation is offered the peace, a city-state's is made at once); a met player at peace gets open borders. The memory keeps one
 /// lost sight from flipping a war into peace and back every turn.
 pub fn diplomacy_commands(obs: &AIObservation<'_>) -> Vec<Command> {
     let player = obs.player;
@@ -161,9 +161,11 @@ pub fn diplomacy_commands(obs: &AIObservation<'_>) -> Vec<Command> {
                 None => u32::MAX,
             };
             if unseen_since >= PEACE_AFTER_UNSEEN_ROUNDS {
-                out.push(Command::MakePeace {
-                    player,
-                    enemy: other,
+                // With a nation peace is a deal it must accept; with a city-state one side makes it.
+                out.push(if relation.kind == crate::world::player::PlayerKind::Major {
+                    Command::ProposeDeal { from: player, to: other, items: vec![(player, crate::world::relations::DealItem::Peace)] }
+                } else {
+                    Command::MakePeace { player, enemy: other }
                 });
                 out.push(Command::OpenBorders {
                     host: player,
