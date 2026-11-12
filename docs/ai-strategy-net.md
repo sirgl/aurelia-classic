@@ -184,6 +184,15 @@ A save of the old `standard` loads into the new one: the strategy net's memory w
 with none (`strategy_net::Memory::decode`), and the science victory's fit, judged at the style's lock, is judged on
 the first turn after the load instead.
 
+## The rivals (`rival-net`, 12 November)
+
+The net's layer 0 holds a model of every nation met, from the seat's public screens alone (`ai/rival_model.rs`; the screens are `derived::standing`, the one computation of the interface and the observation): the seven demographics rows (population, crop, goods, GNP, literacy, land, soldiers), the technologies, the science, the score and its trend, and the closeness to each victory (original capitals held as seen, technologies over all, the rival's influence on the seat, its delegates over the World Leader's need, its era). Nothing hidden is read and a nation not met has no estimate (`tests/ai_rival_model.rs`).
+
+- **A row** gives the seat's value, rank, and the best, average and worst of the living nations (since this branch only nations: city-states and the barbarians were counted before, so a duel's row was not a duel). With two nations alive the rival's value is the best or the worst, whichever is not the seat's: exact. With more, the others' sum is `average × n − own` (+ up to `n − 1` from the truncation); each lies in the range the best, the worst and that sum leave; the point is the sum shared by the public scores.
+- **Technologies** from the literacy (a percent of the rules' technologies, truncated: with fewer than 100 technologies every count has its own percent). **Science** (not on the screens): the rules' cost of the technologies gained in the last 30 Standard rounds, the cheapest first, at the speed's, the map's and the rival's guessed cities' factor, per round; the discount for technologies others know is left out. The samples (every 5 Standard rounds) ride in the net's memory (`Memory::rivals`, section `0x5E`).
+- **Inputs** `fe::RIVAL_*` (14, features 54–67): per row and victory the strongest rival over it plus ours (0.5 level), the width of the ranges (`rival_doubt`, 0 in a duel). Wired into the aims and postures with weight 0 (`weights::rival`): behaviour unchanged (the standard suite's hash `92432fac2d27f99e`), every weight the next step's to train. The trace prints a `RIVALS` line at each review (`ai-strategy-trace --only rivals`).
+- **The check** (`qa bench::rival_net`, `AURELIA_RIVAL_NET=<csv>`): every 25 rounds the estimate the seat's net reads beside the truth; the accuracy by measure, duel and six nations, is in the branch's report.
+
 ## Not done
 
 - No training: the next step is fine-tuning by outcomes with a penalty for moving from the hand weights (the design page).
