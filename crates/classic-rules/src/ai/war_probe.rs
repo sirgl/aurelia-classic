@@ -269,6 +269,9 @@ pub struct WarProbe {
     /// The retake cases that were not opened because the lost city is not worth the units the retake
     /// is expected to cost (`retake::cases_remembered`), same fields as `retakes`.
     pub declined: Vec<(u32, PlayerId, u32, PlayerId, u32)>,
+    /// A turn of a seat with surplus guards on cities in danger, which the dead check of 5c15543 let the retake take:
+    /// (round, player, those guards, the ones the retake keeps on their city now).
+    pub held_guards: Vec<(u32, PlayerId, u32, u32)>,
     /// The cities of every player at the end of its turn: (round, player, tiles). A city taken back
     /// returns to its former owner without a decision, so `captures` does not see it.
     pub cities: Vec<(u32, PlayerId, Vec<u32>)>,

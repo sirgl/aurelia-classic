@@ -974,6 +974,11 @@ struct CapOutcome {
     /// (`war_probe::Probe::retakes`, `declined`; the probe is write-only).
     opened: u32,
     declined: u32,
+    /// Surplus guards of a city in danger seen by the retake / kept on their city (`war_probe::Probe::held_guards`: sums over the former owner's turns).
+    guards_seen: u32,
+    guards_kept: u32,
+    /// Cities of the former owner at its first turn of the play that are not its own at the last one (`Probe::cities`).
+    cities_lost: u32,
 }
 
 /// The positions are recorded in games of another variant, whose seats keep no memory of their cities: the
@@ -1042,6 +1047,12 @@ fn play_capture(rules: &CompiledRuleset, dir: &str, cap: &Cap, layer: &str, dice
     war_probe::enable(false);
     out.opened = probe.retakes.iter().filter(|r| r.1 == cap.from && r.2 == cap.tile.0).count() as u32;
     out.declined = probe.declined.iter().filter(|r| r.1 == cap.from && r.2 == cap.tile.0).count() as u32;
+    out.guards_seen = probe.held_guards.iter().filter(|r| r.1 == cap.from).map(|r| r.2).sum();
+    out.guards_kept = probe.held_guards.iter().filter(|r| r.1 == cap.from).map(|r| r.3).sum();
+    let mine: Vec<_> = probe.cities.iter().filter(|c| c.1 == cap.from).collect();
+    if let (Some(first), Some(last)) = (mine.first(), mine.last()) {
+        out.cities_lost = first.2.iter().filter(|t| !last.2.contains(t)).count() as u32;
+    }
     out.lost_total = alive_count(&game, &own);
     out.captor_lost = alive_count(&game, &captor);
     out.final_owner = city_at(&game, rules, cap.tile).map_or(255, |c| c.0 .0);
@@ -1091,13 +1102,13 @@ fn cap_replay(args: &[String]) -> Result<(), String> {
         }
         o
     });
-    let mut text = String::from("file,offset,tile,from,to,layer,reseed,retaken,peace,lost_at_retake,lost_total,captor_lost,final_owner,war_end,hash_ok,opened,declined\n");
+    let mut text = String::from("file,offset,tile,from,to,layer,reseed,retaken,peace,lost_at_retake,lost_total,captor_lost,final_owner,war_end,hash_ok,opened,declined,guards_seen,guards_kept,cities_lost\n");
     let mut sums: BTreeMap<String, [f64; 9]> = BTreeMap::new();
     for ((i, layer, r), o) in work.iter().zip(results) {
         let cap = &caps[*i];
         let o = o?;
         let ok = reseeds == 0 && o.next_hash == cap.next_hash;
-        text.push_str(&format!("{},{},{},{},{},{layer},{r},{},{},{},{},{},{},{},{},{},{}\n", cap.file, cap.offset, cap.tile.0, cap.from.0, cap.to.0, o.retaken.map_or(-1, i64::from), o.peace.map_or(-1, i64::from), o.lost_at_retake, o.lost_total, o.captor_lost, o.final_owner, u8::from(o.war_end), u8::from(ok), o.opened, o.declined));
+        text.push_str(&format!("{},{},{},{},{},{layer},{r},{},{},{},{},{},{},{},{},{},{},{},{},{}\n", cap.file, cap.offset, cap.tile.0, cap.from.0, cap.to.0, o.retaken.map_or(-1, i64::from), o.peace.map_or(-1, i64::from), o.lost_at_retake, o.lost_total, o.captor_lost, o.final_owner, u8::from(o.war_end), u8::from(ok), o.opened, o.declined, o.guards_seen, o.guards_kept, o.cities_lost));
         let s = sums.entry(layer.clone()).or_default();
         s[0] += 1.0;
         for (k, n) in [(1, 2u32), (2, 5), (3, 8)] {

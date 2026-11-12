@@ -186,6 +186,45 @@ pub fn watch(obs: &AIObservation<'_>, brief: &TurnBrief, state: &AiState, rules:
     Watch { dangers, defender }
 }
 
+/// An own city with hostile power near it, as `watch` finds it (same sight, same radius, same hostility).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct Threat {
+    pub city: TileId,
+    /// Hostile power within `THREAT_RADIUS`.
+    pub threat: u32,
+    /// The city and the own military units within `GUARD_RADIUS` (`Danger::guard`).
+    pub guard: u32,
+}
+
+/// The threats `watch` will find this turn, without its valuation: the retake looks before `watch` is made
+/// and has no `brief.defence` yet. None without the turn's prices, as `watch`.
+pub(crate) fn threats(obs: &AIObservation<'_>, brief: &TurnBrief, rules: &CompiledRuleset) -> Vec<Threat> {
+    if brief.prices.is_none() {
+        return Vec::new();
+    }
+    let hostile = hostile_units(obs, rules);
+    if hostile.is_empty() {
+        return Vec::new();
+    }
+    let mut out = Vec::new();
+    for city in &obs.own_cities {
+        let near = |tile: TileId, radius: i32| brief.dims.distance(tile, city.tile).is_some_and(|d| d <= radius);
+        let threat: u32 = hostile.iter().filter(|h| near(h.tile, THREAT_RADIUS)).map(|h| h.power).sum();
+        if threat == 0 {
+            continue;
+        }
+        let military = brief.units.iter().filter(|u| u.role == AiRole::Military);
+        let guard = city_power(brief, rules, city) + military.filter(|u| near(u.tile, GUARD_RADIUS)).map(|u| power(rules, u)).sum::<u32>();
+        out.push(Threat { city: city.tile, threat, guard });
+    }
+    out
+}
+
+/// The unit's weight in a guard (`Danger::guard`).
+pub(crate) fn guard_power(rules: &CompiledRuleset, unit: &UnitBrief) -> u32 {
+    power(rules, unit)
+}
+
 /// A hostile military unit as the defence weighs it.
 struct Hostile {
     tile: TileId,

@@ -551,3 +551,48 @@ fn a_city_worth_less_than_the_units_it_costs_is_not_retaken() {
         assert_eq!(remembered(&state).lost.len(), 1, "the city stays remembered as lost");
     }
 }
+
+/// The guard of a city the enemy threatens does not go to the retake while the city needs it. The surplus guard
+/// of a city is free for the retake, but the defence of the turn is made after the retake looks (its dangers are
+/// not there yet), so the retake reads the threat itself (`defence::threats`: hostile military units in sight
+/// within the defence's radius of the city): a surplus guard goes only while the guard left (the city and the
+/// units beside it) outweighs the threat. Four swordsmen on the defence of a second city of ours, east of the
+/// lost one: calm, they are free and retake; with six of the captor's swordsmen in sight beside that city they
+/// stay on their guard and no group has them; with one captor swordsman beside it the guard that is not needed
+/// still goes.
+#[test]
+fn the_guard_of_a_city_in_danger_is_not_free_for_the_retake() {
+    let rules = compile_rules(core_rules()).unwrap();
+    let home = (15, 10);
+    let own = vec![(14, 10), (14, 11), (14, 9), (13, 10)];
+    let build = |threat: &[(i32, i32)]| {
+        let mut game = scene(&rules, &Scene { holder: THEM, damage: 190, ours: own.clone(), guards: vec![], war_rounds: 0 });
+        game.debug_found_city(&rules, US, tile(&game, home.0, home.1));
+        for (q, r) in threat {
+            game.debug_spawn_unit(&rules, THEM, tile(&game, *q, *r), unit_kind(&rules, "swordsman"));
+        }
+        game
+    };
+    let guards_in_groups = |game: &GameState| {
+        let mut state = memory_of_cities(game, &[CITY]);
+        let mut held = remembered(&state).held;
+        held.push(tile(game, home.0, home.1));
+        state.mind_memory = strategy_net::Memory { retake: Some(Memory { held, lost: Vec::new() }), ..Default::default() }.encode();
+        let obs = game.ai_observation(&rules, US);
+        let ids: Vec<_> = TurnBrief::from_observation(&obs, &rules).units.iter().map(|u| u.id).collect();
+        assert_eq!(ids.len(), 4);
+        for id in &ids {
+            state.set_task(*id, UnitTask::Defend { city: tile(game, home.0, home.1) }, obs.round);
+        }
+        let (_, cases) = retaking_priced(&rules, game, &mut state, None);
+        cases.iter().map(|c| c.group.len()).sum::<usize>()
+    };
+    assert_eq!(guards_in_groups(&build(&[])), 4, "a calm city's surplus guards retake");
+    let many = [(17, 10), (17, 11), (18, 10), (18, 11), (17, 9), (18, 9)];
+    let threatened = build(&many);
+    let obs = threatened.ai_observation(&rules, US);
+    assert!(obs.visible_foreign_units.iter().filter(|u| u.owner == THEM).count() >= 4, "the test needs the enemy in sight");
+    assert_eq!(guards_in_groups(&threatened), 0, "the guards of a city with an army at its walls are not free");
+    let few = build(&[(17, 10)]);
+    assert!(guards_in_groups(&few) > 0, "one swordsman does not hold four guards and the city");
+}

@@ -56,11 +56,12 @@ pub struct Case {
 
 /// The unit may leave its task for the retake. Free: a unit with no task; a unit that rested (it is fit by
 /// the caller's hit point test); a guard of a city that is no longer ours (the lost city's own garrison); a
-/// guard of a city that is not in danger and has more guards than it wants; a unit on the assault of a lost
+/// guard of a city that has more guards than it wants and that stays safe without it (`kept_guards`: the
+/// defence has not made its dangers yet when the retake looks); a unit on the assault of a lost
 /// city (the retake's own task of the turn before). Not free: a member of an operation or a raid, a unit on
 /// the assault of a city that is not a lost one, an escort of a civilian unit (its ward would walk alone),
 /// and a unit whose task is no war task (scout, settle, improve).
-fn free_for_retake(brief: &TurnBrief, state: &AiState, unit: EntityId, lost: &[TileId]) -> bool {
+fn free_for_retake(brief: &TurnBrief, state: &AiState, unit: EntityId, lost: &[TileId], kept: &[EntityId]) -> bool {
     match state.task_of(unit).map(|t| t.task) {
         // A unit that rests is fit once it stands above `HEAL_BELOW_HP` (the caller tests it): its task is done.
         None | Some(UnitTask::Heal { .. }) => true,
@@ -68,7 +69,7 @@ fn free_for_retake(brief: &TurnBrief, state: &AiState, unit: EntityId, lost: &[T
         Some(UnitTask::Assault { target }) => lost.contains(&target),
         Some(UnitTask::Defend { city }) => {
             !brief.cities.iter().any(|c| c.tile == city)
-                || (!brief.endangered(city) && state.tasks().iter().filter(|t| t.task == UnitTask::Defend { city }).count() > crate::ai::planner_units::garrison_wanted_by(brief, state.strategy.current).max(1))
+                || (!kept.contains(&unit) && surplus_guard(brief, state, city))
         }
         Some(
             UnitTask::Operation { .. }
@@ -79,6 +80,39 @@ fn free_for_retake(brief: &TurnBrief, state: &AiState, unit: EntityId, lost: &[T
             | UnitTask::Improve { .. },
         ) => false,
     }
+}
+
+/// The city has more guards on its defence than it wants.
+fn surplus_guard(brief: &TurnBrief, state: &AiState, city: TileId) -> bool {
+    state.tasks().iter().filter(|t| t.task == UnitTask::Defend { city }).count() > crate::ai::planner_units::garrison_wanted_by(brief, state.strategy.current).max(1)
+}
+
+/// The surplus guards that stay on their city this turn: those of a city with hostile power near it (the
+/// defence's own reading, `defence::threats`) whose guard without them would not outweigh the threat. A
+/// surplus guard goes only while the guard left is above the threat (`defence::chance` under one half);
+/// the units are taken in the order of the brief, each release lowers the guard. The second list is every
+/// surplus guard of a threatened city, kept or not (the count of the defect: what 5c15543 took).
+fn kept_guards(observation: &AIObservation<'_>, brief: &TurnBrief, state: &AiState, rules: &CompiledRuleset) -> (Vec<EntityId>, usize) {
+    let mut threats = crate::ai::defence::threats(observation, brief, rules);
+    let (mut kept, mut threatened) = (Vec::new(), 0);
+    if threats.is_empty() {
+        return (kept, threatened);
+    }
+    for unit in brief.units.iter().filter(|u| army_role(rules, u.kind).is_some() && u.hp >= HEAL_BELOW_HP) {
+        let Some(UnitTask::Defend { city }) = state.task_of(unit.id).map(|t| t.task) else { continue };
+        let Some(t) = threats.iter_mut().find(|t| t.city == city) else { continue };
+        if !surplus_guard(brief, state, city) {
+            continue;
+        }
+        threatened += 1;
+        let left = t.guard.saturating_sub(crate::ai::defence::guard_power(rules, unit));
+        if crate::ai::defence::chance(t.threat, left) >= 500 {
+            kept.push(unit.id);
+        } else {
+            t.guard = left;
+        }
+    }
+    (kept, threatened)
 }
 
 impl TurnBrief {
@@ -324,12 +358,17 @@ pub fn cases_remembered(observation: &AIObservation<'_>, brief: &TurnBrief, stat
     kept.retake = Some(memory.clone());
     state.mind_memory = kept.encode();
     let lost_tiles: Vec<TileId> = memory.lost.iter().map(|l| l.tile).collect();
+    let (kept, threatened) = kept_guards(observation, brief, state, rules);
     let free: Vec<usize> = (0..brief.units.len())
         .filter(|&i| {
             let unit = &brief.units[i];
-            army_role(rules, unit.kind).is_some() && unit.hp >= HEAL_BELOW_HP && free_for_retake(brief, state, unit.id, &lost_tiles)
+            army_role(rules, unit.kind).is_some() && unit.hp >= HEAL_BELOW_HP && free_for_retake(brief, state, unit.id, &lost_tiles, &kept)
         })
         .collect();
+    // Write-only: surplus guards of a city in danger (what 5c15543 took, its check of the danger being dead), and the ones kept.
+    if threatened > 0 && !lost_tiles.is_empty() {
+        crate::ai::war_probe::note(|p| p.held_guards.push((brief.round, brief.player, threatened as u32, kept.len() as u32)));
+    }
     let mut sites: Vec<Site> = Vec::new();
     for lost in &memory.lost {
         let Some(captor) = lost.captor else { continue };
