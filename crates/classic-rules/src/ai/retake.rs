@@ -87,6 +87,12 @@ fn surplus_guard(brief: &TurnBrief, state: &AiState, city: TileId) -> bool {
     state.tasks().iter().filter(|t| t.task == UnitTask::Defend { city }).count() > crate::ai::planner_units::garrison_wanted_by(brief, state.strategy.current).max(1)
 }
 
+/// The chance of the threat to take the city (`defence::chance`, per mille) from which a surplus guard stays on it:
+/// one half. `chance` weighs the fourth powers of threat and guard, so it is exactly one half where the guard left
+/// equals the threat: a guard leaves for the retake only while the guard it leaves behind still outweighs the hostile
+/// power near the city. Not tuned: the point where the defence's own model calls the city as likely lost as held.
+const GUARD_KEPT_CHANCE: crate::ai::grand_strategy::Permille = 500;
+
 /// The surplus guards that stay on their city this turn: those of a city with hostile power near it (the
 /// defence's own reading, `defence::threats`) whose guard without them would not outweigh the threat. A
 /// surplus guard goes only while the guard left is above the threat (`defence::chance` under one half);
@@ -106,7 +112,7 @@ fn kept_guards(observation: &AIObservation<'_>, brief: &TurnBrief, state: &AiSta
         }
         threatened += 1;
         let left = t.guard.saturating_sub(crate::ai::defence::guard_power(rules, unit));
-        if crate::ai::defence::chance(t.threat, left) >= 500 {
+        if crate::ai::defence::chance(t.threat, left) >= GUARD_KEPT_CHANCE {
             kept.push(unit.id);
         } else {
             t.guard = left;

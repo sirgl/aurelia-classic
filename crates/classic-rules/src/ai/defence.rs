@@ -154,7 +154,7 @@ impl Watch {
 }
 
 /// The dangers of the turn: every own city with hostile power within
-/// `THREAT_RADIUS`, valued by the turn's prices (none without them).
+/// `THREAT_RADIUS` (`threatened`), valued by the turn's prices (none without them).
 pub fn watch(obs: &AIObservation<'_>, brief: &TurnBrief, state: &AiState, rules: &CompiledRuleset) -> Watch {
     let Some(prices) = brief.prices.as_ref() else {
         return Watch::default();
@@ -163,30 +163,53 @@ pub fn watch(obs: &AIObservation<'_>, brief: &TurnBrief, state: &AiState, rules:
     if hostile.is_empty() {
         return Watch::default();
     }
-    let dims = brief.dims;
     let mut race = None;
     let mut dangers = Vec::new();
-    for city in &obs.own_cities {
-        let near = |tile: TileId, radius: i32| dims.distance(tile, city.tile).is_some_and(|d| d <= radius);
-        let threats: Vec<&Hostile> = hostile.iter().filter(|h| near(h.tile, THREAT_RADIUS)).collect();
-        let threat: u32 = threats.iter().map(|h| h.power).sum();
-        if threat == 0 {
-            continue;
-        }
-        let own = city_power(brief, rules, city);
-        let military = brief.units.iter().filter(|u| u.role == AiRole::Military);
-        let guard = own + military.filter(|u| near(u.tile, GUARD_RADIUS)).map(|u| power(rules, u)).sum::<u32>();
-        let attacker = strongest(&threats);
+    for near in threatened(obs, brief, rules, &hostile) {
+        let city = near.city;
+        let attacker = strongest(&near.hostile);
         let capital = attacker.map_or(0, |attacker| capital_share(obs, brief, rules, city.tile, attacker, &mut race));
         let stake = operations::city_worth(prices, city.population, 0) + capital;
-        dangers.push(Danger { city: city.tile, threat, guard, planned: own + defenders(brief, state, rules, city.tile), stake, attacker });
+        dangers.push(Danger { city: city.tile, threat: near.threat, guard: near.guard, planned: near.own + defenders(brief, state, rules, city.tile), stake, attacker });
     }
     dangers.sort_by_key(|d| (Reverse(d.loss(d.guard)), d.city));
     let defender = if dangers.is_empty() { None } else { Arsenal::of(brief, rules).melee };
     Watch { dangers, defender }
 }
 
-/// An own city with hostile power near it, as `watch` finds it (same sight, same radius, same hostility).
+/// An own city with hostile power within `THREAT_RADIUS`: the one rule of the threat that `watch` values and
+/// `threats` reads unvalued (same sight, same radii, same hostility, same guard).
+struct Threatened<'o, 'h> {
+    city: &'o OwnCity,
+    /// The hostile units within `THREAT_RADIUS`.
+    hostile: Vec<&'h Hostile>,
+    /// Their power.
+    threat: u32,
+    /// The city's own power (`city_power`).
+    own: u32,
+    /// `own` and the own military units within `GUARD_RADIUS` (`Danger::guard`).
+    guard: u32,
+}
+
+/// The own cities under threat from `hostile` (`hostile_units`), in the order of the observation.
+fn threatened<'o, 'h>(obs: &'o AIObservation<'_>, brief: &TurnBrief, rules: &CompiledRuleset, hostile: &'h [Hostile]) -> Vec<Threatened<'o, 'h>> {
+    let mut out = Vec::new();
+    for city in &obs.own_cities {
+        let near = |tile: TileId, radius: i32| brief.dims.distance(tile, city.tile).is_some_and(|d| d <= radius);
+        let close: Vec<&Hostile> = hostile.iter().filter(|h| near(h.tile, THREAT_RADIUS)).collect();
+        let threat: u32 = close.iter().map(|h| h.power).sum();
+        if threat == 0 {
+            continue;
+        }
+        let own = city_power(brief, rules, city);
+        let military = brief.units.iter().filter(|u| u.role == AiRole::Military);
+        let guard = own + military.filter(|u| near(u.tile, GUARD_RADIUS)).map(|u| power(rules, u)).sum::<u32>();
+        out.push(Threatened { city, hostile: close, threat, own, guard });
+    }
+    out
+}
+
+/// An own city with hostile power near it, as `watch` finds it (`threatened`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct Threat {
     pub city: TileId,
@@ -206,18 +229,7 @@ pub(crate) fn threats(obs: &AIObservation<'_>, brief: &TurnBrief, rules: &Compil
     if hostile.is_empty() {
         return Vec::new();
     }
-    let mut out = Vec::new();
-    for city in &obs.own_cities {
-        let near = |tile: TileId, radius: i32| brief.dims.distance(tile, city.tile).is_some_and(|d| d <= radius);
-        let threat: u32 = hostile.iter().filter(|h| near(h.tile, THREAT_RADIUS)).map(|h| h.power).sum();
-        if threat == 0 {
-            continue;
-        }
-        let military = brief.units.iter().filter(|u| u.role == AiRole::Military);
-        let guard = city_power(brief, rules, city) + military.filter(|u| near(u.tile, GUARD_RADIUS)).map(|u| power(rules, u)).sum::<u32>();
-        out.push(Threat { city: city.tile, threat, guard });
-    }
-    out
+    threatened(obs, brief, rules, &hostile).into_iter().map(|t| Threat { city: t.city.tile, threat: t.threat, guard: t.guard }).collect()
 }
 
 /// The unit's weight in a guard (`Danger::guard`).
