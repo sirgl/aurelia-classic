@@ -720,9 +720,6 @@ impl ClassicMind {
         brief.war_muster = self.muster;
         brief.retake = self.retake2;
         brief.siege_call = if self.call { crate::ai::planner::CallFixes::DEFAULT } else { crate::ai::planner::CallFixes::NONE };
-        if self.retake2 {
-            brief.retaking = crate::ai::retake::cases_remembered(observation, &brief, state, rules);
-        }
         brief.met_eras = observation.view.met_eras();
         if brief.war_open {
             brief.scores = observation.view.race().scores;
@@ -776,6 +773,12 @@ impl ClassicMind {
         } else {
             Stakes::neutral()
         };
+        // The lost cities worth retaking, by the turn's prices and stakes (the value of a city is the strategist's,
+        // `retake::pays`). Before the defence answers its dangers, as the retake always was: the defence sends the
+        // free units to guards (measured: the retaking falls from 40 to 22 percent of the positions when it comes first).
+        if self.retake2 {
+            brief.retaking = crate::ai::retake::cases_remembered(observation, &brief, state, rules, &stakes);
+        }
         let mut defended = Vec::new();
         if self.variant.defends() && major {
             let _span = prof::span("classic/defence_watch_respond");

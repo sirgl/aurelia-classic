@@ -132,3 +132,30 @@ second class and a cost, not a saving, in the first.
 - A captor first seen after the loss is taken as the holder at that moment (`Memory::observe`): a city that changed hands
   between the loss and the first sight is retaken from the wrong enemy, or not at all.
 - The case is opened only for a city in sight; far units and the operations layer are not given the city.
+
+## The third iteration: the city's worth and one unit, one case (review of 12 November)
+
+The independent review of `next-war-retake` (77261d2) found two defects of the case, both fixed in `ai/next-war-retake2`.
+
+**The worth of the city.** A case opens only when the city is worth the units the retake is expected to cost, in the
+measure the strategist prices a capture with (`retake::pays`): the chance the group takes the city (`defence::chance` of the
+group's power after the city's strikes against the city's power and the captor's units around it, the formula of
+`operations::siege_chance`) times the capture's gain (`operations::capture_gain`: the city's worth by the rules, its yields from
+the turn it is ours again, the unrest of the capture, the capital's share, the rival's share), less the units' hammers at
+the production price times `operations::loss_percent` (the share of an operation's units the strategist counts lost). Value
+above zero opens the case. The rule reads citizens, prices and stakes of the turn, no name of content, and has no constant of
+its own. A seat without prices has no measure and retakes as before. The cost divides by the rounds left last: the
+strategist's own `hammer` (production price over rounds left) truncates to zero when the price is under the rounds left.
+Because the prices and the stakes exist after the old call site, `cases_remembered` is called right after the stakes in
+`driver::begin_turn` (still before the defence: after it the defence takes the free units for guards and the retaking fell
+from 40 to 22 percent of the positions).
+
+**One unit, one case.** Each free unit goes to the nearest lost city (the earlier lost on a tie); a case is judged with the
+units it gets (power, siege rounds, outmatching, worth), a case with no unit goes at once, and of the failing ones the
+weakest goes and gives its units to the others, until every case left holds. `free_for_retake` has no `_ => true`: free are
+units without task, a unit that rested, a guard of a city that is no longer ours or of a surplus in a city out of danger, and
+the assault of a lost city (the retake's own task of the turn before); not free are operations, raids, escorts, scouts,
+settlers' and workers' tasks and the assault of another city.
+
+**Not changed:** the world is still blocked for peace for the time a case stands (finding 3 of the review); `!brief.endangered(city)`
+in `free_for_retake` is always true at the call site (the defence watch is made after it), as before.

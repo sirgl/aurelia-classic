@@ -266,6 +266,9 @@ pub struct WarProbe {
     /// The retake cases a seat opened (`retake::cases_remembered`), one a turn and city:
     /// (round, player, the city's tile, its holder, the units of the group).
     pub retakes: Vec<(u32, PlayerId, u32, PlayerId, u32)>,
+    /// The retake cases that were not opened because the lost city is not worth the units the retake
+    /// is expected to cost (`retake::cases_remembered`), same fields as `retakes`.
+    pub declined: Vec<(u32, PlayerId, u32, PlayerId, u32)>,
     /// The cities of every player at the end of its turn: (round, player, tiles). A city taken back
     /// returns to its former owner without a decision, so `captures` does not see it.
     pub cities: Vec<(u32, PlayerId, Vec<u32>)>,

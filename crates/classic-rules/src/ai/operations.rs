@@ -1129,6 +1129,26 @@ fn war_case(prices: &Prices, stakes: &Stakes, rules: &CompiledRuleset, arsenal: 
     war_case_parts(prices, stakes, rules, arsenal, city, need, missing, rounds, armed, chance, fixes, rival).0
 }
 
+/// What the capture of `city` brings the strategist (the gain of `war_case`, before the chance): the
+/// capital's victory alone when the capture is decisive, else the city's worth by the rules' pricing
+/// (`SiegeFixes::priced`) and the capital's share; and whether the capture is decisive. The retake
+/// of a lost city (`ai::retake`) weighs a city by the same measure.
+pub(crate) fn capture_gain(prices: &Prices, stakes: &Stakes, city: &SeenCity, rounds: u32, fixes: SiegeFixes, rival: i64) -> (Centi, bool) {
+    let stake = stakes.capital(city.tile);
+    let decisive = stake.is_some_and(|s| s.decisive);
+    let gain = match stake {
+        Some(stake) if decisive => stake.value,
+        _ if fixes.priced => captured_gain_by(prices, stakes, city.population, rounds, fixes, rival) + stake.map_or(0, |s| s.value),
+        _ => city_gain(prices, stakes, city, rounds) + stake.map_or(0, |s| s.value),
+    };
+    (gain, decisive)
+}
+
+/// The share of the units of an operation that the strategist counts lost, percent (`war_case`).
+pub(crate) fn loss_percent(fixes: SiegeFixes) -> i64 {
+    if fixes.loss { if fixes.pays { PAYS_LOSS_PERCENT } else { OPEN_LOSS_PERCENT } } else { crate::ai::genome::get(crate::ai::genome::Knob::LossPercent) }
+}
+
 /// The terms of a war's case (the war probe's diagnosis, `war_probe::Estimate`): the chance it
 /// counted (percent), the capture's worth before the chance, the hammers and upkeep of the units
 /// it builds, the units it expects to lose and the weapons it plans.
@@ -1145,14 +1165,7 @@ pub struct CaseParts {
 #[allow(clippy::too_many_arguments)]
 /// `rival`: the share of the rival's loss that counts, percent (`rival_percent`).
 fn war_case_parts(prices: &Prices, stakes: &Stakes, rules: &CompiledRuleset, arsenal: &Arsenal, city: &SeenCity, need: Composition, missing: Composition, rounds: u32, armed: Option<&crate::ai::strikes::Armed>, chance: Option<i64>, fixes: SiegeFixes, rival: i64) -> (WarCase, CaseParts) {
-    let priced = fixes.priced;
-    let stake = stakes.capital(city.tile);
-    let decisive = stake.is_some_and(|s| s.decisive);
-    let gain = match stake {
-        Some(stake) if decisive => stake.value,
-        _ if priced => captured_gain_by(prices, stakes, city.population, rounds, fixes, rival) + stake.map_or(0, |s| s.value),
-        _ => city_gain(prices, stakes, city, rounds) + stake.map_or(0, |s| s.value),
-    };
+    let (gain, decisive) = capture_gain(prices, stakes, city, rounds, fixes, rival);
     // Upkeep to the end of the game, which a decisive capture ends.
     let upkeep = if decisive { prices.gold * i64::from(rounds) / i64::from(prices.rounds_left) } else { prices.gold };
     let hammer = prices.production / i64::from(prices.rounds_left);
@@ -1162,7 +1175,7 @@ fn war_case_parts(prices: &Prices, stakes: &Stakes, rules: &CompiledRuleset, ars
     };
     let army = |c: Composition| [ArmyRole::Melee, ArmyRole::Ranged, ArmyRole::Siege].iter().map(|r| unit_cost(*r) * i64::from(c.of(*r))).sum::<i64>();
     let built = if fixes.asset { 0 } else { army(missing) * hammer } + i64::from(missing.total()) * upkeep;
-    let loss = if fixes.loss { if fixes.pays { PAYS_LOSS_PERCENT } else { OPEN_LOSS_PERCENT } } else { crate::ai::genome::get(crate::ai::genome::Knob::LossPercent) };
+    let loss = loss_percent(fixes);
     let lost = army(need) * loss / 100 * hammer;
     let base = crate::ai::genome::get(crate::ai::genome::Knob::SuccessPercent);
     // The weapon the plan counts on (`strikes::armory`) gives the chance it gives and costs its

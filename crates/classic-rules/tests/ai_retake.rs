@@ -4,7 +4,10 @@
 //! captor has more at hand than the group can beat.
 
 use classic_content::core::core_rules;
+use classic_rules::ai::grand_strategy::Stakes;
+use classic_rules::ai::operations::SiegeFixes;
 use classic_rules::ai::planner::TurnBrief;
+use classic_rules::ai::value::{PriceModel, Prices};
 use classic_rules::ai::diplomacy::{DiplomacyAdvisor, ACCEPT_PEACE_AFTER_ROUNDS};
 use classic_rules::ai::planner::{PlanTools, UnitView};
 use classic_rules::ai::planner_map::MapScratch;
@@ -49,6 +52,11 @@ struct Scene {
 }
 
 fn scene(rules: &CompiledRuleset, s: &Scene) -> GameState {
+    scene_of(rules, s, None, &[])
+}
+
+/// `scene` with the citizens of the lost city (None: as founded) and more cities of the holder, damaged like it.
+fn scene_of(rules: &CompiledRuleset, s: &Scene, population: Option<u32>, more_cities: &[(i32, i32)]) -> GameState {
     let mut game = GameState::new(rules, GameConfig { players: 3, width: 30, height: 20, rng_seed: 5 });
     let dims = game.view().auth.map().dimensions;
     let land: Vec<(TileId, TerrainId)> = (0..dims.tile_count() as u32).map(|t| (TileId(t), TerrainId(GRASSLAND))).collect();
@@ -71,6 +79,13 @@ fn scene(rules: &CompiledRuleset, s: &Scene) -> GameState {
     }
     let city = game.debug_found_city(rules, s.holder, tile(&game, CITY.0, CITY.1));
     game.debug_set_city_damage(city, s.damage);
+    if let Some(p) = population {
+        game.debug_set_population(rules, city, p);
+    }
+    for (q, r) in more_cities {
+        let other = game.debug_found_city(rules, s.holder, tile(&game, *q, *r));
+        game.debug_set_city_damage(other, s.damage);
+    }
     let sword = unit_kind(rules, "swordsman");
     for (q, r) in &s.ours {
         game.debug_spawn_unit(rules, US, tile(&game, *q, *r), sword);
@@ -102,7 +117,23 @@ fn retaking(rules: &CompiledRuleset, game: &GameState, state: &mut AiState) -> (
     let obs = game.ai_observation(rules, US);
     let mut brief = TurnBrief::from_observation(&obs, rules);
     brief.retake = true;
-    let cases = retake::cases_remembered(&obs, &brief, state, rules);
+    let cases = retake::cases_remembered(&obs, &brief, state, rules, &Stakes::neutral());
+    brief.retaking = cases.clone();
+    (brief, cases)
+}
+
+/// `retaking` with the prices of the turn and the strategist's war pricing (`SiegeFixes::PAYS`), as the mind plays.
+fn retaking_priced(rules: &CompiledRuleset, game: &GameState, state: &mut AiState, hammer_price: Option<i64>) -> (TurnBrief, Vec<retake::Case>) {
+    let obs = game.ai_observation(rules, US);
+    let mut brief = TurnBrief::from_observation(&obs, rules);
+    brief.retake = true;
+    brief.war.siege = SiegeFixes::PAYS;
+    let mut prices = Prices::of(&obs, rules, PriceModel::Uses);
+    if let Some(price) = hammer_price {
+        prices.production = price;
+    }
+    brief.prices = Some(prices);
+    let cases = retake::cases_remembered(&obs, &brief, state, rules, &Stakes::neutral());
     brief.retaking = cases.clone();
     (brief, cases)
 }
@@ -356,7 +387,7 @@ fn the_holders_peace_offer_is_refused_while_the_case_stands_and_accepted_after()
         assert!(obs.offers_to_us.iter().any(|o| o.from == THEM), "the offer stands");
         let mut brief = TurnBrief::from_observation(&obs, &rules);
         brief.retake = true;
-        let cases = retake::cases_remembered(&obs, &brief, &mut state, &rules);
+        let cases = retake::cases_remembered(&obs, &brief, &mut state, &rules, &Stakes::neutral());
         brief.retaking = cases.clone();
         let input = AdvisorInput { observation: &obs, brief: &brief, state: &state, rules: &rules };
         let answers: Vec<bool> = DiplomacyAdvisor::default()
@@ -406,3 +437,117 @@ fn a_unit_does_not_rally_for_a_city_that_is_being_retaken() {
     assert_eq!(waiting.reason, Reason::Rally, "the same city not being retaken waits for its group: {waiting:?}");
 }
 
+
+
+/// The memory of a seat that held its capital and the cities at `lost` and lost them all.
+fn memory_of_cities(game: &GameState, cities: &[(i32, i32)]) -> AiState {
+    let mut state = AiState::new(US, 1);
+    let mut held: Vec<TileId> = vec![tile(game, 3, 10)];
+    held.extend(cities.iter().map(|(q, r)| tile(game, *q, *r)));
+    state.mind_memory = strategy_net::Memory { retake: Some(Memory { held, lost: Vec::new() }), ..Default::default() }.encode();
+    state
+}
+
+/// A unit is in the group of one case: two lost cities with the same units in reach of both are not two cases of
+/// the same units. Four swordsmen stand next to the first city and within reach of the second: the first city has
+/// them all, and the second, with no unit of its own, opens no case (it was a second case of the same four).
+#[test]
+fn a_unit_belongs_to_the_group_of_one_case_only() {
+    let rules = compile_rules(core_rules()).unwrap();
+    let second = (12, 13);
+    let game = scene_of(&rules, &Scene { holder: THEM, damage: 190, ours: group(), guards: vec![], war_rounds: 0 }, None, &[second]);
+    let mut state = memory_of_cities(&game, &[CITY, second]);
+    let (_, cases) = retaking(&rules, &game, &mut state);
+    assert_eq!(remembered(&state).lost.len(), 2, "both cities are lost and in sight");
+    let obs = game.ai_observation(&rules, US);
+    let brief = TurnBrief::from_observation(&obs, &rules);
+    let in_reach_of_both = brief.units.iter().filter(|u| brief.dims.distance(u.tile, tile(&game, second.0, second.1)).is_some_and(|d| d <= 5)).count();
+    assert!(in_reach_of_both >= 2, "the test needs units in reach of both cities, {in_reach_of_both} are");
+    let members: Vec<_> = cases.iter().flat_map(|c| c.group.iter().copied()).collect();
+    let mut once = members.clone();
+    once.sort_by_key(|id| format!("{id:?}"));
+    once.dedup();
+    assert_eq!(once.len(), members.len(), "no unit is in two groups");
+    assert_eq!(cases.len(), 1, "the four units make one case: the city they stand next to");
+    assert_eq!(cases[0].tile, tile(&game, CITY.0, CITY.1));
+    assert_eq!(cases[0].group.len(), group().len());
+
+    // With units of its own, the second city has its case, and the groups share no unit.
+    let mut ours = group();
+    ours.extend([(13, 14), (13, 13), (12, 15), (11, 14)]);
+    let game = scene_of(&rules, &Scene { holder: THEM, damage: 190, ours, guards: vec![], war_rounds: 0 }, None, &[second]);
+    let mut state = memory_of_cities(&game, &[CITY, second]);
+    let (_, cases) = retaking(&rules, &game, &mut state);
+    assert_eq!(cases.len(), 2, "each city has the units next to it");
+    for unit in &cases[0].group {
+        assert!(!cases[1].group.contains(unit), "{unit:?} is in both groups");
+    }
+    assert_eq!(cases[0].group.len() + cases[1].group.len(), 8, "every unit is in one group");
+}
+
+/// A unit on a task of its own is not taken from it: an escort, a member of an operation or a raid, a unit on
+/// the assault of another city. The units of no task, a rested one, a guard of a city that is gone, and the
+/// retake's own assault of the turn before are free.
+#[test]
+fn a_unit_on_another_task_is_not_taken_from_it() {
+    let rules = compile_rules(core_rules()).unwrap();
+    let game = scene(&rules, &Scene { holder: THEM, damage: 190, ours: group(), guards: vec![], war_rounds: 0 });
+    let obs = game.ai_observation(&rules, US);
+    let ids: Vec<_> = TurnBrief::from_observation(&obs, &rules).units.iter().map(|u| u.id).collect();
+    assert_eq!(ids.len(), 4, "the four swordsmen and nothing else of ours");
+    let city = tile(&game, CITY.0, CITY.1);
+    let round = obs.round;
+    let case_with = |tasks: &[(usize, UnitTask)]| {
+        let mut state = memory_of_the_last_turn(&game);
+        for (i, task) in tasks {
+            state.set_task(ids[*i], *task, round);
+        }
+        retaking(&rules, &game, &mut state).1
+    };
+    // No task: all four.
+    assert_eq!(case_with(&[])[0].group.len(), 4);
+    // An escort of a civilian unit, a member of an operation, a raid or an assault of another city, a scout: kept on its task.
+    let others = [
+        UnitTask::Escort { ward: ids[3] },
+        UnitTask::Operation { target: tile(&game, 27, 10) },
+        UnitTask::Raid { target: tile(&game, 27, 10) },
+        UnitTask::Assault { target: tile(&game, 27, 10) },
+    ];
+    for task in others {
+        let cases = case_with(&[(0, task)]);
+        assert_eq!(cases.len(), 1, "{task:?}: the other three still retake");
+        assert_eq!(cases[0].group.len(), 3, "{task:?}: the unit stays on its task");
+        assert!(!cases[0].group.contains(&ids[0]), "{task:?}: it is not in the group");
+    }
+    // The assault of the lost city is the retake's own task of the turn before: that unit stays in the group.
+    assert_eq!(case_with(&[(0, UnitTask::Assault { target: city })])[0].group.len(), 4);
+    // A unit resting that is fit again, and a guard of a city that is not ours any more, are free.
+    assert_eq!(case_with(&[(1, UnitTask::Heal { at: tile(&game, 13, 9) })])[0].group.len(), 4);
+    assert_eq!(case_with(&[(2, UnitTask::Defend { city })])[0].group.len(), 4);
+    // The tasks are untouched by the look: the retake only reads them.
+    let mut state = memory_of_the_last_turn(&game);
+    state.set_task(ids[0], UnitTask::Escort { ward: ids[3] }, round);
+    let _ = retaking(&rules, &game, &mut state);
+    assert_eq!(state.task_of(ids[0]).map(|t| t.task), Some(UnitTask::Escort { ward: ids[3] }));
+}
+
+/// The city's worth against the units it costs: with the hammers dear (a price that makes four swordsmen worth
+/// more than a city of one citizen and less than a city of twelve) the small city is not retaken and the large one
+/// is; at the prices of the turn both are. The comparison is the strategist's (`operations::capture_gain`,
+/// `loss_percent`), so it reads the citizens, not a name.
+#[test]
+fn a_city_worth_less_than_the_units_it_costs_is_not_retaken() {
+    let rules = compile_rules(core_rules()).unwrap();
+    let dear = Some(120_000);
+    for (citizens, at_the_prices, when_dear) in [(1u32, true, false), (12, true, true)] {
+        let game = scene_of(&rules, &Scene { holder: THEM, damage: 190, ours: group(), guards: vec![], war_rounds: 0 }, Some(citizens), &[]);
+        let mut state = memory_of_the_last_turn(&game);
+        let (_, cases) = retaking_priced(&rules, &game, &mut state, None);
+        assert_eq!(!cases.is_empty(), at_the_prices, "{citizens} citizens at the prices of the turn");
+        let mut state = memory_of_the_last_turn(&game);
+        let (brief, cases) = retaking_priced(&rules, &game, &mut state, dear);
+        assert_eq!(!cases.is_empty(), when_dear, "{citizens} citizens with dear hammers");
+        assert_eq!(brief.retaking_from(THEM), when_dear, "no case, no refusal of peace");
+        assert_eq!(remembered(&state).lost.len(), 1, "the city stays remembered as lost");
+    }
+}
