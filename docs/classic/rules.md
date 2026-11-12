@@ -8,17 +8,17 @@
 
 ## Summary
 
-Rule constants: 483 (AI constants: 417; 14 constants of engine plumbing in `platform/crates/kernel/src/persistence/`, `platform/crates/kernel/src/test_module.rs`, `platform/crates/kernel/src/math.rs`, `platform/crates/kernel/src/module.rs`, `classic/crates/classic-rules/src/save_codec.rs`, `classic/crates/classic-rules/src/fixtures.rs` are not listed).
+Rule constants: 499 (AI constants: 949; 14 constants of engine plumbing in `platform/crates/kernel/src/persistence/`, `platform/crates/kernel/src/test_module.rs`, `platform/crates/kernel/src/math.rs`, `platform/crates/kernel/src/module.rs`, `classic/crates/classic-rules/src/save_codec.rs`, `classic/crates/classic-rules/src/fixtures.rs` are not listed).
 
 | Source | Rule constants | AI constants |
 |---|---|---|
-| Unciv | 247 | 0 |
-| own design | 72 | 9 |
+| Unciv | 256 | 0 |
+| own design | 72 | 11 |
 | own formula (expansion-only system; Unciv has no equivalent) | 0 | 0 |
-| own value | 14 | 2 |
+| own value | 14 | 4 |
 | own value (unverified) | 17 | 4 |
-| own value (source not recorded) | 133 | 402 |
-| total | 483 | 417 |
+| own value (source not recorded) | 140 | 930 |
+| total | 499 | 949 |
 
 Sections:
 
@@ -78,7 +78,7 @@ Every `pub const` of the rule code, by system. Value as written in the code; mea
 
 | Name | Value | Meaning | Source | File |
 |---|---|---|---|---|
-| `CLASSIC_FINGERPRINT` | `3662418266917708599` | The fingerprint of the current content (`CompiledRuleset::hash`). | own value (source not recorded) | `mod.rs` |
+| `CLASSIC_FINGERPRINT` | `835780351697724273` | The fingerprint of the current content (`CompiledRuleset::hash`). | own value (source not recorded) | `mod.rs` |
 | `DEFICIT_DISBAND_THRESHOLD` | `-5` | Treasury balance at or below which a deficit may disband a unit (own value, not compared with a public source (unverified)). | own value (unverified) | `systems.rs` |
 | `SCHEDULE` | `TurnSchedule { end_turn: &[ (Start, Step::Kernel(K::HealUnits)), (Start, Step::Module(M...` | The order of a classic turn (the tables in the module doc). | own value (source not recorded) | `turn.rs` |
 | `START_YEAR` | `-4000` | The year of round 0 (4000 BC; negative years are BC). | Unciv: Speeds.json (`startYear` -4000), equal | `calendar.rs` |
@@ -162,7 +162,7 @@ Every `pub const` of the rule code, by system. Value as written in the code; mea
 | `VERY_UNHAPPY_THRESHOLD` | `-11` | Excess happiness at or below which the empire is very unhappy (below -10). | Unciv: GlobalUniques.json (`when below [-10] [Happiness]`), equal | `happiness.rs` |
 | `VERY_UNHAPPY_PRODUCTION_PERCENT` | `-50` | Production of the cities of a very unhappy empire (percent); no gold penalty. | Unciv: GlobalUniques.json, equal (-50) | `happiness.rs` |
 | `VERY_UNHAPPY_COMBAT_PERCENT` | `-33` | Combat strength of the units of a very unhappy empire (percent, flat). | Unciv: GlobalUniques.json, equal (-33) | `happiness.rs` |
-| `REBELLION_THRESHOLD` | `-21` | Excess happiness at or below which rebels may rise (below -20). | Unciv: GlobalUniques.json (`Rebel units may spawn <when below [-20] [Happiness]>`), equal | `happiness.rs` |
+| `REBELLION_THRESHOLD` | `-21` | Excess happiness at or below which rebels rise (below -20; `systems::revolts`). | Unciv: GlobalUniques.json (`Rebel units may spawn <when below [-20] [Happiness]>`), equal | `happiness.rs` |
 | `UNHAPPY_GROWTH_PERCENT` | `-75` | Growth modifier (percent) of an unhappy (-1 to -10) and of a very unhappy empire (growth nullified). | Unciv: GlobalUniques.json, equal | `happiness.rs` |
 | `VERY_UNHAPPY_GROWTH_PERCENT` | `-100` | Unciv: GlobalUniques.json, equal. | Unciv: GlobalUniques.json, equal | `happiness.rs` |
 | `ALLY_LUXURY_HAPPINESS_PERCENT` | `150` | Percent of a luxury's happiness when allied city-states give it and the player has Cultural Diplomacy. | own value (unverified) | `happiness.rs` |
@@ -638,7 +638,7 @@ Every `pub const` of the rule code, by system. Value as written in the code; mea
 
 ### Map, terrain and tile yields
 
-26 constants (Unciv 5, own value (source not recorded) 21). Files: `classic/crates/classic-rules/src/classic/yields.rs`, `platform/crates/kernel/src/derived/tile_yields.rs`, `platform/crates/kernel/src/derived/yields.rs`, `platform/crates/kernel/src/rules/natural_wonders.rs`, `platform/crates/kernel/src/scenario/generator.rs`, `platform/crates/kernel/src/scenario/landscape.rs`, `platform/crates/kernel/src/scenario/map_script.rs`, `platform/crates/kernel/src/scenario/sea_resources.rs`, `platform/crates/kernel/src/world/map.rs`, `platform/crates/kernel/src/world/size.rs`.
+31 constants (Unciv 5, own value (source not recorded) 26). Files: `classic/crates/classic-rules/src/classic/yields.rs`, `platform/crates/kernel/src/derived/tile_yields.rs`, `platform/crates/kernel/src/derived/yields.rs`, `platform/crates/kernel/src/rules/natural_wonders.rs`, `platform/crates/kernel/src/scenario/generator.rs`, `platform/crates/kernel/src/scenario/landscape.rs`, `platform/crates/kernel/src/scenario/map_script.rs`, `platform/crates/kernel/src/scenario/sea_resources.rs`, `platform/crates/kernel/src/scenario/start_balance.rs`, `platform/crates/kernel/src/world/map.rs`, `platform/crates/kernel/src/world/size.rs`.
 
 | Name | Value | Meaning | Source | File |
 |---|---|---|---|---|
@@ -661,9 +661,14 @@ Every `pub const` of the rule code, by system. Value as written in the code; mea
 | `DESERT` | `Ground::Flat(Climate::Arid)` |  | own value (source not recorded) | `landscape.rs` |
 | `TUNDRA` | `Ground::Flat(Climate::Cold)` |  | own value (source not recorded) | `landscape.rs` |
 | `SNOW` | `Ground::Flat(Climate::Frozen)` |  | own value (source not recorded) | `landscape.rs` |
+| `CLASSIC` | `LandOptions { mountain_percent: MOUNTAIN_SHARE as u8, hill_percent: HILL_SHARE as u8, f...` | The classic map: every share as it always was. | own value (source not recorded) | `landscape.rs` |
+| `RICH` | `LandOptions { mountain_percent: 12, hill_percent: 22, forest_percent: 150, river_percen...` | A land made for a tall science empire (the science audit's ideal case, classic/docs/ai-science-audit.md): twice the mountains, more hills, half again the forest, two and a half times the rivers, twice the land resources. | own value (source not recorded) | `landscape.rs` |
 | `ALL` | `[ MapScript::Continents, MapScript::Pangaea, MapScript::Archipelago, MapScript::Fractal...` |  | own value (source not recorded) | `map_script.rs` |
 | `SHALLOW_REACH` | `2` | Hex distance from land within which water is shallow: the coast and the ring behind it. | own value (source not recorded) | `sea_resources.rs` |
 | `START_REACH` | `3` | Tiles around a start that its first city works: the sea within this reach is the start's own. | own value (source not recorded) | `sea_resources.rs` |
+| `CLASSIC` | `StartPolicy { weights: YieldWeights { food: 2, production: 3, gold: 1, science: 1, cult...` |  | own value (source not recorded) | `start_balance.rs` |
+| `OFF` | `StartBalance { fair: false, strategic: false, policy: StartPolicy::CLASSIC }` | The starts as they were before this module (tests that pin an old map). | own value (source not recorded) | `start_balance.rs` |
+| `ON` | `StartBalance { fair: true, strategic: true, policy: StartPolicy::CLASSIC }` |  | own value (source not recorded) | `start_balance.rs` |
 | `LAKE_MAX_AREA_SIZE` | `10` | A water body of at most this many tiles is a lake (fresh water, +1 food). | Unciv: ModConstants.kt (`maxLakeSize` 10, `MapGenerator.kt` compares with `<=`), equal | `map.rs` |
 | `MIN_WATER_SIZE_FOR_OCEAN` | `10` | A coastal city touches a water body of at least this many tiles (harbors, coastal buildings, sea trade). | own value (source not recorded) | `map.rs` |
 | `NO_AREA` | `u32::MAX` | Water area of a land tile. | own value (source not recorded) | `map.rs` |
@@ -724,11 +729,22 @@ Every `pub const` of the rule code, by system. Value as written in the code; mea
 
 ### Other rule constants
 
-1 constants (own value (source not recorded) 1). Files: `classic/crates/classic-rules/src/knowledge/actions.rs`.
+12 constants (Unciv 9, own value (source not recorded) 3). Files: `classic/crates/classic-rules/src/derived/standing.rs`, `classic/crates/classic-rules/src/knowledge/actions.rs`, `classic/crates/classic-rules/src/systems/revolts.rs`, `classic/crates/classic-rules/src/world/mod.rs`.
 
 | Name | Value | Meaning | Source | File |
 |---|---|---|---|---|
+| `ALL` | `[Measure::Population, Measure::Crop, Measure::Goods, Measure::Gnp, Measure::Literacy, M...` |  | own value (source not recorded) | `standing.rs` |
 | `MARCH_TAG` | `10` | The codec tag of `MarchTo` (`command/codec.rs`), not enumerated. | own value (source not recorded) | `actions.rs` |
+| `REVOLT_DELAY_BASE` | `4` | Turns from the first turn below the threshold to the rising, before the random part and the game speed. | Unciv: `ModConstants.baseTurnsUntilRevolt` (4); equal | `revolts.rs` |
+| `REVOLT_DELAY_RANDOM` | `3` | The random part of the delay: `rand(3)` more turns. | Unciv: TurnManager.getTurnsBeforeRevolt (`nextInt(3)`); equal | `revolts.rs` |
+| `REBEL_PERCENT_PER_CITY` | `20` | Percent of the spawn roll per city beyond the first: one rebel, and one more with the chance `20 × (cities - 1)` percent (a third from 11 cities). | Unciv: TurnManager.doRevoltSpawn (`1 + nextInt(100 + 20 * (cities - 1)) / 100`); equal | `revolts.rs` |
+| `REBEL_CITY_WEIGHT` | `10` | Weight of a city in the draw of the rising city on top of its population. | Unciv: TurnManager.doRevoltSpawn (`nextInt(population + 10)`); equal | `revolts.rs` |
+| `REBEL_TILE_BASE` | `10` | Rate of a free land tile for the rising, and its additions: no improvement, a resource on an unimproved tile, a defence bonus. | Unciv: TurnManager.rateTileForRevoltSpawn (10, +4, +3, +4); equal | `revolts.rs` |
+| `REBEL_TILE_UNIMPROVED` | `4` | Unciv: TurnManager.rateTileForRevoltSpawn (+4 unimproved); equal. | Unciv: TurnManager.rateTileForRevoltSpawn (+4 unimproved); equal | `revolts.rs` |
+| `REBEL_TILE_RESOURCE` | `3` | Unciv: TurnManager.rateTileForRevoltSpawn (+3 resource on an unimproved tile); equal. | Unciv: TurnManager.rateTileForRevoltSpawn (+3 resource on an unimproved tile); equal | `revolts.rs` |
+| `REBEL_TILE_DEFENCE` | `4` | Unciv: TurnManager.rateTileForRevoltSpawn (+4 defence bonus); equal. | Unciv: TurnManager.rateTileForRevoltSpawn (+4 defence bonus); equal | `revolts.rs` |
+| `REBEL_PLACE_RINGS` | `10` | Rings searched around the rising tile for a free tile per rebel. | Unciv: TileMap.placeUnitNearTile (10 tries over the neighbours of the tiles tried); equal | `revolts.rs` |
+| `PUPPET_RESISTS` | `true` | Whether a puppet city is in resistance after its capture as an annexed one is (the owner's decision on the rule; Civ V: a captured city resists whether puppeted or annexed). | own value (source not recorded) | `mod.rs` |
 
 ## AI constants
 
@@ -788,6 +804,19 @@ Tuning numbers of the computer players (`classic/crates/classic-rules/src/ai`). 
 | `CITY_TILE_PERCENT` | `40` | What a unit in an own city is taken to have against an attack, percent: the planning estimate (the city fights with its own strength). | own value (source not recorded) | `battlefield.rs` |
 | `FOG_PRIOR_PERCENT` | `12` | The prior of a fogged tile next to the unit: the chance (percent) that an enemy of the typical kind stands on it. | own value (source not recorded) | `battlefield.rs` |
 | `PRIOR_ROUNDS` | `20` | Rounds after which a remembered threat is no prior any more. | own value (source not recorded) | `battlefield.rs` |
+
+### `camps.rs`
+
+6 constants (own value (source not recorded) 6). Files: `classic/crates/classic-rules/src/ai/camps.rs`.
+
+| Name | Value | Meaning | Source | File |
+|---|---|---|---|---|
+| `CAMP_REACH` | `6` | Camps within this many tiles of an own city are the empire's to clear (Unciv's `tryHeadTowardsEncampment`: 6 tiles). | own value (source not recorded) | `camps.rs` |
+| `GROUP_MOST` | `3` | Units a clearing group takes at most (a raid's, `raid::RAID_SIZE`). | own value (source not recorded) | `camps.rs` |
+| `WALK_MOST` | `CAMP_REACH + 4` | Free units this far from a camp, beyond its reach of the cities, may go. | own value (source not recorded) | `camps.rs` |
+| `LOSS_PER_CAMP_ROUND` | `32` | Losses to barbarians (civilians captured, military units killed) per round of a camp within `CAMP_REACH` of a city, per mille: `standard` on the standard and duel suites at Quick, 80 games, 14.9 losses a seat for 462 such camp-rounds (classic/docs/ai-army.md). | own value (source not recorded) | `camps.rs` |
+| `CAMP_LIFE` | `95` | The rounds a camp near the cities still lives when the player leaves it, in Standard rounds: the measured median life of a camp, 63 rounds at Quick's pace (2/3). | own value (source not recorded) | `camps.rs` |
+| `READY_HP` | `80` | A member goes on only this healthy (a full unit strikes the defender twice). | own value (source not recorded) | `camps.rs` |
 
 ### `capital_search.rs`
 
@@ -854,13 +883,14 @@ Tuning numbers of the computer players (`classic/crates/classic-rules/src/ai`). 
 
 ### `city_states.rs`
 
-3 constants (own value (unverified) 2, own value (source not recorded) 1). Files: `classic/crates/classic-rules/src/ai/city_states.rs`.
+4 constants (own value (unverified) 2, own value (source not recorded) 2). Files: `classic/crates/classic-rules/src/ai/city_states.rs`.
 
 | Name | Value | Meaning | Source | File |
 |---|---|---|---|---|
 | `GIFT_RESERVE` | `300` | Gold the AI keeps before it gives any away. | own value (source not recorded) | `city_states.rs` |
 | `SMALL_GIFT` | `250` | The gift sizes (own values, unverified). | own value (unverified) | `city_states.rs` |
 | `MEDIUM_GIFT` | `500` | (with `SMALL_GIFT`) The gift sizes (own values, unverified). | own value (unverified) | `city_states.rs` |
+| `LUMP_MARGIN` | `10` | Points of influence a seat aims above its estimate of a rival's influence in its ally when it takes the alliance in one lump (the winners' alliances hold 73 points at the median and 94 at the third quartile at the last round of the bench, against 80 for the seat's own: `runs/m1`). | own value (source not recorded) | `city_states.rs` |
 
 ### `combat.rs`
 
@@ -872,6 +902,14 @@ Tuning numbers of the computer players (`classic/crates/classic-rules/src/ai`). 
 | `NONE` | `FightFix { source: Source::Search, retreat: false, reply: false, focus: false, odds: fa...` |  | own value (source not recorded) | `combat.rs` |
 | `UPGRADE_RESERVE` | `150` | Gold the military advisor keeps when it upgrades units. | own value (source not recorded) | `combat.rs` |
 
+### `commander.rs`
+
+1 constants (own value (source not recorded) 1). Files: `classic/crates/classic-rules/src/ai/unit_net/commander.rs`.
+
+| Name | Value | Meaning | Source | File |
+|---|---|---|---|---|
+| `OPTIONS` | `["attack", "wait", "hold", "retreat"]` | The operation head's options (design section 6). | own value (source not recorded) | `commander.rs` |
+
 ### `danger.rs`
 
 4 constants (own value (source not recorded) 4). Files: `classic/crates/classic-rules/src/ai/danger.rs`.
@@ -882,6 +920,17 @@ Tuning numbers of the computer players (`classic/crates/classic-rules/src/ai`). 
 | `NAMES` | `[ "hp", "melee", "ranged", "range", "moves", "level", "promotions", "fortified", "forti...` | The names of the values, in the row's order (the module's table). | own value (source not recorded) | `danger.rs` |
 | `THREATS` | `19` | The column of `threats`: the net reads only rows where it is above 0. | own value (source not recorded) | `danger.rs` |
 | `FAR` | `20` | A distance this large or larger, or none, is written as this. | own value (source not recorded) | `danger.rs` |
+
+### `decide.rs`
+
+4 constants (own value (source not recorded) 4). Files: `classic/crates/classic-rules/src/ai/net_e2e/v2/decide.rs`.
+
+| Name | Value | Meaning | Source | File |
+|---|---|---|---|---|
+| `HEAD_UNIT` | `0` |  | own value (source not recorded) | `decide.rs` |
+| `HEAD_PRODUCTION` | `2` |  | own value (source not recorded) | `decide.rs` |
+| `WAIT_TAG` | `250` |  | own value (source not recorded) | `decide.rs` |
+| `DEFER_TAG` | `251` |  | own value (source not recorded) | `decide.rs` |
 
 ### `defence.rs`
 
@@ -910,11 +959,13 @@ Tuning numbers of the computer players (`classic/crates/classic-rules/src/ai`). 
 
 ### `driver.rs`
 
-1 constants (own value (source not recorded) 1). Files: `classic/crates/classic-rules/src/ai/driver.rs`.
+3 constants (own value (source not recorded) 3). Files: `classic/crates/classic-rules/src/ai/driver.rs`, `platform/crates/kernel/src/ai/driver.rs`.
 
 | Name | Value | Meaning | Source | File |
 |---|---|---|---|---|
 | `VARIANT_ENV` | `"AURELIA_AI_VARIANT"` | The environment variable that makes the game's AI another variant (dev-only: `AURELIA_AI_VARIANT=net` plays the net in the game window and the observer; an unknown name is an error). | own value (source not recorded) | `driver.rs` |
+| `DEFERS_PER_UNIT` | `1` | How many times a turn a unit's decision may be `Reason::Deferred` and the unit moved to the end of the turn's queue: the mind asks (no command, reason `Deferred`), the driver grants it while the unit has deferrals left; a request beyond them ends the unit's turn as no command does. | own value (source not recorded) | `driver.rs` |
+| `REORDERS_PER_UNIT` | `3` | Deferrals a unit has a turn when its mind picks the next unit itself (`AiMind::picks_next`, "who is next"): the mind may hold a unit back while others act and call it again later, so it needs more than one; a bound keeps every turn finite (the queue grows by at most this many times its length). | own value (source not recorded) | `driver.rs` |
 
 ### `economy.rs`
 
@@ -938,11 +989,11 @@ Tuning numbers of the computer players (`classic/crates/classic-rules/src/ai`). 
 
 ### `encode.rs`
 
-53 constants (own value (source not recorded) 53). Files: `classic/crates/classic-rules/src/ai/net_e2e/encode.rs`.
+55 constants (own value (source not recorded) 55). Files: `classic/crates/classic-rules/src/ai/net_e2e/encode.rs`.
 
 | Name | Value | Meaning | Source | File |
 |---|---|---|---|---|
-| `FORMAT` | `6` | The format number of the contract (`meta.json`). | own value (source not recorded) | `encode.rs` |
+| `FORMAT` | `10` | The format number of the contract (`meta.json`). | own value (source not recorded) | `encode.rs` |
 | `JOBS_PER_WORKER` | `4` | A worker serves this many jobs (the scripted mind's `genome::Knob::JobsPerWorker`): `free_worker_jobs` = jobs − 4 × workers alive or queued. | own value (source not recorded) | `encode.rs` |
 | `CLIP` | `32` | Distances are clipped here; "none" (no capital, no city) is `CLIP`. | own value (source not recorded) | `encode.rs` |
 | `REGION` | `4` | Tiles of a region's side (blocks of `REGION` × `REGION` tiles). | own value (source not recorded) | `encode.rs` |
@@ -950,6 +1001,7 @@ Tuning numbers of the computer players (`classic/crates/classic-rules/src/ai`). 
 | `SITE_RADIUS` | `10` | City sites are offered to a founder within this many tiles. | own value (source not recorded) | `encode.rs` |
 | `MARCH` | `crate::knowledge::actions::MARCH_TAG as i32` | A long march (`Command::MarchTo`) to a point of interest. | own value (source not recorded) | `encode.rs` |
 | `WAIT` | `250` | The unit does nothing more this turn (no command). | own value (source not recorded) | `encode.rs` |
+| `DEFER` | `251` | Format 9: the unit decides again after the rest of the turn's queue (no command; `defer_candidate`). | own value (source not recorded) | `encode.rs` |
 | `RESEARCH` | `300` |  | own value (source not recorded) | `encode.rs` |
 | `PRODUCE_UNIT` | `400` |  | own value (source not recorded) | `encode.rs` |
 | `PRODUCE_BUILDING` | `401` |  | own value (source not recorded) | `encode.rs` |
@@ -994,16 +1046,135 @@ Tuning numbers of the computer players (`classic/crates/classic-rules/src/ai`). 
 | `COUNT` | `7` |  | own value (source not recorded) | `encode.rs` |
 | `FIELDS` | `&[$(($label, Scale { num: $num, den: $den })),*]` |  | own value (source not recorded) | `encode.rs` |
 | `COUNT` | `Self::FIELDS.len()` |  | own value (source not recorded) | `encode.rs` |
+| `FORMAT_9_CANDIDATE_COLUMNS` | `C::MoveBlowCaptures as usize` | The candidate columns of a format-9 file: the format-10 columns (`C::MoveBlowCaptures` on) are appended after them, so a format-9 net reads the first `FORMAT_9_CANDIDATE_COLUMNS` of every row (`mind::layout_text_of`). | own value (source not recorded) | `encode.rs` |
 | `STANDARD` | `SpeedFacts { production_percent: 100, science_percent: 100, culture_percent: 100, faith...` |  | own value (source not recorded) | `encode.rs` |
 
 ### `espionage.rs`
 
-2 constants (own value (source not recorded) 2). Files: `classic/crates/classic-rules/src/ai/espionage.rs`.
+4 constants (own value (source not recorded) 4). Files: `classic/crates/classic-rules/src/ai/espionage.rs`.
 
 | Name | Value | Meaning | Source | File |
 |---|---|---|---|---|
 | `SLOW_THEFT_TURNS` | `50` | A theft slower than this is not worth the spy: it looks for another city. | own value (source not recorded) | `espionage.rs` |
 | `COUP_MIN_CHANCE` | `60` | Coups the AI tries (percent chance of success). | own value (source not recorded) | `espionage.rs` |
+| `GUARD_COUP_MIN_CHANCE` | `30` | Coups the vote guard tries on a rival's alliance (percent chance of success): a failure costs the spy (revived after `REVIVE_TURNS`) and 20 points of influence, a success takes the alliance whole (the spy's owner takes the ally's influence, the ally loses 20). | own value (source not recorded) | `espionage.rs` |
+| `GUARD_COUP_WINDOW` | `4` | Our turns (at Standard speed) before the session that holds the vote opens within which the guard stages its coups: late, so that the rival cannot buy the alliance back; the delegates are fixed when the session opens. | own value (source not recorded) | `espionage.rs` |
+
+### `events.rs`
+
+24 constants (own value (source not recorded) 24). Files: `classic/crates/classic-rules/src/ai/net_e2e/events.rs`.
+
+| Name | Value | Meaning | Source | File |
+|---|---|---|---|---|
+| `KEEP_ROUNDS` | `10` | Events older than this many rounds are forgotten (age 0 … 9). | own value (source not recorded) | `events.rs` |
+| `MAX_EVENTS` | `64` | At most this many events in a log (the newest). | own value (source not recorded) | `events.rs` |
+| `MAX_PER_KIND` | `8` | At most this many events of one kind in a log (the newest). | own value (source not recorded) | `events.rs` |
+| `WAR_BEGAN` | `0` | We are at war with a nation or city-state we were at peace with. | own value (source not recorded) | `events.rs` |
+| `PEACE_MADE` | `1` | A war of ours ended. | own value (source not recorded) | `events.rs` |
+| `MET` | `2` | We met a nation or city-state. | own value (source not recorded) | `events.rs` |
+| `ELIMINATED` | `3` | A nation or city-state we knew is gone. | own value (source not recorded) | `events.rs` |
+| `FRIENDSHIP` | `4` | A friendship began (value 1) or ended (−1). | own value (source not recorded) | `events.rs` |
+| `DEFENSIVE_PACT` | `5` | A defensive pact began (1) or ended (−1). | own value (source not recorded) | `events.rs` |
+| `DENOUNCED_US` | `6` | A nation denounced us. | own value (source not recorded) | `events.rs` |
+| `CITY_LOST` | `7` | A city of ours is no longer ours (taken, or razed). | own value (source not recorded) | `events.rs` |
+| `CITY_TAKEN` | `8` | We took a city (it was another player's). | own value (source not recorded) | `events.rs` |
+| `CITY_ATTACKED` | `9` | A city of ours was damaged. | own value (source not recorded) | `events.rs` |
+| `FOREIGN_CITY` | `10` | A foreign city we did not know: founded, or first seen. | own value (source not recorded) | `events.rs` |
+| `CITY_CHANGED_HANDS` | `11` | A foreign city we know changed hands between other players. | own value (source not recorded) | `events.rs` |
+| `UNIT_LOST` | `12` | A unit of ours is gone (not by founding a city or by an upgrade). | own value (source not recorded) | `events.rs` |
+| `UNITS_DAMAGED` | `13` | Units of ours were damaged (one event per turn). | own value (source not recorded) | `events.rs` |
+| `WONDER_ELSEWHERE` | `14` | A world wonder was completed by another player. | own value (source not recorded) | `events.rs` |
+| `RELIGION_FOUNDED` | `15` | Another player founded a religion. | own value (source not recorded) | `events.rs` |
+| `QUEST_GIVEN` | `16` | A city-state gave us a quest. | own value (source not recorded) | `events.rs` |
+| `QUEST_ENDED` | `17` | A quest of a city-state to us ended (done, or expired). | own value (source not recorded) | `events.rs` |
+| `ALLY_CHANGED` | `18` | A city-state's ally changed. | own value (source not recorded) | `events.rs` |
+| `ERA_REACHED` | `19` | A nation we know entered a later era. | own value (source not recorded) | `events.rs` |
+| `NAMES` | `[ "war_began", "peace_made", "met", "eliminated", "friendship", "defensive_pact", "deno...` |  | own value (source not recorded) | `events.rs` |
+
+### `features.rs`
+
+12 constants (own value (source not recorded) 12). Files: `classic/crates/classic-rules/src/ai/strategy_net/features.rs`.
+
+| Name | Value | Meaning | Source | File |
+|---|---|---|---|---|
+| `SURVEY_FEATURES` | `[CAP_FOOD, CAP_PROD, CAP_LUX, ROOM, SITES_FOOD, RIVAL_NEAR, RIVAL_KNOWN, RUINS, CARAVAN...` | The features the survey keeps, in this order. | own value (source not recorded) | `features.rs` |
+| `SURVEYED` | `16` |  | own value (source not recorded) | `features.rs` |
+| `BEST_TILES` | `12` | Tiles of the capital's best tiles the land is judged by (a city of about this size). | own value (source not recorded) | `features.rs` |
+| `ROOM_RADIUS` | `10` | The radius in which free sites are counted. | own value (source not recorded) | `features.rs` |
+| `SITE_SPACING` | `4` | Tiles between two sites. | own value (source not recorded) | `features.rs` |
+| `ROOM_SITES` | `6` | Sites counted at most. | own value (source not recorded) | `features.rs` |
+| `RIVAL_NEAR_FULL` | `7` | The nearest rival city's distance as the `RIVAL_NEAR` feature: 1 at `RIVAL_NEAR_FULL` tiles or closer (its cities' rings and ours meet on the sites between, three tiles each way and one between), 0 from `RIVAL_NEAR_NONE` (farther than an operation's reach, `planner_strategy::OBJECTIVE_RANGE`, by a city's ring) on, linear between. | own value (source not recorded) | `features.rs` |
+| `RIVAL_NEAR_NONE` | `18` |  | own value (source not recorded) | `features.rs` |
+| `RUINS_RADIUS` | `12` | The radius in which ruins near home are counted. | own value (source not recorded) | `features.rs` |
+| `CITY_STATE_NEAR` | `12` | The radius in which a city-state is near. | own value (source not recorded) | `features.rs` |
+| `BARBARIAN_NEAR` | `6` | Barbarian units this near a city press it. | own value (source not recorded) | `features.rs` |
+| `HOSTILE_NEAR` | `8` | Hostile units this near a city count against our force. | own value (source not recorded) | `features.rs` |
+
+### `field_craft.rs`
+
+3 constants (own value (source not recorded) 3). Files: `classic/crates/classic-rules/src/ai/field_craft.rs`.
+
+| Name | Value | Meaning | Source | File |
+|---|---|---|---|---|
+| `SORTIE_ROUNDS` | `3` | Rounds of walking a sortie looks ahead for prey: a trip that takes longer is the raid's (`raid::MAX_ARRIVAL_ROUNDS` is the raid's own limit, a war lasts a few rounds). | own value (source not recorded) | `field_craft.rs` |
+| `SORTIE_TRIES` | `8` | Prey tried a turn, nearest first: the way to one may not exist (the sea, a border) and the nearest few may all lie across it. | own value (source not recorded) | `field_craft.rs` |
+| `GUARD_MIN_HP` | `crate::ai::planner_units::HEAL_BELOW_HP` | Hit points a unit needs to count as a guard of a tile: below the health of the wounded (`planner_units::HEAL_BELOW_HP`) it is one more thing to capture. | own value (source not recorded) | `field_craft.rs` |
+
+### `fields.rs`
+
+40 constants (own value (source not recorded) 40). Files: `classic/crates/classic-rules/src/ai/unit_net/fields.rs`.
+
+| Name | Value | Meaning | Source | File |
+|---|---|---|---|---|
+| `PASSABLE` | `0` |  | own value (source not recorded) | `fields.rs` |
+| `MOVE_COST` | `1` |  | own value (source not recorded) | `fields.rs` |
+| `DEFENCE` | `2` |  | own value (source not recorded) | `fields.rs` |
+| `BLOCKS_SIGHT` | `3` |  | own value (source not recorded) | `fields.rs` |
+| `RIVER` | `4` |  | own value (source not recorded) | `fields.rs` |
+| `TERRITORY` | `5` |  | own value (source not recorded) | `fields.rs` |
+| `OURS` | `6` |  | own value (source not recorded) | `fields.rs` |
+| `OURS_RANGED` | `7` |  | own value (source not recorded) | `fields.rs` |
+| `THEIRS` | `8` |  | own value (source not recorded) | `fields.rs` |
+| `THEIRS_RANGED` | `9` |  | own value (source not recorded) | `fields.rs` |
+| `HIDDEN` | `10` |  | own value (source not recorded) | `fields.rs` |
+| `CITY` | `11` |  | own value (source not recorded) | `fields.rs` |
+| `OUR_REACH1` | `12` |  | own value (source not recorded) | `fields.rs` |
+| `OUR_REACH2` | `13` |  | own value (source not recorded) | `fields.rs` |
+| `THEIR_REACH1` | `14` |  | own value (source not recorded) | `fields.rs` |
+| `THEIR_REACH2` | `15` |  | own value (source not recorded) | `fields.rs` |
+| `ZOC` | `16` |  | own value (source not recorded) | `fields.rs` |
+| `DANGER` | `17` |  | own value (source not recorded) | `fields.rs` |
+| `SUPPORT` | `18` |  | own value (source not recorded) | `fields.rs` |
+| `FOCUS` | `19` |  | own value (source not recorded) | `fields.rs` |
+| `OP_TARGET` | `20` |  | own value (source not recorded) | `fields.rs` |
+| `TARGET_TURNS` | `21` |  | own value (source not recorded) | `fields.rs` |
+| `HEAL` | `22` |  | own value (source not recorded) | `fields.rs` |
+| `PILLAGE` | `23` |  | own value (source not recorded) | `fields.rs` |
+| `N` | `24` |  | own value (source not recorded) | `fields.rs` |
+| `OURS2` | `0` |  | own value (source not recorded) | `fields.rs` |
+| `THEIRS2` | `1` |  | own value (source not recorded) | `fields.rs` |
+| `BALANCE` | `2` |  | own value (source not recorded) | `fields.rs` |
+| `FRONT` | `3` |  | own value (source not recorded) | `fields.rs` |
+| `FRONT_ENEMY` | `4` |  | own value (source not recorded) | `fields.rs` |
+| `CHOKE` | `5` |  | own value (source not recorded) | `fields.rs` |
+| `GAP` | `6` |  | own value (source not recorded) | `fields.rs` |
+| `SIEGE` | `7` |  | own value (source not recorded) | `fields.rs` |
+| `CUT_OFF` | `8` |  | own value (source not recorded) | `fields.rs` |
+| `OUR_CUT` | `9` |  | own value (source not recorded) | `fields.rs` |
+| `SAFE2` | `10` |  | own value (source not recorded) | `fields.rs` |
+| `COHESION` | `11` |  | own value (source not recorded) | `fields.rs` |
+| `LONELY` | `12` |  | own value (source not recorded) | `fields.rs` |
+| `FLOW` | `13` |  | own value (source not recorded) | `fields.rs` |
+| `N` | `14` |  | own value (source not recorded) | `fields.rs` |
+
+### `fit.rs`
+
+2 constants (own value (source not recorded) 2). Files: `classic/crates/classic-rules/src/ai/unit_net/fit.rs`.
+
+| Name | Value | Meaning | Source | File |
+|---|---|---|---|---|
+| `HAND` | `Numbers { table: rows(), war: [weights::prices::POSTURES[3].kill, weights::prices::POST...` | The hand weights (`weights`): what `unit-net` and `hybrid` play. | own value (source not recorded) | `fit.rs` |
+| `FITTED` | `HAND` | The fitted numbers (`tactician-fit`); see the doc for the bank, the method and what moved. | own value (source not recorded) | `fit.rs` |
 
 ### `fleet.rs`
 
@@ -1084,6 +1255,26 @@ Tuning numbers of the computer players (`classic/crates/classic-rules/src/ai`). 
 | `CENTI_PER_POINT` | `6` | Hundredths of a score point one point of warmonger memory is worth: a nation that remembers 400 points (one strike) distrusts, denounces and will not make peace but for 24 points of compensation (own design, not tuned: a city of six citizens is about 100 points). | own value (source not recorded) | `infamy.rs` |
 | `WAR_BONUS_PERCENT` | `50` | The part of the price of peace that is a bonus for war, percent: the world forgives a war on an aggressor, it does not pay for it. | own value (source not recorded) | `infamy.rs` |
 
+### `landless.rs`
+
+5 constants (own design 1, own value (source not recorded) 4). Files: `classic/crates/classic-rules/src/ai/landless.rs`.
+
+| Name | Value | Meaning | Source | File |
+|---|---|---|---|---|
+| `TAKE_ROUNDS` | `5` | Rounds of siege within which a group takes a city to be a target. | own design | `landless.rs` |
+| `STRENGTH_MARGIN_PERCENT` | `125` | The margin on the city's strength when the war is not on yet, percent: walls and the buildings are not seen, so the estimate is raised before the group commits to a war it cannot call off. | own value (source not recorded) | `landless.rs` |
+| `LAST_UNIT_PRICE` | `24` | The price of the player's last unit in units of its own price: its death is elimination. | own value (source not recorded) | `landless.rs` |
+| `MAJOR_WAR_PRICE` | `1` | A war on a nation, in units of a unit's price: the nation's army hunts the player's units. | own value (source not recorded) | `landless.rs` |
+| `ASSUMED_POPULATION` | `2` |  | own value (source not recorded) | `landless.rs` |
+
+### `layers.rs`
+
+1 constants (own value (source not recorded) 1). Files: `classic/crates/classic-rules/src/ai/strategy_net/layers.rs`.
+
+| Name | Value | Meaning | Source | File |
+|---|---|---|---|---|
+| `ONE` | `1000` | 1.0 in thousandths. | own value (source not recorded) | `layers.rs` |
+
 ### `legal.rs`
 
 1 constants (own value (source not recorded) 1). Files: `classic/crates/classic-rules/src/ai/legal.rs`.
@@ -1094,7 +1285,7 @@ Tuning numbers of the computer players (`classic/crates/classic-rules/src/ai`). 
 
 ### `mind.rs`
 
-9 constants (own value (source not recorded) 9). Files: `classic/crates/classic-rules/src/ai/net_e2e/mind.rs`.
+10 constants (own value (source not recorded) 10). Files: `classic/crates/classic-rules/src/ai/net_e2e/mind.rs`.
 
 | Name | Value | Meaning | Source | File |
 |---|---|---|---|---|
@@ -1103,18 +1294,43 @@ Tuning numbers of the computer players (`classic/crates/classic-rules/src/ai`). 
 | `SIMD_ENV` | `"AURELIA_NET_SIMD"` | The environment variables of the forward pass's speed ([`Speed`]; none changes a value): `AURELIA_NET_SIMD=0` the portable loops instead of the aarch64 kernels, `AURELIA_NET_THREADS=N` threads for a turn's encoding (1), `AURELIA_NET_INCREMENTAL=0` every tile state recomputed every turn. | own value (source not recorded) | `mind.rs` |
 | `THREADS_ENV` | `"AURELIA_NET_THREADS"` |  | own value (source not recorded) | `mind.rs` |
 | `INCREMENTAL_ENV` | `"AURELIA_NET_INCREMENTAL"` |  | own value (source not recorded) | `mind.rs` |
+| `DEFER_ENV` | `"AURELIA_NET_DEFER"` | `AURELIA_NET_DEFER`: `off` the defer choice off whatever the weights file says (the A/B of a net with and without it); a number `B` (logits, may be negative or 0) the choice on with the bias `round(B × 256)` in place of the file's, also for a file without defer (whose tag row of the defer bucket is what its training left there). | own value (source not recorded) | `mind.rs` |
 | `DAGGER_ENV` | `"AURELIA_NET_DAGGER"` | The environment variable that records the net's games for DAgger: a directory; the bench writes a shard per game there (`aurelia-qa`), its labels the scripted mind's choices at the states the net visited. | own value (source not recorded) | `mind.rs` |
 | `HEADS_ENV` | `"AURELIA_NET_HEADS"` | The environment variable naming the decision heads the net plays (`AURELIA_NET_HEADS=unit,research`; the names of `encode::head::NAMES`; unset: every head the weights file has). | own value (source not recorded) | `mind.rs` |
 | `SCRIPTED_ENV` | `"AURELIA_NET_SCRIPTED"` | The environment variable naming the unit roles the scripted mind keeps (`AURELIA_NET_SCRIPTED=founder,builder`; [`ScriptedRoles::parse`]). | own value (source not recorded) | `mind.rs` |
 | `NAMES` | `["founder", "builder", "civilian", "naval", "military"]` |  | own value (source not recorded) | `mind.rs` |
 
-### `model.rs`
+### `mod.rs`
 
-14 constants (own value (source not recorded) 14). Files: `classic/crates/classic-rules/src/ai/net_e2e/model.rs`.
+17 constants (own value (source not recorded) 17). Files: `classic/crates/classic-rules/src/ai/books/mod.rs`, `classic/crates/classic-rules/src/ai/net_e2e/v2/mod.rs`, `classic/crates/classic-rules/src/ai/unciv/mod.rs`, `classic/crates/classic-rules/src/ai/unit_net/mod.rs`.
 
 | Name | Value | Meaning | Source | File |
 |---|---|---|---|---|
-| `FORMAT_VERSION` | `3` | The newest weights file version this reader knows: 3 carries the turn trace; a version-2 file (no trace) reads as before. | own value (source not recorded) | `model.rs` |
+| `MUSTER_PATIENCE` | `8` | Rounds (Standard speed) a muster waits for its stragglers before the army marches with half of it. | own value (source not recorded) | `mod.rs` |
+| `MUSTER_LIMIT` | `24` | Rounds (Standard speed) after which the army marches from wherever it stands: a muster point the walk at peace no longer reaches (borders grow) is reached at war. | own value (source not recorded) | `mod.rs` |
+| `ATTACK_ROUNDS` | `75` | Rounds (Standard speed) the attack lasts from its launch before the book hands the war to `standard`. | own value (source not recorded) | `mod.rs` |
+| `UNREACHABLE_TRIES` | `6` | Failed tries to find a land way to the target before the book gives the attack up (another landmass). | own value (source not recorded) | `mod.rs` |
+| `ASSAULT_GROUP` | `3` | The book presses the siege once this many members stand within `ASSAULT_RADIUS` of the target. | own value (source not recorded) | `mod.rs` |
+| `ASSAULT_RADIUS` | `6` |  | own value (source not recorded) | `mod.rs` |
+| `FOE_RADIUS` | `1` | An enemy unit this close to a marching member hands it to the front. | own value (source not recorded) | `mod.rs` |
+| `FIELD_HEAL_RADIUS` | `8` | A wounded member this close to the target heals there. | own value (source not recorded) | `mod.rs` |
+| `MELEE_KEEPS_HP` | `35` | A melee member strikes a worn city only when it keeps this much health. | own value (source not recorded) | `mod.rs` |
+| `MIN_ARMY` | `2` | The fewest units that form or re-form the attack's operation. | own value (source not recorded) | `mod.rs` |
+| `MUSTER_REACH` | `14` | The farthest a muster point may lie from its target. | own value (source not recorded) | `mod.rs` |
+| `WAYPOINT_RADIUS` | `8` | A long march's leg reaches this far; this many leg ends are tried. | own value (source not recorded) | `mod.rs` |
+| `WAYPOINT_TRIES` | `4` |  | own value (source not recorded) | `mod.rs` |
+| `PREFIX` | `"v2:"` | The prefix of a v2 weights spec (`v2:W.v2`). | own value (source not recorded) | `mod.rs` |
+| `UNCIV_RADIUS` | `9` | The local observation's radius of an Unciv decision: Unciv's threat queries look 4-6 tiles around the tiles a unit reaches. | own value (source not recorded) | `mod.rs` |
+| `CANDIDATE_LIMIT` | `24` | Candidate tiles a search tries before it gives up (each may cost a path search; Unciv walks lazy sequences with the same effect). | own value (source not recorded) | `mod.rs` |
+| `UNIT` | `ONE` | Kept for `ONE`'s import in the docs. | own value (source not recorded) | `mod.rs` |
+
+### `model.rs`
+
+16 constants (own value (source not recorded) 16). Files: `classic/crates/classic-rules/src/ai/net_e2e/model.rs`, `classic/crates/classic-rules/src/ai/strategy_net/model.rs`.
+
+| Name | Value | Meaning | Source | File |
+|---|---|---|---|---|
+| `FORMAT_VERSION` | `5` | The newest weights file version this reader knows: 5 carries the defer choice (format 9: `Config::defer` and its logit bias); 4 carries the event table (format 7) and, events on, the event cross-attention; 3 carries the turn trace; a version-2, 3 or 4 file reads as before (no defer). | own value (source not recorded) | `model.rs` |
 | `MIN_FORMAT_VERSION` | `2` | The oldest version it reads. | own value (source not recorded) | `model.rs` |
 | `ACT_BITS` | `8` | Fraction bits of the activations (Q8). | own value (source not recorded) | `model.rs` |
 | `INPUT_SHIFT` | `16` | Input normalisation: `x_q = round_shift(stored × mult, INPUT_SHIFT)`. | own value (source not recorded) | `model.rs` |
@@ -1127,7 +1343,9 @@ Tuning numbers of the computer players (`classic/crates/classic-rules/src/ai`). 
 | `HEAD_RESEARCH` | `1` |  | own value (source not recorded) | `model.rs` |
 | `HEAD_PRODUCTION` | `2` |  | own value (source not recorded) | `model.rs` |
 | `HEAD_POLICY` | `3` |  | own value (source not recorded) | `model.rs` |
+| `MAX_DEFER_BIAS` | `1 << 24` | The largest \|defer bias\| a weights file may carry (Q8): the biased logit stays far inside i32. | own value (source not recorded) | `model.rs` |
 | `PLAIN` | `Speed { simd: false, threads: 1, incremental: false }` | The portable loops on one thread, every tile recomputed: the reference the others are tested against. | own value (source not recorded) | `model.rs` |
+| `MAX_CONDITIONS` | `256` | Static conditions the model keeps at most (bits of a tile). | own value (source not recorded) | `model.rs` |
 
 ### `net.rs`
 
@@ -1140,7 +1358,7 @@ Tuning numbers of the computer players (`classic/crates/classic-rules/src/ai`). 
 
 ### `operations.rs`
 
-40 constants (own value (source not recorded) 40). Files: `classic/crates/classic-rules/src/ai/operations.rs`.
+51 constants (own value (source not recorded) 51). Files: `classic/crates/classic-rules/src/ai/operations.rs`.
 
 | Name | Value | Meaning | Source | File |
 |---|---|---|---|---|
@@ -1169,17 +1387,28 @@ Tuning numbers of the computer players (`classic/crates/classic-rules/src/ai`). 
 | `NONE` | `SiegeFixes { assault: false, garrison: false, close: false, chance: false, recover: fal...` |  | own value (source not recorded) | `operations.rs` |
 | `ALL` | `SiegeFixes { assault: true, garrison: true, close: true, chance: true, recover: true, l...` | The five fixes of the `siege` variant. | own value (source not recorded) | `operations.rs` |
 | `WAR_FIX` | `SiegeFixes { assault: true, garrison: true, close: true, chance: false, recover: true,...` | The fixes of `war-fix` (classic/docs/ai-war-fix.md): the `siege` five with the learned chance in place of the siege model's, the capture priced by the rules, and a siege worth its city. | own value (source not recorded) | `operations.rs` |
+| `OPEN` | `SiegeFixes { puppet: true, recovery: true, loss: true, yields: true, rank: true, ..Sieg...` | `war-open`'s (classic/docs/ai-war-open.md): `WAR_FIX` with the capture priced as the puppet the AI makes of it, its unrest for the rounds the empire takes to recover, its citizens yielding what the empire's do, and the army's loss as measured. | own value (source not recorded) | `operations.rs` |
+| `PAYS` | `SiegeFixes { pays: true, ..SiegeFixes::OPEN }` | `war-pays`' (classic/docs/ai-war-pays.md): `OPEN` with the loss measured on its own operations; `rival_percent` gives it a flat `RIVAL_PERCENT` (`rank` bought twice the captures in the head to head and no share: tuning offsets 200–209, paired +0.00, CI −1.35…+1.35). | own value (source not recorded) | `operations.rs` |
+| `READY_TURNS` | `2` | Turns the army may need to reach the ring after the declaration (`strike_ready`). | own value (source not recorded) | `operations.rs` |
 | `DECISIVE_FORM_LIMIT` | `2 * FORM_LIMIT` | Rounds the army of a capture that wins the game may take to form. | own value (source not recorded) | `operations.rs` |
 | `DECISIVE_RANGE` | `32` | The farthest a capture that wins the game may lie from our nearest city: rival capitals lie mostly 16–30 tiles from it on the duel suite, where `OBJECTIVE_RANGE` left three quarters of the known ones out of reach (classic/docs/ai-leaders.md "Capital search"); the route to the staging tile and the horizon still decide. | own value (source not recorded) | `operations.rs` |
+| `CURRENT_PERCENT` | `67` | The share of the best trainable kind's strength a unit needs to fill a place of the army, percent: two thirds. | own value (source not recorded) | `operations.rs` |
 | `PLAN_LIMIT` | `40` | A war plan waits at most this many rounds for its chest. | own value (source not recorded) | `operations.rs` |
 | `PLAN_KEEP_PERCENT` | `70` | A plan is dropped when its target is worth less than this share of its value at the choice, percent. | own value (source not recorded) | `operations.rs` |
 | `PLAN_SWITCH_PERCENT` | `130` | Another target replaces a plan only when worth this share of it. | own value (source not recorded) | `operations.rs` |
 | `SUCCESS_PERCENT` | `35` | Chance an operation takes its city, percent (step 3: of the operations that marched with their army, about a third took the city or forced it). | own value (source not recorded) | `operations.rs` |
 | `LOSS_PERCENT` | `50` | Share of the army an operation expects to lose, percent. | own value (source not recorded) | `operations.rs` |
+| `OPEN_LOSS_PERCENT` | `66` | The same, measured on `war-open`'s own operations (`SiegeFixes::loss`): the units its members lost from the operation's start to its end over the units it planned — 66 % in 638 operations of `war-open` (pace, Quick, seed offset 201; 124 % of those that marched, whose every unit on an assault of the target joins them, 15 % of those recalled or timed out before; `ai-war-ops`, classic/docs/ai-war-open.md). | own value (source not recorded) | `operations.rs` |
+| `PAYS_LOSS_PERCENT` | `67` | The same measured on `war-pays`'s own operations: 67.3 % of the need in 292 operations (pace, Quick, seeds 203001–204021 with `ai-war-ops`; 101 % of those that marched). | own value (source not recorded) | `operations.rs` |
 | `RIVAL_PERCENT` | `50` | Share of the city's points taken from the rival that counts for us, percent: the time victory compares our score with the best other one. | own value (source not recorded) | `operations.rs` |
-| `CHANCE_FEATURES` | `[ "power_share", "siege_model", "distance", "population", "guard_share", "at_war", "rou...` | What an operation's outcome is learned from, all known to the player when it plans (classic/docs/ai-war-fix.md "The capture chance"): integers, in this order. | own value (source not recorded) | `operations.rs` |
+| `CHANCE_N` | `15` | The features of the learned capture chance (`CHANCE_FEATURES`). | own value (source not recorded) | `operations.rs` |
+| `CHANCE_FEATURES` | `[ "power_share", "siege_model", "distance", "population", "guard_share", "at_war", "rou...` | What an operation's outcome is learned from, all known to the player when it plans (classic/docs/ai-war-fix.md "The capture chance", classic/docs/ai-war-open.md): integers, in this order; the last three are `war-open`'s (the game's AI weighs them 0). | own value (source not recorded) | `operations.rs` |
 | `CHANCE_INTERCEPT` | `-1657` | The learned capture chance's intercept and weights (logit in thousandths; a weight in millionths of the logit per unit of its feature), fitted by a logistic regression on the operations of bench games whose seeds the reported benches do not use (`ai-war-ops`, `tools/war_chance_fit.py`, classic/docs/ai-war-fix.md). | own value (source not recorded) | `operations.rs` |
-| `CHANCE_WEIGHTS` | `[-6986, 0, -61418, -53107, 1909, -990031, 0, 0, 0, -36668, 204117, 18862]` |  | own value (source not recorded) | `operations.rs` |
+| `CHANCE_WEIGHTS` | `[-6986, 0, -61418, -53107, 1909, -990031, 0, 0, 0, -36668, 204117, 18862, 0, 0, 0]` |  | own value (source not recorded) | `operations.rs` |
+| `OPEN_CHANCE_INTERCEPT` | `-1193` | The same model refitted on the operations of `war-open` (`TurnBrief::war_open`): its army is prepared by the posture and its wars open on an opportunity, so its operations are not the ones `CHANCE_WEIGHTS` were fitted on; the fit may use the three features the game's AI weighs 0. | own value (source not recorded) | `operations.rs` |
+| `OPEN_CHANCE_WEIGHTS` | `[-9830, 0, -66899, -65621, -8240, -689142, 0, 0, 0, -19137, 235035, -35079, -2122, 2780...` |  | own value (source not recorded) | `operations.rs` |
+| `ARMY_PER_CITY_TENTHS` | `26` | Army units a nation of these rules keeps a city, tenths: the AI's own army at a look for an operation is 14.35 units for 5.5 cities (classic/docs/ai-war-audit-current.md, `pace`). | own value (source not recorded) | `operations.rs` |
+| `MAX_TARGET_POPULATION` | `8` | The largest target `war-pays` starts an operation against, in citizens: a city of 9 or more held 8 % of the cases against 22–29 % for the smaller ones (it heals behind more walls and keeps a larger garrison). | own value (source not recorded) | `operations.rs` |
 | `STRIKE_SAFE_RADIUS` | `6` | Foreign military units this close to a city make its garrison needed. | own value (source not recorded) | `operations.rs` |
 | `STRIKE_LEND_ONE_IN` | `3` | The share of the cities that lend their garrison to a march: one city in this many. | own value (source not recorded) | `operations.rs` |
 | `JUMP_MIN_DISTANCE` | `3` | A paratrooper jumps when the way to the muster point is at least this long (a shorter one is walked in a round or two). | own value (source not recorded) | `operations.rs` |
@@ -1192,6 +1421,25 @@ Tuning numbers of the computer players (`classic/crates/classic-rules/src/ai`). 
 | Name | Value | Meaning | Source | File |
 |---|---|---|---|---|
 | `LAND_RADIUS` | `3` | Hex radius around a city whose tiles it can work. | own value (source not recorded) | `pantheon.rs` |
+
+### `parts.rs`
+
+2 constants (own value (source not recorded) 2). Files: `classic/crates/classic-rules/src/ai/unciv/parts.rs`.
+
+| Name | Value | Meaning | Source | File |
+|---|---|---|---|---|
+| `DRY_ENV` | `"AURELIA_UNCIV_DRY"` | Dev-only: a hybrid whose families decide but whose decisions are dropped (`standard` plays everything): the proof of the plumbing by result hash. | own value (source not recorded) | `parts.rs` |
+| `NONE` | `UncivParts { research: false, policies: false, settle: false, construction: false, work...` |  | own value (source not recorded) | `parts.rs` |
+
+### `personality.rs`
+
+3 constants (own value (source not recorded) 3). Files: `classic/crates/classic-rules/src/ai/unciv/personality.rs`.
+
+| Name | Value | Meaning | Source | File |
+|---|---|---|---|---|
+| `BRANCHES` | `["Tradition", "Liberty", "Honor", "Commerce", "Patronage", "Piety", "Rationalism", "Fre...` | The policy branches Unciv's priorities name, in the order of `UncivPersonality::priorities`. | own value (source not recorded) | `personality.rs` |
+| `TEMPLATE` | `UncivPersonality { leader: "Template", victory: Victory::Neutral, values: [5; 15], prio...` | Unciv's template: every value neutral. | own value (source not recorded) | `personality.rs` |
+| `LEADERS` | `&[ UncivPersonality { leader: "Ahmad al-Mansur", victory: Victory::Neutral, values: [6,...` | Unciv's leaders (Personalities.json), generated. | own value (source not recorded) | `personality.rs` |
 
 ### `plan.rs`
 
@@ -1213,6 +1461,16 @@ Tuning numbers of the computer players (`classic/crates/classic-rules/src/ai`). 
 | `MAX_GOES` | `4` | Positions (go or withdraw) a member keeps. | own value (source not recorded) | `plan_search.rs` |
 | `SWEEPS` | `2` | Sweeps of one-member improvements after the beam. | own value (source not recorded) | `plan_search.rs` |
 | `LETHAL_PERMILLE` | `360` | With the danger net, a member whose chance of death at its final tile is this or more (permille) falls under the lethal rule: the threshold of the net's best F1 on the validation rows (`ai-train-danger`'s report, 0.36). | own value (source not recorded) | `plan_search.rs` |
+
+### `planner.rs`
+
+3 constants (own value (source not recorded) 3). Files: `classic/crates/classic-rules/src/ai/planner.rs`.
+
+| Name | Value | Meaning | Source | File |
+|---|---|---|---|---|
+| `NONE` | `CallFixes { ready: false, ranged: false, melee: false, threat: false, call: false, wall...` |  | own value (source not recorded) | `planner.rs` |
+| `ALL` | `CallFixes { ready: true, ranged: true, melee: true, threat: true, call: true, walls: tr...` |  | own value (source not recorded) | `planner.rs` |
+| `DEFAULT` | `CallFixes { ready: false, ranged: true, melee: false, threat: false, call: true, walls:...` | What `siege-call` plays: the fixes that measured better on the tuning offsets 200-202 (300 solo pace games, `runs/ops`): ranged units first and the press call. | own value (source not recorded) | `planner.rs` |
 
 ### `planner_cities.rs`
 
@@ -1295,7 +1553,7 @@ Tuning numbers of the computer players (`classic/crates/classic-rules/src/ai`). 
 
 ### `planner_workers.rs`
 
-4 constants (own value (source not recorded) 4). Files: `classic/crates/classic-rules/src/ai/planner_workers.rs`.
+6 constants (own value (source not recorded) 6). Files: `classic/crates/classic-rules/src/ai/planner_workers.rs`.
 
 | Name | Value | Meaning | Source | File |
 |---|---|---|---|---|
@@ -1303,6 +1561,24 @@ Tuning numbers of the computer players (`classic/crates/classic-rules/src/ai`). 
 | `ROADS_FROM_ROUND` | `40` | Roads are built from this round on, with this much gold income (a round of a Standard game: another speed reads its round as the same share of its game, `SpeedValues::standard_round`). | own value (source not recorded) | `planner_workers.rs` |
 | `ROADS_MIN_INCOME` | `3` |  | own value (source not recorded) | `planner_workers.rs` |
 | `ROAD_CITY_RANGE` | `7` | Cities this close are joined by roads. | own value (source not recorded) | `planner_workers.rs` |
+| `NONE` | `WorkersFit { demand: false, park: false, flee: false, repair: false }` |  | own value (source not recorded) | `planner_workers.rs` |
+| `ALL` | `WorkersFit { demand: true, park: true, flee: true, repair: true }` |  | own value (source not recorded) | `planner_workers.rs` |
+
+### `plans.rs`
+
+9 constants (own value (source not recorded) 9). Files: `classic/crates/classic-rules/src/ai/books/plans.rs`.
+
+| Name | Value | Meaning | Source | File |
+|---|---|---|---|---|
+| `SIEGE_FORCE` | `55` |  | own value (source not recorded) | `plans.rs` |
+| `SIEGE_LAST` | `95` |  | own value (source not recorded) | `plans.rs` |
+| `ARCHER_FORCE` | `55` |  | own value (source not recorded) | `plans.rs` |
+| `ARCHER_LAST` | `95` |  | own value (source not recorded) | `plans.rs` |
+| `SWORD_FORCE` | `60` |  | own value (source not recorded) | `plans.rs` |
+| `SWORD_LAST` | `100` |  | own value (source not recorded) | `plans.rs` |
+| `UU_FORCE` | `130` |  | own value (source not recorded) | `plans.rs` |
+| `UU_LAST` | `175` |  | own value (source not recorded) | `plans.rs` |
+| `REX_LAST` | `130` |  | own value (source not recorded) | `plans.rs` |
 
 ### `policies.rs`
 
@@ -1356,6 +1632,17 @@ Tuning numbers of the computer players (`classic/crates/classic-rules/src/ai`). 
 | `LOSS_RISK_PERCENT` | `50` |  | own value (source not recorded) | `raid.rs` |
 | `WARMONGER_ERA_PERCENT` | `60` | Mid-game percent of the warmonger weight of a declaration of war (the rules scale it by the era, `systems::diplomacy`), for the price of a declaration at peace. | own value (source not recorded) | `raid.rs` |
 
+### `raid_war.rs`
+
+4 constants (own design 1, own value (source not recorded) 3). Files: `classic/crates/classic-rules/src/ai/raid_war.rs`.
+
+| Name | Value | Meaning | Source | File |
+|---|---|---|---|---|
+| `NEAR_TURNS` | `4` | A hostile fighter within this many of its turns of walking and striking is "near" a unit holding ground. | own value (source not recorded) | `raid_war.rs` |
+| `SORTIE_ROUNDS` | `5` | Rounds of its walking a free unit looks ahead for prey. | own design | `raid_war.rs` |
+| `WARD_DANGER_RADIUS` | `3` | A ward (a civilian or a ranged unit of ours beside the unit) is left exposed when a hostile fighter is this close to it: the distance at which the empire already sends an escort with a settler (`planner_units`). | own value (source not recorded) | `raid_war.rs` |
+| `CITY_RING` | `3` | Tiles around a city that are its own ground (the city's work radius): a unit farther from the city it is to garrison is not guarding it now. | own value (source not recorded) | `raid_war.rs` |
+
 ### `religion.rs`
 
 1 constants (own value (source not recorded) 1). Files: `classic/crates/classic-rules/src/ai/religion.rs`.
@@ -1363,6 +1650,33 @@ Tuning numbers of the computer players (`classic/crates/classic-rules/src/ai`). 
 | Name | Value | Meaning | Source | File |
 |---|---|---|---|---|
 | `MISSIONARIES_WANTED` | `2` | Missionaries an AI keeps out at most. | own value (source not recorded) | `religion.rs` |
+
+### `remote.rs`
+
+1 constants (own value (source not recorded) 1). Files: `classic/crates/classic-rules/src/ai/net_e2e/remote.rs`.
+
+| Name | Value | Meaning | Source | File |
+|---|---|---|---|---|
+| `PREFIX` | `"remote:"` | The prefix of a remote weights spec (`remote:SOCKET`). | own value (source not recorded) | `remote.rs` |
+
+### `retake.rs`
+
+1 constants (own value (source not recorded) 1). Files: `classic/crates/classic-rules/src/ai/retake.rs`.
+
+| Name | Value | Meaning | Source | File |
+|---|---|---|---|---|
+| `RETAKE_ROUNDS` | `2` | Rounds of strikes the units on the spot may take to bring the city to capture: this turn's and the next. | own value (source not recorded) | `retake.rs` |
+
+### `rival_model.rs`
+
+4 constants (own value (source not recorded) 4). Files: `classic/crates/classic-rules/src/ai/rival_model.rs`.
+
+| Name | Value | Meaning | Source | File |
+|---|---|---|---|---|
+| `MEASURES` | `Measure::ALL.len()` | The demographics rows, in `Measure::ALL`'s order. | own value (source not recorded) | `rival_model.rs` |
+| `SAMPLE_ROUNDS` | `5` | A sample of the book is taken every this many Standard rounds (× the speed's pace). | own value (source not recorded) | `rival_model.rs` |
+| `TREND_ROUNDS` | `30` | The trends (science, score) are read over this many Standard rounds (× the pace): six technologies of the early game, two or three of the late. | own value (source not recorded) | `rival_model.rs` |
+| `TREND_MIN_ROUNDS` | `15` | A trend needs a sample at least this many Standard rounds old (× the pace). | own value (source not recorded) | `rival_model.rs` |
 
 ### `roles.rs`
 
@@ -1392,7 +1706,7 @@ Tuning numbers of the computer players (`classic/crates/classic-rules/src/ai`). 
 
 ### `scouting.rs`
 
-17 constants (own value (source not recorded) 17). Files: `classic/crates/classic-rules/src/ai/scouting.rs`.
+19 constants (own value (source not recorded) 19). Files: `classic/crates/classic-rules/src/ai/scouting.rs`.
 
 | Name | Value | Meaning | Source | File |
 |---|---|---|---|---|
@@ -1413,6 +1727,8 @@ Tuning numbers of the computer players (`classic/crates/classic-rules/src/ai`). 
 | `SECOND_SCOUT_BELOW_PERCENT` | `40` |  | own value (source not recorded) | `scouting.rs` |
 | `RECON_FROM_ROUND` | `30` | The first recon unit is built from this round (before it the starting warrior explores and the capital builds workers and settlers: a scout at round 12 cost the empires a tenth of their first workers and a third of their luxury kinds at round 60, `aurelia-qa` `happiness_pace`). | own value (source not recorded) | `scouting.rs` |
 | `RECON_UNITS` | `1` | Recon units the empire builds for scouting. | own value (source not recorded) | `scouting.rs` |
+| `SCOUT_SHARE_PERCENT` | `33` | `scout-early` (`Variant::scout_early`): the share of the ruins near home a recon unit claims that the starting warrior would not (measured, classic/docs/ai-scouting.md «The opening»: the books, whose scout comes at round 3, claim 1.11 ruins by round 30 of a Quick game where `standard`'s warrior alone claims 0.76, about a third more). | own value (source not recorded) | `scouting.rs` |
+| `RUINS_RACE_ROUNDS` | `10` | `scout-early`: the Standard rounds the ruins near home stay unclaimed (the race with the neighbours' units); the scout's reach is its moves over them. | own value (source not recorded) | `scouting.rs` |
 
 ### `sea_work.rs`
 
@@ -1422,6 +1738,29 @@ Tuning numbers of the computer players (`classic/crates/classic-rules/src/ai`). 
 |---|---|---|---|---|
 | `SEA_JOB_ROUNDS` | `4` | Rounds a work boat takes to reach its deposit and finish the job. | own value (source not recorded) | `sea_work.rs` |
 
+### `sharp.rs`
+
+16 constants (own value (source not recorded) 16). Files: `classic/crates/classic-rules/src/ai/strategy_net/sharp.rs`.
+
+| Name | Value | Meaning | Source | File |
+|---|---|---|---|---|
+| `STYLE_TEMPERATURE` | `600` | The temperatures of the intent's softmaxes: the logits are divided by them (1000 is `standard`'s softmax). | own value (source not recorded) | `sharp.rs` |
+| `AIM_TEMPERATURE` | `600` |  | own value (source not recorded) | `sharp.rs` |
+| `POSTURE_TEMPERATURE` | `1000` | The posture's logits are already apart by thousands (a war is +3000): its own scale. | own value (source not recorded) | `sharp.rs` |
+| `PRICE_PICK` | `500` | The share of each table of the price layer's rows the held choice takes (its one-hot), the rest the shares: at `standard`'s blend a science aim at 52 % priced science as a half-hearted one (1.15–1.34 for every seat). | own value (source not recorded) | `sharp.rs` |
+| `SCIENCE_ROUNDS` | `2` | A technology of our era in this many rounds is the science feature's 1 (the era's mean cost at the game's speed over our beakers): it moves with the era instead of saturating at 1.5 beakers a citizen by round 66. | own value (source not recorded) | `sharp.rs` |
+| `PRODUCTION_ROUNDS` | `4` | A regular building of our era in this many rounds a city is the production feature's 1. | own value (source not recorded) | `sharp.rs` |
+| `CITIES_RATIO` | `4000` | The cities feature: ours over the rivals' known cities a nation, this ratio → 1 (level 0.25): the rivals' cities are known through the fog only, so ours were twice theirs in 44 % of the reviews at a ratio of 2 (tuning traces, step 4). | own value (source not recorded) | `sharp.rs` |
+| `PARTS_SHARE` | `200` | The share of the parts in the way to the spaceship (the technologies take the rest). | own value (source not recorded) | `sharp.rs` |
+| `TREND_SCALE` | `5000` | The score's trend: a change of our score over the best rival's by 1 (thousandths) moves the feature this much: 0.1 of the ratio is the half range. | own value (source not recorded) | `sharp.rs` |
+| `RUNAWAY_SCALE` | `2000` | A rival running away: its lead over the next best nation × this (50 % → 1). | own value (source not recorded) | `sharp.rs` |
+| `CONCEPTS` | `&[ (SCIENCE_LEAD, f(SCIENCE, 300, "the era's technologies at our beakers (the era-relat...` | Terms added to the concepts before their activation: (concept, term). | own value (source not recorded) | `sharp.rs` |
+| `STYLE` | `&[ (0, f(T_EXPANSION, -1500, "a leader who likes new cities does not stay small")), (0,...` | Terms added to the style logits: (style, term). | own value (source not recorded) | `sharp.rs` |
+| `TALL_BIAS` | `400` | The bias added to tall: the terms above sum to about −50 for a neutral leader on middling land; with this bias a third of the traced seats play tall (the replica on the step-4 traces: korea, india, germany, venice, the netherlands, sweden most), the expanders wide. | own value (source not recorded) | `sharp.rs` |
+| `AIM` | `&[ (0, f(SPACE_OWN, 600, "the spaceship within reach: the science victory is ours to fi...` | Terms added to the aim logits: (aim, term). | own value (source not recorded) | `sharp.rs` |
+| `HORIZON` | `&[(SPACE_RIVAL, -30, "a rival near the spaceship may end the game: plans pay sooner")]` | Terms of the horizon (Standard rounds per unit of the feature). | own value (source not recorded) | `sharp.rs` |
+| `STYLE_EVENTS` | `[SPACE_OWN, SPACE_RIVAL, SCORE_TREND, RUNAWAY]` | The features a locked style takes from the turn besides `weights::STYLE_EVENTS`: the memory keeps the lock's first `fe::BASE_N` features only, and these change with the race, not with the empire's growth. | own value (source not recorded) | `sharp.rs` |
+
 ### `siege_tactics.rs`
 
 2 constants (own value (source not recorded) 2). Files: `classic/crates/classic-rules/src/ai/siege_tactics.rs`.
@@ -1430,6 +1769,37 @@ Tuning numbers of the computer players (`classic/crates/classic-rules/src/ai`). 
 |---|---|---|---|---|
 | `NONE` | `SiegeTactics { ground: false, firing: false, outrange: false, fortify: false }` |  | own value (source not recorded) | `siege_tactics.rs` |
 | `ALL` | `SiegeTactics { ground: true, firing: true, outrange: true, fortify: true }` |  | own value (source not recorded) | `siege_tactics.rs` |
+
+### `siege_walls.rs`
+
+15 constants (own value (source not recorded) 15). Files: `classic/crates/classic-rules/src/ai/siege_walls.rs`.
+
+| Name | Value | Meaning | Source | File |
+|---|---|---|---|---|
+| `NONE` | `SiegeJoin { join: false, close: false, sight: false }` |  | own value (source not recorded) | `siege_walls.rs` |
+| `ALL` | `SiegeJoin { join: true, close: true, sight: true }` |  | own value (source not recorded) | `siege_walls.rs` |
+| `GROUP_MARGIN` | `3` | Members this many tiles beyond the ring make the city's siege group; the others are still on their way (they keep marching, `books::press`). | own value (source not recorded) | `siege_walls.rs` |
+| `STRIKE_WINDOW` | `8` | Rounds a strike is valued over: a siege unit that sets up fires in the second round, a city that survives a volley is struck again, a group whose volleys beat the healing wears the city down over several rounds (its losses counted every round). | own value (source not recorded) | `siege_walls.rs` |
+| `MAX_WAIT` | `8` | The longest wait on the ring that is weighed against striking now. | own value (source not recorded) | `siege_walls.rs` |
+| `TIME_ROUNDS` | `30` | The capture loses its whole value over this many Standard rounds of delay (the speed scales it): the time a capture saves. | own value (source not recorded) | `siege_walls.rs` |
+| `CLEAR_MARGIN` | `1.5` | A fortified city (its hit points above a city's base: walls) is besieged by an army without a shooter that outranges its strike only when its value a round beats the best other city's this many times: such a city is taken by units that bombard it without being hit, or not at all. | own value (source not recorded) | `siege_walls.rs` |
+| `SURE_CAPTURE` | `0.9` | A strike whose capture chance within `SOON_ROUNDS` is at least this is made now, whatever a wait promises. | own value (source not recorded) | `siege_walls.rs` |
+| `SOON_ROUNDS` | `3` | The rounds of a strike's start that count as "now": the step in, the volley, the blow. | own value (source not recorded) | `siege_walls.rs` |
+| `MIN_CAPTURE` | `0.25` | The least chance of a capture within the window that makes the group muster for it (below it the group fights as the front does). | own value (source not recorded) | `siege_walls.rs` |
+| `HEADER` | `"round,target,seen,city_hp,cap,pop,group,melee,ranged,siege,wounded,group_hp,awaited,aw...` |  | own value (source not recorded) | `siege_walls.rs` |
+| `NEVER` | `9999` | More rounds than any wait or siege lasts, in tenths. | own value (source not recorded) | `siege_walls.rs` |
+| `CALL` | `CallFit { press: NEVER - 1, withdraw: NEVER - 1 }` | Fitted on the bank (`runs/tactic-call-fit.py`, offsets 200-206 of `runs/bank`, 460 arrival positions, two reseeds each; held out 207-209, 196 positions). | own value (source not recorded) | `siege_walls.rs` |
+| `CALL_REINFORCE_ROUNDS` | `4` | Rounds a member on its way is waited for in the call's count of the group's lasting. | own value (source not recorded) | `siege_walls.rs` |
+| `ARRIVAL` | `ArrivalWeights { base: 0.095, early: 0.223, late: 11.268, turns: -0.504, engaged: -0.90...` | Fitted on bench games (classic/docs/ai-siege-walls.md "Arrival"): 36 504 predictions for members not in place in 400 Quick land duels of the four rushes and `siege-walls` against `standard` (seed offset 0), each against the first later round the member stood in place (it strikes that round or the next), if it did; checked on 36 715 of another 400 (offset 40): mean predicted 0.221, observed 0.227, Brier 0.128 against 0.175 for the base rate. | own value (source not recorded) | `siege_walls.rs` |
+
+### `sight.rs`
+
+2 constants (own value (source not recorded) 2). Files: `classic/crates/classic-rules/src/ai/unciv/sight.rs`.
+
+| Name | Value | Meaning | Source | File |
+|---|---|---|---|---|
+| `FULL_HP` | `100` | The full health of a unit (Unciv's 100). | own value (source not recorded) | `sight.rs` |
+| `CITY_BOMBARD_RANGE` | `2` | A city's bombard range (`City.getBombardRange`: 2 in the classic rules). | own value (source not recorded) | `sight.rs` |
 
 ### `site.rs`
 
@@ -1516,10 +1886,13 @@ Tuning numbers of the computer players (`classic/crates/classic-rules/src/ai`). 
 
 ### `tall.rs`
 
-8 constants (own value (source not recorded) 8). Files: `classic/crates/classic-rules/src/ai/tall.rs`.
+11 constants (own value (source not recorded) 11). Files: `classic/crates/classic-rules/src/ai/tall.rs`.
 
 | Name | Value | Meaning | Source | File |
 |---|---|---|---|---|
+| `FIRST` | `BookPlan { scout_first: false, tenets_first: false, filler: false }` | The first edition (`tall-book`): no scout, the culture waits, the science lens after the science branch. | own value (source not recorded) | `tall.rs` |
+| `SECOND` | `BookPlan { scout_first: true, tenets_first: true, filler: false }` |  | own value (source not recorded) | `tall.rs` |
+| `FILLER` | `BookPlan { scout_first: true, tenets_first: true, filler: true }` |  | own value (source not recorded) | `tall.rs` |
 | `MAX_CITIES` | `40` | Most cities the model looks at. | own value (source not recorded) | `tall.rs` |
 | `SITE_POINTS_PER_FOOD` | `3 * 3` | Site points of a food a turn on a worked tile (`planner_settle`'s land tile score: 3 a food; a tile of the worked rings counts 3 times). | own value (source not recorded) | `tall.rs` |
 | `BOOK_CITIES` | `4` | The book's cities: exactly four. | own value (source not recorded) | `tall.rs` |
@@ -1528,6 +1901,17 @@ Tuning numbers of the computer players (`classic/crates/classic-rules/src/ai`). 
 | `BOOK_OBSERVATORY` | `"core:building/observatory"` | The building whose site the book's cities look for (a mountain next to the city). | own value (source not recorded) | `tall.rs` |
 | `BOOK_BUILDINGS` | `["core:building/library", "core:building/university", "core:building/observatory", "cor...` | The book's science buildings, in the order each city builds them. | own value (source not recorded) | `tall.rs` |
 | `BOOK_MOUNTAIN_POINTS` | `300` | Site points of a site next to a mountain for the book: about ten turns of a settler's walk (`planner_settle::TRAVEL_COST`). | own value (source not recorded) | `tall.rs` |
+
+### `tall_real.rs`
+
+4 constants (own value (source not recorded) 4). Files: `classic/crates/classic-rules/src/ai/tall_real.rs`.
+
+| Name | Value | Meaning | Source | File |
+|---|---|---|---|---|
+| `EARLIEST_VICTORY_PERCENT` | `75` | No economy has won by science before this share of the speed's game (percent): the earliest victory of `tall-book-2`, the book that wins by science, came at round 249 of 330 at Quick and 405 of 500 at Standard (classic/docs/ai-science-audit.md; `victory-price` uses the same bound). | own value (source not recorded) | `tall_real.rs` |
+| `SCIENCE_GROWTH_POWER` | `2` | The science a turn grows as the round to this power: the seat-mean science of `standard` on the pace bench grew ×29 over ×5 rounds, a power of 2.1 (`victory-price`'s measure, reach/LOG.md). | own value (source not recorded) | `tall_real.rs` |
+| `CONTENT_FLOOR` | `crate::ai::value::HAPPINESS_COMFORT as i64` | Excess happiness the empire keeps after a new city and its first citizen: the allocator's comfort (`value::HAPPINESS_COMFORT`, below which growth stalls soon), so that the cities it has keep the headroom to grow; the science branch's opener adds its percent only while the empire is not unhappy (`SocietyStat::ScienceWhileHappyPercent`). | own value (source not recorded) | `tall_real.rs` |
+| `MAX_MORE` | `12` | At most this many new cities are looked at in a turn (a bound of the loop: the model's share test stops every seat of the tuning traces well before it). | own value (source not recorded) | `tall_real.rs` |
 
 ### `taste.rs`
 
@@ -1544,17 +1928,29 @@ Tuning numbers of the computer players (`classic/crates/classic-rules/src/ai`). 
 | `GOLD` | `Sides(1 << 4)` |  | own value (source not recorded) | `taste.rs` |
 | `FAITH` | `Sides(1 << 5)` |  | own value (source not recorded) | `taste.rs` |
 
+### `trace.rs`
+
+1 constants (own value (source not recorded) 1). Files: `classic/crates/classic-rules/src/ai/unit_net/trace.rs`.
+
+| Name | Value | Meaning | Source | File |
+|---|---|---|---|---|
+| `ENV` | `"AURELIA_UNIT_NET_TRACE"` | The environment variable that turns the trace on. | own value (source not recorded) | `trace.rs` |
+
 ### `trade.rs`
 
-1 constants (own value (source not recorded) 1). Files: `classic/crates/classic-rules/src/ai/trade.rs`.
+5 constants (own value (source not recorded) 5). Files: `classic/crates/classic-rules/src/ai/trade.rs`.
 
 | Name | Value | Meaning | Source | File |
 |---|---|---|---|---|
 | `TRADE_FROM_POPULATION` | `8` | Population of the largest city before the first trade unit. | own value (source not recorded) | `trade.rs` |
+| `HOSTILE_REACH` | `3` | Tiles from the straight way between a route's two cities within which a hostile military unit or a barbarian camp makes the route a risk (`HAZARD_LOSS_PERCENT`): the rules plunder a route whose unit meets an enemy combat unit on its path (`derived::trade::enemy_on`), and a unit of two moves a turn reaches the way within the route's first turns. | own value (source not recorded) | `trade.rs` |
+| `FOOD_PRICE_MIN_PERCENT` | `50` | Bounds of a destination's food price, percent of the empire's average one (`food_price_in`). | own value (source not recorded) | `trade.rs` |
+| `FOOD_PRICE_MAX_PERCENT` | `200` |  | own value (source not recorded) | `trade.rs` |
+| `HAZARD_LOSS_PERCENT` | `18` | Chance (percent) that a route with a hazard near its way is lost before its end, measured on `standard`'s routes (which ignore hazards; Quick, solo, 80 games, `ai-trade`): 17.5 % of the routes with a hazard at their start were lost on the standard suite, 18 % on the duel suite, against 1.5 % and 4 % without one (classic/docs/ai-trade.md). | own value (source not recorded) | `trade.rs` |
 
 ### `value.rs`
 
-16 constants (own value (source not recorded) 16). Files: `classic/crates/classic-rules/src/ai/value.rs`.
+17 constants (own value (source not recorded) 17). Files: `classic/crates/classic-rules/src/ai/value.rs`.
 
 | Name | Value | Meaning | Source | File |
 |---|---|---|---|---|
@@ -1562,6 +1958,7 @@ Tuning numbers of the computer players (`classic/crates/classic-rules/src/ai`). 
 | `HAPPINESS_COMFORT` | `6` | Excess happiness at which one more point stops being worth a citizen: below it growth stalls soon (−75 % food while unhappy). | own value (source not recorded) | `value.rs` |
 | `TILE_PRICE` | `75` | Gold a bought tile costs on average: an own estimate (Unciv's tile price, `CityExpansionManager.getGoldCostOfTile`, is 50 per ring beyond the first plus 5 per tile the city already claimed, scaled by game speed; ours is a flat mean). | own value (source not recorded) | `value.rs` |
 | `PROCESS_SHARE` | `25` | Share of production the Wealth and Research processes convert, percent. | own value (source not recorded) | `value.rs` |
+| `UNREST_RECOVERY_ROUNDS` | `120` | Standard rounds an empire takes to climb back over a mood line a captured city pushed it below (`Prices::kept_city_unrest_recovering`): after a puppet given at round 66 (Quick) the taker's excess happiness was −4.3 ten rounds later and −1.3 sixty rounds later (classic/docs/ai-conquest-payoff.md, the gift twins), about 80 Quick rounds to the line. | own value (source not recorded) | `value.rs` |
 | `FOUNDING_MARGIN` | `2` | Points of excess happiness a new city must leave over (`Prices::affords_city`). | own value (source not recorded) | `value.rs` |
 | `CRISIS_CITIZENS` | `6` | Citizens a point of happiness is worth at least at the very-unhappy line (`Outlook::crisis`): enough that a happiness building or a luxury beats sitting at the line unless the other choice gains a lot of score (bench, offsets 20–21: 4 left 32 % of the seats at or below the line at the end, 6 with `Prices::local_cap` 26 %, 8 28 %, 20 no fewer and less strength; classic/docs/ai-allocator.md). | own value (source not recorded) | `value.rs` |
 | `OPENING_CITIES` | `3` | The empire's first cities found the opening: their citizens count as the empire's growth (the food price), not against its happiness: a player founds them for their land. | own value (source not recorded) | `value.rs` |
@@ -1577,11 +1974,12 @@ Tuning numbers of the computer players (`classic/crates/classic-rules/src/ai`). 
 
 ### `variant.rs`
 
-1 constants (own value (source not recorded) 1). Files: `classic/crates/classic-rules/src/ai/variant.rs`.
+2 constants (own value (source not recorded) 2). Files: `classic/crates/classic-rules/src/ai/variant.rs`.
 
 | Name | Value | Meaning | Source | File |
 |---|---|---|---|---|
-| `ALL` | `[ Variant::Standard, Variant::PreTall, Variant::PreAbilities, Variant::PreWarFix, Varia...` | The game's AI first. | own value (source not recorded) | `variant.rs` |
+| `NET_BASE` | `Variant::PrePuppet` | The net's base: the expert the end-to-end net learns from and the mind it plays on top of. | own value (source not recorded) | `variant.rs` |
+| `ALL` | `[ Variant::Standard, Variant::PreCamps, Variant::PreWorkers, Variant::PreJoin, Variant:...` | The game's AI first. | own value (source not recorded) | `variant.rs` |
 
 ### `victory.rs`
 
@@ -1591,6 +1989,345 @@ Tuning numbers of the computer players (`classic/crates/classic-rules/src/ai`). 
 |---|---|---|---|---|
 | `STUCK_FACTOR` | `2` | A part waiting in a city is moved when another city finishes it in at most `1 / STUCK_FACTOR` of the turns it still needs where it is, and at least `STUCK_MIN_TURNS` sooner (own values: a move must be worth more than the noise of the estimate, and must not swing back the next turn; `STUCK_MIN_TURNS` is production turns at Standard speed, × the speed's pace). | own value | `victory.rs` |
 | `STUCK_MIN_TURNS` | `5` | (with `STUCK_FACTOR`) A part waiting in a city is moved when another city finishes it in at most `1 / STUCK_FACTOR` of the turns it still needs where it is, and at least `STUCK_MIN_TURNS` sooner (own values: a move must be worth more than the noise of the estimate, and must not swing back the next turn; `STUCK_MIN_TURNS` is production turns at Standard speed, × the speed's pace). | own value | `victory.rs` |
+
+### `weights.rs`
+
+313 constants (own value 2, own value (source not recorded) 311). Files: `classic/crates/classic-rules/src/ai/net_e2e/v2/weights.rs`, `classic/crates/classic-rules/src/ai/strategy_net/weights.rs`, `classic/crates/classic-rules/src/ai/unit_net/weights.rs`.
+
+| Name | Value | Meaning | Source | File |
+|---|---|---|---|---|
+| `CLIP` | `128.0` |  | own value (source not recorded) | `weights.rs` |
+| `N_BUCKETS` | `14` | Hex distance buckets (`model_v2._BUCKET_OF`, `N_BUCKETS`, `NO_POSITION`). | own value (source not recorded) | `weights.rs` |
+| `N_BUCKETS_PAD` | `16` | [`N_BUCKETS`] rounded up to whole vector blocks. | own value (source not recorded) | `weights.rs` |
+| `NO_POSITION` | `13` |  | own value (source not recorded) | `weights.rs` |
+| `CAP_FOOD` | `0` |  | own value (source not recorded) | `weights.rs` |
+| `CAP_PROD` | `1` |  | own value (source not recorded) | `weights.rs` |
+| `CAP_LUX` | `2` |  | own value (source not recorded) | `weights.rs` |
+| `ROOM` | `3` |  | own value (source not recorded) | `weights.rs` |
+| `SITES_FOOD` | `4` |  | own value (source not recorded) | `weights.rs` |
+| `RIVAL_NEAR` | `5` |  | own value (source not recorded) | `weights.rs` |
+| `RIVAL_KNOWN` | `6` |  | own value (source not recorded) | `weights.rs` |
+| `BARBS` | `7` |  | own value (source not recorded) | `weights.rs` |
+| `RUINS` | `8` |  | own value (source not recorded) | `weights.rs` |
+| `CARAVAN_FOOD` | `9` |  | own value (source not recorded) | `weights.rs` |
+| `CITY_STATES` | `10` |  | own value (source not recorded) | `weights.rs` |
+| `CS_NEAR` | `11` |  | own value (source not recorded) | `weights.rs` |
+| `COASTAL` | `12` |  | own value (source not recorded) | `weights.rs` |
+| `ERA` | `13` |  | own value (source not recorded) | `weights.rs` |
+| `PROGRESS` | `14` |  | own value (source not recorded) | `weights.rs` |
+| `CITIES` | `15` |  | own value (source not recorded) | `weights.rs` |
+| `CITIZENS` | `16` |  | own value (source not recorded) | `weights.rs` |
+| `SCIENCE` | `17` |  | own value (source not recorded) | `weights.rs` |
+| `PRODUCTION` | `18` |  | own value (source not recorded) | `weights.rs` |
+| `GOLD` | `19` |  | own value (source not recorded) | `weights.rs` |
+| `AT_WAR` | `20` |  | own value (source not recorded) | `weights.rs` |
+| `FORCE` | `21` |  | own value (source not recorded) | `weights.rs` |
+| `THREAT` | `22` |  | own value (source not recorded) | `weights.rs` |
+| `HAPPY` | `23` |  | own value (source not recorded) | `weights.rs` |
+| `UNHAPPY` | `24` |  | own value (source not recorded) | `weights.rs` |
+| `FAITH` | `25` |  | own value (source not recorded) | `weights.rs` |
+| `RELIGION` | `26` |  | own value (source not recorded) | `weights.rs` |
+| `TOURISM` | `27` |  | own value (source not recorded) | `weights.rs` |
+| `TECH_GAP` | `28` |  | own value (source not recorded) | `weights.rs` |
+| `TECH_LEAD` | `29` |  | own value (source not recorded) | `weights.rs` |
+| `SCORE_GAP` | `30` |  | own value (source not recorded) | `weights.rs` |
+| `WONDERS_TAKEN` | `31` |  | own value (source not recorded) | `weights.rs` |
+| `OUR_WONDERS` | `32` |  | own value (source not recorded) | `weights.rs` |
+| `RIVALS` | `33` |  | own value (source not recorded) | `weights.rs` |
+| `T_EXPANSION` | `34` |  | own value (source not recorded) | `weights.rs` |
+| `T_WONDERS` | `35` |  | own value (source not recorded) | `weights.rs` |
+| `T_SCIENCE` | `36` |  | own value (source not recorded) | `weights.rs` |
+| `T_CULTURE` | `37` |  | own value (source not recorded) | `weights.rs` |
+| `T_GOLD` | `38` |  | own value (source not recorded) | `weights.rs` |
+| `T_RELIGION` | `39` |  | own value (source not recorded) | `weights.rs` |
+| `T_AGGRESSION` | `40` |  | own value (source not recorded) | `weights.rs` |
+| `T_WAR_TOLERANCE` | `41` |  | own value (source not recorded) | `weights.rs` |
+| `T_DIPLOMACY` | `42` |  | own value (source not recorded) | `weights.rs` |
+| `UNIQUE_MILITARY` | `43` |  | own value (source not recorded) | `weights.rs` |
+| `IDEOLOGY` | `44` |  | own value (source not recorded) | `weights.rs` |
+| `ROUTES_LEFT` | `45` |  | own value (source not recorded) | `weights.rs` |
+| `OPPORTUNITY` | `46` | `war-open`'s features (`features::open`); 0 for every other variant. | own value (source not recorded) | `weights.rs` |
+| `OP_FORMING` | `47` |  | own value (source not recorded) | `weights.rs` |
+| `STRENGTH` | `48` |  | own value (source not recorded) | `weights.rs` |
+| `PAYS` | `49` |  | own value (source not recorded) | `weights.rs` |
+| `SPACE_OWN` | `50` | `sharp`'s features (`sharp::features`); 0 for every other variant. | own value (source not recorded) | `weights.rs` |
+| `SPACE_RIVAL` | `51` |  | own value (source not recorded) | `weights.rs` |
+| `SCORE_TREND` | `52` |  | own value (source not recorded) | `weights.rs` |
+| `RUNAWAY` | `53` |  | own value (source not recorded) | `weights.rs` |
+| `RIVAL_POPULATION` | `54` | The model of the rivals (`ai::rival_model`, `features::rivals`), every variant's: read by no neuron yet (`rival`: every weight 0), the inputs of the next step's training. | own value (source not recorded) | `weights.rs` |
+| `RIVAL_CROP` | `55` |  | own value (source not recorded) | `weights.rs` |
+| `RIVAL_GOODS` | `56` |  | own value (source not recorded) | `weights.rs` |
+| `RIVAL_GNP` | `57` |  | own value (source not recorded) | `weights.rs` |
+| `RIVAL_LITERACY` | `58` |  | own value (source not recorded) | `weights.rs` |
+| `RIVAL_LAND` | `59` |  | own value (source not recorded) | `weights.rs` |
+| `RIVAL_SOLDIERS` | `60` |  | own value (source not recorded) | `weights.rs` |
+| `RIVAL_SCIENCE` | `61` |  | own value (source not recorded) | `weights.rs` |
+| `RIVAL_SCORE_TREND` | `62` |  | own value (source not recorded) | `weights.rs` |
+| `RIVAL_DOUBT` | `63` |  | own value (source not recorded) | `weights.rs` |
+| `RIVAL_DOMINATION` | `64` |  | own value (source not recorded) | `weights.rs` |
+| `RIVAL_TREE` | `65` |  | own value (source not recorded) | `weights.rs` |
+| `RIVAL_CULTURE` | `66` |  | own value (source not recorded) | `weights.rs` |
+| `RIVAL_DIPLOMACY` | `67` |  | own value (source not recorded) | `weights.rs` |
+| `RIVAL_FIRST` | `RIVAL_POPULATION` | The first of them, in `Measure::ALL`'s order for the seven rows. | own value (source not recorded) | `weights.rs` |
+| `N` | `68` |  | own value (source not recorded) | `weights.rs` |
+| `BASE_N` | `46` | The features every variant's net reads: the memory keeps these of a style's lock (`Memory::encode`), `war-open`'s are events of the turn (`open::STYLE_EVENTS`). | own value (source not recorded) | `weights.rs` |
+| `FEATURES` | `[ ("cap_food", "mean food of the capital's 12 best tiles: 1.2 → 0, 3.0 → 1"), ("cap_pro...` | Each feature's name and scale (0 … 1). | own value (source not recorded) | `weights.rs` |
+| `GOOD_LAND` | `0` |  | own value (source not recorded) | `weights.rs` |
+| `ROOM_TO_EXPAND` | `1` |  | own value (source not recorded) | `weights.rs` |
+| `TALL_GROWTH` | `2` |  | own value (source not recorded) | `weights.rs` |
+| `DANGER` | `3` |  | own value (source not recorded) | `weights.rs` |
+| `WARLIKE` | `4` |  | own value (source not recorded) | `weights.rs` |
+| `EARLY` | `5` |  | own value (source not recorded) | `weights.rs` |
+| `STRIKE_WINDOW` | `6` |  | own value (source not recorded) | `weights.rs` |
+| `WONDER_CHANCE` | `7` |  | own value (source not recorded) | `weights.rs` |
+| `SCIENCE_LEAD` | `8` |  | own value (source not recorded) | `weights.rs` |
+| `CULTURE_PRESSURE` | `9` |  | own value (source not recorded) | `weights.rs` |
+| `HAPPINESS_CRISIS` | `10` |  | own value (source not recorded) | `weights.rs` |
+| `CITY_STATE_PLAY` | `11` |  | own value (source not recorded) | `weights.rs` |
+| `RELIGIOUS_PLAY` | `12` |  | own value (source not recorded) | `weights.rs` |
+| `N` | `13` |  | own value (source not recorded) | `weights.rs` |
+| `CONCEPTS` | `[ Neuron { name: "good_land", bias: -100, why: "a middling capital is not good land", a...` | The concept neurons: AND(a, b) is relu(a + b − 1), NOT a is a negative weight, a threshold is the bias; every concept is clamped to 0…1. | own value (source not recorded) | `weights.rs` |
+| `STYLES` | `["tall", "wide", "conquest"]` |  | own value (source not recorded) | `weights.rs` |
+| `AIMS` | `["science", "culture", "domination", "diplomacy"]` |  | own value (source not recorded) | `weights.rs` |
+| `POSTURES` | `["peace", "defence", "prepare", "war"]` |  | own value (source not recorded) | `weights.rs` |
+| `STYLE_TALL` | `0` | The choices the code names, by their index in `STYLES` and `AIMS` (the test `the_named_choices_are_their_names` reads them back). | own value (source not recorded) | `weights.rs` |
+| `AIM_SCIENCE` | `0` |  | own value (source not recorded) | `weights.rs` |
+| `AIM_DIPLOMACY` | `3` |  | own value (source not recorded) | `weights.rs` |
+| `STYLE` | `[ Neuron { name: "style_tall", bias: -200, why: "no tilt without a reason", act: Act::L...` |  | own value (source not recorded) | `weights.rs` |
+| `AIM` | `[ Neuron { name: "aim_science", bias: 300, why: "the science victory is the project's g...` |  | own value (source not recorded) | `weights.rs` |
+| `POSTURE` | `[ Neuron { name: "posture_peace", bias: 1000, why: "peace is the default", act: Act::Li...` |  | own value (source not recorded) | `weights.rs` |
+| `WINDOW` | `Neuron { name: "opportunity_window", bias: -2100, why: "AND(a war that pays, opportunit...` | TUNED, not derived: the bias and the term weights below were set by hand on the tuning seeds (offsets 200–201, classic/docs/ai-war-open.md); `war-pays` keeps them and makes `PAYS` a condition (`Net::pays`). | own value (source not recorded) | `weights.rs` |
+| `STYLE` | `&[ (2, f(OPPORTUNITY, 1000, "conquest: a target worth taking, in any era (the window ad...` | Terms added to the logits of the styles, the aims and the postures: (index, term). | own value (source not recorded) | `weights.rs` |
+| `AIM` | `&[(2, f(OPPORTUNITY, 600, "domination: the capitals come into reach when cities fall"))]` |  | own value (source not recorded) | `weights.rs` |
+| `POSTURE` | `&[ (2, f(OP_FORMING, 2000, "the war machine forms an operation: the posture prepares it...` |  | own value (source not recorded) | `weights.rs` |
+| `STYLE_EVENTS` | `[OPPORTUNITY, OP_FORMING, STRENGTH, PAYS]` | The features a locked style takes from the turn besides `STYLE_EVENTS`: an opportunity and the army's strength change with the neighbours, not with the empire's own growth. | own value (source not recorded) | `weights.rs` |
+| `AIM` | `&[ (0, f(RIVAL_TREE, 0, "science: a rival nearer the end of the tree (race it or turn t...` | Terms added to the aims' logits (science, culture, domination, diplomacy). | own value (source not recorded) | `weights.rs` |
+| `POSTURE` | `&[ (1, f(RIVAL_SOLDIERS, 0, "defence: a rival's army larger than ours")), (2, f(RIVAL_G...` | Terms added to the postures' logits (peace, defence, prepare, war). | own value (source not recorded) | `weights.rs` |
+| `HYSTERESIS` | `1150` | A choice of the intent changes only when the new one's share leads the held one's by more than this (thousandths: 15 %). | own value (source not recorded) | `weights.rs` |
+| `LOCK_MIN_ROUNDS` | `20` | The style is chosen once (classic/docs/ai-strategy-net.md, "The style lock"): it is locked when the first branch may be opened after the first survey of the surroundings (`LOCK_MIN_ROUNDS` Standard rounds), or at `LOCK_MAX_ROUNDS` at the latest. | own value (source not recorded) | `weights.rs` |
+| `LOCK_MAX_ROUNDS` | `40` |  | own value (source not recorded) | `weights.rs` |
+| `STYLE_LOCK` | `1500` |  | own value (source not recorded) | `weights.rs` |
+| `STYLE_EVENTS` | `[AT_WAR, THREAT, FORCE, UNHAPPY]` |  | own value (source not recorded) | `weights.rs` |
+| `SURVIVAL_THREAT` | `300` |  | own value (source not recorded) | `weights.rs` |
+| `SURVIVAL_DANGER` | `600` |  | own value (source not recorded) | `weights.rs` |
+| `CITY_ROWS` | `[ (500, 0, "tall takes the best few sites: half of the free ones (the book keeps four c...` | More cities by style: (per free site, base, why). | own value (source not recorded) | `weights.rs` |
+| `CITY_CRISIS` | `-6000` | Fewer new cities per unit of the happiness crisis. | own value (source not recorded) | `weights.rs` |
+| `CITY_DANGER` | `-1000` | Fewer new cities per unit of danger. | own value (source not recorded) | `weights.rs` |
+| `CITY_FLOOR` | `4` | The plan keeps at least this many cities while sites are free. | own value (source not recorded) | `weights.rs` |
+| `CITY_CEILING_WIDE` | `1000` | The ceiling of the city count: the rules' city model (`tall::city_target`: the count with the most science per research cost) plus this many per unit of the wide and the conquest shares (thousandths of a city). | own value (source not recorded) | `weights.rs` |
+| `CITY_CEILING_CONQUEST` | `500` |  | own value (source not recorded) | `weights.rs` |
+| `HORIZON_BASE` | `60` | The horizon H in Standard rounds: base and each term's weight (rounds per unit of a share or a concept). | own value (source not recorded) | `weights.rs` |
+| `HORIZON_TERMS` | `[ ("style_tall", 50, "tall play invests in growth that pays late"), ("aim_science", 30,...` |  | own value (source not recorded) | `weights.rs` |
+| `HORIZON_MIN` | `20` |  | own value (source not recorded) | `weights.rs` |
+| `HORIZON_MAX` | `150` |  | own value (source not recorded) | `weights.rs` |
+| `SCIENCE` | `0` |  | own value (source not recorded) | `weights.rs` |
+| `PRODUCTION` | `1` |  | own value (source not recorded) | `weights.rs` |
+| `GOLD` | `2` |  | own value (source not recorded) | `weights.rs` |
+| `CULTURE` | `3` |  | own value (source not recorded) | `weights.rs` |
+| `FAITH` | `4` |  | own value (source not recorded) | `weights.rs` |
+| `HAPPINESS` | `5` |  | own value (source not recorded) | `weights.rs` |
+| `MILITARY` | `6` |  | own value (source not recorded) | `weights.rs` |
+| `WONDER` | `7` |  | own value (source not recorded) | `weights.rs` |
+| `EXPANSION` | `8` |  | own value (source not recorded) | `weights.rs` |
+| `TRADE` | `9` |  | own value (source not recorded) | `weights.rs` |
+| `GREAT_PEOPLE` | `10` |  | own value (source not recorded) | `weights.rs` |
+| `TOURISM` | `11` |  | own value (source not recorded) | `weights.rs` |
+| `WORKER` | `12` |  | own value (source not recorded) | `weights.rs` |
+| `CITIZEN` | `13` |  | own value (source not recorded) | `weights.rs` |
+| `FOOD` | `14` |  | own value (source not recorded) | `weights.rs` |
+| `N` | `15` |  | own value (source not recorded) | `weights.rs` |
+| `PRICES` | `[ "science", "production", "gold", "culture", "faith", "happiness", "military", "wonder...` |  | own value (source not recorded) | `weights.rs` |
+| `ROWS` | `[ "style_tall", "style_wide", "style_conquest", "aim_science", "aim_culture", "aim_domi...` | The rows of the price layer: the intent's shares (3 styles, 4 aims, 4 postures) and the two gates (danger, happiness crisis). | own value (source not recorded) | `weights.rs` |
+| `PRICE_ROWS` | `{ use pd::*; &[ (0, SCIENCE, 500, "a tall empire turns its citizens into beakers"), (0,...` | (row, price, deviation from the allocator's price per unit of the row, why). | own value (source not recorded) | `weights.rs` |
+| `PRICE_GAIN` | `500` | The share of the written deviations a price takes (thousandths): the allocator's prices are already the score's, the intent tilts them (at the full deviations the net bought science buildings over food and gold and grew 21 % fewer citizens: dev bench, offsets 120–125). | own value (source not recorded) | `weights.rs` |
+| `PRICE_MIN` | `100` | The least and the most a multiplier may be (thousandths). | own value (source not recorded) | `weights.rs` |
+| `PRICE_MAX` | `6000` |  | own value (source not recorded) | `weights.rs` |
+| `FOOD_MIN` | `700` | The food price from the cell, as a multiplier of the allocator's, is kept within these bounds (thousandths). | own value (source not recorded) | `weights.rs` |
+| `FOOD_MAX` | `4000` |  | own value (source not recorded) | `weights.rs` |
+| `STEPS` | `10` | Coarse steps of the cell over the horizon H. | own value (source not recorded) | `weights.rs` |
+| `TILE_WEIGHTS` | `[3, 2, 1, 2, 1, 1]` | The weights a citizen's tile is chosen by (per unit of a yield): food, production, gold, science, culture, faith. | own value (source not recorded) | `weights.rs` |
+| `UNHAPPY_GROWTH` | `25` | The growth an unhappy empire keeps (percent): unhappy −75 %, very unhappy (−10) none (the rules' moods). | own value (source not recorded) | `weights.rs` |
+| `FED_SURPLUS` | `2` | Food a turn a city keeps above what it eats before its citizens prefer hammers and beakers to food. | own value (source not recorded) | `weights.rs` |
+| `VERY_UNHAPPY` | `-10` |  | own value (source not recorded) | `weights.rs` |
+| `PRODUCING_SHARE` | `30` | A production percent toward some items counts this share of the city's production when the planner has no share of its own. | own value (source not recorded) | `weights.rs` |
+| `GARRISON_SHARE` | `50` | A garrison is assumed in this share of the cities (a garrison condition counts this much). | own value (source not recorded) | `weights.rs` |
+| `CENTRE_FOOD` | `2` | The yields of a city centre are at least these (food, production). | own value (source not recorded) | `weights.rs` |
+| `CENTRE_PRODUCTION` | `1` |  | own value (source not recorded) | `weights.rs` |
+| `MAX` | `5` | Goals chosen at most, and at least while any is worth something. | own value (source not recorded) | `weights.rs` |
+| `MIN` | `3` |  | own value (source not recorded) | `weights.rs` |
+| `MAX_BUILDINGS` | `2` | Key buildings the plan holds beside those goals (they are cheap commitments the allocator makes anyway: they must not crowd out the wonders, branches and technologies). | own value (source not recorded) | `weights.rs` |
+| `STOP_SHARE` | `200` | A goal beyond the minimum stops the pointer when its rate is below this share of the first goal's rate (thousandths). | own value (source not recorded) | `weights.rs` |
+| `CANDIDATES` | `24` | Candidates the pointer keeps after a first screening by their value alone. | own value (source not recorded) | `weights.rs` |
+| `CHANCE_BASE` | `850` | A world wonder's chance to be ours (thousandths): base, per rival met in or past its era, per Standard round to get it, per unit of the wonder-chance concept, bounds. | own value (source not recorded) | `weights.rs` |
+| `CHANCE_PER_RIVAL` | `-120` |  | own value (source not recorded) | `weights.rs` |
+| `CHANCE_PER_ROUND` | `-8` |  | own value (source not recorded) | `weights.rs` |
+| `CHANCE_CONCEPT` | `200` |  | own value (source not recorded) | `weights.rs` |
+| `CHANCE_MIN` | `100` |  | own value (source not recorded) | `weights.rs` |
+| `CHANCE_MAX` | `950` |  | own value (source not recorded) | `weights.rs` |
+| `PROJECT_TECH_WONDERS` | `3` | A technology that opens a project (the spaceship's) is worth this many world wonders' points times the science aim's share. | own value (source not recorded) | `weights.rs` |
+| `REVIEW_ROUNDS` | `5` | The goals are reviewed every this many Standard rounds (and when a goal is lost, the cities change or a war starts or ends). | own value (source not recorded) | `weights.rs` |
+| `SURVEY_ROUNDS` | `10` | The land is surveyed again every this many Standard rounds. | own value (source not recorded) | `weights.rs` |
+| `TALL` | `0` | Few strong cities: growth, the capital, free buildings in the first cities, border growth. | own value (source not recorded) | `weights.rs` |
+| `WIDE` | `1` | Many cities: settlers, workers, per-city yields and happiness, the policy cost of a city. | own value (source not recorded) | `weights.rs` |
+| `WAR` | `2` | Fighting units: combat, promotions, experience, kills, generals. | own value (source not recorded) | `weights.rs` |
+| `DEFENCE` | `3` | The cities' defence: garrisons, city combat. | own value (source not recorded) | `weights.rs` |
+| `SCIENCE` | `4` |  | own value (source not recorded) | `weights.rs` |
+| `GOLD` | `5` |  | own value (source not recorded) | `weights.rs` |
+| `FAITH` | `6` |  | own value (source not recorded) | `weights.rs` |
+| `CULTURE` | `7` |  | own value (source not recorded) | `weights.rs` |
+| `DIPLOMACY` | `8` |  | own value (source not recorded) | `weights.rs` |
+| `N` | `9` |  | own value (source not recorded) | `weights.rs` |
+| `CHARACTERS` | `["tall", "wide", "war", "defence", "science", "gold", "faith", "culture", "diplomacy"]` |  | own value (source not recorded) | `weights.rs` |
+| `FIT` | `&[ (Style(0), TALL, 1500, "tall: the growth branch is the play of few strong cities"),...` | (input, character, weight per unit of the input and of the character's share, why). | own value (source not recorded) | `weights.rs` |
+| `FIT_MIN` | `100` | The bounds of the fit (thousandths). | own value (source not recorded) | `weights.rs` |
+| `FIT_MAX` | `4000` |  | own value (source not recorded) | `weights.rs` |
+| `WAR_GATE` | `true` | A branch whose largest character is war is opened and continued only in the war posture (the owner's play: "the war branch only at war"). | own value (source not recorded) | `weights.rs` |
+| `IDEOLOGY_FIT` | `2000` | The fit of the chosen ideology's tenets (it was chosen for the plan): on par with the style's branch, below the science branch. | own value (source not recorded) | `weights.rs` |
+| `TURNS_PAD` | `2` | Every head divides its score by (turns + TURNS_PAD). | own value (source not recorded) | `weights.rs` |
+| `BEELINE` | `5000` | Technologies: the share of a goal's worth carried back to each technology of its missing prerequisites (by the share of the path's cost the technology is), thousandths. | own value | `weights.rs` |
+| `SHARED_BONUS` | `300` | A technology on the paths of two or more goals: its goal value × (1 + this). | own value (source not recorded) | `weights.rs` |
+| `KEEP_MARGIN` | `1150` | The target technology is kept unless another leads its path by this much (thousandths: 15 %). | own value (source not recorded) | `weights.rs` |
+| `OPEN_MARGIN` | `1500` | Policies: a new branch is opened only when its step leads the best started branch's by this much (thousandths: 50 %), so a branch is finished first (its finisher, and the policy cost that grows with every adoption whatever the branch; traced games opened three branches at 10 %). | own value (source not recorded) | `weights.rs` |
+| `GOAL_BRANCH` | `500` | A goal branch's steps are worth this much more (thousandths). | own value (source not recorded) | `weights.rs` |
+| `VALUE_WEIGHT` | `500` | Policies: a branch is scored by its fit (`branch::FIT`) × (1 + this × its step's value in the cell over the best candidate's): the owner's play is the key, the cell breaks the near ties (the cell sees little of the growth and science branches: border growth, free buildings, a science percent while content, free technologies). | own value (source not recorded) | `weights.rs` |
+| `SWITCH_PRESSURE` | `600` | The ideology is switched at unrest (the rules force it at upheaval) when the culture-pressure concept is above this. | own value (source not recorded) | `weights.rs` |
+| `GOAL_ITEM` | `500` | Production: a goal's item takes this share of the goal's worth beside its own value (thousandths). | own value | `weights.rs` |
+| `MILITARY_RETURN` | `1000` | Production: a military unit returns this share of its hammers' worth at the military price's excess over the allocator's, while the army is short of what it sees (thousandths). | own value (source not recorded) | `weights.rs` |
+| `KIND_ROWS` | `&[ (0, 6, 150, "a tall capital races for wonders"), (0, 3, 150, "tall play feeds its ci...` | The own correction of the production head by kind of order (thousandths of the order's value), by style: (style, kind, value, why). | own value (source not recorded) | `weights.rs` |
+| `POINTS_PER_PERSON` | `100` | A great person point is worth a technology's score points over this many points (a great person is about a technology). | own value (source not recorded) | `weights.rs` |
+| `GOLDEN_AGE_PERCENT` | `20` | A golden age adds this percent of the empire's production and gold. | own value (source not recorded) | `weights.rs` |
+| `COMBAT_HAMMERS` | `20` | A combat effect (a promotion, a combat or unit stat) is worth this many hammers per city at the production price, scaled by the military price. | own value (source not recorded) | `weights.rs` |
+| `CITY_STATE_GOLD` | `1` | A city-state effect is worth this much gold a turn per city-state met, at the gold price. | own value (source not recorded) | `weights.rs` |
+| `TILE_GOLD_SHARE` | `30` | A cost cut of `p` % is worth p % of the yield it saves: border growth (culture), tile purchase (gold, this share of the income), the policy penalty of a city (culture × cities over this). | own value (source not recorded) | `weights.rs` |
+| `POLICY_PENALTY_CITIES` | `10` |  | own value (source not recorded) | `weights.rs` |
+| `TOURISM_ON_CULTURE` | `100` | A tourism percent counts on the empire's culture a turn. | own value (source not recorded) | `weights.rs` |
+| `UNKNOWN` | `0` | An effect the classifier has no model of is worth nothing. | own value (source not recorded) | `weights.rs` |
+| `RADIUS` | `5` | Tiles around every unit of a theatre the window covers: a unit's strike this turn and the next (2 rounds of a 2-move unit) and the convolutions' radius 2 beyond. | own value (source not recorded) | `weights.rs` |
+| `ENGAGE` | `9` | An own military unit within this many tiles of a hostile unit or city (or of its operation's target) is in a theatre. | own value (source not recorded) | `weights.rs` |
+| `CITY_REACH` | `4` | A hostile city this close is contact for any unit (its fire, an assault next turn); farther, only for an operation's member. | own value (source not recorded) | `weights.rs` |
+| `SIGHT` | `8` | The tiles the mind's sensor sees around a deciding unit of a theatre (`ClassicMind::sense_unit`): the whole theatre, so a fresh observation shows every member and every foe of it. | own value (source not recorded) | `weights.rs` |
+| `FORCE_DIV` | `100` | Strength × health is divided by this for the force channels: a unit of strength 20 at full health is 0.2 (the design's «/100»). | own value (source not recorded) | `weights.rs` |
+| `FOG_SHARE` | `120` | A tile in the fog near a hostile city or a foe seen holds this share of a typical enemy (`battlefield::FOG_PRIOR_PERCENT`, 12 %). | own value (source not recorded) | `weights.rs` |
+| `FOG_REACH` | `3` | The fog prior reaches this many tiles from a hostile city or foe. | own value (source not recorded) | `weights.rs` |
+| `HP_DIV` | `100` | Damage in hit points is divided by this for the danger, support and focus channels (the design's «/100»: a unit's whole health is 1.0). | own value (source not recorded) | `weights.rs` |
+| `HEAL_DIV` | `20` | Healing per turn is divided by this (the design's «/20 hp»). | own value (source not recorded) | `weights.rs` |
+| `PILLAGE` | `1000` | The value of a pillage on a hostile improvement (the design's «/10»): 1.0, the improvement's cost to its owner and our unit's heal of 25. | own value (source not recorded) | `weights.rs` |
+| `SECOND_TURN_SLACK` | `1` | The 2-turn reach is the 1-turn reach widened by the unit's moves less one tile (a road or rough ground costs some of the second turn). | own value (source not recorded) | `weights.rs` |
+| `CITY_FULL_HP` | `200` | A city's full health when the player does not know it (the rules' base, `CITY_BASE_HIT_POINTS`); ch11 is health / this. | own value (source not recorded) | `weights.rs` |
+| `COST_DIV` | `3` | The movement cost channel: a tile costing 3 moves is 1.0. | own value (source not recorded) | `weights.rs` |
+| `DEFENCE_DIV` | `50` | The defence channel: a bonus of 50 % is 1.0. | own value (source not recorded) | `weights.rs` |
+| `CHANNELS` | `24` | Unused here; the count of the channels. | own value (source not recorded) | `weights.rs` |
+| `MAPS` | `14` |  | own value (source not recorded) | `weights.rs` |
+| `CHANNEL_NAMES` | `[ "passable", "move_cost", "defence", "blocks_sight", "river", "territory", "ours", "ou...` | Kept for the page: the design's 24 channels by name. | own value (source not recorded) | `weights.rs` |
+| `MAP_NAMES` | `["ours2", "theirs2", "balance", "front", "front_enemy", "choke", "gap", "siege", "cut_o...` |  | own value (source not recorded) | `weights.rs` |
+| `DENSITY_CENTRE` | `1000` | V1: the centre of the density kernel: the force on the tile itself. | own value (source not recorded) | `weights.rs` |
+| `DENSITY_NEIGHBOUR` | `500` | V1: a neighbour's force counts half: it can come, but not at once. | own value (source not recorded) | `weights.rs` |
+| `DENSITY_DIV` | `4` | V1: two passes (radius 2 ≈ a turn's strike) and divided by 4, so a lone unit's own tile reads about its own force. | own value (source not recorded) | `weights.rs` |
+| `BALANCE_GAIN` | `2000` | V1: balance = tanh(2 · (ours2 − theirs2)): a lead of 0.5 (a full strength-25 unit more nearby) is 0.76, almost sure. | own value (source not recorded) | `weights.rs` |
+| `FRONT_GAIN` | `4000` | V2: the front = σ(4 · min(our force near, their reach and zone of control near) − 0.5): both sides touch the tile. | own value (source not recorded) | `weights.rs` |
+| `FRONT_BIAS` | `500` |  | own value (source not recorded) | `weights.rs` |
+| `CHOKE_OPEN` | `3500` | V3: a choke has at most 3 open neighbours: σ((3.5 − open) · 2). | own value (source not recorded) | `weights.rs` |
+| `CHOKE_OPEN_GAIN` | `2000` |  | own value (source not recorded) | `weights.rs` |
+| `CHOKE_FLOW` | `200` | V3: and the enemy's 2-turn reach flows through it: σ((flow − 0.2) · 8) (flow = the share of its neighbours they reach). | own value (source not recorded) | `weights.rs` |
+| `CHOKE_FLOW_GAIN` | `8000` |  | own value (source not recorded) | `weights.rs` |
+| `SIEGE_RING` | `2000` | V4: a siege forms with 2 or more of ours at the walls: σ(ring − 2). | own value (source not recorded) | `weights.rs` |
+| `SIEGE_FIRE_BIAS` | `200` | V4: and the fire nearly enough: σ((focus + 0.2) · 5), focus = (our summed blows − its health) / 100. | own value (source not recorded) | `weights.rs` |
+| `SIEGE_FIRE_GAIN` | `5000` |  | own value (source not recorded) | `weights.rs` |
+| `CUT_ALLIES` | `1000` | V5: a foe is cut off with no ally next to it: σ((1 − allies) · 3) … | own value (source not recorded) | `weights.rs` |
+| `CUT_GAIN` | `3000` |  | own value (source not recorded) | `weights.rs` |
+| `CUT_OURS` | `1500` | V5: … and 2 or more of ours next to it: σ((ours − 1.5) · 3). | own value (source not recorded) | `weights.rs` |
+| `SAFE_DANGER` | `100` | V6: safe where the danger is under 0.1 of a unit's health: 1 − σ((danger − 0.1) · 10). | own value (source not recorded) | `weights.rs` |
+| `SAFE_GAIN` | `10000` |  | own value (source not recorded) | `weights.rs` |
+| `SAFE_HEAL_BASE` | `500` | V6: (0.5 + heal): a safe tile is worth half without healing. | own value (source not recorded) | `weights.rs` |
+| `SAFE_SPREAD` | `800` | V6: the rear spreads one step losing 20 %. | own value (source not recorded) | `weights.rs` |
+| `COHESION_NEIGHBOUR` | `600` | V7: a group member's neighbours count 0.6 (two passes, radius 2) … | own value (source not recorded) | `weights.rs` |
+| `COHESION_DIV` | `5` | V7: … divided by 5: a tile with four members around reads about 1. | own value (source not recorded) | `weights.rs` |
+| `LONELY_AT` | `500` | V7: lonely = σ((0.5 − cohesion) · 4). | own value (source not recorded) | `weights.rs` |
+| `LONELY_GAIN` | `4000` |  | own value (source not recorded) | `weights.rs` |
+| `WOUNDED_AT` | `500` | Wounded: σ((0.5 − hp) / 0.1): below half health a unit's behaviour changes. | own value (source not recorded) | `weights.rs` |
+| `WOUNDED_WIDTH` | `100` |  | own value (source not recorded) | `weights.rs` |
+| `FIRE_AT` | `800` | Under fire: σ((D_u / hp − 0.8) / 0.1): the enemy may take 80 % of what is left. | own value (source not recorded) | `weights.rs` |
+| `FIRE_WIDTH` | `100` |  | own value (source not recorded) | `weights.rs` |
+| `CAPTURER_AT` | `-100` | Capturer: a melee unit at a city that is about to fall: σ((focus(g) + 0.1) / 0.05). | own value (source not recorded) | `weights.rs` |
+| `CAPTURER_WIDTH` | `50` |  | own value (source not recorded) | `weights.rs` |
+| `KILL_CUT` | `500` | m2: a kill of a cut-off foe is worth half more (V5). | own value (source not recorded) | `weights.rs` |
+| `SURVIVE_AT` | `500` | m4: danger above half the unit's health starts to cost. | own value (source not recorded) | `weights.rs` |
+| `DOOM` | `10_000` | m4: ending the turn where the danger reaches the unit's health costs 10, unless the move takes a city or kills (the rule of the design). | own value (source not recorded) | `weights.rs` |
+| `TOWARD` | `1000` | m5: a turn closer to the target is worth 1.0. | own value (source not recorded) | `weights.rs` |
+| `LONELY` | `500` | m6: cohesion − 0.5 · lonely. | own value (source not recorded) | `weights.rs` |
+| `FIRE_SAFE_AT` | `500` | m8: a firing position loses its worth as the danger there passes half the unit's health: 1 − σ((D_u − 0.5·hp) / 10 hp). | own value (source not recorded) | `weights.rs` |
+| `FIRE_SAFE_WIDTH_HP` | `10` |  | own value (source not recorded) | `weights.rs` |
+| `DEFER` | `2000` | m11: deferring a capturer while others still shoot is worth 2. | own value (source not recorded) | `weights.rs` |
+| `PILLAGE_BASE` | `500` | m12: a pillage is worth (0.5 + wounded) of its value: a wounded unit heals by it. | own value (source not recorded) | `weights.rs` |
+| `COVER` | `1000` | m13: a melee unit covering a weak ally: the blows it keeps off, in the ally's health, times the unit price. | own value (source not recorded) | `weights.rs` |
+| `ASSIGNED` | `2500` | m14 (TurnPlan): a candidate that executes the commander's assignment for the unit is worth 2.5 — more than a kill elsewhere (m2 in war: 1.5 · 1.5), less than the doom rule (10): the plan leads, safety overrides. | own value (source not recorded) | `weights.rs` |
+| `ASSIGNED_STEP` | `800` | A move toward the assigned strike's tile that keeps the strike for this turn is worth this share of the assignment. | own value (source not recorded) | `weights.rs` |
+| `MOTIVES` | `["take", "kill", "damage", "survive", "toward", "formation", "wall", "fire", "choke", "...` | The motives' names in order (m1…m13). | own value (source not recorded) | `weights.rs` |
+| `MELEE_GATHER` | `0` |  | own value (source not recorded) | `weights.rs` |
+| `MELEE_APPROACH` | `1` |  | own value (source not recorded) | `weights.rs` |
+| `MELEE_ASSAULT` | `2` |  | own value (source not recorded) | `weights.rs` |
+| `RANGED_ASSAULT` | `3` |  | own value (source not recorded) | `weights.rs` |
+| `MOUNTED_ASSAULT` | `4` |  | own value (source not recorded) | `weights.rs` |
+| `WOUNDED` | `5` |  | own value (source not recorded) | `weights.rs` |
+| `DEFENCE` | `6` |  | own value (source not recorded) | `weights.rs` |
+| `RETREAT` | `7` |  | own value (source not recorded) | `weights.rs` |
+| `CIVILIAN` | `8` |  | own value (source not recorded) | `weights.rs` |
+| `RANGED_GATHER` | `9` |  | own value (source not recorded) | `weights.rs` |
+| `RANGED_APPROACH` | `10` |  | own value (source not recorded) | `weights.rs` |
+| `MOUNTED_GATHER` | `11` |  | own value (source not recorded) | `weights.rs` |
+| `MOUNTED_APPROACH` | `12` |  | own value (source not recorded) | `weights.rs` |
+| `TABLE` | `[ Row { name: "melee · gather", w: [0, 500, 200, 2000, 500, 1500, 0, 0, 500, 500, 0, 0,...` | The output layer (design section 5): the motives' weights by role and phase. | own value (source not recorded) | `weights.rs` |
+| `POSTURES` | `[ PostureRow { name: "peace", kill: 1000, city: 3000, damage: 100, unit: 2000, risk: 15...` | By posture: peace, defence, prepare, war (`strategy_net::weights::POSTURES`). | own value (source not recorded) | `weights.rs` |
+| `CITY_BASE_HAMMERS` | `150` | A city's worth in hammers for the values (V): its buildings and land (base) and each citizen. | own value (source not recorded) | `weights.rs` |
+| `CITY_HAMMERS_PER_POP` | `50` |  | own value (source not recorded) | `weights.rs` |
+| `HAMMERS_PER_POINT` | `100` | Hammers per value point: V is in hundreds of hammers (a 100-hammer unit is 1.0). | own value (source not recorded) | `weights.rs` |
+| `WOUND_SHARE` | `500` | A wound removes half the threat in proportion: f = P·V + (1 − P) · 0.5 · V · d / hp. | own value (source not recorded) | `weights.rs` |
+| `NEAR_CERTAIN` | `900` | Fire stops being added to a target once its kill chance reaches this: the next shooter is kept in reserve (for the fast update after a miss, or for another target). | own value (source not recorded) | `weights.rs` |
+| `REPLY_ROUNDS` | `2` | The reply check runs twice, its changes damped 0.5 then 0.25. | own value (source not recorded) | `weights.rs` |
+| `REPLY_DAMPING` | `[500, 250]` |  | own value (source not recorded) | `weights.rs` |
+| `DEATH_PENALTY` | `1000` | A unit whose gain is less than its price times its chance to die gets this penalty share of its value on that variant. | own value (source not recorded) | `weights.rs` |
+| `WAR_WEIGHT` | `1000` | Players' danger weights by relation: at war 1, others 0 (peace keeps their units off ours), a war on a third × 0.5. | own value (source not recorded) | `weights.rs` |
+| `BUSY_WEIGHT` | `500` |  | own value (source not recorded) | `weights.rs` |
+| `CIVILIAN_DANGER` | `3000` | A civilian's danger counts three times (design 5d): it cannot fight back. | own value (source not recorded) | `weights.rs` |
+| `STRIKE_TILES` | `4` | Most strike candidates the allocation keeps per unit (its best tiles). | own value (source not recorded) | `weights.rs` |
+| `SPREAD_PERCENT` | `33` | The spread of a blow around its expected damage when the preview gives none (a shot of 30 lands 20–40). | own value (source not recorded) | `weights.rs` |
+| `MAX_OPS` | `8` | Most operations at once. | own value (source not recorded) | `weights.rs` |
+| `READY_TURNS` | `2` | Members within this many turns of the target count for readiness. | own value (source not recorded) | `weights.rs` |
+| `READY` | `1000` | Readiness r ≥ 1 moves the group from gathering to the approach. | own value (source not recorded) | `weights.rs` |
+| `GATHER_DEADLINE` | `10` | After this many rounds of gathering the group sets out anyway. | own value (source not recorded) | `weights.rs` |
+| `ASSAULT_TURNS` | `2` | Within this many turns of the target the approach is an assault. | own value (source not recorded) | `weights.rs` |
+| `TAKE_AT` | `1200` | P(take) = σ((ρ − 1.2) / 0.2): an edge of 1.2 in the Lanchester ratio is even. | own value (source not recorded) | `weights.rs` |
+| `TAKE_WIDTH` | `200` |  | own value (source not recorded) | `weights.rs` |
+| `WAIT_COST` | `300` | Waiting a turn costs 0.3 of a city's price. | own value (source not recorded) | `weights.rs` |
+| `RETREAT_RATIO` | `1500` | The assault turns to retreat when the losses pass 1.5 × the gain. | own value (source not recorded) | `weights.rs` |
+| `HYSTERESIS` | `1150` | A change of option needs a lead of 15 %. | own value (source not recorded) | `weights.rs` |
+| `LEAD` | `2` | Approaching out of contact, a member more than this many tiles ahead of the group's median waits (no trickle into the enemy's reach). | own value (source not recorded) | `weights.rs` |
+| `RETREAT_ROUNDS` | `4` | Most rounds a retreat lasts before the operation ends. | own value (source not recorded) | `weights.rs` |
+| `DEFEND_AT` | `300` | A defence operation for a city whose danger is at least this share of its defenders' health. | own value (source not recorded) | `weights.rs` |
+| `DEFEND_RADIUS` | `6` | Members of a defence operation come from this many tiles. | own value (source not recorded) | `weights.rs` |
+| `CITY_DEFENCE_PERCENT` | `25` | The city's defence bonus in N, percent. | own value (source not recorded) | `weights.rs` |
+| `MAX_SIEGE_TURNS` | `8` | The most turns to take a city the losses are counted over. | own value (source not recorded) | `weights.rs` |
+| `ORDER_SHORT` | `800` | Orders: a defence operation short of this share of the threat's force orders a defender. | own value (source not recorded) | `weights.rs` |
+| `ORDER_VALUE` | `600` | An order's value per hammer of the threatened city's worth at risk. | own value (source not recorded) | `weights.rs` |
+
+### `wonder_chance.rs`
+
+4 constants (own value (source not recorded) 4). Files: `classic/crates/classic-rules/src/ai/wonder_chance.rs`.
+
+| Name | Value | Meaning | Source | File |
+|---|---|---|---|---|
+| `TURNS` | `[6, 10, 14, 19, 25, 32, 42, 1000000]` | Upper bound (inclusive) of each row, in turns at Standard speed. | own value (source not recorded) | `wonder_chance.rs` |
+| `POPULATION` | `[0, 3, 7, 1000000]` | Upper bound (inclusive) of each column, in citizens of the largest sighted rival city (0: none sighted). | own value (source not recorded) | `wonder_chance.rs` |
+| `FITTED_AGE` | `15` | Age widening, rounds per citizen. | own value (source not recorded) | `wonder_chance.rs` |
+| `CHANCE` | `[ [[80, 80, 80, 80], [80, 76, 68, 68], [80, 76, 68, 68]], [[66, 66, 66, 66], [66, 66, 5...` | By turns row, then the seat's place (1, 2, 3 or worse), then the rival's size column. | own value (source not recorded) | `wonder_chance.rs` |
+
+### `wonder_race.rs`
+
+1 constants (own value (source not recorded) 1). Files: `classic/crates/classic-rules/src/ai/wonder_race.rs`.
+
+| Name | Value | Meaning | Source | File |
+|---|---|---|---|---|
+| `AGE_ROUNDS_PER_CITIZEN` | `crate::ai::wonder_chance::FITTED_AGE` | A sighted city is taken to have grown by a citizen in this many rounds since it was seen (the sighting's age widens the estimate of the rival's production; fitted with the table: the step where the won rate of the orders by the sighted population is the same at every age). | own value (source not recorded) | `wonder_race.rs` |
 
 ## Data catalogs
 
