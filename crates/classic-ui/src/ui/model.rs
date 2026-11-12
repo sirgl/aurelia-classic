@@ -178,6 +178,8 @@ pub struct HudModel {
     pub ruins: Option<RuinsChoice>,
     /// The card of the city-state whose city the player clicked on the map.
     pub city_state: Option<CityStateWindow>,
+    /// A war or a denunciation waiting for the player's yes.
+    pub confirm: Option<ConfirmCard>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -639,8 +641,12 @@ pub enum GameRequest {
         tile: TileId,
         decision: CityDecision,
     },
+    /// Asks first: the war waits for `Confirm` (`ConfirmCard`).
     DeclareWar(PlayerId),
+    /// Asks first, as `DeclareWar`.
     Denounce(PlayerId),
+    /// The player's answer to the open `ConfirmCard`: yes does it, no leaves it.
+    Confirm(bool),
     ProposeDeal {
         to: PlayerId,
         items: Vec<(PlayerId, DealItem)>,

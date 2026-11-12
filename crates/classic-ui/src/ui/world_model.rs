@@ -87,6 +87,18 @@ pub struct DiplomacyView {
     pub gold: u32,
     pub nations: Vec<NationCard>,
     pub offers: Vec<OfferCard>,
+    /// A war or a denunciation waiting for the player's yes, drawn over the screen.
+    pub confirm: Option<ConfirmCard>,
+}
+
+/// A war or a denunciation the player asked for, shown before anything happens: what it is,
+/// what it costs, the button that does it and the one that leaves it (`GameRequest::Confirm`).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ConfirmCard {
+    pub title: String,
+    pub line: String,
+    pub confirm: String,
+    pub cancel: String,
 }
 
 /// What a nation that refused the player's peace said: why, and the gold it asks for the peace.

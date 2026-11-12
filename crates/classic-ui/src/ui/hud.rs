@@ -18,7 +18,7 @@ pub(crate) mod tile_tooltip;
 #[path = "unit_actions.rs"]
 mod unit_actions;
 #[path = "hud_game.rs"]
-mod game_widgets;
+pub(crate) mod game_widgets;
 pub use game_widgets::Target as TopTarget;
 pub use unit_actions::Action;
 use unit_actions::PanelSource;
@@ -178,6 +178,7 @@ impl ClassicHud {
             clicks.requests.extend(game_widgets::capture(ctx, screen, game));
             clicks.requests.extend(game_widgets::ruins(ctx, screen, game));
             clicks.requests.extend(game_widgets::city_state(ctx, screen, game));
+            clicks.requests.extend(game_widgets::confirm(ctx, screen, game));
             clicks.open_results = game_widgets::outcome(ctx, screen, game);
         }
     }

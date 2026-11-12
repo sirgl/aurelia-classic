@@ -33,7 +33,7 @@ fn relation<'o>(obs: &'o AIObservation<'_>, other: PlayerId) -> Option<&'o Relat
     obs.relation(other)
 }
 
-pub(crate) fn trusted(round: u32, r: &Relation) -> bool {
+pub fn trusted(round: u32, r: &Relation) -> bool {
     let recent_war = r.peace_treaty_until > 0 && round < r.peace_treaty_until + RECENT_WAR_ROUNDS;
     !r.at_war
         && !recent_war
@@ -42,7 +42,8 @@ pub(crate) fn trusted(round: u32, r: &Relation) -> bool {
         && r.warmonger < DISTRUST_WARMONGER
 }
 
-/// Gold value of an item for the AI receiving it (`receiving`) or giving it.
+/// Gold value of a relation item for the AI receiving it (`receiving`) or giving it; gold,
+/// gold a turn, resources and cities are the leader's estimate's (`ai::peace::Negotiation`).
 /// A research agreement is priced by the beakers the rules pay for it when
 /// `agreements` gives the turn's prices (`ScienceLevers::agreements`,
 /// `science_levers::agreement_gold`): what the pool of the smaller of the two
@@ -58,21 +59,10 @@ pub(crate) fn item_value_priced(
 ) -> i64 {
     let r = relation(obs, other);
     let trust = r.is_some_and(|r| trusted(obs.round, r));
-    let sign = if receiving { 1 } else { -1 };
     match item {
-        DealItem::Gold(g) => sign * i64::from(g),
-        // 20 turns of a 30-round deal at Standard: the same share of the speed's deal.
-        DealItem::GoldPerTurn(g) => {
-            sign * i64::from(g) * 20 * i64::from(obs.speed.deal_rounds) / i64::from(crate::systems::diplomacy::DEAL_DURATION)
-        }
-        DealItem::Resource { resource, amount } => {
-            let luxury = rules
-                .resources
-                .get(resource.0 as usize)
-                .is_some_and(|d| d.class == Some(crate::rules::content::ResourceClass::Luxury));
-            sign * i64::from(amount) * if luxury { 150 } else { 80 }
-        }
-        DealItem::City(_) => sign * 600,
+        // Priced by the leader's estimate, not here (`ai::peace::Negotiation::value`): gold and
+        // gold a turn at the price of gold, a city by its worth, a resource by what it gives.
+        DealItem::Gold(_) | DealItem::GoldPerTurn(_) | DealItem::Resource { .. } | DealItem::City(_) => 0,
         DealItem::Embassy => {
             if receiving {
                 30

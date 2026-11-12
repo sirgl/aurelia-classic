@@ -87,6 +87,13 @@ pub(super) fn diplomacy_body(
         Some(card) => nation_detail(ui, center, state, card, view),
         None => nobody_met(ui, center),
     }
+    // A war or a denunciation asked for here waits for the yes over the screen.
+    if let Some(card) = &view.confirm {
+        let screen = ui.ctx().content_rect();
+        if let Some(yes) = crate::ui::hud::game_widgets::confirm_card(ui.ctx(), screen, card) {
+            state.requests.push(GameRequest::Confirm(yes));
+        }
+    }
 }
 
 fn nobody_met(ui: &mut egui::Ui, r: Rect) {
@@ -666,6 +673,7 @@ mod overflow_tests {
                 offers: vec![],
                 outgoing: vec![],
                 preview: None,
+                confirm: None,
             };
             let bounds = Rect::from_min_size(pos2(20., 20.), vec2(width, 340.));
             let point = pos2(bounds.right() - 60., bounds.bottom() - 16.);
@@ -758,6 +766,7 @@ mod overflow_tests {
         let ctx = egui::Context::default();
         let mut state = ScreenState::default();
         let view = DiplomacyView {
+            confirm: None,
             outgoing: Vec::new(),
             preview: None,
             me: PlayerId(0),

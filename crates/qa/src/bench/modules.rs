@@ -199,6 +199,13 @@ pub trait BenchRules {
         false
     }
 
+    /// What a command did to the deals of the players (`DealEvent`), each for the party
+    /// concerned; `game` is the world after the acting player's turn (none: the module has no
+    /// deals).
+    fn deals(_game: &GameState<Self::M>, _rules: &CompiledRuleset<Self::M>, _command: &<Self::M as RulesModule>::Command, _changes: &ChangeJournal<Self::M>) -> Vec<(PlayerId, crate::bench::play::DealEvent)> {
+        Vec::new()
+    }
+
     /// Food each player's cities received from its other cities in the
     /// rounds `changes` closed (none: the module has no food routes).
     fn delivered(_game: &GameState<Self::M>, _changes: &ChangeJournal<Self::M>) -> Vec<(PlayerId, u64)> {
@@ -563,6 +570,41 @@ impl BenchRules for ClassicBench {
 
     fn by_agreement(command: &classic_rules::Command) -> bool {
         matches!(command, classic_rules::Command::RespondDeal { accept: true, .. })
+    }
+
+    /// Cities ceded by an accepted deal (the giver), gold per turn taken on by one (the payer:
+    /// a gold-per-turn trade of the pair that runs the speed's whole deal from this round), and
+    /// deals broken by an unpaid gold per turn (the debtor, `ClassicChange::DealBroken`).
+    fn deals(game: &GameState<Self::M>, rules: &CompiledRuleset<Self::M>, command: &classic_rules::Command, changes: &ChangeJournal<Self::M>) -> Vec<(PlayerId, crate::bench::play::DealEvent)> {
+        use crate::bench::play::DealEvent;
+        use classic_rules::classic::ClassicChange;
+        let mut out = Vec::new();
+        for change in &changes.module_changes {
+            if let ClassicChange::DealBroken { debtor, .. } = *change {
+                out.push((debtor, DealEvent::GoldPerTurnBroken));
+            }
+        }
+        if !matches!(command, classic_rules::Command::RespondDeal { accept: true, .. }) {
+            return out;
+        }
+        for change in &changes.city_changes {
+            if let kernel::transaction::journal::CityChange::OwnerChanged { from, .. } = change {
+                out.push((*from, DealEvent::CityCeded));
+            }
+        }
+        let auth = game.view().auth;
+        let until = auth.turn().round + auth.settings().speed(rules).deal_rounds;
+        for change in &changes.module_changes {
+            let ClassicChange::OfferAnswered { from, to, accepted: true, .. } = *change else { continue };
+            let pair = |a: PlayerId, b: PlayerId| (a, b) == (from, to) || (a, b) == (to, from);
+            for trade in auth.module().relations().trades() {
+                let gold = matches!(trade.flow, classic_rules::world::relations::TradeFlow::GoldPerTurn(_));
+                if gold && trade.until == until && pair(trade.from, trade.to) {
+                    out.push((trade.from, DealEvent::GoldPerTurn));
+                }
+            }
+        }
+        out
     }
 }
 

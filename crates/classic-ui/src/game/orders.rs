@@ -576,8 +576,10 @@ impl Session {
         if at_war {
             return self.strike(command);
         }
+        // A strike at a nation at peace declares war: the player says yes first, as in the
+        // original game (`super::confirm`).
         match self.legal_after_war(enemy, &command) {
-            Ok(()) => self.declare_war_and_strike(enemy, command),
+            Ok(()) => self.ask_first(super::confirm::Confirmation::Attack { enemy, strike: command }),
             Err(error) => self.message = Some(names::reason(self.rules(), &error)),
         }
     }
@@ -618,7 +620,7 @@ impl Session {
 
     /// At peace the core rejects attacks before checking range. Ask it on a copy at war,
     /// so a war is declared only when the strike that follows is legal.
-    fn legal_after_war(&mut self, enemy: PlayerId, command: &Command) -> Result<(), CommandError> {
+    pub(super) fn legal_after_war(&mut self, enemy: PlayerId, command: &Command) -> Result<(), CommandError> {
         let mut probe = self.client.game.clone();
         let war = Command::DeclareWar {
             player: self.me(),
@@ -630,7 +632,7 @@ impl Session {
             .map(|_| ())
     }
 
-    fn declare_war_and_strike(&mut self, enemy: PlayerId, command: Command) {
+    pub(super) fn declare_war_and_strike(&mut self, enemy: PlayerId, command: Command) {
         let war = Command::DeclareWar {
             player: self.me(),
             enemy,

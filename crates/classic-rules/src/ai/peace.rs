@@ -142,7 +142,8 @@ impl<'i, 'o, 'a> Negotiation<'i, 'o, 'a> {
     }
 
     /// What `items` with `other` are worth to the player: gold by the
-    /// price of gold; a city by what it brings or costs; peace by giving up
+    /// price of gold; a city by what it brings or costs; a resource by what its copies
+    /// give for the deal's rounds (`resource`); peace by giving up
     /// the war's prospect; an embassy we receive by the capital it reveals
     /// (`found`) on top of the advisor's scale; the rest by the advisor's
     /// gold scale (`diplomacy::item_value_priced`) at the price of gold. Peace
@@ -165,7 +166,9 @@ impl<'i, 'o, 'a> Negotiation<'i, 'o, 'a> {
                         let rounds = self.input.observation.speed.deal_rounds.min(self.prices.rounds_left);
                         sign * self.gold(i64::from(gold) * i64::from(rounds))
                     }
-                    DealItem::City(city) => sign * self.city(city).unwrap_or_else(|| self.gold(600)),
+                    // A city we cannot see is worth nothing we can tell; ours we always see.
+                    DealItem::City(city) => sign * self.city(city).unwrap_or(0),
+                    DealItem::Resource { resource, amount } => self.resource(other, resource, amount, receiving),
                     DealItem::Embassy if receiving => self.found(other) + self.scale(other, *item, receiving),
                     _ => self.scale(other, *item, receiving),
                 }
@@ -179,6 +182,87 @@ impl<'i, 'o, 'a> Negotiation<'i, 'o, 'a> {
     fn scale(&self, other: PlayerId, item: DealItem, receiving: bool) -> Centi {
         let agreements = crate::ai::diplomacy::agreement_prices(self.input);
         self.gold(crate::ai::diplomacy::item_value_priced(self.obs(), self.input.rules, agreements, other, item, receiving))
+    }
+
+    /// What `amount` copies of `resource` received (`receiving`) from `other` or given to it for
+    /// the speed's deal are worth to the player, by its prices of the turn and the rules' data:
+    /// - a luxury: the happiness of its kind (`module.happiness`) for the deal's rounds, at the
+    ///   price of happiness, while the empire lacks the kind; further copies add nothing;
+    /// - a strategic resource: per copy, the production of the dearest unit the player can
+    ///   build that needs it (cost over the copies it needs), at the price of production, while
+    ///   the empire has no free copy;
+    /// - the rival's side counts `RivalPercent` of the same worth, as `city_worth` counts a
+    ///   rival's gain: what it gains by our copies (a luxury only when it has none to trade of
+    ///   the kind) is our loss, what it loses by giving its last tradeable copies of a luxury is
+    ///   our gain. A swap of last copies is even; a gift of a spare copy is not free.
+    fn resource(&self, other: PlayerId, resource: crate::ids::ResourceId, amount: u16, receiving: bool) -> Centi {
+        let obs = self.obs();
+        let ours = &obs.economy.resources;
+        let rounds = i64::from(obs.speed.deal_rounds.min(self.prices.rounds_left));
+        let rounds_left = i64::from(self.prices.rounds_left.max(1));
+        let Some(def) = self.input.rules.resources.get(resource.0 as usize) else { return 0 };
+        let luxury = def.class == Some(crate::rules::content::ResourceClass::Luxury);
+        let amount = i64::from(amount);
+        // The worth of `copies` copies to one who has none free.
+        let worth = |copies: i64| -> Centi {
+            match def.class {
+                Some(crate::rules::content::ResourceClass::Luxury) => {
+                    i64::from(def.module.happiness.max(0)) * self.prices.happiness * rounds / rounds_left * copies.min(1)
+                }
+                Some(crate::rules::content::ResourceClass::Strategic) => {
+                    copies * self.copy_production(resource) * self.prices.production / rounds_left
+                }
+                _ => 0,
+            }
+        };
+        let rival = |copies: i64| worth(copies) * crate::ai::genome::get(crate::ai::genome::Knob::RivalPercent) / 100;
+        let theirs = obs.view.tradeable_luxuries(other).iter().find(|(r, _)| *r == resource).map_or(0, |(_, n)| i64::from(*n));
+        let free = i64::from(ours.available(resource).max(0));
+        if receiving {
+            let ours = if free > 0 { 0 } else { worth(amount) };
+            let their_loss = if luxury && theirs <= amount { rival(amount) } else { 0 };
+            return ours + their_loss;
+        }
+        let lost = (amount - (free - 1).max(0)).clamp(0, amount);
+        let their_gain = if !luxury || theirs == 0 { rival(amount) } else { 0 };
+        -(worth(lost) + their_gain)
+    }
+
+    /// The production one copy of a strategic `resource` stands for: the dearest unit the
+    /// player's technologies allow (not obsolete, not a nation's own) that needs it, its cost
+    /// over the copies it needs. With no such unit yet, the unit the rules open next: the one
+    /// of the least advanced technology the player lacks (the earlier era, then the cheaper), priced the
+    /// same way; 0 only for a resource no unit of the rules needs.
+    fn copy_production(&self, resource: crate::ids::ResourceId) -> i64 {
+        let techs = &self.obs().economy.techs;
+        let known = |t: Option<crate::ids::TechId>| t.is_some_and(|t| techs.contains(&t));
+        let per_copy = |u: &crate::rules::compiled::UnitDefinition| {
+            let (_, copies) = u.required_resources.iter().find(|(r, _)| *r == resource)?;
+            Some(i64::from(u.cost) / i64::from((*copies).max(1)))
+        };
+        let needing = || {
+            self.input
+                .rules
+                .units
+                .iter()
+                .filter(|u| !u.unbuildable && u.nation.is_none() && !known(u.obsolete_tech))
+                .filter(|u| u.required_resources.iter().any(|(r, _)| *r == resource))
+        };
+        let now = needing()
+            .filter(|u| u.required_tech.is_none_or(|t| techs.contains(&t)))
+            .filter_map(per_copy)
+            .max();
+        if let Some(now) = now {
+            return now;
+        }
+        needing()
+            .filter_map(|u| {
+                let tech = u.required_tech?;
+                let def = self.input.rules.technologies.get(usize::from(tech.0))?;
+                Some(((def.era, def.cost, u.cost), per_copy(u)?))
+            })
+            .min_by_key(|(key, _)| *key)
+            .map_or(0, |(_, worth)| worth)
     }
 
     /// What an embassy in `host`'s capital reveals that the leader values
@@ -210,6 +294,11 @@ impl<'i, 'o, 'a> Negotiation<'i, 'o, 'a> {
     /// the reason is the larger of the war's prospect and the aggressor's price; when the white
     /// peace would pass, the terms asked besides it are what is refused.
     pub fn answer(&self, offer: &DealOffer) -> (bool, PeaceRefusal) {
+        // What the rules would refuse is refused: gold a turn beyond what the income carries
+        // (`deals::gold_income`), copies or gold the player lacks.
+        if self.obs().view.offer_problem(offer.from, &offer.items).is_some() {
+            return (false, PeaceRefusal::Unsaid);
+        }
         let value = self.value(offer.from, &offer.items);
         let makes_peace = offer.items.iter().any(|(_, item)| *item == DealItem::Peace);
         if value >= 0 || !makes_peace {

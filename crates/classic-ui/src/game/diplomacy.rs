@@ -172,8 +172,9 @@ impl Session {
     }
 
     /// Notices of the deals in `records` that concern the player: the answer to its offer
-    /// (`ClassicChange::OfferAnswered`) and an offer of peace addressed to it, which waits on
-    /// the diplomacy screen.
+    /// (`ClassicChange::OfferAnswered`), an offer of peace addressed to it, which waits on
+    /// the diplomacy screen, and a deal broken by an unpaid gold per turn, either way
+    /// (`ClassicChange::DealBroken`).
     pub(super) fn notify_offers(&mut self, records: &[classic_rules::transaction::journal::AppliedCommand]) {
         let me = self.me();
         if self.game().view().auth.settings().is_ai(me) {
@@ -187,6 +188,18 @@ impl Session {
                 }
             }
             for change in &record.changes.module_changes {
+                if let classic_rules::classic::ClassicChange::DealBroken { debtor, creditor, gold } = *change {
+                    // An unpaid gold per turn broke a deal (classic/docs/classic/rules.md, Deals).
+                    let text = if creditor == me {
+                        tf!("classic.game.diplomacy.notice-deal-broken-theirs", name = self.player_name(debtor), gold = gold)
+                    } else if debtor == me {
+                        tf!("classic.game.diplomacy.notice-deal-broken-ours", name = self.player_name(creditor), gold = gold)
+                    } else {
+                        continue;
+                    };
+                    self.notify(NoticeKind::Diplomacy, text);
+                    continue;
+                }
                 let classic_rules::classic::ClassicChange::OfferAnswered { from, to, accepted, peace } = *change else { continue };
                 if from != me {
                     continue;
@@ -262,6 +275,7 @@ impl Session {
             })
             .collect();
         DiplomacyView {
+            confirm: self.confirm_card(),
             outgoing,
             preview: None,
             me: self.me(),
@@ -329,9 +343,9 @@ impl Session {
         items.extend(self.resource_items());
         let view = self.game().player_view(self.rules(), self.me());
         let auth = self.game().view().auth;
-        let income = classic_rules::derived::income::player_income(auth, self.rules(), giver)
-            .gold
-            .max(0) as u32;
+        // The gold a turn the giver's income still carries with its running deals: the rules'
+        // own limit (`DealBlock::NotEnoughIncome`).
+        let income = classic_rules::world::relations::gold_income(auth, self.rules(), giver).max(0) as u32;
         let resources = classic_rules::derived::resources::resource_ledger(auth, self.rules(), giver);
         let mut out = Vec::new();
         for (index, item) in items.into_iter().enumerate() {
@@ -469,18 +483,14 @@ impl Session {
         }
     }
 
-    /// War, denunciation, deals and answers to offers from the diplomacy screen.
+    /// War and denunciation (once confirmed: `super::confirm`), deals and answers to offers
+    /// from the diplomacy screen.
     pub(super) fn deal_request(&mut self, request: GameRequest) {
         let me = self.me();
         let (command, text) = match request {
-            GameRequest::DeclareWar(enemy) => (
-                Command::DeclareWar { player: me, enemy },
-                tf!("classic.game.diplomacy.notice-war", name = self.player_name(enemy)),
-            ),
-            GameRequest::Denounce(target) => (
-                Command::Denounce { player: me, target },
-                tf!("classic.game.diplomacy.notice-denounce", name = self.player_name(target)),
-            ),
+            // War and denunciation wait for the player's yes (`super::confirm`).
+            GameRequest::DeclareWar(enemy) => return self.ask_first(super::confirm::Confirmation::War(enemy)),
+            GameRequest::Denounce(target) => return self.ask_first(super::confirm::Confirmation::Denounce(target)),
             GameRequest::ProposeDeal { to, items } => (
                 Command::ProposeDeal {
                     from: me,
@@ -506,6 +516,23 @@ impl Session {
             _ => return,
         };
         if self.submit(command) {
+            self.notify(NoticeKind::Diplomacy, text);
+        }
+    }
+}
+
+impl Session {
+    /// War on `enemy` or the denunciation of `target`, which the player confirmed.
+    pub(super) fn declare_war(&mut self, enemy: PlayerId) {
+        let text = tf!("classic.game.diplomacy.notice-war", name = self.player_name(enemy));
+        if self.submit(Command::DeclareWar { player: self.me(), enemy }) {
+            self.notify(NoticeKind::Diplomacy, text);
+        }
+    }
+
+    pub(super) fn denounce(&mut self, target: PlayerId) {
+        let text = tf!("classic.game.diplomacy.notice-denounce", name = self.player_name(target));
+        if self.submit(Command::Denounce { player: self.me(), target }) {
             self.notify(NoticeKind::Diplomacy, text);
         }
     }

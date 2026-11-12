@@ -814,6 +814,12 @@ fn wars_table(sides: &[(&SideSummary, CombatRecord)], out: &mut String) {
         );
     }
     out.push('\n');
+    let _ = writeln!(out, "| side | variant | cities ceded by deal | gold-per-turn deals taken on | broken by non-payment |");
+    let _ = writeln!(out, "|---|---|---:|---:|---:|");
+    for (s, c) in sides {
+        let _ = writeln!(out, "| {:?} | {} | {} | {} | {} |", s.side, s.variant, c.cities_ceded, c.gold_per_turn_deals, c.gold_per_turn_broken);
+    }
+    out.push('\n');
 }
 
 /// FNV-1a over every match's label, rounds and final world hash.

@@ -64,6 +64,8 @@ pub struct Session {
     /// What each nation that refused the player's peace asks for it, as it said (`PeaceRefusal`).
     /// UI-only: the next refusal replaces it, an accepted peace removes it.
     pub(super) peace_asks: Vec<(PlayerId, classic_rules::world::relations::PeaceRefusal)>,
+    /// A war or a denunciation waiting for the player's yes (`super::confirm`). UI-only.
+    pub(super) confirm: Option<super::confirm::Confirmation>,
 }
 
 impl Session {
@@ -136,6 +138,7 @@ impl Session {
             ruins_later: None,
             city_state_open: None,
             peace_asks: Vec::new(),
+            confirm: None,
         };
         if observer.is_none() {
             session.select_next_idle_unit();
@@ -284,7 +287,9 @@ impl Session {
         let capture = self.capture_choice();
         let ruins = self.ruins_choice();
         let city_state = self.city_state_window();
+        let confirm = self.confirm_card();
         HudModel {
+            confirm,
             combat,
             capture,
             ruins,
@@ -342,6 +347,14 @@ impl Session {
             self.message = Some(ai_turns_message().into());
             return;
         }
+        if self.confirm.is_some() && !matches!(request, GameRequest::Confirm(_)) {
+            // The card owns the input (`super::confirm`): the end of the turn waits for the
+            // answer; any other request is a no to it.
+            if matches!(request, GameRequest::EndTurn) {
+                return;
+            }
+            self.confirm = None;
+        }
         match request {
             GameRequest::Unit(action) => self.order(action),
             GameRequest::EndTurn => self.end_turn(),
@@ -376,6 +389,7 @@ impl Session {
             GameRequest::Promote(_) | GameRequest::DecideCity { .. } => {
                 self.combat_request(request)
             }
+            GameRequest::Confirm(yes) => self.answer_confirm(yes),
             GameRequest::DeclareWar(_)
             | GameRequest::Denounce(_)
             | GameRequest::ProposeDeal { .. }
@@ -400,6 +414,10 @@ impl Session {
     }
 
     pub fn click(&mut self, tile: Option<TileId>, button: MapButton) {
+        if self.confirm.take().is_some() {
+            // A click on the map beside the card is a no, and does nothing else.
+            return;
+        }
         let Some(tile) = tile else {
             self.client.selection = Selection::None;
             self.targeting = None;
@@ -464,10 +482,11 @@ impl Session {
         self.client.selection = Selection::Tile(tile);
     }
 
-    /// Esc: leave the target mode (move, attack, sweep), the city strike aim or the city-state
-    /// card; true when there was one to leave.
+    /// Esc: leave the target mode (move, attack, sweep), the city strike aim, the city-state
+    /// card or a war waiting for its yes (the answer is no); true when there was one to leave.
     pub fn cancel_aim(&mut self) -> bool {
-        let aiming = self.targeting.is_some() || self.city_strike.is_some() || self.city_state_open.is_some();
+        let aiming = self.targeting.is_some() || self.city_strike.is_some() || self.city_state_open.is_some() || self.confirm.is_some();
+        self.confirm = None;
         self.targeting = None;
         self.city_strike = None;
         self.city_state_open = None;
@@ -705,6 +724,7 @@ impl Session {
         self.sleeping.clear();
         self.notices.clear();
         self.peace_asks.clear();
+        self.confirm = None;
         self.message = None;
         self.path_cache = None;
         self.revision += 1;

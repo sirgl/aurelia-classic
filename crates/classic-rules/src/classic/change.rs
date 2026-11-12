@@ -82,6 +82,9 @@ pub enum ClassicChange {
     /// offer made peace between them (the proposer's screen tells the answer; no derived
     /// system reads it).
     OfferAnswered { from: PlayerId, to: PlayerId, accepted: bool, peace: bool },
+    /// `debtor` could not pay the `gold` per turn it owes `creditor`: their deal is broken and
+    /// the creditor remembers it (both screens tell it; no derived system reads it).
+    DealBroken { debtor: PlayerId, creditor: PlayerId, gold: u32 },
     /// The city took `damage` hit points in a fight (melee, a ranged or air
     /// attack, a nuke). No derived system reads city damage; the
     /// presentation shows the number on the city.
@@ -107,6 +110,7 @@ impl ModuleChange for ClassicChange {
             | ClassicChange::WonderYield { .. }
             | ClassicChange::RelationsChanged { .. }
             | ClassicChange::OfferAnswered { .. }
+            | ClassicChange::DealBroken { .. }
             | ClassicChange::CityDamaged { .. } => {
                 StaleYields::Nothing
             }

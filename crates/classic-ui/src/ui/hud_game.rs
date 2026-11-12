@@ -469,6 +469,46 @@ fn choice_row(ui: &mut egui::Ui, r: Rect, label: &'static str, hint: &str, avail
     response.clicked() && ready
 }
 
+/// A war or a denunciation waiting for the player's yes (`ConfirmCard`), over the dimmed map
+/// and every other card: the title, what it costs, and the two buttons.
+pub(super) fn confirm(ctx: &egui::Context, screen: Rect, game: &HudModel) -> Vec<GameRequest> {
+    game.confirm.as_ref().and_then(|card| confirm_card(ctx, screen, card)).map(GameRequest::Confirm).into_iter().collect()
+}
+
+/// The card of `confirm` (the diplomacy screen draws it too): true on the yes, false on the no.
+pub(crate) fn confirm_card(ctx: &egui::Context, screen: Rect, card: &crate::ui::model::ConfirmCard) -> Option<bool> {
+    game_end::backdrop(ctx, screen, "confirm_backdrop");
+    let width = 520.0_f32.min(screen.width() - 24.);
+    let mut answer = None;
+    egui::Area::new("game_confirm".into())
+        .order(egui::Order::Tooltip)
+        .fixed_pos(screen.center() - vec2(width, 180.0) / 2.0)
+        .show(ctx, |ui| {
+            let galley = ui.painter().layout(card.line.clone(), egui::FontId::proportional(14.0), LIGHT, width - 44.0);
+            let size = vec2(width, 132.0 + galley.size().y);
+            let (r, _) = ui.allocate_exact_size(size, Sense::hover());
+            ui.painter().rect_filled(r, 8., Color32::from_rgb(10, 20, 29));
+            panel(ui.painter(), r, 8.0);
+            text(ui.painter(), r.min + vec2(22.0, 18.0), Align2::LEFT_TOP, &card.title, 24.0, GOLD);
+            ui.painter().galley(r.min + vec2(22.0, 58.0), galley, LIGHT);
+            let half = (r.width() - 48.0) / 2.0;
+            let row = r.bottom() - 56.0;
+            let yes = Rect::from_min_size(pos2(r.left() + 18.0, row), vec2(half, 40.0));
+            let no = Rect::from_min_size(pos2(yes.right() + 12.0, row), vec2(half, 40.0));
+            for (rect, label, value, ink) in [(yes, &card.confirm, true, UNHAPPY), (no, &card.cancel, false, LIGHT)] {
+                let response = ui.interact(rect, egui::Id::new(("confirm", value)), Sense::click());
+                let fill = if response.hovered() { Color32::from_rgb(40, 77, 97) } else { Color32::from_rgb(18, 34, 44) };
+                ui.painter().rect_filled(rect, 4.0, fill);
+                ui.painter().rect_stroke(rect, 4.0, Stroke::new(1.0, GOLD), egui::StrokeKind::Inside);
+                text(ui.painter(), rect.center(), Align2::CENTER_CENTER, label, 15.0, ink);
+                if response.clicked() {
+                    answer = Some(value);
+                }
+            }
+        });
+    answer
+}
+
 /// Ancient Ruins under the player's unit: the three rewards and "later". No backdrop: the
 /// player may keep playing with the card open.
 pub(super) fn ruins(ctx: &egui::Context, screen: Rect, game: &HudModel) -> Vec<GameRequest> {
