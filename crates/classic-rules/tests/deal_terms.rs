@@ -84,6 +84,47 @@ fn deal(game: &mut GameState, rules: &CompiledRuleset, from: PlayerId, to: Playe
     game.execute(rules, Command::RespondDeal { player: to, offer, accept: true, why: PeaceRefusal::Unsaid }).unwrap();
 }
 
+/// Every player ends its turn until a new round begins (the deals are settled once a round,
+/// after every income is in); the module changes of those turns.
+fn end_round(game: &mut GameState, rules: &CompiledRuleset) -> Vec<ClassicChange> {
+    let round = game.view().auth.turn().round;
+    let mut changes = Vec::new();
+    while game.view().auth.turn().round == round {
+        let active = game.view().auth.active_player();
+        changes.extend(game.execute(rules, Command::EndTurn { player: active }).unwrap().changes().module_changes.iter().cloned());
+    }
+    changes
+}
+
+/// `by` (at war with `victim`) takes every city of `victim`: the nation is gone.
+fn eliminate(game: &mut GameState, rules: &CompiledRuleset, victim: PlayerId, by: PlayerId) {
+    until_active(game, rules, by);
+    game.execute(rules, Command::DeclareWar { player: by, enemy: victim }).unwrap();
+    let cities: Vec<(CityHandle, TileId)> = game.view().auth.indexes().cities_of(victim).iter().map(|&c| (c, game.view().auth.cities().get(c).unwrap().tile)).collect();
+    for (city, at) in cities {
+        let hex = game.view().auth.map().dimensions.to_coord(at).unwrap();
+        let beside = tile(game, hex.q - 1, hex.r);
+        let attacker = game.debug_spawn_unit(rules, by, beside, warrior(rules));
+        let core = game.view().auth.cities().get(city).unwrap();
+        let max = classic_rules::combat::city::max_hit_points(game.view().auth, rules, core);
+        game.debug_set_city_damage(city, max - 1);
+        game.execute(rules, Command::AttackCity { attacker, city }).unwrap();
+    }
+    assert!(!game.view().auth.players().is_alive(victim), "the nation is gone");
+}
+
+/// The cheapest buildable land unit of the data.
+fn warrior(rules: &CompiledRuleset) -> UnitKindId {
+    rules
+        .units
+        .iter()
+        .enumerate()
+        .filter(|(_, u)| !u.unbuildable && u.cost > 0 && u.strength > 0 && u.required_resources.is_empty() && u.nation.is_none())
+        .min_by_key(|(_, u)| u.cost)
+        .map(|(i, _)| UnitKindId(i as u16))
+        .unwrap()
+}
+
 fn trades_between(game: &GameState, a: PlayerId, b: PlayerId) -> usize {
     let pair = |x: PlayerId, y: PlayerId| (x, y) == (a, b) || (x, y) == (b, a);
     game.view().auth.module().relations().trades().iter().filter(|t| pair(t.from, t.to)).count()
@@ -136,7 +177,7 @@ fn an_unpaid_gold_per_turn_breaks_the_deal_and_the_creditor_remembers() {
         let p1_before = game.view().auth.players().treasury_of(P1);
         let p1_income = classic_rules::derived::income::player_income(game.view().auth, &rules, P1).gold.max(0) as u32;
         until_active(&mut game, &rules, P0);
-        let changes = game.execute(&rules, Command::EndTurn { player: P0 }).unwrap().changes().module_changes.clone();
+        let changes = end_round(&mut game, &rules);
         let broken = changes.iter().find_map(|c| match *c {
             ClassicChange::DealBroken { debtor, creditor, gold } => Some((debtor, creditor, gold)),
             _ => None,
@@ -145,10 +186,10 @@ fn an_unpaid_gold_per_turn_breaks_the_deal_and_the_creditor_remembers() {
         (game, gold, broken, received, p1_income)
     };
 
-    let (game, gold, broken, received, _) = run(0);
+    let (game, gold, broken, received, p1_income) = run(0);
     assert_eq!(broken, Some((P0, P1, gold)), "the payment it cannot make breaks the deal");
     assert_eq!(trades_between(&game, P0, P1), 0, "the deal ends both ways: the gold and the luxury");
-    assert_eq!(received, 0, "nothing of the payment is taken");
+    assert_eq!(received, p1_income, "nothing of the payment is taken: P1 has its own income only");
     let memory = game.view().auth.module().relations().warmonger(P1, P0);
     assert!(memory >= classic_rules::ai::diplomacy::DISTRUST_WARMONGER, "the creditor remembers: {memory}");
     assert_eq!(game.view().auth.module().relations().warmonger(P2, P0), 0, "only the creditor");
@@ -156,10 +197,64 @@ fn an_unpaid_gold_per_turn_breaks_the_deal_and_the_creditor_remembers() {
     let trust = p1.relations.iter().find(|r| r.other == P0).is_some_and(|r| classic_rules::ai::diplomacy::trusted(p1.round, r));
     assert!(!trust, "the AI no longer trusts the debtor");
 
-    let (game, gold, broken, received, _) = run(10_000);
+    let (game, gold, broken, received, p1_income) = run(10_000);
     assert_eq!(broken, None, "a treasury that covers it pays");
-    assert_eq!(received, gold, "in full");
+    assert_eq!(received, gold + p1_income, "in full, beside its own income");
     assert_eq!(trades_between(&game, P0, P1), 2);
+}
+
+/// A nation that is gone pays nothing and takes nothing: its deals end both ways when it dies
+/// (at the next turn end), and until then the creditor does not count the gold it will never
+/// get (it used to lend on it and break its own deal).
+#[test]
+fn the_deals_of_a_dead_nation_end_and_its_creditor_stops_counting_them() {
+    let rules = compile_rules(core_rules()).unwrap();
+    let wine = luxury(&rules);
+    let World { mut game, .. } = world(&rules);
+    let p1_capital = tile(&game, 18, 10);
+    game.debug_set_resource_batch(&rules, &[(p1_capital, wine)]);
+    let own = gold_income(&game, &rules, P1);
+    let gold = (gold_income(&game, &rules, P0) as u32).min(60);
+    assert!(gold > 0);
+    deal(&mut game, &rules, P0, P1, vec![(P0, DealItem::GoldPerTurn(gold)), (P1, DealItem::Resource { resource: wine, amount: 1 })]);
+    assert_eq!(gold_income(&game, &rules, P1), own + gold as i32, "the deal counts while the payer lives");
+
+    eliminate(&mut game, &rules, P0, P2);
+    assert_eq!(gold_income(&game, &rules, P1), own, "a dead payer's gold is not counted");
+    let before = game.view().auth.players().treasury_of(P1);
+    let changes = end_round(&mut game, &rules);
+    assert_eq!(trades_between(&game, P0, P1), 0, "the deal is closed both ways, the luxury too");
+    assert!(changes.iter().all(|c| !matches!(c, ClassicChange::DealBroken { .. })), "a death is no breach of the payer");
+    assert!(game.view().auth.players().treasury_of(P1) - before <= own.max(0) as u32 + 1, "nothing was paid by the dead");
+    assert_eq!(gold_income(&game, &rules, P1), own);
+}
+
+/// The order of the players decides nothing: B (who moves first) pays C what A (who moves
+/// later) pays B, and B's own treasury could not carry it. The deals are settled once a round,
+/// after every income is in, so A's payment reaches B before B's is due and nothing breaks.
+#[test]
+fn a_debtor_covered_by_what_it_receives_pays_whatever_the_order_of_the_players() {
+    let rules = compile_rules(core_rules()).unwrap();
+    let World { mut game, .. } = world(&rules);
+    let gold = gold_income(&game, &rules, P1) as u32;
+    assert!(gold > 2);
+    // P1 (later in the round than P0) pays P0; P0 (first) passes it on to P2.
+    deal(&mut game, &rules, P1, P0, vec![(P1, DealItem::GoldPerTurn(gold))]);
+    deal(&mut game, &rules, P0, P2, vec![(P0, DealItem::GoldPerTurn(gold))]);
+    // P0's upkeep eats its income: its treasury after its own turn is short of the instalment,
+    // but not of what P1 sends it.
+    burden(&mut game, &rules, P0, -(gold as i32) - 1);
+    let treasury = game.view().auth.players().treasury_of(P0);
+    let income = classic_rules::derived::income::player_income(game.view().auth, &rules, P0).gold;
+    let after_its_turn = treasury as i32 + income;
+    assert!((0..gold as i32).contains(&after_its_turn), "P0 alone cannot carry {gold} but is not in debt: {treasury} + {income}");
+    let p2_before = game.view().auth.players().treasury_of(P2);
+    until_active(&mut game, &rules, P0);
+    let changes = end_round(&mut game, &rules);
+    assert!(changes.iter().all(|c| !matches!(c, ClassicChange::DealBroken { .. })), "{changes:?}");
+    assert_eq!(trades_between(&game, P0, P2), 1);
+    assert_eq!(trades_between(&game, P1, P0), 1);
+    assert!(game.view().auth.players().treasury_of(P2) >= p2_before + gold, "the end of the chain is paid");
 }
 
 /// No deal takes on more gold a turn than the income carries: what the payer already pays by
@@ -329,4 +424,32 @@ fn the_ai_swaps_last_copies_of_luxuries_and_gives_none_away() {
     let mut w = setup();
     let gift = ask(&mut w.game, &rules, P0, P1, vec![(P0, one(ours))], |_| {});
     assert_eq!(gift, Some(false), "no luxury for nothing");
+}
+
+/// A strategic resource no unit the AI may build needs yet is not worth nothing: the AI prices
+/// its copy by the unit the rules open next that needs it (the same way as one with a unit
+/// now), so it is not given away for 0. Picked from the data: a resource whose every unit lies
+/// beyond the technologies of the nations.
+#[test]
+fn the_ai_does_not_give_a_strategic_resource_without_a_unit_yet_for_nothing() {
+    let rules = compile_rules(core_rules()).unwrap();
+    let known = world(&rules).game.ai_observation(&rules, P0).economy.techs.clone();
+    let needs = |u: &classic_rules::rules::compiled::UnitDefinition, r: ResourceId| u.required_resources.iter().any(|(x, _)| *x == r);
+    let resource = rules
+        .resources
+        .iter()
+        .enumerate()
+        .filter(|(_, r)| r.class == Some(ResourceClass::Strategic))
+        .map(|(i, _)| ResourceId(i as u16))
+        .find(|&r| {
+            let units: Vec<_> = rules.units.iter().filter(|u| !u.unbuildable && u.nation.is_none() && needs(u, r)).collect();
+            !units.is_empty() && units.iter().all(|u| u.required_tech.is_some_and(|t| !known.contains(&t)))
+        })
+        .expect("the rules have a strategic resource whose units lie beyond the starting technologies");
+    let only = |w: &mut World| {
+        let at = tile(&w.game, 5, 10);
+        w.game.debug_set_resource_batch(&rules, &[(at, resource)]);
+    };
+    let worth = price(&rules, |_| DealItem::Resource { resource, amount: 1 }, only, 200_000).expect("it has a price");
+    assert!(worth > 0, "the copy is not given away: {worth}");
 }

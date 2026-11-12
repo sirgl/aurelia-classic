@@ -230,22 +230,39 @@ impl<'i, 'o, 'a> Negotiation<'i, 'o, 'a> {
 
     /// The production one copy of a strategic `resource` stands for: the dearest unit the
     /// player's technologies allow (not obsolete, not a nation's own) that needs it, its cost
-    /// over the copies it needs; 0 when no such unit.
+    /// over the copies it needs. With no such unit yet, the unit the rules open next: the one
+    /// of the least advanced technology the player lacks (the earlier era, then the cheaper), priced the
+    /// same way; 0 only for a resource no unit of the rules needs.
     fn copy_production(&self, resource: crate::ids::ResourceId) -> i64 {
         let techs = &self.obs().economy.techs;
         let known = |t: Option<crate::ids::TechId>| t.is_some_and(|t| techs.contains(&t));
-        self.input
-            .rules
-            .units
-            .iter()
-            .filter(|u| !u.unbuildable && u.nation.is_none())
-            .filter(|u| u.required_tech.is_none_or(|t| techs.contains(&t)) && !known(u.obsolete_tech))
+        let per_copy = |u: &crate::rules::compiled::UnitDefinition| {
+            let (_, copies) = u.required_resources.iter().find(|(r, _)| *r == resource)?;
+            Some(i64::from(u.cost) / i64::from((*copies).max(1)))
+        };
+        let needing = || {
+            self.input
+                .rules
+                .units
+                .iter()
+                .filter(|u| !u.unbuildable && u.nation.is_none() && !known(u.obsolete_tech))
+                .filter(|u| u.required_resources.iter().any(|(r, _)| *r == resource))
+        };
+        let now = needing()
+            .filter(|u| u.required_tech.is_none_or(|t| techs.contains(&t)))
+            .filter_map(per_copy)
+            .max();
+        if let Some(now) = now {
+            return now;
+        }
+        needing()
             .filter_map(|u| {
-                let (_, copies) = u.required_resources.iter().find(|(r, _)| *r == resource)?;
-                Some(i64::from(u.cost) / i64::from((*copies).max(1)))
+                let tech = u.required_tech?;
+                let def = self.input.rules.technologies.get(usize::from(tech.0))?;
+                Some(((def.era, def.cost, u.cost), per_copy(u)?))
             })
-            .max()
-            .unwrap_or(0)
+            .min_by_key(|(key, _)| *key)
+            .map_or(0, |(_, worth)| worth)
     }
 
     /// What an embassy in `host`'s capital reveals that the leader values

@@ -1,5 +1,5 @@
-//! The diplomacy step of a player's end turn (after Science): gold per
-//! turn it owes (a payment it cannot make breaks the deal), research agreements (accumulate, pay out at the end),
+//! The diplomacy step of a player's end turn (after Science): the ties with nations that are
+//! gone, research agreements (accumulate, pay out at the end),
 //! open borders that expire, offers to it that lapse, the decay of its
 //! warmonger memory.
 
@@ -26,7 +26,7 @@ impl<'a> WorldTransaction<'a> {
             return;
         }
         let round = self.world.turn.round;
-        self.pay_gold_per_turn(player, round, rules);
+        self.close_dead_ties();
         self.research_agreements(player, science.max(0) as u32, round, rules);
         self.expire_open_borders(player, round, rules);
         self.decay_warmonger(player, rules);
@@ -37,34 +37,73 @@ impl<'a> WorldTransaction<'a> {
         relations.trades.retain(|t| round < t.until);
     }
 
-    /// Every gold-per-turn trade the player owes is paid in full from its treasury (this turn's
-    /// income is in it: the Gold step runs before). A payment the treasury cannot make in full
-    /// is not made at all and breaks the deal (`break_deal`), as in the original game, where a
-    /// deal the payer can no longer honour is cancelled.
-    fn pay_gold_per_turn(&mut self, player: PlayerId, round: u32, rules: &CompiledRuleset) {
-        let owed: Vec<(PlayerId, u32, u32)> = self
+    /// Every tie with a nation that is gone ends, both ways: its trades pay nothing (a dead
+    /// payer's step never runs again, a dead receiver cannot be paid) and the living party must
+    /// not count them. Runs at every turn end and at the settlement of the round.
+    pub(crate) fn close_dead_ties(&mut self) {
+        let players = &self.world.players;
+        let gone = |p: PlayerId| !players.is_alive(p);
+        let pairs: Vec<(PlayerId, PlayerId)> = self
             .world
             .module
             .relations
             .trades
             .iter()
-            .filter(|t| t.from == player && round < t.until)
+            .filter(|t| gone(t.from) || gone(t.to))
+            .map(|t| (t.from, t.to))
+            .collect();
+        for (a, b) in pairs {
+            self.end_ties(a, b);
+        }
+    }
+
+    /// The gold per turn of every running deal, settled once a round after every player's
+    /// income is in the treasury (Civ V counts the deals in the net income of the round, so no
+    /// order of the players decides who can pay). A payment is made in full from the payer's
+    /// treasury or not at all; the payments run until none more can be made, so a payer whose
+    /// instalment is covered by what it receives pays once that has arrived. What no treasury
+    /// can carry breaks its deal (`break_deal`), as in the original game, where a deal the payer
+    /// can no longer honour is cancelled.
+    pub(crate) fn settle_gold_per_turn(&mut self, rules: &CompiledRuleset) {
+        if self.world.module.relations.is_pristine() {
+            return;
+        }
+        self.close_dead_ties();
+        let round = self.world.turn.round;
+        let mut due: Vec<(PlayerId, PlayerId, u32, u32)> = self
+            .world
+            .module
+            .relations
+            .trades
+            .iter()
+            .filter(|t| round < t.until)
             .filter_map(|t| match t.flow {
-                TradeFlow::GoldPerTurn(gold) => Some((t.to, gold, t.until)),
+                TradeFlow::GoldPerTurn(gold) => Some((t.from, t.to, gold, t.until)),
                 TradeFlow::Resource { .. } => None,
             })
             .collect();
-        for (to, gold, until) in owed {
-            let running = self.world.module.relations.trades.iter().any(|t| {
-                (t.from, t.to, t.until, t.flow) == (player, to, until, TradeFlow::GoldPerTurn(gold))
-            });
-            if !running {
-                continue;
+        loop {
+            let before = due.len();
+            let mut i = 0;
+            while i < due.len() {
+                let (from, to, gold, _) = due[i];
+                if self.world.players.spend(from, gold) {
+                    self.world.players.earn(to, gold);
+                    due.remove(i);
+                } else {
+                    i += 1;
+                }
             }
-            if self.world.players.spend(player, gold) {
-                self.world.players.earn(to, gold);
-            } else {
-                self.break_deal(player, to, until, gold, rules);
+            if due.len() == before {
+                break;
+            }
+        }
+        for (from, to, gold, until) in due {
+            let running = self.world.module.relations.trades.iter().any(|t| {
+                (t.from, t.to, t.until, t.flow) == (from, to, until, TradeFlow::GoldPerTurn(gold))
+            });
+            if running {
+                self.break_deal(from, to, until, gold, rules);
             }
         }
     }

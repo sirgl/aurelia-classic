@@ -46,9 +46,11 @@ impl ModuleSystems<Classic> for ClassicSystems {
         crate::classic::turn::run_city_step(WorldTransaction::of(tx), step, input)
     }
 
-    /// Religious pressure between cities, once per round.
+    /// Religious pressure between cities and the gold per turn of the deals, once per round.
     fn end_round(tx: &mut KernelTransaction<'_>, rules: &CompiledRuleset) {
-        WorldTransaction::of(tx).religious_pressure_round(rules);
+        let tx = WorldTransaction::of(tx);
+        tx.settle_gold_per_turn(rules);
+        tx.religious_pressure_round(rules);
     }
 
     /// The aircraft and missiles based on a carrier go down with it.
