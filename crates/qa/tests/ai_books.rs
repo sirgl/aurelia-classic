@@ -148,7 +148,9 @@ fn a_book_on_fog_march_walks_through_the_fog_to_its_target() {
         let closest = ours.iter().map(|s| s.nearest).min().unwrap_or(i32::MAX);
         seen.push((ours.iter().any(|s| s.sighted), closest));
     }
-    assert!(!seen[0].0 && seen[0].1 >= 7, "on standard the army stalls out of sight: {:?}", seen[0]);
+    // 7 tiles until the books made peace by value (12 November: peace with a nation needs its
+    // consent, every AI answers offers by `ai::peace`); 6 since, still out of sight.
+    assert!(!seen[0].0 && seen[0].1 >= 6, "on standard the army stalls out of sight: {:?}", seen[0]);
     assert!(seen[1].1 <= 3, "on fog-march it reaches the walls: {:?}", seen[1]);
 }
 
