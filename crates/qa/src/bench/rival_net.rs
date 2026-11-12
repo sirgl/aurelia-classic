@@ -96,7 +96,7 @@ impl MatchRecorder<ClassicBench> for RivalNetRecorder {
             return;
         }
         let (obs, _) = AIObservation::for_player(auth, view.derived, rules, player);
-        let book = states.get(player).map(|s| Memory::decode(&s.mind_memory).rivals).unwrap_or_default();
+        let book = states.get(player).map(|s| Memory::decode(&s.mind_memory).rival_book).unwrap_or_default();
         let model = estimate(&obs, rules, &book);
         let seat_era = era_of(rules, &obs.economy.techs);
         let congress = obs.congress.is_some();
