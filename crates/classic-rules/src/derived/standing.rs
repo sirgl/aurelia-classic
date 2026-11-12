@@ -4,7 +4,6 @@
 //! observation (`AIObservation::public`): what a human reads on the screens is what the AI reads.
 //! Only the player's own figure and the range of the others are in the rows; no rival's value is.
 
-use crate::derived::income::player_income;
 use crate::derived::DerivedWorld;
 use crate::ids::{PlayerId, TileId};
 use crate::rules::content::ProjectId;
@@ -61,7 +60,7 @@ pub fn demographics(auth: &AuthWorld, rules: &CompiledRuleset, derived: &Derived
             Measure::Population => population(auth, p),
             Measure::Crop => yields.of_player(p).food as i64,
             Measure::Goods => yields.of_player(p).production as i64,
-            Measure::Gnp => player_income(auth, rules, p).gold as i64,
+            Measure::Gnp => crate::derived::income::gold_now(auth, rules, derived, p) as i64,
             Measure::Literacy => auth.players().techs_of(p).len() as i64 * 100 / techs,
             Measure::Land => land.get(p.0 as usize).copied().unwrap_or(0),
             Measure::Soldiers => soldiers(auth, rules, p),

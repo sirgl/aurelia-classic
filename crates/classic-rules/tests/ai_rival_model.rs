@@ -212,6 +212,35 @@ fn the_domination_input_does_not_count_the_rivals_own_capital() {
     assert_eq!(inputs[fe::RIVAL_DOMINATION], 1000);
 }
 
+/// The GNP row reads the gold from the cities' kept yields (`income::gold_now`): the same number as
+/// the full income of every nation, in every state of a played game.
+#[test]
+fn the_gnp_from_kept_yields_is_the_full_income_gold() {
+    use classic_rules::ai::driver::ClassicMind;
+    use classic_rules::ai::variant::Variant;
+    use classic_rules::ai::AiSettings;
+    use classic_rules::derived::income::{gold_now, player_income};
+    use classic_rules::scenario::{generate_new_game, ScenarioConfig};
+    use kernel::ai::driver::AiDriver;
+    let rules = compile_rules(core_rules()).unwrap();
+    let config = ScenarioConfig { seed: 0x1_7004, players: 4, width: 40, height: 28, cities: 0, units: 0, water_ratio: 20 };
+    let mut game = generate_new_game(&rules, &config);
+    let settings = AiSettings::for_rules(&rules, rules.default_difficulty());
+    let mut driver = AiDriver::with_mind(settings, Vec::new(), ClassicMind::new(Variant::Standard));
+    let mut checked = 0;
+    while game.view().auth.turn().round < 90 && game.winner().is_none() {
+        driver.run(&mut game, &rules, 40);
+        let view = game.view();
+        for p in 0..4 {
+            let full = player_income(view.auth, &rules, PlayerId(p)).gold;
+            assert_eq!(gold_now(view.auth, &rules, view.derived, PlayerId(p)), full, "player {p} round {}", view.auth.turn().round);
+            checked += 1;
+        }
+    }
+    assert!(checked > 40, "many states checked: {checked}");
+    assert!((0..4).any(|p| player_income(game.view().auth, &rules, PlayerId(p)).gold != 0), "a game with gold in it");
+}
+
 /// A cut or spoiled book is an empty book; the rest of the memory (target, the old format without the
 /// section) survives, as a cut `sharp` section does.
 #[test]
