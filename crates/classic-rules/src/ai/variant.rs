@@ -30,7 +30,8 @@
 //! with those prices. `AllocatorPeace` is `Allocator` without new wars,
 //! the control of its wars; `LeadersAlone` was `Leaders` without peace by
 //! value, its control (since peace with a nation needs its consent every
-//! variant makes it by a deal, and `LeadersAlone` plays as `Leaders`). The instruments of the bench itself are built on
+//! variant makes it by a deal, so it plays as `Leaders` except that it does not
+//! ask for the embassies the leaders value: `values_embassies`). The instruments of the bench itself are built on
 //! `Standard`: `Nudged` plays as well but differently (the noise floor),
 //! `OneCity` is known to be weaker (the bench sees a difference).
 //!
