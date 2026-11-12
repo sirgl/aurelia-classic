@@ -6,6 +6,7 @@ mod city;
 pub(crate) mod city_states;
 mod civics;
 mod combat;
+mod confirm;
 mod congress;
 pub(crate) mod cues;
 mod culture;

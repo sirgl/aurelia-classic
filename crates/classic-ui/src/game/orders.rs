@@ -576,8 +576,10 @@ impl Session {
         if at_war {
             return self.strike(command);
         }
+        // A strike at a nation at peace declares war: the player says yes first, as in the
+        // original game (`super::confirm`).
         match self.legal_after_war(enemy, &command) {
-            Ok(()) => self.declare_war_and_strike(enemy, command),
+            Ok(()) => self.ask_first(super::confirm::Confirmation::Attack { enemy, strike: command }),
             Err(error) => self.message = Some(names::reason(self.rules(), &error)),
         }
     }
@@ -630,7 +632,7 @@ impl Session {
             .map(|_| ())
     }
 
-    fn declare_war_and_strike(&mut self, enemy: PlayerId, command: Command) {
+    pub(super) fn declare_war_and_strike(&mut self, enemy: PlayerId, command: Command) {
         let war = Command::DeclareWar {
             player: self.me(),
             enemy,
