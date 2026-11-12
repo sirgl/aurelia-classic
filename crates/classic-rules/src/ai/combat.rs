@@ -878,7 +878,7 @@ mod tests {
         // variants and `siege-join` play `standard`; so do `unciv` and `unciv-military` wherever Unciv's AI plays no
         // part of its own, and Unciv's modules inside `standard` (`std-unciv-*`); so do the candidates on
         // `standard` and the standards before the twelfth and the thirteenth promotion.
-        let on_top = [Variant::SiegeTacticsNet, Variant::Net, Variant::PreCamps, Variant::PreWorkers, Variant::PreJoin, Variant::PrePuppet, Variant::PuppetPrice, Variant::PuppetAll, Variant::PuppetWar, Variant::SiegeJoin, Variant::Unciv, Variant::UncivMilitary, Variant::NoIdleCities, Variant::ScoutEarly, Variant::TradeFit, Variant::WorkersFit, Variant::ArmyFit, Variant::Camps, Variant::ArmyCamps, Variant::PromoFit, Variant::HealFirst, Variant::FogMarch, Variant::StrategyNet, Variant::UnitNet, Variant::Hybrid, Variant::StandardScripted, Variant::PreCsGifts, Variant::WarOpen, Variant::PreNext];
+        let on_top = [Variant::SiegeTacticsNet, Variant::Net, Variant::PreCamps, Variant::PreWorkers, Variant::PreJoin, Variant::PrePuppet, Variant::PuppetPrice, Variant::PuppetAll, Variant::PuppetWar, Variant::SiegeJoin, Variant::Unciv, Variant::UncivMilitary, Variant::NoIdleCities, Variant::ScoutEarly, Variant::TradeFit, Variant::WorkersFit, Variant::ArmyFit, Variant::Camps, Variant::ArmyCamps, Variant::PromoFit, Variant::HealFirst, Variant::FogMarch, Variant::StrategyNet, Variant::UnitNet, Variant::Hybrid, Variant::StandardScripted, Variant::PreCsGifts, Variant::WarOpen, Variant::PreNext, Variant::Landless];
         assert_eq!(Variant::ALL.iter().filter(|v| v.fight_fix().any() && !war_fix.contains(v) && !on_top.contains(v) && !v.unciv().parts().any()).count(), 6);
     }
 

@@ -16,7 +16,7 @@ fn a_match_with_net_seats_is_deterministic() {
     let suite = Suite::named("smoke").unwrap();
     let rules = ClassicBench::rules();
     let game_match = &suite.matches(Mode::Versus, 0)[0];
-    let pairing = |candidate: &str| Pairing { baseline: "standard".to_owned(), candidate: candidate.to_owned() };
+    let pairing = |candidate: &str| Pairing { baseline: "standard".to_owned(), candidate: candidate.to_owned(), landless_seat: None };
     let first = play_match::<ClassicBench>(&rules, &suite, game_match, &pairing("net:dummy")).unwrap();
     let second = play_match::<ClassicBench>(&rules, &suite, game_match, &pairing("net:dummy")).unwrap();
     assert_eq!(first.hash, second.hash, "{}", game_match.label());
