@@ -333,7 +333,9 @@ pub fn item_problem(
                 && third != receiver
                 && d.at_war(giver, third)
                 && has_met(auth, receiver, third)
-                && !peace_needs_a_deal(auth, giver, third);
+                && !peace_needs_a_deal(auth, giver, third)
+                // As the peace itself with a city-state: not while its ally is at war with the giver.
+                && !crate::systems::city_states::peace_blocked(auth, giver, third);
             if !ok {
                 return Some(DealBlock::CannotMakePeace);
             }
