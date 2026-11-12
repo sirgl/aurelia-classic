@@ -70,7 +70,7 @@ fn run() -> Result<(), String> {
     let script: &'static str = Box::leak(script.into_boxed_str());
     let size: &'static str = Box::leak(size.into_boxed_str());
     let game = Match { map: MapSpec { script, size }, seed, seating };
-    let pairing = Pairing { baseline, candidate };
+    let pairing = Pairing { baseline, candidate, landless_seat: None };
     println!("strategy net: {} hand weights", weights::count());
     println!("features: {}", weights::FEATURES.iter().map(|(name, _)| *name).collect::<Vec<_>>().join(" "));
     trace::enable(true);

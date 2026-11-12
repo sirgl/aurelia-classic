@@ -78,6 +78,10 @@ pub struct ClassicMind {
     /// thirteenth promotion (`Variant::Standard`, as `Variant::NextW`); `Variant::PreNext` plays
     /// `Standard`'s switches without any of them.
     sharp: bool,
+    /// `Variant::FieldCraft`: the mind plays `Standard` (`variant`) with the flag (`TurnBrief::field_craft`).
+    field: bool,
+    /// `Variant::RaidWar`: the mind plays `Standard` (`variant`) with the flag (`TurnBrief::raid_war`).
+    raidw: bool,
     /// `Variant::TallReal`: the mind plays `Sharp` (`sharp` set) whose tall style reaches for the
     /// science victory (`TurnBrief::tall_real`, `ai::tall_real`).
     tall_real: bool,
@@ -100,6 +104,14 @@ pub struct ClassicMind {
     /// `Variant::VoteGuard`: the mind plays `Standard` (`next-w`'s flags set) and takes the alliances
     /// of a rival that would win the World Leader vote (`TurnBrief::vote_guard`, `ai::victory_watch`).
     vote_guard: bool,
+    /// `Variant::Landless`: the mind plays `Standard` with the goal of a player without a city
+    /// (`TurnBrief::landless`).
+    landless: bool,
+    /// `Variant::LandlessPlan`: the mind plays `Standard` with the goal of a player without a city
+    /// given to its strategist (`TurnBrief::landless_plan`).
+    landless_plan: bool,
+    /// The siege layer's mends on every turn, cities or not (`TurnBrief::siege_mend`, `mended`): the tests' switch.
+    siege_mend: bool,
 }
 
 /// The environment variable that makes the game's AI another variant
@@ -144,10 +156,19 @@ impl ClassicMind {
         };
         // `vote-guard` is `standard` (the flags of `next-w`) with the guard on.
         let vote_guard = flags.vote_guard();
+        // `landless` is `Standard` in every switch but its own (`TurnBrief::landless`).
+        let landless = flags.landless();
+        // `landless-plan` likewise (`TurnBrief::landless_plan`).
+        let landless_plan = flags.landless_plan();
+        let flags = if landless || landless_plan { Variant::Standard } else { flags };
         let next = flags.next() || vote_guard;
         let tall_real = flags.tall_real() || next;
         let wonder_race = flags.wonder_race().max(u8::from(vote_guard));
         let sharp = flags.sharp() || tall_real || wonder_race > 0;
+        // `field-craft` and `raid-war` are `Standard` in every switch but their own (`TurnBrief::field_craft`,
+        // `TurnBrief::raid_war`): the mind plays `PreNext`, as on their branch.
+        let field = flags.field_craft();
+        let raidw = flags.raid_war();
         // `tactician-fit` is `WarPays` in every switch but its own (`TurnBrief::tactician_fit`).
         let fit = war.tactician_fit();
         // `war-muster` is `WarPays` in every switch but the muster fix (`TurnBrief::muster_fix`).
@@ -160,6 +181,8 @@ impl ClassicMind {
         let pays = war.war_pays() || fit || muster;
         let variant = if pays {
             Variant::WarOpen
+        } else if field || raidw {
+            Variant::PreNext
         } else if sharp {
             Variant::Standard
         } else {
@@ -185,7 +208,7 @@ impl ClassicMind {
         // war of `siege-call` under its own, `next-war-retake` as `Standard` with the war of
         // `retake2` under its own.
         let named = named.or(matches!(requested, Variant::NextW | Variant::NextWar | Variant::NextWarRetake).then_some(requested));
-        Self { advisors, variant, genome: None, humans: Vec::new(), walks: Default::default(), choice: None, #[cfg(feature = "experimental-ai")] net, book, named, walls, conquest: None, unciv, tall: None, sharp, tall_real, next, wonder_race, pays, fit, muster, call, retake2, vote_guard }
+        Self { advisors, variant, genome: None, humans: Vec::new(), walks: Default::default(), choice: None, #[cfg(feature = "experimental-ai")] net, book, named, walls, conquest: None, unciv, tall: None, sharp, tall_real, next, wonder_race, pays, fit, muster, call, retake2, vote_guard, field, raidw, landless, landless_plan, siege_mend: false }
     }
 
     /// A league book that may play on another base (`book_on`): a duel book
@@ -231,7 +254,7 @@ impl ClassicMind {
         advisors.register(crate::classic::ClassicSystem::Diplomacy, Box::new(crate::ai::diplomacy::DiplomacyAdvisor { embassies: variant.values_embassies() }));
         // The net plays on `NET_BASE`: its siege too.
         let walls = variant.siege_walls().then(|| Box::new(crate::ai::siege_walls::SiegeWalls::new().joined(variant.siege_join())));
-        Self { advisors, variant, genome: None, humans: Vec::new(), walks: Default::default(), choice: None, net: Some(Box::new(net)), book: None, named: None, walls, conquest: None, unciv: None, tall: None, sharp: false, tall_real: false, next: false, wonder_race: 0, pays: false, fit: false, muster: false, call: false, retake2: false, vote_guard: false }
+        Self { advisors, variant, genome: None, humans: Vec::new(), walks: Default::default(), choice: None, net: Some(Box::new(net)), book: None, named: None, walls, conquest: None, unciv: None, tall: None, sharp: false, tall_real: false, next: false, wonder_race: 0, pays: false, fit: false, muster: false, call: false, retake2: false, vote_guard: false, field: false, raidw: false, landless: false, landless_plan: false, siege_mend: false }
     }
 
     /// The net's part (`Variant::Net`), if any.
@@ -262,6 +285,13 @@ impl ClassicMind {
         self
     }
 
+    /// This mind with the siege layer's mends on every turn, with cities or without (`TurnBrief::siege_mend`): the
+    /// tests that the mends hold for an army with cities, and a later measure of them for `standard`. No variant
+    /// plays it.
+    pub fn mended(self) -> Self {
+        Self { siege_mend: true, ..self }
+    }
+
     /// The mind of `variant` deciding with the knobs of `genome` (dev-only,
     /// `ai::genome`); every other mind keeps the constants.
     pub fn with_genome(variant: Variant, genome: Genome) -> Self {
@@ -269,6 +299,12 @@ impl ClassicMind {
     }
 
     pub fn variant(&self) -> Variant {
+        if self.landless {
+            return Variant::Landless;
+        }
+        if self.landless_plan {
+            return Variant::LandlessPlan;
+        }
         if self.vote_guard {
             return Variant::VoteGuard;
         }
@@ -290,6 +326,12 @@ impl ClassicMind {
         }
         if self.sharp {
             return Variant::Sharp;
+        }
+        if self.field {
+            return Variant::FieldCraft;
+        }
+        if self.raidw {
+            return Variant::RaidWar;
         }
         if self.fit {
             return Variant::TacticianFit;
@@ -420,6 +462,28 @@ impl AiMind<Classic> for ClassicMind {
         let gate = self.variant.war_gate(start.brief.prices.as_ref(), &stakes);
         // A book's attack is its own operation: `standard` starts none while it plays.
         let gate = if self.book.as_ref().is_some_and(|b| b.holds_war(sight.player)) { operations::WarGate::Never } else { gate };
+        if start.brief.landless_planned() && state.operations().is_empty() {
+            // A player with units and no city: the city its units take is the strategist's target (`ai::landless`;
+            // `operations::start` looks for one only while no operation runs).
+            // `TurnBrief::siege_mend`: not a city its siege saw it could not take.
+            let beyond = match &self.walls {
+                Some(walls) if start.brief.siege_mend => walls.beyond_reach(&start.brief),
+                _ => Vec::new(),
+            };
+            start.brief.landless_goal = crate::ai::landless::goal(sight, &start.brief, state, rules, &beyond);
+        }
+        if start.brief.siege_mend && start.brief.landless_planned() {
+            // The target of its operation seen now is weighed again on what the player sees: before its war by the goal's
+            // estimate (`ai::landless::takes`), at war by the siege's (`SiegeWalls::beyond_reach`).
+            let beyond = self.walls.as_ref().map(|w| w.beyond_reach(&start.brief)).unwrap_or_default();
+            let brief = &start.brief;
+            let seen = |t: crate::ids::TileId| sight.visible_foreign_cities.iter().any(|c| c.tile == t);
+            start.brief.landless_untaken = state
+                .operations()
+                .iter()
+                .find(|o| if brief.at_war(o.enemy) { beyond.contains(&o.target) } else { seen(o.target) && !crate::ai::landless::takes(sight, brief, state, rules, o.target) })
+                .map(|o| o.target);
+        }
         let _span = prof::span("classic/operations_plan");
         let mut decisions = operations::plan(&start.brief, state, rules, &mut routes, gate);
         if let Some(book) = &self.book {
@@ -711,6 +775,16 @@ impl ClassicMind {
         brief.fog_march = self.variant.fog_march();
         brief.war_open = self.variant.war_open();
         brief.sharp = self.sharp;
+        brief.field_craft = self.field;
+        brief.raid_war = self.raidw;
+        brief.landless = self.landless;
+        brief.landless_plan = self.landless_plan;
+        if brief.landless_planned() {
+            // The brief's relations are the nations' (city-states have their own system, `ai::system`): a player
+            // with no city takes a city-state's city as well, and its strategist must see that war (`operations`).
+            brief.relations = observation.relations.iter().filter(|r| r.kind != PlayerKind::Module(ClassicKind::Barbarian)).copied().collect();
+        }
+        brief.siege_mend = self.siege_mend || brief.landless_planned();
         brief.tall_real = self.tall_real;
         brief.next = self.next;
         brief.vote_guard = self.vote_guard;
@@ -1008,6 +1082,25 @@ mod sharp_tests {
         let flagged: Vec<Variant> = Variant::ALL.into_iter().filter(|v| v.sharp()).collect();
         assert_eq!(flagged, [Variant::Sharp]);
         assert_eq!(Variant::from_name("sharp"), cfg!(feature = "experimental-ai").then_some(Variant::Sharp));
+    }
+
+    /// `landless` is `Standard` in every switch (the flags of `next-w` included) but for its own flag
+    /// (`TurnBrief::landless`); no other variant has the flag, and `Standard` does not carry it.
+    #[test]
+    fn landless_plays_standard_with_its_flag() {
+        let flags = |m: &ClassicMind| (m.sharp, m.tall_real, m.next, m.wonder_race, m.pays, m.fit, m.field, m.raidw);
+        let (landless, standard) = (ClassicMind::new(Variant::Landless), ClassicMind::new(Variant::Standard));
+        assert_eq!((landless.variant, flags(&landless), landless.landless, landless.variant()), (Variant::Standard, flags(&standard), true, Variant::Landless));
+        assert!(!standard.landless && standard.variant() == Variant::Standard);
+        let flagged: Vec<Variant> = Variant::ALL.into_iter().filter(|v| v.landless()).collect();
+        assert_eq!(flagged, [Variant::Landless]);
+        assert_eq!(Variant::from_name("landless"), cfg!(feature = "experimental-ai").then_some(Variant::Landless));
+        let plan = ClassicMind::new(Variant::LandlessPlan);
+        assert_eq!((plan.variant, flags(&plan), plan.landless, plan.landless_plan, plan.variant()), (Variant::Standard, flags(&standard), false, true, Variant::LandlessPlan));
+        assert!(!standard.landless_plan);
+        let planned: Vec<Variant> = Variant::ALL.into_iter().filter(|v| v.landless_plan()).collect();
+        assert_eq!(planned, [Variant::LandlessPlan]);
+        assert_eq!(Variant::from_name("landless-plan"), cfg!(feature = "experimental-ai").then_some(Variant::LandlessPlan));
     }
 
     /// `tall-real` is `sharp` with its tall play: the mind plays `Standard` with both flags and

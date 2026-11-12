@@ -110,7 +110,7 @@ use kernel::replay::hash::authoritative_hash;
 const SMOKE_RESULT_HASH: &str = "752dcbddd8b2ba1a";
 
 fn pairing(candidate: &str) -> Pairing {
-    Pairing { baseline: "standard".to_owned(), candidate: candidate.to_owned() }
+    Pairing { baseline: "standard".to_owned(), candidate: candidate.to_owned(), landless_seat: None }
 }
 
 fn report(suite: &Suite, mode: Mode, pairing: &Pairing, jobs: usize) -> TournamentReport {
@@ -186,7 +186,7 @@ fn neutral_leaders_on(suite: &str, leaders: &str, allocator: &str) {
     let mut rules = ClassicBench::rules();
     rules.module.personalities.clear();
     for game_match in suite.matches(Mode::Versus, 0) {
-        let against = |candidate: &str| Pairing { baseline: allocator.to_owned(), candidate: candidate.to_owned() };
+        let against = |candidate: &str| Pairing { baseline: allocator.to_owned(), candidate: candidate.to_owned(), landless_seat: None };
         let alone = play_match::<ClassicBench>(&rules, &suite, &game_match, &against(allocator)).unwrap();
         if alone.seats.iter().any(|s| s.combat.wars > 0) {
             continue;

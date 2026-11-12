@@ -241,6 +241,7 @@ mod tests {
             round_ms: Vec::new(),
             eras: Vec::new(),
             space_parts: 6,
+            landless: None,
         }
     }
 

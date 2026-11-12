@@ -170,6 +170,11 @@ pub trait BenchRules {
     /// bench's combat record).
     fn is_combat(command: &<Self::M as RulesModule>::Command) -> bool;
 
+    /// A command that pillages a tile (counted in the combat record: the AI's raids).
+    fn is_pillage(_command: &<Self::M as RulesModule>::Command) -> bool {
+        false
+    }
+
     /// The speed's pace percent and the production a turn of each of the player's cities (probe only).
     fn order_inputs(_game: &GameState<Self::M>, _rules: &CompiledRuleset<Self::M>, _player: PlayerId) -> (u32, Vec<(kernel::ids::CityHandle, u32)>) {
         (100, Vec::new())
@@ -512,6 +517,10 @@ impl BenchRules for ClassicBench {
 
     fn goal_name(goal: u8) -> Option<&'static str> {
         classic_rules::ai::grand_strategy::VictoryPath::from_code(goal).map(|p| p.name())
+    }
+
+    fn is_pillage(command: &classic_rules::Command) -> bool {
+        matches!(command, classic_rules::Command::Pillage { .. })
     }
 
     fn is_combat(command: &classic_rules::Command) -> bool {

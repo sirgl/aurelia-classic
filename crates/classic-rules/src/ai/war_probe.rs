@@ -25,6 +25,9 @@ pub enum EndCause {
     Outmatched,
     /// Its army was worth more at a city in danger (`ai::defence`).
     Recalled,
+    /// `TurnBrief::siege_mend`: the target of a player with no city, in sight now, is not one its units on hand take
+    /// (`ai::landless::takes`).
+    Untaken,
 }
 
 /// One evaluation of a candidate target under `WarGate::Value`.
@@ -275,6 +278,12 @@ pub struct WarProbe {
     /// The cities of every player at the end of its turn: (round, player, tiles). A city taken back
     /// returns to its former owner without a decision, so `captures` does not see it.
     pub cities: Vec<(u32, PlayerId, Vec<u32>)>,
+    /// `landless-plan`: the city `ai::landless::goal` chose for a player with no city, each turn it chose
+    /// one: (round, player, target tile).
+    pub landless_goals: Vec<(u32, PlayerId, u32)>,
+    /// `landless-plan`: the operations started on such a goal (`operations::start_landless`): (round,
+    /// player, target tile).
+    pub landless_starts: Vec<(u32, PlayerId, u32)>,
 }
 
 thread_local! {

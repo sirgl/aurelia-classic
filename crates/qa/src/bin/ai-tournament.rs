@@ -36,6 +36,9 @@
 //!                      same suite and speed; a block's value is then the
 //!                      candidate's share minus the reference's on the same
 //!                      games (S0, S1 are differences: -0.05,0.05)
+//! --landless-seat N    a measurement: at the start of each game the settlers of the N-th major player's seat (from 0)
+//!                      are removed (a seat with no other unit keeps them); the report adds the share of games in
+//!                      which that seat owns a city at the end of round 100 and 200. Not with --sprt, --repeat or --save.
 //! --list               print the variants
 
 use std::time::Instant;
@@ -66,6 +69,7 @@ struct Options {
     min_games: Option<usize>,
     max_games: Option<usize>,
     references: Vec<String>,
+    landless_seat: Option<usize>,
 }
 
 fn pair(flag: &str, value: &str) -> Result<(f64, f64), String> {
@@ -96,6 +100,7 @@ fn options() -> Result<Options, String> {
         min_games: None,
         max_games: None,
         references: Vec::new(),
+        landless_seat: None,
     };
     let mut args = std::env::args().skip(1);
     while let Some(flag) = args.next() {
@@ -123,6 +128,7 @@ fn options() -> Result<Options, String> {
             "--min-games" => options.min_games = Some(value()?.parse().map_err(|e| format!("--min-games: {e}"))?),
             "--max-games" => options.max_games = Some(value()?.parse().map_err(|e| format!("--max-games: {e}"))?),
             "--reference" => options.references.push(value()?),
+            "--landless-seat" => options.landless_seat = Some(value()?.parse().map_err(|e| format!("--landless-seat: {e}"))?),
             other => return Err(format!("unknown option {other}")),
         }
     }
@@ -137,6 +143,9 @@ fn options() -> Result<Options, String> {
         }
         Some((s0, s1)) if s0 >= s1 => return Err("--sprt S0,S1 needs S0 < S1".to_owned()),
         _ => {}
+    }
+    if options.landless_seat.is_some() && (options.sprt.is_some() || options.repeat > 1 || options.save.is_some() || options.compare.is_some()) {
+        return Err("--landless-seat is a plain run: without --sprt, --repeat, --save and --compare".to_owned());
     }
     let (alpha, beta) = options.sprt_error;
     if !(0.0 < alpha && alpha < 0.5 && 0.0 < beta && beta < 0.5) {
@@ -169,15 +178,18 @@ fn run<R: BenchRules>(options: &Options) -> Result<(), String> {
     };
     let game_ai = R::variants()[0];
     let side = |name: &Option<String>| name.as_deref().unwrap_or(game_ai).to_owned();
-    let pairing = Pairing { baseline: side(&options.baseline), candidate: side(&options.candidate) };
+    let pairing = Pairing { baseline: side(&options.baseline), candidate: side(&options.candidate), landless_seat: options.landless_seat };
     if let Some((s0, s1)) = options.sprt {
         let sprt = Sprt { s0, s1, alpha: options.sprt_error.0, beta: options.sprt_error.1 };
         return run_sequential::<R>(options, &pairing, &suite, sprt);
     }
     let mut reports = Vec::new();
     for offset in options.seed_offset..options.seed_offset + options.repeat.max(1) {
-        let report = play_suite::<R>(options, &pairing, &suite, offset)?;
+        let (report, landless) = play_suite::<R>(options, &pairing, &suite, offset)?;
         println!("{}", report.markdown(options.matches));
+        if let Some(text) = landless {
+            println!("{text}");
+        }
         reports.push(report);
     }
     if reports.len() > 1 {
@@ -195,7 +207,7 @@ fn run<R: BenchRules>(options: &Options) -> Result<(), String> {
     Ok(())
 }
 
-fn play_suite<R: BenchRules>(options: &Options, pairing: &Pairing, suite: &Suite, offset: u64) -> Result<TournamentReport, String> {
+fn play_suite<R: BenchRules>(options: &Options, pairing: &Pairing, suite: &Suite, offset: u64) -> Result<(TournamentReport, Option<String>), String> {
     let matches = suite.matches(options.mode, offset);
     let started = Instant::now();
     let results = tournament::<R>(suite, &matches, pairing, options.jobs).map_err(|failed| failed.join("\n"))?;
@@ -208,7 +220,8 @@ fn play_suite<R: BenchRules>(options: &Options, pairing: &Pairing, suite: &Suite
         jobs: options.jobs,
         wall_seconds: started.elapsed().as_secs_f64(),
     };
-    Ok(TournamentReport::new(&run, &results))
+    let landless = aurelia_qa::bench::landless::summary(&results.iter().map(|r| r.landless.clone()).collect::<Vec<_>>());
+    Ok((TournamentReport::new(&run, &results), landless))
 }
 
 /// A sequential run (`--sprt`): seed blocks until the test decides; the

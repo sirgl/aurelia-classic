@@ -320,6 +320,44 @@ fn decide_military(
     if let Some(decision) = tactics::immediate(view, state, tools) {
         return decision;
     }
+    // A player with units and no city gives them a goal (`ai::landless`); with a city it plays on.
+    if view.brief.landless || view.brief.landless_plan {
+        if let Some(decision) = crate::ai::landless::decide(view, state, tools) {
+            return decision;
+        }
+    }
+    if view.brief.field_craft {
+        // The unit has its task before the field-craft rules ask what it is free for.
+        ensure_task(view, state, tools);
+        // A unit whose task has it wait (a forming operation's muster, an assault gathering) is
+        // asked after its task has had its say, unless it is already out on a sortie; any other free
+        // unit is asked first.
+        let waits = matches!(state.task_of(view.local.unit.id).map(|t| t.task), Some(UnitTask::Operation { .. } | UnitTask::Assault { .. })) && !crate::ai::field_craft::abroad(view);
+        if !waits {
+            if let Some(decision) = crate::ai::field_craft::sortie(view, state, tools) {
+                return decision;
+            }
+        }
+        // A sortie that pays comes first (its risk reads the fighters in sight); then the unit takes its ground.
+        if let Some(decision) = crate::ai::field_craft::stance(view, state, tools) {
+            return decision;
+        }
+        let decision = follow_task(view, state, tools);
+        let idle = decision.command.as_ref().is_none_or(|c| matches!(c, Command::Fortify { .. }));
+        if waits && idle {
+            if let Some(sortie) = crate::ai::field_craft::sortie(view, state, tools) {
+                return sortie;
+            }
+        }
+        return decision;
+    }
+    if view.brief.raid_war {
+        // The unit has its task before the pillage asks what it is free for.
+        ensure_task(view, state, tools);
+        if let Some(decision) = crate::ai::raid_war::sortie(view, state, tools) {
+            return decision;
+        }
+    }
     follow_task(view, state, tools)
 }
 
@@ -395,10 +433,7 @@ fn task_valid(view: &UnitView<'_, '_>, state: &AiState, rules: &CompiledRuleset,
         }
         UnitTask::Assault { target } => {
             view.brief.is_retaken(target)
-                || state
-                    .relations()
-                    .iter()
-                    .any(|m| m.at_war && m.objective.is_some_and(|o| o.tile == target))
+                || state.relations().iter().any(|m| m.at_war && m.objective.is_some_and(|o| o.tile == target)) && assault_backed(view, state, target)
         }
         UnitTask::Escort { ward } => escorted_settler_alive(view, state, ward),
         UnitTask::Heal { .. } => unit.hp < crate::world::unit::UNIT_MAX_HP,
@@ -524,7 +559,7 @@ fn assign_military_task(
     if let Some(city) = ungarrisoned_city(view, state) {
         return Some(UnitTask::Defend { city });
     }
-    if let Some(target) = assault_objective(state) {
+    if let Some(target) = assault_objective(state).filter(|t| assault_backed(view, state, *t)) {
         return Some(UnitTask::Assault { target });
     }
     if let Some(ward) = unescorted_settler(view, state) {
@@ -562,6 +597,13 @@ fn ungarrisoned_city(view: &UnitView<'_, '_>, state: &AiState) -> Option<TileId>
         .filter(|c| state.holders(Reservation::Garrison(c.tile), Some(unit.id)) < target)
         .min_by_key(|c| (dims.distance(c.tile, unit.tile).unwrap_or(i32::MAX), c.id))
         .map(|c| c.tile)
+}
+
+/// A player with no city and no settler (`TurnBrief::landless_planned`) assaults a city only beside the
+/// operation on it: its army is that operation, and when the operation is called off (outmatched, timed out) there
+/// is no home to fall back to and no second army. True in every other state.
+fn assault_backed(view: &UnitView<'_, '_>, state: &AiState, target: TileId) -> bool {
+    !view.brief.landless_planned() || state.operation(target).is_some()
 }
 
 fn assault_objective(state: &AiState) -> Option<TileId> {
@@ -924,4 +966,15 @@ pub fn approach_at(
         Some(path) if path.len() > 1 => step_on(view, tools.rules, &path, reason),
         _ => Decision::refuse(actor, Reason::Rally),
     }
+}
+
+/// The unit holds the garrison of `city` beyond what the city wants (the higher ids first), and the
+/// city is not in danger: a unit the city does not need (`field_craft::sortie`).
+pub(crate) fn spare_garrison(view: &UnitView<'_, '_>, state: &AiState, city: TileId) -> bool {
+    if view.brief.endangered(city) {
+        return false;
+    }
+    let unit = view.local.unit.id;
+    let senior = state.tasks().iter().filter(|t| t.task == UnitTask::Defend { city } && t.unit < unit).count();
+    senior >= garrison_target(view, state).max(1)
 }

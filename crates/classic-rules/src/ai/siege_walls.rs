@@ -35,6 +35,21 @@
 //! its worth — is positive, else it closes in next to the city between it and
 //! the shooters (a screen). When the group cannot take the city, it goes back
 //! to the ring and heals.
+//!
+//! The mends found on the siege arenas without a city (`TurnBrief::siege_mend`, 12 Nov; on for a `landless-plan`
+//! player with no city, and for a mind made `ClassicMind::mended`; `standard` plays as before):
+//! - a member of the group is in place: not discounted by the arrival model unless the enemy holds it or it heals
+//!   first; a melee member's first blow is its known path's to the walls (`walk_turns`), not the hex distance's; a
+//!   wait leaves the members on their posts (`waited_from`); a member with no nearer step walks its path to free land
+//!   next to the walls; a wounded one next to the walls that made no blow frees its tile;
+//! - the melee blows a round are as many as the free land tiles next to the walls (`CityModel::slots`); a player with
+//!   no city makes a wearing blow while its striker survives the worst damage, in the model and on the field alike
+//!   (`CityModel::keep_alive`);
+//! - a city out of sight is the one the player remembers: the hit points it showed last healed by the rules' rate
+//!   since, the exchange the last previews showed (`Memory::exchange`); it may be struck so, the spotter first, from
+//!   a tile that sees it by the rules' sight (`sees_from`) and out of its reach when one does;
+//! - the operations' targets seen out of reach (`Choice::Front`) are remembered (`SiegeWalls::beyond_reach`): a
+//!   player with no city calls such an operation off (`operations::advance`, `EndCause::Untaken`).
 
 use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -520,6 +535,14 @@ pub struct CityModel {
     /// Strikes on our units a round besides the city's own (its ranged
     /// garrison and neighbours).
     pub extra_hits: u8,
+    /// The melee blows a round at most: the free land next to the walls a melee unit strikes from
+    /// (`TurnBrief::siege_mend`); 0: no bound (every ready melee unit strikes).
+    pub slots: u8,
+    /// The besiegers' blow rule: a blow that wears the city down is made when its striker survives the blow's worst
+    /// damage (a player with no city, `TurnBrief::landless_planned` with `siege_mend`: no reinforcement comes, no home
+    /// to heal in, the city is all it can win; its members strike by the same rule, `own_part`), else when the worst
+    /// leaves it `front::STRIKE_KEEPS_HP`.
+    pub keep_alive: bool,
 }
 
 /// The expected value of a plan: the capture's value by its chance and
@@ -603,15 +626,20 @@ pub fn simulate(fighters: &[Fighter], city: &CityModel, delay: u32, window: u32)
         let mut p = 0.0;
         let mut left = after;
         let mut reach = 1.0;
+        let mut blows = 0u8;
         for &i in &melee {
+            if city.slots > 0 && blows >= city.slots {
+                break;
+            }
             let d = scaled(fighters[i].dealt, k(i));
             let falls = chance_at_least(d, left, spread) * alive[i];
             let taken = fighters[i].taken;
-            let keeps = hp[i] - f64::from(taken.2) >= f64::from(crate::ai::front::STRIKE_KEEPS_HP);
+            let keeps = hp[i] - f64::from(taken.2) >= if city.keep_alive { 1.0 } else { f64::from(crate::ai::front::STRIKE_KEEPS_HP) };
             if falls <= 0.0 && !keeps {
                 continue;
             }
             let dies = chance_at_least((f64::from(taken.0), f64::from(taken.1), f64::from(taken.2)), hp[i], 0.0);
+            blows += 1;
             out.loss += open * reach * alive[i] * dies * f64::from(fighters[i].worth);
             p += reach * falls;
             reach *= 1.0 - falls;
@@ -660,13 +688,23 @@ pub fn simulate(fighters: &[Fighter], city: &CityModel, delay: u32, window: u32)
 /// when `step_in` (a siege unit sets up, a step into range takes a shooter's
 /// moves); the city healed back.
 pub fn waited(fighters: &[Fighter], step_in: &[bool], awaited: &[Option<Awaited>], city: &CityModel, wait: u32) -> (Vec<Fighter>, CityModel) {
+    let from_post: Vec<u32> = step_in.iter().map(|s| u32::from(*s)).collect();
+    waited_from(fighters, step_in, &from_post, awaited, city, wait)
+}
+
+/// `waited` with each fighter's first round of a strike made from its post (`from_post`, `TurnBrief::siege_mend`):
+/// a member waits on its post, so the wait brings it no nearer the walls than that (the walk from a post one
+/// tile beyond the ring, or round a lake, is counted); `waited` has every post on the ring, a round's step in at
+/// most.
+pub fn waited_from(fighters: &[Fighter], step_in: &[bool], from_post: &[u32], awaited: &[Option<Awaited>], city: &CityModel, wait: u32) -> (Vec<Fighter>, CityModel) {
     // Rounds counted from the strike's start, `wait` rounds from now (`simulate`'s `delay`).
     let later: Vec<Fighter> = fighters
         .iter()
         .zip(step_in)
+        .zip(from_post)
         .zip(awaited.iter().chain(std::iter::repeat(&None)))
-        .map(|((f, set), a)| {
-            let ready = u32::from(*set).max(f.ready.saturating_sub(wait));
+        .map(|(((f, set), post), a)| {
+            let ready = (*post).max(u32::from(*set)).max(f.ready.saturating_sub(wait));
             let arrive = a.as_ref().map_or(f.arrive, |a| arrival(a, wait + ready));
             Fighter { hp: f.hp.saturating_add(FIELD_HEAL.saturating_mul(wait as u16)).min(UNIT_MAX_HP), ready, exposed: ready.saturating_sub(u32::from(*set)), arrive, ..*f }
         })
@@ -746,6 +784,30 @@ struct Memory {
     strength: BTreeMap<TileId, i64>,
     /// The city each operation's group besieged last turn (`plan_operation`).
     chosen: BTreeMap<TileId, TileId>,
+    /// The hit points each foreign city in sight showed last, and the round (`TurnBrief::siege_mend`: out of
+    /// sight it is that, healed by the rules' rate since).
+    last_seen: BTreeMap<TileId, (u16, u32)>,
+    /// The operations' own targets, in sight, whose group had no capture in reach now or after any wait weighed
+    /// (`Choice::Front`; `SiegeWalls::beyond_reach`), with the hit points of the player's military units then.
+    beyond: Vec<(TileId, u32)>,
+    /// The exchange the last preview of a strike on each city showed for each unit kind: the striker's hit points
+    /// then, the damage it deals and the damage it takes (`TurnBrief::siege_mend`: out of sight it is that, not the
+    /// estimate of `operations::estimated_strike`).
+    exchange: BTreeMap<(TileId, u16), (u16, (u16, u16, u16), (u16, u16, u16))>,
+}
+
+/// The hit points of the player's military units (`SiegeWalls::beyond_reach`).
+fn army_hp(brief: &TurnBrief) -> u32 {
+    brief.units.iter().filter(|u| u.role == AiRole::Military).map(|u| u32::from(u.hp)).sum()
+}
+
+/// `TurnBrief::siege_mend`: the remembered exchange of `kind` with the city at `target` for a striker at `hp`: the damage
+/// it deals scaled by its wounds against the striker's then (`WOUNDED_DAMAGE_PERCENT`), the damage it takes as it was.
+fn remembered_exchange(m: &Memory, target: TileId, kind: crate::ids::UnitKindId, hp: u16) -> Option<((u16, u16, u16), (u16, u16, u16))> {
+    let &(then, dealt, taken) = m.exchange.get(&(target, kind.0))?;
+    let k = wounded(f64::from(hp)) / wounded(f64::from(then));
+    let s = |x: u16| (f64::from(x) * k).round() as u16;
+    Some(((s(dealt.0), s(dealt.1), s(dealt.2)), taken))
 }
 
 /// The start-of-turn orders the siege plans take over.
@@ -903,7 +965,16 @@ fn defence_of(brief: &TurnBrief, rules: &CompiledRuleset, m: &Memory, seen: &See
     if let Some(strength) = m.strength.get(&seen.tile) {
         estimate.strength = *strength;
     }
-    Defence { hp: observed.map_or(cap, |c| c.hp), cap, estimate }
+    // `TurnBrief::siege_mend`: a city out of sight has the hit points it showed last, healed since by the rules' rate
+    // (`combat::city::heal_per_turn`, every round of its owner's); else, and never seen, the most it holds.
+    let unseen = match m.last_seen.get(&seen.tile) {
+        Some(&(hp, round)) if brief.siege_mend => {
+            let healed = u32::from(hp) + brief.round.saturating_sub(round) * CITY_HEAL_PER_TURN as u32;
+            healed.min(u32::from(cap)) as u16
+        }
+        _ => cap,
+    };
+    Defence { hp: observed.map_or(unseen, |c| c.hp), cap, estimate }
 }
 
 impl SiegeWalls {
@@ -914,6 +985,17 @@ impl SiegeWalls {
     /// The siege with `siege-join`'s switches.
     pub fn joined(self, fix: SiegeJoin) -> Self {
         Self { fix, ..self }
+    }
+
+    /// The operations' targets the player saw its group could not take (`Choice::Front` with the city in sight: no
+    /// capture in reach, now or after any wait), oldest first, while its military units hold no more hit points than
+    /// then. `TurnBrief::siege_mend`: a player with no city calls such an operation off and chooses another city
+    /// (`ai::landless::goal`); no new unit comes to it, its units heal.
+    pub fn beyond_reach(&self, brief: &TurnBrief) -> Vec<TileId> {
+        let memory = self.memory.lock().expect("no siege thread panicked");
+        let army = army_hp(brief);
+        // The verdict holds while the army is no stronger than it was then (its units heal, no new one comes).
+        memory.get(&brief.player).map(|m| m.beyond.iter().filter(|(_, then)| army <= *then).map(|(t, _)| *t).collect()).unwrap_or_default()
     }
 
     /// The plans of the player's turn; returns the start-of-turn shots they
@@ -930,6 +1012,7 @@ impl SiegeWalls {
         for city in &sight.visible_foreign_cities {
             let hp = m.max_hp.entry(city.tile).or_insert(city.hp);
             *hp = (*hp).max(city.hp);
+            m.last_seen.insert(city.tile, (city.hp, brief.round));
         }
         let mut targets: Vec<TileId> = brief.units.iter().filter_map(|u| besieged(brief, state, u.id, self.fix.join)).collect();
         targets.sort();
@@ -991,7 +1074,9 @@ impl SiegeWalls {
         }
         // The spotter keeps the city in sight for the next turn's plan while the group
         // waits (back on the ring it would not see it: the ring lies beyond its sight).
-        if !plan.choice.strikes() && plan.spot.is_some_and(|s| s.done && s.unit == unit.id) && unit.tile == plan.spot.map_or(unit.tile, |s| s.to) {
+        // `TurnBrief::siege_mend`: not under the walls' strike (the plan remembers the city).
+        let in_reach = view.local.view.dimensions().distance(unit.tile, target).is_some_and(|d| d <= plan.reach);
+        if !plan.choice.strikes() && plan.spot.is_some_and(|s| s.done && s.unit == unit.id) && unit.tile == plan.spot.map_or(unit.tile, |s| s.to) && !(brief.siege_mend && in_reach) {
             return Some(hold(view, Reason::Rally));
         }
         if plan.choice.strikes() {
@@ -1015,6 +1100,8 @@ struct Weighed {
     fortified_unanswered: bool,
     /// Wounded members left out of a strike to heal.
     rested: usize,
+    /// The city was in sight (the previews weighed it).
+    observed: bool,
     /// The trace's line.
     line: String,
 }
@@ -1065,6 +1152,11 @@ fn plan_operation(mind: u64, sight: &AIObservation<'_>, brief: &TurnBrief, state
     let at = chosen.or_else(|| weighed.iter().position(|w| w.plan.target == op))?;
     let mut weighed = weighed;
     let mut pick = weighed.swap_remove(at);
+    if chosen.is_none() && pick.plan.target == op && pick.observed {
+        let army = army_hp(brief);
+        m.beyond.retain(|(t, _)| *t != op);
+        m.beyond.push((op, army));
+    }
     if chosen.is_none() {
         pick.plan.choice = Choice::Front;
         pick.plan.shots.clear();
@@ -1126,6 +1218,45 @@ fn awaited(sight: &AIObservation<'_>, brief: &TurnBrief, rules: &CompiledRuleset
         _ => (by_hex(distance(unit.tile, target)).max(0) as u32, f64::from(u8::from(reached(unit.tile)))),
     };
     Awaited { turns, engaged, wounded: unit.hp < HEAL_BELOW_HP, threat }
+}
+
+/// `TurnBrief::siege_mend`: a unit of `kind` on `from` sees `to` by the rules' sight (`derived::visibility`: its kind's
+/// radius, one more on hills; no tile strictly between higher than its eye: hills 1, mountains 3, a feature that hides
+/// one more, the eye 1 on hills), over the tiles as the player knows them (an unknown tile hides).
+fn sees_from(pv: &crate::knowledge::view::PlayerView<'_>, rules: &CompiledRuleset, kind: crate::ids::UnitKindId, from: TileId, to: TileId) -> bool {
+    use crate::derived::visibility::{HILLS_SIGHT_BONUS, MAX_SIGHT, SIGHT_RADIUS};
+    let kinds = pv.terrain_kinds();
+    let hills = |t: TileId| pv.tile(t).snapshot().is_some_and(|s| kinds.is_hills(s.terrain.0));
+    let level = |t: TileId| match pv.tile(t).snapshot() {
+        None => u8::MAX,
+        Some(s) => {
+            let base = if kinds.is_hills(s.terrain.0) { 1 } else if kinds.is_mountains(s.terrain.0) { 3 } else { 0 };
+            base + u8::from(s.feature.is_some_and(|f| rules.features.get(f.0 as usize).is_some_and(|d| d.see_through > 0)))
+        }
+    };
+    let base = i32::from(rules.units[kind.0 as usize].sight);
+    let radius = (if base == 0 { SIGHT_RADIUS } else { base } + if hills(from) { HILLS_SIGHT_BONUS } else { 0 }).min(MAX_SIGHT);
+    let dims = pv.dimensions();
+    let eye = u8::from(hills(from));
+    dims.distance(from, to).is_some_and(|d| d <= radius) && crate::math::hex_line_all(&dims, from, to, |t| level(t) <= eye)
+}
+
+/// `TurnBrief::siege_mend`: the turns the unit's known path takes to its first tile within `within` of `target` (next
+/// to the walls for a melee unit, its range for a shooter) at its moves a turn, as `awaited` counts a way; None when
+/// the player knows no path there.
+fn walk_turns(sight: &AIObservation<'_>, brief: &TurnBrief, unit: &OwnUnit, target: TileId, within: i32) -> Option<u32> {
+    use crate::ai::planner_map::{find_path, turns_for, Blockers, KnownMap, MapScratch, PathOutcome, SearchStats};
+    let dims = brief.dims;
+    let map = KnownMap::of_kind(&sight.view, unit.kind);
+    let limit = crate::ai::planner::DecisionBudget::default().search();
+    match find_path(&map, unit.tile, target, &Blockers::new(Vec::new()), &mut MapScratch::default(), limit, &mut SearchStats::default()) {
+        PathOutcome::Found { tiles, points } if tiles.len() > 1 => {
+            let at = tiles.iter().position(|t| dims.distance(*t, target).is_some_and(|d| d <= within))?;
+            let share = points as u64 * at as u64 / (tiles.len() - 1) as u64;
+            Some(turns_for(share as u32, unit.moves_max))
+        }
+        _ => None,
+    }
 }
 
 /// The plan of the siege of `target` by the members of the operation against
@@ -1224,6 +1355,12 @@ fn evaluate(mind: u64, sight: &AIObservation<'_>, brief: &TurnBrief, state: &AiS
     let mut ids: Vec<(EntityId, bool)> = Vec::new();
     let mut claimed: Vec<TileId> = Vec::new();
     let mut outranged = false;
+    // `TurnBrief::siege_mend`: a member of the group is in place (the plan walks it; the arrival model is for the
+    // members on their way, and for one the enemy holds or that heals first), its first round of a strike is its
+    // known path's (a post round a lake is no post next to the walls), and a wait leaves it on its post (`waited_from`).
+    let mend = brief.siege_mend;
+    let mut from_post: Vec<u32> = Vec::new();
+    let post_of = |id: EntityId, at: TileId| posts.iter().find(|(p, _)| *p == id).map_or(at, |(_, t)| *t);
     for u in &members {
         let def = &rules.units[u.kind.0 as usize];
         let movement = i32::from(def.movement.max(1));
@@ -1232,7 +1369,9 @@ fn evaluate(mind: u64, sight: &AIObservation<'_>, brief: &TurnBrief, state: &AiS
         let estimated = estimated_strike(rules, u.kind, u.hp, &estimate);
         // A member not in place to strike within a round (on its way, or held where it
         // fights): its measured arrival.
-        let way_of = |ready: u32| (ready > 1).then(|| awaited(sight, brief, rules, u, target, ring));
+        let way_of = |ready: u32| (ready > 1).then(|| awaited(sight, brief, rules, u, target, ring)).filter(|a| !(mend && in_group && !a.engaged && !a.wounded));
+        // The tiles of its walk from its post to where it strikes (`within`): the rounds it takes, its moves left to strike.
+        let post_walk = |within: i32| ((distance(post_of(u.id, u.tile), target) - within).max(0) / movement) as u32;
         match range(rules, u) {
             Some(r) => {
                 outranged |= r > reach;
@@ -1274,10 +1413,15 @@ fn evaluate(mind: u64, sight: &AIObservation<'_>, brief: &TurnBrief, state: &AiS
                 if let Some(p) = preview {
                     m.strength.insert(target, p.defender_strength);
                 }
-                let dealt = match (preview, estimated) {
-                    (Some(p), _) => p.to_defender,
-                    (None, Some(e)) => (e.dealt * 3 / 4, e.dealt, e.dealt * 5 / 4),
-                    (None, None) => continue,
+                if let Some(p) = preview {
+                    m.exchange.insert((target, u.kind.0), (u.hp, p.to_defender, p.to_attacker));
+                }
+                let remembered = if mend && preview.is_none() { remembered_exchange(m, target, u.kind, u.hp) } else { None };
+                let dealt = match (preview, remembered, estimated) {
+                    (Some(p), _, _) => p.to_defender,
+                    (None, Some((d, _)), _) => d,
+                    (None, None, Some(e)) => (e.dealt * 3 / 4, e.dealt, e.dealt * 5 / 4),
+                    (None, None, None) => continue,
                 };
                 let at = from.unwrap_or(u.tile);
                 if let Some(tile) = from {
@@ -1302,6 +1446,7 @@ fn evaluate(mind: u64, sight: &AIObservation<'_>, brief: &TurnBrief, state: &AiS
                 // From its post on the ring: a siege unit sets up first, a shooter whose step
                 // into range takes its moves fires the round after.
                 setups.push(set_up || ring - r >= movement);
+                from_post.push(post_walk(r) + u32::from(set_up));
                 ways.push(way);
                 ids.push((u.id, in_group));
             }
@@ -1322,18 +1467,28 @@ fn evaluate(mind: u64, sight: &AIObservation<'_>, brief: &TurnBrief, state: &AiS
                 };
                 let ready = match adjacent {
                     Some(_) => 0,
-                    None => (((distance(u.tile, target) - 1).max(1) + movement - 1) / movement) as u32,
+                    None => {
+                        let by_hex = (((distance(u.tile, target) - 1).max(1) + movement - 1) / movement) as u32;
+                        if mend && in_group { walk_turns(sight, brief, u, target, 1).map_or(by_hex, |t| t.max(1)) } else { by_hex }
+                    }
                 };
                 let way = way_of(ready);
                 let preview = adjacent.filter(|_| observed.is_some()).and_then(|t| sight.view.attack_preview_from(u.handle, t, target));
-                let (dealt, taken) = match (preview, estimated) {
-                    (Some(p), _) => (p.to_defender, p.to_attacker),
-                    (None, Some(e)) => ((e.dealt * 3 / 4, e.dealt, e.dealt * 5 / 4), (e.taken * 3 / 4, e.taken, e.taken * 5 / 4)),
-                    (None, None) => continue,
+                if let Some(p) = preview {
+                    m.exchange.insert((target, u.kind.0), (u.hp, p.to_defender, p.to_attacker));
+                }
+                // `TurnBrief::siege_mend`: out of reach of a preview, the exchange it remembers with this city.
+                let remembered = if mend && preview.is_none() { remembered_exchange(m, target, u.kind, u.hp) } else { None };
+                let (dealt, taken) = match (preview, remembered, estimated) {
+                    (Some(p), _, _) => (p.to_defender, p.to_attacker),
+                    (None, Some(x), _) => x,
+                    (None, None, Some(e)) => ((e.dealt * 3 / 4, e.dealt, e.dealt * 5 / 4), (e.taken * 3 / 4, e.taken, e.taken * 5 / 4)),
+                    (None, None, None) => continue,
                 };
                 let arrive = way.as_ref().map_or(1.0, |a| arrival(a, ready));
                 fighters.push(Fighter { ranged: false, hp: u.hp, worth: unit_worth, dealt, taken, city_hit: (0, 0, 0), ready, exposed: ready, covered: false, arrive });
                 setups.push(ring > movement);
+                from_post.push(post_walk(1));
                 ways.push(way);
                 ids.push((u.id, in_group));
             }
@@ -1348,7 +1503,21 @@ fn evaluate(mind: u64, sight: &AIObservation<'_>, brief: &TurnBrief, state: &AiS
         let defence = i64::from(def.strength.max(1)) * 100 * (100 + ground(at)) / 100;
         f.city_hit = city_hit(strength, defence);
     }
-    let city = CityModel { hp: city_hp, cap, heal: CITY_HEAL_PER_TURN as u16, value, time_cost, extra_hits };
+    // A player with no city and no settler (`TurnBrief::landless_planned`) buys its first city with the army it has:
+    // without a city the army has no future of its own, so the capture is worth the city and the group (the losses
+    // are weighed against both). Every other player: the city's worth.
+    let value = if brief.landless_planned() { value + fighters.iter().map(|f| f.worth).sum::<i32>() } else { value };
+    // `TurnBrief::siege_mend`: the melee blows a round are as many as the free land tiles next to the walls (a coast,
+    // a mountain, an enemy's unit next to the city leave fewer than six).
+    let slots = if mend {
+        crate::math::hex_disc(dims, target, 1).filter(|t| distance(*t, target) == 1 && land(*t) && !sight.visible_foreign_units.iter().any(|u| u.tile == *t && at_war(u.owner))).count().clamp(1, 6) as u8
+    } else {
+        0
+    };
+    // `TurnBrief::siege_mend`: the model's blows are the members' own (`own_part`); before, a player with no city's model
+    // kept `STRIKE_KEEPS_HP` after the worst damage (one blow a unit) while its members struck on by the expected.
+    let keep_alive = mend && brief.landless_planned();
+    let city = CityModel { hp: city_hp, cap, heal: CITY_HEAL_PER_TURN as u16, value, time_cost, extra_hits, slots, keep_alive };
 
     // Strike now: the shooters that fire this turn (or step in and set up for the
     // next), every melee unit the round it reaches the walls (a blow comes when the
@@ -1381,7 +1550,7 @@ fn evaluate(mind: u64, sight: &AIObservation<'_>, brief: &TurnBrief, state: &AiS
     let mut later = Outcome { value: f64::MIN, ..Outcome::default() };
     let mut wait = 0;
     for k in 1..=MAX_WAIT {
-        let (healed, city_later) = waited(&fighters, &setups, &ways, &city, k);
+        let (healed, city_later) = if mend { waited_from(&fighters, &setups, &from_post, &ways, &city, k) } else { waited(&fighters, &setups, &ways, &city, k) };
         let out = simulate(&healed, &city_later, k, STRIKE_WINDOW);
         if out.value > later.value {
             later = out;
@@ -1396,7 +1565,11 @@ fn evaluate(mind: u64, sight: &AIObservation<'_>, brief: &TurnBrief, state: &AiS
     // A capture all but sure now is not traded for a better one later.
     // A city out of sight is valued by the player's estimate (no walls seen): it is
     // looked at first, then struck.
-    let strike = observed.is_some() && acts && now.value > 0.0 && (now.value >= later.value || now.soon >= SURE_CAPTURE);
+    // `TurnBrief::siege_mend`: a city out of sight that the player has seen is struck on what it remembers
+    // (`defence_of`): the spotter steps where it sees the city first (`Plan::spot`), the shots and blows then read
+    // the previews.
+    let known = observed.is_some() || mend && m.max_hp.contains_key(&target);
+    let strike = known && acts && now.value > 0.0 && (now.value >= later.value || now.soon >= SURE_CAPTURE);
     // `siege-call` (`CallFixes::call`): the call from what the seat sees (`call`).
     let strike = if brief.siege_call.call {
         let seen = Seen {
@@ -1410,7 +1583,7 @@ fn evaluate(mind: u64, sight: &AIObservation<'_>, brief: &TurnBrief, state: &AiS
             extra_hits: i32::from(extra_hits),
         };
         match call(&seen) {
-            Verdict::Press => observed.is_some() && acts,
+            Verdict::Press => known && acts,
             Verdict::Model => strike,
             Verdict::Hold | Verdict::Withdraw => false,
         }
@@ -1418,7 +1591,7 @@ fn evaluate(mind: u64, sight: &AIObservation<'_>, brief: &TurnBrief, state: &AiS
         strike
     };
     let strike = match forced(brief.round) {
-        Some(Call::Press) => observed.is_some() && acts,
+        Some(Call::Press) => known && acts,
         Some(Call::Hold) => false,
         None => strike,
     };
@@ -1453,7 +1626,7 @@ fn evaluate(mind: u64, sight: &AIObservation<'_>, brief: &TurnBrief, state: &AiS
     ) + &if std::env::var_os("SIEGE_WALLS_TRACE_FIGHTERS").is_some() {
         format!(
             " fighters={:?}",
-            fighters.iter().zip(&ids).map(|(f, (id, _))| (f.ranged, f.hp, f.dealt.1, f.city_hit.1, f.ready, (f.arrive * 100.0) as u8, members.iter().find(|u| u.id == *id).map(|u| distance(u.tile, target)))).collect::<Vec<_>>()
+            fighters.iter().zip(&ids).map(|(f, (id, _))| (f.ranged, f.hp, f.dealt.1, f.taken.1, f.taken.2, f.city_hit.1, f.ready, (f.arrive * 100.0) as u8, members.iter().find(|u| u.id == *id).map(|u| distance(u.tile, target)))).collect::<Vec<_>>()
         )
     } else {
         String::new()
@@ -1530,17 +1703,23 @@ fn evaluate(mind: u64, sight: &AIObservation<'_>, brief: &TurnBrief, state: &AiS
     // A city out of sight is neither valued by previews nor shot: the cheapest healthy
     // member (a melee one first) steps where it sees the city — as far from it as its
     // sight allows — before anything else of the turn.
-    let spot = if choice != Choice::Front && observed.is_none() {
+    // `TurnBrief::siege_mend`: a city the player remembers is looked at only for a strike (the wait reads the memory,
+    // `defence_of`), from out of its reach when a tile sees it from there.
+    let looks = !mend || choice.strikes() || !m.max_hp.contains_key(&target);
+    let spot = if choice != Choice::Front && observed.is_none() && looks {
         let mut spotters: Vec<&OwnUnit> = group.iter().filter(|u| !rested.contains(&u.id) && u.hp >= HEAL_BELOW_HP).collect();
         spotters.sort_by_key(|u| (range(rules, u).is_some(), worth(&KindStats::of(rules, u.kind), u.level), u.id));
         spotters.into_iter().find_map(|u| {
             let eyes = i32::from(rules.units[u.kind.0 as usize].sight.max(1));
+            // `TurnBrief::siege_mend`: a tile it sees the city from by the rules' sight (its radius there, the line of
+            // sight over the known land: a forest or a hill between hides the walls).
+            let sees = |t: TileId| if mend { sees_from(&sight.view, rules, u.kind, t, target) } else { distance(t, target) <= eyes };
             sight
                 .view
                 .own_reachable(u.handle)
                 .into_iter()
-                .filter(|(t, _)| distance(*t, target) <= eyes && land(*t) && !foreign_on(*t) && !own_military_on(*t, u.id))
-                .min_by_key(|(t, _)| (std::cmp::Reverse(distance(*t, target)), threatened(*t), -ground(*t), t.0))
+                .filter(|(t, _)| sees(*t) && land(*t) && !foreign_on(*t) && !own_military_on(*t, u.id))
+                .min_by_key(|(t, _)| (mend && distance(*t, target) <= reach, std::cmp::Reverse(distance(*t, target)), threatened(*t), -ground(*t), t.0))
                 .map(|(t, _)| Spot { unit: u.id, handle: u.handle, to: t, done: false })
         })
     } else {
@@ -1564,7 +1743,7 @@ fn evaluate(mind: u64, sight: &AIObservation<'_>, brief: &TurnBrief, state: &AiS
         capture: now.capture,
         close: fix.close,
     };
-    Some(Weighed { plan, rate, in_reach, fortified_unanswered, rested: rested.len(), line })
+    Some(Weighed { plan, rate, in_reach, fortified_unanswered, rested: rested.len(), observed: observed.is_some(), line })
 }
 
 // ---------------------------------------------------------------------------
@@ -1609,7 +1788,7 @@ pub fn rate_target(brief: &TurnBrief, rules: &CompiledRuleset, walls: Option<&Si
         .collect();
     let value = crate::ai::front::city_damage_worth(CITY_BASE_HIT_POINTS, city.population);
     let time_cost = value / brief.speed.pace_rounds(TIME_ROUNDS).max(1) as i32;
-    let model = CityModel { hp: cap, cap, heal: CITY_HEAL_PER_TURN as u16, value, time_cost, extra_hits: 0 };
+    let model = CityModel { hp: cap, cap, heal: CITY_HEAL_PER_TURN as u16, value, time_cost, extra_hits: 0, slots: 0, keep_alive: false };
     let out = simulate(&fighters, &model, march, STRIKE_WINDOW);
     (out.rate(march), cap > CITY_BASE_HIT_POINTS && !outranged)
 }
@@ -1725,7 +1904,18 @@ fn own_part(view: &UnitView<'_, '_>, tools: &mut PlanTools<'_>, plan: &mut Plan,
         // down for the next blow of the strike and leaves its striker able to fight on.
         let wears = |t: TileId| {
             plan.capture > 0.0
-                && pv.attack_preview_from(unit.handle, t, city.tile).is_some_and(|p| p.to_defender.1 > 0 && unit.hp.saturating_sub(p.to_attacker.2) >= crate::ai::front::STRIKE_KEEPS_HP)
+                // A player with no city (`TurnBrief::landless_planned`) has no reinforcement and no home to heal in: its
+                // striker keeps the hit points to fight on by the blow's expected damage, not by its worst; with
+                // `siege_mend` it strikes when it survives the worst (`CityModel::keep_alive`, the model's rule).
+                && pv.attack_preview_from(unit.handle, t, city.tile).is_some_and(|p| {
+                    let landless = view.brief.landless_planned();
+                    p.to_defender.1 > 0
+                        && if landless && view.brief.siege_mend {
+                            unit.hp > p.to_attacker.2
+                        } else {
+                            unit.hp.saturating_sub(if landless { p.to_attacker.1 } else { p.to_attacker.2 }) >= crate::ai::front::STRIKE_KEEPS_HP
+                        }
+                })
         };
         if let Some((_, tile)) = best.filter(|(ev, t)| *ev > 0.0 || wears(*t)) {
             if tile != unit.tile {
@@ -1761,6 +1951,11 @@ fn own_part(view: &UnitView<'_, '_>, tools: &mut PlanTools<'_>, plan: &mut Plan,
         }
     }
     if dims.distance(unit.tile, city.tile) == Some(1) {
+        // `TurnBrief::siege_mend`: a wounded member that made no blow gives its tile next to the walls to a fresh one
+        // (the blows a round are as many as those tiles) and heals on its post.
+        if view.brief.siege_mend && unit.hp < HEAL_BELOW_HP && unit.moves_left > 0 {
+            return to_post(view, tools, plan);
+        }
         return hold(view, Reason::Rally);
     }
     if plan.close && unit.moves_left > 0 && plan.capture > 0.0 {
@@ -1774,6 +1969,21 @@ fn own_part(view: &UnitView<'_, '_>, tools: &mut PlanTools<'_>, plan: &mut Plan,
             .map(|(t, _)| t);
         if let Some(tile) = step {
             return Decision::act(actor, Reason::Advance, Command::MoveUnit { unit: unit.handle, destination: tile });
+        }
+    }
+    if view.brief.siege_mend && unit.moves_left > 0 && plan.capture > 0.0 {
+        // `TurnBrief::siege_mend`: no tile nearer the walls in one step (a lake, a river, a ridge between): it walks its
+        // known path to the free land next to the city nearest to it, as the model counts its walk (`walk_turns`).
+        let kinds = pv.terrain_kinds();
+        let land = |t: TileId| pv.tile(t).snapshot().is_some_and(|s| !kinds.is_water(s.terrain.0) && !kinds.is_mountains(s.terrain.0) && !s.city);
+        let goal = crate::math::hex_disc(dims, city.tile, 1)
+            .filter(|t| dims.distance(*t, city.tile) == Some(1) && land(*t) && can_stop(view, rules, *t))
+            .min_by_key(|t| (dims.distance(*t, unit.tile), t.0));
+        if let Some(goal) = goal {
+            let step = move_along(view, tools, goal, Reason::Advance);
+            if step.command.is_some() {
+                return step;
+            }
         }
     }
     to_post(view, tools, plan)
@@ -1863,7 +2073,7 @@ mod tests {
     }
 
     fn city(hp: u16) -> CityModel {
-        CityModel { hp, cap: 200, heal: 20, value: 1080, time_cost: 36, extra_hits: 0 }
+        CityModel { hp, cap: 200, heal: 20, value: 1080, time_cost: 36, extra_hits: 0, slots: 0, keep_alive: false }
     }
 
     /// Five archers and a swordsman take a full city in a strike: the volley
@@ -1905,6 +2115,69 @@ mod tests {
         let without = simulate(&force, &city(140), 0, STRIKE_WINDOW);
         assert!(with.value > without.value, "with {with:?} without {without:?}");
         force.clear();
+    }
+
+    fn warrior(ready: u32, arrive: f64) -> Fighter {
+        Fighter { ranged: false, hp: 100, worth: 60, dealt: (20, 26, 32), taken: (22, 28, 35), city_hit: (22, 26, 30), ready, exposed: ready, covered: false, arrive }
+    }
+
+    /// `TurnBrief::siege_mend`: a wait leaves a member on its post. A melee member posted one tile beyond the ring
+    /// (two rounds from the walls at two tiles a round) strikes in the second round however long the group waits;
+    /// `waited` had every member step in from the ring in one.
+    #[test]
+    fn a_wait_leaves_a_member_on_its_post() {
+        let force = vec![warrior(1, 1.0), warrior(2, 1.0)];
+        let (old, _) = waited(&force, &[true, true], &[None, None], &city(200), 3);
+        assert_eq!(old.iter().map(|f| f.ready).collect::<Vec<_>>(), vec![1, 1]);
+        let (kept, _) = waited_from(&force, &[true, true], &[1, 2], &[None, None], &city(200), 3);
+        assert_eq!(kept.iter().map(|f| f.ready).collect::<Vec<_>>(), vec![1, 2]);
+        // Without the posts (`from_post` = the step in) it is `waited`, move for move.
+        let (same, _) = waited_from(&force, &[true, true], &[1, 1], &[None, None], &city(200), 3);
+        assert_eq!(same, old);
+    }
+
+    /// `CityModel::slots`: the melee blows a round are as many as the free tiles next to the walls. Eight warriors in
+    /// place take an empty city in the first round when all may strike, not when two tiles are free.
+    #[test]
+    fn the_blows_a_round_are_the_free_tiles_next_to_the_walls() {
+        let force: Vec<Fighter> = (0..8).map(|_| warrior(0, 1.0)).collect();
+        let free = simulate(&force, &city(200), 0, STRIKE_WINDOW);
+        let two = simulate(&force, &CityModel { slots: 2, ..city(200) }, 0, STRIKE_WINDOW);
+        assert!(free.capture > 0.9 && free.eta < 1.5, "{free:?}");
+        assert!(two.capture < free.capture || two.eta > free.eta + 1.0, "{two:?} against {free:?}");
+    }
+
+    /// `CityModel::keep_alive` (a player with no city): a wearing blow is made while its striker survives the worst
+    /// damage. Three warriors at 70 hit points whose worst blow would leave 20 do not strike by the front's rule (keep
+    /// 25) and take the worn city by this one.
+    #[test]
+    fn a_landless_striker_strikes_while_it_survives() {
+        let worn: Vec<Fighter> = (0..3).map(|_| Fighter { hp: 70, dealt: (30, 35, 40), taken: (20, 30, 50), ..warrior(0, 1.0) }).collect();
+        let front_rule = simulate(&worn, &city(90), 0, 1);
+        let alive_rule = simulate(&worn, &CityModel { keep_alive: true, ..city(90) }, 0, 1);
+        assert!(front_rule.capture < 0.01, "{front_rule:?}");
+        assert!(alive_rule.capture > 0.9, "{alive_rule:?}");
+    }
+
+    /// The mends do not make a weak group strike (with cities or without): three warriors in place, striking while they
+    /// survive, with every tile next to the walls free, do not take a full city that heals 20 a round.
+    #[test]
+    fn a_weak_group_in_place_has_no_capture_in_reach() {
+        let few: Vec<Fighter> = (0..3).map(|_| warrior(0, 1.0)).collect();
+        let now = simulate(&few, &CityModel { slots: 6, keep_alive: true, ..city(200) }, 0, STRIKE_WINDOW);
+        assert!(now.capture < MIN_CAPTURE, "{now:?}");
+    }
+
+    /// An empire's army (members on their way from its cities): `waited_from` keeps the arrival model for a member on
+    /// its way (its chance grows with the wait) and a member in place stays in place.
+    #[test]
+    fn a_wait_counts_the_members_on_their_way_by_their_arrival() {
+        let coming = Awaited { turns: 3, engaged: false, wounded: false, threat: 0.0 };
+        let force = vec![warrior(1, 1.0), warrior(3, arrival(&coming, 3))];
+        let (later, _) = waited_from(&force, &[true, true], &[1, 1], &[None, Some(coming)], &city(200), 3);
+        assert_eq!(later[0].arrive, 1.0);
+        assert!(later[1].arrive > force[1].arrive, "{later:?}");
+        assert_eq!(later[1].arrive, arrival(&coming, 3 + later[1].ready));
     }
 
     #[test]

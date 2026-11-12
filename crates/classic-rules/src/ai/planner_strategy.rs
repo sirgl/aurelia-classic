@@ -215,6 +215,13 @@ fn threatened(brief: &TurnBrief, state: &AiState) -> bool {
 }
 
 fn desired_strategy(brief: &TurnBrief, state: &AiState) -> Strategy {
+    if brief.landless_planned() {
+        // `landless-plan`, no city and no settler: nothing to defend, grow or recover. The war its
+        // operation declares (`operations::start`, the target `ai::landless` gives) is an attack
+        // with an objective, as an empire's; before it the player waits as an empire that expands.
+        let objective = state.relations().iter().any(|m| m.at_war && m.objective.is_some());
+        return if objective { Strategy::Attack } else { Strategy::Expand };
+    }
     if brief.cities.is_empty() {
         return Strategy::Expand;
     }

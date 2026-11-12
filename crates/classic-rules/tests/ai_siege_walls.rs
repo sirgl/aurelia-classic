@@ -226,7 +226,7 @@ fn the_arrival_falls_with_the_engagement_and_rises_with_the_slack() {
 fn the_group_strikes_with_what_is_there_when_the_awaited_will_not_come() {
     let shooter = |ready: u32, arrive: f64| Fighter { ranged: true, hp: 100, worth: 120, dealt: (32, 36, 40), taken: (0, 0, 0), city_hit: (18, 22, 26), ready, exposed: ready, covered: false, arrive };
     let melee = Fighter { ranged: false, hp: 100, worth: 140, dealt: (35, 40, 45), taken: (20, 25, 30), city_hit: (12, 15, 18), ready: 0, exposed: 0, covered: false, arrive: 1.0 };
-    let city = |hp: u16| CityModel { hp, cap: 250, heal: 20, value: 1120, time_cost: 37, extra_hits: 0 };
+    let city = |hp: u16| CityModel { hp, cap: 250, heal: 20, value: 1120, time_cost: 37, extra_hits: 0, slots: 0, keep_alive: false };
     // Two shooters and a swordsman at the walls of a worn city; four shooters on their way.
     let far = Awaited { turns: 6, engaged: true, wounded: false, threat: 0.8 };
     let near = Awaited { turns: 1, engaged: false, wounded: false, threat: 0.0 };
@@ -264,7 +264,7 @@ fn the_group_strikes_with_what_is_there_when_the_awaited_will_not_come() {
 fn the_strike_is_chosen_by_its_expected_value() {
     let shooter = |hp: u16, ready: u32| Fighter { ranged: true, hp, worth: 120, dealt: (32, 36, 40), taken: (0, 0, 0), city_hit: (18, 22, 26), ready, exposed: ready, covered: false, arrive: 1.0 };
     let melee = Fighter { ranged: false, hp: 100, worth: 140, dealt: (35, 40, 45), taken: (20, 25, 30), city_hit: (12, 15, 18), ready: 0, exposed: 0, covered: false, arrive: 1.0 };
-    let city = |hp: u16| CityModel { hp, cap: 250, heal: 20, value: 1120, time_cost: 37, extra_hits: 1 };
+    let city = |hp: u16| CityModel { hp, cap: 250, heal: 20, value: 1120, time_cost: 37, extra_hits: 1, slots: 0, keep_alive: false };
     let mut force: Vec<Fighter> = (0..5).map(|_| shooter(100, 0)).collect();
     force.push(melee);
     let strike = simulate(&force, &city(250), 0, STRIKE_WINDOW);

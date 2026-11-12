@@ -134,7 +134,7 @@ pub fn decide(view: &UnitView<'_, '_>, state: &mut AiState, tools: &mut PlanTool
     let front = Front { view, members: members(view, state), foes, threats: OnceCell::new() };
     let mut strikes = front.strikes(tools);
     tools.counters.candidates += strikes.len() as u64;
-    let ready = front.ready_sieges(&strikes, tools);
+    let ready = front.ready_sieges(&strikes, state, tools);
     for _ in 0..MAX_TRIES {
         let Some(strike) = front.next_strike(&strikes, &ready, tools) else { break };
         let decision = front.step(&strike);
@@ -592,12 +592,20 @@ fn kill_plan(foe: &Foe, strikes: &[Strike]) -> Option<(i32, Strike)> {
 
 impl Front<'_, '_, '_> {
     /// The cities in the front whose siege group would take them.
-    fn ready_sieges(&self, strikes: &[Strike], tools: &PlanTools<'_>) -> Vec<TileId> {
+    fn ready_sieges(&self, strikes: &[Strike], state: &AiState, tools: &PlanTools<'_>) -> Vec<TileId> {
         let cities = self.foes.iter().filter_map(|f| match f {
             Foe::City(city) => Some(city),
             Foe::Unit(_) => None,
         });
-        cities.filter(|c| self.siege_takes(c, strikes, tools)).map(|c| c.tile).collect()
+        cities.filter(|c| self.siege_takes(c, strikes, tools) || self.nothing_comes(c, state)).map(|c| c.tile).collect()
+    }
+
+    /// A player with no city (`TurnBrief::landless_planned`) besieges its operation's target with the army it has:
+    /// no city builds another unit, so waiting on the gathering ring only lets the city heal. Its marching operation
+    /// was started because the units on hand take the city (`ai::landless::goal`); the siege is ready while it
+    /// marches. False in every other state.
+    fn nothing_comes(&self, city: &ObservedCity, state: &AiState) -> bool {
+        self.view.brief.landless_planned() && state.operation(city.tile).is_some_and(|o| o.phase == OperationPhase::Marching)
     }
 
     /// The siege group — the healthy members within `GROUP_RADIUS` of
@@ -641,7 +649,7 @@ impl Front<'_, '_, '_> {
 
 /// A member of a siege group as the siege model sees it.
 #[derive(Debug, Clone, Copy)]
-pub(crate) struct Besieger {
+pub struct Besieger {
     pub ranged: bool,
     pub dealt: u16,
     pub taken: u16,
@@ -670,7 +678,7 @@ pub(crate) fn siege_rounds(group: &mut [Besieger], hp: u16, heal: u16) -> Option
 
 /// `siege_rounds` with the number of rounds the group may take (the tactical
 /// layer allows more to a group that is at the walls already).
-pub(crate) fn siege_rounds_within(group: &mut [Besieger], hp: u16, heal: u16, limit: u32) -> Option<u32> {
+pub fn siege_rounds_within(group: &mut [Besieger], hp: u16, heal: u16, limit: u32) -> Option<u32> {
     group.sort_by_key(|b| !b.ranged);
     let mut city = hp;
     for round in 1..=limit {

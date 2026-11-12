@@ -163,7 +163,7 @@ fn play(o: &Options) -> Result<(), String> {
     if let Some(n) = o.games {
         games.truncate(n);
     }
-    let pairing = Pairing { baseline: o.baseline.clone().unwrap_or_else(|| o.candidate.clone()), candidate: o.candidate.clone() };
+    let pairing = Pairing { baseline: o.baseline.clone().unwrap_or_else(|| o.candidate.clone()), candidate: o.candidate.clone(), landless_seat: None };
     let next = AtomicUsize::new(0);
     let found: Mutex<Vec<(usize, Vec<March>)>> = Mutex::new(Vec::new());
     let started = std::time::Instant::now();

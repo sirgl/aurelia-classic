@@ -42,6 +42,8 @@ use kernel::ai::mind::AiMind;
 use serde::{Deserialize, Serialize};
 
 use crate::battle::{self, Arm};
+
+pub mod exam;
 use crate::bench::modules::{majors, BenchRules, ClassicBench};
 
 /// The kinds of battle ground.

@@ -787,6 +787,25 @@ pub enum Variant {
     /// host election against the leader (`victory_watch::host_choice`, `congress::vote_orders_for`).
     /// Every other switch is `Standard`'s. A candidate, `experimental-ai` only.
     VoteGuard,
+    /// `Standard` with the field-craft fixes of the tactics exam (`TurnBrief::field_craft`): raids,
+    /// guarding, a ranged unit in a small fight. Bench-only (`experimental-ai`).
+    FieldCraft,
+    /// `Standard` with the pillaging of `ai::raid_war` (`TurnBrief::raid_war`): a free unit pillages in a war that
+    /// exists for another reason. Bench-only (`experimental-ai`).
+    RaidWar,
+    /// `Standard` that, while it has no city and no settler (its settler lost before it founded
+    /// one: a player that never had a city lives while it has a unit), gives its units a goal
+    /// (`TurnBrief::landless`, `ai::landless`): it takes a city when the units on hand can, else it
+    /// does the harm that pays (captures civilians, pillages). With a city, or a settler to found
+    /// one, it plays exactly as `Standard`. A candidate, `experimental-ai` only.
+    Landless,
+    /// `Landless` through the empire's own strategist: while it has no city and no settler, the
+    /// city `ai::landless` finds the units on hand take is the target of an ordinary operation
+    /// (`operations::start`: muster, declaration, march, the front's siege), the strategy is the
+    /// war's (`planner_strategy::desired_strategy`); with nothing to take its units do the harm
+    /// `landless` does, and keep out of a stronger enemy's reach. With a city, or a settler to found
+    /// one, it plays exactly as `Standard`. For the bench's siege arenas, `experimental-ai` only.
+    LandlessPlan,
 }
 
 /// The net's base: the expert the end-to-end net learns from and the mind it
@@ -807,7 +826,7 @@ const NUDGED_CANDIDATES: u32 = 40;
 
 impl Variant {
     /// The game's AI first.
-    pub const ALL: [Variant; 151] = [
+    pub const ALL: [Variant; 155] = [
         Variant::Standard,
         Variant::PreCamps,
         Variant::PreWorkers,
@@ -959,6 +978,10 @@ impl Variant {
         Variant::Retake2,
         Variant::NextWarRetake,
         Variant::VoteGuard,
+        Variant::FieldCraft,
+        Variant::RaidWar,
+        Variant::Landless,
+        Variant::LandlessPlan,
     ];
 
     pub fn name(self) -> &'static str {
@@ -1096,6 +1119,10 @@ impl Variant {
             Variant::Retake2 => "retake2",
             Variant::NextWarRetake => "next-war-retake",
             Variant::VoteGuard => "vote-guard",
+            Variant::FieldCraft => "field-craft",
+            Variant::RaidWar => "raid-war",
+            Variant::Landless => "landless",
+            Variant::LandlessPlan => "landless-plan",
             Variant::ArmyFit => "army-fit",
             Variant::Camps => "camps",
             Variant::ArmyCamps => "army-camps",
@@ -1133,7 +1160,7 @@ impl Variant {
         cfg!(feature = "experimental-ai")
             || !matches!(
                 self,
-                Variant::Net | Variant::UnitNet | Variant::Hybrid | Variant::SiteNet | Variant::ChoiceNet | Variant::ChoiceNetProduction | Variant::ChoiceNetResearch | Variant::StandardScripted | Variant::PreCsGifts | Variant::Sharp | Variant::TallReal | Variant::Next | Variant::WonderCancel | Variant::WonderRace | Variant::NextW | Variant::NextRace | Variant::PreNext | Variant::WarPays | Variant::TacticianFit | Variant::WarMuster | Variant::SiegeCall | Variant::NextWar | Variant::Retake2 | Variant::NextWarRetake | Variant::VoteGuard
+                Variant::Net | Variant::UnitNet | Variant::Hybrid | Variant::SiteNet | Variant::ChoiceNet | Variant::ChoiceNetProduction | Variant::ChoiceNetResearch | Variant::StandardScripted | Variant::PreCsGifts | Variant::Sharp | Variant::TallReal | Variant::Next | Variant::WonderCancel | Variant::WonderRace | Variant::NextW | Variant::NextRace | Variant::PreNext | Variant::WarPays | Variant::TacticianFit | Variant::WarMuster | Variant::SiegeCall | Variant::NextWar | Variant::Retake2 | Variant::NextWarRetake | Variant::VoteGuard | Variant::FieldCraft | Variant::RaidWar | Variant::Landless | Variant::LandlessPlan
             )
     }
 
@@ -1159,6 +1186,8 @@ impl Variant {
             Variant::StrategyNet | Variant::StandardScripted | Variant::PreCsGifts => Variant::Standard,
             // `Standard` before the thirteenth promotion: its switches without the flags of `next-w`.
             Variant::PreNext => Variant::Standard,
+            // `Standard` but while it has no city and no settler (`landless`).
+            Variant::Landless | Variant::LandlessPlan => Variant::Standard,
             // `Standard` but for their tactical and operations layer (`unit_net`) and the
             // hybrid's strategy net.
             Variant::UnitNet | Variant::Hybrid => Variant::Standard,
@@ -1278,6 +1307,18 @@ impl Variant {
         self == Variant::VoteGuard
     }
 
+    /// The tactics exam's fixes (`TurnBrief::field_craft`): `FieldCraft` alone, which the mind plays as
+    /// `Standard` in every other switch (`ClassicMind::new`).
+    pub fn field_craft(self) -> bool {
+        self == Variant::FieldCraft
+    }
+
+    /// The pillaging in a war that exists (`TurnBrief::raid_war`): `RaidWar` alone, which the mind plays as
+    /// `Standard` in every other switch (`ClassicMind::new`).
+    pub fn raid_war(self) -> bool {
+        self == Variant::RaidWar
+    }
+
     /// The wonder-race switch (`TurnBrief::wonder_race`): 1 drops lost wonder orders, 2 prices a
     /// wonder by the chance to finish it first. The mind plays `Sharp` (`ClassicMind::new`). 1 for
     /// the game's AI since the thirteenth promotion and its alias `NextW`.
@@ -1330,6 +1371,19 @@ impl Variant {
     /// in every other switch (`ClassicMind::new`).
     pub fn retake2(self) -> bool {
         self == Variant::Retake2
+    }
+
+    /// The goal of a player with units and no city (`TurnBrief::landless`, `ai::landless`): `Landless`
+    /// alone, which the mind plays as `Standard` in every switch (`ClassicMind::new`).
+    pub fn landless(self) -> bool {
+        self == Variant::Landless
+    }
+
+    /// The goal of a player with units and no city through the empire's strategist
+    /// (`TurnBrief::landless_plan`, `ai::landless`, `operations::start`): `LandlessPlan` alone, which
+    /// the mind plays as `Standard` in every switch (`ClassicMind::new`).
+    pub fn landless_plan(self) -> bool {
+        self == Variant::LandlessPlan
     }
 
     /// Its research, policies and choice among the allocator's best orders are the
