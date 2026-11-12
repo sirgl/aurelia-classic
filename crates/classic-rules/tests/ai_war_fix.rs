@@ -116,7 +116,7 @@ fn a_captured_city_is_priced_by_what_it_changes() {
     prices.happiness = prices.score.citizen * 8;
     let rounds = 10;
     let (puppet, puppet_unrest) = captured_parts(&prices, 2, rounds, false);
-    assert_eq!(puppet, city_worth(&prices, 1, rounds), "a city of two keeps one citizen and yields at once");
+    assert_eq!(puppet, city_worth(&prices, 1, rounds + 1), "a city of two keeps one citizen; a puppet resists one round too");
     let (annexed, annexed_unrest) = captured_parts(&prices, 8, rounds, false);
     assert_eq!(annexed, city_worth(&prices, 5, rounds + 5), "a city of eight keeps five, annexed after five rounds of resistance");
     assert!(annexed < city_worth(&prices, 5, rounds));
@@ -124,7 +124,7 @@ fn a_captured_city_is_priced_by_what_it_changes() {
     // Priced as a puppet (`SiegeFixes::puppet`, `puppet-war`): the same city yields at once, with a
     // normal city's unrest; a small city is a puppet either way.
     let (as_puppet, as_puppet_unrest) = captured_parts(&prices, 8, rounds, true);
-    assert_eq!(as_puppet, city_worth(&prices, 5, rounds), "a puppet of five yields at once");
+    assert_eq!(as_puppet, city_worth(&prices, 5, rounds + 5), "a puppet of five yields after its five rounds of resistance");
     assert!(as_puppet_unrest < annexed_unrest, "{as_puppet_unrest} against the annexed {annexed_unrest}");
     assert_eq!(captured_parts(&prices, 2, rounds, true), (puppet, puppet_unrest));
     // Crossing the very-unhappy line costs its step.

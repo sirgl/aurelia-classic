@@ -24,7 +24,7 @@ pub use state::GameState;
 pub use state::GameView;
 
 /// Whether a puppet city is in resistance after its capture as an annexed one is (the owner's
-/// decision on the rule; Civ V: a captured city resists whether puppeted or annexed). Off:
-/// the Puppet decision ends the resistance at once. Priced by the AI's capture estimate
+/// decision on the rule; Civ V: a captured city resists whether puppeted or annexed). On (the puppet fork): a puppet
+/// resists as an annexed city does; off: the Puppet decision ends the resistance at once. Priced by the AI's capture estimate
 /// (`ai::operations::captured_parts_by`, `ai::conquest::priced_case`).
-pub const PUPPET_RESISTS: bool = false;
+pub const PUPPET_RESISTS: bool = true;

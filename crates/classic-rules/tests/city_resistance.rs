@@ -146,3 +146,29 @@ fn when_resistance_ends_everything_returns() {
     assert_eq!(a.game.derived().yields.of(a.city), Some(live), "the cached yields follow the end of resistance");
     assert!(a.core().production > 3, "everything returned: the city builds again");
 }
+
+/// The puppet fork: a puppet is in resistance as an annexed city is (Civ V: a captured city
+/// resists whether puppeted or annexed). The city awaiting the decision counts down the same
+/// turns whichever way it is decided, and gives nothing meanwhile.
+#[test]
+fn a_puppet_resists_as_an_annexed_city_does() {
+    use classic_rules::command::CityDecision;
+    use classic_rules::world::city::CityStatus;
+    for (decision, status) in [(CityDecision::Puppet, CityStatus::Puppet), (CityDecision::Annex, CityStatus::Occupied)] {
+        let mut w = World::new(GRASS, 3);
+        w.game.world_mut().cities.get_mut(w.city).unwrap().status = CityStatus::AwaitingDecision;
+        w.exec(Command::DecideCity { player: P0, city: w.city, decision }).unwrap();
+        assert_eq!((w.core().status, w.core().resistance_turns), (status, 3), "{decision:?}");
+        assert_eq!(city_income(w.game.view().auth, &w.rules, &w.core()), Default::default());
+    }
+}
+
+/// A decision left pending to the end of the turn makes a puppet, which keeps its resistance.
+#[test]
+fn a_city_left_undecided_becomes_a_puppet_that_resists() {
+    use classic_rules::world::city::CityStatus;
+    let mut w = World::new(GRASS, 3);
+    w.game.world_mut().cities.get_mut(w.city).unwrap().status = CityStatus::AwaitingDecision;
+    w.end_turn();
+    assert_eq!((w.core().status, w.core().resistance_turns), (CityStatus::Puppet, 2));
+}
