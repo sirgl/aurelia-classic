@@ -203,6 +203,26 @@ pub struct CombatRecord {
     /// before read none; summed records keep the earliest).
     #[serde(default)]
     pub first_capture: Option<u32>,
+    /// Deals it accepted or had accepted (`BenchRules::deals`): cities it ceded by a deal,
+    /// deals in which it took on gold per turn, and those it broke by not paying (reports
+    /// saved before read 0).
+    #[serde(default)]
+    pub cities_ceded: u32,
+    #[serde(default)]
+    pub gold_per_turn_deals: u32,
+    #[serde(default)]
+    pub gold_per_turn_broken: u32,
+}
+
+/// What a command did to a player's deals (`BenchRules::deals`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DealEvent {
+    /// It gave a city by an accepted deal.
+    CityCeded,
+    /// It took on gold per turn by an accepted deal.
+    GoldPerTurn,
+    /// Its gold per turn went unpaid and the deal broke.
+    GoldPerTurnBroken,
 }
 
 /// The width of a bucket of `war_lengths`, in rounds, and their count.
@@ -239,6 +259,9 @@ impl CombatRecord {
                 (Some(a), Some(b)) => Some(a.min(b)),
                 (a, b) => a.or(b),
             },
+            cities_ceded: self.cities_ceded + other.cities_ceded,
+            gold_per_turn_deals: self.gold_per_turn_deals + other.gold_per_turn_deals,
+            gold_per_turn_broken: self.gold_per_turn_broken + other.gold_per_turn_broken,
         }
     }
 
@@ -453,7 +476,7 @@ fn play_round<R: BenchRules>(
                 let ms = |d: std::time::Duration| d.as_secs_f64() * 1000.0;
                 log.turn(player, ms(now - turn_started), ms((now - turn_started).saturating_sub(ending)), after.minus(before));
                 let journal = driver.take_journal();
-                log.journal::<R>(game, player, &journal);
+                log.journal::<R>(game, rules, player, &journal);
                 log.deliveries::<R>(game, &journal);
                 log.decisions::<R>(this_round, player, &journal);
                 if let Some(probe) = log.probe.as_mut() {
@@ -555,9 +578,16 @@ impl MatchLog {
     /// The combat record, the wars and the cities founded of one player's
     /// turn: its commands are `applied` (a turn's journal holds only the
     /// acting player's commands); `game` is the world after them.
-    fn journal<R: BenchRules>(&mut self, game: &GameState<R::M>, player: PlayerId, applied: &[AppliedCommand<R::M>]) {
+    fn journal<R: BenchRules>(&mut self, game: &GameState<R::M>, rules: &CompiledRuleset<R::M>, player: PlayerId, applied: &[AppliedCommand<R::M>]) {
         let now = round(game);
         for command in applied {
+            for (party, event) in R::deals(game, rules, &command.command, &command.changes) {
+                self.record(party, |r| match event {
+                    DealEvent::CityCeded => r.cities_ceded += 1,
+                    DealEvent::GoldPerTurn => r.gold_per_turn_deals += 1,
+                    DealEvent::GoldPerTurnBroken => r.gold_per_turn_broken += 1,
+                });
+            }
             let founded = command.changes.city_changes.iter().filter(|c| matches!(c, CityChange::Founded(_))).count() as u32;
             if let Some(seat) = self.seat(player) {
                 seat.founded += founded;
