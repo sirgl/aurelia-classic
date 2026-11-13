@@ -58,6 +58,10 @@ impl<'a> WorldTransaction<'a> {
             ResolvedCommand::UpgradeUnit { unit, to, price } => {
                 self.upgrade_unit(unit, to, price, rules)
             }
+            ResolvedCommand::DisbandUnit { unit, gold } => self.disband_unit(unit, gold, rules),
+            ResolvedCommand::SellBuilding { player, city, building, gold } => {
+                self.sell_building(player, city, building, gold, rules)
+            }
             ResolvedCommand::DecideCity { city, decision, .. } => {
                 self.decide_city(city, decision, rules)
             }

@@ -79,3 +79,5 @@ classic.ui.unit-actions.hint-blocked =
     { $label }
     { $what }
     不可用：{ $reason }
+classic.ui.unit-actions.disband.label = 解散
+classic.ui.unit-actions.disband.desc = 永久解散该单位；在本国领土上，国库可收回少量金币。

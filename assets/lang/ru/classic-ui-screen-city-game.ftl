@@ -107,3 +107,4 @@ classic.ui.screen-city-game.focus-science = Наука
 classic.ui.screen-city-game.focus-culture = Культура
 classic.ui.screen-city-game.focus-great-people = Великие люди
 classic.ui.screen-city-game.focus-faith = Вера
+classic.ui.screen-city-game.sell = Продать за { NUMBER($gold) } золота

@@ -79,3 +79,5 @@ classic.ui.unit-actions.hint-blocked =
     { $label }
     { $what }
     Nicht verfügbar: { $reason }
+classic.ui.unit-actions.disband.label = Auflösen
+classic.ui.unit-actions.disband.desc = Die Einheit für immer auflösen; auf eigenem Land erhält die Schatzkammer etwas Gold zurück.

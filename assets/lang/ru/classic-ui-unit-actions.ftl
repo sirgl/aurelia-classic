@@ -79,3 +79,5 @@ classic.ui.unit-actions.hint-blocked =
     { $label }
     { $what }
     Недоступно: { $reason }
+classic.ui.unit-actions.disband.label = Распустить
+classic.ui.unit-actions.disband.desc = Навсегда распустить отряд; на своей земле казна получит немного золота.

@@ -94,3 +94,4 @@ classic.ui.screen-city-game.focus-science = Science
 classic.ui.screen-city-game.focus-culture = Culture
 classic.ui.screen-city-game.focus-great-people = Great people
 classic.ui.screen-city-game.focus-faith = Faith
+classic.ui.screen-city-game.sell = Sell for { NUMBER($gold) } gold

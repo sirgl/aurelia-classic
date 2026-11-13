@@ -20,7 +20,9 @@ impl CommandCodec for Classic {
     /// 2: `RespondDeal` carries the refusal's reason (`PeaceRefusal`); peace between two nations is a
     /// deal both accept, so a journal of version 1 may hold a `MakePeace` between nations that
     /// no longer replays: it is refused as another layout, not diverged silently.
-    const COMMAND_CODEC_VERSION: u32 = 2;
+    /// 3: `DisbandUnit` and `SellBuilding` (tags 82, 83); a build of version 2 does not know
+    /// them, so it refuses the journal as another layout instead of failing on a tag.
+    const COMMAND_CODEC_VERSION: u32 = 3;
 }
 
 kernel::command_ids!(PolicyId, BeliefId, PolicyBranchId, ReligionId);
@@ -108,6 +110,8 @@ kernel::command_field!(Command {
     79 => ChooseCityName { player, city, name },
     80 => ClaimRuins { unit, reward },
     81 => Paradrop { unit, destination },
+    82 => DisbandUnit { unit },
+    83 => SellBuilding { player, city, building },
 });
 
 kernel::command_field!(GreatPersonAction {

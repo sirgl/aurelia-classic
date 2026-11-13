@@ -57,12 +57,14 @@ pub enum Action {
     SellGoods,
     /// Fighter: sweep a tile for interceptors (a targeting mode; art: none yet).
     Sweep,
+    /// Any own unit: disband it, after the player's yes (art: none yet).
+    Disband,
 }
 /// Number of actions (texture slots).
-const ACTION_COUNT: usize = 32;
+const ACTION_COUNT: usize = 33;
 /// Actions with no painted medallion yet: the panel draws their fallback icon.
 #[cfg(test)]
-const WITHOUT_ART: [Action; 3] = [Action::BuyCityState, Action::SellGoods, Action::Sweep];
+const WITHOUT_ART: [Action; 4] = [Action::BuyCityState, Action::SellGoods, Action::Sweep, Action::Disband];
 #[path = "unit_action_art.rs"]
 mod action_art;
 /// Stable enum order keeps each atlas contiguous during one-shot decode.
@@ -74,7 +76,7 @@ const ALL: [Action; ACTION_COUNT] = [
     Action::GreatImprovement, Action::Discover, Action::HurryWonder,
     Action::GoldenAge, Action::TradeMission, Action::Promote, Action::Upgrade,
     Action::SetUp, Action::Pillage, Action::Intercept, Action::TradeRoute, Action::Plunder,
-    Action::BuyCityState, Action::SellGoods, Action::Sweep,
+    Action::BuyCityState, Action::SellGoods, Action::Sweep, Action::Disband,
 ];
 const MILITARY: &[Action] = &[
     Action::Move,
@@ -128,6 +130,7 @@ impl Action {
             Self::BuyCityState => "buy-city-state",
             Self::SellGoods => "sell-goods",
             Self::Sweep => "air-sweep",
+            Self::Disband => "disband",
         }
     }
     pub fn label(self) -> &'static str {
@@ -164,6 +167,7 @@ impl Action {
             Self::BuyCityState => t!("classic.ui.unit-actions.buy-city-state.label"),
             Self::SellGoods => t!("classic.ui.unit-actions.sell-goods.label"),
             Self::Sweep => t!("classic.ui.unit-actions.sweep.label"),
+            Self::Disband => t!("classic.ui.unit-actions.disband.label"),
         }
     }
     fn description(self) -> &'static str {
@@ -200,6 +204,7 @@ impl Action {
             Self::BuyCityState => t!("classic.ui.unit-actions.buy-city-state.desc"),
             Self::SellGoods => t!("classic.ui.unit-actions.sell-goods.desc"),
             Self::Sweep => t!("classic.ui.unit-actions.sweep.desc"),
+            Self::Disband => t!("classic.ui.unit-actions.disband.desc"),
         }
     }
     fn fallback(self) -> Icon {
@@ -227,7 +232,7 @@ impl Action {
             Self::Intercept => Icon::Shield,
             Self::Sweep => Icon::Compass,
             Self::TradeRoute => Icon::Coin,
-            Self::Plunder | Self::BuyCityState | Self::SellGoods => Icon::Coin,
+            Self::Plunder | Self::BuyCityState | Self::SellGoods | Self::Disband => Icon::Coin,
         }
     }
 }
@@ -254,7 +259,6 @@ fn selected_owned_unit(world: &RenderWorld, tile: Option<u32>) -> Option<UnitMar
         .copied()
 }
 
-#[derive(Default)]
 pub struct ActionPanelState {
     unit: Option<UnitMarker>,
     /// Preview actions of `unit`, fixed when it is selected.
@@ -265,6 +269,20 @@ pub struct ActionPanelState {
     pending: Option<std::sync::mpsc::Receiver<(Action, egui::ColorImage)>>,
     /// The unit whose promotion list is open (game only).
     promotions_for: Option<UnitHandle>,
+}
+// By hand: the texture slots outnumber the arrays `Default` covers (32).
+impl Default for ActionPanelState {
+    fn default() -> Self {
+        Self {
+            unit: None,
+            actions: &[],
+            preview: None,
+            textures: std::array::from_fn(|_| None),
+            loaded: false,
+            pending: None,
+            promotions_for: None,
+        }
+    }
 }
 impl std::fmt::Debug for ActionPanelState {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

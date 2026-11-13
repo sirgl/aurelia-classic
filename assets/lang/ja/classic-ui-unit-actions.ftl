@@ -79,3 +79,5 @@ classic.ui.unit-actions.hint-blocked =
     { $label }
     { $what }
     利用不可：{ $reason }
+classic.ui.unit-actions.disband.label = 解散
+classic.ui.unit-actions.disband.desc = ユニットを永久に解散します。自国の領土内なら国庫に少しゴールドが戻ります。

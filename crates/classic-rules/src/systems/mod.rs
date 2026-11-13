@@ -30,6 +30,8 @@
 //! | research        | ChooseTechnology                 | TechnologyChosen                 |
 //! | diplomacy       | DeclareWar, MakePeace, OpenBorders | WarDeclared/PeaceMade/...      |
 //! | purchase        | HurryProduction, PurchaseTile    | (production), tile OwnerChanged  |
+//! | disband         | DisbandUnit                      | Destroyed                        |
+//! | building_sale   | SellBuilding (turn: sales reopen) | EffectsChanged, BuildingSold    |
 //! | economy         | —  (turn: upkeep, gold)          | —                                |
 //! | turn            | EndTurn (ordered step list)      | TurnEnded                        |
 //! | effects         | — (triggers of the others)       | Promoted, EffectsChanged, ...    |
@@ -39,12 +41,14 @@ pub(crate) mod airlift;
 pub(crate) mod paradrop;
 pub(crate) mod archaeology;
 pub(crate) mod barbarians;
+pub(crate) mod building_sale;
 pub(crate) mod revolts;
 pub(crate) mod cargo;
 pub(crate) mod city_states;
 pub(crate) mod combat;
 pub(crate) mod congress;
 pub(crate) mod diplomacy;
+pub(crate) mod disband;
 pub(crate) mod economy;
 pub(crate) mod effects;
 pub(crate) mod golden_age;

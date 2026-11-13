@@ -206,6 +206,11 @@ pub trait BenchRules {
         Vec::new()
     }
 
+    /// What an accepted command bought with gold (none: the module has no purchases).
+    fn purchase(_command: &<Self::M as RulesModule>::Command) -> Option<crate::bench::play::Purchase> {
+        None
+    }
+
     /// Risings of rebels in `changes`, each for the nation they rose against, with the rebels
     /// that rose (none: the module has no rebels).
     fn rebellions(_changes: &ChangeJournal<Self::M>) -> Vec<(PlayerId, u32)> {
@@ -582,6 +587,15 @@ impl BenchRules for ClassicBench {
 
     fn by_agreement(command: &classic_rules::Command) -> bool {
         matches!(command, classic_rules::Command::RespondDeal { accept: true, .. })
+    }
+
+    /// `HurryProduction` buys the head of a queue, `PurchaseTile` a tile.
+    fn purchase(command: &classic_rules::Command) -> Option<crate::bench::play::Purchase> {
+        match command {
+            classic_rules::Command::HurryProduction { .. } => Some(crate::bench::play::Purchase::Item),
+            classic_rules::Command::PurchaseTile { .. } => Some(crate::bench::play::Purchase::Tile),
+            _ => None,
+        }
     }
 
     /// `ClassicChange::RebelsRose`: the nation the rebels rose against, and how many.

@@ -229,6 +229,20 @@ pub struct CombatRecord {
     pub rebellions: u32,
     #[serde(default)]
     pub rebels: u32,
+    /// Queue heads and tiles it bought with gold (`BenchRules::purchase`; reports saved
+    /// before read 0).
+    #[serde(default)]
+    pub items_bought: u32,
+    #[serde(default)]
+    pub tiles_bought: u32,
+}
+
+/// What a command bought with gold (`BenchRules::purchase`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Purchase {
+    /// The head of a city's queue.
+    Item,
+    Tile,
 }
 
 /// What a command did to a player's deals (`BenchRules::deals`).
@@ -284,6 +298,8 @@ impl CombatRecord {
             rebel_turns: self.rebel_turns + other.rebel_turns,
             rebellions: self.rebellions + other.rebellions,
             rebels: self.rebels + other.rebels,
+            items_bought: self.items_bought + other.items_bought,
+            tiles_bought: self.tiles_bought + other.tiles_bought,
         }
     }
 
@@ -626,6 +642,11 @@ impl MatchLog {
                     DealEvent::GoldPerTurn => r.gold_per_turn_deals += 1,
                     DealEvent::GoldPerTurnBroken => r.gold_per_turn_broken += 1,
                 });
+            }
+            match R::purchase(&command.command) {
+                Some(Purchase::Item) => self.record(player, |r| r.items_bought += 1),
+                Some(Purchase::Tile) => self.record(player, |r| r.tiles_bought += 1),
+                None => {}
             }
             for (party, rebels) in R::rebellions(&command.changes) {
                 self.record(party, |r| {

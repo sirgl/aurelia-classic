@@ -180,6 +180,13 @@ pub(super) fn show(ui: &mut egui::Ui, r: Rect, state: &mut ScreenState, model: &
             GOLD,
         );
     }
+    // A sale asked for here waits for the yes over the screen.
+    if let Some(card) = &city.confirm {
+        let screen = ui.ctx().content_rect();
+        if let Some(yes) = crate::ui::hud::game_widgets::confirm_card(ui.ctx(), screen, card) {
+            state.requests.push(GameRequest::Confirm(yes));
+        }
+    }
     if let Some(message) = &model.message {
         let toast = Rect::from_min_size(
             pos2(frame.map.left(), frame.map.bottom() - 66.),
@@ -439,15 +446,23 @@ fn buildings(ui: &mut egui::Ui, state: &mut ScreenState, city: &CityView) {
             CREAM,
             Align2::LEFT_TOP,
         );
+        // The Sell button sits under the art, the effect beside it (Unciv: ConstructionInfoTable).
+        let sell = b.sale.as_ref().map(|_| Rect::from_min_size(r.min + vec2(0., 60.), vec2(r.width().min(220.), 28.)));
+        let effect_bottom = sell.map_or(r.bottom(), |s| s.top() - 2.);
         wrapped(
             ui,
-            Rect::from_min_max(r.min + vec2(64., 31.), r.max),
+            Rect::from_min_max(r.min + vec2(64., 31.), pos2(r.right(), effect_bottom)),
             &b.effect,
             11.,
             MUTED,
         );
-        ui.interact(r, ui.id().with(&b.name), Sense::hover())
+        ui.interact(Rect::from_min_max(r.min, pos2(r.right(), effect_bottom)), ui.id().with(&b.name), Sense::hover())
             .on_hover_text(&b.effect);
+        if let (Some(rect), Some((label, availability))) = (sell, &b.sale) {
+            if ready_button(ui, rect, label, availability) {
+                state.requests.push(GameRequest::SellBuilding(b.kind));
+            }
+        }
     }
 }
 fn purchase_details(ui: &mut egui::Ui, r: Rect, state: &mut ScreenState, city: &CityView) {

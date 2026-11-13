@@ -65,22 +65,43 @@ fn damaged_bytes_are_errors_not_panics() {
     );
 }
 
-/// The classic module reads codec versions 19 to 24 (platform/docs/saves.md): a save of version
-/// 19 reads, and is written back as version 24 (every unit on no carrier, the game at Standard speed,
-/// every religious unit with its full strength, no rebellion counting down), which reads back to the
+/// The classic module reads codec versions 19 to 25 (platform/docs/saves.md): a save of version
+/// 19 reads, and is written back as version 25 (every unit on no carrier, the game at Standard speed,
+/// every religious unit with its full strength, no rebellion counting down, no city that sold a
+/// building this turn), which reads back to the
 /// same bytes; other versions are refused.
 #[test]
 fn the_codec_reads_classic_saves_byte_for_byte() {
     let before: &[u8] = include_bytes!("fixtures/city-names-before-v1.aurelia");
     assert_eq!(u32::from_le_bytes(before[8..12].try_into().unwrap()), 19);
     let upgraded = to_bytes(&from_bytes(before).unwrap());
-    assert_eq!(u32::from_le_bytes(upgraded[8..12].try_into().unwrap()), 24);
+    assert_eq!(u32::from_le_bytes(upgraded[8..12].try_into().unwrap()), 25);
     assert_eq!(to_bytes(&from_bytes(&upgraded).unwrap()), upgraded);
-    for version in [18, 25] {
+    for version in [18, 26] {
         let mut other = before.to_vec();
         other[8..12].copy_from_slice(&u32::to_le_bytes(version));
         assert_eq!(from_bytes(&other).unwrap_err(), CodecError::UnsupportedCodec(version));
     }
+}
+
+/// A player's economy record as codec 24 wrote it (no list of the cities that sold a building
+/// this turn at its end) still reads, with no city that sold; codec 25 writes the list.
+#[test]
+fn a_player_record_of_codec_24_reads_with_no_sale_this_turn() {
+    use classic_rules::classic::player::SavedPlayerEconomy;
+    let sold = SavedPlayerEconomy { golden_ages: 2, science_history: vec![1; 8], sold_building_cities: vec![5, 9], ..Default::default() };
+    let mut v25 = Vec::new();
+    sold.put(&mut v25);
+    let back = <SavedPlayerEconomy as Field>::take(&mut Reader::new(&v25, 25)).unwrap();
+    assert_eq!(back, sold);
+    let quiet = SavedPlayerEconomy { sold_building_cities: Vec::new(), ..sold };
+    let mut v24 = Vec::new();
+    quiet.put(&mut v24);
+    let mut empty = Vec::new();
+    Vec::<u64>::new().put(&mut empty);
+    v24.truncate(v24.len() - empty.len());
+    let old = <SavedPlayerEconomy as Field>::take(&mut Reader::new(&v24, 24)).unwrap();
+    assert_eq!(old, quiet);
 }
 
 /// The record of a religious unit as codec 20 wrote it (unit, religion,

@@ -192,6 +192,14 @@ pub fn validate(
             combat::validate_promote(state, rules, unit, promotion)
         }
         Command::UpgradeUnit { unit } => combat::validate_upgrade(state, rules, unit),
+        Command::DisbandUnit { unit } => {
+            let gold = crate::derived::disband::disband_status(state.auth, rules, unit)?;
+            Ok(ResolvedCommand::DisbandUnit { unit, gold })
+        }
+        Command::SellBuilding { player, city, building } => {
+            let gold = crate::derived::building_sale::sale_status(state.auth, rules, player, city, building)?;
+            Ok(ResolvedCommand::SellBuilding { player, city, building, gold })
+        }
         Command::DecideCity {
             player,
             city,
@@ -369,6 +377,7 @@ pub(crate) fn acting_player(state: GameView<'_>, command: &Command) -> Option<Pl
         | Command::SetUpRangedAttack { unit }
         | Command::Promote { unit, .. }
         | Command::UpgradeUnit { unit }
+        | Command::DisbandUnit { unit }
         | Command::Pillage { unit }
         | Command::Rebase { unit, .. }
         | Command::RebaseToCarrier { unit, .. }
@@ -413,7 +422,8 @@ pub(crate) fn acting_player(state: GameView<'_>, command: &Command) -> Option<Pl
         | Command::SwitchIdeology { player }
         | Command::ChooseArchaeology { player, .. }
         | Command::ChooseFreeTechnology { player, .. }
-        | Command::ChooseFreeGreatPerson { player, .. } => Some(player),
+        | Command::ChooseFreeGreatPerson { player, .. }
+        | Command::SellBuilding { player, .. } => Some(player),
         Command::FoundReligion { unit, .. }
         | Command::EnhanceReligion { unit, .. }
         | Command::SpreadReligion { unit }

@@ -79,3 +79,5 @@ classic.ui.unit-actions.hint-blocked =
     { $label }
     { $what }
     No disponible: { $reason }
+classic.ui.unit-actions.disband.label = Disolver
+classic.ui.unit-actions.disband.desc = Disolver la unidad para siempre; en tu territorio el tesoro recupera algo de oro.

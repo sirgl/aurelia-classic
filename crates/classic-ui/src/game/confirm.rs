@@ -2,14 +2,17 @@
 //! unit or city of a nation at peace (the right click or the Attack order), the war button and
 //! the denunciation button of the diplomacy screen open a card that says what the act costs;
 //! nothing happens until the player confirms it (`GameRequest::Confirm(true)`). No, Esc
-//! (`Session::cancel_aim`) or a new game leave everything as it was.
-use classic_rules::ids::PlayerId;
+//! (`Session::cancel_aim`) or a new game leave everything as it was. Disbanding a unit (its
+//! Disband order) and selling a building (the city screen) wait for the yes the same way, as in
+//! Unciv (UiOnlyUnitActions.getDisbandAction, ConstructionInfoTable.sellBuildingClicked): the
+//! card tells the gold.
+use classic_rules::ids::{BuildingKindId, CityHandle, PlayerId, UnitHandle};
 use classic_rules::Command;
 use i18n::{t, tf};
 
 use super::names;
 use super::session::Session;
-use crate::ui::model::ConfirmCard;
+use crate::ui::model::{ConfirmCard, NoticeKind};
 
 /// What waits for the yes.
 #[derive(Debug, Clone)]
@@ -20,6 +23,10 @@ pub(crate) enum Confirmation {
     War(PlayerId),
     /// The denunciation of the nation from the diplomacy screen.
     Denounce(PlayerId),
+    /// Disband the player's unit.
+    Disband(UnitHandle),
+    /// Sell the building of the player's city.
+    SellBuilding { city: CityHandle, building: BuildingKindId },
 }
 
 impl Confirmation {
@@ -27,6 +34,8 @@ impl Confirmation {
         match *self {
             Confirmation::Attack { enemy, .. } | Confirmation::War(enemy) => Command::DeclareWar { player: me, enemy },
             Confirmation::Denounce(target) => Command::Denounce { player: me, target },
+            Confirmation::Disband(unit) => Command::DisbandUnit { unit },
+            Confirmation::SellBuilding { city, building } => Command::SellBuilding { player: me, city, building },
         }
     }
 }
@@ -73,6 +82,39 @@ impl Session {
                     cancel,
                 }
             }
+            Confirmation::Disband(unit) => {
+                let auth = self.game().view().auth;
+                let kind = auth.units().get(*unit)?.core.kind;
+                let name = names::unit(self.rules(), kind);
+                let gold = classic_rules::derived::disband::disband_status(auth, self.rules(), *unit).unwrap_or(0);
+                ConfirmCard {
+                    title: tf!("classic.game.orders.confirm-disband-title", name = name.as_str()),
+                    line: if gold > 0 {
+                        tf!("classic.game.orders.confirm-disband-gold", gold = gold)
+                    } else {
+                        t!("classic.game.orders.confirm-disband-line").to_string()
+                    },
+                    confirm: t!("classic.game.orders.confirm-disband").to_string(),
+                    cancel,
+                }
+            }
+            Confirmation::SellBuilding { city, building } => {
+                let core = self.game().view().auth.cities().get(*city)?;
+                let def = self.rules().buildings.get(building.0 as usize)?;
+                let name = names::named("building", &def.name, &def.key);
+                let gold = classic_rules::derived::building_sale::sale_gold(self.rules(), *building);
+                let weakens = classic_rules::derived::building_sale::sale_weakens_defence(self.game().view().auth, self.rules(), *city, *building);
+                let mut line = tf!("classic.game.city.confirm-sell-line", city = core.name.as_str(), gold = gold);
+                if weakens {
+                    line = format!("{line} {}", t!("classic.game.city.confirm-sell-defence"));
+                }
+                ConfirmCard {
+                    title: tf!("classic.game.city.confirm-sell-title", name = name.as_str()),
+                    line,
+                    confirm: t!("classic.game.city.confirm-sell").to_string(),
+                    cancel,
+                }
+            }
         };
         Some(card)
     }
@@ -100,6 +142,38 @@ impl Session {
             Confirmation::Attack { enemy, strike } => self.declare_war_and_strike(enemy, strike),
             Confirmation::War(enemy) => self.declare_war(enemy),
             Confirmation::Denounce(target) => self.denounce(target),
+            Confirmation::Disband(unit) => self.disband(unit),
+            Confirmation::SellBuilding { city, building } => self.sell_building(city, building),
+        }
+    }
+
+    /// The yes to the Disband card: the unit goes, the notice tells the gold.
+    fn disband(&mut self, unit: UnitHandle) {
+        let auth = self.game().view().auth;
+        let Some(kind) = auth.units().get(unit).map(|u| u.core.kind) else {
+            return;
+        };
+        let gold = classic_rules::derived::disband::disband_status(auth, self.rules(), unit).unwrap_or(0);
+        let name = names::unit(self.rules(), kind);
+        if self.submit(Command::DisbandUnit { unit }) {
+            let text = if gold > 0 {
+                tf!("classic.game.orders.disbanded-gold", name = name.as_str(), gold = gold)
+            } else {
+                tf!("classic.game.orders.disbanded", name = name.as_str())
+            };
+            self.notify(NoticeKind::Production, text);
+        }
+    }
+
+    /// The yes to the Sell card: the building goes, the notice tells the gold.
+    fn sell_building(&mut self, city: CityHandle, building: BuildingKindId) {
+        let Some(def) = self.rules().buildings.get(building.0 as usize) else {
+            return;
+        };
+        let name = names::named("building", &def.name, &def.key);
+        let gold = classic_rules::derived::building_sale::sale_gold(self.rules(), building);
+        if self.submit(Command::SellBuilding { player: self.me(), city, building }) {
+            self.notify(NoticeKind::Production, tf!("classic.game.city.sold", name = name.as_str(), gold = gold));
         }
     }
 }

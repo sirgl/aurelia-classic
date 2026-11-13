@@ -35,6 +35,8 @@ mod turn;
 mod victory;
 
 #[cfg(test)]
+mod disband_sale_tests;
+#[cfg(test)]
 mod presentation_tests;
 #[cfg(test)]
 mod reasons_rules_tests;
