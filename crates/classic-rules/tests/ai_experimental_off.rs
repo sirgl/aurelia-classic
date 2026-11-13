@@ -82,8 +82,11 @@ fn the_game_without_the_feature_plays_next_w() {
 /// gifts to city-states or the world congress's votes (the delegate price): this one does (the
 /// trace below counts them).
 /// Re-pinned for deals by value (rules/deals, 12 November), equal with the feature on (`NextW`).
-const CITY_STATES_NEXT_W: u64 = 0x4801_023c_cf98_5f74;
-const CITY_STATES_ROUNDS: usize = 400;
+/// Re-pinned for purchase prices as Unciv (rules/hurry-modifier, 13 November: dearer settlers and
+/// +20 % units, a new city drops a queued national wonder): the congress's first vote came at round
+/// 404, so the case runs 420 rounds (86 gifts, 5 votes), equal with the feature on (`NextW`).
+const CITY_STATES_NEXT_W: u64 = 0x0090_5e97_0e02_ba04;
+const CITY_STATES_ROUNDS: usize = 420;
 
 /// The longer case of the promotion's review: city-states, gifts and votes are played in the game
 /// without the feature exactly as `next-w` plays them with it.

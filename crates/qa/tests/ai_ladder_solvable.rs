@@ -73,7 +73,9 @@ fn an_unsolvable_scene_is_drawn_again_and_a_solvable_one_is_kept() {
     // inside the move that sees it (0.2): the worlds before the war play differently).
     // Deals by value (rules/deals, 12 November): the AI answers luxury swaps by what the kinds give, so the
     // worlds before the war play differently again and scene 37's solvable world is its fifth (attempt 4).
-    for (i, attempt) in [(48, 1), (37, 4)] {
+    // Purchase prices as Unciv (rules/hurry-modifier, 13 November): settlers and the +20 % units cost more
+    // gold and a new city drops a queued national wonder, so scene 37's solvable world is its seventh (attempt 6).
+    for (i, attempt) in [(48, 1), (37, 6)] {
         let missed = selfplay::play(&rules, &off, &jobs[i]).unwrap();
         assert!(!first_turn(&missed), "scene {i} as drawn is not taken in the first turn");
         let again = selfplay::play(&rules, &on, &jobs[i]).unwrap();
