@@ -380,3 +380,26 @@ fn the_purchase_price_does_not_count_the_production_invested() {
     assert_eq!(after.production, stock, "the invested stock goes to the next order");
     assert_eq!(after.queue.len(), 1);
 }
+
+// ---- journal ----
+
+/// A journal with a disband and a sale (command tags 82 and 83) replays from the save to the
+/// same world.
+#[test]
+fn a_journal_with_a_disband_and_a_sale_replays() {
+    let rules = rules();
+    let (mut game, capital, _) = world(&rules);
+    let at = game.view().auth.cities().get(capital).unwrap().tile;
+    let regular = regular_buildings(&rules)[0];
+    game.debug_add_building(&rules, capital, regular);
+    let unit = game.debug_spawn_unit(&rules, P0, at, kind(&rules, "core:unit/warrior"));
+    let save = kernel::persistence::codec::to_bytes(&encode(&game, &rules));
+    let mut journal = game.begin_journal(&rules);
+    game.execute(&rules, Command::DisbandUnit { unit }).unwrap();
+    game.execute(&rules, Command::SellBuilding { player: P0, city: capital, building: regular }).unwrap();
+    round(&mut game, &rules);
+    journal.extend(game.take_journal());
+    let replayed = kernel::replay::journal::replay(&save, &journal, &rules).expect("the journal replays");
+    assert_eq!(replayed.commands, 4, "disband, sale and two ends of turn");
+    assert_eq!(authoritative_hash(&replayed.game), authoritative_hash(&game));
+}
