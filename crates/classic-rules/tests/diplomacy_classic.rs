@@ -415,7 +415,7 @@ fn revealed_tiles_survive_save_and_load() {
     let loaded = classic_rules::persistence::decode::decode(&classic_rules::save_codec::from_bytes(&bytes).unwrap(), &rules).unwrap();
     assert_eq!(authoritative_hash(&loaded), authoritative_hash(&game));
     assert!(loaded.player_view(&rules, P0).is_known(capital));
-    assert_eq!(classic_rules::save_codec::CODEC_VERSION, 23, "the game's speed is the last codec change");
+    assert_eq!(classic_rules::save_codec::CODEC_VERSION, 24, "the rebellion countdowns are the last codec change");
 }
 
 /// The leaders ask a nation whose capital they value and have not

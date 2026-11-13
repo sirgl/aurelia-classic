@@ -65,18 +65,18 @@ fn damaged_bytes_are_errors_not_panics() {
     );
 }
 
-/// The classic module reads codec versions 19 to 23 (platform/docs/saves.md): a save of version
-/// 19 reads, and is written back as version 23 (every unit on no carrier, the game at Standard speed,
-/// every religious unit with its full strength), which reads back to the
+/// The classic module reads codec versions 19 to 24 (platform/docs/saves.md): a save of version
+/// 19 reads, and is written back as version 24 (every unit on no carrier, the game at Standard speed,
+/// every religious unit with its full strength, no rebellion counting down), which reads back to the
 /// same bytes; other versions are refused.
 #[test]
 fn the_codec_reads_classic_saves_byte_for_byte() {
     let before: &[u8] = include_bytes!("fixtures/city-names-before-v1.aurelia");
     assert_eq!(u32::from_le_bytes(before[8..12].try_into().unwrap()), 19);
     let upgraded = to_bytes(&from_bytes(before).unwrap());
-    assert_eq!(u32::from_le_bytes(upgraded[8..12].try_into().unwrap()), 23);
+    assert_eq!(u32::from_le_bytes(upgraded[8..12].try_into().unwrap()), 24);
     assert_eq!(to_bytes(&from_bytes(&upgraded).unwrap()), upgraded);
-    for version in [18, 24] {
+    for version in [18, 25] {
         let mut other = before.to_vec();
         other[8..12].copy_from_slice(&u32::to_le_bytes(version));
         assert_eq!(from_bytes(&other).unwrap_err(), CodecError::UnsupportedCodec(version));
