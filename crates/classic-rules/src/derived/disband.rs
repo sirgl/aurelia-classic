@@ -4,14 +4,14 @@
 //! ```text
 //! may      the unit is alive and has moves left (Unciv: UiOnlyUnitActions.getDisbandAction,
 //!          the action only `takeIf { unit.hasMovement() }`)
-//! gold     on its owner's land ⌊(30·P)^0.75⌋ / 20, P = the kind's production cost at the
+//! gold     on its owner's land ⌊(30·P)^0.75 · (1 + m %)⌋ / 20, P = the kind's production cost at the
 //!          game's speed and the owner's handicap, no city modifier; elsewhere none
 //!          (Unciv: MapUnit.disband, BaseUnit.getDisbandGold = getBaseGoldCost(civ, null) / 20)
 //! ```
 //!
 //! The base gold cost is the purchase formula before its rounding to 10; a
 //! division by 20 of the rounded price gives the same number, so the gold
-//! is `hurry_price(P, 0) / 20`.
+//! is `hurry_price(P, m) / 20`, m the kind's HurryCostModifier (Unciv: getBaseGoldCost multiplies by it).
 
 use crate::ids::{PlayerId, ProductionItem, UnitHandle, UnitKindId};
 use crate::rules::CompiledRuleset;
@@ -68,7 +68,8 @@ pub fn disband_gold(auth: &AuthWorld, rules: &CompiledRuleset, owner: PlayerId, 
     };
     let mut mods = crate::effects::city::city_modifiers(auth, rules, city);
     mods.cost_percent.fill(0);
+    let modifier = rules.units.get(kind.0 as usize).map_or(0, |u| u.hurry_cost_modifier);
     mods.production_cost(rules, ProductionItem::Unit(kind))
-        .and_then(|cost| crate::world::city::hurry_price(cost, 0))
+        .and_then(|cost| crate::world::city::hurry_price(cost, modifier))
         .map_or(0, |price| price / DISBAND_GOLD_DIVISOR)
 }

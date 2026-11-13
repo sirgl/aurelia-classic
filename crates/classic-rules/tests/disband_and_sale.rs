@@ -97,15 +97,15 @@ fn refused(game: &mut GameState, rules: &CompiledRuleset, command: Command, reas
     }
 }
 
-/// Unciv's disband gold of a unit of production cost `cost`, in floating point as Unciv
-/// computes it: `((30·cost)^0.75).toInt() / 20`.
-fn unciv_disband_gold(cost: u32) -> u32 {
-    (30.0 * f64::from(cost)).powf(0.75) as u32 / 20
+/// Unciv's disband gold of a unit of production cost `cost` and HurryCostModifier `modifier`, in
+/// floating point as Unciv computes it: `((30·cost)^0.75 · modifier.toPercent()).toInt() / 20`.
+fn unciv_disband_gold(cost: u32, modifier: i32) -> u32 {
+    ((30.0 * f64::from(cost)).powf(0.75) * f64::from(1.0f32 + modifier as f32 / 100.0f32)) as u32 / 20
 }
 
 // ---- disband ----
 
-/// On its owner's land a unit brings ⌊(30·P)^0.75⌋ / 20 gold (a 40-production unit 10): every
+/// On its owner's land a unit brings ⌊(30·P)^0.75 · (1 + m %)⌋ / 20 gold (a 40-production unit 10): every
 /// kind with a cost, at Standard speed for a human owner, as Unciv's floating point gives it;
 /// the unit leaves the world with the journal's `Destroyed`.
 #[test]
@@ -121,7 +121,7 @@ fn a_unit_disbanded_on_own_land_brings_a_twentieth_of_its_base_gold_cost() {
             continue;
         }
         let got = disband_gold(game.view().auth, &rules, P0, UnitKindId(i as u16));
-        assert_eq!(got, unciv_disband_gold(def.cost), "{}", def.key);
+        assert_eq!(got, unciv_disband_gold(def.cost, def.hurry_cost_modifier), "{}", def.key);
     }
     let unit = game.debug_spawn_unit(&rules, P0, at, warrior);
     let id = game.view().auth.units().get(unit).unwrap().core.id;

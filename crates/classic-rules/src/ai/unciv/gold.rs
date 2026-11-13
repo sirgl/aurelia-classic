@@ -72,10 +72,7 @@ pub fn use_gold(obs: &AIObservation<'_>, rules: &CompiledRuleset, personality: &
         let Some(price) = obs.view.own_hurry_price(city.handle) else {
             continue;
         };
-        let modifier = match head {
-            crate::ids::ProductionItem::Building(b) => rules.buildings[b.0 as usize].hurry_cost_modifier,
-            _ => 0,
-        };
+        let modifier = crate::effects::city::hurry_cost_modifier(rules, *head).unwrap_or(0);
         // Unciv buys only what nothing was put into yet; its city chooses the next item as
         // the last one completes, ours at the end of the turn, so one turn's production
         // in the item counts as nothing put in.
