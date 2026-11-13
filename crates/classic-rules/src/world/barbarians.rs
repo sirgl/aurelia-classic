@@ -12,7 +12,7 @@ pub use crate::systems::barbarians::{
     CAMP_GOLD, EARLIEST_RELEASE_ROUND, MIN_DISTANCE_CAMP, MIN_DISTANCE_CITY,
 };
 /// The rebellion constants and the rebels' unit kinds (defined by the revolt system).
-pub use crate::systems::revolts::{rebel_kinds, REBEL_PERCENT_PER_CITY, REVOLT_DELAY_BASE, REVOLT_DELAY_RANDOM};
+pub use crate::systems::revolts::{rebel_kinds, rebels_possible, REBEL_PERCENT_PER_CITY, REVOLT_DELAY_BASE, REVOLT_DELAY_RANDOM};
 
 /// Game option of barbarians: no barbarians, normal, raging.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]

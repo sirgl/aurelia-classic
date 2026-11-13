@@ -83,7 +83,10 @@ fn rebels_rise_at_minus_21_after_the_countdown() {
     let risings = play(&mut game, &rules, city, population, 2 * (LONGEST_DELAY + 1) + 1);
     assert!(risings.len() >= 2, "a rising, then another after the next countdown: {risings:?}");
     let (first, _) = risings[0];
-    assert!((REVOLT_DELAY_BASE - 1..=LONGEST_DELAY).contains(&first), "the first rising after 4-6 turns below -20, round {first}");
+    // The countdown starts at the end of the first round (4-6 turns, never
+    // shortened at Standard speed) and the rising comes at the end of its last round.
+    let (earliest, latest) = (REVOLT_DELAY_BASE, LONGEST_DELAY);
+    assert!((earliest..=latest).contains(&first), "the first rising after 4-6 turns below -20, round {first}");
     let auth = game.view().auth;
     let kinds = rebel_kinds(auth, &rules, P0);
     let city_tile = auth.cities().get(city).unwrap().tile;
@@ -150,12 +153,10 @@ fn rebels_are_deterministic_by_seed() {
     assert_eq!(hash_a, hash_b);
 }
 
-/// More cities, more rebels: one city of eleven or more gives one to three
-/// (Unciv: `1 + rand(100 + 20 (cities - 1)) / 100`); every rebel stands on a
-/// tile of its own.
-#[test]
-fn a_wide_empire_raises_more_rebels() {
-    let (mut game, rules, city, _) = world(11, BarbarianMode::Normal, 0);
+/// P0 with eleven cities (and no garrisons) below -20 happiness; the
+/// cities and the population that holds them there.
+fn wide_empire(seed: u64) -> (GameState, CompiledRuleset, Vec<CityHandle>, u32) {
+    let (mut game, rules, city, _) = world(seed, BarbarianMode::Normal, 0);
     let mut cities = vec![city];
     for (q, r) in [(3, 3), (13, 3), (3, 13), (13, 13), (18, 8), (8, 17), (18, 2), (23, 8), (1, 8), (13, 8)] {
         cities.push(game.debug_found_city(&rules, P0, tile(&game, q, r)));
@@ -168,16 +169,31 @@ fn a_wide_empire_raises_more_rebels() {
             player_happiness(game.view().auth, &rules, P0).excess() <= REBELLION_THRESHOLD
         })
         .expect("eleven cities fall below -20");
+    (game, rules, cities, population)
+}
+
+/// The risings of `rounds` rounds of a wide empire: the count of each.
+fn wide_risings(game: &mut GameState, rules: &CompiledRuleset, cities: &[CityHandle], population: u32, rounds: u32) -> Vec<u8> {
     let mut counts = Vec::new();
-    for _ in 0..40 {
-        for change in round(&mut game, &rules, city, population) {
+    for _ in 0..rounds {
+        for change in round(game, rules, cities[0], population) {
             let ClassicChange::RebelsRose { count, .. } = change else { unreachable!() };
             counts.push(count);
         }
-        for c in &cities {
-            game.debug_set_population(&rules, *c, population);
+        for c in cities {
+            game.debug_set_population(rules, *c, population);
         }
     }
+    counts
+}
+
+/// More cities, more rebels: one city of eleven or more gives one to three
+/// (Unciv: `1 + rand(100 + 20 (cities - 1)) / 100`); every rebel stands on a
+/// tile of its own.
+#[test]
+fn a_wide_empire_raises_more_rebels() {
+    let (mut game, rules, cities, population) = wide_empire(11);
+    let counts = wide_risings(&mut game, &rules, &cities, population, 40);
     assert!(counts.len() >= 4, "{counts:?}");
     assert!(counts.iter().all(|c| (1..=3).contains(c)), "{counts:?}");
     assert!(counts.iter().any(|c| *c > 1), "eleven cities: two rebels or more some of the time: {counts:?}");
@@ -187,6 +203,27 @@ fn a_wide_empire_raises_more_rebels() {
     tiles.sort();
     tiles.dedup();
     assert_eq!(tiles.len(), all, "one rebel per tile");
+}
+
+/// Unciv: a unit cannot enter a city centre (`isCityCenterCannotEnter`), so
+/// `placeUnitNearTile` never puts a rebel in one, even an empty city of the
+/// nation or of a neighbour: an empire without garrisons, many rebels, none
+/// of them in a city.
+#[test]
+fn rebels_never_stand_in_a_city() {
+    for seed in [11, 12, 13] {
+        let (mut game, rules, cities, population) = wide_empire(seed);
+        let counts = wide_risings(&mut game, &rules, &cities, population, 60);
+        let auth = game.view().auth;
+        let centres: Vec<TileId> = auth.cities().iter().map(|(_, c)| c.tile).collect();
+        assert_eq!(centres.len(), cities.len() + 1, "no city lost");
+        let rebels = auth.indexes().units_of(BARBARIANS);
+        assert!(rebels.len() >= 6 && counts.len() >= 6, "seed {seed}: {} rebels in {counts:?}", rebels.len());
+        for unit in rebels {
+            let at = auth.units().get(*unit).unwrap().core.tile;
+            assert!(!centres.contains(&at), "seed {seed}: a rebel stands in a city at {at:?}");
+        }
+    }
 }
 
 /// The rebels are of the nation's era: with a later melee unit known, it
@@ -225,6 +262,21 @@ fn rebels_follow_the_era_of_the_nation() {
         let def = &rules.units[kind.0 as usize];
         assert!(def.obsolete_tech.is_none_or(|t| !game.view().auth.players().techs_of(P0).contains(&t)), "nothing obsolete");
     }
+}
+
+/// Unciv's `isBuildable`: a unit that needs a building is a rebel kind of a
+/// nation only once a city of it has the building.
+#[test]
+fn rebels_need_the_building_their_unit_needs() {
+    let (mut game, mut rules, city, _) = world(5, BarbarianMode::Normal, 0);
+    let kind = rebel_kinds(game.view().auth, &rules, P0)[0];
+    let building = rules.buildings.iter().position(|b| !b.unbuildable && b.nation.is_none() && b.requires_buildings.is_empty()).map(|i| classic_rules::ids::BuildingKindId(i as u16)).expect("a plain building");
+    rules.units[kind.0 as usize].requires_buildings = vec![building];
+    assert!(!game.view().auth.cities().get(city).unwrap().buildings.contains(&building));
+    assert!(!rebel_kinds(game.view().auth, &rules, P0).contains(&kind), "no city has the building");
+    game.debug_complete_building(&rules, city, building);
+    assert!(rebel_kinds(game.view().auth, &rules, P0).contains(&kind), "a city has it");
+    assert!(!rebel_kinds(game.view().auth, &rules, P1).contains(&kind), "the other nation has none");
 }
 
 /// A running countdown is saved and loaded; the loaded game rises as the

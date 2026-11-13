@@ -77,6 +77,12 @@ impl<'a> WorldTransaction<'a> {
         if self.world.module.barbarians.mode == BarbarianMode::None {
             return;
         }
+        // A nation without cities (or out of the game) has nothing to
+        // rise in: its countdown is dropped, not restarted.
+        if !self.world.players.is_alive(player) || self.world.indexes.cities_of(player).is_empty() {
+            self.world.module.barbarians.set_revolt(player, None);
+            return;
+        }
         if let Some(left) = self.world.module.barbarians.revolt_countdown(player) {
             let left = left.saturating_sub(1);
             if left == 0 {
@@ -200,8 +206,11 @@ impl<'a> WorldTransaction<'a> {
         use crate::world::stacking::can_stop_at;
         let map = &self.world.map;
         let profile = crate::navigation::MoveProfile::of_kind(self.world, rules, barbarian, kind);
+        // No city centre, empty or not: Unciv's `canMoveTo` refuses to enter one
+        // (`isCityCenterCannotEnter`), so a rebel stands next to it.
         let fits = |t: TileId| {
-            !crate::navigation::terrain::is_water(map, t)
+            self.world.indexes.city_on_tile(t).is_none()
+                && !crate::navigation::terrain::is_water(map, t)
                 && crate::navigation::cost::destination_ok(self.world, &profile, t)
                 && can_stop_at(self.world, rules, barbarian, kind, None, t).is_ok()
         };
@@ -234,6 +243,13 @@ impl<'a> WorldTransaction<'a> {
     }
 }
 
+/// Can rebels rise in this game at all: there is a barbarian player and the
+/// barbarians are not switched off (the gate of `revolt_turn`; the happiness
+/// warning of the interface asks the same).
+pub fn rebels_possible(auth: &crate::world::state::AuthWorld) -> bool {
+    auth.players().barbarian().is_some() && auth.module().barbarians().mode != BarbarianMode::None
+}
+
 /// The unit kinds rebels of `player` may be: regular land units of the
 /// rules that fight in melee (a strength and no ranged strength) and that
 /// `player` could build now (Unciv: TurnManager.doRevoltSpawn, `uniqueTo
@@ -241,6 +257,7 @@ impl<'a> WorldTransaction<'a> {
 pub fn rebel_kinds(auth: &crate::world::state::AuthWorld, rules: &CompiledRuleset, player: PlayerId) -> Vec<UnitKindId> {
     let techs = auth.players().techs_of(player);
     let nation = auth.players().nation_of(player);
+    let cities: Vec<_> = auth.indexes().cities_of(player).iter().filter_map(|h| auth.cities().get(*h)).collect();
     let mut out = Vec::new();
     for (i, def) in rules.units.iter().enumerate() {
         let kind = UnitKindId(i as u16);
@@ -256,10 +273,49 @@ pub fn rebel_kinds(auth: &crate::world::state::AuthWorld, rules: &CompiledRulese
         if def.required_project.is_some() {
             continue;
         }
+        // Unciv's `isBuildable`: the building the unit needs must stand in a city of the nation.
+        if !def.requires_buildings.is_empty() && !cities.iter().any(|c| crate::world::building_rules::first_missing(rules, c, &def.requires_buildings).is_none()) {
+            continue;
+        }
         if crate::derived::resources::production_resources(auth, rules, player, crate::ids::ProductionItem::Unit(kind)).is_err() {
             continue;
         }
         out.push(kind);
     }
     out
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::fixtures::arena_content;
+    use crate::game::ClassicGame;
+    use crate::ids::PlayerId;
+    use crate::transaction::transaction::WorldTransaction;
+    use crate::world::barbarians::BarbarianMode;
+    use crate::world::player::{ClassicKind, PlayerKind};
+    use crate::world::state::GameConfig;
+    use crate::GameState;
+
+    /// A nation that lost its last city keeps no countdown: it is dropped at
+    /// the next step and not restarted (the entry would live in the save for ever).
+    #[test]
+    fn a_nation_without_cities_loses_its_countdown() {
+        let rules = arena_content();
+        let mut game = GameState::new(&rules, GameConfig { players: 3, width: 16, height: 16, rng_seed: 3 });
+        let tile = game.view().auth.map().dimensions.to_tile(crate::math::HexCoord { q: 4, r: 4 }).unwrap();
+        let city = game.debug_found_city(&rules, PlayerId(0), tile);
+        game.debug_set_player_kind(PlayerId(2), PlayerKind::Module(ClassicKind::Barbarian));
+        game.debug_set_barbarian_mode(BarbarianMode::Normal);
+        let mut tx = WorldTransaction::new(game.world_mut());
+        tx.world.players.economy_mut(PlayerId(0)).expect("an economy").excess_happiness = crate::derived::happiness::REBELLION_THRESHOLD - 4;
+        tx.revolt_turn(PlayerId(0), &rules);
+        assert!(tx.world.module.barbarians.revolt_countdown(PlayerId(0)).is_some(), "a nation with a city below -20 counts down");
+        // The city is lost; the stored happiness is still below -20, as it is
+        // for a nation whose last city fell during this very turn.
+        tx.remove_city(city, &rules);
+        tx.revolt_turn(PlayerId(0), &rules);
+        assert_eq!(tx.world.module.barbarians.revolt_countdown(PlayerId(0)), None, "no city, no countdown");
+        tx.revolt_turn(PlayerId(0), &rules);
+        assert!(tx.world.module.barbarians.revolts().is_empty(), "and none is started again");
+    }
 }
