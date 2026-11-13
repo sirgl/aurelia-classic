@@ -530,3 +530,43 @@ fn selling_a_building_of_defence_keeps_the_hit_points_up_to_the_new_maximum() {
     }
     assert!(defences > 0, "the data has a sellable building that gives the city hit points");
 }
+
+/// A national wonder that wants a building in every city loses its order when another city sells
+/// that building (the sale reaches the owner's other queues).
+#[test]
+fn selling_in_another_city_drops_the_national_wonder_that_wanted_the_building_everywhere() {
+    use classic_rules::transaction::journal::{CityChange, OrderRemoval};
+    let rules = rules();
+    let mut checked = 0;
+    for (i, wonder) in rules.buildings.iter().enumerate() {
+        let (wonder_id, Some(req)) = (BuildingKindId(i as u16), wonder.requires_buildings_in_empire.first().copied()) else { continue };
+        if wonder.kind != BuildingKind::NationalWonder || rules.buildings[req.0 as usize].kind != BuildingKind::Regular {
+            continue;
+        }
+        let (mut game, capital, _) = world(&rules);
+        let second = game.debug_found_city(&rules, P0, tile(&game, 8, 12));
+        let mut needed = vec![wonder_id, req];
+        needed.extend(wonder.requires_buildings.iter().copied());
+        learn_for(&mut game, &rules, &needed);
+        for city in [capital, second] {
+            game.debug_add_building(&rules, city, req);
+        }
+        for r in &wonder.requires_buildings {
+            game.debug_add_building(&rules, capital, *r);
+        }
+        let order = ProductionItem::Building(wonder_id);
+        if game.execute(&rules, Command::EnqueueProduction { player: P0, city: capital, item: order }).is_err() {
+            continue;
+        }
+        let Ok(result) = game.execute(&rules, Command::SellBuilding { player: P0, city: second, building: req }) else { continue };
+        let key = &wonder.key;
+        assert!(!queue_of(&game, capital).contains(&order), "{key} still queued");
+        let told = result.changes().city_changes.iter().any(|c| {
+            matches!(c, CityChange::OrderRemoved { city, item, reason, .. }
+                if *city == capital && *item == order && *reason == OrderRemoval::NeedsBuilding)
+        });
+        assert!(told, "{key}: the journal tells the removal");
+        checked += 1;
+    }
+    assert!(checked > 0, "the data has a national wonder that wants a building in every city");
+}
