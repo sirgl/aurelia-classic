@@ -1,7 +1,7 @@
 use kernel::command::KernelCommand;
 
 use crate::ids::{
-    CityHandle, ImprovementId, PlayerId, ProductionItem, PromotionId, TechId, TileId, UnitHandle,
+    BuildingKindId, CityHandle, ImprovementId, PlayerId, ProductionItem, PromotionId, TechId, TileId, UnitHandle,
 };
 
 /// Intent of a player/AI. Bad: SetUnitTile/SetCityPopulation.
@@ -466,6 +466,19 @@ pub enum Command {
     ClaimRuins {
         unit: UnitHandle,
         reward: crate::systems::ruins::Reward,
+    },
+    /// Disband an own unit that has moves left; on its owner's land the
+    /// treasury gets the unit's disband gold (`derived::disband`).
+    DisbandUnit {
+        unit: UnitHandle,
+    },
+    /// Sell a building of an own city for gold: one sale per city and turn,
+    /// never a wonder, the palace or a building holding a great work
+    /// (`derived::building_sale`).
+    SellBuilding {
+        player: PlayerId,
+        city: CityHandle,
+        building: BuildingKindId,
     },
 }
 

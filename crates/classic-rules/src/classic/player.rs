@@ -42,6 +42,10 @@ pub struct PlayerEconomy {
     pub natural_wonders_found: Vec<crate::ids::TileId>,
     /// Free choices the player is owed (`Modifier::Grant`).
     pub owed: OwedChoices,
+    /// Cities of the player that sold a building on its current turn (one
+    /// sale per city and turn), ascending entity id; emptied at the start
+    /// of the player's turn (`systems::building_sale`).
+    pub sold_building_cities: Vec<crate::ids::EntityId>,
 }
 
 /// Technologies and great people granted for the player to choose, oldest
@@ -113,6 +117,9 @@ pub struct SavedPlayerEconomy {
     /// Entity ids of the cities that gave a conquest technology, ascending.
     pub conquest_tech_cities: Vec<u64>,
     pub unique_luxury_cities: u8,
+    /// Entity ids of the cities that sold a building this turn, ascending;
+    /// empty in saves older than `save_codec::SALES_SINCE`.
+    pub sold_building_cities: Vec<u64>,
 }
 
 /// `SavedPlayerEconomy::free_technologies` code of `FreeTechnology::Any`.
@@ -138,6 +145,7 @@ fn encode_player(e: &PlayerEconomy, kernel: KernelPlayerRecord) -> SavedPlayerEc
         long_count_given: e.owed.long_count_given,
         conquest_tech_cities: e.owed.conquest_tech_cities.iter().map(|c| c.0).collect(),
         unique_luxury_cities: e.owed.unique_luxury_cities,
+        sold_building_cities: e.sold_building_cities.iter().map(|c| c.0).collect(),
     }
 }
 
@@ -195,6 +203,9 @@ fn decode_player(p: &SavedPlayerEconomy, players: usize) -> Result<PlayerEconomy
     }
     let mut science_history = [0u32; SCIENCE_HISTORY_TURNS];
     science_history.copy_from_slice(&p.science_history);
+    if !p.sold_building_cities.windows(2).all(|w| w[0] < w[1]) {
+        return Err("cities that sold a building");
+    }
     Ok(PlayerEconomy {
         golden_age_turns: p.golden_age_turns,
         golden_age_meter: p.golden_age_meter,
@@ -207,6 +218,7 @@ fn decode_player(p: &SavedPlayerEconomy, players: usize) -> Result<PlayerEconomy
         excess_happiness: p.excess_happiness,
         natural_wonders_found: p.natural_wonders_found.iter().map(|t| crate::ids::TileId(*t)).collect(),
         owed: decode_owed(p, players)?,
+        sold_building_cities: p.sold_building_cities.iter().map(|c| crate::ids::EntityId(*c)).collect(),
     })
 }
 
@@ -252,6 +264,14 @@ fn hash_player(p: &SavedPlayerEconomy, mix: &mut dyn FnMut(u64)) {
     // choices keep their hashes.
     for w in owed_hash_words(p) {
         mix(w);
+    }
+    // Mixed only while a city has sold a building this turn: games without
+    // sales keep their hashes.
+    if !p.sold_building_cities.is_empty() {
+        mix(0x736f_6c64);
+        for c in &p.sold_building_cities {
+            mix(*c);
+        }
     }
 }
 
@@ -299,6 +319,7 @@ impl Field for SavedPlayerEconomy {
         self.long_count_given.put(out);
         self.conquest_tech_cities.put(out);
         self.unique_luxury_cities.put(out);
+        self.sold_building_cities.put(out);
     }
     fn take(r: &mut Reader<'_>) -> Result<Self, CodecError> {
         Ok(Self {
@@ -319,6 +340,7 @@ impl Field for SavedPlayerEconomy {
             long_count_given: Field::take(r)?,
             conquest_tech_cities: Field::take(r)?,
             unique_luxury_cities: Field::take(r)?,
+            sold_building_cities: r.since(crate::save_codec::SALES_SINCE)?,
         })
     }
 }

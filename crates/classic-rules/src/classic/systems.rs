@@ -96,6 +96,7 @@ impl ModuleSystems<Classic> for ClassicSystems {
             KernelEvent::TurnStarted { player } => {
                 // OnTurnStart, then OnLongCountCycle when the game year
                 // crossed the end of a Long Count cycle since the last round.
+                tx.reopen_building_sales(player);
                 tx.lend_movement_to_generals(player, rules);
                 tx.religious_strength_loss(player, rules);
                 tx.fire(rules, TriggerEvent::TurnStart { player });

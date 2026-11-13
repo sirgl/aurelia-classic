@@ -99,6 +99,9 @@ pub enum ClassicChange {
     /// attack, a nuke). No derived system reads city damage; the
     /// presentation shows the number on the city.
     CityDamaged { city: CityHandle, damage: u16 },
+    /// The player sold `building` of `city` for `gold` (`systems::building_sale`; the
+    /// recomputation rides on the `EffectsChanged` beside it, the city screen tells the sale).
+    BuildingSold { player: PlayerId, city: CityHandle, building: crate::ids::BuildingKindId, gold: u32 },
 }
 
 impl ModuleChange for ClassicChange {
@@ -122,7 +125,8 @@ impl ModuleChange for ClassicChange {
             | ClassicChange::OfferAnswered { .. }
             | ClassicChange::DealBroken { .. }
             | ClassicChange::RebelsRose { .. }
-            | ClassicChange::CityDamaged { .. } => {
+            | ClassicChange::CityDamaged { .. }
+            | ClassicChange::BuildingSold { .. } => {
                 StaleYields::Nothing
             }
         }

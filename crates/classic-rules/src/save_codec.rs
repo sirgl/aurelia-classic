@@ -32,8 +32,14 @@ use crate::persistence::SaveGameV1;
 /// last saw (the kernel's knowledge sections, `SIGHTINGS_SINCE`); 23: the
 /// game's speed (the kernel's economy section, `SPEED_SINCE`; older saves
 /// play at Standard); 24: the rebellion countdowns of the barbarian section
-/// (`REVOLTS_SINCE`; older saves have none running).
-pub const CODEC_VERSION: u32 = 24;
+/// (`REVOLTS_SINCE`; older saves have none running); 25: the cities that
+/// sold a building this turn, in the player's economy record
+/// (`SALES_SINCE`; older saves have sold none).
+pub const CODEC_VERSION: u32 = 25;
+
+/// The codec version whose player economy record gained the cities that
+/// sold a building this turn; older saves read none.
+pub(crate) const SALES_SINCE: u32 = 25;
 
 /// The codec version whose barbarian section gained the rebellion
 /// countdowns; older saves read none.

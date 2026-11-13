@@ -75,6 +75,7 @@ pub fn acting_unit(command: &Command) -> Option<UnitHandle> {
         | C::SetUpRangedAttack { unit }
         | C::Promote { unit, .. }
         | C::UpgradeUnit { unit }
+        | C::DisbandUnit { unit }
         | C::Pillage { unit }
         | C::Rebase { unit, .. }
         | C::SellExoticGoods { unit }

@@ -23,6 +23,18 @@ pub enum ResolvedCommand {
         to: crate::ids::UnitKindId,
         price: u32,
     },
+    /// The unit goes; `gold` is its disband gold (0 off its owner's land).
+    DisbandUnit {
+        unit: UnitHandle,
+        gold: u32,
+    },
+    /// The building leaves the city for `gold`.
+    SellBuilding {
+        player: PlayerId,
+        city: CityHandle,
+        building: crate::ids::BuildingKindId,
+        gold: u32,
+    },
     DecideCity {
         player: PlayerId,
         city: CityHandle,
