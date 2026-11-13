@@ -8,17 +8,17 @@
 
 ## Summary
 
-Rule constants: 499 (AI constants: 949; 14 constants of engine plumbing in `platform/crates/kernel/src/persistence/`, `platform/crates/kernel/src/test_module.rs`, `platform/crates/kernel/src/math.rs`, `platform/crates/kernel/src/module.rs`, `classic/crates/classic-rules/src/save_codec.rs`, `classic/crates/classic-rules/src/fixtures.rs` are not listed).
+Rule constants: 503 (AI constants: 949; 14 constants of engine plumbing in `platform/crates/kernel/src/persistence/`, `platform/crates/kernel/src/test_module.rs`, `platform/crates/kernel/src/math.rs`, `platform/crates/kernel/src/module.rs`, `classic/crates/classic-rules/src/save_codec.rs`, `classic/crates/classic-rules/src/fixtures.rs` are not listed).
 
 | Source | Rule constants | AI constants |
 |---|---|---|
-| Unciv | 256 | 0 |
+| Unciv | 258 | 0 |
 | own design | 72 | 11 |
 | own formula (expansion-only system; Unciv has no equivalent) | 0 | 0 |
 | own value | 14 | 4 |
 | own value (unverified) | 17 | 4 |
-| own value (source not recorded) | 140 | 930 |
-| total | 499 | 949 |
+| own value (source not recorded) | 142 | 930 |
+| total | 503 | 949 |
 
 Sections:
 
@@ -729,10 +729,14 @@ Every `pub const` of the rule code, by system. Value as written in the code; mea
 
 ### Other rule constants
 
-12 constants (Unciv 9, own value (source not recorded) 3). Files: `classic/crates/classic-rules/src/derived/standing.rs`, `classic/crates/classic-rules/src/knowledge/actions.rs`, `classic/crates/classic-rules/src/systems/revolts.rs`, `classic/crates/classic-rules/src/world/mod.rs`.
+16 constants (Unciv 11, own value (source not recorded) 5). Files: `classic/crates/classic-rules/src/derived/building_sale.rs`, `classic/crates/classic-rules/src/derived/disband.rs`, `classic/crates/classic-rules/src/derived/standing.rs`, `classic/crates/classic-rules/src/knowledge/actions.rs`, `classic/crates/classic-rules/src/systems/revolts.rs`, `classic/crates/classic-rules/src/world/mod.rs`.
 
 | Name | Value | Meaning | Source | File |
 |---|---|---|---|---|
+| `BUILDING_SALE_DIVISOR` | `10` | Unciv: City.getGoldForSellingBuilding, `cost / 10` (Civ V: BUILDING_SALE_DIVISOR). | Unciv: City.getGoldForSellingBuilding, `cost / 10` (Civ V: BUILDING_SALE_DIVISOR) | `building_sale.rs` |
+| `ALL` | `[ SaleBlock::UnknownCity, SaleBlock::NotYourCity, SaleBlock::CityTakesNoOrders, SaleBlo...` |  | own value (source not recorded) | `building_sale.rs` |
+| `DISBAND_GOLD_DIVISOR` | `20` | Unciv: BaseUnit.getDisbandGold divides the base gold cost by 20. | Unciv: BaseUnit.getDisbandGold divides the base gold cost by 20 | `disband.rs` |
+| `ALL` | `[DisbandBlock::UnknownUnit, DisbandBlock::NoMovesLeft]` |  | own value (source not recorded) | `disband.rs` |
 | `ALL` | `[Measure::Population, Measure::Crop, Measure::Goods, Measure::Gnp, Measure::Literacy, M...` |  | own value (source not recorded) | `standing.rs` |
 | `MARCH_TAG` | `10` | The codec tag of `MarchTo` (`command/codec.rs`), not enumerated. | own value (source not recorded) | `actions.rs` |
 | `REVOLT_DELAY_BASE` | `4` | Turns from the first turn below the threshold to the rising, before the random part and the game speed. | Unciv: `ModConstants.baseTurnsUntilRevolt` (4); equal | `revolts.rs` |
