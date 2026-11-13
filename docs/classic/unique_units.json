@@ -47,13 +47,15 @@
    "unciv_fields": [
     "combat",
     "cost",
+    "hurry_cost_modifier",
     "moves",
     "obsolete_tech",
     "ranged_combat",
     "required_resources",
     "required_tech",
     "upgrades_to"
-   ]
+   ],
+   "hurry_cost_modifier": 20
   },
   {
    "id": "core:unit/b17",
@@ -799,13 +801,15 @@
    "unciv_fields": [
     "combat",
     "cost",
+    "hurry_cost_modifier",
     "moves",
     "obsolete_tech",
     "ranged_combat",
     "required_resources",
     "required_tech",
     "upgrades_to"
-   ]
+   ],
+   "hurry_cost_modifier": 20
   },
   {
    "id": "core:unit/companion-cavalry",
@@ -852,13 +856,15 @@
    "unciv_fields": [
     "combat",
     "cost",
+    "hurry_cost_modifier",
     "moves",
     "obsolete_tech",
     "ranged_combat",
     "required_resources",
     "required_tech",
     "upgrades_to"
-   ]
+   ],
+   "hurry_cost_modifier": 20
   },
   {
    "id": "core:unit/mohawk-warrior",
@@ -898,13 +904,15 @@
    "unciv_fields": [
     "combat",
     "cost",
+    "hurry_cost_modifier",
     "moves",
     "obsolete_tech",
     "ranged_combat",
     "required_resources",
     "required_tech",
     "upgrades_to"
-   ]
+   ],
+   "hurry_cost_modifier": 20
   },
   {
    "id": "core:unit/legion",
@@ -951,13 +959,15 @@
    "unciv_fields": [
     "combat",
     "cost",
+    "hurry_cost_modifier",
     "moves",
     "obsolete_tech",
     "ranged_combat",
     "required_resources",
     "required_tech",
     "upgrades_to"
-   ]
+   ],
+   "hurry_cost_modifier": 20
   },
   {
    "id": "core:unit/war-chariot",
@@ -2052,13 +2062,15 @@
    "unciv_fields": [
     "combat",
     "cost",
+    "hurry_cost_modifier",
     "moves",
     "obsolete_tech",
     "ranged_combat",
     "required_resources",
     "required_tech",
     "upgrades_to"
-   ]
+   ],
+   "hurry_cost_modifier": 20
   },
   {
    "id": "core:unit/norwegian-ski-infantry",
@@ -2144,13 +2156,15 @@
    "unciv_fields": [
     "combat",
     "cost",
+    "hurry_cost_modifier",
     "moves",
     "obsolete_tech",
     "ranged_combat",
     "required_resources",
     "required_tech",
     "upgrades_to"
-   ]
+   ],
+   "hurry_cost_modifier": 30
   },
   {
    "id": "core:unit/hwach-a",
@@ -2385,13 +2399,15 @@
    "unciv_fields": [
     "combat",
     "cost",
+    "hurry_cost_modifier",
     "moves",
     "obsolete_tech",
     "ranged_combat",
     "required_resources",
     "required_tech",
     "upgrades_to"
-   ]
+   ],
+   "hurry_cost_modifier": 20
   },
   {
    "id": "core:unit/african-forest-elephant",
@@ -2435,13 +2451,15 @@
    "unciv_fields": [
     "combat",
     "cost",
+    "hurry_cost_modifier",
     "moves",
     "obsolete_tech",
     "ranged_combat",
     "required_resources",
     "required_tech",
     "upgrades_to"
-   ]
+   ],
+   "hurry_cost_modifier": 20
   },
   {
    "id": "core:unit/quinquereme",

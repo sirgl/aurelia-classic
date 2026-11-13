@@ -1386,7 +1386,11 @@ fn defence_item(
 /// hurry formula on an empty stock) and keeps `HURRY_RESERVE` (with the
 /// reserve priced, `PricedStops::reserve`: the deficit's, `deficit_reserve`).
 fn affordable_now(obs: &AIObservation<'_>, empire: &Empire, city: &OwnCity, item: ProductionItem) -> bool {
-    let price = obs.view.own_production_cost(city.handle, item).and_then(|cost| crate::world::city::hurry_price(cost, 0));
+    let price = obs
+        .view
+        .own_production_cost(city.handle, item)
+        .zip(crate::effects::city::hurry_cost_modifier(obs.view.rules(), item))
+        .and_then(|(cost, modifier)| crate::world::city::hurry_price(cost, modifier));
     let kept = if empire.stops.reserve { deficit_reserve(obs) } else { HURRY_RESERVE };
     price.is_some_and(|price| obs.economy.treasury >= price + kept)
 }

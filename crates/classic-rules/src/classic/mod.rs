@@ -54,7 +54,7 @@ use crate::world::state::{AuthWorld, GameView};
 pub struct Classic;
 
 /// The fingerprint of the current content (`CompiledRuleset::hash`).
-pub const CLASSIC_FINGERPRINT: u64 = 835780351697724273;
+pub const CLASSIC_FINGERPRINT: u64 = 3078422782052653983;
 
 impl RulesModule for Classic {
     type World = ClassicWorld;
@@ -107,6 +107,9 @@ impl RulesModule for Classic {
         // Sight: a save of before loads under the new content, its units as they were
         // (`tests/rules_fingerprint.rs`).
         (3662418266917708599, CLASSIC_FINGERPRINT),
+        // Before the units' purchase modifiers (Unciv hurryCostModifier) and the Shrine's and the
+        // Pyramid's 0: a save of before loads, its queues priced by the new rows.
+        (835780351697724273, CLASSIC_FINGERPRINT),
 ];
 
     fn execute(

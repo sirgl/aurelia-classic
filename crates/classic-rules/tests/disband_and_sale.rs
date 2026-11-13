@@ -97,15 +97,15 @@ fn refused(game: &mut GameState, rules: &CompiledRuleset, command: Command, reas
     }
 }
 
-/// Unciv's disband gold of a unit of production cost `cost`, in floating point as Unciv
-/// computes it: `((30·cost)^0.75).toInt() / 20`.
-fn unciv_disband_gold(cost: u32) -> u32 {
-    (30.0 * f64::from(cost)).powf(0.75) as u32 / 20
+/// Unciv's disband gold of a unit of production cost `cost` and HurryCostModifier `modifier`, in
+/// floating point as Unciv computes it: `((30·cost)^0.75 · modifier.toPercent()).toInt() / 20`.
+fn unciv_disband_gold(cost: u32, modifier: i32) -> u32 {
+    ((30.0 * f64::from(cost)).powf(0.75) * f64::from(1.0f32 + modifier as f32 / 100.0f32)) as u32 / 20
 }
 
 // ---- disband ----
 
-/// On its owner's land a unit brings ⌊(30·P)^0.75⌋ / 20 gold (a 40-production unit 10): every
+/// On its owner's land a unit brings ⌊(30·P)^0.75 · (1 + m %)⌋ / 20 gold (a 40-production unit 10): every
 /// kind with a cost, at Standard speed for a human owner, as Unciv's floating point gives it;
 /// the unit leaves the world with the journal's `Destroyed`.
 #[test]
@@ -121,7 +121,7 @@ fn a_unit_disbanded_on_own_land_brings_a_twentieth_of_its_base_gold_cost() {
             continue;
         }
         let got = disband_gold(game.view().auth, &rules, P0, UnitKindId(i as u16));
-        assert_eq!(got, unciv_disband_gold(def.cost), "{}", def.key);
+        assert_eq!(got, unciv_disband_gold(def.cost, def.hurry_cost_modifier), "{}", def.key);
     }
     let unit = game.debug_spawn_unit(&rules, P0, at, warrior);
     let id = game.view().auth.units().get(unit).unwrap().core.id;
@@ -566,6 +566,254 @@ fn selling_in_another_city_drops_the_national_wonder_that_wanted_the_building_ev
                 if *city == capital && *item == order && *reason == OrderRemoval::NeedsBuilding)
         });
         assert!(told, "{key}: the journal tells the removal");
+        checked += 1;
+    }
+    assert!(checked > 0, "the data has a national wonder that wants a building in every city");
+}
+
+// ---- the queue after a new city (rules/hurry-modifier) ----
+
+/// National wonders that want a regular building in every city, with that building (the class of
+/// cases from the data, not one wonder).
+fn empire_wide_wonders(rules: &CompiledRuleset) -> Vec<(BuildingKindId, BuildingKindId)> {
+    rules
+        .buildings
+        .iter()
+        .enumerate()
+        .filter(|(_, w)| w.kind == BuildingKind::NationalWonder && !w.unbuildable)
+        .filter_map(|(i, w)| {
+            let req = *w.requires_buildings_in_empire.first()?;
+            (rules.buildings[req.0 as usize].kind == BuildingKind::Regular).then_some((BuildingKindId(i as u16), req))
+        })
+        .collect()
+}
+
+/// Unciv keeps only buildable orders at the city's turn (CityConstructions.validateConstructionQueue,
+/// `isBuildable`; `ConditionalBuildingBuiltAll` counts every non-puppet city): a city founded after a
+/// national wonder was queued, without the building the wonder wants in every city, takes the order
+/// out at the next turn of the queue's city, with the record the sale gives (`NeedsBuilding`). The
+/// purchase is refused in between, and nothing is built.
+#[test]
+fn founding_a_city_drops_the_national_wonder_that_wanted_the_building_everywhere() {
+    use classic_rules::command::Refusal;
+    use classic_rules::transaction::journal::{CityChange, OrderRemoval};
+    let rules = rules();
+    let mut checked = 0;
+    for (wonder_id, req) in empire_wide_wonders(&rules) {
+        let wonder = &rules.buildings[wonder_id.0 as usize];
+        let (mut game, capital, _) = world(&rules);
+        let mut needed = vec![wonder_id, req];
+        needed.extend(wonder.requires_buildings.iter().copied());
+        learn_for(&mut game, &rules, &needed);
+        for b in std::iter::once(&req).chain(&wonder.requires_buildings) {
+            game.debug_add_building(&rules, capital, *b);
+        }
+        let order = ProductionItem::Building(wonder_id);
+        if game.execute(&rules, Command::EnqueueProduction { player: P0, city: capital, item: order }).is_err() {
+            continue;
+        }
+        let key = &wonder.key;
+        game.debug_found_city(&rules, P0, tile(&game, 8, 13));
+        game.debug_earn(P0, 100_000);
+        let gold = treasury(&game, P0);
+        let error = game.execute(&rules, Command::HurryProduction { player: P0, city: capital }).unwrap_err();
+        assert_eq!(error, CommandError::Refused(Refusal::NeedsBuilding), "{key}");
+        assert_eq!(treasury(&game, P0), gold, "{key}: nothing spent");
+        let mut told = false;
+        for _ in 0..4 {
+            for _ in 0..2 {
+                let player = game.view().auth.active_player();
+                let result = game.execute(&rules, Command::EndTurn { player }).unwrap();
+                told |= result.changes().city_changes.iter().any(|c| {
+                    matches!(c, CityChange::OrderRemoved { city, owner, item, reason }
+                        if *city == capital && *owner == P0 && *item == order && *reason == OrderRemoval::NeedsBuilding)
+                });
+            }
+        }
+        assert!(told, "{key}: the journal tells the removal");
+        let core = game.view().auth.cities().get(capital).unwrap();
+        assert!(!core.queue.contains(&order), "{key} still queued after a city without the building was founded");
+        assert!(!core.buildings.contains(&wonder_id), "{key} built");
+        game.validate(&rules).unwrap();
+        checked += 1;
+    }
+    assert!(checked > 0, "the data has a national wonder that wants a building in every city");
+}
+
+/// The unique building that replaces the one a national wonder wants in every city counts for it
+/// (Unciv: `containsBuildingOrEquivalent`): the wonder is ordered and stays in the queue across turns.
+#[test]
+fn a_unique_building_counts_in_every_city_for_the_one_it_replaces() {
+    let rules = rules();
+    let mut checked = 0;
+    for (wonder_id, req) in empire_wide_wonders(&rules) {
+        let wonder = &rules.buildings[wonder_id.0 as usize];
+        let uniques = (0..rules.buildings.len()).filter(|u| rules.buildings[*u].replaces == Some(req));
+        for unique in uniques.map(|u| BuildingKindId(u as u16)) {
+            let (mut game, capital, _) = world(&rules);
+            let second = game.debug_found_city(&rules, P0, tile(&game, 8, 13));
+            let mut needed = vec![wonder_id, req];
+            needed.extend(wonder.requires_buildings.iter().copied());
+            learn_for(&mut game, &rules, &needed);
+            for city in [capital, second] {
+                game.debug_add_building(&rules, city, unique);
+            }
+            for r in &wonder.requires_buildings {
+                game.debug_add_building(&rules, capital, *r);
+            }
+            let order = ProductionItem::Building(wonder_id);
+            let key = format!("{} with {}", wonder.key, rules.buildings[unique.0 as usize].key);
+            match game.execute(&rules, Command::EnqueueProduction { player: P0, city: capital, item: order }) {
+                Ok(_) => {}
+                Err(CommandError::RuleViolation(text)) if text != "needs a building in every city" => continue,
+                Err(e) => panic!("{key}: {e:?}"),
+            }
+            round(&mut game, &rules);
+            assert!(queue_of(&game, capital).contains(&order), "{key}: the order stays");
+            checked += 1;
+        }
+    }
+    assert!(checked > 0, "the data has a unique building that replaces a requirement of a national wonder");
+}
+
+// ---- the requirement "in every city" and the status of a city (review of rules/hurry-modifier) ----
+
+/// P0's capital with the wonder's requirements and the national wonder `wonder` queued in it, or
+/// None where the data does not let the order stand.
+fn empire_wide_order(rules: &CompiledRuleset, wonder_id: BuildingKindId, req: BuildingKindId) -> Option<(GameState, CityHandle)> {
+    let wonder = &rules.buildings[wonder_id.0 as usize];
+    let (mut game, capital, _) = world(rules);
+    let mut needed = vec![wonder_id, req];
+    needed.extend(wonder.requires_buildings.iter().copied());
+    learn_for(&mut game, rules, &needed);
+    for b in std::iter::once(&req).chain(&wonder.requires_buildings) {
+        game.debug_add_building(rules, capital, *b);
+    }
+    let order = ProductionItem::Building(wonder_id);
+    game.execute(rules, Command::EnqueueProduction { player: P0, city: capital, item: order }).ok()?;
+    Some((game, capital))
+}
+
+fn end_turn_of(game: &mut GameState, rules: &CompiledRuleset, player: PlayerId) -> Vec<classic_rules::transaction::journal::CityChange> {
+    game.execute(rules, Command::EndTurn { player }).unwrap().changes().city_changes.clone()
+}
+
+fn dropped(changes: &[classic_rules::transaction::journal::CityChange], city: CityHandle, order: ProductionItem) -> bool {
+    use classic_rules::transaction::journal::{CityChange, OrderRemoval};
+    changes.iter().any(|c| {
+        matches!(c, CityChange::OrderRemoved { city: at, item, reason, .. }
+            if *at == city && *item == order && *reason == OrderRemoval::NeedsBuilding)
+    })
+}
+
+/// Unciv moves a captured city to the conqueror only when the conqueror decides
+/// (`CityConquestFunctions.moveToCiv`), and `ConditionalBuildingBuiltAll` skips puppets: a city
+/// that awaits the decision, or is a puppet, does not take the national wonder out of the queue.
+/// Annexing it makes it a city of the empire, and the order goes at the next turn.
+#[test]
+fn a_city_awaiting_the_decision_or_a_puppet_does_not_count_for_every_city_until_annexed() {
+    let rules = rules();
+    let mut checked = 0;
+    for (wonder_id, req) in empire_wide_wonders(&rules) {
+        let key = rules.buildings[wonder_id.0 as usize].key.clone();
+        let order = ProductionItem::Building(wonder_id);
+        for status in [CityStatus::AwaitingDecision, CityStatus::Puppet] {
+            let Some((mut game, capital)) = empire_wide_order(&rules, wonder_id, req) else { continue };
+            let second = game.debug_found_city(&rules, P0, tile(&game, 8, 13));
+            game.debug_set_city_status(second, status);
+            let changes = end_turn_of(&mut game, &rules, P0);
+            assert!(!dropped(&changes, capital, order), "{key} with a city {status:?}: the order stays");
+            round(&mut game, &rules);
+            assert!(queue_of(&game, capital).contains(&order), "{key} with a city {status:?}: still queued");
+        }
+        let Some((mut game, capital)) = empire_wide_order(&rules, wonder_id, req) else { continue };
+        let second = game.debug_found_city(&rules, P0, tile(&game, 8, 13));
+        game.debug_set_city_status(second, CityStatus::AwaitingDecision);
+        let annex = Command::DecideCity { player: P0, city: second, decision: classic_rules::command::CityDecision::Annex };
+        game.execute(&rules, annex).unwrap();
+        let changes = end_turn_of(&mut game, &rules, P0);
+        assert!(dropped(&changes, capital, order), "{key}: an annexed city counts, the order goes");
+        checked += 1;
+    }
+    assert!(checked > 0, "the data has a national wonder that wants a building in every city");
+}
+
+/// A city of the other player, empty of defenders and one hit point from falling, taken by a
+/// warrior that stands next to it. `attacker` is the active player.
+fn capture(game: &mut GameState, rules: &CompiledRuleset, attacker: PlayerId, city: CityHandle) {
+    let at = game.view().auth.cities().get(city).unwrap().tile;
+    let from = game.view().auth.map().dimensions.neighbors(at).as_slice()[0];
+    let warrior = game.debug_spawn_unit(rules, attacker, from, kind(rules, "core:unit/warrior"));
+    let max = classic_rules::combat::city::max_hit_points(game.view().auth, rules, game.view().auth.cities().get(city).unwrap());
+    game.debug_set_city_damage(city, max - 1);
+    game.execute(rules, Command::AttackCity { attacker: warrior, city }).unwrap();
+}
+
+fn declare_war(game: &mut GameState, rules: &CompiledRuleset, player: PlayerId, enemy: PlayerId) {
+    game.debug_meet(player, enemy);
+    game.execute(rules, Command::DeclareWar { player, enemy }).unwrap();
+}
+
+/// The real capture: the city P0 takes from P1 awaits the decision and, with the order in the
+/// capital's queue, leaves it alone through the end of the turn that makes it a puppet.
+#[test]
+fn a_captured_city_does_not_take_the_national_wonder_out_of_the_queue() {
+    let rules = rules();
+    let mut checked = 0;
+    for (wonder_id, req) in empire_wide_wonders(&rules) {
+        let key = rules.buildings[wonder_id.0 as usize].key.clone();
+        let order = ProductionItem::Building(wonder_id);
+        let Some((mut game, capital)) = empire_wide_order(&rules, wonder_id, req) else { continue };
+        let prize = game.debug_found_city(&rules, P1, tile(&game, 8, 13));
+        declare_war(&mut game, &rules, P0, P1);
+        capture(&mut game, &rules, P0, prize);
+        let core = game.view().auth.cities().get(prize).unwrap();
+        assert_eq!((core.owner, core.status), (P0, CityStatus::AwaitingDecision), "{key}");
+        let changes = end_turn_of(&mut game, &rules, P0);
+        assert!(!dropped(&changes, capital, order), "{key}: the captured city is not counted");
+        assert_eq!(game.view().auth.cities().get(prize).unwrap().status, CityStatus::Puppet, "{key}");
+        round(&mut game, &rules);
+        assert!(queue_of(&game, capital).contains(&order), "{key}: the order stays beside a puppet");
+        checked += 1;
+    }
+    assert!(checked > 0, "the data has a national wonder that wants a building in every city");
+}
+
+/// Losing the one city without the building lifts the empire-wide requirement: the order is refused
+/// for it while the city is the empire's, and no longer once the other player has taken it.
+#[test]
+fn losing_the_city_without_the_building_lets_the_national_wonder_be_ordered() {
+    let rules = rules();
+    let mut checked = 0;
+    for (wonder_id, req) in empire_wide_wonders(&rules) {
+        let key = rules.buildings[wonder_id.0 as usize].key.clone();
+        let wonder = &rules.buildings[wonder_id.0 as usize];
+        let (mut game, capital, _) = world(&rules);
+        let mut needed = vec![wonder_id, req];
+        needed.extend(wonder.requires_buildings.iter().copied());
+        learn_for(&mut game, &rules, &needed);
+        for b in std::iter::once(&req).chain(&wonder.requires_buildings) {
+            game.debug_add_building(&rules, capital, *b);
+        }
+        let weak = game.debug_found_city(&rules, P0, tile(&game, 8, 13));
+        let order = ProductionItem::Building(wonder_id);
+        let enqueue = Command::EnqueueProduction { player: P0, city: capital, item: order };
+        match game.execute(&rules, enqueue.clone()) {
+            Err(CommandError::RuleViolation(text)) if text == "needs a building in every city" => {}
+            Err(_) => continue,
+            Ok(_) => panic!("{key}: ordered while a city lacks the building"),
+        }
+        end_turn_of(&mut game, &rules, P0);
+        declare_war(&mut game, &rules, P1, P0);
+        capture(&mut game, &rules, P1, weak);
+        assert_eq!(game.view().auth.cities().get(weak).unwrap().owner, P1, "{key}");
+        end_turn_of(&mut game, &rules, P1);
+        // Other rules (a holy city, a coast) may still refuse the order; the empire-wide one does not.
+        match game.execute(&rules, enqueue) {
+            Ok(_) => assert!(queue_of(&game, capital).contains(&order), "{key}"),
+            Err(CommandError::RuleViolation(text)) => assert_ne!(text, "needs a building in every city", "{key}"),
+            Err(e) => panic!("{key}: {e:?}"),
+        }
         checked += 1;
     }
     assert!(checked > 0, "the data has a national wonder that wants a building in every city");

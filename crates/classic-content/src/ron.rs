@@ -36,6 +36,8 @@ struct RonUnit {
     builder: bool,
     cost: u32,
     #[serde(default)]
+    hurry_cost_modifier: i32,
+    #[serde(default)]
     effects: Vec<RonEffect>,
     required_tech: Option<String>,
     #[serde(default)]
@@ -999,6 +1001,7 @@ fn unit(u: RonUnit) -> SourceUnit {
         founder: u.founder,
         builder: u.builder,
         cost: u.cost,
+        hurry_cost_modifier: u.hurry_cost_modifier,
         effects: effects(u.effects),
         required_tech: opt_key(u.required_tech),
         name: u.name,

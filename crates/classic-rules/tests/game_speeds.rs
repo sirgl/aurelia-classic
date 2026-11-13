@@ -165,6 +165,13 @@ fn without_speeds_the_rules_hash_as_before_speeds() {
     let extra = rules.promotions.iter().position(|p| p.key == "core:promotion/extra-sight-i").unwrap();
     let pathfinder = rules.units.iter_mut().find(|u| u.key == "core:unit/pathfinder").unwrap();
     pathfinder.free_promotions.retain(|p| p.0 as usize != extra);
+    // So did the units' purchase modifiers and Unciv's 0 for the Shrine and the Pyramid.
+    for unit in &mut rules.units {
+        unit.hurry_cost_modifier = 0;
+    }
+    for building in rules.buildings.iter_mut().filter(|b| ["core:building/shrine", "core:building/pyramid"].contains(&b.key.as_str())) {
+        building.hurry_cost_modifier = 25;
+    }
     assert_eq!(rules.hash(), BEFORE_SPEEDS_FINGERPRINT);
 }
 

@@ -38,11 +38,13 @@
    "unciv_fields": [
     "combat",
     "cost",
+    "hurry_cost_modifier",
     "moves",
     "obsolete_tech",
     "ranged_combat",
     "required_resources"
-   ]
+   ],
+   "hurry_cost_modifier": 20
   },
   {
    "id": "core:unit/worker",
@@ -913,13 +915,15 @@
    "unciv_fields": [
     "combat",
     "cost",
+    "hurry_cost_modifier",
     "moves",
     "obsolete_tech",
     "ranged_combat",
     "required_resources",
     "required_tech",
     "upgrades_to"
-   ]
+   ],
+   "hurry_cost_modifier": 20
   },
   {
    "id": "core:unit/caravel",
@@ -958,13 +962,15 @@
    "unciv_fields": [
     "combat",
     "cost",
+    "hurry_cost_modifier",
     "moves",
     "obsolete_tech",
     "ranged_combat",
     "required_resources",
     "required_tech",
     "upgrades_to"
-   ]
+   ],
+   "hurry_cost_modifier": 30
   },
   {
    "id": "core:unit/trireme",
@@ -2532,13 +2538,15 @@
    "unciv_fields": [
     "combat",
     "cost",
+    "hurry_cost_modifier",
     "moves",
     "obsolete_tech",
     "ranged_combat",
     "required_resources",
     "required_tech",
     "upgrades_to"
-   ]
+   ],
+   "hurry_cost_modifier": 20
   },
   {
    "id": "core:unit/horseman",
@@ -2583,13 +2591,15 @@
    "unciv_fields": [
     "combat",
     "cost",
+    "hurry_cost_modifier",
     "moves",
     "obsolete_tech",
     "ranged_combat",
     "required_resources",
     "required_tech",
     "upgrades_to"
-   ]
+   ],
+   "hurry_cost_modifier": 20
   },
   {
    "id": "core:unit/swordsman",
@@ -2631,13 +2641,15 @@
    "unciv_fields": [
     "combat",
     "cost",
+    "hurry_cost_modifier",
     "moves",
     "obsolete_tech",
     "ranged_combat",
     "required_resources",
     "required_tech",
     "upgrades_to"
-   ]
+   ],
+   "hurry_cost_modifier": 20
   },
   {
    "id": "core:unit/chariot-archer",
