@@ -221,6 +221,10 @@ pub struct BuildingEntry {
     pub name: String,
     pub art: String,
     pub effect: String,
+    pub kind: classic_rules::ids::BuildingKindId,
+    /// The Sell button: its label (the gold) and whether the rules allow the sale now; None for
+    /// a building never sold (a wonder, the palace).
+    pub sale: Option<(String, Availability)>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -281,6 +285,8 @@ pub struct CityView {
     pub processes: Vec<(Option<classic_rules::world::city_economy::Process>, String, bool, Availability)>,
     pub tiles: Vec<WorkedTile>,
     pub offers: Vec<TileOffer>,
+    /// The card of a sale waiting for the yes, shown over the city screen.
+    pub confirm: Option<ConfirmCard>,
 }
 
 /// One specialist kind of a city: working now, slots, set by hand.
@@ -647,6 +653,8 @@ pub enum GameRequest {
     Denounce(PlayerId),
     /// The player's answer to the open `ConfirmCard`: yes does it, no leaves it.
     Confirm(bool),
+    /// Asks first: the sale of the selected city's building waits for `Confirm`.
+    SellBuilding(classic_rules::ids::BuildingKindId),
     ProposeDeal {
         to: PlayerId,
         items: Vec<(PlayerId, DealItem)>,

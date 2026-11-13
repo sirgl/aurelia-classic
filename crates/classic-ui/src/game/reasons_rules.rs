@@ -5,6 +5,8 @@
 //! the ruleset («needs Iron») is a pattern with a hole (`HOLES`).
 use i18n::t;
 use classic_rules::derived::archaeology::DigBlock;
+use classic_rules::derived::building_sale::SaleBlock;
+use classic_rules::derived::disband::DisbandBlock;
 use classic_rules::derived::culture::{BranchBlock, IdeologyBlock, PolicyBlock};
 use classic_rules::derived::grants::ChoiceBlock;
 use classic_rules::derived::great_people::GreatPersonBlock;
@@ -48,6 +50,8 @@ pub(super) fn entries() -> impl Iterator<Item = (&'static str, &'static str)> {
         .chain(AirliftBlock::ALL.iter().map(|b| (b.reason(), airlift(*b))))
         .chain(ParadropBlock::ALL.iter().map(|b| (b.reason(), paradrop(*b))))
         .chain(RuinsBlock::ALL.iter().map(|b| (b.reason(), ruins(*b))))
+        .chain(DisbandBlock::ALL.iter().map(|b| (b.reason(), disband(*b))))
+        .chain(SaleBlock::ALL.iter().map(|b| (b.reason(), sale(*b))))
         // «out of range» is the trade reason's English text too: a sweep asks `air_order_text`.
         .chain(AirOrderBlock::ALL.iter().filter(|b| **b != AirOrderBlock::OutOfRange).map(|b| (b.reason(), air_order(*b))))
 }
@@ -105,6 +109,25 @@ pub fn ruins(block: RuinsBlock) -> &'static str {
         RuinsBlock::NotANation => t!("classic.game.reasons-rules.ruins-not-a-nation"),
         RuinsBlock::NoRuinsHere => t!("classic.game.reasons-rules.ruins-none-here"),
         RuinsBlock::NotAnOffer => t!("classic.game.reasons-rules.ruins-not-an-offer"),
+    }
+}
+
+pub fn disband(block: DisbandBlock) -> &'static str {
+    match block {
+        DisbandBlock::UnknownUnit => t!("classic.game.reasons.unavailable"),
+        DisbandBlock::NoMovesLeft => t!("classic.game.reasons-rules.disband-no-moves"),
+    }
+}
+
+pub fn sale(block: SaleBlock) -> &'static str {
+    match block {
+        SaleBlock::UnknownCity | SaleBlock::NotInCity => t!("classic.game.reasons.unavailable"),
+        SaleBlock::NotYourCity => t!("classic.game.reasons-rules.sale-not-your-city"),
+        SaleBlock::CityTakesNoOrders => t!("classic.game.reasons-rules.sale-city-takes-no-orders"),
+        SaleBlock::Wonder => t!("classic.game.reasons-rules.sale-wonder"),
+        SaleBlock::Palace => t!("classic.game.reasons-rules.sale-palace"),
+        SaleBlock::HoldsGreatWork => t!("classic.game.reasons-rules.sale-great-work"),
+        SaleBlock::SoldThisTurn => t!("classic.game.reasons-rules.sale-sold-this-turn"),
     }
 }
 

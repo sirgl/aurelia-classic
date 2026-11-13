@@ -77,3 +77,4 @@ classic.ui.screen-city-game.focus-science = 科学力
 classic.ui.screen-city-game.focus-culture = 文化
 classic.ui.screen-city-game.focus-great-people = 偉人
 classic.ui.screen-city-game.focus-faith = 信仰
+classic.ui.screen-city-game.sell = { NUMBER($gold) }ゴールドで売却

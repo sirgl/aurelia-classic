@@ -100,6 +100,8 @@ impl Session {
         let core = *core;
         let mut list = self.actions_for(&core).to_vec();
         list.extend(self.situational_actions(unit));
+        // Every own unit may be disbanded (Unciv shows the order to all; it waits for the yes).
+        list.push(Action::Disband);
         let actions = list
             .iter()
             .map(|action| self.action_state(unit, &core, *action))
@@ -241,6 +243,7 @@ impl Session {
             Action::Plunder => (self.availability(&Command::PlunderTradeRoute { unit }), None),
             Action::SellGoods => (self.availability(&Command::SellExoticGoods { unit }), None),
             Action::BuyCityState => (self.availability(&buy_city_state(unit)), None),
+            Action::Disband => (self.availability(&Command::DisbandUnit { unit }), self.disband_detail(unit)),
         };
         ActionState {
             action,
@@ -380,7 +383,14 @@ impl Session {
             Action::Plunder => self.order_and_continue(Command::PlunderTradeRoute { unit }),
             Action::SellGoods => self.order_and_continue(Command::SellExoticGoods { unit }),
             Action::BuyCityState => self.order_and_continue(buy_city_state(unit)),
+            Action::Disband => self.ask_first(super::confirm::Confirmation::Disband(unit)),
         }
+    }
+
+    /// What disbanding the unit brings now: its gold on own land, none elsewhere.
+    fn disband_detail(&self, unit: UnitHandle) -> Option<String> {
+        let gold = classic_rules::derived::disband::disband_status(self.game().view().auth, self.rules(), unit).ok()?;
+        Some(if gold > 0 { tf!("classic.game.orders.disband-gold", gold = gold) } else { t!("classic.game.orders.disband-no-gold").to_string() })
     }
 
     fn trade_route_state(&self, unit: UnitHandle) -> Availability {

@@ -48,3 +48,7 @@ classic.game.city.row-defence = 防御
 classic.game.city.row-hit-points = 耐久力
 classic.game.city.no-effect = まだ効果なし
 classic.game.city.resistance = 抵抗中：残り { $n } ターン。終わるまで都市は何も生産せず、成長もしません。
+classic.game.city.confirm-sell-title = { $name }を売却しますか？
+classic.game.city.confirm-sell-line = この建造物は{ NUMBER($gold) }ゴールドで{ $city }から失われます。都市が売却できるのは1ターンに1つです。
+classic.game.city.confirm-sell = 売却
+classic.game.city.sold = { $name }を{ NUMBER($gold) }ゴールドで売却しました

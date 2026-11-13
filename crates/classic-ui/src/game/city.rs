@@ -105,7 +105,7 @@ impl Session {
             options: self.production_options(handle, &core, &income),
             hurry,
             clear: self.clear_state(handle, &core),
-            buildings: self.building_entries(&core),
+            buildings: self.building_entries(handle, &core),
             citizens: self.citizens_line(&core),
             focus: self.focus_options(handle, &core),
             avoid_growth: self.avoid_growth_option(handle, &core),
@@ -114,6 +114,7 @@ impl Session {
             processes: self.process_options(handle, &core),
             tiles: self.worked_tiles(handle, &core),
             offers: self.tile_offers(handle, &core),
+            confirm: self.confirm_card(),
         })
     }
 
@@ -272,16 +273,30 @@ impl Session {
         })
     }
 
-    fn building_entries(&self, core: &CityCore) -> Vec<BuildingEntry> {
-        core.buildings
-            .iter()
-            .filter_map(|kind| self.rules().buildings.get(kind.0 as usize))
-            .map(|def| BuildingEntry {
+    fn building_entries(&mut self, city: CityHandle, core: &CityCore) -> Vec<BuildingEntry> {
+        let mut out = Vec::with_capacity(core.buildings.len());
+        for kind in &core.buildings {
+            let Some(def) = self.rules().buildings.get(kind.0 as usize) else {
+                continue;
+            };
+            let entry = BuildingEntry {
                 name: names::named("building", &def.name, &def.key),
                 art: names::art(&def.key),
                 effect: effect_text(self.rules(), def),
-            })
-            .collect()
+                kind: *kind,
+                sale: None,
+            };
+            out.push(entry);
+        }
+        for entry in &mut out {
+            if classic_rules::derived::building_sale::sellable_kind(self.rules(), entry.kind).is_err() {
+                continue;
+            }
+            let gold = classic_rules::derived::building_sale::sale_gold(self.rules(), entry.kind);
+            let command = Command::SellBuilding { player: self.me(), city, building: entry.kind };
+            entry.sale = Some((tf!("classic.ui.screen-city-game.sell", gold = gold), self.availability(&command)));
+        }
+        out
     }
 
     /// Own tiles in the city's three rings: worked or not, locked or not.
@@ -629,6 +644,9 @@ impl Session {
             },
             GameRequest::BuyTile(tile) => Command::PurchaseTile { player, city, tile },
             GameRequest::RenameCity(name) => return self.rename_city(city, name),
+            GameRequest::SellBuilding(building) => {
+                return self.ask_first(super::confirm::Confirmation::SellBuilding { city, building })
+            }
             _ => return,
         };
         self.submit(command);

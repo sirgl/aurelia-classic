@@ -79,3 +79,5 @@ classic.ui.unit-actions.hint-blocked =
     { $label }
     { $what }
     Unavailable: { $reason }
+classic.ui.unit-actions.disband.label = Disband
+classic.ui.unit-actions.disband.desc = Remove the unit for good; on your land the treasury gets a little gold back.

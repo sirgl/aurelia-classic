@@ -48,3 +48,7 @@ classic.game.city.row-defence = 防御
 classic.game.city.row-hit-points = 生命值
 classic.game.city.no-effect = 暂无效果
 classic.game.city.resistance = 抵抗中：还剩 { $n } 回合。结束前城市不生产任何东西，也不增长。
+classic.game.city.confirm-sell-title = 出售{ $name }？
+classic.game.city.confirm-sell-line = 该建筑将以{ NUMBER($gold) }金币从{ $city }移除。每座城市每回合只能出售一座建筑。
+classic.game.city.confirm-sell = 出售
+classic.game.city.sold = 已以{ NUMBER($gold) }金币出售{ $name }

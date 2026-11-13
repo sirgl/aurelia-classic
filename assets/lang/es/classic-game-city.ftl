@@ -57,3 +57,7 @@ classic.game.city.row-defence = Defensa
 classic.game.city.row-hit-points = Puntos de vida
 classic.game.city.no-effect = Aún sin efecto
 classic.game.city.resistance = Resistencia: quedan { $n } turnos. La ciudad no produce nada ni crece hasta que termine.
+classic.game.city.confirm-sell-title = ¿Vender { $name }?
+classic.game.city.confirm-sell-line = El edificio deja { $city } por { NUMBER($gold) } de oro. Una ciudad vende un edificio por turno.
+classic.game.city.confirm-sell = Vender
+classic.game.city.sold = Edificio vendido: { $name }, { NUMBER($gold) } de oro

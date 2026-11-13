@@ -36,6 +36,8 @@ fn every_typed_block_of_the_rules_is_worded_in_both_languages() {
     worded(&AirliftBlock::ALL, AirliftBlock::reason);
     worded(&ParadropBlock::ALL, ParadropBlock::reason);
     worded(&RuinsBlock::ALL, RuinsBlock::reason);
+    worded(&classic_rules::derived::disband::DisbandBlock::ALL, classic_rules::derived::disband::DisbandBlock::reason);
+    worded(&classic_rules::derived::building_sale::SaleBlock::ALL, classic_rules::derived::building_sale::SaleBlock::reason);
     worded(&SpyBlock::ALL, SpyBlock::reason);
     worded(&CityStateBlock::ALL, CityStateBlock::reason);
     i18n::with_language("ru", || {

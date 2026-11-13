@@ -79,3 +79,5 @@ classic.ui.unit-actions.hint-blocked =
     { $label }
     { $what }
     Indisponible : { $reason }
+classic.ui.unit-actions.disband.label = Dissoudre
+classic.ui.unit-actions.disband.desc = Dissoudre l'unité pour de bon ; sur votre territoire, le trésor récupère un peu d'or.
