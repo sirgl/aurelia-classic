@@ -17,7 +17,7 @@
 //! | 8 | Resolution | Happiness | M | the snapshot every later step reads |
 //! | 9 | Resolution | GoldenAge | M | fills from that happiness; before the cities read it |
 //! | 10 | Resolution | Trade | M | route values and moves before the cities and the gold (rules.md) |
-//! | 11 | Resolution | Barbarians | M | camps and spawns; no known dependency, today's slot |
+//! | 11 | Resolution | Barbarians | M | camps and spawns; no known dependency, today's slot; a nation's rebels after the happiness snapshot they read |
 //! | 12 | Resolution | CityCombat | M | cities heal, resistance and razing before they resolve |
 //! | 13 | Resolution | Cities | K | each city runs the city schedule below; yields summed |
 //! | 14 | Resolution | Gold | K | the cities' gold; a deficit is recorded for science |
@@ -80,7 +80,8 @@ pub enum ClassicStep {
     GoldenAge,
     /// Trade route values, trade units move, finished routes end.
     Trade,
-    /// The barbarian player places camps and spawns units.
+    /// The barbarian player places camps and spawns units; a nation below
+    /// the rebellion threshold counts down to its rebels.
     Barbarians,
     /// Cities heal, may strike again; resistance and razing advance.
     CityCombat,
@@ -166,7 +167,10 @@ pub(crate) fn run_step(tx: &mut WorldTransaction<'_>, step: ClassicStep, input: 
         M::Happiness => tx.update_happiness(player, rules),
         M::GoldenAge => tx.process_golden_age(player, rules),
         M::Trade => tx.trade_turn(player, rules),
-        M::Barbarians => tx.barbarian_turn(player, rules, input.derived),
+        M::Barbarians => {
+            tx.barbarian_turn(player, rules, input.derived);
+            tx.revolt_turn(player, rules);
+        }
         M::CityCombat => tx.conquest_and_city_heal(player, rules),
         M::Culture => collect_culture(tx, input),
         M::Tourism => tx.tourism_turn(player, rules),

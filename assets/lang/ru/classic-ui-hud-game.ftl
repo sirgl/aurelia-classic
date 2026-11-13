@@ -74,3 +74,6 @@ classic.ui.hud-game.see-results = Посмотреть итоги
 ## city-state card over the map
 classic.ui.hud-game.city-state-gold = Золото в казне: { $gold }
 classic.ui.hud-game.city-state-close = Закрыть (Esc)
+
+classic.ui.hud-game.rebels-ahead = Ниже { $threshold } счастья в ваших землях поднимаются мятежники: до этого { NUMBER($left) } недовольства
+classic.ui.hud-game.rebels-now = Счастье ниже { $threshold }: каждые несколько ходов в ваших землях поднимаются мятежники

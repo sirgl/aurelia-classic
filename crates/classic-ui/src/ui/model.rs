@@ -126,6 +126,8 @@ pub struct Economy {
     pub production: u32,
     /// Excess happiness of the empire now.
     pub happiness: i32,
+    /// Rebels can rise in this game (barbarians are on): the happiness tooltip may warn of them.
+    pub rebels_possible: bool,
     /// "Golden age · 7 turns" or "Golden age 120/500".
     pub golden_age: String,
     /// Culture pool and its income (policies).

@@ -66,3 +66,6 @@ classic.ui.hud-game.see-results = Voir les résultats
 ## city-state card over the map
 classic.ui.hud-game.city-state-gold = Trésor : { $gold } or
 classic.ui.hud-game.city-state-close = Fermer (Échap)
+
+classic.ui.hud-game.rebels-ahead = Sous { $threshold } de bonheur, des rebelles se soulèvent sur vos terres : encore { NUMBER($left) } de mécontentement avant cela
+classic.ui.hud-game.rebels-now = Bonheur sous { $threshold } : des rebelles se soulèvent sur vos terres tous les quelques tours

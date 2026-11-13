@@ -28,3 +28,5 @@ classic.game.wonder.found = Merveille naturelle découverte : { $name }
 classic.game.wonder.found-with = Merveille naturelle découverte : { $name } : { $parts }
 classic.game.wonder.gold-first = +{ NUMBER($n) } or (première à la découvrir)
 classic.game.wonder.happiness = +{ NUMBER($n) } bonheur
+
+classic.game.rebels.rose = Mécontentement extrême : des rebelles se sont soulevés près de { $city } ({ NUMBER($count) } × { $unit })

@@ -66,3 +66,6 @@ classic.ui.hud-game.see-results = Ergebnisse ansehen
 ## city-state card over the map
 classic.ui.hud-game.city-state-gold = Schatzkammer: { $gold } Gold
 classic.ui.hud-game.city-state-close = Schließen (Esc)
+
+classic.ui.hud-game.rebels-ahead = Unter { $threshold } Zufriedenheit erheben sich Rebellen in Ihrem Land: noch { NUMBER($left) } Unzufriedenheit bis dahin
+classic.ui.hud-game.rebels-now = Zufriedenheit unter { $threshold }: Alle paar Runden erheben sich Rebellen in Ihrem Land

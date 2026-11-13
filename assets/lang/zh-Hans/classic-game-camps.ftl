@@ -28,3 +28,5 @@ classic.game.wonder.found = 发现自然奇观：{ $name }
 classic.game.wonder.found-with = 发现自然奇观：{ $name }：{ $parts }
 classic.game.wonder.gold-first = +{ NUMBER($n) }金币（首个发现者）
 classic.game.wonder.happiness = +{ NUMBER($n) }幸福
+
+classic.game.rebels.rose = 极度不满：{ $city }附近爆发叛乱（{ $unit } × { NUMBER($count) }）

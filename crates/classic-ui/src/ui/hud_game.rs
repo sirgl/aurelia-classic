@@ -24,7 +24,7 @@ const UNHAPPY: Color32 = Color32::from_rgb(214, 96, 78);
 /// only; the full text stays on hover), and which of the breakdown tips belongs to it
 /// (`HudExtras::top_bar` lists them in the order gold, food, production, science, culture,
 /// faith).
-pub(super) struct EconomyValue {
+pub(crate) struct EconomyValue {
     pub icon: Icon,
     pub text: String,
     pub compact: String,
@@ -93,7 +93,7 @@ fn signed(n: i32) -> String {
     format!("{n:+}")
 }
 
-pub(super) fn economy_values(economy: &Economy) -> Vec<EconomyValue> {
+pub(crate) fn economy_values(economy: &Economy) -> Vec<EconomyValue> {
     let value = |icon, text: String, compact: String, tint, tip, target| EconomyValue {
         icon,
         text,
@@ -166,14 +166,7 @@ pub(super) fn economy_values(economy: &Economy) -> Vec<EconomyValue> {
             Some(Target::Economy),
         ),
         science,
-        value(
-            Icon::Note,
-            tf!("classic.ui.hud-game.top-happiness", happiness = happiness.as_str()),
-            happiness.clone(),
-            if economy.happiness < 0 { UNHAPPY } else { HAPPY },
-            None,
-            None,
-        ),
+        happiness_value(economy.happiness, economy.rebels_possible, happiness),
         value(Icon::Sun, economy.golden_age.clone(), compact_golden_age(&economy.golden_age), GOLD, None, None),
         culture,
         faith,
@@ -182,6 +175,33 @@ pub(super) fn economy_values(economy: &Economy) -> Vec<EconomyValue> {
         values.push(value(Icon::Shield, economy.resources.clone(), economy.resources.clone(), LIGHT, None, Some(Target::Resources)));
     }
     values
+}
+
+/// The happiness value; an unhappy empire's tooltip warns of the rebellion threshold
+/// (`derived::happiness::REBELLION_THRESHOLD`): how much more unhappiness raises rebels, or that
+/// they rise now; no warning in a game without barbarians, where none rise.
+fn happiness_value(excess: i32, rebels_possible: bool, text: String) -> EconomyValue {
+    use classic_rules::derived::happiness::{uprising_possible, REBELLION_THRESHOLD};
+    let threshold = format!("{}", REBELLION_THRESHOLD + 1);
+    let progress = if !rebels_possible {
+        None
+    } else if uprising_possible(excess) {
+        Some(tf!("classic.ui.hud-game.rebels-now", threshold = threshold.as_str()))
+    } else if excess < 0 {
+        Some(tf!("classic.ui.hud-game.rebels-ahead", threshold = threshold.as_str(), left = excess - REBELLION_THRESHOLD))
+    } else {
+        None
+    };
+    EconomyValue {
+        icon: Icon::Note,
+        text: tf!("classic.ui.hud-game.top-happiness", happiness = text.as_str()),
+        compact: text,
+        tint: if excess < 0 { UNHAPPY } else { HAPPY },
+        tip: None,
+        target: None,
+        ready: false,
+        progress,
+    }
 }
 
 /// A pool saved for a step shows "have/price" in place of the pool and its income (the income and
@@ -670,6 +690,36 @@ mod tests {
 
     fn saving(goal: Goal, have: u32, cost: u32, ready: bool) -> Saving {
         Saving { goal, have, cost, ready }
+    }
+
+    /// An unhappy empire's happiness tooltip warns of the rebellion threshold: how much more
+    /// unhappiness raises rebels, then that they rise; a content empire's has no warning; every
+    /// language has the texts.
+    #[test]
+    fn the_happiness_tooltip_warns_of_rebels() {
+        let progress = |happiness: i32| {
+            let economy = Economy { happiness, rebels_possible: true, ..Economy::default() };
+            economy_values(&economy).into_iter().find(|v| v.icon == Icon::Note && v.target.is_none()).and_then(|v| v.progress)
+        };
+        assert_eq!(progress(3), None);
+        assert_eq!(progress(0), None);
+        assert_eq!(progress(-15).as_deref(), Some("Below -20 happiness rebels rise in your land: 6 unhappiness to go"));
+        assert_eq!(progress(-20).as_deref(), Some("Below -20 happiness rebels rise in your land: 1 unhappiness to go"));
+        assert_eq!(progress(-21).as_deref(), Some("Below -20 happiness: rebels rise in your land every few turns"));
+        // No barbarians in the game: no rebels, so no warning, however unhappy the empire.
+        for happiness in [-5, -21, -30] {
+            let economy = Economy { happiness, rebels_possible: false, ..Economy::default() };
+            assert!(economy_values(&economy).iter().all(|v| v.progress.is_none()), "{happiness}");
+        }
+        for lang in ["en", "ru", "de", "fr", "es", "ja", "zh-Hans"] {
+            i18n::with_language(lang, || {
+                for happiness in [-5, -30] {
+                    let economy = Economy { happiness, rebels_possible: true, ..Economy::default() };
+                    let tip = economy_values(&economy).into_iter().find_map(|v| v.progress).unwrap_or_default();
+                    assert!(tip.contains("-20") && !tip.contains("classic."), "{lang}: {tip}");
+                }
+            });
+        }
     }
 
     #[test]

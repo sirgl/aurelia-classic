@@ -68,7 +68,7 @@ pub const VERY_UNHAPPY_PRODUCTION_PERCENT: i32 = -50;
 /// Combat strength of the units of a very unhappy empire (percent, flat).
 /// Unciv: GlobalUniques.json, equal (-33).
 pub const VERY_UNHAPPY_COMBAT_PERCENT: i32 = -33;
-/// Excess happiness at or below which rebels may rise (below -20). Unciv:
+/// Excess happiness at or below which rebels rise (below -20; `systems::revolts`). Unciv:
 /// GlobalUniques.json (`Rebel units may spawn <when below [-20] [Happiness]>`), equal.
 pub const REBELLION_THRESHOLD: i32 = -21;
 /// Growth modifier (percent) of an unhappy (-1 to -10) and of a very unhappy

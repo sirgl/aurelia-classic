@@ -85,6 +85,16 @@ pub enum ClassicChange {
     /// `debtor` could not pay the `gold` per turn it owes `creditor`: their deal is broken and
     /// the creditor remembers it (both screens tell it; no derived system reads it).
     DealBroken { debtor: PlayerId, creditor: PlayerId, gold: u32 },
+    /// Very high unhappiness of `player` (below the rebellion threshold)
+    /// made `count` rebels of `kind` rise for the barbarians around `tile`,
+    /// a tile of `city` (`systems::revolts`).
+    RebelsRose {
+        player: PlayerId,
+        city: CityHandle,
+        tile: crate::ids::TileId,
+        kind: crate::ids::UnitKindId,
+        count: u8,
+    },
     /// The city took `damage` hit points in a fight (melee, a ranged or air
     /// attack, a nuke). No derived system reads city damage; the
     /// presentation shows the number on the city.
@@ -111,6 +121,7 @@ impl ModuleChange for ClassicChange {
             | ClassicChange::RelationsChanged { .. }
             | ClassicChange::OfferAnswered { .. }
             | ClassicChange::DealBroken { .. }
+            | ClassicChange::RebelsRose { .. }
             | ClassicChange::CityDamaged { .. } => {
                 StaleYields::Nothing
             }

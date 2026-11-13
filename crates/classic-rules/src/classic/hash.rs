@@ -118,6 +118,10 @@ fn barbarians(world: &ClassicWorld, mix: &mut dyn FnMut(u64)) {
             mix((c.tile.0 as u64) << 40 ^ (c.player.0 as u64) << 32 ^ c.round as u64);
         }
         mix(barbarians.rng().state());
+        // Rebellion countdowns: mixed only while one runs (older games keep their hashes).
+        for (p, turns) in barbarians.revolts() {
+            mix(0x7265_7600_0000_0000 ^ (p.0 as u64) << 8 ^ *turns as u64);
+        }
     }
 }
 

@@ -55,6 +55,9 @@ pub struct SavedBarbarians {
     pub released: bool,
     pub cleared: Vec<(u32, u8, u32)>,
     pub rng: u64,
+    /// Rebellion countdowns (player, turns), ascending by player; empty in
+    /// saves older than `save_codec::REVOLTS_SINCE`.
+    pub revolts: Vec<(u8, u8)>,
 }
 
 fn corrupt(msg: impl Into<String>) -> DecodeError {
@@ -107,6 +110,7 @@ fn encode_barbarians(b: &BarbarianState) -> SavedBarbarians {
             .map(|c| (c.tile.0, c.player.0, c.round))
             .collect(),
         rng: b.rng().state(),
+        revolts: b.revolts().iter().map(|(p, n)| (p.0, *n)).collect(),
     }
 }
 
@@ -239,11 +243,20 @@ fn decode_barbarians(
         });
     }
     let rng = crate::rng::StreamRng::restore(saved.rng);
+    let mut revolts = Vec::with_capacity(saved.revolts.len());
+    for (p, turns) in &saved.revolts {
+        let after_last = revolts.last().is_none_or(|(last, _): &(PlayerId, u8)| last.0 < *p);
+        if usize::from(*p) >= players || *turns == 0 || !after_last {
+            return Err(corrupt("barbarian revolt"));
+        }
+        revolts.push((PlayerId(*p), *turns));
+    }
     Ok(BarbarianState::from_parts(
         mode,
         camps,
         saved.released,
         cleared,
         rng,
+        revolts,
     ))
 }

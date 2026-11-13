@@ -1,6 +1,6 @@
 //! Barbarian state: the game option, the camps with
-//! their spawn counters and the record of cleared camps (city-state quests
-//! read it). Camps are also on the map as the barbarian-camp improvement
+//! their spawn counters, the record of cleared camps (city-state quests
+//! read it) and the countdowns of rebellions (`systems::revolts`). Camps are also on the map as the barbarian-camp improvement
 //! (the map is what players see); this store holds what the map does not.
 //! Authoritative: persisted and hashed.
 
@@ -11,6 +11,8 @@ use crate::rng::StreamRng;
 pub use crate::systems::barbarians::{
     CAMP_GOLD, EARLIEST_RELEASE_ROUND, MIN_DISTANCE_CAMP, MIN_DISTANCE_CITY,
 };
+/// The rebellion constants and the rebels' unit kinds (defined by the revolt system).
+pub use crate::systems::revolts::{rebel_kinds, rebels_possible, REBEL_PERCENT_PER_CITY, REVOLT_DELAY_BASE, REVOLT_DELAY_RANDOM};
 
 /// Game option of barbarians: no barbarians, normal, raging.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
@@ -45,8 +47,11 @@ pub struct BarbarianState {
     pub(crate) released: bool,
     /// Cleared camps, oldest first (kept for 30 rounds).
     pub(crate) cleared: Vec<ClearedCamp>,
-    /// Camp sites and spawns draw from this stream only.
+    /// Camp sites and spawns draw from this stream only (rebellions too).
     pub(crate) rng: StreamRng,
+    /// Players whose rebels rise in so many of their turns (ascending by
+    /// player; a player at or above the rebellion threshold has none).
+    pub(crate) revolts: Vec<(PlayerId, u8)>,
 }
 
 impl BarbarianState {
@@ -57,6 +62,30 @@ impl BarbarianState {
             released: false,
             cleared: Vec::new(),
             rng: StreamRng::new(seed ^ 0xBA4B),
+            revolts: Vec::new(),
+        }
+    }
+
+    /// Turns of `player` left until its rebels rise (None: no rebellion
+    /// is coming).
+    pub fn revolt_countdown(&self, player: PlayerId) -> Option<u8> {
+        self.revolts.iter().find(|(p, _)| *p == player).map(|(_, n)| *n)
+    }
+
+    /// Every running rebellion countdown, ascending by player.
+    pub fn revolts(&self) -> &[(PlayerId, u8)] {
+        &self.revolts
+    }
+
+    pub(crate) fn set_revolt(&mut self, player: PlayerId, turns: Option<u8>) {
+        let at = self.revolts.binary_search_by_key(&player, |(p, _)| *p);
+        match (at, turns) {
+            (Ok(i), Some(n)) => self.revolts[i].1 = n,
+            (Ok(i), None) => {
+                self.revolts.remove(i);
+            }
+            (Err(i), Some(n)) => self.revolts.insert(i, (player, n)),
+            (Err(_), None) => {}
         }
     }
 
@@ -75,6 +104,7 @@ impl BarbarianState {
             && self.camps.is_empty()
             && !self.released
             && self.cleared.is_empty()
+            && self.revolts.is_empty()
     }
 
     pub fn rng(&self) -> &StreamRng {
@@ -97,6 +127,7 @@ impl BarbarianState {
         released: bool,
         cleared: Vec<ClearedCamp>,
         rng: StreamRng,
+        revolts: Vec<(PlayerId, u8)>,
     ) -> Self {
         Self {
             mode,
@@ -104,6 +135,7 @@ impl BarbarianState {
             released,
             cleared,
             rng,
+            revolts,
         }
     }
 }

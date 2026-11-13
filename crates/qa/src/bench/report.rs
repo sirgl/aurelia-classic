@@ -820,6 +820,14 @@ fn wars_table(sides: &[(&SideSummary, CombatRecord)], out: &mut String) {
         let _ = writeln!(out, "| {:?} | {} | {} | {} | {} |", s.side, s.variant, c.cities_ceded, c.gold_per_turn_deals, c.gold_per_turn_broken);
     }
     out.push('\n');
+    let _ = writeln!(out, "| side | variant | turns below -20 happiness | of its turns | risings of rebels | rebels | risings per seat |");
+    let _ = writeln!(out, "|---|---|---:|---:|---:|---:|---:|");
+    for (s, c) in sides {
+        let share = 100.0 * f64::from(c.rebel_turns) / f64::from(c.turns.max(1));
+        let per_game = f64::from(c.rebellions) / f64::from(s.seat_games.max(1));
+        let _ = writeln!(out, "| {:?} | {} | {} | {share:.2} % | {} | {} | {per_game:.3} |", s.side, s.variant, c.rebel_turns, c.rebellions, c.rebels);
+    }
+    out.push('\n');
 }
 
 /// FNV-1a over every match's label, rounds and final world hash.

@@ -54,3 +54,6 @@ classic.ui.hud-game.see-results = 查看结果
 ## city-state card over the map
 classic.ui.hud-game.city-state-gold = 国库：{ $gold } 金币
 classic.ui.hud-game.city-state-close = 关闭（Esc）
+
+classic.ui.hud-game.rebels-ahead = 幸福低于{ $threshold }时，你的领土上会爆发叛乱：还差{ NUMBER($left) }点不满
+classic.ui.hud-game.rebels-now = 幸福低于{ $threshold }：你的领土上每隔几回合就会爆发叛乱
