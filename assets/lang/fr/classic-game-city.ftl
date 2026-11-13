@@ -60,4 +60,5 @@ classic.game.city.resistance = Résistance : encore { $n } tours. La ville ne pr
 classic.game.city.confirm-sell-title = Vendre { $name } ?
 classic.game.city.confirm-sell-line = Le bâtiment quitte { $city } pour { NUMBER($gold) } or. Une ville vend un bâtiment par tour.
 classic.game.city.confirm-sell = Vendre
+classic.game.city.confirm-sell-defence = La ville perd de la défense : ses points de vie sont conservés, jusqu'au nouveau maximum.
 classic.game.city.sold = Bâtiment vendu : { $name }, { NUMBER($gold) } or

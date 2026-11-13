@@ -33,3 +33,4 @@ classic.game.turn.order-removed-wonder-built = { $city }: { $item } se ha termin
 classic.game.turn.order-removed-national-wonder-built = { $city }: { $item } se ha terminado en otra de tus ciudades. Se retiró la orden; la producción acumulada se conserva.
 classic.game.turn.order-removed-already-built = { $city }: { $item } ya existe aquí. Se retiró la orden duplicada; la producción acumulada se conserva.
 classic.game.turn.order-removed-blocked = { $city }: { $item } ya no se puede producir. Se retiró la orden; la producción acumulada se conserva.
+classic.game.turn.order-removed-needs-building = { $city }: { $item } necesita un edificio que ya no está. Se retiró la orden; la producción acumulada se conserva.

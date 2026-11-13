@@ -60,4 +60,5 @@ classic.game.city.resistance = Resistencia: quedan { $n } turnos. La ciudad no p
 classic.game.city.confirm-sell-title = ¿Vender { $name }?
 classic.game.city.confirm-sell-line = El edificio deja { $city } por { NUMBER($gold) } de oro. Una ciudad vende un edificio por turno.
 classic.game.city.confirm-sell = Vender
+classic.game.city.confirm-sell-defence = La ciudad pierde defensa con él: conserva sus puntos de vida hasta el nuevo máximo.
 classic.game.city.sold = Edificio vendido: { $name }, { NUMBER($gold) } de oro

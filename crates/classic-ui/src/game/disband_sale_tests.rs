@@ -176,3 +176,45 @@ fn a_building_sells_after_the_yes_once_a_turn() {
     session.request(GameRequest::SellBuilding(regular[1]));
     assert!(session.city_view().unwrap().confirm.is_none(), "no card for a sale the rules refuse");
 }
+
+#[test]
+fn the_sell_card_warns_only_for_a_building_that_gives_the_city_defence() {
+    let mut session = new_match(7);
+    let at = capital(&mut session);
+    let (plain, defence) = {
+        let (game, rules) = session.harness_game();
+        let city = game.view().auth.indexes().cities_of(PlayerId(0))[0];
+        let core = game.view().auth.cities().get(city).unwrap();
+        let sellable: Vec<BuildingKindId> = (0..rules.buildings.len())
+            .filter(|i| {
+                let b = &rules.buildings[*i];
+                b.kind == BuildingKind::Regular && b.cost >= 40 && b.module.great_work_slots.is_none()
+            })
+            .map(|i| BuildingKindId(i as u16))
+            .collect();
+        let weakens = |b: &BuildingKindId| {
+            let mut with = core.clone();
+            with.buildings.push(*b);
+            classic_rules::combat::city::max_hit_points(game.view().auth, &rules, &with)
+                > classic_rules::combat::city::max_hit_points(game.view().auth, &rules, core)
+        };
+        let defence = *sellable.iter().find(|b| weakens(b)).expect("a building of defence in the data");
+        let plain = *sellable.iter().find(|b| !weakens(b)).expect("a plain building");
+        game.debug_add_building(&rules, city, defence);
+        game.debug_add_building(&rules, city, plain);
+        (plain, defence)
+    };
+    session.refresh_after_harness();
+    session.select_city_at(at);
+    session.request(GameRequest::SellBuilding(plain));
+    let card = session.city_view().unwrap().confirm.expect("the card");
+    assert!(!card.line.contains("hit points"), "{card:?}");
+    session.request(GameRequest::Confirm(false));
+    session.request(GameRequest::SellBuilding(defence));
+    let card = session.city_view().unwrap().confirm.expect("the card");
+    assert!(card.line.contains("hit points"), "{card:?}");
+    for lang in LANGUAGES {
+        let card = i18n::with_language(lang, || session.city_view().unwrap().confirm.unwrap());
+        assert!(!card.line.contains("classic."), "{lang}: {card:?}");
+    }
+}

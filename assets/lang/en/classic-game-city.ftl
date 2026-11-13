@@ -59,4 +59,5 @@ classic.game.city.resistance = In resistance: { $n } turns left. The city produc
 classic.game.city.confirm-sell-title = Sell { $name }?
 classic.game.city.confirm-sell-line = The building leaves { $city } for { NUMBER($gold) } gold. A city sells one building a turn.
 classic.game.city.confirm-sell = Sell
+classic.game.city.confirm-sell-defence = The city loses defence with it: its hit points are kept, up to the new maximum.
 classic.game.city.sold = { $name } sold for { NUMBER($gold) } gold

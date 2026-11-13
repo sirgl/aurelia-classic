@@ -32,6 +32,7 @@ impl Session {
                     OrderRemoval::WonderBuilt => tf!("classic.game.turn.order-removed-wonder-built", city = name, item = item),
                     OrderRemoval::NationalWonderBuilt => tf!("classic.game.turn.order-removed-national-wonder-built", city = name, item = item),
                     OrderRemoval::AlreadyBuilt => tf!("classic.game.turn.order-removed-already-built", city = name, item = item),
+                    OrderRemoval::NeedsBuilding => tf!("classic.game.turn.order-removed-needs-building", city = name, item = item),
                     OrderRemoval::Blocked => tf!("classic.game.turn.order-removed-blocked", city = name, item = item),
                 };
                 self.notify_at(NoticeKind::Production, text, Some(tile));
@@ -183,7 +184,7 @@ mod tests {
         let (records, wonder, lost) = stale_order(&mut session, me, PlayerId(1), false);
         let item = ProductionItem::Building(wonder);
         let mut seen = Vec::new();
-        for reason in [OrderRemoval::WonderBuilt, OrderRemoval::NationalWonderBuilt, OrderRemoval::AlreadyBuilt, OrderRemoval::Blocked] {
+        for reason in [OrderRemoval::WonderBuilt, OrderRemoval::NationalWonderBuilt, OrderRemoval::AlreadyBuilt, OrderRemoval::NeedsBuilding, OrderRemoval::Blocked] {
             let mut journal = ChangeJournal::default();
             journal.city_changes.push(CityChange::OrderRemoved { city: lost, owner: me, item, reason });
             session.notices.clear();

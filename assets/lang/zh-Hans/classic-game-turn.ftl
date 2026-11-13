@@ -30,3 +30,4 @@ classic.game.turn.order-removed-wonder-built = { $city }：{ $item }已在另一
 classic.game.turn.order-removed-national-wonder-built = { $city }：{ $item }已在你的另一座城市建成。该生产命令已移除，已积累的产能予以保留。
 classic.game.turn.order-removed-already-built = { $city }：{ $item }已存在于该城市。重复的生产命令已移除，已积累的产能予以保留。
 classic.game.turn.order-removed-blocked = { $city }：{ $item }已无法生产。该生产命令已移除，已积累的产能予以保留。
+classic.game.turn.order-removed-needs-building = { $city }：{ $item }所需的建筑已不存在。该生产命令已移除，已积累的产能予以保留。

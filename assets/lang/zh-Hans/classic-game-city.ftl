@@ -51,4 +51,5 @@ classic.game.city.resistance = 抵抗中：还剩 { $n } 回合。结束前城�
 classic.game.city.confirm-sell-title = 出售{ $name }？
 classic.game.city.confirm-sell-line = 该建筑将以{ NUMBER($gold) }金币从{ $city }移除。每座城市每回合只能出售一座建筑。
 classic.game.city.confirm-sell = 出售
+classic.game.city.confirm-sell-defence = 该城市将失去防御：其生命值保留，但不超过新的上限。
 classic.game.city.sold = 已以{ NUMBER($gold) }金币出售{ $name }

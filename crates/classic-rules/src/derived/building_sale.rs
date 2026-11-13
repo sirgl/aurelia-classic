@@ -127,3 +127,16 @@ pub fn sale_status(
     }
     Ok(sale_gold(rules, building))
 }
+
+/// Does the city lose hit points or strength with `building` (walls and the like)? The sale
+/// card warns about it: the city keeps its current hit points up to the new maximum
+/// (`systems::building_sale`).
+pub fn sale_weakens_defence(auth: &AuthWorld, rules: &CompiledRuleset, city: CityHandle, building: BuildingKindId) -> bool {
+    let Some(core) = auth.cities().get(city) else {
+        return false;
+    };
+    let mut without = core.clone();
+    without.buildings.retain(|b| *b != building);
+    crate::combat::city::max_hit_points(auth, rules, &without) < crate::combat::city::max_hit_points(auth, rules, core)
+        || crate::combat::city::city_strength(auth, rules, &without) < crate::combat::city::city_strength(auth, rules, core)
+}

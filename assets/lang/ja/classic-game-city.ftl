@@ -51,4 +51,5 @@ classic.game.city.resistance = 抵抗中：残り { $n } ターン。終わる�
 classic.game.city.confirm-sell-title = { $name }を売却しますか？
 classic.game.city.confirm-sell-line = この建造物は{ NUMBER($gold) }ゴールドで{ $city }から失われます。都市が売却できるのは1ターンに1つです。
 classic.game.city.confirm-sell = 売却
+classic.game.city.confirm-sell-defence = この都市は防御力を失います。耐久力は新しい上限まで維持されます。
 classic.game.city.sold = { $name }を{ NUMBER($gold) }ゴールドで売却しました

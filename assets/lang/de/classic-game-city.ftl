@@ -60,4 +60,5 @@ classic.game.city.resistance = Widerstand: noch { $n } Züge. Die Stadt produzie
 classic.game.city.confirm-sell-title = { $name } verkaufen?
 classic.game.city.confirm-sell-line = Das Gebäude verlässt { $city } für { NUMBER($gold) } Gold. Eine Stadt verkauft ein Gebäude pro Runde.
 classic.game.city.confirm-sell = Verkaufen
+classic.game.city.confirm-sell-defence = Die Stadt verliert dadurch Verteidigung: ihre Trefferpunkte bleiben erhalten, höchstens bis zum neuen Maximum.
 classic.game.city.sold = { $name } für { NUMBER($gold) } Gold verkauft

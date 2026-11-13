@@ -103,9 +103,14 @@ impl Session {
                 let def = self.rules().buildings.get(building.0 as usize)?;
                 let name = names::named("building", &def.name, &def.key);
                 let gold = classic_rules::derived::building_sale::sale_gold(self.rules(), *building);
+                let weakens = classic_rules::derived::building_sale::sale_weakens_defence(self.game().view().auth, self.rules(), *city, *building);
+                let mut line = tf!("classic.game.city.confirm-sell-line", city = core.name.as_str(), gold = gold);
+                if weakens {
+                    line = format!("{line} {}", t!("classic.game.city.confirm-sell-defence"));
+                }
                 ConfirmCard {
                     title: tf!("classic.game.city.confirm-sell-title", name = name.as_str()),
-                    line: tf!("classic.game.city.confirm-sell-line", city = core.name.as_str(), gold = gold),
+                    line,
                     confirm: t!("classic.game.city.confirm-sell").to_string(),
                     cancel,
                 }

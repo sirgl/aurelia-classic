@@ -65,4 +65,5 @@ classic.game.city.resistance = Сопротивление: ещё ходов —
 classic.game.city.confirm-sell-title = Продать здание: { $name }?
 classic.game.city.confirm-sell-line = Здание покинет город { $city } за { NUMBER($gold) } золота. Город продаёт одно здание за ход.
 classic.game.city.confirm-sell = Продать
+classic.game.city.confirm-sell-defence = Город потеряет часть защиты: его здоровье сохранится в пределах нового максимума.
 classic.game.city.sold = Здание продано: { $name }, { NUMBER($gold) } золота

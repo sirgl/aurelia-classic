@@ -11,6 +11,7 @@
 use crate::classic::change::ClassicChange;
 use crate::command::CommandError;
 use crate::ids::{BuildingKindId, CityHandle, PlayerId};
+use crate::rules::CompiledRuleset;
 use crate::transaction::journal::PlayerChange;
 use crate::transaction::transaction::WorldTransaction;
 
@@ -21,12 +22,23 @@ impl<'a> WorldTransaction<'a> {
         city: CityHandle,
         building: BuildingKindId,
         gold: u32,
+        rules: &CompiledRuleset,
     ) -> Result<(), CommandError> {
-        let core = self.world.cities.get_mut(city).ok_or(CommandError::UnknownCity)?;
+        let core = self.world.cities.get(city).ok_or(CommandError::UnknownCity)?;
         let Some(at) = core.buildings.iter().position(|b| *b == building) else {
             return Err(crate::derived::building_sale::SaleBlock::NotInCity.into());
         };
+        // The city keeps the hit points it has, up to the new maximum: the maximum falls with a
+        // building of defence. Unciv keeps `City.health` as it is and heals only up to the maximum
+        // (CityTurnManager); here damage is stored, so it is re-based on the new maximum, and the
+        // city is never left at 0.
+        let kept_hp = crate::combat::city::hit_points(&*self.world, rules, core);
+        let core = self.world.cities.get_mut(city).ok_or(CommandError::UnknownCity)?;
         core.buildings.remove(at);
+        let core = self.world.cities.get(city).ok_or(CommandError::UnknownCity)?;
+        let max = crate::combat::city::max_hit_points(&*self.world, rules, core);
+        let core = self.world.cities.get_mut(city).ok_or(CommandError::UnknownCity)?;
+        core.damage = max - kept_hp.min(max).max(1);
         let id = core.id;
         if let Some(economy) = self.world.players.economy_mut(player) {
             let sold = &mut economy.sold_building_cities;
@@ -35,6 +47,8 @@ impl<'a> WorldTransaction<'a> {
             }
         }
         self.world.players.earn(player, gold);
+        // A dependent order whose building was just sold leaves the queues (Unciv `isBuildable`).
+        self.sweep_unbuildable_orders(player, rules);
         self.journal.player_changes.push(PlayerChange::EffectsChanged { player });
         self.journal.module_changes.push(ClassicChange::BuildingSold { player, city, building, gold });
         Ok(())

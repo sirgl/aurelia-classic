@@ -403,3 +403,130 @@ fn a_journal_with_a_disband_and_a_sale_replays() {
     assert_eq!(replayed.commands, 4, "disband, sale and two ends of turn");
     assert_eq!(authoritative_hash(&replayed.game), authoritative_hash(&game));
 }
+
+// ---- the queue and the hit points after a sale (review of rules/actions) ----
+
+/// Pairs (dependent, requirement): both regular, the dependent costs production and needs the
+/// requirement in its city (the class of cases, not one building).
+fn dependent_pairs(rules: &CompiledRuleset) -> Vec<(BuildingKindId, BuildingKindId)> {
+    regular_buildings(rules)
+        .into_iter()
+        .filter(|b| !rules.buildings[b.0 as usize].unbuildable)
+        .filter_map(|b| {
+            let r = *rules.buildings[b.0 as usize].requires_buildings.first()?;
+            (rules.buildings[r.0 as usize].kind == BuildingKind::Regular).then_some((b, r))
+        })
+        .collect()
+}
+
+fn queue_of(game: &GameState, city: CityHandle) -> Vec<ProductionItem> {
+    game.view().auth.cities().get(city).unwrap().queue.clone()
+}
+
+fn learn_for(game: &mut GameState, rules: &CompiledRuleset, buildings: &[BuildingKindId]) {
+    for b in buildings {
+        if let Some(t) = rules.buildings[b.0 as usize].required_tech {
+            game.debug_learn(rules, P0, t);
+        }
+    }
+}
+
+/// Unciv drops a queued building that is no longer buildable (CityConstructions.validateConstructionQueue,
+/// `isBuildable`): selling the requirement takes the dependent out of the queue at once, with a record.
+#[test]
+fn selling_a_requirement_takes_the_dependent_order_out_of_the_queue() {
+    use classic_rules::transaction::journal::{CityChange, OrderRemoval};
+    let rules = rules();
+    let mut checked = 0;
+    for (dep, req) in dependent_pairs(&rules) {
+        let (mut game, capital, _) = world(&rules);
+        learn_for(&mut game, &rules, &[dep, req]);
+        game.debug_add_building(&rules, capital, req);
+        let order = ProductionItem::Building(dep);
+        if game.execute(&rules, Command::EnqueueProduction { player: P0, city: capital, item: order }).is_err() {
+            continue;
+        }
+        let Ok(result) = game.execute(&rules, Command::SellBuilding { player: P0, city: capital, building: req }) else {
+            continue;
+        };
+        let key = &rules.buildings[dep.0 as usize].key;
+        assert!(!queue_of(&game, capital).contains(&order), "{key} still queued after its requirement was sold");
+        let told = result.changes().city_changes.iter().any(|c| {
+            matches!(c, CityChange::OrderRemoved { city, owner, item, reason }
+                if *city == capital && *owner == P0 && *item == order && *reason == OrderRemoval::NeedsBuilding)
+        });
+        assert!(told, "{key}: the journal tells the removal");
+        game.debug_earn(P0, 100_000);
+        for _ in 0..4 {
+            round(&mut game, &rules);
+        }
+        assert!(!game.view().auth.cities().get(capital).unwrap().buildings.contains(&dep), "{key} built without its requirement");
+        game.validate(&rules).unwrap();
+        checked += 1;
+    }
+    assert!(checked > 0, "the data has dependent buildings");
+}
+
+/// An order that lost its requirement without a sweep (a save from before) is not bought and not built:
+/// the purchase is refused with the reason, nothing is spent, and the drain takes the order out.
+#[test]
+fn an_order_without_its_requirement_is_neither_bought_nor_built() {
+    use classic_rules::command::Refusal;
+    let rules = rules();
+    let mut checked = 0;
+    for (dep, req) in dependent_pairs(&rules) {
+        let (mut game, capital, _) = world(&rules);
+        learn_for(&mut game, &rules, &[dep, req]);
+        game.debug_add_building(&rules, capital, req);
+        let order = ProductionItem::Building(dep);
+        if game.execute(&rules, Command::EnqueueProduction { player: P0, city: capital, item: order }).is_err() {
+            continue;
+        }
+        game.debug_remove_building(capital, req);
+        game.debug_earn(P0, 100_000);
+        let gold = treasury(&game, P0);
+        let key = &rules.buildings[dep.0 as usize].key;
+        let error = game.execute(&rules, Command::HurryProduction { player: P0, city: capital }).unwrap_err();
+        assert_eq!(error, CommandError::Refused(Refusal::NeedsBuilding), "{key}");
+        assert_eq!(treasury(&game, P0), gold, "{key}: nothing spent");
+        for _ in 0..4 {
+            round(&mut game, &rules);
+        }
+        let city = game.view().auth.cities().get(capital).unwrap();
+        assert!(!city.buildings.contains(&dep), "{key} built without its requirement");
+        assert!(!city.queue.contains(&order), "{key} left in the queue");
+        checked += 1;
+    }
+    assert!(checked > 0);
+}
+
+/// Unciv keeps a city's health when a building goes and heals only up to the maximum; the rules here
+/// store damage, so the sale re-bases it: hit points = min(before, new maximum), never below 1.
+#[test]
+fn selling_a_building_of_defence_keeps_the_hit_points_up_to_the_new_maximum() {
+    use classic_rules::combat::city::{hit_points, max_hit_points};
+    let rules = rules();
+    let mut defences = 0;
+    for b in regular_buildings(&rules) {
+        for hurt in [0u16, 30, 120, 10_000] {
+            let (mut game, capital, _) = world(&rules);
+            game.debug_add_building(&rules, capital, b);
+            let max_with = max_hit_points(game.view().auth, &rules, game.view().auth.cities().get(capital).unwrap());
+            game.debug_set_city_damage(capital, hurt.min(max_with - 1));
+            let before = hit_points(game.view().auth, &rules, game.view().auth.cities().get(capital).unwrap());
+            if game.execute(&rules, Command::SellBuilding { player: P0, city: capital, building: b }).is_err() {
+                continue;
+            }
+            let core = game.view().auth.cities().get(capital).unwrap();
+            let max = max_hit_points(game.view().auth, &rules, core);
+            if hurt == 0 && max < max_with {
+                defences += 1;
+            }
+            let key = &rules.buildings[b.0 as usize].key;
+            assert_eq!(hit_points(game.view().auth, &rules, core), before.min(max).max(1), "{key} hurt {hurt}");
+            assert!(core.damage < max, "{key}: the city is not left at 0");
+            game.validate(&rules).unwrap();
+        }
+    }
+    assert!(defences > 0, "the data has a sellable building that gives the city hit points");
+}
