@@ -228,6 +228,9 @@ def units(uc, ids, cat):
                     setf(cat, it, "moves", u["movement"], fields)
             if "cost" in u:
                 setf(cat, it, "cost", u["cost"], fields)
+            # IConstruction.getBaseGoldCost: the purchase price, +20 % for a Settler (default 0, BaseUnit)
+            if "hurryCostModifier" in u or "hurry_cost_modifier" in it:
+                setf(cat, it, "hurry_cost_modifier", u.get("hurryCostModifier", 0), fields)
             rt = ids.get("tech", u.get("requiredTech"))
             if u.get("requiredTech") is None:
                 if it.get("required_tech") is None:
@@ -296,8 +299,10 @@ def buildings(uc, ids, cat):
                     pass
                 elif rt:
                     setf(cat, it, "required_tech", rt, fields)
-                if "hurryCostModifier" in u:
-                    setf(cat, it, "hurry_cost_modifier", u["hurryCostModifier"], fields)
+                # Unciv's default is 0 (Building.hurryCostModifier); a wonder keeps -1: Unciv does not
+                # sell it for gold (Building.canBePurchasedWithStat, isAnyWonder)
+                if not wonder and ("hurryCostModifier" in u or "hurry_cost_modifier" in it):
+                    setf(cat, it, "hurry_cost_modifier", u.get("hurryCostModifier", 0), fields)
         mark(cat, it, u, "Buildings" if hit and hit[1] == "gk" else "Vanilla Buildings", fields)
     return d
 

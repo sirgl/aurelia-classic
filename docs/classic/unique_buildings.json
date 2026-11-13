@@ -1615,7 +1615,7 @@
    "required_tech": "core:tech/pottery",
    "obsolete_tech": null,
    "era": "core:era/ancient",
-   "hurry_cost_modifier": 25,
+   "hurry_cost_modifier": 0,
    "conquest_survival_pct": 66,
    "never_capture": true,
    "specialists": null,
@@ -1658,6 +1658,7 @@
    "provenance": "unciv: Buildings.json, Pyramid",
    "unciv_fields": [
     "cost",
+    "hurry_cost_modifier",
     "maintenance",
     "required_tech"
    ]

@@ -311,7 +311,6 @@
             required_tech: Some("core:tech/pottery"),
             maintenance: 1,
             era: Some("core:era/ancient"),
-            hurry_cost_modifier: 25,
             conquest_survival_pct: 66,
             never_capture: true,
             max_start_era: Some("core:era/renaissance"),

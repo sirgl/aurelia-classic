@@ -854,6 +854,7 @@ fn unit(u: &Value, actions: &[(String, String)]) -> Record {
         .num("range", int(u, "range"))
         .num("sight", int(u, "sight"))
         .raw("cost", cost.max(0).to_string())
+        .num("hurry_cost_modifier", int(u, "hurry_cost_modifier"))
         .flag("unbuildable", unbuildable);
     if let Some(faith) = u["faith_cost"].as_i64() {
         r = r.raw("faith_cost", format!("Some({faith})"));
