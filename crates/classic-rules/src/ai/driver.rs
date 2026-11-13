@@ -366,6 +366,17 @@ impl ClassicMind {
         self.retake2
     }
 
+    /// The mind makes the call at the walls (`TurnBrief::siege_call`): `siege-call`'s line, `next-war-retake` and `next-x`.
+    pub fn calls_at_walls(&self) -> bool {
+        self.call
+    }
+
+    /// The mind plans the war of a player with no city (`TurnBrief::landless_plan`, with the mends of
+    /// `TurnBrief::siege_mend` it brings): `landless-plan` and `next-x`.
+    pub fn plans_landless(&self) -> bool {
+        self.landless_plan
+    }
+
     /// Its tactical and operations layer is the unit net's: `unit-net`, `hybrid`, and
     /// `tactician-fit` (`TurnBrief::tactician_fit`: the unit net with its fitted numbers,
     /// `unit_net::fit`).

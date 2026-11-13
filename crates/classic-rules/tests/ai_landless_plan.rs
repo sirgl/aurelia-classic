@@ -152,3 +152,51 @@ fn standard_without_a_city_starts_no_war() {
     assert!(probe.landless_goals.is_empty() && probe.landless_starts.is_empty());
     assert!(!scene.game.view().auth.diplomacy().at_war(AI, FOE));
 }
+
+/// Plays `rounds` rounds of the scene as `play` does, with the trace kept: the AI's applied commands and the
+/// war probe's goals and starts.
+fn play_traced(variant: Variant, rounds: u32) -> (Vec<String>, Vec<(u32, PlayerId, u32)>, Vec<(u32, PlayerId, u32)>, Option<PlayerId>) {
+    use classic_rules::ai::trace::Outcome;
+    let mut scene = scene(8, (8, 12), false);
+    let foe_tile = scene.tile(15, 10);
+    war_probe::enable(true);
+    let driver = play_with_trace(&mut scene, variant, rounds);
+    let probe = war_probe::take();
+    war_probe::enable(false);
+    let applied = driver.trace().entries().filter(|e| e.player == AI && e.outcome == Outcome::Applied).filter_map(|e| e.command.as_ref().map(|c| format!("{c:?}"))).collect();
+    (applied, probe.landless_goals, probe.landless_starts, scene.owner_of_city(foe_tile))
+}
+
+fn play_with_trace(scene: &mut Scene, variant: Variant, rounds: u32) -> AiDriver<classic_rules::classic::Classic, ClassicMind> {
+    let settings = AiSettings::for_rules(&scene.rules, scene.rules.default_difficulty());
+    let mut driver = AiDriver::with_mind(settings, vec![], ClassicMind::new(variant));
+    driver.set_trace_capacity(1_000_000);
+    let start = scene.game.view().auth.turn().round;
+    while scene.game.view().auth.turn().round < start + rounds && scene.game.winner().is_none() {
+        if scene.game.view().auth.active_player() == FOE {
+            scene.game.execute(&scene.rules, Command::EndTurn { player: FOE }).unwrap();
+        } else {
+            driver.run(&mut scene.game, &scene.rules, u32::MAX);
+        }
+    }
+    driver
+}
+
+/// `next-x` carries `siege-call`'s call at the walls and `landless-plan`'s plan with its siege mends together; a
+/// player with no city then gives commands (it marches on the empty city and takes it), nothing panics, and the same
+/// scene played twice gives the same commands, goals and starts.
+#[test]
+fn next_x_without_a_city_plans_and_mends_together_deterministically() {
+    let mind = ClassicMind::new(Variant::NextX);
+    assert!(mind.calls_at_walls(), "siege_call is on");
+    assert!(mind.plans_landless(), "siege_mend (through the landless plan) is on");
+    let foe_tile = scene(8, (8, 12), false).tile(15, 10);
+    let (commands, goals, starts, owner) = play_traced(Variant::NextX, 20);
+    assert!(!commands.is_empty(), "the player with no city gives commands");
+    assert_eq!(goals.first().map(|g| g.2), Some(foe_tile.0), "the empty city is the goal: {goals:?}");
+    assert!(starts.iter().any(|s| s.2 == foe_tile.0), "an operation was started on it: {starts:?}");
+    assert!(commands.iter().any(|c| c.starts_with("AttackCity")), "the units strike the city: {commands:#?}");
+    assert_eq!(owner, Some(AI), "the melee army takes the city through the mends");
+    let again = play_traced(Variant::NextX, 20);
+    assert_eq!((commands, goals, starts, owner), again, "two runs of the same scene are the same");
+}

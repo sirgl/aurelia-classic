@@ -292,3 +292,47 @@ fn the_standard_ai_keeps_the_book() {
     assert!(rounds.len() >= 3, "samples every 5 rounds: {rounds:?}");
     assert!(memory.rival_book.samples.iter().all(|s| s.nations.iter().any(|n| n.0 == PlayerId(0))), "the seat's own numbers in every sample");
 }
+
+/// The retake section (0x5E), the rivals' book (0x5F) and `sharp`'s section (0x5D with the `next` fields) in one
+/// byte array: they come in that order after the strategy memory's bytes, every marker where it belongs, and
+/// everything reads back without a loss (the sections hold each other's offsets, so a swap or a wrong marker loses one).
+#[test]
+fn the_retake_book_and_sharp_sections_ride_together_without_loss() {
+    use classic_rules::ai::retake::{Lost, Memory as Retake};
+    use classic_rules::ai::rival_model::Sample;
+    use classic_rules::ai::strategy_net::{sharp, Memory};
+    let book = Book { samples: vec![Sample { round: 12, nations: vec![(PlayerId(0), 40, 5), (PlayerId(3), 55, 7)] }, Sample { round: 17, nations: vec![(PlayerId(0), 44, 6)] }] };
+    let retake = Retake { held: vec![TileId(7), TileId(9)], lost: vec![Lost { tile: TileId(4), round: 12, captor: Some(PlayerId(1)) }] };
+    let plain = Memory { target: Some(TechId(4)), ..Default::default() };
+    let prefix = plain.encode();
+    for sharp in [Some(sharp::Memory { ratio: 870, trend: 430, rivals: Some(3), fits: Some(true) }), Some(sharp::Memory { ratio: 5, trend: -6, rivals: None, fits: None })] {
+        let memory = Memory { retake: Some(retake.clone()), rival_book: book.clone(), sharp, ..plain.clone() };
+        let bytes = memory.encode();
+        assert_eq!(Memory::decode(&bytes), memory, "all three sections come back");
+        assert!(bytes.starts_with(&prefix), "the sections follow the bytes the other variants write");
+        // The layout: 0x5E, its length (2 bytes) and body; then 0x5F and the book; then sharp's marker and numbers.
+        let at = prefix.len();
+        assert_eq!(bytes[at], 0x5E, "the retake marker");
+        let len = usize::from(u16::from_le_bytes([bytes[at + 1], bytes[at + 2]]));
+        assert_eq!(&bytes[at + 3..at + 3 + len], retake.encode().as_slice(), "the retake body");
+        let book_at = at + 3 + len;
+        assert_eq!(bytes[book_at], 0x5F, "the book marker follows the retake section");
+        let mut book_bytes = Vec::new();
+        book.encode(&mut book_bytes);
+        assert_eq!(&bytes[book_at + 1..book_at + 1 + book_bytes.len()], book_bytes.as_slice(), "the book body");
+        let sharp_at = book_at + 1 + book_bytes.len();
+        let marker = if memory.sharp.is_some_and(|m| m.rivals.is_some() || m.fits.is_some()) { 0x5D } else { 0x5C };
+        assert_eq!(bytes[sharp_at], marker, "sharp's marker is last");
+        assert_eq!(bytes.len(), sharp_at + if marker == 0x5D { 1 + 8 * 4 } else { 1 + 8 * 2 }, "sharp's numbers end the memory");
+        // Each pair of sections alone reads back the same.
+        for (with_retake, with_book, with_sharp) in [(true, true, false), (true, false, true), (false, true, true)] {
+            let part = Memory {
+                retake: with_retake.then(|| retake.clone()),
+                rival_book: if with_book { book.clone() } else { Book::default() },
+                sharp: if with_sharp { memory.sharp } else { None },
+                ..plain.clone()
+            };
+            assert_eq!(Memory::decode(&part.encode()), part, "retake {with_retake} book {with_book} sharp {with_sharp}");
+        }
+    }
+}
