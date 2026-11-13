@@ -438,9 +438,11 @@ def formulas(v):
         "from the city costs %s gold times (d - 1) plus %s gold for every tile the city has claimed beyond its "
         "first ring (by culture or purchase); the city's tile purchase modifiers then apply, and a tile is never free."
         % (v("PURCHASE_RADIUS_MAX"), v("PLOT_BASE_COST"), v("PLOT_COST_PER_PLOT_BOUGHT")),
-        "- **Item gold price** (`kernel::world::city`). The gold price of a unit or building grows with "
-        "(%s times its production cost) raised to the power 0.75, rounded down to a multiple of %s; a partly "
-        "built item costs less." % (v("GOLD_PER_PRODUCTION"), v("PURCHASE_DIVISOR")),
+        "- **Item gold price** (`kernel::world::city`). The gold price of a unit or building is "
+        "(%s times its production cost) raised to the power 0.75, times the item's own percent (its "
+        "`hurry_cost_modifier`: a settler, a horseman or a catapult +20, a caravel +30, a monument +40; a "
+        "wonder is not for sale) and the city's purchase percents, rounded down to a multiple of %s once, at "
+        "the end; the production already invested does not lower it." % (v("GOLD_PER_PRODUCTION"), v("PURCHASE_DIVISOR")),
         "- **Combat damage** (`combat::damage`). The stronger side's strength divided by the weaker's gives "
         "a ratio r; the damage factor is the mean of ((r + 3) / 4) to the fourth power and 1 (its inverse for "
         "the weaker side). A unit takes that factor times a base of %s hundredths of a hit point plus a "
