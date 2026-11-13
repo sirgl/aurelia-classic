@@ -34,4 +34,4 @@ classic.game.turn.order-removed-wonder-built = { $city }: { $item } уже по�
 classic.game.turn.order-removed-national-wonder-built = { $city }: { $item } уже построено в другом вашем городе. Заказ снят, накопленное производство сохранено.
 classic.game.turn.order-removed-already-built = { $city }: { $item } уже есть в этом городе. Повторный заказ снят, накопленное производство сохранено.
 classic.game.turn.order-removed-blocked = { $city }: { $item } больше нельзя производить. Заказ снят, накопленное производство сохранено.
-classic.game.turn.order-removed-needs-building = { $city }: для { $item } больше нет нужного здания. Заказ снят, накопленное производство сохранено.
+classic.game.turn.order-removed-needs-building = { $city }: для { $item } нужного здания нет в этом городе или в другом вашем городе. Заказ снят, накопленное производство сохранено.

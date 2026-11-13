@@ -32,4 +32,4 @@ classic.game.turn.order-removed-wonder-built = { $city }: { $item } was finished
 classic.game.turn.order-removed-national-wonder-built = { $city }: { $item } was finished in another of your cities. The order was removed; the production you had stored is kept.
 classic.game.turn.order-removed-already-built = { $city }: { $item } already stands here. The duplicate order was removed; the production you had stored is kept.
 classic.game.turn.order-removed-blocked = { $city }: { $item } can no longer be produced. The order was removed; the production you had stored is kept.
-classic.game.turn.order-removed-needs-building = { $city }: { $item } needs a building that is gone. The order was removed; the production you had stored is kept.
+classic.game.turn.order-removed-needs-building = { $city }: { $item } needs a building that this city or another of your cities does not have. The order was removed; the production you had stored is kept.
