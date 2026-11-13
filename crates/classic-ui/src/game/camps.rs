@@ -231,4 +231,32 @@ mod tests {
         assert!(near >= 1, "the rebels stand there for the barbarians");
     }
 
+
+    /// A match without barbarians has no rebels: however unhappy the empire, the top bar does
+    /// not promise them.
+    #[test]
+    fn no_rebel_warning_in_a_match_without_barbarians() {
+        use classic_rules::derived::happiness::{player_happiness, REBELLION_THRESHOLD};
+        let request = MatchRequest { nation: "core:nation/rome".into(), seed: 4, size: MapSize::Small, players: 3, water: 25 };
+        let options = crate::ui::screens::GameOptions { barbarians: false, ..Default::default() };
+        let prepared = crate::ui::screens::prepare_game(crate::ui::screens::NewGame { request, options }).expect("world");
+        let mut session = Session::new(prepared.game, game_rules());
+        let me = session.me();
+        let (_, unit) = session.selected_unit().expect("the starting unit is selected");
+        let at = unit.tile;
+        let (game, rules) = session.harness_game();
+        let city = game.debug_found_city(&rules, me, at);
+        (1..80)
+            .find(|p| {
+                game.debug_set_population(&rules, city, *p);
+                player_happiness(game.view().auth, &rules, me).excess() <= REBELLION_THRESHOLD
+            })
+            .expect("a population below -20");
+        session.refresh_after_harness();
+        let economy = session.economy();
+        assert!(economy.happiness <= REBELLION_THRESHOLD && !economy.rebels_possible);
+        let tip = crate::ui::hud::game_widgets::economy_values(&economy).into_iter().find_map(|v| v.progress.filter(|p| p.contains("rebels")));
+        assert_eq!(tip, None);
+    }
+
 }

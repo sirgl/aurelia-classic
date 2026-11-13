@@ -37,6 +37,7 @@ impl Session {
         let happiness = classic_rules::derived::happiness::player_happiness(view.auth, self.rules(), me);
         Economy {
             happiness: happiness.excess(),
+            rebels_possible: classic_rules::world::barbarians::rebels_possible(view.auth),
             golden_age: golden_age_text(view.auth, self.rules(), me),
             gold: view.auth.players().treasury_of(me),
             science: view.auth.players().science_of(me),
