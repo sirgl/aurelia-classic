@@ -189,15 +189,37 @@ impl<'a> WorldTransaction<'a> {
         if taken.is_empty() {
             return;
         }
-        let Some(city) = take_over_city(self.world, owner, tile, &taken) else {
-            return;
-        };
+        let cities = take_over_cities(self.world, owner, tile, &taken);
+        let max = i32::from(crate::world::city::CULTURE_RADIUS_MAX);
+        let mut guests = Vec::new();
         for near in taken {
+            // A tile goes to the first city, in the order of Unciv's `cityPriority`, that holds it
+            // within its culture radius; a tile no city of the owner reaches stays as it is (a
+            // city's tiles lie within `CULTURE_RADIUS_MAX`, `validate` and the capture of a city
+            // rely on it).
+            let Some(city) = cities.iter().copied().find(|c| {
+                self.world.cities.get(*c).is_some_and(|core| dims.distance(core.tile, near).is_some_and(|d| d <= max))
+            }) else {
+                continue;
+            };
             let from = self.world.map.owner(near).flatten();
             crate::transaction::journal::claim_tile(&mut *self.0.world, &mut self.0.journal, city, near);
             if let Some(victim) = from.filter(|&v| crate::world::player::ClassicPlayers::is_city_state(&self.world.players, v)) {
                 self.change_influence(victim, owner, -CITADEL_CITY_STATE_INFLUENCE * 100, rules);
             }
+            // Unciv takeOwnership: a barbarian encampment on the tile is removed.
+            self.remove_camp_at(near);
+            for unit in self.world.indexes.units_on(near).to_vec() {
+                if let Some(guest) = self.world.units.get(unit).map(|u| u.core.owner).filter(|g| *g != owner) {
+                    if !guests.contains(&guest) {
+                        guests.push(guest);
+                    }
+                }
+            }
+        }
+        // ... and a unit that may no longer stand there goes to the nearest tile it may enter.
+        for guest in guests {
+            self.expel_units(owner, guest, rules);
         }
     }
 
@@ -427,15 +449,15 @@ pub const CITADEL_CITY_STATE_INFLUENCE: i32 = 15;
 /// equal.
 pub const RAZING_CITY_EXTRA_DISTANCE: i32 = 5;
 
-/// The city that gets the tiles of a culture bomb at `tile` (see
-/// `take_over_tiles`): the nearest own city holding a tile among `taken`
-/// or next to one, else the nearest own city (ties: the older city).
-fn take_over_city(
+/// The cities that may get the tiles of a culture bomb at `tile` (see `take_over_tiles`), the best
+/// first: the nearest own city holding a tile among `taken` or next to one, then the other own
+/// cities by the same distance (ties: the older city).
+fn take_over_cities(
     auth: &crate::world::state::AuthWorld,
     owner: PlayerId,
     tile: TileId,
     taken: &[TileId],
-) -> Option<crate::ids::CityHandle> {
+) -> Vec<crate::ids::CityHandle> {
     let dims = auth.map().dimensions;
     let priority = |c: crate::ids::CityHandle| {
         let core = auth.cities().get(c)?;
@@ -451,8 +473,13 @@ fn take_over_city(
         .collect();
     bordering.sort_by_key(|c| c.index);
     bordering.dedup();
-    let pick = |cities: &mut dyn Iterator<Item = crate::ids::CityHandle>| {
-        cities.filter_map(|c| priority(c).map(|p| (p, c))).min_by_key(|(p, _)| *p).map(|(_, c)| c)
-    };
-    pick(&mut bordering.into_iter()).or_else(|| pick(&mut auth.indexes().cities_of(owner).iter().copied()))
+    let mut ranked: Vec<((i32, u32), crate::ids::CityHandle)> = Vec::new();
+    let near = bordering.clone();
+    let others: Vec<_> = auth.indexes().cities_of(owner).iter().copied().filter(|c| !near.contains(c)).collect();
+    for group in [bordering, others] {
+        let mut part: Vec<_> = group.into_iter().filter_map(|c| priority(c).map(|p| (p, c))).collect();
+        part.sort_by_key(|(p, _)| *p);
+        ranked.extend(part);
+    }
+    ranked.into_iter().map(|(_, c)| c).collect()
 }

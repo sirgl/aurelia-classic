@@ -8,17 +8,17 @@
 
 ## Summary
 
-Rule constants: 503 (AI constants: 949; 14 constants of engine plumbing in `platform/crates/kernel/src/persistence/`, `platform/crates/kernel/src/test_module.rs`, `platform/crates/kernel/src/math.rs`, `platform/crates/kernel/src/module.rs`, `classic/crates/classic-rules/src/save_codec.rs`, `classic/crates/classic-rules/src/fixtures.rs` are not listed).
+Rule constants: 505 (AI constants: 949; 14 constants of engine plumbing in `platform/crates/kernel/src/persistence/`, `platform/crates/kernel/src/test_module.rs`, `platform/crates/kernel/src/math.rs`, `platform/crates/kernel/src/module.rs`, `classic/crates/classic-rules/src/save_codec.rs`, `classic/crates/classic-rules/src/fixtures.rs` are not listed).
 
 | Source | Rule constants | AI constants |
 |---|---|---|
-| Unciv | 258 | 0 |
+| Unciv | 260 | 0 |
 | own design | 72 | 11 |
 | own formula (expansion-only system; Unciv has no equivalent) | 0 | 0 |
 | own value | 14 | 4 |
 | own value (unverified) | 17 | 4 |
 | own value (source not recorded) | 142 | 930 |
-| total | 503 | 949 |
+| total | 505 | 949 |
 
 Sections:
 
@@ -244,7 +244,7 @@ Every `pub const` of the rule code, by system. Value as written in the code; mea
 
 ### Combat, experience and healing
 
-72 constants (Unciv 59, own value (unverified) 4, own value (source not recorded) 9). Files: `classic/crates/classic-rules/src/combat/damage.rs`, `classic/crates/classic-rules/src/combat/experience.rs`, `classic/crates/classic-rules/src/combat/strength.rs`, `classic/crates/classic-rules/src/combat/terrain.rs`, `classic/crates/classic-rules/src/systems/airlift.rs`, `classic/crates/classic-rules/src/systems/combat/actions.rs`, `classic/crates/classic-rules/src/systems/combat/air.rs`, `classic/crates/classic-rules/src/systems/combat/heal.rs`, `classic/crates/classic-rules/src/systems/combat/upgrade.rs`, `classic/crates/classic-rules/src/systems/combat/validate.rs`, `classic/crates/classic-rules/src/systems/paradrop.rs`, `classic/crates/classic-rules/src/systems/plunder.rs`, `platform/crates/kernel/src/effects/unit.rs`.
+74 constants (Unciv 61, own value (unverified) 4, own value (source not recorded) 9). Files: `classic/crates/classic-rules/src/combat/damage.rs`, `classic/crates/classic-rules/src/combat/experience.rs`, `classic/crates/classic-rules/src/combat/strength.rs`, `classic/crates/classic-rules/src/combat/terrain.rs`, `classic/crates/classic-rules/src/systems/airlift.rs`, `classic/crates/classic-rules/src/systems/combat/actions.rs`, `classic/crates/classic-rules/src/systems/combat/air.rs`, `classic/crates/classic-rules/src/systems/combat/heal.rs`, `classic/crates/classic-rules/src/systems/combat/upgrade.rs`, `classic/crates/classic-rules/src/systems/combat/validate.rs`, `classic/crates/classic-rules/src/systems/paradrop.rs`, `classic/crates/classic-rules/src/systems/plunder.rs`, `platform/crates/kernel/src/effects/unit.rs`.
 
 | Name | Value | Meaning | Source | File |
 |---|---|---|---|---|
@@ -299,6 +299,8 @@ Every `pub const` of the rule code, by system. Value as written in the code; mea
 | `NUKE_LEVEL2_POPULATION_DEATH_RAND` | `10` | Unciv: battle/Nuke.kt (60 plus two rolls below 10 percent), equal. | Unciv: battle/Nuke.kt (60 plus two rolls below 10 percent), equal | `actions.rs` |
 | `NUKE_LEVEL2_ELIM_POPULATION_THRESHOLD` | `5` | Unciv: battle/Nuke.kt (a strength-2 nuke destroys a city under 5 citizens), equal. | Unciv: battle/Nuke.kt (a strength-2 nuke destroys a city under 5 citizens), equal | `actions.rs` |
 | `NUKE_FALLOUT_PROB` | `50` | Unciv: battle/Nuke.kt (fallout chance 0.5), equal. | Unciv: battle/Nuke.kt (fallout chance 0.5), equal | `actions.rs` |
+| `CITADEL_CITY_STATE_INFLUENCE` | `15` | Influence a city-state loses with the player whose culture bomb takes one of its tiles. | Unciv: UniqueTriggerActivation.kt (`OneTimeTakeOverTilesInRadius`, `addInfluence(-15f)`); equal | `actions.rs` |
+| `RAZING_CITY_EXTRA_DISTANCE` | `5` | Extra distance of a razing city when the culture bomb picks the city that gets the tiles. | Unciv: UniqueTriggerActivation.kt (`cityPriority`); equal | `actions.rs` |
 | `REBASE_RANGE_PERCENT` | `200` | Rebase range of an air unit, in percent of its range. | Unciv: MapUnit.getAirUnitMovementRange, twice the range; equal | `air.rs` |
 | `CITY_AIR_UNIT_CAPACITY` | `6` | Air slots of a city before buildings add more. | Unciv: ModConstants, cityAirUnitCapacity, 6; equal | `air.rs` |
 | `ALL` | `[ AirOrderBlock::CannotSweep, AirOrderBlock::NoAttacksLeft, AirOrderBlock::OutOfRange,...` |  | own value (source not recorded) | `air.rs` |
