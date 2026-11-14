@@ -255,10 +255,11 @@ pub enum GreatPersonBlock {
     NeedsCityStateLand,
     NotMet,
     AtWar,
+    NoCityReaches,
 }
 
 impl GreatPersonBlock {
-    pub const ALL: [GreatPersonBlock; 15] = [
+    pub const ALL: [GreatPersonBlock; 16] = [
         GreatPersonBlock::NotAGreatPerson,
         GreatPersonBlock::WrongImprovement,
         GreatPersonBlock::CannotDiscover,
@@ -274,6 +275,7 @@ impl GreatPersonBlock {
         GreatPersonBlock::NeedsCityStateLand,
         GreatPersonBlock::NotMet,
         GreatPersonBlock::AtWar,
+        GreatPersonBlock::NoCityReaches,
     ];
 
     pub fn reason(self) -> &'static str {
@@ -291,6 +293,7 @@ impl GreatPersonBlock {
             GreatPersonBlock::CannotBuyCityState => "cannot buy a city-state",
             GreatPersonBlock::NeedsCity => "needs a city",
             GreatPersonBlock::NeedsCityStateLand => "needs a city-state's land",
+            GreatPersonBlock::NoCityReaches => "no city of yours reaches this tile",
             GreatPersonBlock::NotMet => "not met",
             GreatPersonBlock::AtWar => "at war",
         }
@@ -329,7 +332,7 @@ pub fn validate_action(
             )
             .map_err(|reason| CommandError::RuleViolation(reason.into()))?;
             if rules.improvements[improvement.0 as usize].culture_bomb_radius > 0 && !culture_bomb_reaches(auth, core.owner, core.tile) {
-                return Err(CommandError::RuleViolation("no city of yours reaches this tile".into()));
+                return Err(GreatPersonBlock::NoCityReaches.into());
             }
         }
         GreatPersonAction::DiscoverTechnology => {

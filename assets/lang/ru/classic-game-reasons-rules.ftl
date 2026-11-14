@@ -47,6 +47,7 @@ classic.game.reasons-rules.gp-cannot-trade = Он не ведёт торговы
 classic.game.reasons-rules.gp-cannot-buy-city-state = Он не выкупает города-государства
 classic.game.reasons-rules.gp-needs-city = Нужен хотя бы один город
 classic.game.reasons-rules.gp-needs-city-state-land = Нужна земля города-государства
+classic.game.reasons-rules.gp-no-city-reaches = Ни один ваш город не достаёт до этой клетки
 classic.game.reasons-rules.cs-not-a-nation = С городами-государствами имеют дело только нации
 classic.game.reasons-rules.cs-not-a-city-state = Это не город-государство
 classic.game.reasons-rules.cs-unit-not-giftable = Этот юнит подарить нельзя

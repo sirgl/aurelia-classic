@@ -206,6 +206,7 @@ pub fn great_person(block: GreatPersonBlock) -> &'static str {
         GreatPersonBlock::CannotBuyCityState => t!("classic.game.reasons-rules.gp-cannot-buy-city-state"),
         GreatPersonBlock::NeedsCity => t!("classic.game.reasons-rules.gp-needs-city"),
         GreatPersonBlock::NeedsCityStateLand => t!("classic.game.reasons-rules.gp-needs-city-state-land"),
+        GreatPersonBlock::NoCityReaches => t!("classic.game.reasons-rules.gp-no-city-reaches"),
         GreatPersonBlock::NotMet => t!("classic.game.reasons.not-met"),
         GreatPersonBlock::AtWar => t!("classic.game.reasons.at-war"),
     }
