@@ -475,7 +475,8 @@ Every `pub const` of the rule code, by system. Value as written in the code; mea
 | Name | Value | Meaning | Source | File |
 |---|---|---|---|---|
 | `MAX_DEAL_ITEMS` | `12` | At most this many items in one deal. | own value | `deals.rs` |
-| `OFFER_ROUNDS` | `1` | An offer waits this many rounds for its answer. | own value | `deals.rs` |
+| `OFFER_ROUNDS` | `1` | An offer to an AI waits this many rounds for its answer; the AI answers at the start of its turn. | own value | `deals.rs` |
+| `INBOX_ROUNDS` | `10` | An offer to a human waits this many rounds in the inbox. Unciv keeps a `TradeRequest` until it is answered or can no longer be met; ten rounds is the length of a deal (own bound, so the inbox does not grow for ever). | Unciv: `TradeRequest` (no bound); own bound | `deals.rs` |
 | `EMBASSY_REVEAL_RADIUS` | `2` | An embassy reveals the tiles this close to the host's capital (our rule: public descriptions name the capital and the tiles around it, no number). | own value (source not recorded) | `deals.rs` |
 | `ALL` | `[ DealBlock::NotOurDeal, DealBlock::GoldNeedsFriendship, DealBlock::NotEnoughGold, Deal...` |  | own value (source not recorded) | `deals.rs` |
 | `MIN_WAR_ROUNDS_BEFORE_PEACE` | `10` | Rounds a war between two nations lasts before either may end it: no peace deal until then (the original game's ten turns). | own value (source not recorded) | `deals.rs` |

@@ -82,9 +82,10 @@ pub enum ClassicChange {
     /// offer made peace between them (the proposer's screen tells the answer; no derived
     /// system reads it).
     OfferAnswered { from: PlayerId, to: PlayerId, accepted: bool, peace: bool },
-    /// `to` did not answer the offer of `from` before it expired; the offer is gone (the proposer's
-    /// screen tells it; no derived system reads it).
-    OfferLapsed { from: PlayerId, to: PlayerId, peace: bool },
+    /// The offer of `from` to `to` left the list of `to` unanswered, for `reason`
+    /// (`systems::diplomacy::turn`; the screens of both tell it, no derived system reads it).
+    /// `peace`: the offer asked for peace.
+    OfferLapsed { from: PlayerId, to: PlayerId, peace: bool, reason: crate::world::relations::OfferLapse },
     /// `debtor` could not pay the `gold` per turn it owes `creditor`: their deal is broken and
     /// the creditor remembers it (both screens tell it; no derived system reads it).
     DealBroken { debtor: PlayerId, creditor: PlayerId, gold: u32 },

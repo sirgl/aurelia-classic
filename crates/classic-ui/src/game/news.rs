@@ -13,6 +13,7 @@ use classic_rules::classic::ClassicChange;
 use classic_rules::derived::standing::{victory_warnings, VictoryWarning};
 use classic_rules::transaction::journal::{AppliedCommand, PlayerChange};
 use classic_rules::world::city::{CityCore, CityStatus};
+use classic_rules::world::relations::OfferLapse;
 use i18n::{t, tf};
 
 use super::session::Session;
@@ -37,7 +38,7 @@ impl Session {
                 }
             }
             for change in &record.changes.module_changes {
-                let ClassicChange::OfferLapsed { from, to, peace } = *change else { continue };
+                let ClassicChange::OfferLapsed { from, to, peace, .. } = *change else { continue };
                 if from != me {
                     continue;
                 }
@@ -136,7 +137,7 @@ mod tests {
     }
 
     fn lapsed(from: PlayerId, to: PlayerId, peace: bool) -> AppliedCommand {
-        record(to, |j| j.module_changes.push(ClassicChange::OfferLapsed { from, to, peace }))
+        record(to, |j| j.module_changes.push(ClassicChange::OfferLapsed { from, to, peace, reason: OfferLapse::Expired }))
     }
 
     fn found_city(session: &mut Session, player: PlayerId) -> CityHandle {

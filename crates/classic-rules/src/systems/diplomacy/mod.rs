@@ -8,7 +8,7 @@
 //! RelationsChanged, CityChange::OwnerChanged (ceded cities).
 
 pub(crate) mod deals;
-pub use deals::MIN_WAR_ROUNDS_BEFORE_PEACE;
+pub use deals::{INBOX_ROUNDS, MIN_WAR_ROUNDS_BEFORE_PEACE, OFFER_ROUNDS};
 pub(crate) mod turn;
 pub(crate) mod validate;
 
