@@ -26,11 +26,11 @@ widgets
   scrollbar "" 1035,92 10x642
 painted
   clip 0,0 1366x768
-    figure 3 shapes 681,322 4x14 #00000096 #ebe7d5 #f23f3f
+    figure 3 shapes 681,322 4x14 #00000096 #ebe7d5 #c52c2a
     rect 659,299 49x27 fill #0000005a r4
     rect 659,297 49x27 fill #0c1821 r4
     rect 659,297 49x27 stroke 2 #bb9c5c r4
-    rect 661,299 25x23 fill #f23f3f r3
+    rect 661,299 25x23 fill #c52c2a r3
     path 5pt 667,304 12x14 fill #ebe7d5
     text "2" 694,304 7x13 #bb9c5c 11px
     image "atlas serpent" -172,508 363x265 tint #ffffff5b

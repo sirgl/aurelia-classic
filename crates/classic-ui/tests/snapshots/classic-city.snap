@@ -186,6 +186,6 @@ painted
   clip 0,0 1366x768
     text "ROME  ·  CITY MANAGEMENT" 602,125 130x11 #c1a263 10px
 art
-  bnw:unit/scout
+  core:unit/scout
   core:unit/worker
   warrior

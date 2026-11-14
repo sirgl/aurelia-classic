@@ -200,7 +200,7 @@ mod tests {
     /// The opened screen scrolls to a card far from antiquity, and not otherwise.
     #[test]
     fn opening_the_screen_draws_the_researched_card_at_once() {
-        let session = session();
+        let mut session = session();
         let far = session.research_view().techs.iter().position(|t| t.name == "Future Tech").unwrap();
         let view = with_status(&session.research_view(), Some(far));
         let drawn = |opened: bool| {

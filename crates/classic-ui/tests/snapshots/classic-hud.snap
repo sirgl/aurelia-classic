@@ -22,7 +22,7 @@ painted
     rect 794,324 29x27 fill #0000005a r4
     rect 794,322 29x27 fill #0c1821 r4
     rect 794,322 29x27 stroke 2 #bb9c5c r4
-    rect 796,324 25x23 fill #f23f3f r3
+    rect 796,324 25x23 fill #c52c2a r3
     path 5pt 802,329 13x14 fill #ebe7d5
     image "atlas serpent" -172,508 363x265 tint #ffffff5b
     image "atlas kraken" 1016,372 378x198 tint #ffffff5b
@@ -63,7 +63,7 @@ painted
     rect 578,321 210x52 fill #0000003c r3
     rect 578,318 210x52 fill #0b151ff0 r3
     rect 578,318 210x52 stroke 2 #bb9c5c r3
-    figure 2 shapes 580,320 30x30 #f23f3f #bb9c5c
+    figure 2 shapes 580,320 30x30 #c52c2a #bb9c5c
     text "1" 591,327 8x16 #ebe7d5 14px
     text "Rome" 616,327 39x17 #ebe7d5 15px
     text "12" 765,328 15x15 #ebe7d5 13px
