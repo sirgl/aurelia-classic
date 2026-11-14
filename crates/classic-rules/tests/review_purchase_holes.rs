@@ -1,5 +1,5 @@
 //! Reviewer's tests of rules/city-purchase (794d623 + 0fbd890). Each one is a hole; a test that
-//! fails names it. Own copy only, never committed.
+//! fails names it. Moved in from the review of rules/city-purchase.
 
 use classic_rules::effects::city::{city_modifiers, head_hurry_price};
 use classic_rules::ids::{BuildingKindId, CityHandle, PlayerId, PolicyId, ProductionItem, TileId, UnitKindId};
