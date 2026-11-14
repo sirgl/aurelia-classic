@@ -30,4 +30,4 @@ classic.game.turn.order-removed-wonder-built = { $city }：{ $item }は別の都
 classic.game.turn.order-removed-national-wonder-built = { $city }：{ $item }はあなたの別の都市で完成しました。生産指示を取り消しました。蓄積した生産力はそのまま保持されます。
 classic.game.turn.order-removed-already-built = { $city }：{ $item }はすでにこの都市にあります。重複した生産指示を取り消しました。蓄積した生産力はそのまま保持されます。
 classic.game.turn.order-removed-blocked = { $city }：{ $item }はもう生産できません。生産指示を取り消しました。蓄積した生産力はそのまま保持されます。
-classic.game.turn.order-removed-needs-building = { $city }：{ $item }に必要な建造物がなくなりました。生産指示を取り消しました。蓄積した生産力はそのまま保持されます。
+classic.game.turn.order-removed-needs-building = { $city }：{ $item }に必要な建造物が、この都市にも他の自国の都市にもありません。生産指示を取り消しました。蓄積した生産力はそのまま保持されます。

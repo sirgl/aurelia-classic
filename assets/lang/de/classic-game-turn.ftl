@@ -33,4 +33,4 @@ classic.game.turn.order-removed-wonder-built = { $city }: { $item } wurde in ein
 classic.game.turn.order-removed-national-wonder-built = { $city }: { $item } wurde in einer anderen Ihrer Städte fertiggestellt. Der Auftrag wurde entfernt; die gesammelte Produktion bleibt erhalten.
 classic.game.turn.order-removed-already-built = { $city }: { $item } steht hier bereits. Der doppelte Auftrag wurde entfernt; die gesammelte Produktion bleibt erhalten.
 classic.game.turn.order-removed-blocked = { $city }: { $item } kann nicht mehr hergestellt werden. Der Auftrag wurde entfernt; die gesammelte Produktion bleibt erhalten.
-classic.game.turn.order-removed-needs-building = { $city }: { $item } braucht ein Gebäude, das fehlt. Der Auftrag wurde entfernt; die gesammelte Produktion bleibt erhalten.
+classic.game.turn.order-removed-needs-building = { $city }: { $item } braucht ein Gebäude, das weder diese Stadt noch eine andere Ihrer Städte besitzt. Der Auftrag wurde entfernt; die gesammelte Produktion bleibt erhalten.
