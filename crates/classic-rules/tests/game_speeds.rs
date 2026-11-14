@@ -172,6 +172,10 @@ fn without_speeds_the_rules_hash_as_before_speeds() {
     for building in rules.buildings.iter_mut().filter(|b| ["core:building/shrine", "core:building/pyramid"].contains(&b.key.as_str())) {
         building.hurry_cost_modifier = 25;
     }
+    // So did the great person improvements on hills (the citadel as Unciv has it).
+    for improvement in rules.improvements.iter_mut().filter(|i| i.kind == classic_rules::classic::content::GREAT_PERSON_IMPROVEMENT) {
+        improvement.placement.hills_makes_valid = false;
+    }
     assert_eq!(rules.hash(), BEFORE_SPEEDS_FINGERPRINT);
 }
 

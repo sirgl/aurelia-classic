@@ -78,7 +78,7 @@ Every `pub const` of the rule code, by system. Value as written in the code; mea
 
 | Name | Value | Meaning | Source | File |
 |---|---|---|---|---|
-| `CLASSIC_FINGERPRINT` | `3078422782052653983` | The fingerprint of the current content (`CompiledRuleset::hash`). | own value (source not recorded) | `mod.rs` |
+| `CLASSIC_FINGERPRINT` | `9970789956216259444` | The fingerprint of the current content (`CompiledRuleset::hash`). | own value (source not recorded) | `mod.rs` |
 | `DEFICIT_DISBAND_THRESHOLD` | `-5` | Treasury balance at or below which a deficit may disband a unit (own value, not compared with a public source (unverified)). | own value (unverified) | `systems.rs` |
 | `SCHEDULE` | `TurnSchedule { end_turn: &[ (Start, Step::Kernel(K::HealUnits)), (Start, Step::Module(M...` | The order of a classic turn (the tables in the module doc). | own value (source not recorded) | `turn.rs` |
 | `START_YEAR` | `-4000` | The year of round 0 (4000 BC; negative years are BC). | Unciv: Speeds.json (`startYear` -4000), equal | `calendar.rs` |
