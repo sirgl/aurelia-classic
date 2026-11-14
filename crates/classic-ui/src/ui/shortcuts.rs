@@ -145,4 +145,35 @@ mod tests {
         assert_eq!(key("end-turn"), "Enter");
         assert_eq!(map.chords("end-turn"), &[Chord::parse("Enter").unwrap(), Chord::parse("Ctrl+Space").unwrap()]);
     }
+
+    /// The keys the player asked for, from Civ V and Unciv (`KeyboardBinding`): one test for
+    /// the whole list, with the screen that opens each, so that a changed default is seen.
+    #[test]
+    fn the_keys_of_the_turn_the_units_and_the_screens() {
+        let map = Keymap::defaults(SET);
+        let key = |id: &str| map.hint(id).unwrap_or_default();
+        assert_eq!(key("end-turn"), "Enter");
+        assert_eq!(key("next-unit"), "Period");
+        assert_eq!(key("previous-unit"), "Comma");
+        assert_eq!(key("order-fortify"), "F");
+        assert_eq!(key("order-sleep"), "A");
+        assert_eq!(key("order-skip"), "Space");
+        assert_eq!(key("technologies"), "F6");
+        assert_eq!(key("policies"), "F5");
+        assert_eq!(key("overview-diplomacy"), "F4");
+        assert_eq!(key("encyclopedia"), "F1");
+    }
+
+    #[test]
+    fn a_top_bar_value_that_opens_a_screen_names_the_key_of_it() {
+        use crate::ui::hud_game::Target;
+        let map = Keymap::defaults(SET);
+        for target in Target::ALL {
+            if let Some(row) = target.shortcut() {
+                assert!(ROWS.iter().any(|r| r.id == row), "{row} is no row");
+                assert!(map.hint(row).is_some(), "{row} has no key");
+            }
+        }
+        assert_eq!(Target::Research.shortcut(), Some("technologies"));
+    }
 }
