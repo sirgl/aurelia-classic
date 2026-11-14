@@ -7,7 +7,6 @@
 //! an intact improvement it removes the road.
 
 use crate::classic::ClassicChange;
-use crate::navigation::terrain::is_water;
 use crate::command::CommandError;
 use crate::effects::unit::unit_modifiers;
 use crate::ids::{PlayerId, TileId, UnitHandle};
@@ -143,7 +142,7 @@ impl<'a> WorldTransaction<'a> {
     }
 
     /// The great general builds a citadel: the tile and the tiles around it
-    /// become the owner's (to its nearest city), the general is consumed.
+    /// become the owner's (`take_over_tiles`), the general is consumed.
     pub(crate) fn build_citadel(
         &mut self,
         unit: UnitHandle,
@@ -162,30 +161,53 @@ impl<'a> WorldTransaction<'a> {
         ))?;
         let radius = i32::from(rules.improvements[citadel.0 as usize].culture_bomb_radius);
         self.expend_unit(unit, rules)?;
-        self.world.map.set_improvement(tile, Some(citadel));
-        self.journal
-            .tile_changes
-            .push(TileChange::ImprovementBuilt { tile });
-        let Some(city) = nearest_own_city(self.world, owner, tile) else {
-            return Ok(());
-        };
-        let dims = self.world.map.dimensions;
-        for near in crate::math::tiles_in_hex_radius(&dims, tile, radius) {
-            let foreign_city = self.world.indexes.city_on_tile(near).is_some();
-            if foreign_city || is_water(&self.world.map, near) && near != tile {
-                continue;
-            }
-            let previous = self.world.map.owning_city(near);
-            if previous == Some(city) {
-                continue;
-            }
-            crate::transaction::journal::claim_tile(&mut *self.0.world, &mut self.0.journal, city, near);
-        }
+        self.place_improvement(owner, tile, citadel, rules);
+        self.take_over_tiles(owner, tile, radius, rules);
         Ok(())
     }
 
-    /// End of a player's turn: its units next to an enemy citadel take the
-    /// citadel's damage (§5.3).
+    /// A culture bomb (the citadel): every tile within `radius` of `tile`,
+    /// the tile itself included, that is not a city and not already the
+    /// owner's becomes the owner's, foreign land too. All go to one city: of
+    /// the owner's cities that hold a tile next to or among the taken ones,
+    /// the nearest to `tile` (a razing city counts 5 tiles farther), else
+    /// the owner's nearest city; with no city nothing is taken. A city-state
+    /// that loses a tile loses 15 influence with the taker per tile. Unciv:
+    /// UniqueTriggerActivation.kt `OneTimeTakeOverTilesInRadius` (Citadel:
+    /// "Gain control over [all] tiles in a [1]-tile radius"); equal, but the
+    /// opinion of a major that loses tiles (Unciv: −10 per tile,
+    /// `StealingTerritory`) is not kept: there is no opinion memory of that
+    /// shape (`systems::diplomacy`).
+    pub(crate) fn take_over_tiles(&mut self, owner: PlayerId, tile: TileId, radius: i32, rules: &CompiledRuleset) {
+        if radius < 0 {
+            return;
+        }
+        let dims = self.world.map.dimensions;
+        let taken: Vec<TileId> = crate::math::hex_disc(dims, tile, radius)
+            .filter(|&t| self.world.indexes.city_on_tile(t).is_none() && self.world.map.owner(t).flatten() != Some(owner))
+            .collect();
+        if taken.is_empty() {
+            return;
+        }
+        let Some(city) = take_over_city(self.world, owner, tile, &taken) else {
+            return;
+        };
+        for near in taken {
+            let from = self.world.map.owner(near).flatten();
+            crate::transaction::journal::claim_tile(&mut *self.0.world, &mut self.0.journal, city, near);
+            if let Some(victim) = from.filter(|&v| crate::world::player::ClassicPlayers::is_city_state(&self.world.players, v)) {
+                self.change_influence(victim, owner, -CITADEL_CITY_STATE_INFLUENCE * 100, rules);
+            }
+        }
+    }
+
+    /// End of a player's turn, after its moves and healing: its units next
+    /// to an enemy citadel take the citadel's damage (§5.3) — the strongest
+    /// one, they do not add up; a pillaged citadel does not hurt. A unit
+    /// that walks away during its turn is not hurt. Unciv:
+    /// UnitTurnManager.kt `doCitadelDamage` (in `endTurn`, after
+    /// `healUnit`; "Adjacent enemy units ending their turn take [30]
+    /// damage"); equal.
     pub(crate) fn citadel_damage(&mut self, player: PlayerId, rules: &CompiledRuleset) {
         if !rules.improvements.iter().any(|d| d.nearby_enemy_damage > 0) {
             return;
@@ -201,6 +223,9 @@ impl<'a> WorldTransaction<'a> {
                 let Some(imp) = self.world.map.improvement(near).flatten() else {
                     continue;
                 };
+                if self.world.map.pillaged(near) {
+                    continue;
+                }
                 let hurt = rules
                     .improvements
                     .get(imp.0 as usize)
@@ -392,21 +417,42 @@ pub fn citadel_of(rules: &CompiledRuleset) -> Option<crate::ids::ImprovementId> 
     Some(crate::ids::ImprovementId(index as u16))
 }
 
-fn nearest_own_city(
+/// Influence a city-state loses with the player whose culture bomb takes one
+/// of its tiles. Unciv: UniqueTriggerActivation.kt
+/// (`OneTimeTakeOverTilesInRadius`, `addInfluence(-15f)`); equal.
+pub const CITADEL_CITY_STATE_INFLUENCE: i32 = 15;
+
+/// Extra distance of a razing city when the culture bomb picks the city
+/// that gets the tiles. Unciv: UniqueTriggerActivation.kt (`cityPriority`);
+/// equal.
+pub const RAZING_CITY_EXTRA_DISTANCE: i32 = 5;
+
+/// The city that gets the tiles of a culture bomb at `tile` (see
+/// `take_over_tiles`): the nearest own city holding a tile among `taken`
+/// or next to one, else the nearest own city (ties: the older city).
+fn take_over_city(
     auth: &crate::world::state::AuthWorld,
     owner: PlayerId,
     tile: TileId,
+    taken: &[TileId],
 ) -> Option<crate::ids::CityHandle> {
     let dims = auth.map().dimensions;
-    auth.indexes()
-        .cities_of(owner)
+    let priority = |c: crate::ids::CityHandle| {
+        let core = auth.cities().get(c)?;
+        let razing = core.status == crate::world::city::CityStatus::Razing;
+        let distance = dims.distance(core.tile, tile).unwrap_or(i32::MAX / 2);
+        Some((distance + if razing { RAZING_CITY_EXTRA_DISTANCE } else { 0 }, c.index))
+    };
+    let mut bordering: Vec<crate::ids::CityHandle> = taken
         .iter()
-        .copied()
-        .filter_map(|c| {
-            auth.cities()
-                .get(c)
-                .map(|core| (dims.distance(core.tile, tile).unwrap_or(i32::MAX), c))
-        })
-        .min_by_key(|(d, c)| (*d, c.index))
-        .map(|(_, c)| c)
+        .flat_map(|&t| dims.neighbors(t).into_iter().chain(std::iter::once(t)))
+        .filter(|&t| auth.map().owner(t).flatten() == Some(owner))
+        .filter_map(|t| auth.map().owning_city(t))
+        .collect();
+    bordering.sort_by_key(|c| c.index);
+    bordering.dedup();
+    let pick = |cities: &mut dyn Iterator<Item = crate::ids::CityHandle>| {
+        cities.filter_map(|c| priority(c).map(|p| (p, c))).min_by_key(|(p, _)| *p).map(|(_, c)| c)
+    };
+    pick(&mut bordering.into_iter()).or_else(|| pick(&mut auth.indexes().cities_of(owner).iter().copied()))
 }

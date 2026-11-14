@@ -17,7 +17,7 @@
             resources: ["core:resource/horses", "core:resource/iron", "core:resource/coal", "core:resource/oil", "core:resource/aluminum", "core:resource/uranium"],
             pillage_gold: 20,
             created_by_great_person: true,
-            placement: (buildable_on_resources: true),
+            placement: (buildable_on_resources: true, hills_makes_valid: true),
         ),
         (
             id: "core:improvement/ancient-ruins",
@@ -87,7 +87,7 @@
             culture_bomb_radius: 1,
             nearby_enemy_damage: 30,
             created_by_great_person: true,
-            placement: (buildable_on_resources: true, in_adjacent_friendly: true),
+            placement: (buildable_on_resources: true, hills_makes_valid: true, in_adjacent_friendly: true),
         ),
         (
             id: "core:improvement/city-ruins",
@@ -106,7 +106,7 @@
             resources: ["core:resource/horses", "core:resource/iron", "core:resource/coal", "core:resource/oil", "core:resource/aluminum", "core:resource/uranium"],
             pillage_gold: 20,
             created_by_great_person: true,
-            placement: (buildable_on_resources: true),
+            placement: (buildable_on_resources: true, hills_makes_valid: true),
         ),
         (
             id: "core:improvement/encampment",
@@ -180,7 +180,7 @@
             resources: ["core:resource/horses", "core:resource/iron", "core:resource/coal", "core:resource/oil", "core:resource/aluminum", "core:resource/uranium"],
             pillage_gold: 20,
             created_by_great_person: true,
-            placement: (buildable_on_resources: true),
+            placement: (buildable_on_resources: true, hills_makes_valid: true),
         ),
         (
             id: "core:improvement/kasbah",
@@ -228,7 +228,7 @@
             resources: ["core:resource/horses", "core:resource/iron", "core:resource/coal", "core:resource/oil", "core:resource/aluminum", "core:resource/uranium"],
             pillage_gold: 20,
             created_by_great_person: true,
-            placement: (buildable_on_resources: true),
+            placement: (buildable_on_resources: true, hills_makes_valid: true),
         ),
         (
             id: "core:improvement/mine",

@@ -17,7 +17,8 @@
 //!
 //! Actions (`GreatPersonAction`), each uses the unit up:
 //! construct    its improvement on the tile it stands on (academy, manufactory,
-//!              customs house, citadel — the citadel claims the tiles around)
+//!              customs house, citadel — the citadel takes the tiles around,
+//!              foreign ones too, see `take_over_tiles`)
 //! discover     science of the player's last turns (great scientist),
 //!              × (100 + Stat::Module(crate::rules::stats::ClassicStat::GreatScientistSciencePercent)) / 100
 //! hurry        production 300 + 30 × population in the city it stands in
@@ -48,7 +49,6 @@ use crate::rules::effects::UnitStat;
 use crate::ids::{CityHandle, ImprovementId, PlayerId, TileId, UnitHandle};
 use crate::classic::tables::GreatPersonDefinition;
 use crate::rules::CompiledRuleset;
-use crate::transaction::journal::TileChange;
 use crate::transaction::transaction::WorldTransaction;
 
 impl<'a> WorldTransaction<'a> {
@@ -221,7 +221,7 @@ impl<'a> WorldTransaction<'a> {
     }
 
     /// Build a great person improvement where the unit stands; a culture
-    /// bomb (citadel) claims the tiles around for the tile's city.
+    /// bomb (citadel) takes the tiles around (`take_over_tiles`).
     fn construct(
         &mut self,
         owner: PlayerId,
@@ -234,24 +234,7 @@ impl<'a> WorldTransaction<'a> {
         if radius == 0 {
             return;
         }
-        let Some(city) = self.world.map.owning_city(tile) else {
-            return;
-        };
-        let dims = self.world.map.dimensions;
-        for near in crate::math::hex_disc(dims, tile, i32::from(radius)) {
-            let foreign_city = self.world.indexes.city_on_tile(near).is_some();
-            let mine = self.world.map.owner(near).flatten() == Some(owner);
-            if near == tile || foreign_city || mine {
-                continue;
-            }
-            let from = self.world.map.owner(near).flatten();
-            self.world.map.set_owner(near, Some(owner), Some(city));
-            self.journal.tile_changes.push(TileChange::OwnerChanged {
-                tile: near,
-                from,
-                to: Some(owner),
-            });
-        }
+        self.take_over_tiles(owner, tile, i32::from(radius), rules);
     }
 
     /// Remember this turn's science (the great scientist reads the last

@@ -660,7 +660,8 @@
    "nation_unique": null,
    "created_by_great_person": true,
    "placement": {
-    "buildable_on_resources": true
+    "buildable_on_resources": true,
+    "hills_makes_valid": true
    },
    "effects": [],
    "kind": "great_person",
@@ -711,7 +712,8 @@
    "nation_unique": null,
    "created_by_great_person": true,
    "placement": {
-    "buildable_on_resources": true
+    "buildable_on_resources": true,
+    "hills_makes_valid": true
    },
    "effects": [],
    "kind": "great_person",
@@ -762,7 +764,8 @@
    "nation_unique": null,
    "created_by_great_person": true,
    "placement": {
-    "buildable_on_resources": true
+    "buildable_on_resources": true,
+    "hills_makes_valid": true
    },
    "effects": [],
    "kind": "great_person",
@@ -806,6 +809,7 @@
    "created_by_great_person": true,
    "placement": {
     "buildable_on_resources": true,
+    "hills_makes_valid": true,
     "in_adjacent_friendly": true
    },
    "effects": [
@@ -819,7 +823,7 @@
      "modifier": "improvement.culture_bomb_radius",
      "amount": 1,
      "needs_mechanic": "culture_bomb_radius",
-     "source": "own value, unverified"
+     "source": "unciv: TileImprovements.json, Citadel"
     },
     {
      "scope": "tile",
@@ -831,7 +835,7 @@
      "modifier": "improvement.nearby_enemy_damage",
      "amount": 30,
      "needs_mechanic": "nearby_enemy_damage",
-     "source": "own value, unverified"
+     "source": "unciv: TileImprovements.json, Citadel"
     }
    ],
    "kind": "great_person",
@@ -876,7 +880,8 @@
    "nation_unique": null,
    "created_by_great_person": true,
    "placement": {
-    "buildable_on_resources": true
+    "buildable_on_resources": true,
+    "hills_makes_valid": true
    },
    "effects": [],
    "kind": "great_person",
