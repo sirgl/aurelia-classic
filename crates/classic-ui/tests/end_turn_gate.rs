@@ -280,7 +280,7 @@ fn a_city_without_production_stops_the_turn_and_the_button_leads_to_it() {
 
 #[test]
 fn a_unit_without_an_order_stops_the_turn_until_it_gets_one() {
-    let mut stage = stage_at_start_with_a_warrior();
+    let mut stage = stage_at_start(ClassicUi::game(), 0, false); // Rome: a settler and a warrior
     stage.module.request(GameRequest::Unit(Action::FoundCity));
     give_production(&mut stage);
     choose_research(&mut stage);
@@ -308,19 +308,4 @@ fn a_unit_without_an_order_stops_the_turn_until_it_gets_one() {
 
 fn unit_id(stage: &mut Stage<ClassicUi>, unit: classic_rules::ids::UnitHandle) -> u64 {
     session(stage).game().view().auth.units().get(unit).expect("the unit").core.id.0
-}
-
-/// The first turn with a warrior next to the settler.
-fn stage_at_start_with_a_warrior() -> Stage<ClassicUi> {
-    use classic_rules::ClassicGame as _;
-    let mut prepared = prepare_match(request()).expect("the match is generated");
-    let rules = game_rules();
-    let settler = prepared.game.view().auth.indexes().units_of(PlayerId(0))[0];
-    let tile = prepared.game.view().auth.units().get(settler).expect("the settler").core.tile;
-    let warrior = UnitKindId(rules.units.iter().position(|u| u.key == "core:unit/warrior").expect("a warrior") as u16);
-    prepared.game.debug_spawn_unit(&rules, PlayerId(0), tile, warrior);
-    let mut stage = Stage::new(ClassicUi::game(), SIZE);
-    stage.module.start(prepared);
-    stage.apply_module_actions();
-    stage
 }
