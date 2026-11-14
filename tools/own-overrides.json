@@ -653,25 +653,7 @@
     0
    ]
   },
-  "core:tech/banking": {
-   "effects_only": true,
-   "effects": [
-    0
-   ]
-  },
-  "core:tech/biology": {
-   "effects_only": true,
-   "effects": [
-    0
-   ]
-  },
   "core:tech/railroad": {
-   "effects_only": true,
-   "effects": [
-    0
-   ]
-  },
-  "core:tech/penicillin": {
    "effects_only": true,
    "effects": [
     0
