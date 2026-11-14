@@ -662,3 +662,37 @@ fn a_religious_unit_that_lost_more_than_all_its_strength_is_a_corrupt_save() {
     save.world.module.faith.units[0].strength_lost = 101;
     assert!(matches!(decode(&save, &rules), Err(classic_rules::persistence::decode::DecodeError::Corrupt(_))));
 }
+
+/// The faith price is one calculation, as Unciv's `getStatBuyCost`: the base x the era's multiplier
+/// x Mandate of Heaven's -20 %, rounded down to 10 once at the end (it was cut down at each step).
+#[test]
+fn a_faith_price_is_floored_once_after_the_discount() {
+    let rules = rules();
+    let mut game = world(&rules);
+    let holy = game.debug_found_city(&rules, P0, tile(&game, 5, 5));
+    found_religion(&mut game, &rules, P0, holy, 0, Founding::plain());
+    game.debug_grant_faith(P0, 5000);
+    let kinds: Vec<UnitKindId> = ["core:unit/missionary", "core:unit/inquisitor"].iter().map(|k| unit_kind(&rules, k)).collect();
+    for kind in &kinds {
+        if let Some(tech) = rules.units[kind.0 as usize].required_tech {
+            game.debug_learn(&rules, P0, tech);
+        }
+    }
+    let price = |game: &GameState, kind: UnitKindId| faith_purchase_status(game.view().auth, &rules, P0, holy, ProductionItem::Unit(kind));
+    let era = classic_rules::world::player::player_era(game.view().auth, &rules, P0);
+    let multiplier = f64::from(rules.eras.iter().find(|e| e.index == era).map_or(100, |e| e.module.faith_cost_multiplier.max(1)));
+    let unciv = |kind: UnitKindId, discount: f64| {
+        let base = f64::from(rules.units[kind.0 as usize].module.faith_cost.unwrap());
+        (base * multiplier / 100.0 * discount / 10.0).floor() as u32 * 10
+    };
+    let plain: Vec<_> = kinds.iter().map(|k| price(&game, *k)).collect();
+    game.debug_adopt_policy(&rules, P0, policy(&rules, "core:policy/piety/mandate-of-heaven"));
+    let mut checked = 0;
+    for (kind, before) in kinds.iter().zip(plain) {
+        let Ok(before) = before else { continue };
+        assert_eq!(before, unciv(*kind, 1.0));
+        assert_eq!(price(&game, *kind), Ok(unciv(*kind, 0.8)), "{kind:?}: floored once");
+        checked += 1;
+    }
+    assert!(checked > 0, "a religious unit is for sale for faith");
+}
