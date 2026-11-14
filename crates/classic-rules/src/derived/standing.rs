@@ -167,3 +167,59 @@ pub fn victory_progress(auth: &AuthWorld, rules: &CompiledRuleset, me: PlayerId)
     let time = VictoryProgress { kind: VictoryKind::Time, enabled: options.enabled(VictoryKind::Time), show_progress: true, have: auth.turn().round + 1, need: last, extra: 0 };
     vec![domination, science, culture, diplomacy, time]
 }
+
+/// Turns before the Congress session that elects the World Leader from which the player is told
+/// that the vote is near.
+pub const LEADER_VOTE_WARNING_TURNS: u32 = 3;
+
+/// A step of a rival toward a victory that the player is told about, once per step. The state of
+/// the world holds it while it is true (`victory_warnings`); the one who reports compares the
+/// list before and after a round and tells the steps that are new. Everything it reads the
+/// victory screen shows to every nation (the ship parts, the capitals, the Congress).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum VictoryWarning {
+    /// The rival has half of the Apollo Program and the spaceship parts.
+    ShipHalf(PlayerId),
+    /// The rival lacks one part of the Apollo Program and the spaceship parts.
+    ShipLastPart(PlayerId),
+    /// The rival holds every original capital but one (and took at least one from another nation).
+    LastCapital(PlayerId),
+    /// The Congress session that elects the World Leader is near.
+    LeaderVote,
+}
+
+/// The victory steps of the other living nations that are true now, as `me` is to be told.
+pub fn victory_warnings(auth: &AuthWorld, rules: &CompiledRuleset, me: PlayerId) -> Vec<VictoryWarning> {
+    let mut warnings = Vec::new();
+    for rival in crate::systems::city_states::majors(auth) {
+        if rival == me {
+            continue;
+        }
+        for row in victory_progress(auth, rules, rival) {
+            if let Some(warning) = rival_step(&row, rival) {
+                warnings.push(warning);
+            }
+        }
+    }
+    let congress = auth.module().congress();
+    let vote_near = congress.united_nations() && congress.leader_vote_due() && congress.turns_until_session() <= LEADER_VOTE_WARNING_TURNS;
+    if vote_near && auth.module().victory().options().enabled(VictoryKind::Diplomatic) {
+        warnings.push(VictoryWarning::LeaderVote);
+    }
+    warnings
+}
+
+/// The step that one row of `rival`'s victory screen has reached, if it is one to tell.
+fn rival_step(row: &VictoryProgress, rival: PlayerId) -> Option<VictoryWarning> {
+    if !row.enabled {
+        return None;
+    }
+    match row.kind {
+        VictoryKind::Science if row.have > 0 && row.have + 1 >= row.need && row.need > 1 => Some(VictoryWarning::ShipLastPart(rival)),
+        VictoryKind::Science if row.have > 0 && row.have * 2 >= row.need => Some(VictoryWarning::ShipHalf(rival)),
+        VictoryKind::Domination if row.extra > 0 && row.have + 1 == row.need => {
+            Some(VictoryWarning::LastCapital(rival))
+        }
+        _ => None,
+    }
+}

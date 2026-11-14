@@ -82,6 +82,9 @@ pub enum ClassicChange {
     /// offer made peace between them (the proposer's screen tells the answer; no derived
     /// system reads it).
     OfferAnswered { from: PlayerId, to: PlayerId, accepted: bool, peace: bool },
+    /// `to` did not answer the offer of `from` before it expired; the offer is gone (the proposer's
+    /// screen tells it; no derived system reads it).
+    OfferLapsed { from: PlayerId, to: PlayerId, peace: bool },
     /// `debtor` could not pay the `gold` per turn it owes `creditor`: their deal is broken and
     /// the creditor remembers it (both screens tell it; no derived system reads it).
     DealBroken { debtor: PlayerId, creditor: PlayerId, gold: u32 },
@@ -123,6 +126,7 @@ impl ModuleChange for ClassicChange {
             | ClassicChange::WonderYield { .. }
             | ClassicChange::RelationsChanged { .. }
             | ClassicChange::OfferAnswered { .. }
+            | ClassicChange::OfferLapsed { .. }
             | ClassicChange::DealBroken { .. }
             | ClassicChange::RebelsRose { .. }
             | ClassicChange::CityDamaged { .. }

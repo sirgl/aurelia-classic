@@ -15,6 +15,7 @@ mod end_gate;
 mod espionage;
 mod income;
 mod lost_orders;
+mod news;
 pub(crate) mod names;
 mod observed_city;
 mod orders;

@@ -30,11 +30,20 @@ impl<'a> WorldTransaction<'a> {
         self.research_agreements(player, science.max(0) as u32, round, rules);
         self.expire_open_borders(player, round, rules);
         self.decay_warmonger(player, rules);
-        let relations = &mut self.world.module.relations;
-        relations
-            .offers
-            .retain(|o| !(o.to == player && round >= o.expires));
-        relations.trades.retain(|t| round < t.until);
+        self.lapse_offers(player, round);
+        self.world.module.relations.trades.retain(|t| round < t.until);
+    }
+
+    /// The offers to `player` that nobody answered in time leave the list; their proposers are told
+    /// (`ClassicChange::OfferLapsed`).
+    fn lapse_offers(&mut self, player: PlayerId, round: u32) {
+        let offers = &mut self.world.module.relations.offers;
+        let (lapsed, kept): (Vec<_>, Vec<_>) = offers.drain(..).partition(|o| o.to == player && round >= o.expires);
+        *offers = kept;
+        for offer in lapsed {
+            let peace = offer.items.iter().any(|(_, i)| *i == crate::world::relations::DealItem::Peace);
+            self.journal.module_changes.push(ClassicChange::OfferLapsed { from: offer.from, to: offer.to, peace });
+        }
     }
 
     /// Every tie with a nation that is gone ends, both ways: its trades pay nothing (a dead
