@@ -1,9 +1,9 @@
 //! The end of the human's turn waits for a research and a policy to be chosen when they can be
 //! (UI only: the rules, `Session::end_turn` and the AI driver are not gated). The keys go through
 //! a stage like the app's: Enter reaches the module's `begin_end_turn`, which opens the screen.
-use classic_rules::ids::PlayerId;
+use classic_rules::ids::{PlayerId, ProductionItem, UnitKindId};
 use classic_rules::ClassicGame;
-use classic_ui::game::Session;
+use classic_ui::game::{PendingAction, Session};
 use classic_ui::ui::model::{Action, BranchState, GameRequest, TechStatus};
 use classic_ui::ui::screens::{game_rules, prepare_match, MapSize, MatchRequest, Screen};
 use classic_ui::ClassicUi;
@@ -27,12 +27,40 @@ fn stage_where(ui: ClassicUi, culture: u32, all_known: bool) -> Stage<ClassicUi>
     let mut stage = stage_at_start(ui, culture, all_known);
     stage.module.request(GameRequest::Unit(Action::FoundCity));
     assert_eq!(cities(&mut stage), 1, "the capital is founded");
+    settle_production_and_orders(&mut stage);
     stage
 }
 
-fn cities(stage: &mut Stage<ClassicUi>) -> usize {
+/// The first city builds a warrior and every unit is told to skip: only research and policy are left to ask.
+fn settle_production_and_orders(stage: &mut Stage<ClassicUi>) {
+    give_production(stage);
+    skip_idle_units(stage);
     let session = session(stage);
-    session.game().view().auth.indexes().cities_of(session.me()).len()
+    assert!(session.pending_actions(true).iter().all(|a| matches!(a, PendingAction::Research)), "{:?}", session.pending_actions(true));
+}
+
+/// Every city without production builds a warrior.
+fn give_production(stage: &mut Stage<ClassicUi>) {
+    let session = session(stage);
+    let warrior = session.rules().units.iter().position(|u| u.key == "core:unit/warrior").expect("a warrior") as u16;
+    for action in session.pending_actions(true) {
+        if let PendingAction::EmptyProduction(_) = action {
+            let tile = session.pending_tile(action).expect("the city stands on a tile");
+            session.request(GameRequest::SelectCity(tile.0));
+            session.request(GameRequest::Enqueue(ProductionItem::Unit(UnitKindId(warrior))));
+        }
+    }
+}
+
+/// Every unit without an order skips the turn.
+fn skip_idle_units(stage: &mut Stage<ClassicUi>) {
+    let session = session(stage);
+    for action in session.pending_actions(true) {
+        if let PendingAction::UnitOrder(unit) | PendingAction::GreatPerson(unit) = action {
+            session.select_unit(unit);
+            session.request(GameRequest::Unit(Action::Skip));
+        }
+    }
 }
 
 /// The first turn: the settler has not founded a city yet.
@@ -151,7 +179,7 @@ fn both_missing_research_comes_first_then_the_policy() {
     match button(&mut stage) {
         EndTurn::Decide { label, tip } => {
             assert_eq!(label, "Choose research");
-            assert!(tip.contains("policy"), "the tip names both: {tip}");
+            assert!(tip.contains("technology"), "the tip names the first item: {tip}");
         }
         other => panic!("{other:?}"),
     }
@@ -183,7 +211,7 @@ fn the_ai_playing_for_the_player_is_not_asked_and_the_rules_are_not_gated() {
     let mut stage = stage_with(ClassicUi::game(), 100);
     session(&mut stage).autoplay();
     assert!(!session(&mut stage).human_seat());
-    assert!(session(&mut stage).missing_choices(false).is_empty());
+    assert!(session(&mut stage).pending_actions(false).is_empty());
     assert!(!matches!(button(&mut stage), EndTurn::Decide { .. }), "the AI plays: the button does not ask");
 
     // The gate is the module's: the session of a human with nothing chosen ends the turn.
@@ -191,7 +219,7 @@ fn the_ai_playing_for_the_player_is_not_asked_and_the_rules_are_not_gated() {
     let mut session = Session::new(prepared.game, game_rules());
     assert!(session.human_seat());
     session.request(GameRequest::Unit(Action::FoundCity));
-    assert_eq!(session.missing_choices(false), vec![classic_ui::game::Choice::Research]);
+    assert!(session.pending_actions(false).contains(&PendingAction::Research));
     let start = session.turn();
     session.end_turn();
     assert_eq!(session.turn(), start + 1, "Session::end_turn is not gated");
@@ -208,22 +236,91 @@ fn scripts_can_leave_the_gate_off() {
 }
 
 #[test]
-fn nothing_is_asked_before_the_first_city_is_founded() {
+fn before_the_first_city_only_the_settler_is_asked_for() {
     let mut stage = stage_at_start(ClassicUi::game(), 100, false);
     let start = turn(&stage);
     assert_eq!(cities(&mut stage), 0);
-    assert!(session(&mut stage).missing_choices(false).is_empty(), "no city: nothing to direct");
-    assert_eq!(button(&mut stage), EndTurn::Ready, "the button is normal");
+    let waiting = session(&mut stage).pending_actions(false);
+    assert!(matches!(waiting.as_slice(), [PendingAction::UnitOrder(_), ..]), "no city: no research or policy, but the units: {waiting:?}");
+    match button(&mut stage) {
+        EndTurn::Decide { label, .. } => assert_eq!(label, "Unit needs an order"),
+        other => panic!("{other:?}"),
+    }
     stage.open(ShellScreen::Map);
     assert_eq!(stage.press("Enter"), Routed::Shell(ShellAction::EndTurn));
-    assert_eq!(turn(&stage), start + 1, "the turn ends as before");
+    assert_eq!(turn(&stage), start, "the turn did not end");
 
-    // The capital is founded: from now on the research is asked for.
+    // The capital is founded: its production comes first, then the research.
     let mut stage = stage_at_start(ClassicUi::game(), 0, false);
     stage.module.request(GameRequest::Unit(Action::FoundCity));
     assert_eq!(cities(&mut stage), 1);
     match button(&mut stage) {
-        EndTurn::Decide { label, .. } => assert_eq!(label, "Choose research"),
+        EndTurn::Decide { label, .. } => assert_eq!(label, "Choose production"),
         other => panic!("after the founding the button must ask, it is {other:?}"),
     }
+}
+
+#[test]
+fn a_city_without_production_stops_the_turn_and_the_button_leads_to_it() {
+    let mut stage = stage_at_start(ClassicUi::game(), 0, false);
+    stage.module.request(GameRequest::Unit(Action::FoundCity));
+    skip_idle_units(&mut stage);
+    let start = turn(&stage);
+    stage.open(ShellScreen::Map);
+    assert_eq!(stage.press("Enter"), Routed::Shell(ShellAction::EndTurn));
+    assert_eq!(turn(&stage), start, "the turn did not end");
+    stage.frame(Vec::new());
+    assert_eq!(stage.screens.screen, Screen::City.into(), "the city screen opened");
+    give_production(&mut stage);
+    match button(&mut stage) {
+        EndTurn::Decide { label, .. } => assert_eq!(label, "Choose research", "research is next"),
+        other => panic!("{other:?}"),
+    }
+}
+
+#[test]
+fn a_unit_without_an_order_stops_the_turn_until_it_gets_one() {
+    let mut stage = stage_at_start_with_a_warrior();
+    stage.module.request(GameRequest::Unit(Action::FoundCity));
+    give_production(&mut stage);
+    choose_research(&mut stage);
+    let start = turn(&stage);
+    match button(&mut stage) {
+        EndTurn::Decide { label, tip } => {
+            assert_eq!(label, "Unit needs an order");
+            assert!(tip.contains("order"), "{tip}");
+        }
+        other => panic!("the warrior has no order, the button is {other:?}"),
+    }
+    stage.open(ShellScreen::Map);
+    assert_eq!(stage.press("Enter"), Routed::Shell(ShellAction::EndTurn));
+    assert_eq!(turn(&stage), start, "the turn did not end");
+    let waiting = session(&mut stage).pending_actions(false);
+    let [PendingAction::UnitOrder(unit)] = waiting.as_slice() else { panic!("one unit waits: {waiting:?}") };
+    assert_eq!(session(&mut stage).selected_unit_id(), Some(unit_id(&mut stage, *unit)), "the button selected the unit");
+
+    stage.module.request(GameRequest::Unit(Action::Fortify));
+    assert_eq!(button(&mut stage), EndTurn::Ready, "the order was given");
+    stage.open(ShellScreen::Map);
+    stage.press("Enter");
+    assert_eq!(turn(&stage), start + 1);
+}
+
+fn unit_id(stage: &mut Stage<ClassicUi>, unit: classic_rules::ids::UnitHandle) -> u64 {
+    session(stage).game().view().auth.units().get(unit).expect("the unit").core.id.0
+}
+
+/// The first turn with a warrior next to the settler.
+fn stage_at_start_with_a_warrior() -> Stage<ClassicUi> {
+    use classic_rules::ClassicGame as _;
+    let mut prepared = prepare_match(request()).expect("the match is generated");
+    let rules = game_rules();
+    let settler = prepared.game.view().auth.indexes().units_of(PlayerId(0))[0];
+    let tile = prepared.game.view().auth.units().get(settler).expect("the settler").core.tile;
+    let warrior = UnitKindId(rules.units.iter().position(|u| u.key == "core:unit/warrior").expect("a warrior") as u16);
+    prepared.game.debug_spawn_unit(&rules, PlayerId(0), tile, warrior);
+    let mut stage = Stage::new(ClassicUi::game(), SIZE);
+    stage.module.start(prepared);
+    stage.apply_module_actions();
+    stage
 }

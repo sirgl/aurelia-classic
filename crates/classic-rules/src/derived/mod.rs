@@ -13,6 +13,7 @@ pub mod great_people;
 pub mod happiness;
 pub mod income;
 pub mod maintenance;
+pub mod pending;
 pub mod religion;
 pub mod research;
 pub mod resources;

@@ -13,6 +13,7 @@ use i18n::{t, tf};
 
 use super::names;
 use super::reasons;
+use super::end_gate::PendingAction;
 use super::session::Session;
 use crate::ui::model::{Action, ActionState, Availability, NoticeKind, UnitOrders};
 
@@ -461,20 +462,18 @@ impl Session {
         self.targeting = None;
     }
 
+    /// The units that have moves left and no order, great people included: the core's list, less the
+    /// units the player put to rest.
     pub fn idle_units(&self) -> Vec<UnitHandle> {
-        let auth = self.client.game.view().auth;
-        let mut idle = Vec::new();
-        for &handle in auth.indexes().units_of(self.me()) {
-            let Some(unit) = auth.units().get(handle) else {
-                continue;
-            };
-            let resting = self.skipped.contains(&handle) || self.sleeping.contains(&handle);
-            let busy = unit.core.stance.is_fortified() || unit.core.work.is_some();
-            if unit.core.moves_left > 0 && !resting && !busy {
-                idle.push(handle);
-            }
-        }
-        idle
+        let resting = self.resting_units();
+        let actions = classic_rules::derived::pending::unit_actions(self.client.game.view().auth, self.rules(), self.me(), &resting);
+        actions
+            .into_iter()
+            .filter_map(|action| match action {
+                PendingAction::GreatPerson(unit) | PendingAction::UnitOrder(unit) => Some(unit),
+                _ => None,
+            })
+            .collect()
     }
 
     /// An aircraft never walks: its move order is a rebase to an own city or

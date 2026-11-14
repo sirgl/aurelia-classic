@@ -17,7 +17,7 @@ use render::unit_models::UnitModelBook;
 use render::world::state::RenderWorld;
 use render::world_models::WorldBook;
 
-use crate::game::{Choice, Session};
+use crate::game::{PendingAction, Session};
 use crate::ui::shortcuts;
 use crate::ui::hud::{Action, ClassicHud, PanelClicks, TopTarget};
 use crate::ui::model::{GameRequest, ScreenModel};
@@ -259,6 +259,34 @@ impl ClassicUi {
             .or_else(|| wonder.and_then(|w| rules.natural_wonders.get(w as usize)).map(|d| d.key.clone()))
             .or_else(|| rules.terrains.iter().find(|t| t.map_code == Some(cell.terrain)).map(|d| d.key.clone()))?;
         pedia::game_pedia().by_key(&key)
+    }
+
+    /// Open the place where a pending action is answered: a screen, or the map at the city or unit.
+    fn go_to(&mut self, action: PendingAction) {
+        let Some(session) = &self.session else { return };
+        let tile = session.pending_tile(action);
+        match action {
+            PendingAction::FreeGreatPerson => self.screens.open(Screen::Culture),
+            PendingAction::FreeTechnology | PendingAction::Research => self.screens.open(Screen::Research),
+            PendingAction::Policy => self.screens.open(Screen::Civics),
+            PendingAction::Pantheon => self.screens.open(Screen::Religion),
+            PendingAction::EmptyProduction(_) => {
+                if let Some(tile) = tile {
+                    self.request(GameRequest::SelectCity(tile.0));
+                    self.actions.push(ShellAction::CenterOn(tile.0));
+                }
+            }
+            PendingAction::CityDecision(_) => {
+                self.screens.open(Screen::Map);
+                if let Some(tile) = tile {
+                    self.actions.push(ShellAction::CenterOn(tile.0));
+                }
+            }
+            PendingAction::Promotion(unit) | PendingAction::GreatPerson(unit) | PendingAction::UnitOrder(unit) => {
+                self.screens.open(Screen::Map);
+                self.focus(Focus::Unit(unit));
+            }
+        }
     }
 
     /// Centre the map on what an overview row points at.
@@ -615,9 +643,8 @@ impl ModuleUi for ClassicUi {
         let Some(session) = &mut self.session else { return };
         // The button, Enter and every other way to end the turn arrive here: a missing choice
         // opens its screen instead (the rules would accept the end of the turn).
-        match missing_choices(session, self.end_turn_gate, self.policy_round).first() {
-            Some(Choice::Research) => self.screens.open(Screen::Research),
-            Some(Choice::Policy) => self.screens.open(Screen::Civics),
+        match pending_actions(session, self.end_turn_gate, self.policy_round).first() {
+            Some(action) => self.go_to(*action),
             None => session.begin_end_turn(),
         }
     }
@@ -695,7 +722,7 @@ impl ModuleUi for ClassicUi {
             session.close_city_state();
         }
         let game = session.hud_model(input.hovered_tile);
-        let missing = missing_choices(session, self.end_turn_gate, self.policy_round);
+        let missing = pending_actions(session, self.end_turn_gate, self.policy_round);
         self.paint = session.air_paint();
         self.hud.extras = session.hud_extras(input.hovered_badge);
         let screen = Screen::from(input.shell.screen);
@@ -769,35 +796,43 @@ impl ModuleUi for ClassicUi {
     }
 }
 
-/// The choices the end of the turn waits for (none when the gate is off).
-fn missing_choices(session: &Session, gate: bool, policy_round: Option<u32>) -> Vec<Choice> {
+/// The actions the end of the turn waits for (none when the gate is off).
+fn pending_actions(session: &Session, gate: bool, policy_round: Option<u32>) -> Vec<PendingAction> {
     if !gate {
         return Vec::new();
     }
-    session.missing_choices(policy_round == Some(session.turn()))
+    session.pending_actions(policy_round == Some(session.turn()))
 }
 
-/// The end-turn button: ready, naming the first missing choice, waiting while the others (or the
+/// The end-turn button: ready, naming the first pending action, waiting while the others (or the
 /// autoplay) act, or over.
-fn end_turn(game: &crate::ui::model::HudModel, missing: &[Choice]) -> EndTurn {
+fn end_turn(game: &crate::ui::model::HudModel, pending: &[PendingAction]) -> EndTurn {
     match (game.outcome, game.can_end_turn) {
-        (crate::ui::model::Outcome::Playing, true) => match missing {
-            [] => EndTurn::Ready,
-            [Choice::Research, Choice::Policy, ..] => EndTurn::Decide {
-                label: t!("classic.module.end-turn-research").into(),
-                tip: t!("classic.module.end-turn-both-tip").into(),
-            },
-            [Choice::Research, ..] => EndTurn::Decide {
-                label: t!("classic.module.end-turn-research").into(),
-                tip: t!("classic.module.end-turn-research-tip").into(),
-            },
-            [Choice::Policy, ..] => EndTurn::Decide {
-                label: t!("classic.module.end-turn-policy").into(),
-                tip: t!("classic.module.end-turn-policy-tip").into(),
-            },
+        (crate::ui::model::Outcome::Playing, true) => match pending.first() {
+            None => EndTurn::Ready,
+            Some(action) => {
+                let (label, tip) = pending_texts(*action);
+                EndTurn::Decide { label: label.into(), tip: tip.into() }
+            }
         },
         (crate::ui::model::Outcome::Playing, false) => EndTurn::Waiting,
         _ => EndTurn::Unavailable,
+    }
+}
+
+/// The button's label and its tip for the action it asks for.
+fn pending_texts(action: PendingAction) -> (&'static str, &'static str) {
+    match action {
+        PendingAction::FreeGreatPerson => (t!("classic.module.end-turn-free-great-person"), t!("classic.module.end-turn-free-great-person-tip")),
+        PendingAction::CityDecision(_) => (t!("classic.module.end-turn-city-decision"), t!("classic.module.end-turn-city-decision-tip")),
+        PendingAction::EmptyProduction(_) => (t!("classic.module.end-turn-production"), t!("classic.module.end-turn-production-tip")),
+        PendingAction::FreeTechnology => (t!("classic.module.end-turn-free-technology"), t!("classic.module.end-turn-free-technology-tip")),
+        PendingAction::Research => (t!("classic.module.end-turn-research"), t!("classic.module.end-turn-research-tip")),
+        PendingAction::Policy => (t!("classic.module.end-turn-policy"), t!("classic.module.end-turn-policy-tip")),
+        PendingAction::Pantheon => (t!("classic.module.end-turn-pantheon"), t!("classic.module.end-turn-pantheon-tip")),
+        PendingAction::Promotion(_) => (t!("classic.module.end-turn-promotion"), t!("classic.module.end-turn-promotion-tip")),
+        PendingAction::GreatPerson(_) => (t!("classic.module.end-turn-great-person"), t!("classic.module.end-turn-great-person-tip")),
+        PendingAction::UnitOrder(_) => (t!("classic.module.end-turn-unit-order"), t!("classic.module.end-turn-unit-order-tip")),
     }
 }
 

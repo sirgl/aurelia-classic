@@ -48,7 +48,7 @@ mod stack_click_tests;
 mod tests;
 
 pub use client::shell::module::{AiProgress, MapButton};
-pub use end_gate::Choice;
+pub use end_gate::PendingAction;
 pub use observed_city::ObservedCity;
 pub use save_header::describe as describe_save;
 pub use session::{decode_game, decode_save, Session, ai_turns_message};
