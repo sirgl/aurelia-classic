@@ -150,8 +150,9 @@ fn a_book_on_fog_march_walks_through_the_fog_to_its_target() {
         seen.push((ours.iter().any(|s| s.sighted), closest));
     }
     // 7 tiles until 12 November, when peace with a nation became a deal and the books began to
-    // answer offers by `ai::peace`; 6 since, still out of sight.
-    assert!(!seen[0].0 && seen[0].1 >= 6, "on standard the army stalls out of sight: {:?}", seen[0]);
+    // answer offers by `ai::peace`; 6 since; 4 since 14 November, when a tile is priced by one
+    // rounding (the AI's purchases moved the world), still out of sight.
+    assert!(!seen[0].0 && seen[0].1 >= 4, "on standard the army stalls out of sight: {:?}", seen[0]);
     assert!(seen[1].1 <= 3, "on fog-march it reaches the walls: {:?}", seen[1]);
 }
 

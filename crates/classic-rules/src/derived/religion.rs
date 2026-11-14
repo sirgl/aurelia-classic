@@ -936,6 +936,23 @@ fn round_ten(cost: i64) -> u32 {
     (cost.max(0) / 10 * 10).min(i64::from(u32::MAX)) as u32
 }
 
+/// The faith price of an item of `base` faith: one product, as Unciv's `getStatBuyCost`: × the
+/// game speed's faith percent (`statCostModifiers[Faith]`), × the era's multiplier when `era`,
+/// × Mandate of Heaven's percent (every item), × each of `extra` (a missionary's belief percent),
+/// rounded down to 10 once, at the end.
+fn faith_price(auth: &AuthWorld, rules: &CompiledRuleset, player: PlayerId, base: u32, era: bool, extra: &[i32]) -> u32 {
+    let mut factors = crate::world::city::PurchasePercents::default();
+    factors.push(auth.settings().speed(rules).faith_percent as i32 - 100);
+    if era {
+        factors.push(era_multiplier(auth, rules, player) as i32 - 100);
+    }
+    factors.push(faith_cost_percent(auth, rules, player));
+    for percent in extra {
+        factors.push(*percent);
+    }
+    round_ten(factors.scale(u64::from(base)) as i64)
+}
+
 fn era_multiplier(auth: &AuthWorld, rules: &CompiledRuleset, player: PlayerId) -> i64 {
     let era = crate::world::player::player_era(auth, rules, player);
     rules
@@ -1052,8 +1069,7 @@ fn unit_faith_cost(
     if let Some(gp) = great_person_kind(rules, kind) {
         return great_person_faith_cost(auth, rules, player, gp);
     }
-    // × the game speed's faith percent (Unciv: BaseUnitCost/Building, `statCostModifiers[Faith]`).
-    let base = i64::from(speed_faith(auth, rules, def.module.faith_cost.ok_or(FaithPurchaseBlock::NoFaithPrice)?));
+    let base = def.module.faith_cost.ok_or(FaithPurchaseBlock::NoFaithPrice)?;
     if let Some(tech) = def.required_tech {
         if !auth.players().techs_of(player).contains(&tech) {
             return Err(FaithPurchaseBlock::TechnologyMissing);
@@ -1066,7 +1082,6 @@ fn unit_faith_cost(
     let religious = def.module.abilities.contains(&UnitAbility::SpreadReligion)
         || def.module.abilities.contains(&UnitAbility::RemoveHeresy);
     let majority = city_majority(auth, city);
-    let mut cost = base * era_multiplier(auth, rules, player) / 100;
     if religious {
         let Some(Creed::Religion(religion)) = majority else {
             return Err(FaithPurchaseBlock::NeedsReligion);
@@ -1083,18 +1098,15 @@ fn unit_faith_cost(
         {
             return Err(FaithPurchaseBlock::NeedsEnhancedReligion);
         }
-        cost = cost * (100 + i64::from(faith_cost_percent(auth, rules, player))) / 100;
         let mods = crate::classic::religion_effects::religion_modifiers(auth, rules, religion);
-        cost = cost
-            * (100 + i64::from(mods.of(crate::classic::effects::ReligionStat::MissionaryCost)))
-            / 100;
-        return Ok(round_ten(cost));
+        let missionary = mods.of(crate::classic::effects::ReligionStat::MissionaryCost);
+        return Ok(faith_price(auth, rules, player, base, true, &[missionary]));
     }
     // Units without `FaithPurchaseNeedsBelief` are bought at their
     // price; the others (military units) need a belief of the city that
     // unlocks their era (Holy Warriors, Religious Fervor).
     if !def.module.abilities.contains(&UnitAbility::FaithPurchaseNeedsBelief) {
-        return Ok(round_ten(cost));
+        return Ok(faith_price(auth, rules, player, base, true, &[]));
     }
     let era = def.era.ok_or(FaithPurchaseBlock::NeedsBelief)?;
     let unlocked = city_beliefs(auth, city, player).iter().any(|b| {
@@ -1107,7 +1119,7 @@ fn unit_faith_cost(
     if !unlocked {
         return Err(FaithPurchaseBlock::NeedsBelief);
     }
-    Ok(round_ten(cost))
+    Ok(faith_price(auth, rules, player, base, true, &[]))
 }
 
 /// Cost percent modifier of faith purchases (Mandate of Heaven).
@@ -1133,7 +1145,9 @@ fn great_person_faith_cost(
         return Err(FaithPurchaseBlock::TooEarly);
     }
     let n = u32::from(faith.bought_of(kind)) + 1;
-    let price = round_ten(i64::from(speed_faith(auth, rules, great_person_number(n))));
+    // Unciv: the n-th price (`BuyUnitsIncreasingCost`) × the speed, then the discounts of the
+    // city (Mandate of Heaven), rounded down to 10 once; no era multiplier.
+    let price = faith_price(auth, rules, player, great_person_number(n), false, &[]);
     let any_kind = crate::classic::effects::ReligionAbility::FaithPurchaseAllGreatPeople;
     if founded_religion_has(auth, rules, player, any_kind) {
         return Ok(price);
@@ -1173,8 +1187,7 @@ fn building_faith_cost(
         .buildings
         .get(building.0 as usize)
         .ok_or(FaithPurchaseBlock::UnknownItem)?;
-    // × the game speed's faith percent (Unciv: BaseUnitCost/Building, `statCostModifiers[Faith]`).
-    let base = i64::from(speed_faith(auth, rules, def.module.faith_cost.ok_or(FaithPurchaseBlock::NoFaithPrice)?));
+    let base = def.module.faith_cost.ok_or(FaithPurchaseBlock::NoFaithPrice)?;
     let core = auth
         .cities()
         .get(city)
@@ -1196,9 +1209,7 @@ fn building_faith_cost(
     if def.module.faith_purchase_needs_belief && !belief_unlocks_building(auth, rules, city, player, building) {
         return Err(FaithPurchaseBlock::NeedsBelief);
     }
-    let cost = base * era_multiplier(auth, rules, player) / 100;
-    let cost = cost * (100 + i64::from(faith_cost_percent(auth, rules, player))) / 100;
-    Ok(round_ten(cost))
+    Ok(faith_price(auth, rules, player, base, true, &[]))
 }
 
 /// A belief of the city's majority unlocks `building` for faith: it names
