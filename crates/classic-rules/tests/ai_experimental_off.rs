@@ -87,7 +87,9 @@ fn the_game_without_the_feature_plays_next_w() {
 /// 404, so the case runs 420 rounds (86 gifts, 5 votes), equal with the feature on (`NextW`).
 /// Re-pinned for the citadel as Unciv (ai/great-people GP0, 13 November: the citadel on any tile next to
 /// own land, the great person improvements on hills): 88 gifts, 5 votes.
-const CITY_STATES_NEXT_W: u64 = 0xa4fd_2f91_a852_9e93;
+/// Re-pinned for the tile price as Unciv (rules/purchase-holes, 14 November: one product of the speed and
+/// the purchase factors, rounded once; no tile bought by a puppet): 37 gifts, 5 votes.
+const CITY_STATES_NEXT_W: u64 = 0x60b9_0818_7ba3_9a7c;
 const CITY_STATES_ROUNDS: usize = 420;
 
 /// The longer case of the promotion's review: city-states, gifts and votes are played in the game
