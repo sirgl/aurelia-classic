@@ -110,6 +110,9 @@ use kernel::replay::hash::authoritative_hash;
 /// - 14 November, the price of a tile is rounded once to the nearest gold, as Unciv's `roundToInt`
 ///   (it was cut down twice): the AI buys tiles at other prices, the smoke game differs:
 ///   752dcbddd8b2ba1a -> 2bfc4393a36c5fba.
+/// - 14 November, the fourteenth promotion: `standard` plays as `next-x` (classic/docs/ai-strategy-net.md
+///   "Promoted: next-x"); the smoke game's 70 rounds play the same: the benched `next-x` against itself
+///   (`runs/px/bin-before`, main 4d43b0e) gave 2bfc4393a36c5fba, as the old `standard` did; the hash stays.
 const SMOKE_RESULT_HASH: &str = "2bfc4393a36c5fba";
 
 fn pairing(candidate: &str) -> Pairing {
