@@ -9,7 +9,7 @@
 use crate::ai::planner_value::{league_project_value, Weights};
 use crate::command::Command;
 use crate::ids::CityHandle;
-use crate::knowledge::observation::{AIObservation, CongressInfo, ProjectInfo};
+use crate::knowledge::observation::{AIObservation, ProjectInfo};
 use crate::rules::CompiledRuleset;
 use crate::systems::congress::{NO, YES};
 use crate::world::city_economy::Process;
@@ -104,15 +104,12 @@ pub fn vote_orders_for(obs: &AIObservation<'_>, guard: bool) -> Vec<Command> {
         // All the delegates on the host election, the rest abstain.
         return vec![Command::CastVotes { player: obs.player, proposal: i as u8, choice: u32::from(host.0), delegates: info.delegates_left }];
     }
-    let share = split(info);
-    let mut left = info.delegates_left;
+    let shares = shares(&info.proposals, info.delegates_left);
     let mut out = Vec::new();
-    for (i, proposal) in info.proposals.iter().enumerate() {
-        let delegates = share.min(left);
+    for (i, (proposal, delegates)) in info.proposals.iter().zip(shares).enumerate() {
         if delegates == 0 {
-            break;
+            continue;
         }
-        left -= delegates;
         let choice = if proposal.kind.elects() {
             if proposal.kind == ResolutionKind::DiplomaticVictory {
                 crate::ai::strategy_net::trace::leader_vote(obs, delegates, info.delegates_left, info.needed, info.proposals.len());
@@ -133,13 +130,19 @@ pub fn vote_orders_for(obs: &AIObservation<'_>, guard: bool) -> Vec<Command> {
     out
 }
 
-/// Delegates per proposal: all on an election when there is one (the
-/// World Leader matters most), else an even split.
-fn split(info: &CongressInfo) -> u16 {
-    if info.proposals.iter().any(|p| p.kind.elects()) && info.proposals.len() == 1 {
-        return info.delegates_left;
+/// Delegates per proposal, in the order of `proposals`: all of them on the World Leader vote when
+/// it is on the table (it needs the whole seat, a share of it cannot win), else an even split in
+/// which the remainder goes to the first proposals, so that no delegate is left uncast and, with
+/// fewer delegates than proposals, the first ones get one each.
+fn shares(proposals: &[Proposal], delegates_left: u16) -> Vec<u16> {
+    if let Some(vote) = proposals.iter().position(|p| p.kind == ResolutionKind::DiplomaticVictory) {
+        let mut shares = vec![0; proposals.len()];
+        shares[vote] = delegates_left;
+        return shares;
     }
-    (info.delegates_left / info.proposals.len() as u16).max(1)
+    let count = proposals.len() as u16;
+    let (each, rest) = (delegates_left / count, delegates_left % count);
+    (0..count).map(|i| each + u16::from(i < rest)).collect()
 }
 
 /// The project still short of our full share (the most advanced first).
