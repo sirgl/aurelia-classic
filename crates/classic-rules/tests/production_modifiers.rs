@@ -183,25 +183,26 @@ fn purchase_percents_make_gold_purchases_cheaper() {
     };
     let unit_cost = rules.units[warrior.0 as usize].cost;
     let building_def = &rules.buildings[monument.0 as usize];
-    let expect = |cost: u32, modifier: i32, hurry: i32, kind: i32| {
-        gold_purchase_price(cost, modifier, PurchasePercents { hurry, kind }).unwrap()
+    // Each source multiplies the price, as Unciv's getStatBuyCost does.
+    let expect = |cost: u32, modifier: i32, sources: &[i32]| {
+        gold_purchase_price(cost, modifier, PurchasePercents::of(sources)).unwrap()
     };
     enqueue(&mut game, &rules, c, ProductionItem::Unit(warrior));
-    assert_eq!(price(&game), expect(unit_cost, 0, 0, 0));
+    assert_eq!(price(&game), expect(unit_cost, 0, &[]));
     game.debug_adopt_policy(&rules, P0, policy(&rules, "core:policy/autocracy/mobilization"));
-    assert_eq!(price(&game), expect(unit_cost, 0, 0, -25));
+    assert_eq!(price(&game), expect(unit_cost, 0, &[-25]));
     game.debug_adopt_policy(&rules, P0, policy(&rules, "core:policy/commerce/mercantilism"));
-    assert_eq!(price(&game), expect(unit_cost, 0, -25, -25));
+    assert_eq!(price(&game), expect(unit_cost, 0, &[-25, -25]));
     enqueue(&mut game, &rules, c, ProductionItem::Building(monument));
     let cost = building_def.cost;
     let modifier = building_def.hurry_cost_modifier;
-    assert_eq!(price(&game), expect(cost, modifier, -25, 0), "Mobilization is for units");
+    assert_eq!(price(&game), expect(cost, modifier, &[-25]), "Mobilization is for units");
     game.debug_adopt_policy(&rules, P0, policy(&rules, "core:policy/order/skyscrapers"));
-    assert_eq!(price(&game), expect(cost, modifier, -25, -25));
+    assert_eq!(price(&game), expect(cost, modifier, &[-25, -25]));
     // Big Ben in another city: every city of the owner buys cheaper.
     game.debug_add_building(&rules, other, building(&rules, "core:building/big_ben"));
-    assert_eq!(price(&game), expect(cost, modifier, -40, -25));
-    assert!(price(&game) < expect(cost, modifier, 0, 0));
+    assert_eq!(price(&game), expect(cost, modifier, &[-25, -15, -25]));
+    assert!(price(&game) < expect(cost, modifier, &[]));
 }
 
 #[test]
@@ -331,6 +332,6 @@ fn negative_purchase_percents_lower_the_price() {
     // negative percent to u64: it wrapped in release and overflowed in
     // debug builds.)
     assert_eq!(gold_purchase_price(40, -50, PurchasePercents::default()), Some(100));
-    assert_eq!(gold_purchase_price(40, 0, PurchasePercents { hurry: -100, kind: 0 }), Some(0));
+    assert_eq!(gold_purchase_price(40, 0, PurchasePercents::of(&[-100])), Some(0));
     assert_eq!(gold_purchase_price(40, -1, PurchasePercents::default()), None, "not for sale");
 }
