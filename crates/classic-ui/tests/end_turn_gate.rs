@@ -1,7 +1,7 @@
 //! The end of the human's turn waits for a research and a policy to be chosen when they can be
 //! (UI only: the rules, `Session::end_turn` and the AI driver are not gated). The keys go through
 //! a stage like the app's: Enter reaches the module's `begin_end_turn`, which opens the screen.
-use classic_rules::ids::{PlayerId, ProductionItem, UnitKindId};
+use classic_rules::ids::PlayerId;
 use classic_rules::ClassicGame;
 use classic_ui::game::{PendingAction, Session};
 use classic_ui::ui::model::{Action, BranchState, GameRequest, TechStatus};
@@ -39,15 +39,15 @@ fn settle_production_and_orders(stage: &mut Stage<ClassicUi>) {
     assert!(session.pending_actions(true).iter().all(|a| matches!(a, PendingAction::Research)), "{:?}", session.pending_actions(true));
 }
 
-/// Every city without production builds a warrior.
+/// Every city without production builds the first thing it can build.
 fn give_production(stage: &mut Stage<ClassicUi>) {
     let session = session(stage);
-    let warrior = session.rules().units.iter().position(|u| u.key == "core:unit/warrior").expect("a warrior") as u16;
     for action in session.pending_actions(true) {
         if let PendingAction::EmptyProduction(_) = action {
             let tile = session.pending_tile(action).expect("the city stands on a tile");
             session.request(GameRequest::SelectCity(tile.0));
-            session.request(GameRequest::Enqueue(ProductionItem::Unit(UnitKindId(warrior))));
+            let item = session.city_view().expect("the city is open").options.iter().find(|o| o.availability.is_ready()).expect("something to build").item;
+            session.request(GameRequest::Enqueue(item));
         }
     }
 }
@@ -61,6 +61,11 @@ fn skip_idle_units(stage: &mut Stage<ClassicUi>) {
             session.request(GameRequest::Unit(Action::Skip));
         }
     }
+}
+
+fn cities(stage: &mut Stage<ClassicUi>) -> usize {
+    let session = session(stage);
+    session.game().view().auth.indexes().cities_of(session.me()).len()
 }
 
 /// The first turn: the settler has not founded a city yet.

@@ -153,7 +153,7 @@ fn a_unit_that_can_be_promoted_waits_even_with_an_order() {
     settle_city_and_research(&mut game, &rules, capital);
     let warrior = spawn(&mut game, &rules, "core:unit/warrior");
     game.execute(&rules, Command::Fortify { unit: warrior }).unwrap();
-    game.debug_set_experience(warrior, 1000);
+    game.debug_set_experience(warrior, 10);
     assert_eq!(pending(&game, &rules), vec![PendingAction::Promotion(warrior)]);
     let core = *game.view().auth.units().get(warrior).unwrap().core;
     let promotion = available_promotions(game.view().auth, &rules, &core)[0];
