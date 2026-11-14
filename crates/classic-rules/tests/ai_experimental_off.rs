@@ -85,7 +85,9 @@ fn the_game_without_the_feature_plays_next_w() {
 /// Re-pinned for purchase prices as Unciv (rules/hurry-modifier, 13 November: dearer settlers and
 /// +20 % units, a new city drops a queued national wonder): the congress's first vote came at round
 /// 404, so the case runs 420 rounds (86 gifts, 5 votes), equal with the feature on (`NextW`).
-const CITY_STATES_NEXT_W: u64 = 0x0090_5e97_0e02_ba04;
+/// Re-pinned for the citadel as Unciv (ai/great-people GP0, 13 November: the citadel on any tile next to
+/// own land, the great person improvements on hills): 88 gifts, 5 votes.
+const CITY_STATES_NEXT_W: u64 = 0xa4fd_2f91_a852_9e93;
 const CITY_STATES_ROUNDS: usize = 420;
 
 /// The longer case of the promotion's review: city-states, gifts and votes are played in the game

@@ -544,8 +544,8 @@ pub(crate) fn validate_nuke(
     Ok(ResolvedCommand::Nuke { unit, target })
 }
 
-/// Citadel: a great general on a land tile of its owner or next to it, not
-/// on a city.
+/// Citadel: a great general on a land tile of its owner or next to it
+/// (anybody's), not on a city.
 pub(crate) fn validate_citadel(
     view: GameView<'_>,
     rules: &CompiledRuleset,
@@ -560,9 +560,9 @@ pub(crate) fn validate_citadel(
     if !crate::effects::unit::own_ability(rules, &core, UnitAbility::Module(ClassicUnitAbility::GreatGeneral)) {
         return Err(violation("not a great general"));
     }
-    if crate::systems::combat::actions::citadel_of(rules).is_none() {
+    let Some(citadel) = crate::systems::combat::actions::citadel_of(rules) else {
         return Err(violation("no citadel in the rules"));
-    }
+    };
     let tile = core.tile;
     let map = auth.map();
     if crate::navigation::cost::enter_cost_on_map(map, tile).is_none()
@@ -576,12 +576,16 @@ pub(crate) fn validate_citadel(
         .neighbors(tile)
         .into_iter()
         .any(|t| map.owner(t).flatten() == Some(core.owner));
-    let foreign = map.owner(tile).flatten().is_some_and(|o| o != core.owner);
-    if foreign || !(own || next_to_own) {
+    // Unciv: ImprovementFunctions.kt ("Can be built just outside your
+    // borders": any tile next to own land, a foreign one too).
+    if !(own || next_to_own) {
         return Err(violation("in or next to own territory"));
     }
     if auth.indexes().cities_of(core.owner).is_empty() {
         return Err(violation("no city"));
     }
+    // The same site rule as the great person action `Construct` (an improvement already there, a
+    // feature or a natural wonder that forbids it, ...).
+    kernel::world::builds::improvement_site(auth, rules, core.owner, tile, citadel).map_err(violation)?;
     Ok(ResolvedCommand::BuildCitadel { unit, tile })
 }

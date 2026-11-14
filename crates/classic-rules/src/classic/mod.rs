@@ -54,7 +54,7 @@ use crate::world::state::{AuthWorld, GameView};
 pub struct Classic;
 
 /// The fingerprint of the current content (`CompiledRuleset::hash`).
-pub const CLASSIC_FINGERPRINT: u64 = 3078422782052653983;
+pub const CLASSIC_FINGERPRINT: u64 = 9970789956216259444;
 
 impl RulesModule for Classic {
     type World = ClassicWorld;
@@ -110,6 +110,9 @@ impl RulesModule for Classic {
         // Before the units' purchase modifiers (Unciv hurryCostModifier) and the Shrine's and the
         // Pyramid's 0: a save of before loads, its queues priced by the new rows.
         (835780351697724273, CLASSIC_FINGERPRINT),
+        // Before the citadel as Unciv has it (any tile next to own land, hills too; the five great
+        // person improvements on hills): a save of before loads, its improvements as they stand.
+        (3078422782052653983, CLASSIC_FINGERPRINT),
 ];
 
     fn execute(

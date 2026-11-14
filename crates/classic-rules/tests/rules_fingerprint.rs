@@ -14,7 +14,7 @@ use classic_rules::{compile_rules, CompiledRuleset, GameState};
 /// (nation traits that were inert, city name lists, spy names), then
 /// the resources at sea (`sea_density`, the modern strategics' land counts),
 /// then the game speeds table (`speeds.ron`), then the Shoshone start unit and the Pathfinder's sight,
-/// then the units' purchase modifiers.
+/// then the units' purchase modifiers, then the citadel's placement and the great person improvements on hills.
 const CURRENT: u64 = classic_rules::classic::CLASSIC_FINGERPRINT;
 /// The fingerprints of the earlier editions the snapshot loader migrates
 /// (`Classic::EARLIER_EDITIONS`), in the order of the list: before role
@@ -28,7 +28,7 @@ const CURRENT: u64 = classic_rules::classic::CLASSIC_FINGERPRINT;
 /// (16018243681386759787: the rows differ in the map generator's counts only, a saved map
 /// keeps its deposits) and the one before the rename (11011276917743099964: the module id
 /// and the content keys, which the hash covers, carried an earlier module name then).
-const EARLIER: [u64; 17] = [
+const EARLIER: [u64; 18] = [
     1312007536065307279,
     8423526412409906946,
     2736398163960058391,
@@ -52,6 +52,8 @@ const EARLIER: [u64; 17] = [
     3662418266917708599,
     // Before the units' purchase modifiers (`tests/purchase_price_unciv.rs`).
     835780351697724273,
+    // Before the citadel as Unciv has it and the great person improvements on hills (`tests/citadel_rules.rs`).
+    3078422782052653983,
 ];
 
 fn rules() -> CompiledRuleset {
@@ -61,7 +63,7 @@ fn rules() -> CompiledRuleset {
 #[test]
 fn the_classic_fingerprint_is_pinned() {
     assert_eq!(rules().hash(), CURRENT);
-    assert_eq!(CURRENT, 3078422782052653983);
+    assert_eq!(CURRENT, 9970789956216259444);
 }
 
 #[test]

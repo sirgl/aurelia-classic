@@ -387,6 +387,17 @@ impl<'a> WorldTransaction<'a> {
         }
     }
 
+    /// A barbarian camp on a tile that changes hands (a culture bomb) is removed, with no gold for
+    /// anybody. Unciv: `takeOwnership` (`isBarbarianEncampment` -> `removeImprovement`).
+    pub(crate) fn remove_camp_at(&mut self, tile: TileId) {
+        let Some(index) = self.world.module.barbarians.camps.iter().position(|c| c.tile == tile) else {
+            return;
+        };
+        self.world.module.barbarians.camps.remove(index);
+        self.world.map.set_improvement(tile, None);
+        self.journal.tile_changes.push(TileChange::ImprovementBuilt { tile });
+    }
+
     /// A unit of a nation or city-state entered a barbarian camp: the
     /// camp is gone and the player earns the camp gold (times its plunder
     /// percent: Songhai triple, `systems::plunder`).

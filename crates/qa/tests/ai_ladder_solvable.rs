@@ -75,7 +75,9 @@ fn an_unsolvable_scene_is_drawn_again_and_a_solvable_one_is_kept() {
     // worlds before the war play differently again and scene 37's solvable world is its fifth (attempt 4).
     // Purchase prices as Unciv (rules/hurry-modifier, 13 November): settlers and the +20 % units cost more
     // gold and a new city drops a queued national wonder, so scene 37's solvable world is its seventh (attempt 6).
-    for (i, attempt) in [(48, 1), (37, 6)] {
+    // The citadel as Unciv (ai/great-people GP0, 13 November): the great person improvements stand on hills and the
+    // citadel next to any own tile, so scene 37's solvable world is its sixth (attempt 5).
+    for (i, attempt) in [(48, 1), (37, 5)] {
         let missed = selfplay::play(&rules, &off, &jobs[i]).unwrap();
         assert!(!first_turn(&missed), "scene {i} as drawn is not taken in the first turn");
         let again = selfplay::play(&rules, &on, &jobs[i]).unwrap();
