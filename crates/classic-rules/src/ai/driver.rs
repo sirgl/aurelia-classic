@@ -146,6 +146,14 @@ impl ClassicMind {
         // wonder rule (`TurnBrief::wonder_race` = 1).
         // `next-war` is `standard` (the flags of `next-w` below) with the war of `siege-call` (its
         // flags and the switches of `WarOpen`, the variant `siege-call` plays).
+        // The fourteenth promotion (14 November): `standard` plays as `next-x` did, under its own name,
+        // and `pre-next-x` plays as `standard` did before it (the flags of `next-w`), under its own.
+        // Every other variant, `next-x` among them, plays as before.
+        let (variant, promoted) = match variant {
+            Variant::Standard => (Variant::NextX, Some(Variant::Standard)),
+            Variant::PreNextX => (Variant::Standard, Some(Variant::PreNextX)),
+            other => (other, None),
+        };
         let requested = variant;
         // `next-war-retake` is `next-war` with the retake of `retake2` (its flag on top of the war of
         // `siege-call`).
@@ -213,6 +221,8 @@ impl ClassicMind {
         // `retake2` under its own, `next-x` as `next-war-retake` with the guard and the landless
         // plan under its own.
         let named = named.or(matches!(requested, Variant::NextW | Variant::NextWar | Variant::NextWarRetake | Variant::NextX).then_some(requested));
+        // The game's AI since the fourteenth promotion and the standard before it carry their own names.
+        let named = promoted.or(named);
         Self { advisors, variant, genome: None, humans: Vec::new(), walks: Default::default(), choice: None, #[cfg(feature = "experimental-ai")] net, book, named, walls, conquest: None, unciv, tall: None, sharp, tall_real, next, wonder_race, pays, fit, muster, call, retake2, vote_guard, field, raidw, landless, landless_plan, siege_mend: false }
     }
 
@@ -304,9 +314,10 @@ impl ClassicMind {
     }
 
     pub fn variant(&self) -> Variant {
-        // The joint build's candidate carries the flags below under its own name.
-        if self.named == Some(Variant::NextX) {
-            return Variant::NextX;
+        // The joint build's candidate, the game's AI since the fourteenth promotion (which plays as it)
+        // and the standard before it carry the flags below under their own names.
+        if let Some(v @ (Variant::NextX | Variant::Standard | Variant::PreNextX)) = self.named {
+            return v;
         }
         if self.landless {
             return Variant::Landless;
@@ -1124,14 +1135,49 @@ mod sharp_tests {
         assert_eq!(Variant::from_name("next-x"), cfg!(feature = "experimental-ai").then_some(Variant::NextX));
     }
 
+    /// Every part of a mind the promotion can move: the variant whose switches it reads, its flags and the
+    /// parts it builds.
+    fn mind_parts(m: &ClassicMind) -> String {
+        format!(
+            "{:?}",
+            (
+                (m.variant, m.sharp, m.tall_real, m.next, m.wonder_race, m.pays, m.fit, m.muster, m.call, m.retake2),
+                (m.vote_guard, m.field, m.raidw, m.landless, m.landless_plan, m.siege_mend),
+                (m.walls.is_some(), m.unciv.is_some(), m.book.is_some(), m.tall, m.conquest, m.choice, m.genome.is_some()),
+            )
+        )
+    }
+
+    /// The fourteenth promotion (14 November): the game's AI is the mind of `next-x` and names itself
+    /// `standard`; `next-x` stays as its alias with the same mind; `pre-next-x` is the standard before
+    /// it, the mind of `next-w` (bench only). No other variant's mind moves: the ones measured on the
+    /// standard of the thirteenth promotion still play it.
+    #[test]
+    fn the_game_plays_next_x_and_pre_next_x_is_the_standard_before() {
+        let (standard, alias, before, next_w) = (ClassicMind::new(Variant::Standard), ClassicMind::new(Variant::NextX), ClassicMind::new(Variant::PreNextX), ClassicMind::new(Variant::NextW));
+        assert_eq!(mind_parts(&standard), mind_parts(&alias));
+        assert_eq!(mind_parts(&ClassicMind::default()), mind_parts(&standard), "the game's AI");
+        assert_eq!(mind_parts(&before), mind_parts(&next_w));
+        assert_eq!((standard.variant(), alias.variant(), before.variant(), next_w.variant()), (Variant::Standard, Variant::NextX, Variant::PreNextX, Variant::NextW));
+        assert!(standard.retakes() && standard.calls_at_walls() && standard.vote_guard && standard.landless_plan && standard.variant.war_open());
+        assert!(!before.retakes() && !before.vote_guard && !before.landless_plan && (before.variant, before.pays) == (Variant::Standard, false));
+        assert_eq!(Variant::from_name("standard"), Some(Variant::Standard));
+        assert_eq!(Variant::from_name("pre-next-x"), cfg!(feature = "experimental-ai").then_some(Variant::PreNextX));
+        // A book on `standard` plays on `pre-next`, as before the promotion.
+        let tall = ClassicMind::book_on(Variant::TallBook, Variant::Standard).unwrap();
+        assert_eq!((tall.variant, tall.pays, tall.vote_guard, tall.landless_plan), (Variant::PreNext, false, false, false));
+    }
+
     /// `landless` is `Standard` in every switch (the flags of `next-w` included) but for its own flag
-    /// (`TurnBrief::landless`); no other variant has the flag, and `Standard` does not carry it.
+    /// (`TurnBrief::landless`); no other variant has the flag, and `Standard` does not carry it. Its
+    /// `Standard` is the one it was measured on, `pre-next-x` since the fourteenth promotion.
     #[test]
     fn landless_plays_standard_with_its_flag() {
         let flags = |m: &ClassicMind| (m.sharp, m.tall_real, m.next, m.wonder_race, m.pays, m.fit, m.field, m.raidw);
-        let (landless, standard) = (ClassicMind::new(Variant::Landless), ClassicMind::new(Variant::Standard));
+        let (landless, standard) = (ClassicMind::new(Variant::Landless), ClassicMind::new(Variant::PreNextX));
         assert_eq!((landless.variant, flags(&landless), landless.landless, landless.variant()), (Variant::Standard, flags(&standard), true, Variant::Landless));
-        assert!(!standard.landless && standard.variant() == Variant::Standard);
+        assert!(!standard.landless && standard.variant() == Variant::PreNextX);
+        assert!(!ClassicMind::new(Variant::Standard).landless);
         let flagged: Vec<Variant> = Variant::ALL.into_iter().filter(|v| v.landless()).collect();
         assert_eq!(flagged, [Variant::Landless]);
         assert_eq!(Variant::from_name("landless"), cfg!(feature = "experimental-ai").then_some(Variant::Landless));
@@ -1188,8 +1234,9 @@ mod sharp_tests {
     #[test]
     fn the_game_plays_next_w_and_pre_next_is_the_standard_before() {
         let flags = |m: &ClassicMind| (m.sharp, m.tall_real, m.next, m.wonder_race);
-        let (standard, alias, before) = (ClassicMind::new(Variant::Standard), ClassicMind::new(Variant::NextW), ClassicMind::new(Variant::PreNext));
-        assert_eq!((standard.variant, flags(&standard), standard.variant()), (Variant::Standard, (true, true, true, 1), Variant::Standard));
+        // The standard of the thirteenth promotion is `pre-next-x` since the fourteenth.
+        let (standard, alias, before) = (ClassicMind::new(Variant::PreNextX), ClassicMind::new(Variant::NextW), ClassicMind::new(Variant::PreNext));
+        assert_eq!((standard.variant, flags(&standard), standard.variant()), (Variant::Standard, (true, true, true, 1), Variant::PreNextX));
         assert_eq!((alias.variant, flags(&alias), alias.variant()), (Variant::Standard, (true, true, true, 1), Variant::NextW));
         assert_eq!((before.variant, flags(&before), before.variant()), (Variant::PreNext, (false, false, false, 0), Variant::PreNext));
         assert_eq!(flags(&ClassicMind::default()), flags(&standard), "the game's AI");
@@ -1213,12 +1260,13 @@ mod sharp_tests {
     fn next_war_is_standard_with_the_war_of_siege_call() {
         let next = |m: &ClassicMind| (m.sharp, m.tall_real, m.next, m.wonder_race);
         let war = |m: &ClassicMind| (m.variant, m.pays, m.fit, m.muster, m.call);
-        let (mind, standard, call) = (ClassicMind::new(Variant::NextWar), ClassicMind::new(Variant::Standard), ClassicMind::new(Variant::SiegeCall));
+        // The game's AI of the thirteenth promotion, `pre-next-x` since the fourteenth.
+        let (mind, standard, call) = (ClassicMind::new(Variant::NextWar), ClassicMind::new(Variant::PreNextX), ClassicMind::new(Variant::SiegeCall));
         assert_eq!(next(&mind), next(&standard));
         assert_eq!(war(&mind), war(&call));
         assert_eq!(war(&call), (Variant::WarOpen, true, false, true, true));
         assert_eq!(next(&call), (false, false, false, 0));
-        assert_eq!((mind.variant(), call.variant(), standard.variant()), (Variant::NextWar, Variant::SiegeCall, Variant::Standard));
+        assert_eq!((mind.variant(), call.variant(), standard.variant()), (Variant::NextWar, Variant::SiegeCall, Variant::PreNextX));
         assert_eq!(Variant::from_name("next-war"), cfg!(feature = "experimental-ai").then_some(Variant::NextWar));
     }
 
@@ -1246,7 +1294,8 @@ mod sharp_tests {
             out.push(("nets", format!("{:?}", (m.net.is_some(), m.unit_net_on()))));
             out
         };
-        let standard = ClassicMind::new(Variant::Standard);
+        // The game's AI of the thirteenth promotion, `pre-next-x` since the fourteenth.
+        let standard = ClassicMind::new(Variant::PreNextX);
         for v in [Variant::NextWar, Variant::NextWarRetake, Variant::NextX] {
             let mind = ClassicMind::new(v);
             for ((name, a), (_, b)) in switches(&mind).into_iter().zip(switches(&standard)) {

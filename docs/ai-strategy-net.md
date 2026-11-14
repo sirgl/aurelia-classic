@@ -209,6 +209,29 @@ The net's layer 0 holds a model of every nation met, from the seat's public scre
 - **Inputs** `fe::RIVAL_*` (14, features 54–67): per row and victory the strongest rival over it plus ours (0.5 level), the width of the ranges (`rival_doubt`, 0 in a duel). Wired into the aims and postures with weight 0 (`weights::rival`): behaviour unchanged (the standard suite's hash `92432fac2d27f99e`), every weight the next step's to train. The trace prints a `RIVALS` line at each review (`ai-strategy-trace --only rivals`).
 - **The check** (`qa bench::rival_net`, `AURELIA_RIVAL_NET=<csv>`): every 25 rounds the estimate the seat's net reads beside the truth; the accuracy by measure, duel and six nations, is in the branch's report.
 
+## Promoted: next-x (the fourteenth promotion, 14 November)
+
+`standard` plays as the bench's `next-x`, the joint build of 12 November: the play of `next-w` above, with the war of
+`next-war-retake` (classic/docs/ai-war-pays.md §8–9: the flags of `war-pays`, `war-muster`, `siege-call` and the retake of
+a lost city, classic/docs/ai-retake.md, on the switches of `war-open`), the vote guard of `vote-guard` (above) and the goal
+of a player with no city and no settler given to its strategist (`landless-plan`), with the rivals' inputs at weight 0.
+The promotion is a choice of the mind (`ClassicMind::new`): `Variant::Standard` builds the mind `Variant::NextX` built,
+under the name `standard`. None of its code is behind `experimental-ai`, so the game built without it plays it
+(`ai_experimental_off`).
+
+`pre-next-x` is the standard before it: the mind of `next-w`, bench only (`experimental-ai`). Every other variant plays as
+it was measured: `next-w` (the play of the thirteenth promotion), `vote-guard`, `next-war`, `next-war-retake`,
+`landless-plan`, the variants on `pre-next` and the books (`book@standard` plays on `pre-next`, as before); `next-x`
+stays as an alias that plays as `standard`.
+
+Measured on the bench (pace, Quick, against the old `standard`; programme `work/nets`): `next-x` 59.4 % victory-weighted
+on 12 November; the control on the main of 14 November is in the programme's log. The checks of the promotion (the new
+`standard` plays the games of the old `next-x`, `pre-next-x` those of the old `standard`, the other variants theirs, and
+the time of a turn) are in the lane's log.
+
+A save of the old `standard` loads into the new one: a memory without the retake's section (`0x5E`) loads as no memory
+(classic/docs/ai-retake.md "Versioning"): a city lost before the load is not retaken as lost.
+
 ## Not done
 
 - No training: the next step is fine-tuning by outcomes with a penalty for moving from the hand weights (the design page).

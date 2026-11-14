@@ -38,7 +38,9 @@ harness = ["kernel/harness"]
 # strategy net). NOT in the game: the launchers and the UI do not turn it on; the AI bench
 # (aurelia-qa) does. Without it the game's AI is `Variant::Standard` (with the strategy net, its
 # 266 weights in `ai::strategy_net::weights`, since the twelfth promotion; playing as `next-w`, with
-# `ai::tall_real`, the delegates' price and `ai::wonder_race`, since the thirteenth) whatever
+# `ai::tall_real`, the delegates' price and `ai::wonder_race`, since the thirteenth; playing as
+# `next-x`, with the war of `next-war-retake`, the vote guard and the landless plan, since the
+# fourteenth) whatever
 # `AURELIA_AI_VARIANT` says, and the two tables of the site net and the choice net (played only by
 # `Variant::SiteNet` and the `ChoiceNet*` variants) are not compiled.
 experimental-ai = []
