@@ -243,6 +243,8 @@ pub struct ScreenState {
     pub actions: Vec<ShellAction>,
     /// The technology tree's selection and scroll.
     research_tree: dag::GraphState,
+    /// The tree was just opened: the next frame scrolls it to the technology in research.
+    research_opened: bool,
     match_setup: match_setup::MatchSetup,
     art: ScreenArt,
     nations: nations::NationsState,
@@ -285,6 +287,7 @@ impl Default for ScreenState {
             requests: Vec::new(),
             actions: Vec::new(),
             research_tree: Default::default(),
+            research_opened: false,
             match_setup: Default::default(),
             art: ScreenArt::new(CLASSIC_ART),
             nations: Default::default(),
@@ -552,6 +555,11 @@ impl ScreenState {
     pub fn opened(&mut self, screen: Screen, from: Screen) {
         if screen == Screen::Encyclopedia {
             self.pedia.return_to = from;
+        }
+        // The tree opens on the technology in research, not on antiquity; from a reference page
+        // it comes back where the player left it.
+        if screen == Screen::Research && from != Screen::Encyclopedia {
+            self.research_opened = true;
         }
         // Every new game starts from a fresh seed; coming back from a reference page keeps the form.
         if screen == Screen::MatchSetup && from != Screen::Encyclopedia {
