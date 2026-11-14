@@ -48,6 +48,7 @@ classic.game.reasons-rules.gp-cannot-trade = 他不能执行贸易任务
 classic.game.reasons-rules.gp-cannot-buy-city-state = 他不能收购城邦
 classic.game.reasons-rules.gp-needs-city = 至少需要一座城市
 classic.game.reasons-rules.gp-needs-city-state-land = 需要位于城邦领土上
+classic.game.reasons-rules.gp-no-city-reaches = 你的城市都无法覆盖这块地块
 classic.game.reasons-rules.cs-not-a-nation = 只有国家才能与城邦往来
 classic.game.reasons-rules.cs-not-a-city-state = 这不是城邦
 classic.game.reasons-rules.cs-unit-not-giftable = 该单位无法赠送

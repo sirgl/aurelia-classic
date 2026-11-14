@@ -48,6 +48,7 @@ classic.game.reasons-rules.gp-cannot-trade = Diese Persönlichkeit führt keine 
 classic.game.reasons-rules.gp-cannot-buy-city-state = Diese Persönlichkeit kauft keine Stadtstaaten
 classic.game.reasons-rules.gp-needs-city = Benötigt mindestens eine Stadt
 classic.game.reasons-rules.gp-needs-city-state-land = Benötigt das Land eines Stadtstaats
+classic.game.reasons-rules.gp-no-city-reaches = Keine Ihrer Städte reicht bis zu diesem Feld
 classic.game.reasons-rules.cs-not-a-nation = Nur Nationen verhandeln mit Stadtstaaten
 classic.game.reasons-rules.cs-not-a-city-state = Das ist kein Stadtstaat
 classic.game.reasons-rules.cs-unit-not-giftable = Diese Einheit kann nicht verschenkt werden

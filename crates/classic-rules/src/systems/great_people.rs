@@ -229,6 +229,7 @@ impl<'a> WorldTransaction<'a> {
         improvement: ImprovementId,
         rules: &CompiledRuleset,
     ) {
+        self.remove_camp_at(tile);
         self.place_improvement(owner, tile, improvement, rules);
         let radius = rules.improvements[improvement.0 as usize].culture_bomb_radius;
         if radius == 0 {

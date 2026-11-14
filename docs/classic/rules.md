@@ -8,7 +8,7 @@
 
 ## Summary
 
-Rule constants: 505 (AI constants: 949; 14 constants of engine plumbing in `platform/crates/kernel/src/persistence/`, `platform/crates/kernel/src/test_module.rs`, `platform/crates/kernel/src/math.rs`, `platform/crates/kernel/src/module.rs`, `classic/crates/classic-rules/src/save_codec.rs`, `classic/crates/classic-rules/src/fixtures.rs` are not listed).
+Rule constants: 506 (AI constants: 949; 14 constants of engine plumbing in `platform/crates/kernel/src/persistence/`, `platform/crates/kernel/src/test_module.rs`, `platform/crates/kernel/src/math.rs`, `platform/crates/kernel/src/module.rs`, `classic/crates/classic-rules/src/save_codec.rs`, `classic/crates/classic-rules/src/fixtures.rs` are not listed).
 
 | Source | Rule constants | AI constants |
 |---|---|---|
@@ -17,8 +17,8 @@ Rule constants: 505 (AI constants: 949; 14 constants of engine plumbing in `plat
 | own formula (expansion-only system; Unciv has no equivalent) | 0 | 0 |
 | own value | 14 | 4 |
 | own value (unverified) | 17 | 4 |
-| own value (source not recorded) | 142 | 930 |
-| total | 505 | 949 |
+| own value (source not recorded) | 143 | 930 |
+| total | 506 | 949 |
 
 Sections:
 
@@ -102,7 +102,7 @@ Every `pub const` of the rule code, by system. Value as written in the code; mea
 
 ### Production, purchase and processes
 
-22 constants (Unciv 7, own value 2, own value (unverified) 2, own value (source not recorded) 11). Files: `classic/crates/classic-rules/src/command/validate.rs`, `classic/crates/classic-rules/src/derived/grants.rs`, `classic/crates/classic-rules/src/systems/processes.rs`, `platform/crates/kernel/src/world/builds.rs`, `platform/crates/kernel/src/world/city.rs`, `platform/crates/kernel/src/world/city_economy.rs`.
+23 constants (Unciv 7, own value 2, own value (unverified) 2, own value (source not recorded) 12). Files: `classic/crates/classic-rules/src/command/validate.rs`, `classic/crates/classic-rules/src/derived/grants.rs`, `classic/crates/classic-rules/src/systems/processes.rs`, `platform/crates/kernel/src/world/builds.rs`, `platform/crates/kernel/src/world/city.rs`, `platform/crates/kernel/src/world/city_economy.rs`.
 
 | Name | Value | Meaning | Source | File |
 |---|---|---|---|---|
@@ -125,6 +125,7 @@ Every `pub const` of the rule code, by system. Value as written in the code; mea
 | `PURCHASE_DIVISOR` | `10` | Item prices are rounded down to a multiple of this. | Unciv: models/ruleset/IConstruction.kt (rounded down to 10), equal | `city.rs` |
 | `CITY_BASE_HIT_POINTS` | `200` | Hit points of a city without buildings (walls, castles and the rest add theirs, `crate::combat::city`). | own value (unverified) | `city.rs` |
 | `HURRY_RATE` | `2` | Urgency surcharge (Nation): buying out costs x2 of the missing points. | own value | `city.rs` |
+| `MAX_SOURCES` | `8` | Sources counted; a further one is not multiplied in (no rule set has more than three on one price). | own value (source not recorded) | `city.rs` |
 | `CULTURE_COST_LEN` | `128` | Cost of the city's next territory tile (border growth): `round(6 (t + 1.4813)^1.3)`, t is how many tiles the city has already claimed beyond its first ring (by culture and purchase together). | Unciv: CityExpansionManager.getCultureToNextTile, equal (Standard speed, no modifiers) | `city.rs` |
 | `GAME_MAX_TURNS` | `500` | Game length for GameProgress of the legacy tile price `purchase_price` (Standard speed, 500 turns; only tests read that price: the game's tile price is `territory::tile_purchase_offer`, its length `SpeedValues::max_rounds`). | Unciv: Speeds.json (Standard, 500 turns), equal | `city.rs` |
 | `UNLOCKED` | `[Process::Wealth, Process::Research]` | The processes a technology unlocks. | own value (source not recorded) | `city_economy.rs` |

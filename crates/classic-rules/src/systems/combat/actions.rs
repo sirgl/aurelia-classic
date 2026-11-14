@@ -161,6 +161,7 @@ impl<'a> WorldTransaction<'a> {
         ))?;
         let radius = i32::from(rules.improvements[citadel.0 as usize].culture_bomb_radius);
         self.expend_unit(unit, rules)?;
+        self.remove_camp_at(tile);
         self.place_improvement(owner, tile, citadel, rules);
         self.take_over_tiles(owner, tile, radius, rules);
         Ok(())

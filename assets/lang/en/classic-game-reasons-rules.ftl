@@ -47,6 +47,7 @@ classic.game.reasons-rules.gp-cannot-trade = He does not lead trade missions
 classic.game.reasons-rules.gp-cannot-buy-city-state = He does not buy city-states
 classic.game.reasons-rules.gp-needs-city = Needs at least one city
 classic.game.reasons-rules.gp-needs-city-state-land = Needs city-state land
+classic.game.reasons-rules.gp-no-city-reaches = No city of yours reaches this tile
 classic.game.reasons-rules.cs-not-a-nation = Only nations deal with city-states
 classic.game.reasons-rules.cs-not-a-city-state = This is not a city-state
 classic.game.reasons-rules.cs-unit-not-giftable = This unit cannot be gifted

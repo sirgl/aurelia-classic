@@ -48,6 +48,7 @@ classic.game.reasons-rules.gp-cannot-trade = この偉人は交易使節を率�
 classic.game.reasons-rules.gp-cannot-buy-city-state = この偉人は都市国家を買収できません
 classic.game.reasons-rules.gp-needs-city = 都市が1つ以上必要です
 classic.game.reasons-rules.gp-needs-city-state-land = 都市国家の領土が必要です
+classic.game.reasons-rules.gp-no-city-reaches = この区画に届く自国の都市がありません
 classic.game.reasons-rules.cs-not-a-nation = 都市国家と取引できるのは国家だけです
 classic.game.reasons-rules.cs-not-a-city-state = 都市国家ではありません
 classic.game.reasons-rules.cs-unit-not-giftable = このユニットは贈与できません

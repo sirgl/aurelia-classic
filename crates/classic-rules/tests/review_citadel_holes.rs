@@ -75,23 +75,27 @@ fn hole_unit_of_a_peaceful_player_left_inside_taken_land() {
     assert_ne!(at, Some(victim_tile), "a peaceful unit must not stay inside P0's closed borders");
 }
 
-/// Same for a ship on a taken water tile (Unciv: the filter is "all", water is taken).
+/// Same for a ship on a taken water tile (Unciv: the filter is "all", water is taken). The tile
+/// (8,7) is the other player's before the citadel, the ship stands on it and must be moved.
 #[test]
 fn hole_ship_of_a_peaceful_player_left_inside_taken_water() {
     let mut w = W::new(2);
     w.city(P0, 5, 7);
     w.city(P1, 9, 7);
     let sea = terrain(&w.rules, "core:terrain/coast");
-    let wet = w.tile(8, 6);
-    w.game.debug_set_terrain_batch(&w.rules, &[(wet, sea)]);
+    let wet = w.tile(8, 7);
+    // Water for the ship to go to: the taken tile and three more on P1's side.
+    let lake = [wet, w.tile(9, 6), w.tile(10, 7), w.tile(10, 6)];
+    w.game.debug_set_terrain_batch(&w.rules, &lake.map(|t| (t, sea)));
+    assert_eq!(w.owner(wet), Some(P1), "the water is P1's before the citadel");
     let site = w.tile(7, 7);
     let ship = w.spawn(P1, "core:unit/trireme", wet);
     let general = w.spawn(P0, "core:unit/great-general", site);
     w.exec(Command::GreatPersonAction { unit: general, action: GreatPersonAction::Construct(w.citadel()) }).unwrap();
-    if w.owner(wet) == Some(P0) {
-        let at = w.game.view().auth.units().get(ship).map(|u| u.core.tile);
-        assert_ne!(at, Some(wet), "ship inside P0's closed waters");
-    }
+    assert_eq!(w.owner(wet), Some(P0), "the water is taken");
+    let at = w.game.view().auth.units().get(ship).map(|u| u.core.tile);
+    assert!(at.is_some(), "the ship lives");
+    assert_ne!(at, Some(wet), "ship inside P0's closed waters");
 }
 
 /// Unciv takeOwnership: `if (tile.isBarbarianEncampment()) tile.removeImprovement()`.

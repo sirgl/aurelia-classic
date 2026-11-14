@@ -587,5 +587,8 @@ pub(crate) fn validate_citadel(
     // The same site rule as the great person action `Construct` (an improvement already there, a
     // feature or a natural wonder that forbids it, ...).
     kernel::world::builds::improvement_site(auth, rules, core.owner, tile, citadel).map_err(violation)?;
+    if !crate::derived::great_people::culture_bomb_reaches(auth, core.owner, tile) {
+        return Err(crate::derived::great_people::GreatPersonBlock::NoCityReaches.into());
+    }
     Ok(ResolvedCommand::BuildCitadel { unit, tile })
 }

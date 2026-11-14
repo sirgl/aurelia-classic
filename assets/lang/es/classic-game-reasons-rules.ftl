@@ -48,6 +48,7 @@ classic.game.reasons-rules.gp-cannot-trade = No dirige misiones comerciales
 classic.game.reasons-rules.gp-cannot-buy-city-state = No compra ciudades-estado
 classic.game.reasons-rules.gp-needs-city = Requiere al menos una ciudad
 classic.game.reasons-rules.gp-needs-city-state-land = Requiere territorio de una ciudad-estado
+classic.game.reasons-rules.gp-no-city-reaches = Ninguna de tus ciudades llega a esta casilla
 classic.game.reasons-rules.cs-not-a-nation = Solo las naciones tratan con ciudades-estado
 classic.game.reasons-rules.cs-not-a-city-state = No es una ciudad-estado
 classic.game.reasons-rules.cs-unit-not-giftable = Esta unidad no se puede regalar

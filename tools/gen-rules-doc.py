@@ -436,12 +436,12 @@ def formulas(v):
            v("CULTURE_TO_NEXT_TILE_EXPONENT"), v("CULTURE_TO_NEXT_TILE_MAX_DISCOUNT_PERCENT").replace("-", "")),
         "- **Tile purchase** (`kernel::world::territory::tile_purchase_offer`). A tile at distance d (at most %s) "
         "from the city costs %s gold times (d - 1) plus %s gold for every tile the city has claimed beyond its "
-        "first ring (by culture or purchase); the city's tile purchase percents then apply, multiplied one after the other (America -50 %, Angkor Wat -25 %), and a tile is never free."
+        "first ring (by culture or purchase); the city's tile purchase percents then apply, multiplied one after the other (America -50 %%, Angkor Wat -25 %%), and a tile is never free."
         % (v("PURCHASE_RADIUS_MAX"), v("PLOT_BASE_COST"), v("PLOT_COST_PER_PLOT_BOUGHT")),
         "- **Item gold price** (`kernel::world::city`). The gold price of a unit or building is "
         "(%s times its production cost) raised to the power 0.75, times the item's own percent (its "
         "`hurry_cost_modifier`: a settler, a horseman or a catapult +20, a caravel +30, a monument +40; a "
-        "wonder is not for sale) and the purchase percents of the city, each source one factor (multiplied one after the other, as Unciv does: -25 % and -15 % leave 63.75 %, not 60 %), rounded down to a multiple of %s once, at "
+        "wonder is not for sale) and the purchase percents of the city, each source one factor (multiplied one after the other, as Unciv does: -25 %% and -15 %% leave 63.75 %%, not 60 %%), rounded down to a multiple of %s once, at "
         "the end; the production already invested does not lower it." % (v("GOLD_PER_PRODUCTION"), v("PURCHASE_DIVISOR")),
         "- **Combat damage** (`combat::damage`). The stronger side's strength divided by the weaker's gives "
         "a ratio r; the damage factor is the mean of ((r + 3) / 4) to the fourth power and 1 (its inverse for "

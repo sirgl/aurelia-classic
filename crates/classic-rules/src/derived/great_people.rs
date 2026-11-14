@@ -27,6 +27,20 @@ pub const POINTS_FOR_NEXT_GREAT_PERSON_FACTOR: u32 = 2;
 /// Shortest golden age a great artist can start, in turns: a guard for a rules file that gives the unit no length. Own design.
 pub const MIN_GREAT_PERSON_GOLDEN_AGE_TURNS: u16 = 3;
 
+/// A culture bomb at `tile` has a city of `owner` that can hold the tile: within
+/// `CULTURE_RADIUS_MAX` of it. Unciv gives the tiles to the nearest city at any distance; here a
+/// city's tiles lie within that radius (`validate`), so a site no city reaches is refused rather
+/// than left unowned.
+pub fn culture_bomb_reaches(auth: &AuthWorld, owner: PlayerId, tile: crate::ids::TileId) -> bool {
+    let dims = auth.map().dimensions;
+    let max = i32::from(crate::world::city::CULTURE_RADIUS_MAX);
+    auth.indexes()
+        .cities_of(owner)
+        .iter()
+        .filter_map(|c| auth.cities().get(*c))
+        .any(|c| dims.distance(c.tile, tile).is_some_and(|d| d <= max))
+}
+
 /// What a great person does (each action uses the unit up).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum GreatPersonAction {
@@ -241,10 +255,11 @@ pub enum GreatPersonBlock {
     NeedsCityStateLand,
     NotMet,
     AtWar,
+    NoCityReaches,
 }
 
 impl GreatPersonBlock {
-    pub const ALL: [GreatPersonBlock; 15] = [
+    pub const ALL: [GreatPersonBlock; 16] = [
         GreatPersonBlock::NotAGreatPerson,
         GreatPersonBlock::WrongImprovement,
         GreatPersonBlock::CannotDiscover,
@@ -260,6 +275,7 @@ impl GreatPersonBlock {
         GreatPersonBlock::NeedsCityStateLand,
         GreatPersonBlock::NotMet,
         GreatPersonBlock::AtWar,
+        GreatPersonBlock::NoCityReaches,
     ];
 
     pub fn reason(self) -> &'static str {
@@ -277,6 +293,7 @@ impl GreatPersonBlock {
             GreatPersonBlock::CannotBuyCityState => "cannot buy a city-state",
             GreatPersonBlock::NeedsCity => "needs a city",
             GreatPersonBlock::NeedsCityStateLand => "needs a city-state's land",
+            GreatPersonBlock::NoCityReaches => "no city of yours reaches this tile",
             GreatPersonBlock::NotMet => "not met",
             GreatPersonBlock::AtWar => "at war",
         }
@@ -314,6 +331,9 @@ pub fn validate_action(
                 improvement,
             )
             .map_err(|reason| CommandError::RuleViolation(reason.into()))?;
+            if rules.improvements[improvement.0 as usize].culture_bomb_radius > 0 && !culture_bomb_reaches(auth, core.owner, core.tile) {
+                return Err(GreatPersonBlock::NoCityReaches.into());
+            }
         }
         GreatPersonAction::DiscoverTechnology => {
             if abilities.beakers_turns == 0 {
