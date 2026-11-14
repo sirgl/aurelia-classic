@@ -18,6 +18,7 @@ mod lost_orders;
 pub(crate) mod names;
 mod observed_city;
 mod orders;
+pub(crate) mod owner_colors;
 mod overview;
 mod path;
 pub(crate) mod reasons;
