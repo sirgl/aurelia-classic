@@ -107,7 +107,10 @@ use kernel::replay::hash::authoritative_hash;
 ///   "Promoted: next-w"); its strategy net, tall seats and wonder orders change the smoke game:
 ///   752dcbddd8b2ba1a, the hash of the benched `next-w` (`runs/bin-w`, 5079048) against itself,
 ///   measured; the old `standard` against itself (now `pre-next`) gave the old 6ee9092d56f035ca.
-const SMOKE_RESULT_HASH: &str = "752dcbddd8b2ba1a";
+/// - 14 November, the price of a tile is rounded once to the nearest gold, as Unciv's `roundToInt`
+///   (it was cut down twice): the AI buys tiles at other prices, the smoke game differs:
+///   752dcbddd8b2ba1a -> 2bfc4393a36c5fba.
+const SMOKE_RESULT_HASH: &str = "2bfc4393a36c5fba";
 
 fn pairing(candidate: &str) -> Pairing {
     Pairing { baseline: "standard".to_owned(), candidate: candidate.to_owned(), landless_seat: None }

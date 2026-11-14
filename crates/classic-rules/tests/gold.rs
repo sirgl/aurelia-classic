@@ -407,10 +407,10 @@ fn tile_prices_grow_with_distance_and_tiles_bought() {
             },
         )
         .unwrap();
-    // One tile claimed: ring 2 is 55 → 27; ring 3 is 105 → 52 (the
-    // percent truncates; Unciv rounds 27.5 and 52.5 up).
-    assert_eq!(offer(&w, 12, 9), Some(27));
-    assert_eq!(offer(&w, 13, 10), Some(52));
+    // One tile claimed: ring 2 is 55 → 27.5 → 28; ring 3 is 105 → 52.5 → 53 (Unciv's roundToInt
+    // rounds the halves up; the price is rounded once, after the speed and the percents).
+    assert_eq!(offer(&w, 12, 9), Some(28));
+    assert_eq!(offer(&w, 13, 10), Some(53));
 }
 
 #[test]
