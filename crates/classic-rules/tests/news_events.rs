@@ -6,7 +6,7 @@
 use classic_content::core::core_rules;
 use classic_rules::classic::ClassicChange;
 use classic_rules::derived::standing::{victory_warnings, VictoryWarning};
-use classic_rules::ids::{CityHandle, PlayerId, TechId, TileId, UnitKindId};
+use classic_rules::ids::{CityHandle, PlayerId, TechId, TerrainId, TileId, UnitKindId};
 use classic_rules::math::HexCoord;
 use classic_rules::rules::content::{CityStateId, ProjectId};
 use classic_rules::transaction::journal::PlayerChange;
@@ -15,6 +15,7 @@ use classic_rules::world::relations::{DealItem, PeaceRefusal};
 use classic_rules::world::victory::spaceship_parts;
 use classic_rules::{compile_rules, ClassicGame, Command, CompiledRuleset, GameConfig, GameState};
 
+const GRASSLAND: u16 = 1;
 const P0: PlayerId = PlayerId(0);
 const P1: PlayerId = PlayerId(1);
 const P2: PlayerId = PlayerId(2);
@@ -25,6 +26,9 @@ fn tile(game: &GameState, q: i32, r: i32) -> TileId {
 
 fn game_of(rules: &CompiledRuleset, players: u8) -> GameState {
     let mut game = GameState::new(rules, GameConfig { players, width: 30, height: 20, rng_seed: 4 });
+    let tiles = game.view().auth.map().dimensions.tile_count() as u32;
+    let land: Vec<(TileId, TerrainId)> = (0..tiles).map(|t| (TileId(t), TerrainId(GRASSLAND))).collect();
+    game.debug_set_terrain_batch(rules, &land);
     game.debug_found_city(rules, P0, tile(&game, 3, 3));
     game.debug_found_city(rules, P1, tile(&game, 24, 15));
     if players > 2 {
@@ -70,6 +74,10 @@ fn lapsed(changes: &[ClassicChange]) -> Vec<(PlayerId, PlayerId)> {
 fn an_unanswered_offer_lapses_and_names_its_proposer() {
     let rules = compile_rules(core_rules()).unwrap();
     let mut game = game_of(&rules, 2);
+    let writing = TechId(rules.technologies.iter().position(|t| t.key == "core:tech/writing").unwrap() as u16);
+    for player in [P0, P1] {
+        game.debug_learn(&rules, player, writing);
+    }
     until_active(&mut game, &rules, P0);
     game.execute(&rules, Command::ProposeDeal { from: P0, to: P1, items: vec![(P0, DealItem::Embassy)] }).unwrap();
     let mut told = Vec::new();

@@ -99,7 +99,7 @@ impl Session {
 mod tests {
     use classic_rules::ids::{CityHandle, PlayerId};
     use classic_rules::transaction::journal::ChangeJournal;
-    use classic_rules::Command;
+    use classic_rules::{ClassicGame, Command};
 
     use super::*;
     use crate::ui::screens::{game_rules, prepare_match, MapSize, MatchRequest};
