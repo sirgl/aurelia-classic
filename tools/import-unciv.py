@@ -618,6 +618,16 @@ HANDLERS = {
 
 
 # ----------------------------------------------------------------------------- own overrides
+def override_effect(effs, i, entry_id):
+    """The effect `i` of an entry that an override names; an override of an effect the entry does not
+    have (the catalog moved on, the override stayed) is an error that names both, not an IndexError."""
+    if not isinstance(i, int) or not 0 <= i < len(effs):
+        raise SystemExit(
+            f"own-overrides.json: {entry_id} names effect {i!r}, but the entry has {len(effs)} effects; "
+            "drop or correct that override")
+    return effs[i]
+
+
 def own_overrides(cats):
     """Apply classic/tools/own-overrides.json to the entries Unciv does not have.
 
@@ -642,8 +652,9 @@ def own_overrides(cats):
                 if o.get("effects_only"):  # an Unciv entry whose Brave New World effects the article states
                     effs = it.get("effects", [])
                     for i in o.get("effects", []):
-                        if effs[i].get("source") == OWN:
-                            effs[i]["source"] = src
+                        eff = override_effect(effs, i, it["id"])
+                        if eff.get("source") == OWN:
+                            eff["source"] = src
                             STATS["nation_effects"] += 1
                     continue
                 if it.get("provenance") != OWN and it.get("provenance") != OWN_CHECKED:
@@ -658,14 +669,14 @@ def own_overrides(cats):
                     STATS["nation_verified"][cat] = STATS["nation_verified"].get(cat, 0) + 1
                 effs = it.get("effects", [])
                 for i, fields in o.get("effect_set", {}).items():
-                    e = effs[int(i)]
+                    e = override_effect(effs, int(i), it["id"])
                     for f, v in fields.items():
                         if e.get(f) != v:
                             STATS["nation_changed"].append(f"{it['id']}.effects[{i}].{f}: {e.get(f)!r} -> {v!r}")
                         e[f] = v
                 idx = range(len(effs)) if o.get("effects") == "all" else o.get("effects", [])
                 for i in idx:
-                    effs[i]["source"] = src
+                    override_effect(effs, i, it["id"])["source"] = src
                     STATS["nation_effects"] += 1
                 # a nation's effects sit in its abilities: "all" or "<ability>.<effect>" indices
                 abl = [(f"{a}.{i}", e) for a, ab in enumerate(it.get("ability", [])) for i, e in enumerate(ab["effects"])]
