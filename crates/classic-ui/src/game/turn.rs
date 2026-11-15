@@ -10,6 +10,8 @@ use i18n::{t, tf};
 use client::simulation_driver::TickOutcome;
 use classic_rules::ids::{CityHandle, TechId, UnitHandle, UnitKindId};
 
+use classic_rules::derived::standing::VictoryWarning;
+
 use super::names;
 use super::AiProgress;
 use super::session::Session;
@@ -34,14 +36,18 @@ pub(super) struct EmpireSnapshot {
     routes: Vec<super::trade::RouteMark>,
     /// Own spies: name, rank, state.
     spies: Vec<(u8, u8, classic_rules::world::espionage::SpyState)>,
+    /// The steps of rivals toward a victory that were true.
+    victory_steps: Vec<VictoryWarning>,
 }
 
-struct CitySnapshot {
-    name: String,
-    tile: u32,
-    population: u32,
+pub(super) struct CitySnapshot {
+    pub(super) name: String,
+    pub(super) tile: u32,
+    pub(super) population: u32,
     buildings: usize,
-    damage: u16,
+    pub(super) damage: u16,
+    /// The city's food surplus was below zero.
+    pub(super) starving: bool,
 }
 
 impl Session {
@@ -150,6 +156,7 @@ impl Session {
                     population: core.population,
                     buildings: core.buildings.len(),
                     damage: core.damage,
+                    starving: self.is_starving(core),
                 };
                 cities.insert(handle, city);
             }
@@ -186,10 +193,11 @@ impl Session {
             resources: self.resource_marks(),
             routes: self.route_marks(),
             spies: self.spy_marks(),
+            victory_steps: self.victory_steps(),
         }
     }
 
-    fn report_changes(&mut self, before: &EmpireSnapshot) {
+    pub(super) fn report_changes(&mut self, before: &EmpireSnapshot) {
         self.report_cities(before);
         self.report_units(before);
         self.report_research(before);
@@ -198,6 +206,7 @@ impl Session {
         self.report_resources(&before.resources);
         self.report_trade(&before.routes);
         self.report_spies(&before.spies);
+        self.report_victory_steps(&before.victory_steps);
     }
 
     /// Golden ages starting and ending, the empire turning unhappy.
@@ -277,6 +286,7 @@ impl Session {
             if city.damage > old.damage {
                 notes.push((NoticeKind::Combat, tf!("classic.game.turn.city-attacked", city = city.name.as_str()), at));
             }
+            notes.extend(self.starvation_notes(city, old));
         }
         for (kind, text, tile) in notes {
             self.notify_at(kind, text, tile);

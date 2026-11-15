@@ -159,6 +159,7 @@ impl Session {
         self.notify_nuclear(&records);
         self.notify_lost_orders(&records);
         self.notify_offers(&records);
+        self.notify_news(&records);
         let observer = Observer::new(self.client.game.view(), &self.client.rules, self.me());
         let cues = derive(&observer, &records);
         self.presentation.push(cues);
