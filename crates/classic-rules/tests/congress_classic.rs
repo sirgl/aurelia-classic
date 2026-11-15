@@ -332,3 +332,63 @@ fn the_sessions_grow_with_the_eras() {
     assert!(SESSIONS.windows(2).all(|w| w[1].nation_delegates > w[0].nation_delegates));
     assert!(SESSIONS[..2].iter().all(|s| !s.united_nations) && SESSIONS[2].united_nations);
 }
+
+/// P0 (the host, 3 delegates) and P1 both propose, and the session opens with two proposals.
+fn session_of_two_proposals() -> (GameState, CompiledRuleset) {
+    let (mut game, rules) = world();
+    game.debug_learn(&rules, P0, tech(&rules, "core:tech/printing-press"));
+    end_round(&mut game, &rules);
+    for (player, kind) in [(P0, ResolutionKind::ScholarsInResidence), (P1, ResolutionKind::StandingArmyTax)] {
+        until_active(&mut game, &rules, player);
+        game.execute(&rules, Command::ProposeResolution { player, kind, choice: 0, repeal: false }).unwrap();
+    }
+    for _ in 0..60 {
+        if game.view().auth.module().congress().in_session() {
+            break;
+        }
+        end_round(&mut game, &rules);
+    }
+    assert_eq!(game.view().auth.module().congress().proposals().len(), 2);
+    until_active(&mut game, &rules, P0);
+    (game, rules)
+}
+
+/// A second resolution in the session must not cost the AI a vote: every delegate is cast (the
+/// even split leaves a remainder of one delegate when 3 delegates meet 2 proposals) and each
+/// resolution gets a vote.
+#[test]
+fn the_ai_casts_every_delegate_over_two_resolutions() {
+    let (mut game, rules) = session_of_two_proposals();
+    let left = game.view().auth.module().congress().delegates_left(P0);
+    assert_eq!(left, 3, "the host's seat");
+    let orders = vote_orders(&game.ai_observation(&rules, P0));
+    let cast: u16 = orders
+        .iter()
+        .map(|o| match o {
+            Command::CastVotes { delegates, .. } => *delegates,
+            other => panic!("{other:?}"),
+        })
+        .sum();
+    assert_eq!(cast, left, "{orders:?}");
+    assert_eq!(orders.len(), 2, "a vote on each resolution");
+    for order in orders {
+        game.execute(&rules, order).unwrap();
+    }
+    assert_eq!(game.view().auth.module().congress().delegates_left(P0), 0);
+}
+
+/// Nothing to cast: a nation with no delegates, or no session, gets no order.
+#[test]
+fn the_ai_without_delegates_or_session_casts_nothing() {
+    let (mut game, rules) = session_of_two_proposals();
+    let orders = vote_orders(&game.ai_observation(&rules, P0));
+    for order in orders {
+        game.execute(&rules, order).unwrap();
+    }
+    assert!(vote_orders(&game.ai_observation(&rules, P0)).is_empty(), "all cast: nothing left");
+    for _ in 0..3 {
+        end_round(&mut game, &rules);
+    }
+    assert!(!game.view().auth.module().congress().in_session());
+    assert!(vote_orders(&game.ai_observation(&rules, P0)).is_empty(), "no session");
+}
