@@ -141,16 +141,33 @@ fn a_melee_army_takes_the_city_through_the_siege() {
     assert_eq!(scene.owner_of_city(foe_tile), Some(AI), "the city is taken");
 }
 
-/// `standard` in the same state gives its units nothing to do: no goal, no operation, no war.
+/// `pre-next-x`, the standard before the fourteenth promotion, in the same state gives its units nothing to do:
+/// no goal, no operation, no war.
 #[test]
-fn standard_without_a_city_starts_no_war() {
+fn the_standard_before_without_a_city_starts_no_war() {
     let mut scene = scene(6, (8, 12), false);
     war_probe::enable(true);
-    play(&mut scene, Variant::Standard, 10);
+    play(&mut scene, Variant::PreNextX, 10);
     let probe = war_probe::take();
     war_probe::enable(false);
     assert!(probe.landless_goals.is_empty() && probe.landless_starts.is_empty());
     assert!(!scene.game.view().auth.diplomacy().at_war(AI, FOE));
+}
+
+/// The fourteenth promotion: `standard` in the same state plays the plan, as `landless-plan` does: the empty city
+/// is the goal, an operation is started on it and the war is declared and marched.
+#[test]
+fn standard_without_a_city_plays_the_landless_plan() {
+    let mut scene = scene(6, (8, 12), false);
+    let foe_tile = scene.tile(15, 10);
+    war_probe::enable(true);
+    play(&mut scene, Variant::Standard, 8);
+    let probe = war_probe::take();
+    war_probe::enable(false);
+    assert_eq!(probe.landless_goals.first().map(|g| g.2), Some(foe_tile.0), "the empty city is the goal");
+    assert!(probe.landless_starts.iter().any(|s| s.2 == foe_tile.0), "an operation was started on it: {:?}", probe.landless_starts);
+    assert!(probe.declarations.iter().any(|d| d.1 == AI && d.2 == FOE), "the operation declared the war: {:?}", probe.declarations);
+    assert!(probe.launched.iter().any(|l| l.1 == AI && l.2 == FOE), "the operation marched");
 }
 
 /// Plays `rounds` rounds of the scene as `play` does, with the trace kept: the AI's applied commands and the

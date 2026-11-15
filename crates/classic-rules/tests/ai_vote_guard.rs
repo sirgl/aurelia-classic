@@ -287,11 +287,11 @@ fn a_guard_denies_the_host_to_the_front_runner() {
     assert_eq!(vote(&game, &rules, true).map(|v| v.0), Some(u32::from(P0.0)));
 }
 
-/// The whole mind: the seat of `vote-guard` gifts to the rival's city-states in its turn and
-/// the plain `standard` does not.
+/// The whole mind: the seat of `vote-guard` gifts to the rival's city-states in its turn, and so does
+/// `standard` since the fourteenth promotion; `pre-next-x`, the standard before it, does not.
 #[cfg(feature = "experimental-ai")]
 #[test]
-fn the_vote_guard_seat_takes_influence_from_the_rival_and_the_standard_does_not() {
+fn the_vote_guard_seat_takes_influence_from_the_rival_and_the_standard_before_does_not() {
     use classic_rules::ai::driver::ClassicMind;
     use classic_rules::ai::variant::Variant;
     use classic_rules::ai::{AiDriver, AiSettings};
@@ -300,7 +300,7 @@ fn the_vote_guard_seat_takes_influence_from_the_rival_and_the_standard_does_not(
         obs.city_states.iter().filter(|c| (cs(0).0..=cs(2).0).contains(&c.player.0)).map(|c| c.influence).sum::<i32>()
     };
     let mut gained = Vec::new();
-    for variant in [Variant::VoteGuard, Variant::Standard] {
+    for variant in [Variant::VoteGuard, Variant::Standard, Variant::PreNextX] {
         let (mut game, rules) = scene(3, true);
         game.debug_earn(P0, 3000);
         let before = influence(&game, &rules);
@@ -308,8 +308,8 @@ fn the_vote_guard_seat_takes_influence_from_the_rival_and_the_standard_does_not(
         driver.run(&mut game, &rules, u32::MAX);
         gained.push(influence(&game, &rules) - before);
     }
-    // A gift of the smallest size reaches the rival's alliances; the plain AI never gifts them.
-    assert!(gained[0] > 0 && gained[1] == 0, "vote-guard {} against standard {} points of influence", gained[0], gained[1]);
+    // A gift of the smallest size reaches the rival's alliances; the AI before the guard never gifts them.
+    assert!(gained[0] > 0 && gained[1] > 0 && gained[2] == 0, "vote-guard {}, standard {}, pre-next-x {} points of influence", gained[0], gained[1], gained[2]);
 }
 
 fn until_active(game: &mut GameState, rules: &CompiledRuleset, player: PlayerId) {
