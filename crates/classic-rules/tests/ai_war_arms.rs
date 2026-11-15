@@ -97,10 +97,16 @@ fn war_counts(variant: Variant, pop: u32, bomb: bool) -> (u64, u64, u64) {
 
 /// The AI that owns a nuclear weapon forms its operation counting on it and uses it; the game's
 /// AI before the heavy arms (`previous`) does not use the weapon it owns.
+///
+/// Played by `pre-next-x`, `standard` before the fourteenth promotion. Since then `standard` wars as `next-x`, on
+/// the war line (`war-pays`, `war-muster`, `siege-call`): a war is started only when it pays, and in this scene
+/// it forms no operation against a city of 4 to 12 citizens, so there is none to plan around the weapon;
+/// `next-war`, `siege-call` and `next-war-retake` do the same, `war-pays` alone forms one against a city of up
+/// to 8 citizens. The counting of weapons is the operation's (`operations::candidate`), not a variant's flag.
 #[test]
 fn an_operation_planned_around_a_nuclear_weapon_on_hand_uses_it() {
     let (_, _, nukes_previous) = war_counts(Variant::Previous, 12, true);
-    let (operations, _, nukes) = war_counts(Variant::Standard, 12, true);
+    let (operations, _, nukes) = war_counts(Variant::PreNextX, 12, true);
     assert_eq!(nukes_previous, 0);
     assert!(operations >= 1 && nukes >= 1, "operations {operations}, nuclear weapons launched {nukes}");
 }

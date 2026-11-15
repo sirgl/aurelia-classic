@@ -426,7 +426,12 @@ fn the_siege_ladder_sets_the_scene() {
     // The minimal world (`--battle-minimal`): the duel map, two nations, no city-states; it replays and exports aligned.
     let (bare, _, _) = play_in(None, Some(at(grounds::Rung::Ring { extra: grounds::FULL })), None, true);
     assert_eq!(bare.rung, Some(at(grounds::Rung::Ring { extra: grounds::FULL })));
-    let (bare_blow, _, _) = play_in(None, Some(at(grounds::Rung::Blow)), Some("standard"), true);
+    // `pre-next-x`, the standard before the fourteenth promotion, not `standard`: `standard` wars on the war line of
+    // `next-x`, which starts a war only when it pays, and in the bare world (two nations, no city-states) it takes the
+    // city of the blow at offset 3 in none of the rounds played (so do `next-x`, `next-war` and `next-war-retake`;
+    // `pre-next-x`, `next-w`, `vote-guard` and `landless-plan` take it in round 60). `standard` takes it in the world
+    // with city-states, above.
+    let (bare_blow, _, _) = play_in(None, Some(at(grounds::Rung::Blow)), Some("pre-next-x"), true);
     assert!(bare_blow.captured_round.is_some(), "a bare world's blow takes the city too");
     // Varied scenes (`--battle-vary`): the draws recorded (the era, the kinds, the city's and the units' tiles); they replay and export aligned.
     for rung in [at(grounds::Rung::Ring { extra: grounds::FULL }), at(grounds::Rung::Back { tiles: 1 })] {

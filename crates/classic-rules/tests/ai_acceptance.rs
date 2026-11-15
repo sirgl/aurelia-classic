@@ -533,15 +533,26 @@ fn a_blind_front_member_holds_on_the_ring() {
     assert!(both <= 40, "front members step in and back: {both} unit-rounds");
 }
 
-/// The conquest matrix played by the game's AI (`standard`). Before a
+/// The conquest matrix played by the game's AI of the thirteenth promotion
+/// (`pre-next-x`, `standard` before the fourteenth). Before a
 /// captured city's unrest was priced at the empire's own rates
 /// (`Prices::captured_city_unrest`), econ2's dear happiness made the
 /// capture worth less than its unrest: no war at 10 and 12 tiles, no capture
 /// at 8.
+///
+/// Since the fourteenth promotion `standard` wars as `next-x`, on the war line
+/// (`war-pays`, `war-muster`, `siege-call`, classic/docs/ai-war-pays.md): a war
+/// is started only when it pays. In this scene (two nations, a band of
+/// warriors against a passive neighbour) it declares no war and captures
+/// nothing at 8, 10 or 12 tiles; `war-pays`, `siege-call`, `next-war`,
+/// `next-war-retake` and `next-x` do the same here, while `pre-next-x`,
+/// `next-w`, `vote-guard` and `landless-plan` capture at every distance. The
+/// matrix pins the standard it was written for; the war line is measured on
+/// the bench, not in this scene.
 #[test]
 fn the_games_ai_conquers_in_the_matrix() {
     for (seed, distance) in [(31, 8), (32, 10), (33, 12)] {
-        conquest_by(seed, distance, ClassicMind::default());
+        conquest_by(seed, distance, ClassicMind::new(Variant::PreNextX));
     }
 }
 
