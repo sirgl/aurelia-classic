@@ -186,6 +186,6 @@ painted
   clip 0,0 1366x768
     text "ローマ  ·  都市管理" 626,125 82x11 #c1a263 10px
 art
-  core:unit/scout
+  bnw:unit/scout
   core:unit/worker
   warrior
