@@ -38,8 +38,8 @@ fn replay(module: &str, save: &[u8], journal: &[u8]) -> Result<String, String> {
 }
 
 fn main() {
-    // What a bug report says about the build (`AURELIA_GIT_HASH`: set it when building to name the commit).
-    launcher_core::client::shell::report::set_build(env!("CARGO_PKG_VERSION"), option_env!("AURELIA_GIT_HASH"));
+    // The version and commit the menu, the settings and a bug report state (`build-info.rs` names the commit).
+    launcher_core::client::register_build!();
     desktop::main(Product {
         title: "Aurelia",
         module: || (ClassicUi::game(), classic_ui::terrain_layers()),

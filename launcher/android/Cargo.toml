@@ -8,6 +8,7 @@ repository = "https://github.com/sirgl/aurelia-classic"
 keywords = ["launcher", "android", "gamedev"]
 categories = ["game-development"]
 rust-version = "1.98"
+build = "../build-info.rs"
 publish = false
 description = "Aurelia for Android: the shell of `client` on a NativeActivity window (lands/docs/android.md)."
 

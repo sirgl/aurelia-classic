@@ -60,6 +60,14 @@ fn main_menu() {
 }
 
 #[test]
+fn the_menu_and_the_settings_show_the_registered_build() {
+    let mut stage = Stage::new(ClassicUi::game(), SIZE);
+    assert!(stage.snapshot().contains("text \"Version 9.9.9 (abcdef0)\""), "the menu names the build");
+    stage.open(ShellScreen::Settings);
+    assert!(stage.snapshot().contains("text \"Version 9.9.9 (abcdef0)\""), "the settings screen names the build");
+}
+
+#[test]
 fn hud_over_the_map() {
     let mut stage = opened_match();
     assert_eq!(stage.screens.screen, ShellScreen::Map);

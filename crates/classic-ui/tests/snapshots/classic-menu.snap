@@ -37,5 +37,7 @@ painted
     rect 89,550 320x34 fill #192f34 r4
     rect 89,550 320x34 stroke 1 #344849 r4
     text "Report a bug" 208,559 81x16 #efe9d3 14px
+    rect 1222,743 124x17 fill #00000078 r3
+    text "Version 9.9.9 (abcdef0)" 1228,745 112x13 #92a8aa 11px
 art
   menu

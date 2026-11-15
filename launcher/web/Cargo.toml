@@ -8,6 +8,7 @@ repository = "https://github.com/sirgl/aurelia-classic"
 keywords = ["launcher", "wasm", "gamedev"]
 categories = ["game-development", "wasm"]
 rust-version = "1.98"
+build = "../build-info.rs"
 publish = false
 description = "Aurelia in a browser page"
 

@@ -14,7 +14,7 @@ The report file holds `report.txt` (the same facts and the log tail), `game.aure
 
 ## What the text says
 
-Game version (`CARGO_PKG_VERSION` of the launcher; the commit too when the build is made with `AURELIA_GIT_HASH` set), operating system and architecture, graphics backend and adapter (on the web also `navigator.userAgent`), the language, the window size, whether a match runs with its seed (unknown for a match loaded from a save, which does not keep it), the round and the number of the last command played in this session, the last panic (message and location) if there was one, and the last 20 lines of the game's log (warnings and errors).
+Game version (`CARGO_PKG_VERSION` of the launcher; the commit too when the build knows it: `launcher/build-info.rs` sets `AURELIA_GIT_HASH` from the checkout, or the caller's own value wins; the main menu and the settings screen show the same version and short commit), operating system and architecture, graphics backend and adapter (on the web also `navigator.userAgent`), the language, the window size, whether a match runs with its seed (unknown for a match loaded from a save, which does not keep it), the round and the number of the last command played in this session, the last panic (message and location) if there was one, and the last 20 lines of the game's log (warnings and errors).
 
 ## Privacy
 
@@ -45,5 +45,5 @@ The repository is one constant: `ISSUE_REPO` in `platform/crates/client/src/shel
 | dialog | `…/report/dialog.rs` |
 | gathering and saving (the app) | `platform/crates/client/src/shell/app/report_host.rs` |
 | web download and crash hook | `platform/crates/launcher-core/src/web/report.rs`, `launcher/web/static/report.js` |
-| build registration | `launcher/*/src/main.rs`, `lib.rs` (`report::set_build`) |
+| build registration | `launcher/*/src/main.rs`, `lib.rs` (`client::register_build!`), `launcher/build-info.rs` |
 | the seed of a match | `ModuleUi::world_seed`, `classic-ui/src/module.rs` |
