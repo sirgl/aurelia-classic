@@ -259,4 +259,29 @@ mod tests {
         assert_eq!(colors[2], BARBARIAN);
         assert!(closest_pair(&[colors[0], colors[1], colors[3]]) >= MIN_DISTANCE);
     }
+
+    /// The slots of a real match, from the new-game screen's own numbers.
+    fn slots_of_match(size: crate::ui::screens::WorldSize, players: u8, city_states: u8) -> usize {
+        use crate::ui::screens::{prepare_game, GameOptions, MapSize, MatchRequest, NewGame};
+        let request = MatchRequest { nation: "core:nation/rome".into(), seed: 4, size: MapSize::World(size), players, water: 25 };
+        let options = GameOptions { city_states, barbarians: true, ..GameOptions::default() };
+        let prepared = prepare_game(NewGame { request, options }).expect("the world is generated");
+        slots_of(&prepared.game, &crate::ui::screens::game_rules()).len()
+    }
+
+    /// The renderer paints `MAX_PAINTED_OWNERS` slots; a slot past it falls back to the old palette
+    /// of eight colours, which another owner already wears. Every size of the setup, and the most
+    /// the setup lets through (16 powers, 24 city-states, the barbarians), must fit.
+    #[test]
+    fn every_player_slot_of_a_real_match_is_painted_by_the_renderer() {
+        use crate::ui::screens::WorldSize;
+        let cap = render::gpu::buffers::MAX_PAINTED_OWNERS;
+        for size in WorldSize::ALL {
+            let slots = slots_of_match(size, size.nations(), size.city_states());
+            assert!(slots <= cap, "{size:?}: {slots} player slots, the renderer paints {cap}");
+        }
+        let most = slots_of_match(WorldSize::Huge, 16, 24);
+        assert_eq!(most, 41, "16 powers, 24 city-states, the barbarians");
+        assert!(most <= cap, "the biggest match: {most} player slots, the renderer paints {cap}");
+    }
 }
