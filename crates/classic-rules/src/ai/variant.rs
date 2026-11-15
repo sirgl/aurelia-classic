@@ -97,8 +97,12 @@
 //! is `NextWar` with its retake flag: the mind of `Standard` with the war of `Retake2`.
 //! `NextX` (the joint build of 12 November) is every AI line accepted on 11–12 November on one mind:
 //! the war of `NextWarRetake`, the guard of `VoteGuard` and the plan of `LandlessPlan`, with the
-//! rivals' inputs every variant reads at weight 0. A bench-only candidate; `Standard` is unchanged,
-//! and the transfer of `NextX` into it is a promotion of its own.
+//! rivals' inputs every variant reads at weight 0. In the fourteenth promotion (14 November)
+//! `Standard` took the play of `NextX`: the mind of `NextX` (`ClassicMind::new`) under the name
+//! `standard`, in every build. `PreNextX` is the standard before it (the play of `NextW`; bench only,
+//! `experimental-ai`); `NextX` stays as an alias that plays as `Standard`. As in the thirteenth, the
+//! promotion is a choice of the mind, not of a variant's switches: every other variant plays as it
+//! was measured (`NextW`, `VoteGuard`, `NextWarRetake`, `LandlessPlan`, the books on `PreNext` …).
 
 use crate::ai::grand_strategy::Stakes;
 use crate::ai::operations::WarGate;
@@ -157,6 +161,11 @@ pub enum Variant {
     /// nation has built is dropped and not hurry-bought (`TurnBrief::wonder_race` = 1,
     /// `ai::wonder_race`); classic/docs/ai-strategy-net.md "Promoted: next-w". The mind plays its
     /// switches with these flags (`ClassicMind::new`).
+    /// Since the fourteenth promotion (14 November) it plays as `NextX`: on top of the play of
+    /// `NextW` it wars as `NextWarRetake` does (the flags of `WarPays`, `WarMuster`, `SiegeCall` and the
+    /// retake of a lost city, on the switches of `WarOpen`), takes the alliances of a rival that would
+    /// win the World Leader vote (`VoteGuard`), and gives a player with no city and no settler a goal
+    /// through its strategist (`LandlessPlan`); `PreNextX` is the standard before it.
     #[default]
     Standard,
     /// The game's AI before the eleventh promotion (2 November): `Standard` without the
@@ -822,8 +831,16 @@ pub enum Variant {
     ///   `TurnBrief::siege_mend`); `Landless`, the goal without the strategist, is replaced by it;
     /// - the model of the rivals (`ai::rival_model`) as inputs of the strategy net at weight 0, which
     ///   every variant reads.
-    /// A bench-only candidate, `experimental-ai` only; `Standard` does not change.
+    /// Promoted to `Standard` on 14 November (the fourteenth promotion): kept under its name as an
+    /// alias that plays as `Standard` (`experimental-ai` only, as before).
     NextX,
+    /// The game's AI before the fourteenth promotion (14 November): the mind of `NextW`, `Standard`'s
+    /// switches with the flags of the thirteenth promotion (sharp, tall-real, next, the wonder rule),
+    /// without the war, the guard and the landless plan of `NextX` (`ClassicMind::new`). The control of
+    /// the promotion. The variants described as `Standard` with or without a change keep playing as they
+    /// were measured (`NextW`'s flags or `PreNext`); none plays on `PreNextX`. Kept for the bench
+    /// (`experimental-ai` only).
+    PreNextX,
 }
 
 /// The net's base: the expert the end-to-end net learns from and the mind it
@@ -844,7 +861,7 @@ const NUDGED_CANDIDATES: u32 = 40;
 
 impl Variant {
     /// The game's AI first.
-    pub const ALL: [Variant; 156] = [
+    pub const ALL: [Variant; 157] = [
         Variant::Standard,
         Variant::PreCamps,
         Variant::PreWorkers,
@@ -1001,6 +1018,7 @@ impl Variant {
         Variant::Landless,
         Variant::LandlessPlan,
         Variant::NextX,
+        Variant::PreNextX,
     ];
 
     pub fn name(self) -> &'static str {
@@ -1143,6 +1161,7 @@ impl Variant {
             Variant::Landless => "landless",
             Variant::LandlessPlan => "landless-plan",
             Variant::NextX => "next-x",
+            Variant::PreNextX => "pre-next-x",
             Variant::ArmyFit => "army-fit",
             Variant::Camps => "camps",
             Variant::ArmyCamps => "army-camps",
@@ -1176,12 +1195,14 @@ impl Variant {
     /// since the thirteenth: `Standard` carries its flags in every build (none of its code is
     /// behind the feature); the name `next-w` stays the bench's. The war line (`WarPays` …
     /// `NextWarRetake`), the vote guard, the landless players and the joint build's `NextX` are the
-    /// bench's too.
+    /// bench's too. The play of `next-x` is the game's since the fourteenth promotion: `Standard`
+    /// plays it in every build (none of its code is behind the feature); the names `next-x` and
+    /// `pre-next-x` (the standard before) are the bench's.
     pub fn compiled(self) -> bool {
         cfg!(feature = "experimental-ai")
             || !matches!(
                 self,
-                Variant::Net | Variant::UnitNet | Variant::Hybrid | Variant::SiteNet | Variant::ChoiceNet | Variant::ChoiceNetProduction | Variant::ChoiceNetResearch | Variant::StandardScripted | Variant::PreCsGifts | Variant::Sharp | Variant::TallReal | Variant::Next | Variant::WonderCancel | Variant::WonderRace | Variant::NextW | Variant::NextRace | Variant::PreNext | Variant::WarPays | Variant::TacticianFit | Variant::WarMuster | Variant::SiegeCall | Variant::NextWar | Variant::Retake2 | Variant::NextWarRetake | Variant::VoteGuard | Variant::FieldCraft | Variant::RaidWar | Variant::Landless | Variant::LandlessPlan | Variant::NextX
+                Variant::Net | Variant::UnitNet | Variant::Hybrid | Variant::SiteNet | Variant::ChoiceNet | Variant::ChoiceNetProduction | Variant::ChoiceNetResearch | Variant::StandardScripted | Variant::PreCsGifts | Variant::Sharp | Variant::TallReal | Variant::Next | Variant::WonderCancel | Variant::WonderRace | Variant::NextW | Variant::NextRace | Variant::PreNext | Variant::WarPays | Variant::TacticianFit | Variant::WarMuster | Variant::SiegeCall | Variant::NextWar | Variant::Retake2 | Variant::NextWarRetake | Variant::VoteGuard | Variant::FieldCraft | Variant::RaidWar | Variant::Landless | Variant::LandlessPlan | Variant::NextX | Variant::PreNextX
             )
     }
 
