@@ -132,16 +132,18 @@ fn siege(variant: Variant) -> Siege {
     out
 }
 
-/// `standard` (since the seventh promotion; `siege-walls` its alias) gathers
-/// out of the walls' strike, steps in and shoots with every archer in one
-/// turn, and takes the capital; `pre-siege`, the standard before, with the
-/// same army does not take it in the same rounds.
+/// `pre-next-x`, the standard of the seventh to the thirteenth promotion
+/// (`siege-walls` its alias), gathers out of the walls' strike, steps in and
+/// shoots with every archer in one turn, and takes the capital; `pre-siege`,
+/// the standard before the seventh, with the same army does not take it in the
+/// same rounds. (`standard` plays the war of `next-x` since the fourteenth
+/// promotion; it is measured in `the_standard_takes_the_walls_as_the_standard_before`.)
 #[test]
 fn the_army_musters_out_of_reach_strikes_together_and_takes_the_walls() {
-    let walls = siege(Variant::Standard);
-    eprintln!("standard: {walls:?}");
+    let walls = siege(Variant::PreNextX);
+    eprintln!("pre-next-x: {walls:?}");
     let alias = siege(Variant::SiegeWalls);
-    assert_eq!(format!("{alias:?}"), format!("{walls:?}"), "`siege-walls` plays as `standard`");
+    assert_eq!(format!("{alias:?}"), format!("{walls:?}"), "`siege-walls` plays as the standard before the fourteenth promotion");
     let standard = siege(Variant::PreSiege);
     eprintln!("pre-siege: {standard:?}");
     // Out of the walls' strike until the strike: one member at most (the one that looks at
@@ -177,7 +179,18 @@ fn siege_join_plays_the_tasked_siege_as_pre_join() {
     let before = siege(Variant::PreJoin);
     let join = siege(Variant::SiegeJoin);
     assert_eq!(format!("{join:?}"), format!("{before:?}"), "`siege-join` besieges a tasked army as `pre-join`");
-    assert_eq!(format!("{:?}", siege(Variant::Standard)), format!("{join:?}"), "`standard` besieges as its alias `siege-join`");
+    assert_eq!(format!("{:?}", siege(Variant::PreNextX)), format!("{join:?}"), "`pre-next-x`, the standard before the fourteenth promotion, besieges as its alias `siege-join`");
+}
+
+/// The fourteenth promotion: `standard` (the war of `next-x`) sieges the same scene.
+#[test]
+fn the_standard_takes_the_walls_as_the_standard_before() {
+    let before = siege(Variant::PreNextX);
+    let now = siege(Variant::Standard);
+    eprintln!("standard: {now:?}");
+    assert!(now.taken.is_some(), "`standard` takes the capital: {now:?}");
+    assert!(now.taken <= before.taken, "no later than the standard before ({:?}): {now:?}", before.taken);
+    assert!(now.volleys.iter().any(|(_, n)| *n >= 4), "a volley of four shooters at once: {now:?}");
 }
 
 /// The seventh promotion: `standard` besieges walled cities, `siege-walls`
