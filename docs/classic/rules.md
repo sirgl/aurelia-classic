@@ -102,7 +102,7 @@ Every `pub const` of the rule code, by system. Value as written in the code; mea
 
 ### Production, purchase and processes
 
-23 constants (Unciv 7, own value 2, own value (unverified) 2, own value (source not recorded) 12). Files: `classic/crates/classic-rules/src/command/validate.rs`, `classic/crates/classic-rules/src/derived/grants.rs`, `classic/crates/classic-rules/src/systems/processes.rs`, `platform/crates/kernel/src/world/builds.rs`, `platform/crates/kernel/src/world/city.rs`, `platform/crates/kernel/src/world/city_economy.rs`.
+22 constants (Unciv 7, own value 2, own value (unverified) 2, own value (source not recorded) 11). Files: `classic/crates/classic-rules/src/command/validate.rs`, `classic/crates/classic-rules/src/derived/grants.rs`, `classic/crates/classic-rules/src/systems/processes.rs`, `platform/crates/kernel/src/world/builds.rs`, `platform/crates/kernel/src/world/city.rs`, `platform/crates/kernel/src/world/city_economy.rs`.
 
 | Name | Value | Meaning | Source | File |
 |---|---|---|---|---|
@@ -125,7 +125,6 @@ Every `pub const` of the rule code, by system. Value as written in the code; mea
 | `PURCHASE_DIVISOR` | `10` | Item prices are rounded down to a multiple of this. | Unciv: models/ruleset/IConstruction.kt (rounded down to 10), equal | `city.rs` |
 | `CITY_BASE_HIT_POINTS` | `200` | Hit points of a city without buildings (walls, castles and the rest add theirs, `crate::combat::city`). | own value (unverified) | `city.rs` |
 | `HURRY_RATE` | `2` | Urgency surcharge (Nation): buying out costs x2 of the missing points. | own value | `city.rs` |
-| `MAX_SOURCES` | `8` | Sources counted; a further one is not multiplied in (no rule set has more than three on one price). | own value (source not recorded) | `city.rs` |
 | `CULTURE_COST_LEN` | `128` | Cost of the city's next territory tile (border growth): `round(6 (t + 1.4813)^1.3)`, t is how many tiles the city has already claimed beyond its first ring (by culture and purchase together). | Unciv: CityExpansionManager.getCultureToNextTile, equal (Standard speed, no modifiers) | `city.rs` |
 | `GAME_MAX_TURNS` | `500` | Game length for GameProgress of the legacy tile price `purchase_price` (Standard speed, 500 turns; only tests read that price: the game's tile price is `territory::tile_purchase_offer`, its length `SpeedValues::max_rounds`). | Unciv: Speeds.json (Standard, 500 turns), equal | `city.rs` |
 | `UNLOCKED` | `[Process::Wealth, Process::Research]` | The processes a technology unlocks. | own value (source not recorded) | `city_economy.rs` |
@@ -732,7 +731,7 @@ Every `pub const` of the rule code, by system. Value as written in the code; mea
 
 ### Other rule constants
 
-16 constants (Unciv 11, own value (source not recorded) 5). Files: `classic/crates/classic-rules/src/derived/building_sale.rs`, `classic/crates/classic-rules/src/derived/disband.rs`, `classic/crates/classic-rules/src/derived/standing.rs`, `classic/crates/classic-rules/src/knowledge/actions.rs`, `classic/crates/classic-rules/src/systems/revolts.rs`, `classic/crates/classic-rules/src/world/mod.rs`.
+17 constants (Unciv 11, own value (source not recorded) 6). Files: `classic/crates/classic-rules/src/derived/building_sale.rs`, `classic/crates/classic-rules/src/derived/disband.rs`, `classic/crates/classic-rules/src/derived/standing.rs`, `classic/crates/classic-rules/src/knowledge/actions.rs`, `classic/crates/classic-rules/src/systems/revolts.rs`, `classic/crates/classic-rules/src/world/mod.rs`.
 
 | Name | Value | Meaning | Source | File |
 |---|---|---|---|---|
@@ -741,6 +740,7 @@ Every `pub const` of the rule code, by system. Value as written in the code; mea
 | `DISBAND_GOLD_DIVISOR` | `20` | Unciv: BaseUnit.getDisbandGold divides the base gold cost by 20. | Unciv: BaseUnit.getDisbandGold divides the base gold cost by 20 | `disband.rs` |
 | `ALL` | `[DisbandBlock::UnknownUnit, DisbandBlock::NoMovesLeft]` |  | own value (source not recorded) | `disband.rs` |
 | `ALL` | `[Measure::Population, Measure::Crop, Measure::Goods, Measure::Gnp, Measure::Literacy, M...` |  | own value (source not recorded) | `standing.rs` |
+| `LEADER_VOTE_WARNING_TURNS` | `3` | Turns before the Congress session that elects the World Leader from which the player is told that the vote is near. | own value (source not recorded) | `standing.rs` |
 | `MARCH_TAG` | `10` | The codec tag of `MarchTo` (`command/codec.rs`), not enumerated. | own value (source not recorded) | `actions.rs` |
 | `REVOLT_DELAY_BASE` | `4` | Turns from the first turn below the threshold to the rising, before the random part and the game speed. | Unciv: `ModConstants.baseTurnsUntilRevolt` (4); equal | `revolts.rs` |
 | `REVOLT_DELAY_RANDOM` | `3` | The random part of the delay: `rand(3)` more turns. | Unciv: TurnManager.getTurnsBeforeRevolt (`nextInt(3)`); equal | `revolts.rs` |
