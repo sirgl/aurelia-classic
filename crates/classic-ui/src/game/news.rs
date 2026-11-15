@@ -12,7 +12,7 @@
 use classic_rules::classic::ClassicChange;
 use classic_rules::derived::standing::{victory_warnings, VictoryWarning};
 use classic_rules::transaction::journal::{AppliedCommand, PlayerChange};
-use classic_rules::world::city::CityCore;
+use classic_rules::world::city::{CityCore, CityStatus};
 use i18n::{t, tf};
 
 use super::session::Session;
@@ -82,11 +82,12 @@ impl Session {
     }
 
     /// The notices of a city of the player that starves: it began to starve in the round, or it
-    /// lost a citizen to hunger (a fight that took a citizen also took the city's hit points).
+    /// lost a citizen to hunger (a fight that took a citizen also took the city's hit points, and a
+    /// city the player razes loses a citizen every turn: that is the player's order, not hunger).
     pub(super) fn starvation_notes(&self, city: &CityCore, old: &CitySnapshot) -> Vec<(NoticeKind, String, Option<u32>)> {
         let at = Some(old.tile);
         let mut notes = Vec::new();
-        if city.population < old.population && city.damage <= old.damage {
+        if city.population < old.population && city.damage <= old.damage && city.status != CityStatus::Razing {
             notes.push((NoticeKind::Growth, tf!("classic.game.news.starved", city = city.name.as_str(), n = city.population), at));
         }
         if !old.starving && self.is_starving(city) {
@@ -367,6 +368,55 @@ mod tests {
         for lang in LANGUAGES {
             let told = told_in(lang, &mut session, |s| s.notify_news(&[war(stranger, me)]));
             assert!(told.is_empty(), "{lang}: a stranger is named: {told:?}");
+        }
+    }
+
+    /// A land city of `player` four tiles from its first unit.
+    fn found_city_near(session: &mut Session, player: PlayerId) -> CityHandle {
+        let (game, rules) = session.harness_game();
+        let unit = game.view().auth.indexes().units_of(player)[0];
+        let at = game.view().auth.units().get(unit).unwrap().core.tile;
+        let dims = game.view().auth.map().dimensions;
+        let near = classic_rules::math::tiles_in_hex_radius(&dims, at, 3);
+        let far = classic_rules::math::tiles_in_hex_radius(&dims, at, 4)
+            .into_iter()
+            .find(|t| !near.contains(t) && classic_rules::navigation::cost::enter_cost_on_map(game.view().auth.map(), *t).is_some() && game.view().auth.indexes().units_on(*t).is_empty())
+            .expect("land four tiles off");
+        game.debug_found_city(&rules, player, far)
+    }
+
+    /// A city the player razes loses a citizen every turn: that is not hunger and is not told so.
+    #[test]
+    fn a_city_the_player_razes_is_not_told_as_starved() {
+        let mut session = new_match();
+        let (me, rival) = (session.me(), PlayerId(1));
+        found_city(&mut session, rival);
+        let theirs = found_city_near(&mut session, rival);
+        session.refresh_after_harness();
+        set_population(&mut session, theirs, 10);
+        take_city(&mut session, theirs, me);
+        {
+            let (game, rules) = session.harness_game();
+            game.execute(&rules, Command::DecideCity { player: me, city: theirs, decision: classic_rules::command::CityDecision::Raze }).unwrap();
+        }
+        session.refresh_after_harness();
+        let population = |s: &Session| s.game().view().auth.cities().get(theirs).map(|c| c.population);
+        let before_round = population(&session);
+        let before = session.snapshot();
+        {
+            let (game, rules) = session.harness_game();
+            let round = game.view().auth.turn().round;
+            while game.view().auth.turn().round == round {
+                let active = game.view().auth.active_player();
+                game.execute(&rules, Command::EndTurn { player: active }).unwrap();
+            }
+        }
+        session.refresh_after_harness();
+        assert!(population(&session) < before_round, "the razed city shrinks, else the scene proves nothing");
+        for lang in LANGUAGES {
+            let told = told_in(lang, &mut session, |s| s.report_changes(&before));
+            let name = name_of(&session, theirs);
+            assert!(told.iter().all(|t| !t.contains(&name)), "{lang}: a razed city is told as hunger: {told:?}");
         }
     }
 }
