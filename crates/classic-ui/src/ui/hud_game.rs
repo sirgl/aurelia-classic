@@ -83,6 +83,16 @@ impl Target {
         }
     }
 
+    /// The shortcut row that opens the same screen (its key shows in the tooltip).
+    pub fn shortcut(self) -> Option<&'static str> {
+        match self {
+            Target::Economy => Some("overview-economy"),
+            Target::Research => Some("technologies"),
+            Target::Policies => Some("policies"),
+            Target::Religion | Target::Resources => None,
+        }
+    }
+
     /// The tooltip line that says a click opens it.
     pub fn hint(self) -> String {
         tf!("classic.ui.hud-game.click-to-open", screen = self.label())

@@ -441,3 +441,11 @@ fn the_phone_form_has_finger_sized_rows_inside_its_width() {
         assert!(Look::PHONE.label >= 16. && Look::PHONE.value >= 16.);
     }
 }
+
+/// The renderer's palette (`MAX_PAINTED_OWNERS`) is tied to the setup's limits: the most the
+/// screen offers, all powers, all city-states and the barbarians, gets a colour of its own.
+#[test]
+fn the_setup_limits_fit_the_renderer_palette() {
+    let most = usize::from(MAX_NATIONS) + usize::from(MAX_CITY_STATES) + 1;
+    assert!(most <= render::gpu::buffers::MAX_PAINTED_OWNERS, "{most} owners, the renderer paints {}", render::gpu::buffers::MAX_PAINTED_OWNERS);
+}

@@ -116,7 +116,7 @@ impl ClassicHud {
                     tint: value.tint,
                     compact: value.compact,
                     tip,
-                    click: value.target.map(|target| TopBarClick { id: target.id(), hint: target.hint() }),
+                    click: value.target.map(|target| TopBarClick { id: target.id(), hint: target.hint(), shortcut: target.shortcut() }),
                     ready: value.ready,
                     text: value.text,
                 }

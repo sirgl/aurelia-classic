@@ -59,6 +59,25 @@ pub(super) fn graph(view: &ResearchView) -> Graph {
     Graph { id: TREE, nodes: view.techs.iter().map(|tech| node(view, tech)).collect() }
 }
 
+/// The technology the tree opens on: the one in research, else the one to choose that is the
+/// farthest along the tree (the highest column: the era the player is in, not an old leftover;
+/// the first of them when several share the column).
+fn opening_technology(view: &ResearchView) -> Option<usize> {
+    let researching = view.techs.iter().position(|tech| tech.status == TechStatus::Researching);
+    researching.or_else(|| {
+        let available = view.techs.iter().enumerate().filter(|(_, tech)| tech.status == TechStatus::Available);
+        available.max_by_key(|(index, tech)| (tech.column, std::cmp::Reverse(*index))).map(|(index, _)| index)
+    })
+}
+
+/// Scroll the tree to `opening_technology`; with none the tree stays at its start.
+fn show_first_technology(state: &mut ScreenState, view: &ResearchView) {
+    if let Some(index) = opening_technology(view) {
+        state.research_tree.focus(index);
+        state.research_tree.selected = None;
+    }
+}
+
 pub(super) fn show(ui: &mut egui::Ui, r: Rect, state: &mut ScreenState, view: &ResearchView) {
     panel(ui.painter(), r);
     let title = if view.free_choice { t!("classic.ui.screen-research.free-title") } else { t!("classic.ui.screen-research.title") };
@@ -67,6 +86,9 @@ pub(super) fn show(ui: &mut egui::Ui, r: Rect, state: &mut ScreenState, view: &R
         else { tf!("classic.ui.screen-research.subtitle", stored = view.stored, per_turn = view.per_turn) };
     text(ui.painter(), r.min + vec2(17., 39.), subtitle, 12., MUTED);
     let area = Rect::from_min_max(r.min + vec2(8., 62.), r.max - vec2(8., 8.));
+    if std::mem::take(&mut state.research_opened) {
+        show_first_technology(state, view);
+    }
     let mut pen = ArtPen { art: &mut state.art, tint: art_tint(state.brightness) };
     let response = dag::show(ui, area, &graph(view), &mut state.research_tree, &mut pen);
     if let Some(tech) = response.clicked.and_then(|i| view.techs.get(i)) {
@@ -139,6 +161,95 @@ mod tests {
         assert_eq!(view.techs.len(), 81);
         // 134 prerequisite edges: Unciv drops one of Ballistics' two prerequisites (Railroad).
         assert_eq!(count, 134);
+    }
+
+    fn with_status(view: &ResearchView, researching: Option<usize>) -> ResearchView {
+        let mut view = view.clone();
+        for tech in &mut view.techs {
+            if tech.status == TechStatus::Researching {
+                tech.status = TechStatus::Available;
+            }
+        }
+        if let Some(index) = researching {
+            view.techs[index].status = TechStatus::Researching;
+        }
+        view
+    }
+
+    #[test]
+    fn the_tree_opens_on_the_technology_in_research_else_on_the_farthest_available() {
+        let view = session().research_view();
+        let far = view.techs.iter().position(|t| t.name == "Future Tech").unwrap();
+        assert_eq!(opening_technology(&with_status(&view, Some(far))), Some(far));
+        let none = with_status(&view, None);
+        let first = none.techs.iter().position(|t| t.status == TechStatus::Available);
+        assert!(first.is_some(), "a new game has a technology to choose");
+        assert_eq!(opening_technology(&none), first, "in a new game the technologies to choose share the first column");
+        let mut done = none.clone();
+        for tech in &mut done.techs {
+            tech.status = TechStatus::Known;
+        }
+        assert_eq!(opening_technology(&done), None, "nothing to open on: the tree stays at its start");
+    }
+
+    /// A player in the Medieval era with an old Ancient technology left over and no research chosen:
+    /// the tree opens in the Medieval era, not on the leftover that comes first in the list.
+    #[test]
+    fn without_research_the_tree_opens_in_the_era_of_the_player_not_on_an_old_leftover() {
+        let view = session().research_view();
+        let mut view = with_status(&view, None);
+        let leftover = view.techs.iter().position(|t| t.name == "Animal Husbandry").unwrap();
+        for (i, tech) in view.techs.iter_mut().enumerate() {
+            tech.status = match tech.era.as_str() {
+                "Ancient" | "Classical" if i != leftover => TechStatus::Known,
+                "Ancient" | "Medieval" => TechStatus::Available,
+                _ => TechStatus::Locked(String::new()),
+            };
+        }
+        let opened = opening_technology(&view).unwrap();
+        assert_eq!(view.techs[opened].era, "Medieval", "opens on {}, the player is in the Medieval era", view.techs[opened].name);
+        assert!(view.techs[opened].column > view.techs[leftover].column);
+        let first_of_the_column = view.techs.iter().position(|t| t.status == TechStatus::Available && t.column == view.techs[opened].column);
+        assert_eq!(Some(opened), first_of_the_column, "the first of the technologies of the column");
+    }
+
+    #[test]
+    fn the_shell_opening_the_screen_asks_for_the_scroll_but_a_return_from_the_pedia_does_not() {
+        let mut state = ScreenState::default();
+        state.opened(Screen::Research, Screen::City);
+        assert!(state.research_opened);
+        state.research_opened = false;
+        state.opened(Screen::Research, Screen::Encyclopedia);
+        assert!(!state.research_opened, "back from a reference page the tree stays where it was");
+    }
+
+    /// The opened screen scrolls to a card far from antiquity, and not otherwise.
+    #[test]
+    fn opening_the_screen_draws_the_researched_card_at_once() {
+        let mut session = session();
+        let far = session.research_view().techs.iter().position(|t| t.name == "Future Tech").unwrap();
+        let view = with_status(&session.research_view(), Some(far));
+        let drawn = |opened: bool| {
+            let mut state = ScreenState::default();
+            state.research_opened = opened;
+            let ctx = egui::Context::default();
+            let screen = Rect::from_min_size(egui::Pos2::ZERO, vec2(1366., 768.));
+            let mut seen = false;
+            for _ in 0..3 {
+                let mut output = ctx.run_ui(egui::RawInput { screen_rect: Some(screen), ..Default::default() }, |ui| {
+                    if std::mem::take(&mut state.research_opened) {
+                        show_first_technology(&mut state, &view);
+                    }
+                    let mut pen = ArtPen { art: &mut state.art, tint: Color32::WHITE };
+                    let response = dag::show(ui, screen.shrink(8.), &graph(&view), &mut state.research_tree, &mut pen);
+                    seen = response.cards.iter().any(|c| c.node == far);
+                });
+                output.textures_delta.clear();
+            }
+            seen
+        };
+        assert!(drawn(true), "the opened screen shows the technology in research");
+        assert!(!drawn(false), "without the opening the tree starts at antiquity");
     }
 
     /// Focus the farthest technology, click its card where the widget drew it.

@@ -2,15 +2,37 @@
 //! after the opening of a small match (the capital founded, a Warrior queued, the first
 //! technology chosen) the HUD over the map, the city, research and victory screens.
 //! A changed screen fails with a line diff; `SNAPSHOT_UPDATE=1` accepts it.
+//!
+//! The snapshots are drawn WITH the art pack (`assets/visual/generated`, fetched, not in git: the
+//! item cards take their art key and icon from it). `SNAPSHOT_UPDATE=1` refuses to write without
+//! the pack (`.pack-version` missing): copy it from another clone (`cp -c -R`) first.
 use classic_ui::ui::model::{Action, GameRequest, TechStatus};
 use classic_ui::ui::screens::{prepare_match, MapSize, MatchRequest, Screen};
 use classic_ui::ClassicUi;
 use client::shell::module::{ModuleUi, Screen as ShellScreen};
-use client::shell::snapshot::{assert_snapshot, snapshot_file, Stage};
+use client::shell::snapshot::{assert_snapshot, snapshot_file, Stage, UPDATE_VARIABLE};
+use std::path::Path;
 
 const SIZE: egui::Vec2 = egui::vec2(1366.0, 768.0);
 
+/// The reason an update must not write, when it is asked for (`update`) and the pack's
+/// `.pack-version` file is not at `pack_version`: a snapshot written without the pack carries the
+/// fallback art (no icons, `bnw:` keys), which the game with its pack never draws.
+fn update_refusal(update: bool, pack_version: &Path) -> Option<String> {
+    if !update || pack_version.exists() {
+        return None;
+    }
+    Some(format!(
+        "{UPDATE_VARIABLE}=1 refused: no art pack ({} is missing), so the snapshots would be written with the fallback art. Copy assets/visual/generated from a clone that has it (cp -c -R), then rerun.",
+        pack_version.display()
+    ))
+}
+
 fn check(stage: &mut Stage<ClassicUi>, name: &str) {
+    let update = std::env::var(UPDATE_VARIABLE).as_deref() == Ok("1");
+    if let Some(refusal) = update_refusal(update, &client::shell::assets::path("visual/generated/.pack-version")) {
+        panic!("{refusal}");
+    }
     assert_snapshot(snapshot_file(env!("CARGO_MANIFEST_DIR"), name), &stage.snapshot());
 }
 
@@ -144,4 +166,17 @@ fn city_screen_in_german() {
 #[test]
 fn city_screen_in_japanese() {
     city_in("ja", "classic-city-ja");
+}
+
+#[test]
+fn an_update_without_the_art_pack_is_refused() {
+    let refusal = update_refusal(true, Path::new("/nonexistent/visual/generated/.pack-version")).expect("refused");
+    assert!(refusal.contains("SNAPSHOT_UPDATE=1 refused") && refusal.contains(".pack-version"), "{refusal}");
+}
+
+#[test]
+fn an_update_with_the_art_pack_and_a_plain_run_are_not_refused() {
+    let present = Path::new(env!("CARGO_MANIFEST_DIR")).join("Cargo.toml");
+    assert_eq!(update_refusal(true, &present), None);
+    assert_eq!(update_refusal(false, Path::new("/nonexistent/.pack-version")), None);
 }

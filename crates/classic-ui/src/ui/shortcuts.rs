@@ -145,4 +145,36 @@ mod tests {
         assert_eq!(key("end-turn"), "Enter");
         assert_eq!(map.chords("end-turn"), &[Chord::parse("Enter").unwrap(), Chord::parse("Ctrl+Space").unwrap()]);
     }
+
+    /// The keys the player asked for, from Civ V and Unciv (`KeyboardBinding`): one test for
+    /// the whole list, with the screen that opens each, so that a changed default is seen.
+    #[test]
+    fn the_keys_of_the_turn_the_units_and_the_screens() {
+        let map = Keymap::defaults(SET);
+        let keys = |id: &str| map.chords(id).to_vec();
+        let chord = |text: &str| Chord::parse(text).expect("a key name");
+        assert_eq!(keys("end-turn"), vec![chord("Enter"), chord("Ctrl+Space")]);
+        assert_eq!(keys("next-unit"), vec![chord("Period")]);
+        assert_eq!(keys("previous-unit"), vec![chord("Comma")]);
+        assert_eq!(keys("order-fortify"), vec![chord("F")]);
+        assert_eq!(keys("order-sleep"), vec![chord("A")]);
+        assert_eq!(keys("order-skip"), vec![chord("Space")]);
+        assert_eq!(keys("technologies"), vec![chord("F6")]);
+        assert_eq!(keys("policies"), vec![chord("F5")]);
+        assert_eq!(keys("overview-diplomacy"), vec![chord("F4")]);
+        assert_eq!(keys("encyclopedia"), vec![chord("F1")]);
+    }
+
+    #[test]
+    fn a_top_bar_value_that_opens_a_screen_names_the_key_of_it() {
+        use crate::ui::hud::TopTarget as Target;
+        let map = Keymap::defaults(SET);
+        for target in Target::ALL {
+            if let Some(row) = target.shortcut() {
+                assert!(ROWS.iter().any(|r| r.id == row), "{row} is no row");
+                assert!(map.hint(row).is_some(), "{row} has no key");
+            }
+        }
+        assert_eq!(Target::Research.shortcut(), Some("technologies"));
+    }
 }

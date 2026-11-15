@@ -113,6 +113,7 @@ impl Session {
         driver.configure_game(&mut game);
         let human = observer.unwrap_or_else(|| driver.config.first_human());
         paint_barbarians(&game);
+        super::owner_colors::paint_owners(&game, &rules);
         let mut client = GameClient::new(game, rules, Renderer::headless(), human);
         client.render_world.visual_surface = true;
         client.record_journal();
@@ -718,6 +719,7 @@ impl Session {
         self.driver.reset_with_difficulty(&self.client.rules, difficulty);
         self.driver.configure_game(&mut game);
         paint_barbarians(&game);
+        super::owner_colors::paint_owners(&game, &self.client.rules);
         self.pending_report = None;
         self.client.replace_game(game);
         self.presentation.reset(self.client.render_world.width);
