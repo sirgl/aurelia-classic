@@ -59,10 +59,15 @@ pub(super) fn graph(view: &ResearchView) -> Graph {
     Graph { id: TREE, nodes: view.techs.iter().map(|tech| node(view, tech)).collect() }
 }
 
-/// The technology the tree opens on: the one in research, else the first that can be chosen.
+/// The technology the tree opens on: the one in research, else the one to choose that is the
+/// farthest along the tree (the highest column: the era the player is in, not an old leftover;
+/// the first of them when several share the column).
 fn opening_technology(view: &ResearchView) -> Option<usize> {
     let researching = view.techs.iter().position(|tech| tech.status == TechStatus::Researching);
-    researching.or_else(|| view.techs.iter().position(|tech| tech.status == TechStatus::Available))
+    researching.or_else(|| {
+        let available = view.techs.iter().enumerate().filter(|(_, tech)| tech.status == TechStatus::Available);
+        available.max_by_key(|(index, tech)| (tech.column, std::cmp::Reverse(*index))).map(|(index, _)| index)
+    })
 }
 
 /// Scroll the tree to `opening_technology`; with none the tree stays at its start.
@@ -172,19 +177,40 @@ mod tests {
     }
 
     #[test]
-    fn the_tree_opens_on_the_technology_in_research_else_on_the_first_available() {
+    fn the_tree_opens_on_the_technology_in_research_else_on_the_farthest_available() {
         let view = session().research_view();
         let far = view.techs.iter().position(|t| t.name == "Future Tech").unwrap();
         assert_eq!(opening_technology(&with_status(&view, Some(far))), Some(far));
         let none = with_status(&view, None);
         let first = none.techs.iter().position(|t| t.status == TechStatus::Available);
         assert!(first.is_some(), "a new game has a technology to choose");
-        assert_eq!(opening_technology(&none), first);
+        assert_eq!(opening_technology(&none), first, "in a new game the technologies to choose share the first column");
         let mut done = none.clone();
         for tech in &mut done.techs {
             tech.status = TechStatus::Known;
         }
         assert_eq!(opening_technology(&done), None, "nothing to open on: the tree stays at its start");
+    }
+
+    /// A player in the Medieval era with an old Ancient technology left over and no research chosen:
+    /// the tree opens in the Medieval era, not on the leftover that comes first in the list.
+    #[test]
+    fn without_research_the_tree_opens_in_the_era_of_the_player_not_on_an_old_leftover() {
+        let view = session().research_view();
+        let mut view = with_status(&view, None);
+        let leftover = view.techs.iter().position(|t| t.name == "Animal Husbandry").unwrap();
+        for (i, tech) in view.techs.iter_mut().enumerate() {
+            tech.status = match tech.era.as_str() {
+                "Ancient" | "Classical" if i != leftover => TechStatus::Known,
+                "Ancient" | "Medieval" => TechStatus::Available,
+                _ => TechStatus::Locked(String::new()),
+            };
+        }
+        let opened = opening_technology(&view).unwrap();
+        assert_eq!(view.techs[opened].era, "Medieval", "opens on {}, the player is in the Medieval era", view.techs[opened].name);
+        assert!(view.techs[opened].column > view.techs[leftover].column);
+        let first_of_the_column = view.techs.iter().position(|t| t.status == TechStatus::Available && t.column == view.techs[opened].column);
+        assert_eq!(Some(opened), first_of_the_column, "the first of the technologies of the column");
     }
 
     #[test]
