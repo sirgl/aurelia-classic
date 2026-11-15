@@ -15,7 +15,7 @@ widgets
   click "" 154,694 53x53
   click "" 221,694 53x53
   click "" 1070,580 270x159
-  click "End turn" 1105,523 245x37
+  click "Unit needs an order" 1105,523 245x37
   click "Empire" 1214,51 136x34
 painted
   clip 0,0 1366x768
@@ -92,9 +92,9 @@ painted
     rect 1135,569 87x69 stroke 1 #ebe7d5
   clip 0,0 1366x768
     figure 8 shapes 1064,572 282x175 #bb9c5c
-    rect 1105,523 245x37 fill #0b151ff0 r3
+    rect 1105,523 245x37 fill #685024 r3
     rect 1105,523 245x37 stroke 1.5 #bb9c5c r3
-    text "End turn" 1197,533 61x18 #ebe7d5 16px
+    text "Unit needs an order" 1157,533 141x18 #ebe7d5 16px
     rect 1214,51 136x34 fill #192f34 r4
     rect 1214,51 136x34 stroke 1 #344849 r4
     text "Empire" 1260,60 44x16 #efe9d3 14px

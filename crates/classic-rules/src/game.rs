@@ -111,6 +111,10 @@ pub trait ClassicGame {
     #[cfg(any(test, feature = "harness"))]
     fn debug_grant_culture(&mut self, p: PlayerId, amount: u32);
 
+    /// Owe `p` one free technology of any kind and one free great person of any kind.
+    #[cfg(any(test, feature = "harness"))]
+    fn debug_owe_free_choices(&mut self, p: PlayerId);
+
     /// A landmark of the dig record of era `era` stands on `tile`.
     #[cfg(any(test, feature = "harness"))]
     fn debug_set_landmark(&mut self, tile: TileId, era: u8);
@@ -368,6 +372,14 @@ impl ClassicGame for GameState {
         if let Some(state) = self.world_mut().module.culture.player_mut(p) {
             state.culture = state.culture.saturating_add(amount);
             state.lifetime = state.lifetime.saturating_add(u64::from(amount));
+        }
+    }
+
+    #[cfg(any(test, feature = "harness"))]
+    fn debug_owe_free_choices(&mut self, p: PlayerId) {
+        if let Some(economy) = self.world_mut().players.economy_mut(p) {
+            economy.owed.technologies.push(crate::world::player_economy::FreeTechnology::Any);
+            economy.owed.great_people.push(crate::world::player_economy::FreeGreatPerson::Any);
         }
     }
 

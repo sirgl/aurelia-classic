@@ -24,7 +24,8 @@
 //! AURELIA_GAME_CAPTURE_EVERY (capture every k-th turn as <path stem>-tNNN.png),
 //! AURELIA_GAME_AUTOPLAY (set: the AI plays the observed player too),
 //! AURELIA_GAME_END_TURN_GATE (set: the end-turn button asks for a research or a policy, as in the game; off in the runs),
-//! AURELIA_GAME_OPENING (found | none, default found), AURELIA_GAME_PARADE (set: one unit of every
+//! AURELIA_GAME_OPENING (found | bare | none, default found; bare: the capital is founded and a technology
+//! chosen, but nothing is queued: the end-turn button asks for the production), AURELIA_GAME_PARADE (set: one unit of every
 //! kind around the start), AURELIA_GAME_ZOOM (camera zoom), AURELIA_VISUAL_SIZE (WxH),
 //! AURELIA_VISUAL_HOVER_PIXEL (x,y: physical pointer for tooltip and route preview),
 //! AURELIA_GAME_SHORTCUTS (set: the keyboard shortcuts overlay is open), AURELIA_GAME_REPORT (set: the "Report a bug" dialog is open), AURELIA_GAME_SAVES (list | delete | name: the "Load game" list, with the first confirmation of the selected save asked (delete), or the "Save game" naming dialog; AURELIA_GAME_SAVES_SELECT=<row>; the saves are those of AURELIA_SAVE_DIR), AURELIA_GAME_UI_SCALE (0.75..1.5), AURELIA_GAME_SETTINGS_TAB (audio | graphics | game | controls),
@@ -322,6 +323,7 @@ pub fn screenshot(path: &str) {
     }
     let capital = match std::env::var("AURELIA_GAME_OPENING").as_deref() {
         Ok("none") => None,
+        Ok("bare") => bare_opening(&mut run.app),
         _ => opening(&mut run.app),
     };
     match std::env::var("AURELIA_GAME_DEPOSITS").as_deref() {
@@ -939,6 +941,16 @@ pub(super) fn opening(app: &mut GameApp) -> Option<u32> {
         .iter()
         .find(|t| t.status == TechStatus::Available)?
         .id;
+    session.request(GameRequest::Research(first));
+    capital
+}
+
+/// The capital is founded and the first technology chosen; the city queues nothing.
+fn bare_opening(app: &mut GameApp) -> Option<u32> {
+    request(app, GameRequest::Unit(Action::FoundCity));
+    let session = app.module.session.as_mut()?;
+    let capital = session.selected_city_tile();
+    let first = session.research_view().techs.iter().find(|t| t.status == TechStatus::Available)?.id;
     session.request(GameRequest::Research(first));
     capital
 }

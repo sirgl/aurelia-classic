@@ -1,18 +1,14 @@
-//! What the end of the human's turn waits for: a technology to research, a policy to adopt.
+//! What the end of the human's turn waits for. The list is the core's (`derived::pending`); this file
+//! only asks it for the local player and says where each item is answered.
 //! UI only: the rules accept the end-turn command anyway (the AI driver and the tests call
-//! `Session::end_turn` directly); the module's end-turn button and key stop at the choice.
-use classic_rules::derived::culture::{branch_statuses, culture_overview, policy_statuses};
-use classic_rules::derived::grants::researchable;
+//! `Session::end_turn` directly); the module's end-turn button and key stop at the first item.
+use classic_rules::derived::culture::culture_overview;
+use classic_rules::derived::pending::{self, HandledThisTurn};
+use classic_rules::ids::TileId;
+pub use classic_rules::derived::pending::PendingAction;
 
 use super::session::Session;
 use crate::ui::model::Outcome;
-
-/// A choice the player has not made yet, in the order the end-turn button asks for them.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Choice {
-    Research,
-    Policy,
-}
 
 impl Session {
     /// The local player is a human seat (not the one the AI plays for: the autoplay).
@@ -28,15 +24,12 @@ impl Session {
 
     /// No technology is being researched although one can be.
     pub fn research_pending(&self) -> bool {
-        let auth = self.game().view().auth;
-        auth.players().research_queue_of(self.me()).is_empty() && !researchable(auth, self.rules(), self.me()).is_empty()
+        pending::research_pending(self.game().view().auth, self.rules(), self.me())
     }
 
-    /// A policy can be adopted now (a tenet, or a branch to open): the Civics screen's own
-    /// statuses say which cards are ready.
+    /// A policy can be adopted now (a tenet, or a branch to open).
     pub fn policy_pending(&self) -> bool {
-        let (auth, rules, me) = (self.game().view().auth, self.rules(), self.me());
-        policy_statuses(auth, rules, me).iter().any(Result::is_ok) || branch_statuses(auth, rules, me).iter().any(Result::is_ok)
+        pending::policy_pending(self.game().view().auth, self.rules(), self.me())
     }
 
     /// How many policies, branches and ideologies the player holds: a request that raises it
@@ -46,19 +39,30 @@ impl Session {
         overview.policies.len() + overview.branches.len() + usize::from(overview.ideology.is_some())
     }
 
-    /// The choices the end of the turn waits for, research first. Nothing waits for an AI seat, a player
-    /// without a city, while the others play, or after the game is over. `policy_chosen`: one was made this turn.
-    pub fn missing_choices(&self, policy_chosen: bool) -> Vec<Choice> {
-        let mut missing = Vec::new();
-        if !self.human_seat() || !self.has_city() || self.outcome() != Outcome::Playing || self.ai_busy() {
-            return missing;
+    /// The units the player put to rest this turn (skip, sleep).
+    pub(super) fn resting_units(&self) -> Vec<classic_rules::ids::UnitHandle> {
+        self.skipped.iter().chain(self.sleeping.iter()).copied().collect()
+    }
+
+    /// The actions the end of the turn waits for, the first one first. Nothing waits for an AI seat, while the others play, or after the game is over. `policy_chosen`: one
+    /// was made this turn.
+    pub fn pending_actions(&self, policy_chosen: bool) -> Vec<PendingAction> {
+        if !self.human_seat() || self.outcome() != Outcome::Playing || self.ai_busy() {
+            return Vec::new();
         }
-        if self.research_pending() {
-            missing.push(Choice::Research);
+        let resting = self.resting_units();
+        pending::pending_actions(self.game().view().auth, self.rules(), self.me(), HandledThisTurn { policy_chosen, resting: &resting })
+    }
+
+    /// The map tile of a city or a unit item (None: the item has no place on the map).
+    pub fn pending_tile(&self, action: PendingAction) -> Option<TileId> {
+        let auth = self.game().view().auth;
+        match action {
+            PendingAction::CityDecision(city) | PendingAction::EmptyProduction(city) => auth.cities().get(city).map(|c| c.tile),
+            PendingAction::Promotion(unit) | PendingAction::GreatPerson(unit) | PendingAction::UnitOrder(unit) => {
+                auth.units().get(unit).map(|u| u.core.tile)
+            }
+            PendingAction::FreeGreatPerson | PendingAction::FreeTechnology | PendingAction::Research | PendingAction::Policy | PendingAction::Pantheon => None,
         }
-        if !policy_chosen && self.policy_pending() {
-            missing.push(Choice::Policy);
-        }
-        missing
     }
 }
