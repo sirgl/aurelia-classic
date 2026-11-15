@@ -42,6 +42,19 @@ cargo +1.98.1 nextest run --cargo-profile fasttest --build-jobs 4 --test-threads
 * Rendering and UI changes need a screenshot in the pull request (`--screenshot out.png` renders without opening a window).
 * The Rust toolchain is pinned (1.98.1); the tree is not yet rustfmt-clean, so do not reformat files you do not change.
 
+## Versions
+
+The game has one version, the version of its launchers: `classic-desktop`, `classic-web` and `classic-android` carry the
+same number in their `Cargo.toml` (`platform/tools/launcher/package.sh` reads it from the desktop one), and
+`version_code` of `launcher/android/Cargo.toml` is major * 10000 + minor * 100 + patch of it. The library crates
+(`classic-rules`, `classic-content`, `classic-ui`, `qa`, and everything in `../platform`) are not published and stay at
+0.1.0: their number says nothing about a release. `CHANGELOG.md` has a section for the version, and
+`crates/classic-ui/tests/release_version.rs` fails when one of them is missed. The game shows the version and the short
+commit in the main menu and on the settings screen (`client::register_build!`, `launcher/build-info.rs`).
+
+To release: bump the three launchers and `version_code` together, refresh `Cargo.lock`, write the `CHANGELOG.md` section,
+then tag.
+
 ## Running the tests and sharing builds
 
 The details and the measurements are in [docs/testing.md](docs/testing.md).

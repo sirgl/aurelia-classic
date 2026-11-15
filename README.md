@@ -46,17 +46,19 @@ the research, the policies and what the cities build. It runs on the CPU and dow
 
 ## Plans
 
-Not in 0.2:
+What each release changed: [CHANGELOG.md](CHANGELOG.md).
+
+Not in 0.3:
 
 - Network play: several people in one game, with simultaneous turns and chat. The protocol and the match logic exist in the platform (`net`); the server program and the screens do not.
-- A new neural-network AI.
-- Music that follows the era and the mood of the game.
+- A trained neural-network AI. The strategy net of the computer opponents is written by hand and no weight is trained; the unit and end-to-end nets exist only in the bench.
+- Music that follows the mood of the game. It changes only with the era, between two game tracks.
 - Better models and animations.
 - A more detailed interface.
 
 ## Known problems
 
-- Rebellions are not implemented: low happiness and an empty treasury cost growth, production, science and units, but no rebels rise and no city revolts.
+- Rebels rise only in a game with barbarians; with them off, low happiness and an empty treasury cost growth, production, science and units, but nothing more.
 - The interface is not always the best.
 
 ## Running the game
