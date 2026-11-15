@@ -90,9 +90,11 @@ const GATHER_RADIUS: i32 = 3;
 const PREY_ROUNDS: i32 = 5;
 
 /// The behaviour is on: the mind plays `landless` (or `landless-plan`), the player has no city and no unit that
-/// founds one.
+/// founds one. A unit of a kind the rules do not list is not known to be unable to found: it keeps the player out
+/// of the behaviour (a game whose rules lack the kind of its units, such as the UI tests' empty rules, has no
+/// kind data to plan with).
 pub fn active(view: &UnitView<'_, '_>, tools: &PlanTools<'_>) -> bool {
-    (view.brief.landless || view.brief.landless_plan) && view.brief.cities.is_empty() && !view.brief.units.iter().any(|u| tools.rules.units[u.kind.0 as usize].founder)
+    (view.brief.landless || view.brief.landless_plan) && view.brief.cities.is_empty() && !view.brief.units.iter().any(|u| tools.rules.units.get(u.kind.0 as usize).is_none_or(|kind| kind.founder))
 }
 
 /// What the player sees and knows when it chooses a city: a unit's observation (`landless`) or the turn's
