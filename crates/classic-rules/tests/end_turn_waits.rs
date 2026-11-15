@@ -202,3 +202,40 @@ fn before_the_first_city_only_units_are_asked() {
     let settler = spawn(&mut game, &rules, "core:unit/settler");
     assert_eq!(pending(&game, &rules), vec![PendingAction::UnitOrder(settler)], "no research, no policy: there is no city");
 }
+
+/// P0 takes a city of P1 (a second one, so it is not an original capital) and annexes it.
+fn annexed_conquest(game: &mut GameState, rules: &CompiledRuleset, capital: CityHandle) -> CityHandle {
+    let city = game.debug_found_city(rules, P1, tile(9, 5));
+    game.debug_set_population(rules, city, 4);
+    let attacker = game.debug_spawn_unit(rules, P0, tile(8, 5), kind(rules, "core:unit/warrior"));
+    game.debug_meet(P0, P1);
+    game.execute(rules, Command::DeclareWar { player: P0, enemy: P1 }).unwrap();
+    let max = classic_rules::combat::city::max_hit_points(game.view().auth, rules, game.view().auth.cities().get(city).unwrap());
+    game.debug_set_city_damage(city, max - 1);
+    game.execute(rules, Command::AttackCity { attacker, city }).unwrap();
+    game.execute(rules, Command::DecideCity { player: P0, city, decision: CityDecision::Annex }).unwrap();
+    settle_city_and_research(game, rules, capital);
+    game.execute(rules, Command::Fortify { unit: attacker }).unwrap();
+    city
+}
+
+/// The core refuses every order in a city in resistance, so the list must not ask for one: the resistance
+/// ends only with the owner's turns, and the end of the turn waits for the list.
+#[test]
+fn an_annexed_conquest_in_resistance_is_not_asked_until_it_can_build() {
+    let (mut game, rules, capital) = setup();
+    let city = annexed_conquest(&mut game, &rules, capital);
+    let core = game.view().auth.cities().get(city).unwrap();
+    assert_eq!((core.status, core.resistance_turns, core.queue.is_empty()), (CityStatus::Occupied, 2, true));
+    assert_eq!(pending(&game, &rules), vec![], "in resistance: no order can be given");
+
+    for _ in 0..2 {
+        game.execute(&rules, Command::EndTurn { player: P0 }).unwrap();
+        game.execute(&rules, Command::EndTurn { player: P1 }).unwrap();
+    }
+    assert_eq!(game.view().auth.cities().get(city).unwrap().resistance_turns, 0);
+    let warrior = ProductionItem::Unit(kind(&rules, "core:unit/warrior"));
+    assert!(pending(&game, &rules).contains(&PendingAction::EmptyProduction(city)), "the resistance is over: it asks");
+    game.execute(&rules, Command::EnqueueProduction { player: P0, city, item: warrior }).unwrap();
+    assert!(!pending(&game, &rules).contains(&PendingAction::EmptyProduction(city)));
+}

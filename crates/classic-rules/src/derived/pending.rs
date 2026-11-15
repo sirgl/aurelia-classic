@@ -16,6 +16,9 @@
 //! a unit with moves and no order      UnitOrder
 //! ```
 //!
+//! An item is in the list only if there is a command that the core accepts and that clears it: the end of
+//! the turn waits for the list, so an item the player cannot clear would lock the turn.
+//!
 //! A unit the player put to rest (skip, sleep) has an order. Spies and the vote of the congress only
 //! hint in Unciv and are not here.
 
@@ -125,7 +128,9 @@ fn push_city_actions(auth: &AuthWorld, player: PlayerId, pending: &mut Vec<Pendi
             CityStatus::AwaitingDecision => pending.push(PendingAction::CityDecision(*handle)),
             CityStatus::Puppet | CityStatus::Razing => {}
             CityStatus::Own | CityStatus::Occupied => {
-                if city.queue.is_empty() && city.economy.process.is_none() {
+                // A city in resistance refuses every production order, and the resistance ends only with
+                // the owner's turns: asking now would lock the end of the turn.
+                if city.resistance_turns == 0 && city.queue.is_empty() && city.economy.process.is_none() {
                     pending.push(PendingAction::EmptyProduction(*handle));
                 }
             }
