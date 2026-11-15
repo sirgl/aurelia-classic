@@ -174,8 +174,9 @@ pub const LEADER_VOTE_WARNING_TURNS: u32 = 3;
 
 /// A step of a rival toward a victory that the player is told about, once per step. The state of
 /// the world holds it while it is true (`victory_warnings`); the one who reports compares the
-/// list before and after a round and tells the steps that are new. Everything it reads the
-/// victory screen shows to every nation (the ship parts, the capitals, the Congress).
+/// list before and after a round and tells the steps that are new. It names only the rivals the
+/// player has met: the victory screen shows the player the points of the nations it has met and
+/// nothing of the others, and a notice must not tell more than the screen does.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum VictoryWarning {
     /// The rival has half of the Apollo Program and the spaceship parts.
@@ -188,11 +189,11 @@ pub enum VictoryWarning {
     LeaderVote,
 }
 
-/// The victory steps of the other living nations that are true now, as `me` is to be told.
+/// The victory steps of the other living nations that `me` has met and that are true now, as `me` is to be told.
 pub fn victory_warnings(auth: &AuthWorld, rules: &CompiledRuleset, me: PlayerId) -> Vec<VictoryWarning> {
     let mut warnings = Vec::new();
     for rival in crate::systems::city_states::majors(auth) {
-        if rival == me {
+        if rival == me || !crate::derived::tourism::met(auth, me, rival) {
             continue;
         }
         for row in victory_progress(auth, rules, rival) {

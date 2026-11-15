@@ -20,8 +20,9 @@ use super::turn::CitySnapshot;
 use crate::ui::model::NoticeKind;
 
 impl Session {
-    /// A notice for every war a nation declared on the player and every offer of the player that
-    /// lapsed unanswered, in `records`.
+    /// A notice for every war a nation the player has met declared on it and every offer of the
+    /// player that lapsed unanswered, in `records`. A war of a stranger (a city-state joins the
+    /// war of its ally) is not told: a notice names only whom the player knows.
     pub(super) fn notify_news(&mut self, records: &[AppliedCommand]) {
         let me = self.me();
         if self.game().view().auth.settings().is_ai(me) {
@@ -30,7 +31,7 @@ impl Session {
         for record in records {
             for change in &record.changes.player_changes {
                 let PlayerChange::WarDeclared { player, enemy } = *change else { continue };
-                if enemy == me && player != me {
+                if enemy == me && player != me && classic_rules::derived::tourism::met(self.game().view().auth, me, player) {
                     let text = tf!("classic.game.news.war-declared", name = self.player_name(player));
                     self.notify(NoticeKind::Diplomacy, text);
                 }
@@ -160,6 +161,7 @@ mod tests {
     fn a_war_declared_on_the_player_is_told_to_it_and_not_a_war_of_others() {
         let mut session = new_match();
         let (me, a, b) = (session.me(), PlayerId(1), PlayerId(2));
+        session.harness_game().0.debug_meet(me, a);
         let records = vec![war(a, me), war(me, a), war(a, b)];
         for lang in LANGUAGES {
             let told = told_in(lang, &mut session, |s| s.notify_news(&records));
@@ -238,6 +240,7 @@ mod tests {
         let me = session.me();
         {
             let (game, _) = session.harness_game();
+            game.debug_meet(me, rival);
             for player in [me, rival] {
                 game.debug_add_project(player, apollo);
                 for _ in 0..3 {
@@ -327,6 +330,43 @@ mod tests {
         for lang in LANGUAGES {
             let told = told_in(lang, &mut session, |s| s.report_changes(&before));
             assert!(told.iter().any(|t| t.contains(&mine_name)) && told.iter().all(|t| !t.contains("classic.") && !t.contains(&their_name)), "{lang}: {told:?}");
+        }
+    }
+
+    /// A rival the player has never met is not named in the notice of its ship, in any language.
+    #[test]
+    fn a_rival_the_player_has_not_met_is_not_named_in_its_ship_notice() {
+        let mut session = new_match();
+        let (me, rival) = (session.me(), PlayerId(1));
+        assert!(!classic_rules::derived::tourism::met(session.game().view().auth, me, rival), "the rival is a stranger");
+        let rules = game_rules();
+        let project = |key: &str| classic_rules::rules::content::ProjectId(rules.module.projects.iter().position(|p| p.key == key).unwrap() as u16);
+        let apollo = project("core:project/apollo_program");
+        let boosters = classic_rules::world::victory::spaceship_parts(&rules)[0].0;
+        let before = session.victory_steps();
+        {
+            let (game, _) = session.harness_game();
+            game.debug_add_project(rival, apollo);
+            for _ in 0..3 {
+                game.debug_add_project(rival, boosters);
+            }
+        }
+        for lang in LANGUAGES {
+            let told = told_in(lang, &mut session, |s| s.report_victory_steps(&before));
+            assert!(told.is_empty(), "{lang}: told about a nation never met: {told:?}");
+        }
+    }
+
+    /// A war declared on the player by a nation it has never met (an allied city-state joins the
+    /// war of its ally) is not told, so the notice does not name a stranger.
+    #[test]
+    fn a_war_declared_by_a_nation_the_player_has_not_met_is_not_told() {
+        let mut session = new_match();
+        let (me, stranger) = (session.me(), PlayerId(1));
+        assert!(!classic_rules::derived::tourism::met(session.game().view().auth, me, stranger), "the declarer is a stranger");
+        for lang in LANGUAGES {
+            let told = told_in(lang, &mut session, |s| s.notify_news(&[war(stranger, me)]));
+            assert!(told.is_empty(), "{lang}: a stranger is named: {told:?}");
         }
     }
 }
