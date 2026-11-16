@@ -2,77 +2,57 @@
 
 ## 0.3.0
 
-Changes since 0.2.0 (4 November 2026), in this repository and in the [platform](https://github.com/sirgl/aurelia-platform)
-it builds on. Saves made by 0.2.0 still load (the ruleset fingerprint of 0.2.0 is on the list of earlier editions).
+What changed since 0.2.0 (4 November 2026). Saves made by 0.2.0 still load.
 
-### Rules
-
-- **Citadel as in Unciv 4.22.10.** It can be built on any land tile next to your own land, another player's too. It takes
-  over the tiles around it (radius 1, its own tile included, city centres excepted) for the nearest own city that touches
-  them, and only a tile inside that city's culture radius; a city-state loses influence for each tile; units and camps on
-  a taken tile are dealt with, and a camp on the site goes before the citadel is placed. A site no city of yours reaches is
-  refused, with the reason told in every language. A pillaged citadel does not hurt.
-- **Gold prices as in Unciv.** The percents of a gold purchase multiply, one factor per source, with no upper bound on the
-  number of sources, and the price is rounded once. A unit's purchase modifier (`hurryCostModifier`) prices its purchase and
-  its disband gold. The Mandate of Heaven discount applies to every item, and faith uses the same one price calculation. A
-  tile costs the speed percent and the factors in one product, rounded to the nearest gold. A puppet, a razing city and a
-  city in resistance buy no tile.
-- **Disband a unit, sell a building**, as in Unciv, each after a confirmation. A sale removes the queued orders that needed
-  the building, and the city keeps its hit points up to the new maximum.
-- **Rebels** rise below -20 happiness, as in Unciv (only in a game with barbarians): a countdown, then rebels near one of the
-  nation's cities, with a notice and a warning in the happiness tooltip.
-- **A city in resistance gives nothing**: it runs no turn step and takes no order that builds or buys. The city screen says
-  why production and buying are blocked.
-- **Lost orders** leave the queue by themselves at no cost when the building they needed is gone, and the owner is told. The
-  requirement "a building in every city" ignores a captured city that awaits its fate, counts a unique building for the one
-  it replaces, and a city founded later drops the national wonder that wanted it.
-- **Diplomacy.** Peace with a nation needs its consent and is made as a deal (with a city-state either side can make it
-  alone); a refused peace says why and what it would cost. An unpaid gold per turn breaks the deal, counts against the
-  debtor like a declaration of war, and is told to both sides. A new gold-per-turn item must fit the payer's income. War and
-  denunciation wait for the player's yes.
-- **Congress.** Every delegate is cast: the remainder of an even split over several resolutions was lost, and beside another
-  proposal the World Leader vote was halved. The player is warned three turns before the session that elects the World Leader.
-- **New games** start from balanced positions. The Shoshone start with a Pathfinder that sees
-  3 tiles, and a nation does not build the unit its unique unit replaces.
-- **Saves.** The ruleset fingerprint and the command layout moved; earlier editions keep loading.
+Highlights: **much stronger computer opponents**, **a game version shown in the menu**, an **End turn button that tells
+you what still needs an order**, **notices for what happens to you**, and rules that now follow Unciv more closely
+(citadels, gold prices, diplomacy, Congress).
 
 ### Computer opponents
 
-- **The standard AI is the former bench player `next-x`** (the fourteenth promotion, 14 November). On top of `next-w`
-  (below) it plays the war of `next-war-retake` (ranged units first and a press call at the walls, a muster before
-  the war, a retake of a lost city when it is worth the units), the vote guard (it denies a rival the World Leader vote,
-  and values an alliance by what it adds to its own chance) and a plan for a player left with no city. Against the previous
-  standard (`pre-next-x`, still in the bench) at Quick speed on the pace suite it holds about 58 % of the victory-weighted
-  share (59.4 % when first built, 56.6-58.8 % in four control blocks on the merged code), and wins more real victories
-  (228 against 134 in the four blocks of the first build).
-- **`next-w`** (the thirteenth promotion, 11 November): the strategy net chooses sharply and sees more; the tall style
-  keeps the cities the rules make worth it and plays for the science victory; a wonder another nation has built is dropped
-  from the queue, and a wonder race is priced by the chance to finish first.
-- The AI makes peace by deals, prices cities and resources by worth, and casts all its delegates in a session.
-- Fixes: no division by zero when no rival capital is left to march on, and a unit of a kind the rules do not list no longer
-  keeps a landless player out of the plan.
-- The bench gained the tools that measured this (the tactics exam `ai-exam`, the siege bank, the war probe, counters for
-  deals, wars, rebels and purchases, and the victory-weighted share with its interval).
+- **A new default AI.** It fights a smarter war: it sends ranged units first and brings siege units up to the walls,
+  gathers its army before it declares war, and tries to win back a city it lost when that is worth the units. It also
+  stops a rival from winning the World Leader vote, judges an alliance by what it adds to its own chances, and keeps
+  playing a plan when it has lost every city.
+- **How much stronger.** In 800 test games at Quick speed against the previous default AI, the new one takes about 58 %
+  of the points (counting a win by a real victory in full and a win on the turn limit as a quarter) and wins 204 games by
+  a real victory against 128.
+- The AI makes peace through deals, prices cities and resources by what they are worth, builds the tall-empire style
+  when it pays, drops a wonder another nation has already built, and always casts all its delegates in a Congress session.
+- Fixes: the AI no longer breaks when no rival capital is left to march on, and a nation that lost every city is no longer
+  stuck with no plan.
+
+### Rules
+
+- **Citadels work as in Unciv.** You can build one on land next to your territory, even next to a neighbour's. It claims
+  the tiles around it for your nearest city, pushes other units off them, takes influence from a city-state for each tile
+  it takes, and removes a barbarian camp on its site. If none of your cities can reach the site, the game says so.
+- **Gold prices work as in Unciv.** Discounts and surcharges from several sources now multiply, and the price is rounded
+  once. A puppet city, a city being razed and a city in resistance cannot buy a tile.
+- **Disband a unit and sell a building**, each after a confirmation.
+- **Rebels** appear when happiness falls below -20 (only in a game with barbarians). You get a notice, and the happiness
+  tooltip warns you beforehand.
+- **A city in resistance produces nothing.** The city screen says why production and buying are blocked.
+- **Diplomacy.** Peace needs the other side's consent and is made as a deal. A refused peace tells you why and what it
+  would cost. A gold-per-turn deal that is not paid breaks the deal. War and denouncing a nation ask you to confirm first.
+- **Congress.** Every delegate is now counted, and you are warned three turns before the session that elects the World
+  Leader.
+- **New games** start from more balanced positions. The Shoshone start with a Pathfinder that sees 3 tiles.
 
 ### Interface
 
-- **End turn waits for your orders.** One list of what you still owe (free picks, empty production, a captured city,
-  research, policy, pantheon, promotion, great person, a unit order); the button names the first item and leads to it. A
-  city in resistance is not asked for production.
-- **Notices** for a war declared on you, lapsed offers, starving cities, rival victory steps, answers to peace offers, broken
-  deals, orders removed by the rules and rebels. They name only the nations you have met, read right with a plural nation
-  name, and do not tell a city you razed as starved.
-- **Colours of the powers.** Every owner of a match gets a distinct colour (a nation whose colour is close to an earlier
-  one takes the first spare colour far enough away); the renderer paints up to 64 owners and the new-game screen offers up
-  to 41 (16 powers, 24 city-states, the barbarians).
-- **The technology tree** opens on the technology in research; without research, on the farthest available one. Coming
-  back from the Encyclopedia keeps the scroll.
-- **Keys of the screens** are shown in the tooltips of the top bar.
-- **Cards that ask for a yes**: war, denunciation, disband and sale; Esc is a no, and an old yes declares nothing. The peace
-  button offers peace to a nation.
-- Every new text is in all seven languages.
-- **The version of the game** and, when the build knows it, the short commit are shown in the main menu and on the settings
-  screen (also in the browser and on Android).
+- **End turn tells you what is left to do.** One list of everything that still needs an order (free picks, empty
+  production, a captured city, research, a policy, a pantheon, a promotion, a great person, a unit). The button names the
+  first item and takes you to it.
+- **Notices** for a war declared on you, an offer that ran out, a starving city, a rival close to winning, an answer to
+  your peace offer, a broken deal, and rebels. They name only the nations you have met.
+- **Nation colours** no longer repeat in a game with many players, including a full-size map.
+- **The technology tree** opens on the technology you are researching.
+- **Keys** for the screens are shown in the tooltips of the top bar.
+- **Yes/no cards** for war, denouncing, disbanding and selling. Esc means no.
+- **The game version** (and, when known, the build) is shown at the bottom right of the main menu and the settings screen,
+  in the browser and on Android too.
+- Every new text is available in all seven languages.
 
 ### Builds and tests
 
