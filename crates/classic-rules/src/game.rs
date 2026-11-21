@@ -124,6 +124,12 @@ pub trait ClassicGame {
     #[cfg(any(test, feature = "harness"))]
     fn debug_grant_promotion(&mut self, rules: &CompiledRuleset, unit: UnitHandle, promotion: crate::ids::PromotionId);
 
+    /// Harness-only: `conqueror` takes `city` as a strike on it would (`capture_city`: the plunder,
+    /// the garrison dead, the buildings that survive, the citizens lost), with no army in the
+    /// way. The stress exam's "the capital is lost".
+    #[cfg(any(test, feature = "harness"))]
+    fn debug_capture_city(&mut self, rules: &CompiledRuleset, city: CityHandle, conqueror: PlayerId);
+
     /// Count one Great General as born for `p` (what a Carthaginian
     /// crossing of mountains waits for), as the kill that earns it would.
     #[cfg(any(test, feature = "harness"))]
@@ -290,6 +296,14 @@ impl ClassicGame for GameState {
         self.world_mut().module.victory.options = options;
     }
 
+
+    #[cfg(any(test, feature = "harness"))]
+    fn debug_capture_city(&mut self, rules: &CompiledRuleset, city: CityHandle, conqueror: PlayerId) {
+        let mut tx = WorldTransaction::new(self.world_mut());
+        tx.capture_city(city, conqueror, rules).expect("debug_capture_city: the city exists");
+        let journal = tx.commit().expect("debug_capture_city commit");
+        self.commit_journal(rules, &journal);
+    }
 
     #[cfg(any(test, feature = "harness"))]
     fn debug_add_project(&mut self, player: PlayerId, project: crate::rules::content::ProjectId) {

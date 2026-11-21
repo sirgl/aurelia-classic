@@ -148,6 +148,12 @@ pub struct PlayedLog {
 /// Plays `spec` to its end (or its last round) with `ClassicMind` of
 /// `variant` on every seat and the command journal on.
 pub fn play_log(rules: &CompiledRuleset, spec: &LogSpec) -> Result<PlayedLog, String> {
+    play_log_until(rules, spec, spec.rounds)
+}
+
+/// `play_log` that stops after round `stop` (a position for `ai-stress`: the game of the whole
+/// `spec`, its rounds and so its AI's prices as ever, but a log of the first `stop` rounds only).
+pub fn play_log_until(rules: &CompiledRuleset, spec: &LogSpec, stop: u32) -> Result<PlayedLog, String> {
     let variant = Variant::from_name(&spec.variant).ok_or_else(|| format!("unknown variant {}", spec.variant))?;
     let game_spec = spec.game()?;
     let mut game = start(rules, &game_spec);
@@ -155,7 +161,7 @@ pub fn play_log(rules: &CompiledRuleset, spec: &LogSpec) -> Result<PlayedLog, St
     let settings = AiSettings::for_rules(rules, &game_spec.difficulty);
     let mut driver = kernel::ai::driver::AiDriver::<Classic, ClassicMind>::with_mind(settings, Vec::new(), ClassicMind::new(variant));
     driver.set_trace_capacity(0);
-    while !game.is_over() && game.view().auth.turn().round <= spec.rounds {
+    while !game.is_over() && game.view().auth.turn().round <= stop.min(spec.rounds) {
         let report = driver.run(&mut game, rules, u32::MAX);
         if !report.round_done && !game.is_over() {
             return Err(format!("round {} waits for a human", game.view().auth.turn().round));
