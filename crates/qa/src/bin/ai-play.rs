@@ -15,6 +15,8 @@
 //! --speed NAME         the game speed: quick, standard (default), epic or
 //!                      marathon (kept in each log's `.json`)
 //! --jobs J             games played at once (default 1)
+//! --stop-round N      stop after round N: the log holds the first N rounds of a game of the whole
+//!                      length (a position for `ai-stress`; the AI plays by the game's own length)
 //! --variant NAME       the expert on every seat (default the net's base,
 //!                      `NET_BASE`: `pre-puppet`, the standard before the
 //!                      eighth promotion; kept in each log's `.json`).
@@ -28,7 +30,7 @@ use std::time::Instant;
 
 use aurelia_qa::bench::modules::{BenchRules, ClassicBench};
 use aurelia_qa::bench::suite::Suite;
-use aurelia_qa::export::{parallel, play_log, suite_specs_with, write_log};
+use aurelia_qa::export::{parallel, play_log_until, suite_specs_with, write_log};
 use classic_rules::ai::variant::{Variant, NET_BASE};
 
 struct Options {
@@ -40,10 +42,12 @@ struct Options {
     jobs: usize,
     speed: Option<String>,
     variant: Variant,
+    /// `--stop-round N`: the logs hold the first N rounds only (positions for `ai-stress`).
+    stop: Option<u32>,
 }
 
 fn options() -> Result<Options, String> {
-    let mut o = Options { out: None, suite: "smoke".to_owned(), games: 1, offset: 0, rounds: None, jobs: 1, speed: None, variant: NET_BASE };
+    let mut o = Options { out: None, suite: "smoke".to_owned(), games: 1, offset: 0, rounds: None, jobs: 1, speed: None, variant: NET_BASE, stop: None };
     let mut args = std::env::args().skip(1);
     while let Some(flag) = args.next() {
         let mut value = || args.next().ok_or_else(|| format!("{flag} needs a value"));
@@ -55,6 +59,7 @@ fn options() -> Result<Options, String> {
             "--rounds" => o.rounds = Some(value()?.parse().map_err(|e| format!("--rounds: {e}"))?),
             "--jobs" => o.jobs = value()?.parse().map_err(|e| format!("--jobs: {e}"))?,
             "--speed" => o.speed = Some(value()?),
+            "--stop-round" => o.stop = Some(value()?.parse().map_err(|e| format!("--stop-round: {e}"))?),
             "--variant" => {
                 let name = value()?;
                 o.variant = Variant::from_name(&name).ok_or_else(|| format!("--variant: no AI variant {name}"))?;
@@ -93,7 +98,7 @@ fn run(o: &Options) -> Result<(), String> {
     let started = Instant::now();
     let results = parallel(&specs, o.jobs, |spec| {
         let clock = Instant::now();
-        let log = play_log(&rules, spec)?;
+        let log = play_log_until(&rules, spec, o.stop.unwrap_or(spec.rounds))?;
         let path = write_log(out, spec, &log).map_err(|e| format!("{}: {e}", spec.name()))?;
         Ok::<_, String>((path, log.journal.len(), log.rounds, clock.elapsed().as_secs_f64()))
     });

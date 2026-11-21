@@ -112,3 +112,7 @@ path = "src/bin/ai-exam.rs"
 [[bin]]
 name = "ai-strategy-trace"
 path = "src/bin/ai-strategy-trace.rs"
+
+[[bin]]
+name = "ai-stress"
+path = "src/bin/ai-stress.rs"

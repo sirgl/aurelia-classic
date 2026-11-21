@@ -645,7 +645,7 @@ fn replay_prefix(rules: &CompiledRuleset, game: &mut GameState, start_at: &Start
 /// `replay_prefix` of the log `log` to the start of round `to`; `short_ok`:
 /// a log that ends (or a game that is over) before it is replayed to its end
 /// instead of an error.
-fn replay_to(rules: &CompiledRuleset, game: &mut GameState, log: &Path, to: u32, nations: &[PlayerId], eliminated: &mut [Option<u32>], short_ok: bool) -> Result<u64, String> {
+pub fn replay_to(rules: &CompiledRuleset, game: &mut GameState, log: &Path, to: u32, nations: &[PlayerId], eliminated: &mut [Option<u32>], short_ok: bool) -> Result<u64, String> {
     let (source, bytes) = read_log(log)?;
     let start_at = Start { log: log.to_path_buf(), round: to, give_space_techs: false };
     let label = start_at.log.display();
