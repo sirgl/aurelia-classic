@@ -434,6 +434,10 @@ impl BenchRules for ClassicBench {
     }
 
     fn recorder(name: &str, seed: u64) -> Option<Box<dyn MatchRecorder<Self>>> {
+        // The probe of lane A's defects (`bench::diplo_probe`, `AURELIA_DIPLO_PROBE`).
+        if let Some(probe) = crate::bench::diplo_probe::DiploProbe::new(name, seed) {
+            return Some(Box::new(probe));
+        }
         // The check of the model of the rivals (`bench::rival_net`, `AURELIA_RIVAL_NET`).
         if let Some(check) = crate::bench::rival_net::RivalNetRecorder::new(name, seed) {
             return Some(Box::new(check));
