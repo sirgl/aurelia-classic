@@ -10,7 +10,8 @@
 //! otherwise waits in port; a wounded ship heals there.
 
 use crate::ai::combat::ranged_range;
-use crate::ai::planner::{Decision, PlanTools, UnitView};
+use crate::ai::net2::plan::Escorts;
+use crate::ai::planner::{Decision, PlanTools, TurnBrief, UnitView};
 use crate::ai::planner_units::{approach_at, hold, move_along, HEAL_BELOW_HP};
 use crate::ai::state::{AiState, OperationPhase};
 use crate::ai::trace::{Actor, Reason};
@@ -35,11 +36,26 @@ pub fn coastal(view: &crate::knowledge::view::PlayerView<'_>, tile: TileId) -> b
 
 /// Warships the running operations want: some of their targets are coastal.
 pub fn wanted(obs: &AIObservation<'_>, state: &AiState) -> usize {
+    wanted_with(obs, state, Escorts::AsToday)
+}
+
+/// `wanted` with the escorts `net2` asks for an `Overseas` order (`Net2Plan::escorts`): the landing needs ships
+/// that shell the coast and keep the melee ships off the embarked army, so the wish is the larger of
+/// `FLEET_SIZE` and the order's count.
+pub fn wanted_with(obs: &AIObservation<'_>, state: &AiState, escorts: Escorts) -> usize {
     if state.operations().iter().any(|o| coastal(&obs.view, o.target)) {
-        FLEET_SIZE
+        match escorts {
+            Escorts::Ships(ships) => FLEET_SIZE.max(ships as usize),
+            _ => FLEET_SIZE,
+        }
     } else {
         0
     }
+}
+
+/// The escorts of the turn's `net2` plan; `Escorts::AsToday` without a plan.
+pub fn escorts_of(brief: &TurnBrief) -> Escorts {
+    crate::ai::operations::with_net2(brief, |plan| plan.escorts).unwrap_or_default()
 }
 
 fn is_warship(rules: &CompiledRuleset, kind: UnitKindId) -> bool {
@@ -78,6 +94,11 @@ pub fn on_hand(obs: &AIObservation<'_>, rules: &CompiledRuleset) -> usize {
 /// Warships still to build.
 pub fn shortfall(obs: &AIObservation<'_>, state: &AiState, rules: &CompiledRuleset) -> usize {
     wanted(obs, state).saturating_sub(on_hand(obs, rules))
+}
+
+/// `shortfall` under the turn's `net2` plan (the city planner's demand reads this one).
+pub fn shortfall_for(obs: &AIObservation<'_>, brief: &TurnBrief, state: &AiState, rules: &CompiledRuleset) -> usize {
+    wanted_with(obs, state, escorts_of(brief)).saturating_sub(on_hand(obs, rules))
 }
 
 /// The decision of a ship: heal in port when wounded, sail into the range
