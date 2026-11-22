@@ -33,7 +33,7 @@ pub fn read(obs: &AIObservation<'_>, brief: &TurnBrief, state: &AiState, rules: 
     let seat = seat(obs, brief, state, rules, memory);
     let rivals = super::rival_inputs::read(obs, brief, state, rules, rivals, memory);
     let cities = cities(obs, brief, state);
-    Inputs { situation: *situation, seat, rivals, cities }
+    Inputs { situation: *situation, seat, rivals, cities, pairs: Vec::new(), aims: Vec::new() }
 }
 
 /// G1–G10 (§2.2).

@@ -23,7 +23,7 @@
 
 use crate::ai::strategy_net::weights::fe;
 use crate::ai::strategy_net::{Milli, Plan};
-use crate::ids::{EntityId, PlayerId};
+use crate::ids::{EntityId, PlayerId, ResourceId, TileId};
 
 /// The most rivals read per turn (met majors, by id).
 pub const MAX_RIVALS: usize = 7;
@@ -53,6 +53,16 @@ pub struct SeatInputs {
     pub cs_allies: Milli,
     /// G10: city-states where our influence trails the leader's by < 30 points, 0…4 → 0…1000.
     pub cs_contested: Milli,
+    /// G11 (offence addendum §2.1): the warmonger an average met major holds of us, / 250.
+    pub own_infamy: Milli,
+    /// G12: friendships, research agreements and pacts with majors other than the order's target, / 4.
+    pub ties_at_risk: Milli,
+    /// G13: luxury kinds with ≥ 2 copies + strategic copies beyond the queue, / 3.
+    pub spare_copies: Milli,
+    /// G14: the World Leader within the alliances we can buy before a session within 5 paced rounds.
+    pub vote_reach: Milli,
+    /// G15: own workers < cities / 2, early (0/1000).
+    pub worker_need: Milli,
 }
 
 /// The inputs of one met major rival (§2.3, R1–R24 and the two facts the war order needs).
@@ -111,6 +121,20 @@ pub struct RivalInputs {
     pub retake_case: Milli,
     /// We captured one of its cities in the last 10 paced rounds (0/1000): a war that pays runs on.
     pub captured_recent: Milli,
+    /// R25 (offence addendum §2.2): its seen cities near ours first seen < 20 paced rounds ago with ≤ 3 citizens, share.
+    pub young: Milli,
+    /// R26: its seen-city growth over 40 paced rounds minus ours, −2…+4 → 0…1000 (333 = even).
+    pub spread: Milli,
+    /// R27: its spaceship progress.
+    pub space: Milli,
+    /// R28: its visible luxury or strategic tiles we lack within 2 of our border, 0…2 → 0…1000.
+    pub lux_near: Milli,
+    /// R29: it grants us entry (0/1000).
+    pub entry: Milli,
+    /// R30: our era ahead of its (0/1000).
+    pub era_ahead: Milli,
+    /// R31: city-states allied to it / 3.
+    pub cs_held: Milli,
 }
 
 impl RivalInputs {
@@ -144,6 +168,13 @@ impl RivalInputs {
             score: 500,
             retake_case: 0,
             captured_recent: 0,
+            young: 0,
+            spread: 333,
+            space: 0,
+            lux_near: 0,
+            entry: 0,
+            era_ahead: 0,
+            cs_held: 0,
         }
     }
 }
@@ -163,6 +194,34 @@ pub struct CityInputs {
     pub young: Milli,
 }
 
+/// The inputs of a hire (offence addendum §2.3): an ordered pair of met majors, `hired` ≠ `target`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PairInputs {
+    pub hired: PlayerId,
+    pub target: PlayerId,
+    /// P1: 1000 at ≤ 6 tiles between their nearest seen cities, 0 at ≥ 16.
+    pub near: Milli,
+    /// P2: the hired's soldiers over both (500 level).
+    pub matched: Milli,
+    /// P3: they are at war (0/1000).
+    pub at_war: Milli,
+    /// P4: the hired refused us within 30 paced rounds (0/1000).
+    pub refused: Milli,
+}
+
+/// The inputs of one seen rival city within `DECISIVE_RANGE` (offence addendum §2.4, T1–T6).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct AimInputs {
+    pub rival: PlayerId,
+    pub city: TileId,
+    pub capital: Milli,
+    pub young: Milli,
+    pub lux: Milli,
+    pub holy: Milli,
+    pub worth: Milli,
+    pub ring: Milli,
+}
+
 /// Everything `net2` reads in a turn.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Inputs {
@@ -172,6 +231,10 @@ pub struct Inputs {
     /// At most `MAX_RIVALS`, by id.
     pub rivals: Vec<RivalInputs>,
     pub cities: Vec<CityInputs>,
+    /// Every ordered pair of met majors (the hire).
+    pub pairs: Vec<PairInputs>,
+    /// The seen rival cities a war may aim at, at most 40.
+    pub aims: Vec<AimInputs>,
 }
 
 /// The inputs of the site head for one candidate tile (§3.4, S1–S9). Points are the planner's site points.
@@ -195,6 +258,8 @@ pub struct SiteInputs {
     pub fill: Milli,
     /// S9: the style share of tall (`Net2Plan::tall_share`), 0…1000.
     pub tall: Milli,
+    /// S10 (offence addendum §2.5): kinds we lack in the site's radius within 3 of a rival's border, / 2.
+    pub claim: Milli,
 }
 
 // ---- the outputs (design §4.4–§4.7) ----
@@ -237,6 +302,11 @@ impl WarKind {
         matches!(self, WarKind::Retake | WarKind::Spoiler | WarKind::Duty)
     }
 
+    /// Retake and Duty wait only the rules' treaty (`PEACE_DURATION`), not `PEACE_COOLDOWN_ROUNDS`.
+    pub fn waits_own_cooldown(self) -> bool {
+        !matches!(self, WarKind::Retake | WarKind::Duty)
+    }
+
     pub fn name(self) -> &'static str {
         match self {
             WarKind::Prey => "prey",
@@ -247,6 +317,35 @@ impl WarKind {
             WarKind::Overseas => "overseas",
         }
     }
+}
+
+/// Why a war order aims at its city (offence addendum §3.3).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum AimWhy {
+    Capital,
+    Young,
+    Resource,
+    Holy,
+    Worth,
+    Parts,
+}
+
+/// The city a war order aims at.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct WarAim {
+    pub city: TileId,
+    pub why: AimWhy,
+}
+
+/// How a war order opens (offence addendum §3.3, MO3).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum Opening {
+    #[default]
+    Plain,
+    /// Stage inside the target's land under its entry, declare when assembled (by `until` at the latest).
+    Staged { since: u32, until: u32 },
 }
 
 /// A war order: one at a time (§4.4).
@@ -260,6 +359,11 @@ pub struct WarOrder {
     pub budget: u32,
     /// Its war value this turn (≥ 350 while kept).
     pub value: Milli,
+    /// The named city (None: any city of the rival, as the war machine picks today).
+    pub aim: Option<WarAim>,
+    pub opening: Opening,
+    /// The war machine pillages the order's enemy where no capture fits (`raid_war`).
+    pub raid: bool,
 }
 
 impl WarOrder {
@@ -329,6 +433,46 @@ pub enum Generals {
     Hold,
 }
 
+/// A hire: `hired` is paid to declare on `target` (offence addendum §3.3, D4).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct HireOrder {
+    pub hired: PlayerId,
+    pub target: PlayerId,
+    pub gold: u32,
+    pub gold_per_turn: u32,
+    pub since: u32,
+}
+
+/// Spare copies sold for gold a turn to the order's target until the declaration (D1/D2).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct MilkOrder {
+    pub target: PlayerId,
+    pub until: u32,
+}
+
+/// The final city-state sweep before a congress session (CS6/W2).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CsSweep {
+    pub until: u32,
+}
+
+/// The offensive levers (offence addendum §3.3); `Default` is the design's play (`net2-defence`).
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Offence {
+    pub hire: Option<HireOrder>,
+    pub milk: Option<MilkOrder>,
+    pub sell_spares: bool,
+    pub ask_entry: Option<PlayerId>,
+    pub tourism_entry: bool,
+    pub cs_sweep: Option<CsSweep>,
+    pub ban_luxury: Option<ResourceId>,
+    pub coup_floor: Option<u8>,
+    pub bully_worker: Option<PlayerId>,
+    pub faith_target: Option<PlayerId>,
+    pub citadel_at: Option<TileId>,
+    pub liberate: bool,
+}
+
 /// The guard level of one own city, 0…1000 (§4.5).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CityGuard {
@@ -355,6 +499,8 @@ pub struct RivalRead {
     pub grabber: Milli,
     /// AND(grabber, weak): the value of a `Border` war.
     pub border: Milli,
+    /// A runaway we cannot beat ourselves (offence addendum §3.2; 0 until the offence is built).
+    pub brake: Milli,
     /// max of the war kinds (§4.4).
     pub war_value: Milli,
     /// The argmax kind (Overseas when not a retake and no land route).
@@ -382,6 +528,7 @@ pub struct Net2Plan {
     pub generals: Generals,
     /// The style share of tall (the site head's S9).
     pub tall_share: Milli,
+    pub offence: Offence,
 }
 
 /// The trust of a rival without a reading (a city-state, a stranger): a stranger is not yet a liar.
@@ -458,6 +605,8 @@ pub struct SpentWar {
 pub struct CoreMemory {
     pub war: WarPlan,
     pub spent: Vec<SpentWar>,
+    /// Targets hired against: no new hire on one until `until`.
+    pub hires: Vec<SpentWar>,
 }
 
 /// `net2`'s memory: the core's and the inputs' (part A's own type, `inputs::InputMemory`).

@@ -498,6 +498,32 @@ pub const CS_SHARE: Neuron = Neuron {
     ],
 };
 
+// ---- the offence addendum (work/new-net-offence-addendum-2026-11-22.md §3): declared, not yet built ----
+
+/// The offence is off: `net2` plays as the addendum's control `net2-defence` (every `Offence` field and
+/// the `WarOrder` aim, opening and raid at their defaults). The offence's levers read this switch.
+pub const OFFENCE: bool = false;
+
+const fn declared(name: &'static str, why: &'static str) -> Neuron {
+    Neuron { name, bias: 0, why, join: UNIT, terms: &[] }
+}
+
+/// The offence's seat concepts (addendum §3.1): no terms yet, each fires 0; not in `neurons()`.
+pub const OFFENCE_SEAT: [Neuron; 3] = [
+    declared("infamy_cost", "unit(−100 + 1000·G11 + 600·G12): the declaration's cost in ties, read by every offensive war value"),
+    declared("isolation", "unit(1000 − 1200·max reach − 600·max menace − 400·max(runaway·reach)): the minimal army is safe"),
+    declared("sweep", "unit(−600 + 1200·G14 + 600·Y(aim_diplomacy) + 400·G8): the city-state sweep before a session"),
+];
+
+/// The offence's rival (and pair) concepts (addendum §3.2): no terms yet, each fires 0; not in `neurons()`.
+pub const OFFENCE_RIVAL: [Neuron; 5] = [
+    declared("brake", "unit(−200 + 1200·runaway − 1000·spoiler): a runaway we cannot beat ourselves"),
+    declared("hire", "per pair h, t: unit(−900 + 1200·brake_t + 800·[order on t] + 600·P1 + 600·(P2 − 500) − 1200·runaway_h − 800·P4 − 1000·P3 − 500·(1000 − G8))"),
+    declared("milk", "unit(−1200 + 1000·[order on r, at peace, posture prepare] + 800·G13)"),
+    declared("stage", "unit(−700 + 1000·[order on r, Prey/Border, at peace] + 400·R1 − 600·menace − 400·distrust)"),
+    declared("citadel", "unit(−600 + 700·T6(aim) + 800·R28 + 400·[order on r and at war]); 0 at peace"),
+];
+
 /// The thresholds of the levers: (value, why).
 pub mod gate {
     use super::Milli;

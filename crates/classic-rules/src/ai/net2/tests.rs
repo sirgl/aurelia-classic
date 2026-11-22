@@ -6,7 +6,7 @@ use crate::ai::strategy_net::{intent_from, Held, Intent, Logits, Milli, Net, Til
 use crate::ids::{EntityId, PlayerId};
 
 use super::levers::{self, After, Pass};
-use super::plan::{CityInputs, CoreMemory, Embargo, Escorts, Generals, Help, Inputs, RivalInputs, SeatInputs, SpentWar, WarKind, WarOrder, WarPlan};
+use super::plan::{CityInputs, CoreMemory, Embargo, Escorts, Generals, Help, Inputs, Opening, RivalInputs, SeatInputs, SpentWar, WarKind, WarOrder, WarPlan};
 use super::weights::{a, q};
 
 const ROUND: u32 = 100;
@@ -34,7 +34,7 @@ fn carried() -> [Milli; kc::N] {
 }
 
 fn inputs(seat: SeatInputs, rivals: Vec<RivalInputs>, cities: Vec<CityInputs>) -> Inputs {
-    Inputs { situation: situation(), seat, rivals, cities }
+    Inputs { situation: situation(), seat, rivals, cities, pairs: vec![], aims: vec![] }
 }
 
 fn pass_of(inputs: &Inputs, held: &CoreMemory, round: u32) -> Pass {
@@ -67,7 +67,7 @@ fn a5_the_disarmed_neighbour_is_prey() {
     assert_eq!((c[q::WEAK], c[q::REACH]), (1000, 800));
     // prey = unit(−1700 + 1600 + 1600·0.8 + 400·0.3) = unit(1300) = 1000 → a Prey order with the budget of 25.
     assert_eq!(c[q::PREY], 1000);
-    let order = WarOrder { rival: PlayerId(1), kind: WarKind::Prey, since: ROUND, budget: 25, value: 1000 };
+    let order = WarOrder { rival: PlayerId(1), kind: WarKind::Prey, since: ROUND, budget: 25, value: 1000, aim: None, opening: Opening::Plain, raid: false };
     assert_eq!(p.core.war, WarPlan::Order(order));
     // At peace with it: the posture prepares (+1800·1.0), conquest gains +1500 − 400.
     let tilt = levers::tilt(&p);
@@ -208,7 +208,7 @@ fn p3_a_stack_at_the_border_is_defence() {
 // ---- the war order's timing (§3.3, §4.4) ----
 
 fn held(value: Milli, since: u32) -> CoreMemory {
-    CoreMemory { war: WarPlan::Order(WarOrder { rival: PlayerId(1), kind: WarKind::Prey, since, budget: 25, value }), spent: vec![] }
+    CoreMemory { war: WarPlan::Order(WarOrder { rival: PlayerId(1), kind: WarKind::Prey, since, budget: 25, value, aim: None, opening: Opening::Plain, raid: false }), spent: vec![], hires: vec![] }
 }
 
 /// A neighbour whose prey value is `prey`-ish: weak 1000, its reach set to land it at the value.
@@ -262,6 +262,7 @@ fn the_default_plan_is_todays_behaviour() {
     assert!(!plan.denies_help(PlayerId(1)) && !plan.makes_peace_with(PlayerId(1)));
     assert_eq!((plan.cs_gold_share, plan.guard_of(EntityId(1))), (0, 0));
     assert_eq!((plan.embargo, plan.escorts, plan.generals), (Embargo::Nobody, Escorts::AsToday, Generals::AsToday));
+    assert_eq!(plan.offence, super::plan::Offence::default(), "no offence: the design's play (`net2-defence`)");
 }
 
 // ---- the float twin's fixture ----
@@ -333,6 +334,7 @@ fn generated_rival(rng: &mut Lcg, id: u8) -> RivalInputs {
         score: r(ri::SCORE),
         retake_case: r(ri::RETAKE_CASE),
         captured_recent: r(ri::CAPTURED_RECENT),
+        ..RivalInputs::stranger(PlayerId(id))
     }
 }
 
@@ -349,10 +351,10 @@ fn generated_held(rng: &mut Lcg, rivals: &[RivalInputs], round: u32) -> CoreMemo
     } else {
         let rival = rivals[rng.below(rivals.len() as u64) as usize].rival;
         let kind = WarKind::ALL[rng.below(6) as usize];
-        WarPlan::Order(WarOrder { rival, kind, since: round - rng.below(40) as u32, budget: kind.budget(), value: rng.milli() })
+        WarPlan::Order(WarOrder { rival, kind, since: round - rng.below(40) as u32, budget: kind.budget(), value: rng.milli(), aim: None, opening: Opening::Plain, raid: false })
     };
     let spent = if rng.below(4) == 0 { vec![SpentWar { rival: rivals[0].rival, until: round + rng.below(20) as u32 - 5 }] } else { vec![] };
-    CoreMemory { war, spent }
+    CoreMemory { war, spent, hires: vec![] }
 }
 
 /// One generated turn's line (the record of `trace::line`).
@@ -379,11 +381,12 @@ fn generated_line(rng: &mut Lcg) -> String {
         gold_stock: seat_row[7],
         cs_allies: seat_row[8],
         cs_contested: seat_row[9],
+        ..SeatInputs::default()
     };
     let rivals: Vec<RivalInputs> = (0..1 + rng.below(7)).map(|i| generated_rival(rng, 1 + i as u8)).collect();
     let cities = (0..1 + rng.below(6)).map(|i| generated_city(rng, 100 + i, &rivals)).collect();
     let held = generated_held(rng, &rivals, round);
-    let inputs = Inputs { situation, seat, rivals, cities };
+    let inputs = Inputs { situation, seat, rivals, cities, pairs: vec![], aims: vec![] };
     let spread = |rng: &mut Lcg| rng.below(6001) as Milli - 3000;
     let logits = Logits { concepts: k, style: [spread(rng), spread(rng), spread(rng)], aim: [spread(rng), spread(rng), spread(rng), spread(rng)], posture: [spread(rng), spread(rng), spread(rng), spread(rng)], style_margin: 1150 };
     let tempered = rng.below(2) == 0;
@@ -436,4 +439,15 @@ fn the_tilt_of_nothing_is_the_bias_terms_only() {
     let inputs = inputs(seat(), vec![], vec![]);
     let tilt = levers::tilt(&pass(&inputs));
     assert_eq!(tilt, Tilt { style: [0, -1200, -400], aim: [0; 4], posture: [0, 0, -3000, -3000] });
+}
+
+#[test]
+fn the_offence_is_declared_and_off() {
+    use super::weights::{OFFENCE, OFFENCE_RIVAL, OFFENCE_SEAT};
+    assert!(!OFFENCE, "net2 plays as net2-defence until the offence is built");
+    assert_eq!(OFFENCE_SEAT.len() + OFFENCE_RIVAL.len(), 8);
+    for neuron in OFFENCE_SEAT.iter().chain(OFFENCE_RIVAL.iter()) {
+        assert_eq!(super::concepts::fire(neuron, &super::concepts::Frame::default()), 0, "{} fires 0", neuron.name);
+    }
+    assert!(WarKind::Prey.waits_own_cooldown() && !WarKind::Retake.waits_own_cooldown() && !WarKind::Duty.waits_own_cooldown());
 }

@@ -8,7 +8,7 @@ use crate::ai::strategy_net::{Intent, Milli, Tilt};
 use crate::ids::PlayerId;
 
 use super::concepts::{self, fire, Frame};
-use super::plan::{CityGuard, CityInputs, CoreMemory, Embargo, Escorts, Generals, Help, Inputs, Net2Plan, RivalRead, SpentWar, WarKind, WarOrder, WarPlan};
+use super::plan::{CityGuard, CityInputs, CoreMemory, Embargo, Escorts, Generals, Help, Inputs, Net2Plan, Offence, Opening, RivalRead, SpentWar, WarKind, WarOrder, WarPlan};
 use super::weights::{self as w, a, gate, q, r, s, y, Table};
 
 /// One rival's layer: its inputs and its concepts.
@@ -65,6 +65,7 @@ fn read_of(rival: PlayerId, inputs: &[Milli; r::N], c: &[Milli; q::N]) -> RivalR
         duty: c[q::DUTY],
         grabber: c[q::GRABBER],
         border: c[q::BORDER],
+        brake: 0,
         war_value: c[q::WAR_VALUE],
         war_kind: kind,
         trust: ONE - c[q::DISTRUST],
@@ -101,14 +102,15 @@ enum Verdict {
 /// capture or a retake case running; else a new one on the largest war value ≥ the start.
 fn war_plan(held: &CoreMemory, reads: &[RivalRead], rivals: &[RivalPass], war_gain: Milli, round: u32, pace: u32) -> CoreMemory {
     let mut spent: Vec<SpentWar> = held.spent.iter().filter(|s| s.until > round).copied().collect();
+    let hires: Vec<SpentWar> = held.hires.iter().filter(|s| s.until > round).copied().collect();
     if let WarPlan::Order(order) = held.war {
         match judge(&order, reads, rivals, war_gain, round) {
-            Verdict::Keep(kept) => return CoreMemory { war: WarPlan::Order(kept), spent },
+            Verdict::Keep(kept) => return CoreMemory { war: WarPlan::Order(kept), spent, hires },
             Verdict::Spent => spent.push(SpentWar { rival: order.rival, until: round + paced(gate::SPENT_ROUNDS.0, pace) }),
             Verdict::Dropped => {}
         }
     }
-    CoreMemory { war: start(reads, &spent, round, pace), spent }
+    CoreMemory { war: start(reads, &spent, round, pace), spent, hires }
 }
 
 fn judge(order: &WarOrder, reads: &[RivalRead], rivals: &[RivalPass], war_gain: Milli, round: u32) -> Verdict {
@@ -140,7 +142,7 @@ fn start(reads: &[RivalRead], spent: &[SpentWar], round: u32, pace: u32) -> WarP
         }
     }
     match best {
-        Some(read) => WarPlan::Order(WarOrder { rival: read.rival, kind: read.war_kind, since: round, budget: paced(read.war_kind.budget(), pace), value: read.war_value }),
+        Some(read) => WarPlan::Order(WarOrder { rival: read.rival, kind: read.war_kind, since: round, budget: paced(read.war_kind.budget(), pace), value: read.war_value, aim: None, opening: Opening::Plain, raid: false }),
         None => WarPlan::NoWar,
     }
 }
@@ -235,6 +237,7 @@ pub fn after_intent(pass: &Pass, intent: &Intent, inputs: &Inputs, round: u32) -
         escorts: escorts_of(&pass.core.war),
         generals: if pass.core.war.order().is_none() && !at_war { Generals::Hold } else { Generals::AsToday },
         tall_share: intent.style[0],
+        offence: Offence::default(),
     };
     After { plan, price_tilt, peace }
 }
