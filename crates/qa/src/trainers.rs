@@ -16,6 +16,7 @@
 //! units that fight.
 
 pub mod act;
+pub mod dump;
 pub mod families;
 pub mod lab;
 pub mod suite;

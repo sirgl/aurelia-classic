@@ -138,6 +138,10 @@ pub fn prove(rules: &CompiledRuleset, fam: Fam, era: u8, instance: usize, attemp
 }
 
 pub fn main(cmd: &str, args: &[String]) -> Result<(), String> {
+    if cmd == "suite-dump" {
+        let rules = crate::bench::modules::ClassicBench::rules();
+        return super::dump::main(&rules, args);
+    }
     let o = opts(args)?;
     let rules = crate::bench::modules::ClassicBench::rules();
     let rules = &rules;
