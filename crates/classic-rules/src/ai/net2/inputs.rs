@@ -546,7 +546,7 @@ pub fn read(obs: &AIObservation<'_>, brief: &TurnBrief, state: &AiState, rules: 
     let seat = seat(obs, brief, rules, memory);
     let rival_rows = super::rival_inputs::read(obs, brief, state, rules, rivals, memory);
     let cities = cities(obs, brief, state, rules, memory);
-    Inputs { situation: *situation, seat, rivals: rival_rows, cities }
+    Inputs { situation: *situation, seat, rivals: rival_rows, cities, pairs: Vec::new(), aims: Vec::new() }
 }
 
 /// G1–G10 (§2.2).
@@ -580,7 +580,7 @@ fn seat(obs: &AIObservation<'_>, brief: &TurnBrief, rules: &CompiledRuleset, mem
     let gold_stock = ramp(i64::from(obs.economy.treasury), 0, 3 * i64::from(crate::ai::city_states::MEDIUM_GIFT));
     let cs_allies = ramp(obs.city_states.iter().filter(|c| c.ally == Some(me)).count() as i64, 0, 4);
     let cs_contested = ramp(contested_city_states(obs), 0, 4);
-    SeatInputs { capital_lost, cities_lost, war_rounds, war_gain, unhappy_trend, embark, enemy_air, gold_stock, cs_allies, cs_contested }
+    SeatInputs { capital_lost, cities_lost, war_rounds, war_gain, unhappy_trend, embark, enemy_air, gold_stock, cs_allies, cs_contested, ..SeatInputs::default() }
 }
 
 /// G4 (§2.2): in each current war, the cities captured from the enemy since it began minus the cities
