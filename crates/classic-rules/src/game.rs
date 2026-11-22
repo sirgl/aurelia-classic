@@ -135,6 +135,17 @@ pub trait ClassicGame {
     #[cfg(any(test, feature = "harness"))]
     fn debug_earn_great_general(&mut self, p: PlayerId, rules: &CompiledRuleset);
 
+    /// Harness-only: one item of a deal between `giver` and `receiver`, made as an accepted deal
+    /// makes it (friendship, a defensive pact, open borders, peace, gold). The stress exam's base of a
+    /// friendship or a pact; an error names what the rules refuse.
+    #[cfg(any(test, feature = "harness"))]
+    fn debug_deal_item(&mut self, rules: &CompiledRuleset, giver: PlayerId, receiver: PlayerId, item: crate::world::relations::DealItem) -> Result<(), String>;
+
+    /// Harness-only: a citadel of `owner` on `tile` with its culture bomb, as a great general builds
+    /// one, with no general and no placement check. False when the rules hold no citadel.
+    #[cfg(any(test, feature = "harness"))]
+    fn debug_raise_citadel(&mut self, rules: &CompiledRuleset, owner: PlayerId, tile: TileId) -> bool;
+
 
 
     fn outcome(&self) -> Option<crate::world::victory::Outcome>;
@@ -379,6 +390,27 @@ impl ClassicGame for GameState {
         let mut journal = ChangeJournal::default();
         journal.module_changes.push(ClassicChange::GeneralBorn { player: p });
         self.commit_journal(rules, &journal);
+    }
+
+    #[cfg(any(test, feature = "harness"))]
+    fn debug_deal_item(&mut self, rules: &CompiledRuleset, giver: PlayerId, receiver: PlayerId, item: crate::world::relations::DealItem) -> Result<(), String> {
+        let mut tx = WorldTransaction::new(self.world_mut());
+        tx.run_item(giver, receiver, item, rules).map_err(|e| format!("{e:?}"))?;
+        let journal = tx.commit().expect("debug_deal_item commit");
+        self.commit_journal(rules, &journal);
+        Ok(())
+    }
+
+    #[cfg(any(test, feature = "harness"))]
+    fn debug_raise_citadel(&mut self, rules: &CompiledRuleset, owner: PlayerId, tile: TileId) -> bool {
+        let Some(citadel) = crate::systems::combat::actions::citadel_of(rules) else {
+            return false;
+        };
+        let mut tx = WorldTransaction::new(self.world_mut());
+        tx.raise_citadel(owner, tile, citadel, rules);
+        let journal = tx.commit().expect("debug_raise_citadel commit");
+        self.commit_journal(rules, &journal);
+        true
     }
 
     #[cfg(any(test, feature = "harness"))]

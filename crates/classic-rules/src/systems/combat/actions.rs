@@ -159,12 +159,18 @@ impl<'a> WorldTransaction<'a> {
         let citadel = citadel_of(rules).ok_or(CommandError::RuleViolation(
             "no citadel in the rules".into(),
         ))?;
-        let radius = i32::from(rules.improvements[citadel.0 as usize].culture_bomb_radius);
         self.expend_unit(unit, rules)?;
+        self.raise_citadel(owner, tile, citadel, rules);
+        Ok(())
+    }
+
+    /// The citadel stands on `tile` for `owner` and its culture bomb takes the tiles around it (what
+    /// `build_citadel` does once the general is consumed; the stress exam raises one with no general).
+    pub(crate) fn raise_citadel(&mut self, owner: PlayerId, tile: TileId, citadel: crate::ids::ImprovementId, rules: &CompiledRuleset) {
+        let radius = i32::from(rules.improvements[citadel.0 as usize].culture_bomb_radius);
         self.remove_camp_at(tile);
         self.place_improvement(owner, tile, citadel, rules);
         self.take_over_tiles(owner, tile, radius, rules);
-        Ok(())
     }
 
     /// A culture bomb (the citadel): every tile within `radius` of `tile`,
