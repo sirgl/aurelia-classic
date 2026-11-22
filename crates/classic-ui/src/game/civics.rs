@@ -11,10 +11,10 @@ use classic_rules::{Command, CompiledRuleset};
 use i18n::tf;
 
 use super::names;
-use super::reasons::{branch, ideology, policy};
 use super::session::Session;
 use crate::ui::model::{
-    Availability, BranchCard, BranchState, CivicsView, GameRequest, NoticeKind, PolicyCard,
+    BranchCard, BranchState, CivicsView, Cost, GameRequest, Lock, NoticeKind, Offer, PolicyCard,
+    PolicyState,
 };
 
 impl Session {
@@ -60,6 +60,7 @@ impl Session {
             turns,
             free_policies: overview.free_policies,
             free_tenets: overview.free_tenets,
+            offers: Offer::all(&cards),
             branches: cards,
         }
     }
@@ -96,8 +97,8 @@ fn normal_state(
         return BranchState::Open;
     }
     match status {
-        Ok(_) => BranchState::Available,
-        Err(block) => BranchState::Locked(branch(*block).into()),
+        Ok(payment) => BranchState::Available((*payment).into()),
+        Err(block) => BranchState::Locked(Lock::Branch(*block)),
     }
 }
 
@@ -112,8 +113,8 @@ fn ideology_state(
         return BranchState::Open;
     }
     match ideology_status(auth, rules, me, id) {
-        Ok(_) => BranchState::Available,
-        Err(block) => BranchState::Locked(ideology(block).into()),
+        Ok(_) => BranchState::Available(Cost::Nothing),
+        Err(block) => BranchState::Locked(Lock::Ideology(block)),
     }
 }
 
@@ -168,9 +169,14 @@ fn policy_card(
         PolicyRole::Tenet(tier) => (slug_with_branch(&def.key), tier),
         PolicyRole::Policy => (slug_with_branch(&def.key), 0),
     };
-    let availability = match &statuses[id.0 as usize] {
-        Ok(_) => Availability::Ready,
-        Err(block) => Availability::Blocked(policy(*block).into()),
+    let state = if adopted.contains(&id) {
+        PolicyState::Adopted
+    } else {
+        match &statuses[id.0 as usize] {
+            Ok(payment) => PolicyState::Adoptable((*payment).into()),
+            Err(PolicyBlock::NotChoosable) => PolicyState::Included,
+            Err(block) => PolicyState::Locked(Lock::Policy(*block)),
+        }
     };
     PolicyCard {
         id,
@@ -191,8 +197,7 @@ fn policy_card(
             .iter()
             .filter_map(|p| members.iter().position(|m| m == p))
             .collect(),
-        adopted: adopted.contains(&id),
-        availability,
+        state,
     }
 }
 

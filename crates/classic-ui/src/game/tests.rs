@@ -561,7 +561,7 @@ fn civics_screen_unlocks_a_branch_with_the_culture_pool() {
     assert_eq!(view.branches[0].name, "Tradition", "rule set order");
     assert_eq!(view.next_cost, 25);
     let tradition = &view.branches[0];
-    assert_eq!(tradition.state, crate::ui::model::BranchState::Available);
+    assert_eq!(tradition.state, crate::ui::model::BranchState::Available(crate::ui::model::Cost::Culture(25)));
     let freedom = view.branches.iter().find(|b| b.name == "Freedom").unwrap();
     assert!(matches!(
         freedom.state,
@@ -578,7 +578,7 @@ fn civics_screen_unlocks_a_branch_with_the_culture_pool() {
         .find(|p| p.name == "Aristocracy")
         .unwrap();
     assert!(
-        matches!(aristocracy.availability, Availability::Blocked(_)),
+        matches!(aristocracy.state, crate::ui::model::PolicyState::Locked(_)),
         "5 < 30 culture"
     );
 }

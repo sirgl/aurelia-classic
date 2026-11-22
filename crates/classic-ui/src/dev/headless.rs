@@ -844,9 +844,34 @@ pub(super) fn env_float(name: &str, default: f32) -> f32 {
     std::env::var(name).ok().and_then(|v| v.parse().ok()).unwrap_or(default)
 }
 
+/// AURELIA_GAME_POLICY_CULTURE=n: the player's culture pool gets n more, and AURELIA_GAME_IDEOLOGY=key
+/// (e.g. `core:policy/freedom`) gives the player that ideology, as a late game would (the policy screen
+/// with several things to take). Both come before AURELIA_GAME_POLICIES. AURELIA_GAME_CIVICS_BRANCH=key
+/// opens the policy screen on that branch.
+fn grant_policy_state(app: &mut GameApp) {
+    let Some(session) = app.module.session.as_mut() else {
+        return;
+    };
+    let me = session.me();
+    let culture = env_number("AURELIA_GAME_POLICY_CULTURE", 0);
+    let ideology = std::env::var("AURELIA_GAME_IDEOLOGY").ok();
+    let (game, rules) = session.harness_game();
+    if culture > 0 {
+        game.debug_grant_culture(me, culture as u32);
+    }
+    if let Some(key) = ideology {
+        match rules.module.policy_branches.iter().position(|b| b.key == key) {
+            Some(i) => game.debug_set_ideology(&rules, me, classic_rules::rules::content::PolicyBranchId(i as u16)),
+            None => println!("AURELIA_GAME_IDEOLOGY: unknown key {key}"),
+        }
+    }
+    session.refresh_after_harness();
+}
+
 /// AURELIA_GAME_POLICIES=key,key,...: unlock these branches and adopt these policies in order
 /// (content keys, e.g. `core:policy/tradition,core:policy/tradition/aristocracy`).
 fn adopt_policies(app: &mut GameApp) {
+    grant_policy_state(app);
     let Ok(list) = std::env::var("AURELIA_GAME_POLICIES") else {
         return;
     };
@@ -1079,6 +1104,13 @@ fn show_screen(app: &mut GameApp, capital: Option<u32>) {
     app.screens.preload_screen_art(&app.ctx, &mut app.module);
     app.module.hud.preload_action_art(&app.ctx);
     if screen == Screen::Civics {
+        if let Ok(key) = std::env::var("AURELIA_GAME_CIVICS_BRANCH") {
+            let rules = screens::game_rules();
+            match rules.module.policy_branches.iter().position(|b| b.key == key) {
+                Some(i) => app.module.screens.capture_civics_branch(classic_rules::rules::content::PolicyBranchId(i as u16)),
+                None => println!("AURELIA_GAME_CIVICS_BRANCH: unknown key {key}"),
+            }
+        }
         if let Some(session) = app.module.session.as_mut() {
             let mut model = session.screen_model();
             model.civics = Some(session.civics_view());

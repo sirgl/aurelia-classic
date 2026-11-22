@@ -7,10 +7,13 @@ use client::shell::keymap::{ActionDef, Scope, ShortcutSet};
 
 /// Shell id of the city screen (`Screen::City.id()`; a test keeps them equal).
 pub const CITY_SCREEN: u8 = 0;
+/// Shell id of the policy screen (`Screen::Civics.id()`; a test keeps them equal).
+pub const CIVICS_SCREEN: u8 = 2;
 
 const GAME: Scope = Scope::Game;
 const MAP: Scope = Scope::Map;
 const CITY: Scope = Scope::Screen(CITY_SCREEN);
+const CIVICS: Scope = Scope::Screen(CIVICS_SCREEN);
 
 pub const SET: ShortcutSet = ShortcutSet { name: "classic", rows: ROWS };
 
@@ -47,6 +50,12 @@ pub const ROWS: &[ActionDef] = &[
     ActionDef::new("order-sweep", "units", MAP, "E"),
     ActionDef::new("next-city", "cities", CITY, "ArrowRight"),
     ActionDef::new("previous-city", "cities", CITY, "ArrowLeft"),
+    ActionDef::new("civics-previous", "civics", CIVICS, "ArrowUp"),
+    ActionDef::new("civics-next", "civics", CIVICS, "ArrowDown"),
+    ActionDef::new("civics-previous-policy", "civics", CIVICS, "ArrowLeft"),
+    ActionDef::new("civics-next-policy", "civics", CIVICS, "ArrowRight"),
+    ActionDef::new("civics-switch", "civics", CIVICS, "Space"), // i18n-ok: keycap names and file keys
+    ActionDef::new("civics-take", "civics", CIVICS, "Enter"), // i18n-ok: keycap names and file keys
 ];
 
 /// The unit order a row gives (the order must be among the selected unit's to work).
@@ -104,6 +113,7 @@ mod tests {
     #[test]
     fn the_city_screen_scope_is_the_city_screen() {
         assert_eq!(crate::ui::screens::Screen::City.id().0, CITY_SCREEN);
+        assert_eq!(crate::ui::screens::Screen::Civics.id().0, CIVICS_SCREEN);
     }
 
     #[test]
