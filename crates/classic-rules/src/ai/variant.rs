@@ -841,11 +841,11 @@ pub enum Variant {
     /// were measured (`NextW`'s flags or `PreNext`); none plays on `PreNextX`. Kept for the bench
     /// (`experimental-ai` only).
     PreNextX,
-    /// `strategist-x` (lane A, 22 November, classic/docs/ai-strategist-defects.md): `Standard` whose
-    /// strategist emits three outputs more, each read by the scripted planners: the copies its goal's
-    /// items lack (`Plan::supply`, `ai::supply`), a stance toward each city-state (`Plan::city_states`)
-    /// and the rival running away (`Plan::threat`). A bench-only candidate, `experimental-ai` only;
-    /// `Standard` does not change.
+    /// `strategist-x` (lane A, 22 November, classic/docs/ai-strategist-defects.md): `next-x` whose
+    /// strategist names the rival running away (`Plan::wishes.threat`, read by the posture, the war's
+    /// stakes, the denunciation and the deals) and needs a strong reason for the wide style
+    /// (`weights::style::WIDE`): its parts are `strategist_parts`. A bench-only candidate,
+    /// `experimental-ai` only; `Standard` does not change.
     StrategistX,
     /// `Standard` (the play of the fourteenth promotion, `ClassicMind::new`) whose settlers value a site
     /// worth a city by the site net (`site_net`, as `SiteNet` did on its older base); every other
@@ -864,6 +864,10 @@ pub enum Variant {
     /// `NetsX` whose settlers are `EconSite`'s (lane C: the site net as fitted, with its guard against
     /// rivals and the walk); measured beside `NetsX` for information (`experimental-ai` only).
     NetsXSite,
+    /// `strategist-x-style`: `strategist-x` with tall first alone (the ablation of its threat; bench only).
+    StrategistXStyle,
+    /// `strategist-x-threat`: `strategist-x` with the threat alone (the ablation of tall first; bench only).
+    StrategistXThreat,
 }
 
 /// The net's base: the expert the end-to-end net learns from and the mind it
@@ -884,7 +888,7 @@ const NUDGED_CANDIDATES: u32 = 40;
 
 impl Variant {
     /// The game's AI first.
-    pub const ALL: [Variant; 163] = [
+    pub const ALL: [Variant; 165] = [
         Variant::Standard,
         Variant::PreCamps,
         Variant::PreWorkers,
@@ -1048,7 +1052,24 @@ impl Variant {
         Variant::EconSiteOwnLand,
         Variant::NetsX,
         Variant::NetsXSite,
+        Variant::StrategistXStyle,
+        Variant::StrategistXThreat,
     ];
+
+    /// The parts of the strategist's wishes the variant plays (`strategy_net::wishes::Parts`): a property
+    /// of the variant, never of the environment. `NONE` for every variant but `strategist-x` and its
+    /// two ablations.
+    pub fn strategist_parts(self) -> crate::ai::strategy_net::wishes::Parts {
+        use crate::ai::strategy_net::wishes::Parts;
+        match self {
+            Variant::StrategistX => Parts { threat: true, tall_first: true },
+            Variant::StrategistXStyle => Parts { threat: false, tall_first: true },
+            Variant::StrategistXThreat => Parts { threat: true, tall_first: false },
+            // `nets-x` and `nets-x-site` play `strategist-x`'s strategist under their own names.
+            Variant::NetsX | Variant::NetsXSite => Variant::StrategistX.strategist_parts(),
+            _ => Parts::NONE,
+        }
+    }
 
     pub fn name(self) -> &'static str {
         match self {
@@ -1197,6 +1218,8 @@ impl Variant {
             Variant::EconSiteOwnLand => "econ-site-own-land",
             Variant::NetsX => "nets-x",
             Variant::NetsXSite => "nets-x-site",
+            Variant::StrategistXStyle => "strategist-x-style",
+            Variant::StrategistXThreat => "strategist-x-threat",
             Variant::ArmyFit => "army-fit",
             Variant::Camps => "camps",
             Variant::ArmyCamps => "army-camps",
@@ -1237,7 +1260,7 @@ impl Variant {
         cfg!(feature = "experimental-ai")
             || !matches!(
                 self,
-                Variant::Net | Variant::UnitNet | Variant::Hybrid | Variant::SiteNet | Variant::ChoiceNet | Variant::ChoiceNetProduction | Variant::ChoiceNetResearch | Variant::StandardScripted | Variant::PreCsGifts | Variant::Sharp | Variant::TallReal | Variant::Next | Variant::WonderCancel | Variant::WonderRace | Variant::NextW | Variant::NextRace | Variant::PreNext | Variant::WarPays | Variant::TacticianFit | Variant::WarMuster | Variant::SiegeCall | Variant::NextWar | Variant::Retake2 | Variant::NextWarRetake | Variant::VoteGuard | Variant::FieldCraft | Variant::RaidWar | Variant::Landless | Variant::LandlessPlan | Variant::NextX | Variant::PreNextX | Variant::StrategistX | Variant::EconSite | Variant::EconSiteTall | Variant::EconSiteOwnLand | Variant::NetsX | Variant::NetsXSite
+                Variant::Net | Variant::UnitNet | Variant::Hybrid | Variant::SiteNet | Variant::ChoiceNet | Variant::ChoiceNetProduction | Variant::ChoiceNetResearch | Variant::StandardScripted | Variant::PreCsGifts | Variant::Sharp | Variant::TallReal | Variant::Next | Variant::WonderCancel | Variant::WonderRace | Variant::NextW | Variant::NextRace | Variant::PreNext | Variant::WarPays | Variant::TacticianFit | Variant::WarMuster | Variant::SiegeCall | Variant::NextWar | Variant::Retake2 | Variant::NextWarRetake | Variant::VoteGuard | Variant::FieldCraft | Variant::RaidWar | Variant::Landless | Variant::LandlessPlan | Variant::NextX | Variant::PreNextX | Variant::StrategistX | Variant::StrategistXStyle | Variant::StrategistXThreat | Variant::EconSite | Variant::EconSiteTall | Variant::EconSiteOwnLand | Variant::NetsX | Variant::NetsXSite
             )
     }
 

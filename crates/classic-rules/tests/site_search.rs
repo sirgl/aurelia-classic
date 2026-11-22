@@ -55,7 +55,6 @@ fn the_capped_count_and_the_tile_memo_change_no_answer() {
                     reserved: &[],
                     danger: &[],
                     tile_memo: memo,
-                    supply: Default::default(),
                 };
                 let shared = context(Default::default());
                 // The score of every tile around the capital: one context that
@@ -151,7 +150,6 @@ fn the_site_net_values_the_sites_the_score_admits() {
                 reserved: &[],
                 danger: &[],
                 tile_memo: Default::default(),
-                supply: Default::default(),
             };
             let inputs = SiteInputs { nation: 0, techs: &[], own_cities: &own, foreign_cities: &[], round, excess_happiness: 0 };
             let moves = 2 * classic_rules::world::unit::MOVE_DENOMINATOR;

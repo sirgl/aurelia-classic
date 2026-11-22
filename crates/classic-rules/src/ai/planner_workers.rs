@@ -324,21 +324,11 @@ fn repair_job(
     let builder = Builder { player: brief.player, nation: brief.nation, techs: TechSet::of(&brief.techs) };
     let plan = site(view, rules, &builder, tile, kind).ok()?;
     let resource = match snapshot.resource {
-        Some(r) if rules.improvements[kind.0 as usize].resources.contains(&r) => resource_value(rules, r, w) + supply_gain(rules, brief, r, w),
+        Some(r) if rules.improvements[kind.0 as usize].resources.contains(&r) => resource_value(rules, r, w),
         _ => 0,
     };
     let gain = improvement_value(rules, kind, w) + resource;
     (gain > 0).then_some(JobOffer { job: WorkerJob::Improvement(kind), gain, turns: i32::from(plan.work_turns.max(1)) })
-}
-
-/// `ship-supply`: what connecting a deposit of `resource` gives the goal that lacks its copies
-/// (`Prices::supply`, `ai::supply`), as a yield a round at the weights: the hammers the copies let the
-/// goal build over the rounds left, at the weight of production. 0 without a shortage.
-fn supply_gain(rules: &CompiledRuleset, brief: &TurnBrief, resource: crate::ids::ResourceId, w: &Weights) -> i32 {
-    let Some(prices) = brief.prices.as_ref() else { return 0 };
-    let hammers = prices.supply.hammers(resource, crate::ai::supply::deposit_copies(rules, resource));
-    let per_round = hammers * i64::from(w.production) * 10 / i64::from(prices.rounds_left.max(1));
-    per_round.min(i64::from(i32::MAX)) as i32
 }
 
 fn work_turns(rules: &CompiledRuleset, kind: ImprovementId) -> i32 {
@@ -368,7 +358,7 @@ fn best_improvement(
 ) -> Option<(ImprovementId, i32)> {
     let resource_gain = |kind: ImprovementId| match snapshot.resource {
         Some(r) if rules.improvements[kind.0 as usize].resources.contains(&r) => {
-            resource_value(rules, r, w) + supply_gain(rules, brief, r, w)
+            resource_value(rules, r, w)
         }
         _ => 0,
     };

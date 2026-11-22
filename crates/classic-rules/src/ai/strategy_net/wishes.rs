@@ -1,15 +1,12 @@
 //! The strategist's wishes to the scripted planners (`strategist-x`, classic/docs/ai-strategist-defects.md):
-//! three outputs of the net that the planners read and no planner computes itself.
+//! an output of the net that the planners read and no planner computes itself.
 //!
 //! | output | what | readers |
 //! |---|---|---|
-//! | `supply` | the copies the goal's items lack, priced by the intent (`ai::supply`) | `Prices::supply`: tiles, workers, sites, buildings, deals, city-state gifts, the release of copies |
-//! | `threat` | the rival running away and how far (`threat`) | the posture (`fe::THREAT`), the war's stakes, the denunciation and the deals |
-//! | `city_states` | a stance toward each known city-state (`stance`) | the war machine's targets (prey), the pledges (client) |
+//! | `threat` | the rival running away and how far (`threat`) | the posture (`weights::threat::POSTURE`), the war's stakes (`Stakes::with_plan`), the denunciation and the deals (`diplomacy::contained`) |
 //!
 //! Every other variant's plan carries `Wishes::default()`: nothing is wished, nothing changes.
 
-use crate::ai::supply::SupplyNeed;
 use crate::ids::PlayerId;
 
 use super::Milli;
@@ -21,62 +18,27 @@ pub struct Threat {
     pub level: Milli,
 }
 
-/// The strategist's stance toward one city-state (0…1000 each).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Stance {
-    pub city_state: PlayerId,
-    /// Its cities are targets of the war machine (`weights::stance::PREY`).
-    pub prey: Milli,
-    /// It is courted: pledged to at influence ≥ 0 (`weights::stance::CLIENT`).
-    pub client: Milli,
-}
-
 /// What the strategist wishes of the planners this turn.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Wishes {
-    pub supply: SupplyNeed,
     pub threat: Option<Threat>,
-    pub city_states: Vec<Stance>,
 }
 
-impl Wishes {
-    /// The stance toward `city_state`, if the strategist has one.
-    pub fn stance(&self, city_state: PlayerId) -> Option<&Stance> {
-        self.city_states.iter().find(|s| s.city_state == city_state)
-    }
-}
-
-/// The bench's ablation of `strategist-x` (`AURELIA_X_PARTS=supply,threat,stance`, a measurement switch:
-/// unset, every part): which outputs the strategist emits. Read once per process.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// The parts of `strategist-x` a variant plays (`Variant::strategist_parts`; the bench's ablations are
+/// the variants `strategist-x-style` and `strategist-x-threat`).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct Parts {
-    pub supply: bool,
+    /// The rival running away (`threat::assess`): the posture term, the stakes, the denunciation, the deals.
     pub threat: bool,
-    pub stance: bool,
-    /// Within the stance: the prey and the client parts (`prey`, `client` in the list; `stance` = both).
-    pub prey: bool,
-    pub client: bool,
-    /// The style's tilt to tall (`Net::tall_first`).
-    pub style: bool,
+    /// The wide style needs a strong reason (`weights::style::WIDE`).
+    pub tall_first: bool,
 }
 
 impl Parts {
-    pub const ENV: &'static str = "AURELIA_X_PARTS";
+    /// Every variant but `strategist-x` and its ablations.
+    pub const NONE: Parts = Parts { threat: false, tall_first: false };
 
-    /// The parts `strategist-x` plays (22 Nov, tuning offsets 1200 and 1202, classic/docs/ai-strategist-defects.md):
-    /// the threat, the client pledge and tall first. The supply (S1 not halved: 16-21 % lacking against
-    /// 26-32 %, and it cost alliances) and the prey (0.01 wars on city-states a seat against the 0.10 its gate
-    /// needs) stay in the code and are switched on by `AURELIA_X_PARTS` for their next step.
-    pub const ACCEPTED: Parts = Parts { supply: false, threat: true, stance: true, prey: false, client: true, style: true };
-
-    pub fn of_env() -> Self {
-        static PARTS: std::sync::OnceLock<Parts> = std::sync::OnceLock::new();
-        *PARTS.get_or_init(|| match std::env::var(Self::ENV) {
-            Ok(list) if !list.is_empty() => {
-                let (prey, client) = (list.contains("prey") || list.contains("stance"), list.contains("client") || list.contains("stance"));
-                Parts { supply: list.contains("supply"), threat: list.contains("threat"), stance: prey || client, prey, client, style: list.contains("style") }
-            }
-            _ => Self::ACCEPTED,
-        })
+    pub fn any(self) -> bool {
+        self != Self::NONE
     }
 }

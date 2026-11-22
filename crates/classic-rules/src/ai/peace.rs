@@ -222,13 +222,10 @@ impl<'i, 'o, 'a> Negotiation<'i, 'o, 'a> {
         let rival = |copies: i64| worth(copies) * crate::ai::genome::get(crate::ai::genome::Knob::RivalPercent) / 100;
         let theirs = obs.view.tradeable_luxuries(other).iter().find(|(r, _)| *r == resource).map_or(0, |(_, n)| i64::from(*n));
         let free = i64::from(ours.available(resource).max(0));
-        // `ship-supply`: the copies the strategist's goal lacks are worth the hammers they let it build
-        // (`Prices::supply`): each copy received fills the shortage, each given deepens it.
-        let supply = self.prices.supply.worth(resource, amount as i32, &self.prices);
         if receiving {
             let ours = if free > 0 { 0 } else { worth(amount) };
             let their_loss = if luxury && theirs <= amount { rival(amount) } else { 0 };
-            return ours + their_loss + supply;
+            return ours + their_loss;
         }
         // `strategist-x`: no strategic copy for the rival running away (a part of its spaceship may
         // wait for it; Vox Populi's rule of no aluminium to a nation close to the spaceship, by class).
@@ -237,7 +234,7 @@ impl<'i, 'o, 'a> Negotiation<'i, 'o, 'a> {
         }
         let lost = (amount - (free - 1).max(0)).clamp(0, amount);
         let their_gain = if !luxury || theirs == 0 { rival(amount) } else { 0 };
-        -(worth(lost) + their_gain + supply)
+        -(worth(lost) + their_gain)
     }
 
     /// The production one copy of a strategic `resource` stands for: the dearest unit the
@@ -411,43 +408,6 @@ pub fn embassy_offers(input: &AdvisorInput<'_, '_>, skip: &[PlayerId]) -> Vec<Co
             (worth && obs.view.offer_problem(r.other, &items).is_none()).then_some(Command::ProposeDeal { from: me, to: r.other, items })
         })
         .collect()
-}
-
-/// `ship-supply`: the copies the strategist's goal lacks (`Prices::supply`), asked of every nation at
-/// peace with the leader that can give them and has no offer waiting: the copies for gold a turn under
-/// what they are worth to the leader (`Negotiation::value`), as much as its income carries, when the deal
-/// is possible now. `skip`: partners that already have an offer of ours this turn.
-pub fn supply_offers(input: &AdvisorInput<'_, '_>, skip: &[PlayerId]) -> Vec<Command> {
-    let obs = input.observation;
-    let me = obs.player;
-    let Some(prices) = input.brief.prices else { return Vec::new() };
-    if !prices.supply.any() {
-        return Vec::new();
-    }
-    let negotiation = Negotiation::new(input);
-    let mut out = Vec::new();
-    for r in &obs.relations {
-        let busy = r.at_war || skip.contains(&r.other) || obs.offers_to_us.iter().any(|o| o.from == r.other);
-        if r.kind != PlayerKind::Major || busy {
-            continue;
-        }
-        let Some(&(resource, amount)) = prices.supply.offered_by(obs, r.other).first() else { continue };
-        let copies = vec![(r.other, DealItem::Resource { resource, amount: amount as u16 })];
-        // Gold a turn for the deal's rounds (a lump of gold needs friendship, `deals`), under the
-        // worth: `gold_for` rounds up, the deal must stay worth it.
-        let rounds = obs.speed.deal_rounds.min(negotiation.prices.rounds_left).max(1);
-        let worth = negotiation.gold_for(negotiation.value(r.other, &copies)).saturating_sub(1) / rounds;
-        let per_turn = worth.min(input.brief.gold_income.max(0) as u32);
-        if per_turn == 0 {
-            continue;
-        }
-        let mut items = copies;
-        items.push((me, DealItem::GoldPerTurn(per_turn)));
-        if negotiation.value(r.other, &items) >= 0 && obs.view.offer_problem(r.other, &items).is_none() {
-            out.push(Command::ProposeDeal { from: me, to: r.other, items });
-        }
-    }
-    out
 }
 
 /// A peace offer to every nation at war with the leader that has no

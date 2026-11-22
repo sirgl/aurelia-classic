@@ -34,7 +34,6 @@ pub mod heads;
 pub mod layers;
 pub mod model;
 pub mod sharp;
-pub mod stance;
 pub mod threat;
 pub mod trace;
 pub mod weights;
@@ -93,7 +92,7 @@ pub struct Net {
     /// `strategist-x`: the threat of the rival running away (`threat::assess`, 0…1000), a term of the
     /// posture (`weights::threat::POSTURE`); 0 in every other net.
     pub threat: Milli,
-    /// `strategist-x`: the wide style needs a strong reason (`weights::threat::WIDE`); false elsewhere.
+    /// `strategist-x`: the wide style needs a strong reason (`weights::style::WIDE`); false elsewhere.
     pub tall_first: bool,
 }
 
@@ -242,7 +241,7 @@ pub fn intent_net(features: &[Milli; fe::N], held: Held, cities: u32, rounds_lef
                 style_logits = sharp_style(style_logits, &at_lock, &lock_concepts);
             }
             if net.tall_first {
-                style_logits[1] += weights::threat::WIDE.0;
+                style_logits[1] += weights::style::WIDE.0;
             }
             let margin = if survival(features, &concepts) { weights::HYSTERESIS } else { weights::STYLE_LOCK };
             (softmax(&temper(<[Milli; 3]>::try_from(style_logits).expect("three styles"), sharp::w::STYLE_TEMPERATURE)), margin)
@@ -253,7 +252,7 @@ pub fn intent_net(features: &[Milli; fe::N], held: Held, cities: u32, rounds_lef
                 style_logits = sharp_style(style_logits, features, &concepts);
             }
             if net.tall_first {
-                style_logits[1] += weights::threat::WIDE.0;
+                style_logits[1] += weights::style::WIDE.0;
             }
             (softmax(&temper(<[Milli; 3]>::try_from(style_logits).expect("three styles"), sharp::w::STYLE_TEMPERATURE)), weights::HYSTERESIS)
         }
@@ -336,23 +335,6 @@ pub fn price_mult(intent: &Intent) -> [Milli; pd::N] {
     }
     mult[pd::FOOD] = ONE;
     mult
-}
-
-/// Layer 2's supply price (`ship-supply`, `ai::supply`): the multiplier of a missing strategic copy's
-/// hammers by the intent's rows (`weights::SUPPLY_ROWS`).
-pub fn supply_mult(intent: &Intent) -> Milli {
-    let rows = rows(intent);
-    let mut mult = ONE;
-    for (row, w, _) in weights::SUPPLY_ROWS {
-        mult += rows[*row] * w / ONE;
-    }
-    mult.clamp(weights::PRICE_MIN, weights::PRICE_MAX)
-}
-
-/// How far the supply wish is open (0…1000) by the ship's progress (`weights::SUPPLY_OPEN`).
-pub fn supply_open(features: &[Milli; fe::N]) -> Milli {
-    let (from, full, _) = weights::SUPPLY_OPEN;
-    ((features[fe::SPACE_OWN] - from) * ONE / (full - from).max(1)).clamp(0, ONE)
 }
 
 /// The allocator's prices the net multiplies (centi-points of the score,
@@ -447,7 +429,7 @@ pub struct Plan {
     pub growth: Vec<(u64, [Milli; 6])>,
     /// The net of `war-open` (`TurnBrief::war_open`): its army is the war machine's.
     pub war_open: bool,
-    /// `strategist-x`: the wishes to the planners (supply, threat, city-states); empty elsewhere.
+    /// `strategist-x`: the wishes to the planners (the threat); empty elsewhere.
     pub wishes: wishes::Wishes,
 }
 
@@ -827,10 +809,10 @@ pub fn think(obs: &AIObservation<'_>, brief: &crate::ai::planner::TurnBrief, sta
         memory.rival_book.record(obs.player, &rivals, pace);
     }
     let rounds_left = prices.rounds_left;
-    // `strategist-x`: the rival running away (`threat`), a term of the posture.
-    let parts = wishes::Parts::of_env();
-    let threat = if brief.strategist_x && parts.threat { threat::assess(&rivals) } else { None };
-    let net = Net { open: brief.war_open, sharp: brief.sharp, pays: brief.war_pays, threat: threat.map_or(0, |t| t.level), tall_first: brief.strategist_x && parts.style };
+    // `strategist-x`: the rival running away (`threat`), a term of the posture; tall first.
+    let parts = brief.strategist;
+    let threat = if parts.threat { threat::assess(&rivals) } else { None };
+    let net = Net { open: brief.war_open, sharp: brief.sharp, pays: brief.war_pays, threat: threat.map_or(0, |t| t.level), tall_first: parts.tall_first };
     let mut intent = intent_net(&situation, memory.held, cities, rounds_left, pace, net);
     // The style is locked when the first branch may be opened after the
     // first survey of the surroundings, at the latest `LOCK_MAX_ROUNDS`.
@@ -906,14 +888,7 @@ pub fn think(obs: &AIObservation<'_>, brief: &crate::ai::planner::TurnBrief, sta
         let allowance = (intent.style[1] * weights::CITY_CEILING_WIDE + intent.style[2] * weights::CITY_CEILING_CONQUEST) / ONE / ONE;
         city_target = city_target.min(model + allowance as u32).max(cities);
     }
-    let wishes = if brief.strategist_x {
-        let open = supply_open(&situation);
-        let supply = if parts.supply && open > 0 { crate::ai::supply::SupplyNeed::of(obs, rules).priced(supply_mult(&intent) * open / ONE) } else { Default::default() };
-        let city_states = if parts.stance { stance::of(obs, &intent) } else { Vec::new() };
-        wishes::Wishes { supply, threat, city_states }
-    } else {
-        wishes::Wishes::default()
-    };
+    let wishes = wishes::Wishes { threat };
     let plan = Plan { round, features: situation, intent, mult, goals: review.goals.clone(), target, city_target, growth: review.growth.clone(), war_open: brief.war_open, wishes };
     trace::turn(obs.player.0, &plan, review_due, rules);
     if review_due {

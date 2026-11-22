@@ -1692,10 +1692,6 @@ pub fn city_worth_ranked(prices: &Prices, population: u32, rounds: u32, rival: i
 /// one the time victory compares us with), half when it is only ahead of us, nothing when it is
 /// behind us; `RIVAL_PERCENT` without it or with no scores known.
 pub fn rival_percent(brief: &TurnBrief, rival: PlayerId) -> i64 {
-    // `strategist-x`: a city-state's loss is no rival's (its score is nobody's in the race).
-    if brief.strategist_x && brief.relation(rival).is_some_and(|r| r.kind != crate::world::player::PlayerKind::Major) {
-        return 0;
-    }
     let score = |p: PlayerId| brief.scores.iter().find(|(q, _)| *q == p).map(|(_, s)| *s);
     let (Some(ours), Some(theirs)) = (score(brief.player), score(rival)) else { return RIVAL_PERCENT };
     if !brief.war.siege.rank || brief.war_pays {

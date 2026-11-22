@@ -775,7 +775,6 @@ mod tests {
             content_founding: false,
             true_effects: false,
             space: None,
-            supply: crate::ai::supply::SupplyNeed::default(),
             pace: 100,
             city_cap: None,
             gift_cap: true,

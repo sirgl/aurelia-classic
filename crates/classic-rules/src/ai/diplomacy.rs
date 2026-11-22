@@ -278,11 +278,12 @@ pub fn helps(item: DealItem) -> bool {
     matches!(item, DealItem::Friendship | DealItem::ResearchAgreement | DealItem::DefensivePact | DealItem::OpenBorders)
 }
 
-/// The denunciation of the contained rival (`contained`) when not yet denounced and not a friend.
+/// The denunciation of the contained rival (`contained`) when not yet denounced, not a friend, not at war,
+/// and not denounced by `denunciations` this turn already (its warmonger memory at `DENOUNCE_WARMONGER`).
 fn denounce_contained(obs: &AIObservation<'_>, rival: Option<PlayerId>) -> Vec<Command> {
     obs.relations
         .iter()
-        .filter(|r| Some(r.other) == rival && !r.we_denounced && !r.friends && !r.at_war)
+        .filter(|r| Some(r.other) == rival && !r.we_denounced && !r.friends && !r.at_war && r.warmonger < DENOUNCE_WARMONGER)
         .map(|r| Command::Denounce { player: obs.player, target: r.other })
         .collect()
 }
@@ -332,9 +333,6 @@ impl crate::ai::system::SystemAdvisor for DiplomacyAdvisor {
             let asked: Vec<PlayerId> = deals.iter().chain(&swaps).filter_map(partner).collect();
             out.extend(crate::ai::combat::proposals(5, deals));
             out.extend(crate::ai::combat::proposals(5, swaps));
-            let supply = crate::ai::peace::supply_offers(input, &asked);
-            let asked: Vec<PlayerId> = asked.into_iter().chain(supply.iter().filter_map(partner)).collect();
-            out.extend(crate::ai::combat::proposals(5, supply));
             if self.embassies {
                 out.extend(crate::ai::combat::proposals(5, crate::ai::peace::embassy_offers(input, &asked)));
             }
@@ -342,7 +340,7 @@ impl crate::ai::system::SystemAdvisor for DiplomacyAdvisor {
             let peace = crate::ai::peace::peace_offers(input).into_iter().filter(|c| !matches!(c, Command::ProposeDeal { to, .. } if input.brief.retaking_from(*to)));
             out.extend(crate::ai::combat::proposals(5, peace.collect::<Vec<_>>()));
             let mut denounced = denunciations(obs);
-            denounced.extend(denounce_contained(obs, contained).into_iter().filter(|_| obs.relations.iter().all(|r| Some(r.other) != contained || r.warmonger < DENOUNCE_WARMONGER)));
+            denounced.extend(denounce_contained(obs, contained));
             out.extend(crate::ai::combat::proposals(5, denounced));
         }
         out

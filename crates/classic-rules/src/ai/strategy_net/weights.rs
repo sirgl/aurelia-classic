@@ -632,7 +632,15 @@ pub mod rival {
     }
 }
 
-// ---- strategist-x: the rival running away and the city-states (classic/docs/ai-strategist-defects.md) ----
+// ---- strategist-x: the rival running away and tall first (classic/docs/ai-strategist-defects.md) ----
+
+/// Tall first (`Net::tall_first`, `strategist-x`): a term of the style logits. Written by hand.
+pub mod style {
+    use super::Milli;
+
+    /// Added to the wide style's logit.
+    pub const WIDE: (Milli, &str) = (-1200, "wide needs a strong reason, not room alone: a seat held to tall, science and peace took 65 % of the victory-weighted share against standard, held to wide and science 34.5 %, with 0.6 cities fewer at round 198 (dreams step 0, pace Quick, offsets 300-301); the city model already gives a tall seat the sites it can use");
+}
 
 /// The threat of a rival's victory (`threat::assess`), from its public screens (`ai::rival_model`):
 /// threat = unit(BIAS + TREE × its share of the tree + LEAD × its lead over us (a tenth of the tree → 1)
@@ -641,9 +649,6 @@ pub mod threat {
     use super::Milli;
 
     pub const BIAS: (Milli, &str) = (-1000, "a rival level with us is no threat: the race is open");
-    /// Not the threat's: the style's (kept here with the other strategist-x weights). Added to the wide
-    /// style's logit.
-    pub const WIDE: (Milli, &str) = (-1200, "wide needs a strong reason, not room alone: a seat held to tall, science and peace took 65 % of the victory-weighted share against standard, held to wide and science 34.5 %, with 0.6 cities fewer at round 198 (dreams step 0, pace Quick, offsets 300-301); the city model already gives a tall seat the sites it can use");
     pub const TREE: (Milli, &str) = (1200, "its share of the tree is its road to the spaceship: a rival with the space technologies (0.75 of the tree) gives +900");
     pub const LEAD: (Milli, &str) = (1000, "a tenth of the tree ahead of us: it reaches the spaceship first");
     pub const PACE: (Milli, &str) = (600, "it researches faster than we do: the lead grows (twice our science gives +200)");
@@ -662,37 +667,6 @@ pub mod threat {
     /// stake of `grand_strategy::Stakes`): written as a ratio, no weight.
     pub fn count() -> usize {
         4 + 2 + POSTURE.len()
-    }
-}
-
-/// The stance toward a known city-state (`stance::of`), two neurons 0…1 from the city-state
-/// screen, the seen cities and the intent. Written by hand.
-pub mod stance {
-    use super::Milli;
-
-    /// prey = unit(Σ): (input, weight, why).
-    pub const PREY: &[(&str, Milli, &str)] = &[
-        ("bias", -600, "no city-state is prey by default"),
-        ("style_conquest", 1200, "a conquest plan takes cities: a city-state's are the nearest weak ones"),
-        ("warlike", 600, "an aggressive leader takes what lies near"),
-        ("near", 800, "an army reaches it within the plan (6 tiles from our nearest city → 1, 12 → 0)"),
-        ("city_state_play", -1000, "an empire that lives on its city-states keeps them"),
-        ("ours", -2000, "never the own client: our ally, our friend or our pledge"),
-    ];
-    /// client = unit(Σ).
-    pub const CLIENT: &[(&str, Milli, &str)] = &[
-        ("bias", -300, "a city-state is courted for a reason"),
-        ("aim_diplomacy", 1500, "the votes of the World Leader are the city-states'"),
-        ("city_state_play", 800, "an empire that lives on its city-states"),
-        ("near", 300, "its land and its quests are at hand"),
-    ];
-    /// The stance that acts: prey for the war machine, client for the pledge.
-    pub const ACTS: (Milli, &str) = (500, "more likely than not");
-    /// Tiles from our nearest city at which `near` is 1 and 0.
-    pub const NEAR_FULL: i32 = 6;
-    pub const NEAR_NONE: i32 = 12;
-    pub fn count() -> usize {
-        PREY.len() + CLIENT.len() + 3
     }
 }
 
@@ -849,21 +823,6 @@ pub const PRICE_ROWS: &[(usize, usize, Milli, &str)] = {
         (12, WONDER, -200, "wonders wait for content citizens"),
     ]
 };
-
-/// The rows of the supply price (`ship-supply`, `ai::supply`): (row of `ROWS`, deviation per unit of
-/// the row, why). The multiplier of a missing strategic copy's hammers is 1000 + Σ row × deviation,
-/// within `PRICE_MIN`…`PRICE_MAX` (`strategy_net::supply_mult`). Written by hand, as the price rows.
-/// The supply wish opens with the ship's progress (`fe::SPACE_OWN`: the beakers of the spaceship's
-/// technologies known over all of them, 0.8, and its parts built, 0.2): 0 below `SUPPLY_OPEN.0`, full from
-/// `SUPPLY_OPEN.1`, linear between (`strategy_net::supply_open`).
-pub const SUPPLY_OPEN: (Milli, Milli, &str) = (500, 800, "the copies are wanted when the ship is near: half its beakers known opens the wish, all its technologies give it whole; before, the gold has better uses (the wish from the reveal technology on cost 0.5 city-state allies a seat, tuning offset 1200)");
-
-pub const SUPPLY_ROWS: &[(usize, Milli, &str)] = &[
-    (3, 1500, "a part waits for its copy: the copy is the part's hammers on the way to the science victory"),
-    (0, 300, "a tall empire has few deposits of its own: each copy it lacks is bought or allied for"),
-    (2, -500, "a conquest empire takes the copies with the cities"),
-    (11, -500, "danger: the copies go to the defence first"),
-];
 
 /// The share of the written deviations a price takes (thousandths): the
 /// allocator's prices are already the score's, the intent tilts them (at
