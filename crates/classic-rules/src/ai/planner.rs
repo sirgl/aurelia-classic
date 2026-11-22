@@ -434,6 +434,8 @@ pub struct TurnBrief {
     /// The seat takes the alliances of a rival that would win the World Leader vote
     /// (`Variant::vote_guard`, `ai::victory_watch`).
     pub vote_guard: bool,
+    /// STUB of part E's field (`TurnBrief::net2`): the levers of the turn's `net2` plan; None for every other mind.
+    pub net2: Option<crate::ai::net2::plan::Net2Plan>,
     /// `strategist-x` and its ablations (`Variant::strategist_parts`): the parts of the strategist's
     /// wishes it plays (`strategy_net::wishes`); `Parts::NONE` elsewhere.
     pub strategist: crate::ai::strategy_net::wishes::Parts,
@@ -588,6 +590,7 @@ impl TurnBrief {
             tall_real: false,
             next: false,
             vote_guard: false,
+            net2: None,
             strategist: crate::ai::strategy_net::wishes::Parts::NONE,
             wonder_race: 0,
             war_pays: false,
