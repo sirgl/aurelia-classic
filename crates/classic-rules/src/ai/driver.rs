@@ -1184,7 +1184,7 @@ mod sharp_tests {
         assert_eq!(mind_parts(&threat), mind_parts(&standard));
         assert_eq!((candidate.strategist, threat.strategist, standard.strategist), (Parts { threat: false, tall_first: true }, Parts { threat: true, tall_first: false }, Parts::NONE));
         assert_eq!((candidate.variant(), threat.variant()), (Variant::StrategistX, Variant::StrategistXThreat));
-        assert!(Variant::ALL.iter().filter(|v| v.strategist_parts().any()).eq([Variant::StrategistX, Variant::StrategistXThreat, Variant::NetsX, Variant::NetsXSite].iter()));
+        assert!(Variant::ALL.iter().filter(|v| v.strategist_parts().any()).eq([Variant::StrategistX, Variant::NetsX, Variant::NetsXSite, Variant::StrategistXThreat].iter()));
     }
 
     /// The fourteenth promotion (14 November): the game's AI is the mind of `next-x` and names itself
