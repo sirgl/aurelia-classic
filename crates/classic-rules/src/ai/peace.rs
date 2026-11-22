@@ -157,8 +157,8 @@ impl<'i, 'o, 'a> Negotiation<'i, 'o, 'a> {
     }
 
     /// What a `net2` war order on `enemy` promises (`net2::orders`, CHAIN.md D8): the capture of the order rival's
-    /// easiest city it still holds (`Net2Plan::order_eases`, the aim first) — `operations::captured_gain` of its last
-    /// seen size, a puppet below `ANNEX_POPULATION`, at its ease — with no army cost (the order's army is the war
+    /// easiest city it still holds (`Net2Plan::order_eases`, the aim first) — the city's worth as a deal prices a city
+    /// (`seen_city_worth`, its last seen size), at its ease — with no army cost (the order's army is the war
     /// machine's to form). None without an order on it or a city of it we have seen.
     fn ordered_case(&self, enemy: PlayerId) -> Option<WarCase> {
         let input = self.input;
@@ -166,9 +166,13 @@ impl<'i, 'o, 'a> Negotiation<'i, 'o, 'a> {
         let mut best: Option<WarCase> = None;
         for (tile, ease) in eases {
             let Some(city) = input.state.seen_cities().iter().find(|c| c.tile == tile && c.owner == enemy) else { continue };
+            // The war machine's price of the capture and the deal's price of the city each cross 0 at some small sizes
+            // (HD8 #1: a city of 1 citizen priced 2 947 by the one and below 0 by the other, of 2 citizens the other way
+            // round): the larger of the two is the city's worth to a war that is to take it.
             let puppet = city.population < crate::ai::combat::ANNEX_POPULATION;
-            let gain = crate::ai::operations::captured_gain(&self.prices, &self.stakes, city.population, self.prices.rounds_left, puppet);
-            let case = WarCase { gain: (gain * ease / 1000).max(0), cost: 0 };
+            let captured = crate::ai::operations::captured_gain(&self.prices, &self.stakes, city.population, self.prices.rounds_left, puppet);
+            let worth = captured.max(self.seen_city_worth(city.population));
+            let case = WarCase { gain: (worth * ease / 1000).max(0), cost: 0 };
             if best.is_none_or(|b| case.gain > b.gain) {
                 best = Some(case);
             }
@@ -376,8 +380,14 @@ impl<'i, 'o, 'a> Negotiation<'i, 'o, 'a> {
             return Some(city_worth(&self.prices, own.population, 0));
         }
         let seen = obs.visible_foreign_cities.iter().find(|c| c.handle == city)?;
-        let unrest = (5 + i64::from(seen.population.max(1))) * self.prices.happiness * self.stakes.unrest / 100;
-        Some(city_worth(&self.prices, seen.population, 0) - unrest)
+        Some(self.seen_city_worth(seen.population))
+    }
+
+    /// What a foreign city of `population` citizens brings when it becomes ours without the fight: its worth less
+    /// the unrest of a conquered city (the deal's price of a city, and the war order's, `ordered_case`).
+    fn seen_city_worth(&self, population: u32) -> Centi {
+        let unrest = (5 + i64::from(population.max(1))) * self.prices.happiness * self.stakes.unrest / 100;
+        city_worth(&self.prices, population, 0) - unrest
     }
 
     pub fn accepts(&self, offer: &DealOffer) -> bool {
@@ -466,8 +476,10 @@ pub fn answer_offers(input: &AdvisorInput<'_, '_>) -> Vec<Command> {
                 let prospect = negotiation.prospect(offer.from);
                 let order = input.brief.net2.as_ref().and_then(|p| p.war_on(offer.from)).map(|o| format!("{{\"kind\":\"{}\",\"value\":{},\"fighting\":{}}}", o.kind.name(), o.value, o.war_since().is_some()));
                 let trust = input.brief.net2.as_ref().map(|p| p.trust(offer.from));
+                let eases = input.brief.net2.as_ref().map(|p| format!("{:?}", p.order_eases)).unwrap_or_default();
+                let seen: Vec<(u32, u32)> = input.state.seen_cities().iter().filter(|c| c.owner == offer.from).map(|c| (c.tile.0, c.population)).collect();
                 format!(
-                    "{{\"ev\":\"answer\",\"r\":{},\"p\":{},\"from\":{},\"items\":\"{:?}\",\"accept\":{accept},\"value\":{},\"attack_gain\":{},\"attack_cost\":{},\"defence\":{},\"order\":{},\"trust\":{:?},\"peace_with\":{}}}",
+                    "{{\"ev\":\"answer\",\"r\":{},\"p\":{},\"from\":{},\"items\":\"{:?}\",\"accept\":{accept},\"value\":{},\"attack_gain\":{},\"attack_cost\":{},\"defence\":{},\"order\":{},\"trust\":{:?},\"peace_with\":{},\"eases\":\"{eases}\",\"seen\":\"{seen:?}\"}}",
                     obs.round,
                     obs.player.0,
                     offer.from.0,
