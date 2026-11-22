@@ -142,9 +142,10 @@ fn mind(n: &str) -> Result<ClassicMind, String> {
     ClassicBench::mind(n).ok_or_else(|| format!("no AI variant {n}"))
 }
 
-/// The tiles within `reach` of the scene's centre, shown to both sides.
+/// The whole map, shown to both sides: in the pilot an unexplored map beyond the arena sent the AI's
+/// scene units off to scout (a straight walk to the map's edge), which is no part of any task.
 fn reveal(game: &mut GameState, scene: &Scene) {
-    let tiles = lab::tiles_within(game, scene.centre, lab::ARENA + 4);
+    let tiles: Vec<TileId> = (0..game.view().auth.map().tile_count() as u32).map(TileId).collect();
     game.debug_reveal(scene.learner, &tiles);
     game.debug_reveal(scene.enemy, &tiles);
 }
