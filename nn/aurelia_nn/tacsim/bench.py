@@ -36,19 +36,24 @@ I32 = mx.int32
 
 
 def replicate(path, batch_size, limit=None, families=None, seed=1):
+    from .parity import sight_radius
     dumps = load_lines(path, limit=limit, families=families)
     tb = Batch(dumps)
     mr = max(1, max(p["moves_land"] for d in dumps for p in d["scene"]["profiles"]) // 60)
-    geo = Geometry(tb.w, radius=4, move_radius=max(mr, 4))
+    geo = Geometry(tb.w, radius=sight_radius(dumps), move_radius=max(mr, 4))
     has_near = any(t["cond"][0] == "other" for d in dumps for p in d["scene"]["profiles"] for t in p["terms"])
-    tsim = Sim(geo, tb.m, tb.cost_pool, tb.cstatic, tb.n_pieces, move_radius=mr, has_near_imp=has_near)
+    has_air = any(p["domain"] == "Air" or p.get("air_intercept_range", 0) > 0 for d in dumps for p in d["scene"]["profiles"])
+    kw = dict(move_radius=mr, has_near_imp=has_near, dest_pool=tb.dest_pool, withdraw_pool=tb.withdraw_pool, has_air=has_air)
+    tsim = Sim(geo, tb.m, tb.cost_pool, tb.cstatic, tb.n_pieces, extra=tb.extra(), **kw)
     assert all(o >= 0 for o in geo.disc_to_local_list)
     idx = mx.arange(batch_size) % tb.b
     take = lambda a: mx.take(a, idx, axis=0)
     m = {k: take(v) for k, v in tb.m.items()}
     cs = {k: take(v) for k, v in tb.cstatic.items()}
-    sim = Sim(geo, m, tb.cost_pool, cs, take(tb.n_pieces), move_radius=mr, has_near_imp=has_near, los=take(tsim.los))
+    ex = {k: take(v) for k, v in tb.extra().items()}
+    sim = Sim(geo, m, tb.cost_pool, cs, take(tb.n_pieces), los=take(tsim.los), extra=ex, **kw)
     s0 = tb.initial_state()
+    s0["n_unmodelled"] = mx.zeros((tb.b,), dtype=mx.int32)
     s = {k: take(v) for k, v in s0.items()}
     # Each copy its own combat stream.
     salt = (mx.arange(batch_size).astype(mx.uint64) * 0x2545F4914F6CDD1D) | 1

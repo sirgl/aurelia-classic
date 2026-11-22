@@ -25,7 +25,7 @@ from .geometry import Geometry
 from .scene import Batch, VERBS, load_lines
 from .sim import Sim, A_PAD, A_UNIT, A_CITY, A_END, A_ROUND
 
-UNIT_FIELDS = ["alive", "tile", "hp", "mv", "mmax", "att", "st", "xp", "side", "kind"]
+UNIT_FIELDS = ["alive", "tile", "hp", "mv", "mmax", "att", "st", "xp", "side", "kind", "level", "icpt"]
 
 
 def step_action(st):
@@ -44,18 +44,30 @@ def step_action(st):
     return A_ROUND, 0, 0, 0, -1
 
 
+def sight_radius(dumps):
+    """The largest sight radius a scene's units can reach (hills +1, promotions' sight), at least 4."""
+    r = 4
+    for d in dumps:
+        for p in d["scene"]["profiles"] + d["scene"].get("spawn", []):
+            extra = sum(max(0, (dl or {}).get("sight_base", 0)) for dl in (p.get("promo") or {}).get("delta", {}).values())
+            r = max(r, min(7, p["sight_base"] + 1 + extra), p.get("sight_embarked", 1))
+    return r
+
+
 def build(dumps, move_radius=None):
     batch = Batch(dumps)
     mr = move_radius or max(1, max(p["moves_land"] for d in dumps for p in d["scene"]["profiles"]) // 60)
-    geo = Geometry(batch.w, radius=4, move_radius=mr)
+    geo = Geometry(batch.w, radius=sight_radius(dumps), move_radius=mr)
     has_near = any(t["cond"][0] == "other" for d in dumps for p in d["scene"]["profiles"] for t in p["terms"])
-    sim = Sim(geo, batch.m, batch.cost_pool, batch.cstatic, batch.n_pieces, move_radius=mr, has_near_imp=has_near)
+    has_air = any(p["domain"] == "Air" or p.get("air_intercept_range", 0) > 0 for d in dumps for p in d["scene"]["profiles"])
+    sim = Sim(geo, batch.m, batch.cost_pool, batch.cstatic, batch.n_pieces, move_radius=mr, has_near_imp=has_near, extra=batch.extra(),
+              dest_pool=batch.dest_pool, withdraw_pool=batch.withdraw_pool, has_air=has_air)
     return batch, geo, sim
 
 
 def rust_masks(st, T):
     fort = setup = found = False
-    move, att = set(), set()
+    move, att, promo = set(), set(), set()
     for k, t in st["options"]:
         if k == "F":
             fort = True
@@ -63,11 +75,13 @@ def rust_masks(st, T):
             setup = True
         elif k == "C":
             found = True
+        elif k == "P":
+            promo.add(t)
         elif k in ("M",):
             move.add(t)
         elif k in ("A", "S"):
             att.add(t)
-    return fort, setup, found, move, att
+    return fort, setup, found, move, att, promo
 
 
 def run(path, mode="free", limit=None, show=5, families=None, out=None):
@@ -114,18 +128,21 @@ def run(path, mode="free", limit=None, show=5, families=None, out=None):
                         note(b, k, f"vis: side {side} tiles {bad} mlx {[got[i] for i in bad]}")
         if unit_steps:
             gmv, gat = sim.global_masks(mk)
-            fort, setup, found = (mk[x].tolist() for x in ("fort", "setup", "found"))
+            fort, setup, found, promo = (mk[x].tolist() for x in ("fort", "setup", "found", "promo"))
             mv, att = gmv.tolist(), gat.tolist()
             for b in unit_steps:
                 if mode == "free" and diverged[b] is not None:
                     continue
-                rf, ru, rc, rm, ra = rust_masks(rows[b], T)
+                rf, ru, rc, rm, ra, rp = rust_masks(rows[b], T)
+                gp = {i for i, v in enumerate(promo[b]) if v}
                 gm = {i for i in range(T) if mv[b][i]}
                 ga = {i for i in range(T) if att[b][i]}
                 key = (dumps[b]["scene"]["family"], dumps[b]["scene"]["era"])
                 stats[key]["masks"] += 1
                 if (rf, ru, rc) != (fort[b], setup[b], found[b]):
                     note(b, k, f"mask: F/U/C rust {(rf, ru, rc)} mlx {(fort[b], setup[b], found[b])}")
+                elif gp != rp:
+                    note(b, k, f"mask: promotions rust-only {sorted(rp - gp)} mlx-only {sorted(gp - rp)} (unit {acts[b][2]})")
                 elif gm != rm:
                     note(b, k, f"mask: moves rust-only {sorted(rm - gm)[:8]} mlx-only {sorted(gm - rm)[:8]} (unit {acts[b][2]})")
                 elif ga != ra:
@@ -139,7 +156,7 @@ def run(path, mode="free", limit=None, show=5, families=None, out=None):
             for b in city_steps:
                 if mode == "free" and diverged[b] is not None:
                     continue
-                _, _, _, _, ra = rust_masks(rows[b], T)
+                _, _, _, _, ra, _ = rust_masks(rows[b], T)
                 ga = {i for i in range(T) if cmask[b][i]}
                 key = (dumps[b]["scene"]["family"], dumps[b]["scene"]["era"])
                 stats[key]["masks"] += 1
@@ -166,6 +183,9 @@ def run(path, mode="free", limit=None, show=5, families=None, out=None):
         gc = {f: s[f].tolist() for f in ("c_owner", "c_dmg", "c_strike")}
         wc = {f: rs[f].tolist() for f in ("c_owner", "c_dmg", "c_strike")}
         grng, wrng = exact.u64_to_ints(s["rng"]), exact.u64_to_ints(rs["rng"])
+        alive_g = s["u_alive"][:, :, None]
+        gprom = mx.where(alive_g, s["u_prom"], False).tolist()
+        wprom = mx.where(rs["u_alive"][:, :, None], rs["u_prom"], False).tolist()
         for b in live:
             key = (dumps[b]["scene"]["family"], dumps[b]["scene"]["era"])
             if mode == "free" and diverged[b] is not None:
@@ -183,6 +203,9 @@ def run(path, mode="free", limit=None, show=5, families=None, out=None):
                     i = next(i for i in range(n_alive_slots) if gw[i] != ww[i])
                     bad = f"state: unit {i} {f} rust {ww[i]} mlx {gw[i]} after {describe(rows[b])}"
                     break
+            if bad is None and gprom[b] != wprom[b]:
+                i = next(i for i in range(U) if gprom[b][i] != wprom[b][i])
+                bad = f"state: unit {i} promotions rust {wprom[b][i]} mlx {gprom[b][i]} after {describe(rows[b])}"
             if bad is None:
                 for f in ("c_owner", "c_dmg", "c_strike"):
                     if [bool(x) if f == "c_strike" else x for x in gc[f][b][: len(dumps[b]["scene"]["cities"])]] != [bool(x) if f == "c_strike" else x for x in wc[f][b][: len(dumps[b]["scene"]["cities"])]]:
@@ -196,13 +219,16 @@ def run(path, mode="free", limit=None, show=5, families=None, out=None):
                 stats[key]["steps_ok"] += 1
         if mode == "forced":
             keep = {k2: v for k2, v in s.items()}
-            for k2 in ("u_alive", "u_tile", "u_hp", "u_mv", "u_mmax", "u_att", "u_st", "u_xp", "u_side", "u_kind", "c_owner", "c_dmg", "c_strike", "c_pop", "owner", "rng"):
+            for k2 in ("u_alive", "u_tile", "u_hp", "u_mv", "u_mmax", "u_att", "u_st", "u_xp", "u_side", "u_kind", "u_level", "u_icpt", "u_prom",
+                       "c_owner", "c_dmg", "c_strike", "c_pop", "owner", "rng"):
                 sel = mx.array([rows[b] is not None for b in range(B)])
                 shape = (B,) + (1,) * (keep[k2].ndim - 1)
                 keep[k2] = mx.where(sel.reshape(shape), rs[k2], keep[k2])
             s = keep
     t_run = time.time() - t1
     report = summarize(dumps, stats, diverged, examples, batch, t_load, t_run, mode)
+    report["unmodelled_taken"] = int(mx.sum(s["n_unmodelled"]).item()) if "n_unmodelled" in s else 0
+    report["odd_promotions"] = sorted({k for v in batch.odd_promos.values() for k in v})
     if out:
         with open(out, "w") as f:
             json.dump(report, f, indent=1)
@@ -258,6 +284,7 @@ def main(argv=None):
     for r in rep["rows"]:
         print(f"  {r['family']:8} {r['era']:12} scenes {r['scenes_ok']}/{r['scenes']} steps {r['steps_ok']}/{r['steps']} masks {r['masks_ok']}/{r['masks']} {r['bad'] or ''}")
     print("causes:", rep["causes"])
+    print("unmodelled promotions taken:", rep["unmodelled_taken"], "odd promotion changes in the tables:", rep["odd_promotions"])
     for e in rep["examples"]:
         print("  ex:", e)
     if rep["unsupported"]:

@@ -8,7 +8,10 @@ Tables (MLX int32 arrays):
   tiles strictly between the centre and each offset on the hex line (the kernel's `hex_line_all`:
   cube lerp, nudge (1, 1, -2), `round_cube`; translation invariant, so one table of offsets),
   `disc_tile[T, O]` and `disc_mid[T, O, R-1]` (window tiles or -1);
-- `rel[2R+1, 2R+1]`: the disc offset index of a (dq, dr) pair (-1 outside the disc);
+- `rel[2R+1, 2R+1]`: the disc offset index of a (dq, dr) pair (-1 outside the disc); `words`: uint64
+  words of a tile's line-of-sight bits over the disc;
+- the attack disc (radius `RA` <= R, the reach of ranged units and cities): `att_tile[T, OA]`,
+  `att_dist[OA]` (in disc order);
 - `local`: the disc of radius `RM` around a unit for its movement wavefront: `ltile[T, L]` and the
   local neighbour table `lnbr[L, 6]`.
 """
@@ -61,7 +64,7 @@ def line_between(dq, dr):
 
 
 class Geometry:
-    def __init__(self, w, radius=4, move_radius=5):
+    def __init__(self, w, radius=4, move_radius=5, att_radius=4):
         self.w = w
         self.t = w * w
         self.radius = radius
@@ -81,6 +84,9 @@ class Geometry:
         self.offs = offs
         self.o = len(offs)
         self.off_dist = mx.array([hex_distance(*o) for o in offs], dtype=mx.int32)
+        self.words = (self.o + 63) // 64
+        ra = min(att_radius, radius)
+        att = [i for i, o in enumerate(offs) if hex_distance(*o) <= ra]
         mids = [line_between(*o) for o in offs]
         km = max(1, radius - 1)
         self.km = km
@@ -98,6 +104,9 @@ class Geometry:
                 row.append(cells)
             dm.append(row)
         self.disc_tile = mx.array(dt, dtype=mx.int32)
+        self.att_tile = mx.array([[row[i] for i in att] for row in dt], dtype=mx.int32)
+        self.att_dist = mx.array([hex_distance(*offs[i]) for i in att], dtype=mx.int32)
+        self.att_offs = [offs[i] for i in att]
         # -2: no mid in this slot; -1: a mid off the window (open land: never blocks)
         self.disc_mid = mx.array(dm, dtype=mx.int32)
         # The movement disc.
@@ -107,8 +116,9 @@ class Geometry:
         self.l = len(loffs)
         lpos = {o: i for i, o in enumerate(loffs)}
         self.lnbr = mx.array([[lpos.get((dq + a, dr + b), -1) for a, b in DIRS] for dq, dr in loffs], dtype=mx.int32)
-        self.disc_to_local_list = [lpos.get(o, -1) for o in offs]
-        dpos = {o: i for i, o in enumerate(offs)}
+        # The attack disc against the movement disc (the policies read attack masks per local tile).
+        self.disc_to_local_list = [lpos.get(o, -1) for o in self.att_offs]
+        dpos = {o: i for i, o in enumerate(self.att_offs)}
         self.local_to_disc = mx.array([dpos.get(o, -1) for o in loffs], dtype=mx.int32)
         self.ltile = mx.array([[idx(q + dq, r + dr) for dq, dr in loffs] for q, r in qr], dtype=mx.int32)
         self.inner = mx.array([INNER <= q < w - INNER and INNER <= r < w - INNER for q, r in qr])

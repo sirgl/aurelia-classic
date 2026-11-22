@@ -20,14 +20,14 @@ use std::io::Write;
 
 use classic_rules::combat::strength::{embarked_defense, Fighter};
 use classic_rules::effects::unit::{combat_slot, unit_modifiers};
-use classic_rules::ids::{PlayerId, TileId, UnitHandle};
+use classic_rules::ids::{PlayerId, PromotionId, TileId, UnitHandle};
 use classic_rules::navigation::cost::{step_cost_for, StepCost};
 use classic_rules::navigation::MoveProfile;
 use classic_rules::rules::effects::{CombatContext, Condition, UnitAbility, UnitStat};
 use classic_rules::classic::effects::{ClassicUnitAbility, ClassicUnitStat};
 use classic_rules::{ClassicGame, Command, CompiledRuleset, GameState};
 use kernel::ids::EntityId;
-use kernel::world::unit::Stance;
+use kernel::world::unit::{Stance, UnitCore};
 use serde_json::{json, Value};
 
 use super::act;
@@ -140,11 +140,17 @@ fn condition_json(rules: &CompiledRuleset, c: &Condition) -> Value {
 
 /// The compiled combat and movement profile of a unit (its kind, promotions and owner).
 fn profile(rules: &CompiledRuleset, game: &GameState, win: &Window, h: UnitHandle) -> Value {
+    let core = *game.view().auth.units().get(h).unwrap().core;
+    profile_of(rules, game, win, h, core, true)
+}
+
+/// The profile of `core` (the unit `h` as it would stand: another promotion set), with or without
+/// its per-tile tables (step costs, where it may stop, where it may withdraw).
+fn profile_of(rules: &CompiledRuleset, game: &GameState, win: &Window, h: UnitHandle, core: UnitCore, tables: bool) -> Value {
     let auth = game.view().auth;
-    let core = *auth.units().get(h).unwrap().core;
     let mods = unit_modifiers(auth, rules, &core);
     let def = &rules.units[core.kind.0 as usize];
-    let fighter = Fighter::of(auth, rules, h).unwrap();
+    let fighter = Fighter { handle: h, core, def: rules.units.get(core.kind.0 as usize), mods: mods.clone() };
     let contexts: Vec<i32> = CONTEXTS.iter().map(|c| mods.combat[combat_slot(*c)]).collect();
     let terms: Vec<Value> = mods.situational.iter().map(|t| json!({"ctx": combat_slot(t.context), "cond": condition_json(rules, &t.condition), "pct": t.percent})).collect();
     let abilities = [
@@ -166,6 +172,10 @@ fn profile(rules: &CompiledRuleset, game: &GameState, win: &Window, h: UnitHandl
         ("heal_outside_friendly", UnitAbility::HealOutsideFriendly),
         ("great_general", UnitAbility::Module(ClassicUnitAbility::GreatGeneral)),
         ("heal_on_kill_not_barbarians", UnitAbility::Module(ClassicUnitAbility::HealOnKillNotBarbarians)),
+        ("air_sweep", UnitAbility::AirSweep),
+        ("cross_mountains", UnitAbility::CrossMountains),
+        ("hovering", UnitAbility::Hovering),
+        ("insta_heal", UnitAbility::InstaHeal),
     ];
     let mut flags = serde_json::Map::new();
     for (k, a) in abilities {
@@ -192,32 +202,21 @@ fn profile(rules: &CompiledRuleset, game: &GameState, win: &Window, h: UnitHandl
         ("gg_points_percent", UnitStat::Module(ClassicUnitStat::GreatGeneralPointsPercent)),
         ("adjacent_damage_chance", UnitStat::Module(ClassicUnitStat::AdjacentDamageChance)),
         ("capital_falloff", UnitStat::CapitalDefenseFalloff),
+        ("intercept_chance", UnitStat::InterceptChance),
+        ("interceptions_per_turn", UnitStat::InterceptionsPerTurn),
+        ("evasion", UnitStat::EvasionPercent),
+        ("interception_taken", UnitStat::InterceptionDamageTakenPercent),
+        ("xp_needed_pct", UnitStat::Module(ClassicUnitStat::ExperienceNeededPercent)),
     ];
     let mut st = serde_json::Map::new();
     for (k, s) in stats {
         st.insert(k.to_owned(), json!(mods.stat(s)));
     }
     let situational_stats = mods.situational_stats.len();
-    // The step-cost table: per window tile and direction, the cost code of the unit's own price of the
-    // step (points; 255 all moves; -1 no step; -2 outside the window).
     let prof = MoveProfile::of_unit(auth, rules, &core);
-    let mut cost: Vec<i32> = Vec::with_capacity((win.w * win.w * 6) as usize);
-    for t in win.tiles() {
-        for d in 0..6 {
-            let code = match neighbour(win, t, d) {
-                Some(n) if win.index(n).is_some() => match step_cost_for(auth, rules, core.owner, &prof, t, n) {
-                    Some(StepCost::Points(p)) => p as i32,
-                    Some(StepCost::AllMoves) => 255,
-                    None => -1,
-                },
-                _ => -2,
-            };
-            cost.push(code);
-        }
-    }
     let sight = classic_rules::derived::visibility::UnitSight::of(rules, &mods, core.kind);
     let sight_land = sight.at(auth.map(), TileId(u32::MAX)).max(0);
-    json!({
+    let mut v = json!({
         "kind": def.name, "kind_id": core.kind.0, "owner": core.owner.0,
         "domain": format!("{:?}", def.domain), "role": def.role.map(|r| format!("{r:?}")), "class": def.class,
         "strength": def.strength, "ranged_strength": def.ranged_strength, "range_base": def.range,
@@ -229,12 +228,242 @@ fn profile(rules: &CompiledRuleset, game: &GameState, win: &Window, h: UnitHandl
         "founder": def.founder,
         "moves_land": mods.movement(rules, core.kind), "moves_embarked": mods.embarked_movement(),
         "embarks": prof.embarks(), "embarked_defense": embarked_defense(auth, rules, &fighter),
-        "sight_base": sight_land, "ignore_zoc": prof.ignore_zone_of_control,
+        "sight_base": sight_land, "sight_embarked": (1 + mods.stat(UnitStat::EmbarkedSight)).clamp(1, 7),
+        "ignore_zoc": prof.ignore_zone_of_control,
+        "air_intercept_range": def.combat.air_intercept_range,
         "contexts": contexts, "terms": terms, "flags": flags, "stats": st,
         "situational_stats": situational_stats, "post_combat": mods.post_combat.len(),
         "terrain_rules": mods.terrain_rules.len(),
-        "cost": cost,
-    })
+    });
+    if tables {
+        // The step-cost table: per window tile and direction, the cost code of the unit's own price of
+        // the step (points; 255 all moves; -1 no step; -2 outside the window).
+        let mut cost: Vec<i32> = Vec::with_capacity((win.w * win.w * 6) as usize);
+        for t in win.tiles() {
+            for d in 0..6 {
+                let code = match neighbour(win, t, d) {
+                    Some(n) if win.index(n).is_some() => match step_cost_for(auth, rules, core.owner, &prof, t, n) {
+                        Some(StepCost::Points(p)) => p as i32,
+                        Some(StepCost::AllMoves) => 255,
+                        None => -1,
+                    },
+                    _ => -2,
+                };
+                cost.push(code);
+            }
+        }
+        // Where the unit may stand (`destination_ok`), and where it may withdraw to (its element, the
+        // destination rule and the borders; the units and cities there are the simulator's).
+        let map = auth.map();
+        let dest: String = win.tiles().map(|t| if classic_rules::navigation::cost::destination_ok(auth, &prof, t) { '1' } else { '0' }).collect();
+        let withdraw: String = win
+            .tiles()
+            .map(|t| {
+                let element = match prof.domain {
+                    kernel::rules::content::Domain::Sea => classic_rules::navigation::terrain::is_water(map, t),
+                    _ => classic_rules::navigation::cost::enter_cost_on_map(map, t).is_some(),
+                };
+                let ok = element && classic_rules::navigation::cost::destination_ok(auth, &prof, t) && classic_rules::world::territory::may_enter(auth, core.owner, t);
+                if ok { '1' } else { '0' }
+            })
+            .collect();
+        v["cost"] = json!(cost);
+        v["dest_ok"] = json!(dest);
+        v["withdraw_ok"] = json!(withdraw);
+    }
+    v
+}
+
+/// What `new` changes against `base`: numbers as differences, other scalars as the new value, arrays
+/// of equal length index by index (`[i, change]`), other arrays as the added and removed elements,
+/// objects key by key. Null when nothing changes.
+fn diff(base: &Value, new: &Value) -> Value {
+    match (base, new) {
+        (Value::Number(a), Value::Number(b)) => {
+            let (a, b) = (a.as_i64().unwrap_or(0), b.as_i64().unwrap_or(0));
+            if a == b { Value::Null } else { json!(b - a) }
+        }
+        (Value::Array(a), Value::Array(b)) if a.len() == b.len() && a.iter().all(|x| !x.is_object() && !x.is_array()) => {
+            let ch: Vec<Value> = a.iter().zip(b).enumerate().filter_map(|(i, (x, y))| {
+                let d = diff(x, y);
+                (!d.is_null()).then(|| json!([i, d]))
+            }).collect();
+            if ch.is_empty() { Value::Null } else { Value::Array(ch) }
+        }
+        (Value::Array(a), Value::Array(b)) => {
+            let mut left: Vec<&Value> = a.iter().collect();
+            let mut added = Vec::new();
+            for y in b {
+                if let Some(i) = left.iter().position(|x| *x == y) {
+                    left.remove(i);
+                } else {
+                    added.push(y.clone());
+                }
+            }
+            if added.is_empty() && left.is_empty() { Value::Null } else { json!({"added": added, "removed": left}) }
+        }
+        (Value::Object(a), Value::Object(b)) => {
+            let mut m = serde_json::Map::new();
+            for (k, y) in b {
+                let d = match a.get(k) { Some(x) => diff(x, y), None => y.clone() };
+                if !d.is_null() {
+                    m.insert(k.clone(), d);
+                }
+            }
+            if m.is_empty() { Value::Null } else { Value::Object(m) }
+        }
+        (a, b) => if a == b { Value::Null } else { b.clone() },
+    }
+}
+
+/// `base` with the change `d` (the inverse of `diff`).
+fn apply(base: &Value, d: &Value) -> Value {
+    if d.is_null() {
+        return base.clone();
+    }
+    match (base, d) {
+        (Value::Number(a), Value::Number(x)) => json!(a.as_i64().unwrap_or(0) + x.as_i64().unwrap_or(0)),
+        (Value::Array(a), Value::Array(ch)) => {
+            let mut out = a.clone();
+            for c in ch {
+                let i = c[0].as_u64().unwrap_or(0) as usize;
+                if i < out.len() {
+                    out[i] = apply(&out[i], &c[1]);
+                }
+            }
+            Value::Array(out)
+        }
+        (Value::Array(a), Value::Object(o)) => {
+            let mut out = a.clone();
+            for r in o.get("removed").and_then(|r| r.as_array()).into_iter().flatten() {
+                if let Some(i) = out.iter().position(|x| x == r) {
+                    out.remove(i);
+                }
+            }
+            out.extend(o.get("added").and_then(|r| r.as_array()).cloned().unwrap_or_default());
+            Value::Array(out)
+        }
+        (Value::Object(a), Value::Object(o)) => {
+            let mut out = a.clone();
+            for (k, x) in o {
+                let v = match a.get(k) { Some(y) => apply(y, x), None => x.clone() };
+                out.insert(k.clone(), v);
+            }
+            Value::Object(out)
+        }
+        (_, x) => x.clone(),
+    }
+}
+
+/// Equal as profiles: arrays of objects (the situational terms) compared as multisets.
+fn same(a: &Value, b: &Value) -> bool {
+    diff(a, b).is_null()
+}
+
+/// The promotions a unit may ever choose in the scene (choosable, listed for its kind, fitting, the
+/// technology known): `available_promotions` without the held and prerequisite tests, which the
+/// simulator makes.
+fn choosable_for(rules: &CompiledRuleset, game: &GameState, core: &UnitCore) -> Vec<PromotionId> {
+    let techs = game.view().auth.players().techs_of(core.owner);
+    let mut out = Vec::new();
+    for (i, def) in rules.promotions.iter().enumerate() {
+        let id = PromotionId(i as u16);
+        let listed = !def.unit_roles.is_empty() || def.civilian_units.contains(&core.kind);
+        if !def.choosable || !listed || !classic_rules::effects::unit::promotion_fits(rules, id, core.kind) {
+            continue;
+        }
+        if def.required_tech.is_some_and(|t| !techs.contains(&t)) {
+            continue;
+        }
+        out.push(id);
+    }
+    out
+}
+
+/// The scene's promotion table: every promotion a piece holds or may choose, and their
+/// prerequisites (global ids, in id order).
+fn promotion_table(rules: &CompiledRuleset, game: &GameState, pieces: &[UnitHandle]) -> Vec<PromotionId> {
+    let auth = game.view().auth;
+    let mut set: std::collections::BTreeSet<u16> = std::collections::BTreeSet::new();
+    for h in pieces {
+        let core = *auth.units().get(*h).unwrap().core;
+        for p in core.promotions.iter() {
+            set.insert(p.0);
+        }
+        for p in choosable_for(rules, game, &core) {
+            set.insert(p.0);
+        }
+    }
+    loop {
+        let more: Vec<u16> = set
+            .iter()
+            .flat_map(|p| rules.promotions[*p as usize].requires.iter().chain(&rules.promotions[*p as usize].requires_any_of).map(|q| q.0))
+            .filter(|q| !set.contains(q))
+            .collect();
+        if more.is_empty() {
+            break;
+        }
+        set.extend(more);
+    }
+    set.into_iter().map(PromotionId).collect()
+}
+
+/// The promotions of a piece in the simulator's form: the ones it may choose (local ids), the change
+/// each makes to its profile alone, the changes of the pairs of those that touch its movement tables
+/// (step costs, stopping, withdrawal: not additive), and the pairs whose changes do not add up.
+fn promotion_part(rules: &CompiledRuleset, game: &GameState, win: &Window, h: UnitHandle, table: &[PromotionId], base: &Value) -> Value {
+    let core = *game.view().auth.units().get(h).unwrap().core;
+    let local = |p: PromotionId| table.iter().position(|q| *q == p).map_or(-1, |i| i as i32);
+    let fit: Vec<PromotionId> = choosable_for(rules, game, &core);
+    let with = |ps: &[PromotionId], tables: bool| {
+        let mut c = core;
+        for p in ps {
+            c.promotions.insert(*p);
+        }
+        profile_of(rules, game, win, h, c, tables)
+    };
+    let mut deltas = serde_json::Map::new();
+    let mut moving: Vec<PromotionId> = Vec::new();
+    for p in &fit {
+        let d = diff(base, &with(&[*p], true));
+        if ["cost", "dest_ok", "withdraw_ok", "embarks", "ignore_zoc"].iter().any(|k| d.get(*k).is_some()) {
+            moving.push(*p);
+        }
+        deltas.insert(local(*p).to_string(), d);
+    }
+    let mut pairs = Vec::new();
+    for (i, p) in moving.iter().enumerate() {
+        for q in &moving[i + 1..] {
+            pairs.push(json!({"set": [local(*p), local(*q)], "delta": diff(base, &with(&[*p, *q], true))}));
+        }
+    }
+    // The additivity guard (without the tables): the profile with two promotions is the base plus both
+    // changes.
+    let mut base_nt = base.clone();
+    for k in ["cost", "dest_ok", "withdraw_ok"] {
+        base_nt.as_object_mut().unwrap().remove(k);
+    }
+    let strip = |v: &Value| {
+        let mut v = v.clone();
+        for k in ["cost", "dest_ok", "withdraw_ok"] {
+            if let Some(o) = v.as_object_mut() {
+                o.remove(k);
+            }
+        }
+        v
+    };
+    let mut nonadditive = Vec::new();
+    for (i, p) in fit.iter().enumerate() {
+        for q in &fit[i + 1..] {
+            let dp = strip(&deltas[&local(*p).to_string()]);
+            let dq = strip(&deltas[&local(*q).to_string()]);
+            let want = with(&[*p, *q], false);
+            if !same(&apply(&apply(&base_nt, &dp), &dq), &want) {
+                nonadditive.push(json!([local(*p), local(*q)]));
+            }
+        }
+    }
+    json!({"fit": fit.iter().map(|p| local(*p)).collect::<Vec<i32>>(), "delta": deltas, "pairs": pairs, "nonadditive": nonadditive})
 }
 
 fn stance_code(s: Stance) -> i32 {
@@ -249,6 +478,8 @@ fn stance_code(s: Stance) -> i32 {
 /// The play's slot table: entity id -> slot.
 struct Slots {
     ids: Vec<EntityId>,
+    /// The scene's promotion table (global ids; the state's promotion bits follow it).
+    promos: Vec<PromotionId>,
 }
 
 impl Slots {
@@ -265,6 +496,7 @@ impl Slots {
 }
 
 fn state(rules: &CompiledRuleset, game: &GameState, win: &Window, slots: &mut Slots, sides: [PlayerId; 2], cities: &[TileId]) -> Value {
+    let promos = slots.promos.clone();
     let auth = game.view().auth;
     // New units of the two seats get slots in id order (captured civilians).
     let mut new: Vec<(EntityId, UnitHandle)> = auth.units().iter_handles().filter(|(_, c)| sides.contains(&c.owner) && !slots.ids.contains(&c.id)).map(|(h, c)| (c.id, h)).collect();
@@ -279,9 +511,10 @@ fn state(rules: &CompiledRuleset, game: &GameState, win: &Window, slots: &mut Sl
         .map(|id| match by_id.get(id).and_then(|h| auth.units().get(*h)) {
             Some(u) => {
                 let c = u.core;
-                json!([1, win.index(c.tile).unwrap_or(-1), c.hp, c.moves_left, c.moves_max, c.attacks_made, stance_code(c.stance), c.experience, sides.iter().position(|s| *s == c.owner).map_or(-1, |p| p as i32), c.kind.0])
+                let bits: String = promos.iter().map(|p| if c.promotions.contains(*p) { '1' } else { '0' }).collect();
+                json!([1, win.index(c.tile).unwrap_or(-1), c.hp, c.moves_left, c.moves_max, c.attacks_made, stance_code(c.stance), c.experience, sides.iter().position(|s| *s == c.owner).map_or(-1, |p| p as i32), c.kind.0, c.level, bits, c.interceptions_made])
             }
-            None => json!([0, -1, 0, 0, 0, 0, 0, 0, -1, -1]),
+            None => json!([0, -1, 0, 0, 0, 0, 0, 0, -1, -1, 0, "", 0]),
         })
         .collect();
     let cs: Vec<Value> = cities
@@ -314,7 +547,7 @@ fn state(rules: &CompiledRuleset, game: &GameState, win: &Window, slots: &mut Sl
 }
 
 /// The options of one unit action, in a fixed order: fortify, set up, found, moves by tile, attacks by tile.
-fn options(rules: &CompiledRuleset, game: &GameState, win: &Window, side: PlayerId, h: UnitHandle) -> Vec<(String, i32, Command)> {
+fn options(rules: &CompiledRuleset, game: &GameState, win: &Window, side: PlayerId, h: UnitHandle, promos: &[PromotionId]) -> Vec<(String, i32, Command)> {
     let mut v = Vec::new();
     let Some(me) = act::core_of(game, h) else { return v };
     let mut push = |v: &mut Vec<(String, i32, Command)>, k: &str, t: i32, c: Command| {
@@ -325,6 +558,9 @@ fn options(rules: &CompiledRuleset, game: &GameState, win: &Window, side: Player
     push(&mut v, "F", -1, Command::Fortify { unit: h });
     push(&mut v, "U", -1, Command::SetUpRangedAttack { unit: h });
     push(&mut v, "C", -1, Command::FoundCity { settler: h });
+    for (i, p) in promos.iter().enumerate() {
+        push(&mut v, "P", i as i32, Command::Promote { unit: h, promotion: *p });
+    }
     for (t, _) in act::reachable(game, rules, side, h) {
         if t != me.tile && win.inner(t) && act::free_for(game, rules, h, t) {
             push(&mut v, "M", win.index(t).unwrap(), Command::MoveUnit { unit: h, destination: t });
@@ -391,6 +627,11 @@ fn scene_json(rules: &CompiledRuleset, game: &GameState, sc: &Scene, win: &Windo
         let hides = map.feature(t).flatten().and_then(|f| rules.features.get(f.0 as usize)).is_some_and(|d| d.see_through > 0);
         json!(base + i32::from(hides))
     }));
+    // The citadel's damage to adjacent enemies (an intact improvement that has it).
+    tiles.insert("citadel_dmg".into(), col(&|t| {
+        let imp = map.improvement(t).flatten().filter(|_| !map.pillaged(t));
+        json!(imp.and_then(|i| rules.improvements.get(i.0 as usize)).map_or(0, |d| d.nearby_enemy_damage))
+    }));
     let rivers: Vec<Value> = tl.iter().map(|t| json!((0..6).map(|d| neighbour(win, *t, d).is_some_and(|n| map.river_between(*t, n))).collect::<Vec<bool>>())).collect();
     tiles.insert("river".into(), Value::Array(rivers));
     // Units: pieces in order (mine, then theirs).
@@ -398,7 +639,70 @@ fn scene_json(rules: &CompiledRuleset, game: &GameState, sc: &Scene, win: &Windo
     for p in sc.mine.iter().chain(&sc.theirs) {
         slots.slot_of(p.id);
     }
-    let profiles: Vec<Value> = pieces.iter().map(|h| profile(rules, game, win, *h)).collect();
+    let mut profiles: Vec<Value> = pieces.iter().map(|h| profile(rules, game, win, *h)).collect();
+    // Promotions: each piece's choices and the change of each to its profile.
+    for (i, h) in pieces.iter().enumerate() {
+        let part = promotion_part(rules, game, win, *h, &slots.promos, &profiles[i]);
+        profiles[i]["promo"] = part;
+    }
+    let promotions: Vec<Value> = slots
+        .promos
+        .iter()
+        .map(|p| {
+            let def = &rules.promotions[p.0 as usize];
+            let local = |q: &PromotionId| slots.promos.iter().position(|x| x == q).map_or(-1, |i| i as i32);
+            json!({"id": p.0, "key": def.key, "name": def.name, "insta_heal": def.heals_instantly(),
+                   "requires": def.requires.iter().map(local).collect::<Vec<i32>>(),
+                   "requires_any": def.requires_any_of.iter().map(local).collect::<Vec<i32>>()})
+        })
+        .collect();
+    // Units a capture brings: the defeated piece's kind as the captor's (CaptureDefeatedEnemy), and
+    // what a captured civilian becomes (its capture kind as the captor's, closed over captures of
+    // captured units). Profiles on a clone (the profile reads the owner, not the tile).
+    let mut spawn: Vec<Value> = Vec::new();
+    let mut spawn_ix: BTreeMap<(u16, u8), i32> = BTreeMap::new();
+    let other_side = |o: PlayerId| if o == sides[0] { sides[1] } else { sides[0] };
+    let mut make = |kind: classic_rules::ids::UnitKindId, owner: PlayerId, at: TileId, spawn: &mut Vec<Value>| -> i32 {
+        if let Some(i) = spawn_ix.get(&(kind.0, owner.0)) {
+            return *i;
+        }
+        let mut g = game.clone();
+        let nh = g.debug_spawn_unit(rules, owner, at, kind);
+        let core = *g.view().auth.units().get(nh).unwrap().core;
+        let i = spawn.len() as i32;
+        let mut v = profile_of(rules, &g, win, nh, core, true);
+        v["prom_bits"] = json!(slots.promos.iter().map(|p| if core.promotions.contains(*p) { '1' } else { '0' }).collect::<String>());
+        v["level"] = json!(core.level);
+        spawn.push(v);
+        spawn_ix.insert((kind.0, owner.0), i);
+        i
+    };
+    let mut civ_spawn: Vec<i32> = Vec::new();
+    for (i, h) in pieces.iter().enumerate() {
+        let me = *auth.units().get(*h).unwrap().core;
+        let captures = profiles[i]["flags"]["capture_defeated"].as_bool().unwrap_or(false);
+        let mut row: Vec<i32> = Vec::new();
+        for o in &pieces {
+            let other = *auth.units().get(*o).unwrap().core;
+            row.push(if captures && other.owner != me.owner { make(other.kind, me.owner, me.tile, &mut spawn) } else { -1 });
+        }
+        profiles[i]["capture_spawn"] = json!(row);
+        let civ = rules.units[me.kind.0 as usize].combat.capture.map_or(-1, |k| make(k, other_side(me.owner), me.tile, &mut spawn));
+        civ_spawn.push(civ);
+    }
+    for (i, c) in civ_spawn.into_iter().enumerate() {
+        profiles[i]["civ_spawn"] = json!(c);
+    }
+    // Close: a spawned civilian may be captured again.
+    let mut k = 0;
+    while k < spawn.len() {
+        let kind = spawn[k]["capture_kind"].as_u64();
+        let owner = PlayerId(spawn[k]["owner"].as_u64().unwrap_or(0) as u8);
+        let at = pieces.first().and_then(|h| auth.units().get(*h)).map_or(TileId(0), |u| u.core.tile);
+        let c = kind.map_or(-1, |kd| make(classic_rules::ids::UnitKindId(kd as u16), other_side(owner), at, &mut spawn));
+        spawn[k]["civ_spawn"] = json!(c);
+        k += 1;
+    }
     let city_list: Vec<Value> = cities
         .iter()
         .map(|t| {
@@ -452,15 +756,16 @@ fn scene_json(rules: &CompiledRuleset, game: &GameState, sc: &Scene, win: &Windo
         "city_counts": city_counts,
         "family": sc.fam.name(), "era": lab::era_names(rules).get(sc.era as usize), "era_index": sc.era, "instance": sc.instance, "attempt": sc.attempt,
         "window": {"q0": win.q0, "r0": win.r0, "w": win.w, "map_w": win.map_w, "map_h": win.map_h},
-        "tiles": tiles, "profiles": profiles, "cities": city_list,
+        "tiles": tiles, "profiles": profiles, "cities": city_list, "promotions": promotions, "spawn": spawn,
         "n_mine": sc.mine.len(), "n_theirs": sc.theirs.len(),
         "move_denominator": kernel::world::unit::MOVE_DENOMINATOR,
     })
 }
 
 /// One dumped play of a scene.
-pub fn dump_one(rules: &CompiledRuleset, fam: Fam, era: u8, instance: usize, attempt: u32, rounds: u32, seed: u64, aggressive: bool, record: bool) -> Result<Value, String> {
-    let (mut game, sc) = families::build(rules, fam, era, instance, attempt)?;
+pub fn dump_one(rules: &CompiledRuleset, fam: Fam, era: u8, instance: usize, attempt: u32, rounds: u32, seed: u64, aggressive: bool, record: bool, plant: &[String]) -> Result<Value, String> {
+    let (mut game, mut sc) = families::build(rules, fam, era, instance, attempt)?;
+    let planted = plant_extras(rules, &mut game, &mut sc, plant);
     // The whole map known to both sides, as the trainers play it.
     let all: Vec<TileId> = (0..game.view().auth.map().tile_count() as u32).map(TileId).collect();
     game.debug_reveal(sc.learner, &all);
@@ -469,7 +774,8 @@ pub fn dump_one(rules: &CompiledRuleset, fam: Fam, era: u8, instance: usize, att
     let sides = [sc.learner, sc.enemy];
     let mut cities: Vec<TileId> = game.view().auth.cities().iter().map(|(_, c)| c.tile).filter(|t| win.index(*t).is_some()).collect();
     cities.sort_by_key(|t| t.0);
-    let mut slots = Slots { ids: Vec::new() };
+    let pieces: Vec<UnitHandle> = sc.mine.iter().chain(&sc.theirs).map(|p| p.h).collect();
+    let mut slots = Slots { ids: Vec::new(), promos: promotion_table(rules, &game, &pieces) };
     let scene = if record { scene_json(rules, &game, &sc, &win, &cities, &mut slots) } else {
         for p in sc.mine.iter().chain(&sc.theirs) {
             slots.slot_of(p.id);
@@ -508,7 +814,7 @@ pub fn dump_one(rules: &CompiledRuleset, fam: Fam, era: u8, instance: usize, att
                         break;
                     }
                     let before_vis = if record { state(rules, &game, &win, &mut slots, sides, &cities)["vis"].clone() } else { Value::Null };
-                    let opts = options(rules, &game, &win, side, h);
+                    let opts = options(rules, &game, &win, side, h, &slots.promos);
                     let pick = if aggressive { aggressive_pick(&game, &win, &opts, side, &d) } else { (d.next() % (opts.len() as u64 + 1)) as usize };
                     let listed: Vec<Value> = opts.iter().map(|(k, t, _)| json!([k, t])).collect();
                     let mut ok = true;
@@ -579,8 +885,62 @@ pub fn dump_one(rules: &CompiledRuleset, fam: Fam, era: u8, instance: usize, att
             break;
         }
     }
-    Ok(json!({"scene": scene, "initial": initial, "steps": steps, "stop": stop, "seed": seed, "slots": slots.ids.len(),
+    Ok(json!({"scene": scene, "initial": initial, "steps": steps, "stop": stop, "seed": seed, "slots": slots.ids.len(), "planted": planted,
         "play_s": play_started.elapsed().as_secs_f64(), "actions": actions, "rounds_played": rounds_played}))
+}
+
+/// Parity variants of a scene (`--plant`), to exercise rules the families rarely reach; measurement
+/// only, the families are not changed. `citadel`: a citadel on the enemy's land nearest the arena
+/// centre (the families' citadel stands on unowned land, where it hurts nobody); `aa`: an enemy
+/// anti-aircraft unit (the first land kind with an interception range) next to the enemy's first piece,
+/// in scenes with aircraft.
+fn plant_extras(rules: &CompiledRuleset, game: &mut GameState, sc: &mut Scene, plant: &[String]) -> Vec<String> {
+    let mut done = Vec::new();
+    let dims = game.view().auth.map().dimensions;
+    if plant.iter().any(|p| p == "citadel") {
+        let citadel = rules.improvements.iter().position(|d| d.nearby_enemy_damage > 0).map(|i| classic_rules::ids::ImprovementId(i as u16));
+        let auth = game.view().auth;
+        let map = auth.map();
+        let mut best: Option<(i32, TileId)> = None;
+        for t in (0..map.tile_count() as u32).map(TileId) {
+            let ok = map.owner(t).flatten() == Some(sc.enemy)
+                && !classic_rules::navigation::terrain::is_water(map, t)
+                && auth.indexes().city_on_tile(t).is_none()
+                && auth.indexes().units_on(t).is_empty();
+            if ok {
+                let d = dims.distance(t, sc.centre).unwrap_or(999);
+                if best.is_none_or(|(b, _)| d < b) {
+                    best = Some((d, t));
+                }
+            }
+        }
+        if let (Some(c), Some((_, t))) = (citadel, best) {
+            game.debug_set_improvement_batch(rules, &[(t, c)]);
+            done.push(format!("citadel {}", t.0));
+        }
+    }
+    if plant.iter().any(|p| p == "aa") {
+        let has_air = sc.mine.iter().chain(&sc.theirs).any(|p| rules.units[p.kind.0 as usize].domain == kernel::rules::content::Domain::Air);
+        let aa = rules.units.iter().position(|d| d.domain == kernel::rules::content::Domain::Land && d.combat.air_intercept_range > 0);
+        if let (true, Some(k), Some(first)) = (has_air, aa, sc.theirs.first().map(|p| p.h)) {
+            let kind = classic_rules::ids::UnitKindId(k as u16);
+            let at = game.view().auth.units().get(first).map(|u| u.core.tile);
+            if let Some(at) = at {
+                let auth = game.view().auth;
+                let spot = dims.neighbors(at).into_iter().find(|t| {
+                    !classic_rules::navigation::terrain::is_water(auth.map(), *t) && auth.indexes().units_on(*t).is_empty() && auth.indexes().city_on_tile(*t).is_none()
+                        && classic_rules::navigation::cost::enter_cost_on_map(auth.map(), *t).is_some()
+                });
+                if let Some(t) = spot {
+                    let h = game.debug_spawn_unit(rules, sc.enemy, t, kind);
+                    let id = game.view().auth.units().get(h).unwrap().core.id;
+                    sc.theirs.push(super::Piece { h, id, kind, role: "planted-aa" });
+                    done.push(format!("aa {} at {}", rules.units[k].name, t.0));
+                }
+            }
+        }
+    }
+    done
 }
 
 /// The aggressive script: an attack when one is offered (9 in 10), else (8 in 10) the move that comes
@@ -618,6 +978,7 @@ pub fn main(rules: &CompiledRuleset, args: &[String]) -> Result<(), String> {
     let mut jobs = 1usize;
     let mut aggressive = false;
     let mut record = true;
+    let mut plant: Vec<String> = Vec::new();
     let mut one: Option<(Fam, String, usize, u32)> = None;
     let (mut fam, mut era, mut inst, mut att) = (None, None, 0usize, 0u32);
     let mut it = args.iter();
@@ -633,6 +994,7 @@ pub fn main(rules: &CompiledRuleset, args: &[String]) -> Result<(), String> {
             "--jobs" => jobs = v()?.parse().map_err(|e| format!("{e}"))?,
             "--policy" => aggressive = v()? == "aggressive",
             "--no-record" => record = false,
+            "--plant" => plant = v()?.split(',').map(str::to_owned).collect(),
             "--family" => fam = Some(Fam::parse(&v()?)?),
             "--era" => era = Some(v()?),
             "--instance" => inst = v()?.parse().map_err(|e| format!("{e}"))?,
@@ -669,7 +1031,7 @@ pub fn main(rules: &CompiledRuleset, args: &[String]) -> Result<(), String> {
     let ix: Vec<usize> = (0..cells.len()).collect();
     crate::export::parallel(&ix, jobs, |&i| {
         let (f, e, inst, a) = cells[i];
-        match dump_one(rules, f, e, inst, a, rounds, seed, aggressive, record) {
+        match dump_one(rules, f, e, inst, a, rounds, seed, aggressive, record, &plant) {
             Ok(v) => {
                 let mut t = totals.lock().unwrap();
                 t.0 += v["play_s"].as_f64().unwrap_or(0.0);

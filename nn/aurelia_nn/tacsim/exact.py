@@ -124,6 +124,14 @@ def city_damage(city, opp, roll):
     return to_hp(scale_by_ratio(dmg, city, opp))
 
 
+def interception_damage(interceptor, attacker, interceptor_damage, taken_percent, roll):
+    """Damage of an interception (`damage::interception_damage`): the interceptor's wounded factor is
+    100 - its damage (all of it, not the 33 % rule), the rounded damage times the attacker's
+    InterceptionDamageTaken factor, truncated."""
+    hp = unit_damage(interceptor, attacker, interceptor_damage, mx.full(interceptor_damage.shape, 100 - WOUNDED_PERCENT, dtype=mx.int32), roll)
+    return hp * mx.maximum(100 + taken_percent.astype(I64), 0) // 100
+
+
 def resolve_mutual_kill(to_def, def_hp, to_att, att_hp):
     dt = to_def + (MAX_HP - def_hp)
     at = to_att + (MAX_HP - att_hp)
