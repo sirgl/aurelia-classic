@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+### Computer opponents
+
+- **A new default AI.** The computer players now prefer fewer, larger cities, and spread wide only when they have a
+  strong reason. They pick city sites farther from rivals' borders and from enemy armies, and they do not send a settler
+  on a long, unprotected walk. They win more often by science and by diplomacy, and their cities rise in revolt less often.
+- **How much stronger.** In 800 test games at Quick speed against the previous default AI, the new one takes about 63 %
+  of the points (counting a win by a real victory in full and a win on the turn limit as a quarter) and wins 238 games by
+  a real victory against 113. A computer turn takes no longer than before.
+- Saves made by the previous version still load.
+
 ## 0.3.0
 
 What changed since 0.2.0 (4 November 2026). Saves made by 0.2.0 still load.

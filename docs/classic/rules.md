@@ -8,7 +8,7 @@
 
 ## Summary
 
-Rule constants: 506 (AI constants: 949; 14 constants of engine plumbing in `platform/crates/kernel/src/persistence/`, `platform/crates/kernel/src/test_module.rs`, `platform/crates/kernel/src/math.rs`, `platform/crates/kernel/src/module.rs`, `classic/crates/classic-rules/src/save_codec.rs`, `classic/crates/classic-rules/src/fixtures.rs` are not listed).
+Rule constants: 506 (AI constants: 966; 14 constants of engine plumbing in `platform/crates/kernel/src/persistence/`, `platform/crates/kernel/src/test_module.rs`, `platform/crates/kernel/src/math.rs`, `platform/crates/kernel/src/module.rs`, `classic/crates/classic-rules/src/save_codec.rs`, `classic/crates/classic-rules/src/fixtures.rs` are not listed).
 
 | Source | Rule constants | AI constants |
 |---|---|---|
@@ -17,8 +17,8 @@ Rule constants: 506 (AI constants: 949; 14 constants of engine plumbing in `plat
 | own formula (expansion-only system; Unciv has no equivalent) | 0 | 0 |
 | own value | 14 | 4 |
 | own value (unverified) | 17 | 4 |
-| own value (source not recorded) | 143 | 930 |
-| total | 506 | 949 |
+| own value (source not recorded) | 143 | 947 |
+| total | 506 | 966 |
 
 Sections:
 
@@ -953,7 +953,7 @@ Tuning numbers of the computer players (`classic/crates/classic-rules/src/ai`). 
 
 ### `diplomacy.rs`
 
-6 constants (own value (unverified) 1, own value (source not recorded) 5). Files: `classic/crates/classic-rules/src/ai/diplomacy.rs`.
+7 constants (own value (unverified) 1, own value (source not recorded) 6). Files: `classic/crates/classic-rules/src/ai/diplomacy.rs`.
 
 | Name | Value | Meaning | Source | File |
 |---|---|---|---|---|
@@ -962,6 +962,7 @@ Tuning numbers of the computer players (`classic/crates/classic-rules/src/ai`). 
 | `DISTRUST_WARMONGER` | `100` | Warmonger memory above which the AI distrusts (no friendship, pacts). | own value (source not recorded) | `diplomacy.rs` |
 | `DENOUNCE_WARMONGER` | `250` | Warmonger memory above which the AI denounces. | own value (source not recorded) | `diplomacy.rs` |
 | `RECENT_WAR_ROUNDS` | `30` | No friendly deal with a former enemy for this many rounds after the peace treaty ends. | own value (source not recorded) | `diplomacy.rs` |
+| `REFUSED` | `-1000` | The gold-scale value of an item the AI refuses outright (`item_value_priced`'s untrusted). | own value (source not recorded) | `diplomacy.rs` |
 | `PROPOSAL_INTERVAL` | `5` | Rounds between two rounds of proposals of one player. | own value (source not recorded) | `diplomacy.rs` |
 
 ### `driver.rs`
@@ -1505,7 +1506,7 @@ Tuning numbers of the computer players (`classic/crates/classic-rules/src/ai`). 
 
 ### `planner_settle.rs`
 
-7 constants (own value (source not recorded) 7). Files: `classic/crates/classic-rules/src/ai/planner_settle.rs`.
+12 constants (own value (source not recorded) 12). Files: `classic/crates/classic-rules/src/ai/planner_settle.rs`.
 
 | Name | Value | Meaning | Source | File |
 |---|---|---|---|---|
@@ -1516,6 +1517,11 @@ Tuning numbers of the computer players (`classic/crates/classic-rules/src/ai`). 
 | `SITE_MIN_SCORE` | `20` | A site below this score is not worth a city. | own value (source not recorded) | `planner_settle.rs` |
 | `ESCORT_WAIT_ROUNDS` | `10` | Rounds a settler that met danger waits for an escort before it gives its site up. | own value (source not recorded) | `planner_settle.rs` |
 | `DANGER_RANGE` | `3` | No site this close to a hostile military unit in sight. | own value (source not recorded) | `planner_settle.rs` |
+| `RIVAL_SAFE_DISTANCE` | `7` | Tiles from the nearest rival city a site on the net's path is free of `rival_risk`. | own value (source not recorded) | `planner_settle.rs` |
+| `RIVAL_PENALTY` | `30` | Score points a tile closer than `RIVAL_SAFE_DISTANCE` costs: at 4 tiles 3 × 30 = 90, three turns of travel, about what the land score takes for 15 rival tiles in the radius. | own value (source not recorded) | `planner_settle.rs` |
+| `ARMY_RANGE` | `6` | Hostile military units in sight within this many tiles of a site weigh on it. | own value (source not recorded) | `planner_settle.rs` |
+| `ARMY_PENALTY` | `60` | Score points each such unit costs: two turns of travel. | own value (source not recorded) | `planner_settle.rs` |
+| `NET_TRAVEL_RISK` | `10` | Score points each turn of a settler's walk costs on the site net's path on top of `TRAVEL_COST`: the net's sites lie farther out and 11.5 % of its settlers never founded a city (5.1 % on the land score); a turn on the road is a turn an unescorted settler can be caught. | own value (source not recorded) | `planner_settle.rs` |
 
 ### `planner_strategy.rs`
 
@@ -1810,7 +1816,7 @@ Tuning numbers of the computer players (`classic/crates/classic-rules/src/ai`). 
 
 ### `site.rs`
 
-7 constants (own value (source not recorded) 7). Files: `classic/crates/classic-rules/src/ai/site.rs`.
+8 constants (own value (source not recorded) 8). Files: `classic/crates/classic-rules/src/ai/site.rs`.
 
 | Name | Value | Meaning | Source | File |
 |---|---|---|---|---|
@@ -1819,6 +1825,7 @@ Tuning numbers of the computer players (`classic/crates/classic-rules/src/ai`). 
 | `TERRAIN_SLOTS` | `12` | Slots of the terrain and feature counts (the tables' indexes; a later index counts in the last slot). | own value (source not recorded) | `site.rs` |
 | `FEATURE_SLOTS` | `12` |  | own value (source not recorded) | `site.rs` |
 | `FAR` | `99` | The distance feature when no such city is known. | own value (source not recorded) | `site.rs` |
+| `FOREIGN_TILES` | `TILES + 2` | The index of `foreign_tiles` (a hand edit of the site net reads it as 0: `site_net::SiteNetPlay::OwnLand`). | own value (source not recorded) | `site.rs` |
 | `SITE_FEATURES` | `HEURISTIC + 2` | Number of site features. | own value (source not recorded) | `site.rs` |
 | `SITE_NAMES` | `[ "nature_r0_food", "nature_r0_production", "nature_r0_gold", "nature_r0_science", "nat...` | The features' names, in order (the module docs say what each is). | own value (source not recorded) | `site.rs` |
 
@@ -1999,7 +2006,7 @@ Tuning numbers of the computer players (`classic/crates/classic-rules/src/ai`). 
 
 ### `weights.rs`
 
-313 constants (own value 2, own value (source not recorded) 311). Files: `classic/crates/classic-rules/src/ai/net_e2e/v2/weights.rs`, `classic/crates/classic-rules/src/ai/strategy_net/weights.rs`, `classic/crates/classic-rules/src/ai/unit_net/weights.rs`.
+322 constants (own value 2, own value (source not recorded) 320). Files: `classic/crates/classic-rules/src/ai/net_e2e/v2/weights.rs`, `classic/crates/classic-rules/src/ai/strategy_net/weights.rs`, `classic/crates/classic-rules/src/ai/unit_net/weights.rs`.
 
 | Name | Value | Meaning | Source | File |
 |---|---|---|---|---|
@@ -2110,6 +2117,15 @@ Tuning numbers of the computer players (`classic/crates/classic-rules/src/ai`). 
 | `STYLE_EVENTS` | `[OPPORTUNITY, OP_FORMING, STRENGTH, PAYS]` | The features a locked style takes from the turn besides `STYLE_EVENTS`: an opportunity and the army's strength change with the neighbours, not with the empire's own growth. | own value (source not recorded) | `weights.rs` |
 | `AIM` | `&[ (0, f(RIVAL_TREE, 0, "science: a rival nearer the end of the tree (race it or turn t...` | Terms added to the aims' logits (science, culture, domination, diplomacy). | own value (source not recorded) | `weights.rs` |
 | `POSTURE` | `&[ (1, f(RIVAL_SOLDIERS, 0, "defence: a rival's army larger than ours")), (2, f(RIVAL_G...` | Terms added to the postures' logits (peace, defence, prepare, war). | own value (source not recorded) | `weights.rs` |
+| `WIDE` | `(-1200, "wide needs a strong reason, not room alone: a seat held to tall, science and p...` | Added to the wide style's logit. | own value (source not recorded) | `weights.rs` |
+| `BIAS` | `(-1000, "a rival level with us is no threat: the race is open")` |  | own value (source not recorded) | `weights.rs` |
+| `TREE` | `(1200, "its share of the tree is its road to the spaceship: a rival with the space tech...` |  | own value (source not recorded) | `weights.rs` |
+| `LEAD` | `(1000, "a tenth of the tree ahead of us: it reaches the spaceship first")` |  | own value (source not recorded) | `weights.rs` |
+| `PACE` | `(600, "it researches faster than we do: the lead grows (twice our science gives +200)")` |  | own value (source not recorded) | `weights.rs` |
+| `LEAD_SCALE` | `10` | The tenth of the tree a full lead stands for (per mille of the tree, × 10). | own value (source not recorded) | `weights.rs` |
+| `MIN` | `(300, "below it the rival is one of the race")` | The least threat the plan names: below it the rival is in the race, not running away. | own value (source not recorded) | `weights.rs` |
+| `DENOUNCE` | `(500, "a rival more likely than not to run away: no help to it, and the world told")` | The threat from which the rival is denounced and offered no friendship, research or open borders. | own value (source not recorded) | `weights.rs` |
+| `POSTURE` | `&[ (2, 2000, "prepare: the army that stops the leader before it wins (a threat of 0.6 o...` | Terms of the threat in the posture logits (peace, defence, prepare, war): (posture, weight, why). | own value (source not recorded) | `weights.rs` |
 | `HYSTERESIS` | `1150` | A choice of the intent changes only when the new one's share leads the held one's by more than this (thousandths: 15 %). | own value (source not recorded) | `weights.rs` |
 | `LOCK_MIN_ROUNDS` | `20` | The style is chosen once (classic/docs/ai-strategy-net.md, "The style lock"): it is locked when the first branch may be opened after the first survey of the surroundings (`LOCK_MIN_ROUNDS` Standard rounds), or at `LOCK_MAX_ROUNDS` at the latest. | own value (source not recorded) | `weights.rs` |
 | `LOCK_MAX_ROUNDS` | `40` |  | own value (source not recorded) | `weights.rs` |
@@ -2316,6 +2332,14 @@ Tuning numbers of the computer players (`classic/crates/classic-rules/src/ai`). 
 | `MAX_SIEGE_TURNS` | `8` | The most turns to take a city the losses are counted over. | own value (source not recorded) | `weights.rs` |
 | `ORDER_SHORT` | `800` | Orders: a defence operation short of this share of the threat's force orders a defender. | own value (source not recorded) | `weights.rs` |
 | `ORDER_VALUE` | `600` | An order's value per hammer of the threatened city's worth at risk. | own value (source not recorded) | `weights.rs` |
+
+### `wishes.rs`
+
+1 constants (own value (source not recorded) 1). Files: `classic/crates/classic-rules/src/ai/strategy_net/wishes.rs`.
+
+| Name | Value | Meaning | Source | File |
+|---|---|---|---|---|
+| `NONE` | `Parts { threat: false, tall_first: false }` | Every variant but `strategist-x` and `strategist-x-threat`. | own value (source not recorded) | `wishes.rs` |
 
 ### `wonder_chance.rs`
 
