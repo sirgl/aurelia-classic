@@ -42,11 +42,15 @@ pub use plan::{Net2Plan, Plan2};
 /// The turn of `net2` for a seat, at the place of `strategy_net::think` (`driver.rs`): the same
 /// arguments; the strategist's plan with `net2`'s intent and prices, and the levers.
 pub fn think(obs: &AIObservation<'_>, brief: &TurnBrief, state: &mut AiState, rules: &CompiledRuleset, prices: &Prices, stakes: &Stakes) -> Plan2 {
+    let _span = prof::span("net2/think");
     let seat = Seat { obs, brief, rules, prices };
     let mut memory = Memory::decode(&state.mind_memory);
     let situation = strategy_net::situation(seat, state, stakes, &mut memory);
     let mut own = memory.net2.take().unwrap_or_default();
-    let inputs = inputs::read(obs, brief, state, rules, &situation.features, &situation.rivals, &mut own.inputs);
+    let inputs = {
+        let _span = prof::span("net2/inputs");
+        inputs::read(obs, brief, state, rules, &situation.features, &situation.rivals, &mut own.inputs)
+    };
     let net = net_of(brief);
     let carried = strategy_net::concepts_net(&situation.features, net);
     let pass = levers::before_intent(&inputs, &carried, &own.core, obs.round, obs.speed.pace_percent);
@@ -61,6 +65,7 @@ pub fn think(obs: &AIObservation<'_>, brief: &TurnBrief, state: &mut AiState, ru
     let mut levers = after.plan;
     read_soldiers(&mut levers, &own.inputs);
     memory.net2 = Some(plan::Memory2 { core: pass.core.clone(), inputs: own.inputs });
+    let _plan_span = prof::span("net2/plan_with_intent");
     let strategy = strategy_net::plan_with_intent(seat, state, memory, &situation, intent, &after.price_tilt, Wishes::default());
     Plan2 { strategy, net2: levers }
 }

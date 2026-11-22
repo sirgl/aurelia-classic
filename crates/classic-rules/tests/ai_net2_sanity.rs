@@ -45,6 +45,8 @@ struct Pair {
     net2: ClassicMind,
     baseline: ClassicMind,
     seen: Arc<Mutex<Vec<Seen>>>,
+    /// Nanoseconds of the mind's calls per side (`net2`, `nets-x-site`): the AI time of its seats.
+    spent: Mutex<[u64; 2]>,
 }
 
 fn is_net2(player: PlayerId) -> bool {
@@ -52,6 +54,15 @@ fn is_net2(player: PlayerId) -> bool {
 }
 
 impl Pair {
+    /// Runs `call` and adds its time to `player`'s side.
+    fn timed<T>(&self, player: PlayerId, call: impl FnOnce() -> T) -> T {
+        let start = std::time::Instant::now();
+        let out = call();
+        let side = usize::from(!is_net2(player));
+        self.spent.lock().unwrap()[side] += start.elapsed().as_nanos() as u64;
+        out
+    }
+
     fn mind(&self, player: PlayerId) -> &ClassicMind {
         if is_net2(player) {
             &self.net2
@@ -80,7 +91,7 @@ impl AiMind<Classic> for Pair {
     }
 
     fn start_turn(&self, sight: &AIObservation<'_>, rules: &CompiledRuleset, player: PlayerId, state: &mut AiState) -> TurnStart<Classic, TurnBrief> {
-        let start = self.mind(player).start_turn(sight, rules, player, state);
+        let start = self.timed(player, || self.mind(player).start_turn(sight, rules, player, state));
         if start.kind == TurnKind::Full && start.cities > 0 {
             self.seen.lock().unwrap().push(Seen { player, round: sight.round, plan: start.brief.net2.clone(), strategy: format!("{:?}", state.strategy.current) });
         }
@@ -96,15 +107,15 @@ impl AiMind<Classic> for Pair {
     }
 
     fn next_unit(&self, near: &LocalObservation<'_>, brief: &TurnBrief, state: &AiState, remaining: &[(EntityId, UnitHandle)]) -> Option<EntityId> {
-        self.mind(brief.player).next_unit(near, brief, state, remaining)
+        self.timed(brief.player, || self.mind(brief.player).next_unit(near, brief, state, remaining))
     }
 
     fn plan_strategic(&self, brief: &TurnBrief, state: &mut AiState, rules: &CompiledRuleset) -> Vec<classic_rules::ai::planner::Decision> {
-        self.mind(brief.player).plan_strategic(brief, state, rules)
+        self.timed(brief.player, || self.mind(brief.player).plan_strategic(brief, state, rules))
     }
 
     fn decide_unit(&self, near: &LocalObservation<'_>, player: PlayerId, unit: UnitHandle, brief: &TurnBrief, state: &mut AiState, tools: &mut PlanTools<'_>) -> Option<classic_rules::ai::planner::Decision> {
-        self.mind(player).decide_unit(near, player, unit, brief, state, tools)
+        self.timed(player, || self.mind(player).decide_unit(near, player, unit, brief, state, tools))
     }
 
     fn permits(&self, game: &GameState, rules: &CompiledRuleset, player: PlayerId, command: &Command) -> bool {
@@ -112,7 +123,7 @@ impl AiMind<Classic> for Pair {
     }
 
     fn plan_end_of_turn(&self, sight: &AIObservation<'_>, player: PlayerId, brief: &TurnBrief, state: &AiState, tools: &mut PlanTools<'_>) -> Vec<classic_rules::ai::planner::Decision> {
-        self.mind(player).plan_end_of_turn(sight, player, brief, state, tools)
+        self.timed(player, || self.mind(player).plan_end_of_turn(sight, player, brief, state, tools))
     }
 }
 
@@ -139,7 +150,8 @@ fn sanity_the_levers_move_against_nets_x_site() {
     for (script, seed) in [("pangaea", 1_700_001u64), ("continents", 1_700_002), ("fractal", 1_700_003), ("small-continents", 1_700_004)] {
         let mut game = game(&rules, script, seed);
         let seen = Arc::new(Mutex::new(Vec::new()));
-        let pair = Pair { net2: ClassicMind::new(Variant::Net2), baseline: ClassicMind::new(Variant::NetsXSite), seen: seen.clone() };
+        let pair = Pair { net2: ClassicMind::new(Variant::Net2), baseline: ClassicMind::new(Variant::NetsXSite), seen: seen.clone(), spent: Mutex::new([0, 0]) };
+        let _ = prof::drain();
         let mut driver: AiDriver<Classic, Pair> = AiDriver::with_mind(AiSettings::for_rules(&rules, rules.default_difficulty()), Vec::new(), pair);
         driver.set_trace_capacity(usize::MAX);
         classic_rules::ai::war_probe::enable(true);
@@ -164,6 +176,7 @@ fn sanity_the_levers_move_against_nets_x_site() {
             }
         }
         let probe = classic_rules::ai::war_probe::take();
+        print_time(&driver.mind_mut().spent.lock().unwrap(), &prof::drain());
         classic_rules::ai::war_probe::enable(false);
         let seen = seen.lock().unwrap();
         for p in majors.iter().filter(|p| is_net2(**p)) {
@@ -215,5 +228,26 @@ fn sanity_the_levers_move_against_nets_x_site() {
                 top(&|r| r.spoiler),
             );
         }
+    }
+}
+
+/// The AI time of each side and, with `--features prof/enabled`, the spans of `net2` and of the executors (summed
+/// over every path that ends in the span; the executors' spans hold both sides' calls).
+fn print_time(spent: &[u64; 2], records: &[prof::Record]) {
+    println!("  AI time: net2 {:.0} ms, nets-x-site {:.0} ms ({:.2} x)", spent[0] as f64 / 1e6, spent[1] as f64 / 1e6, spent[0] as f64 / spent[1].max(1) as f64);
+    let mut sums: Vec<(&str, u64, u64)> = Vec::new();
+    for r in records {
+        let name = r.path.rsplit(" > ").next().unwrap_or(&r.path);
+        match sums.iter_mut().find(|(n, _, _)| *n == name) {
+            Some(entry) => {
+                entry.1 += r.incl_ns;
+                entry.2 += r.calls;
+            }
+            None => sums.push((name, r.incl_ns, r.calls)),
+        }
+    }
+    sums.sort_by_key(|(_, ns, _)| std::cmp::Reverse(*ns));
+    for (name, ns, calls) in sums.iter().filter(|(n, _, _)| n.starts_with("net2/") || n.starts_with("classic/")).take(16) {
+        println!("    span {name}: {:.0} ms, {calls} calls, {:.1} % of net2's AI time", *ns as f64 / 1e6, *ns as f64 * 100.0 / spent[0].max(1) as f64);
     }
 }
