@@ -103,6 +103,8 @@ impl<'o, 'a> Diplomat<'o, 'a> {
         }
         // Our memory of their warmongering (100 points distrust) as Unciv's WarMongerer modifier.
         opinion -= r.warmonger as f32 / 10.0;
+        // What they did to us, by reason (`DiplomaticModifiers.StealingTerritory` and the like).
+        opinion -= r.grievance_points();
         opinion
     }
 

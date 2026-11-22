@@ -624,7 +624,8 @@ fn overdraw_iron(
 /// `<path stem>-tNNN.png` with its turn time and resident memory printed
 /// (the QA soak of the game with presentation, classic/docs/QA.md).
 fn play_turns(run: &mut Offscreen, path: &str) {
-    if std::env::var("AURELIA_GAME_AUTOPLAY").is_ok() {
+    let autoplay = std::env::var("AURELIA_GAME_AUTOPLAY").is_ok();
+    if autoplay {
         if let Some(session) = run.app.module.session.as_mut() {
             session.autoplay();
         }
@@ -653,6 +654,20 @@ fn play_turns(run: &mut Offscreen, path: &str) {
             save_capture(&run.core, &run.texture, run.size.0, run.size.1, &format!("{stem}-t{index:03}.png"));
         }
     }
+    if autoplay {
+        if let Some(session) = run.app.module.session.as_mut() {
+            end_autoplay(session);
+        }
+    }
+}
+
+/// The scripted turns are over: the observed player is the human again and the AI turns that
+/// are left run to their end now, so the capture frames that follow run no AI. A seat left to
+/// the AI would play a few turns in every frame's wall-time slice on the worker thread, and the
+/// captured world would depend on timing.
+fn end_autoplay(session: &mut crate::game::Session) {
+    session.end_autoplay();
+    session.finish_ai_turns();
 }
 
 /// The process memory after a bench phase; the heap peak then restarts.
@@ -1820,4 +1835,45 @@ pub(super) fn open_pedia(app: &mut GameApp, page: Option<crate::ui::pedia::Pedia
 fn open_overview(app: &mut GameApp, tab: crate::ui::screens::OverviewTab) {
     app.module.screens.open_overview(tab);
     app.apply_module_actions();
+}
+
+#[cfg(test)]
+mod tests {
+    use std::time::Duration;
+
+    use super::end_autoplay;
+    use crate::game::Session;
+    use crate::ui::model::GameRequest;
+    use crate::ui::screens::{game_rules, prepare_match, MapSize, MatchRequest};
+
+    /// A match autoplayed for `turns` end turns, as `play_turns` does it.
+    fn autoplayed(turns: u32) -> Session {
+        let request = MatchRequest { nation: "core:nation/rome".into(), seed: 20260928, size: MapSize::Small, players: 3, water: 25 };
+        let mut session = Session::new(prepare_match(request).expect("world").game, game_rules());
+        session.autoplay();
+        for _ in 0..turns {
+            session.request(GameRequest::EndTurn);
+            session.finish_ai_turns();
+        }
+        session
+    }
+
+    /// After the scripted turns no AI is left to run in the capture frames: nothing is busy, and
+    /// frames (3 ms slices of the AI) change nothing. Two runs of the same state end in one hash.
+    #[test]
+    fn the_capture_frames_after_autoplay_run_no_ai() {
+        let mut hashes = Vec::new();
+        for _ in 0..2 {
+            let mut session = autoplayed(6);
+            end_autoplay(&mut session);
+            assert!(!session.ai_busy(), "the AI still has a turn to play when the capture is saved");
+            let settled = session.world_hash();
+            for _ in 0..50 {
+                session.tick_ai(Duration::from_millis(3));
+            }
+            assert_eq!(session.world_hash(), settled, "a capture frame changed the world");
+            hashes.push(settled);
+        }
+        assert_eq!(hashes[0], hashes[1]);
+    }
 }

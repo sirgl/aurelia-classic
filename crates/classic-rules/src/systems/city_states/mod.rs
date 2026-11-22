@@ -28,6 +28,7 @@ use crate::world::city::CityCore;
 use crate::world::state::AuthWorld;
 use crate::world::player::ClassicKind;
 use crate::world::player::ClassicPlayers;
+use crate::world::city_states::{MajorRecord, Quest, QuestKind, Standing};
 
 /// Influence at which a city-state counts a major as a friend and as an
 /// ally (the types carry the same). Unciv: DiplomacyManager.relationshipLevel,
@@ -157,6 +158,15 @@ pub fn city_states(auth: &AuthWorld) -> Vec<PlayerId> {
         .map(|p| PlayerId(p as u8))
         .filter(|p| auth.players().is_city_state(*p))
         .collect()
+}
+
+/// The quest is of `player` or names it.
+fn quest_names(quest: &Quest, player: PlayerId) -> bool {
+    let target = match quest.kind {
+        QuestKind::FindPlayer(p) | QuestKind::BullyCityState(p) | QuestKind::DenounceMajor(p) => Some(p),
+        _ => None,
+    };
+    quest.city_state == player || quest.major == player || target == Some(player)
 }
 
 /// Every alive nation.
@@ -291,6 +301,45 @@ pub fn city_food_bonus(auth: &AuthWorld, rules: &CompiledRuleset, city: &CityCor
 }
 
 impl<'a> WorldTransaction<'a> {
+    /// `dead` was eliminated (`systems::elimination`): its standing with every city-state
+    /// (influence, pledge, bullying) and, for a dead city-state, every nation's standing with it
+    /// start again, the quests of it or naming it end, and a city-state it was the ally of takes
+    /// its next ally at once (Unciv: `updateAllyCivForCityState` counts no defeated civ).
+    pub(crate) fn forget_in_city_states(&mut self, dead: PlayerId, rules: &CompiledRuleset) {
+        let players = self.world.players.count();
+        let round = self.world.turn.round;
+        let state = &mut self.world.module.city_states;
+        for i in 0..players {
+            let other = PlayerId(i as u8);
+            for (city_state, major) in [(other, dead), (dead, other)] {
+                if let Some(standing) = state.standing_mut(city_state, major) {
+                    *standing = Standing::default();
+                }
+            }
+        }
+        if let Some(record) = state.major_mut(dead) {
+            *record = MajorRecord::default();
+        }
+        state.quests.retain(|quest| !quest_names(quest, dead));
+        let mut orphans = Vec::new();
+        for i in 0..players {
+            let city_state = PlayerId(i as u8);
+            let Some(minor) = state.minor_mut(city_state) else {
+                continue;
+            };
+            if minor.ally == Some(dead) {
+                minor.ally = None;
+                minor.allied_since = round;
+                orphans.push(city_state);
+            }
+        }
+        for city_state in orphans {
+            if self.world.players.is_alive(city_state) {
+                self.update_ally(city_state, rules);
+            }
+        }
+    }
+
     /// Change the base influence by `delta` ×100 (floor −60), then the
     /// statuses.
     pub(crate) fn change_influence(

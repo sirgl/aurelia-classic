@@ -53,6 +53,11 @@ impl ModuleSystems<Classic> for ClassicSystems {
         tx.religious_pressure_round(rules);
     }
 
+    /// An eliminated nation leaves no tie behind (`systems::elimination`).
+    fn player_eliminated(tx: &mut KernelTransaction<'_>, rules: &CompiledRuleset, player: PlayerId) {
+        WorldTransaction::of(tx).forget_eliminated(player, rules);
+    }
+
     /// The aircraft and missiles based on a carrier go down with it.
     fn unit_removing(tx: &mut KernelTransaction<'_>, unit: crate::ids::UnitHandle) {
         WorldTransaction::of(tx).destroy_cargo(unit);

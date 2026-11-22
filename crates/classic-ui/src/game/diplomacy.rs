@@ -8,6 +8,7 @@ use classic_rules::PlayerQueries;
 use classic_rules::ClassicGame;
 use classic_rules::ids::PlayerId;
 use classic_rules::knowledge::observation::Relation;
+use classic_rules::world::relations::{GrievanceKind, GRIEVANCE_POINT};
 use classic_rules::rules::content::ResourceClass;
 use classic_rules::world::player::PlayerKind;
 use classic_rules::world::relations::{DealItem, DealOffer, PeaceRefusal};
@@ -574,7 +575,24 @@ fn treaties(relation: &Relation) -> Vec<String> {
     if relation.warmonger > 0 {
         out.push(tf!("classic.game.diplomacy.fact-warmonger", n = relation.warmonger));
     }
+    for kind in GrievanceKind::all() {
+        let amount = relation.grievances[kind.index()];
+        if amount > 0 {
+            out.push(grievance_fact(kind, amount));
+        }
+    }
     out
+}
+
+/// What the player holds against a nation, for one reason: `amount` in opinion points, rounded up so
+/// that a grievance that has not faded yet never reads as 0.
+fn grievance_fact(kind: GrievanceKind, amount: i32) -> String {
+    let points = (amount + GRIEVANCE_POINT - 1) / GRIEVANCE_POINT;
+    match kind {
+        GrievanceKind::StolenLand => tf!("classic.game.diplomacy.fact-grievance-stolen-land", n = points),
+        GrievanceKind::BetrayedFriendship => tf!("classic.game.diplomacy.fact-grievance-betrayed-friendship", n = points),
+        GrievanceKind::BetrayedPact => tf!("classic.game.diplomacy.fact-grievance-betrayed-pact", n = points),
+    }
 }
 
 

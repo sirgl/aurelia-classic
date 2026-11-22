@@ -69,6 +69,11 @@ fn relations(world: &ClassicWorld, auth: &AuthWorld, mix: &mut dyn FnMut(u64)) {
         for e in &saved.embassy {
             mix(u64::from(*e));
         }
+        // Mixed only when there are some: a game without grievances hashes as before them.
+        for (observer, offender, kind, amount) in &saved.grievances {
+            mix(u64::from(*observer) << 16 | u64::from(*offender) << 8 | u64::from(*kind));
+            mix(u64::from(*amount));
+        }
         for (from, to, (tag, value, extra), until) in &saved.trades {
             mix(u64::from(*from) << 8 | u64::from(*to));
             mix(u64::from(*tag) << 48 | u64::from(*value) << 16 | u64::from(*extra));

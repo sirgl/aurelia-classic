@@ -70,7 +70,7 @@ pub fn resource_available(
 /// screen's check (`DealBlock::NotEnoughIncome`) and the AI read the same number.
 pub fn gold_income(auth: &AuthWorld, rules: &CompiledRuleset, player: PlayerId) -> i32 {
     let income = crate::derived::income::player_income(auth, rules, player).gold;
-    income + auth.module().relations().gold_per_turn(player, auth.turn().round, |p| auth.players().is_alive(p))
+    income + auth.module().relations().gold_per_turn(player, auth.turn().round)
 }
 
 /// Why an item cannot pass in a deal. `reason` is the rule text of logs and tests; a screen

@@ -18,7 +18,10 @@ use crate::rules::CompiledRuleset;
 use crate::classic::ClassicChange;
 use crate::transaction::journal::PlayerChange;
 use crate::transaction::transaction::WorldTransaction;
-use crate::world::relations::RelationsState;
+use crate::world::relations::{
+    DealItem, GrievanceKind, RelationsState, BETRAYED_ALLY_POINTS, BETRAYED_FRIEND_POINTS, BETRAYED_FRIEND_WITNESS_POINTS,
+    BETRAYED_PACT_POINTS, BETRAYED_PACT_WITNESS_POINTS, GRIEVANCE_POINT,
+};
 use crate::world::player::ClassicPlayers;
 
 /// Rounds a timed deal lasts at Standard speed: gold per turn, resources,
@@ -90,7 +93,94 @@ pub const MEDIAN_TECH_PERCENT: u32 = 50;
 /// eras weigh more). Own value (see `WARMONGER_ATTACKED_WEIGHT`).
 const WARMONGER_PERCENT: [i32; 8] = [50, 60, 70, 80, 90, 100, 100, 100];
 
+/// A treaty a declaration of war breaks: what its victim and every other nation that knows the
+/// betrayer hold against it, in opinion points.
+struct Betrayal {
+    kind: GrievanceKind,
+    victim: i32,
+    witness: i32,
+}
+
 impl<'a> WorldTransaction<'a> {
+    /// `dead` was eliminated (`systems::elimination`): its wars, treaties, deals and offers end
+    /// and nobody remembers it (peace treaty, war, denunciation, warmonger), both ways.
+    pub(crate) fn forget_in_relations(&mut self, dead: PlayerId) {
+        for i in 0..self.world.players.count() {
+            let other = PlayerId(i as u8);
+            if other == dead {
+                continue;
+            }
+            if self.world.diplomacy.at_war(dead, other) {
+                self.set_war_state(dead, other, false);
+            }
+            if self.tied(dead, other) {
+                self.end_ties(dead, other);
+            }
+            self.forget_memories(dead, other);
+        }
+        self.withdraw_offers_naming(dead);
+        self.world.module.relations.grievances.retain(|g| g.observer != dead && g.offender != dead);
+    }
+
+    /// A tie `end_ties` ends holds between `a` and `b`.
+    fn tied(&self, a: PlayerId, b: PlayerId) -> bool {
+        let relations = &self.world.module.relations;
+        let slots = [relations.slot(a, b), relations.slot(b, a)];
+        let set = |table: &[u32]| slots.iter().flatten().any(|i| table[*i] != 0);
+        let trading = relations.trades.iter().any(|t| (t.from, t.to) == (a, b) || (t.from, t.to) == (b, a));
+        trading
+            || set(&relations.research_until)
+            || set(&relations.research_points)
+            || set(&relations.pact_until)
+            || set(&relations.friends_until)
+            || set(&relations.open_until)
+            || slots.iter().flatten().any(|i| relations.embassy[*i] != 0)
+            || self.world.diplomacy.grants_entry(a, b)
+            || self.world.diplomacy.grants_entry(b, a)
+    }
+
+    /// The peace treaty, the war's start, the denunciation and the warmonger memory of the pair
+    /// are forgotten.
+    fn forget_memories(&mut self, dead: PlayerId, other: PlayerId) {
+        let relations = &mut self.world.module.relations;
+        let slots = [relations.slot(dead, other), relations.slot(other, dead)];
+        let mut changed = false;
+        for i in slots.into_iter().flatten() {
+            for table in [&mut relations.peace_until, &mut relations.war_since, &mut relations.denounced_until] {
+                changed |= table[i] != 0;
+                table[i] = 0;
+            }
+            changed |= relations.warmonger[i] != 0;
+            relations.warmonger[i] = 0;
+        }
+        if changed {
+            self.relations_changed(other);
+        }
+    }
+
+    /// The offers of `dead`, to it or naming it (a war or a peace with it) are withdrawn; a
+    /// living proposer is told as of a lapsed offer (`ClassicChange::OfferLapsed`).
+    fn withdraw_offers_naming(&mut self, dead: PlayerId) {
+        let names = |offer: &crate::world::relations::DealOffer| {
+            offer.from == dead
+                || offer.to == dead
+                || offer.items.iter().any(|(giver, item)| {
+                    let third = matches!(item, DealItem::ThirdPartyWar(p) | DealItem::ThirdPartyPeace(p) if *p == dead);
+                    *giver == dead || third
+                })
+        };
+        let offers = &mut self.world.module.relations.offers;
+        let (withdrawn, kept): (Vec<_>, Vec<_>) = offers.drain(..).partition(names);
+        *offers = kept;
+        for offer in withdrawn {
+            if offer.from != dead {
+                let peace = offer.items.iter().any(|(_, item)| *item == DealItem::Peace);
+                self.journal.module_changes.push(ClassicChange::OfferLapsed { from: offer.from, to: offer.to, peace });
+                self.relations_changed(offer.from);
+            }
+        }
+    }
+
     /// War (§5.1): the declarer's pacts end, every deal between the two
     /// ends (research without payout), embassies close, friendship breaks,
     /// the victim's defensive partners join, observers remember the
@@ -116,6 +206,7 @@ impl<'a> WorldTransaction<'a> {
             return;
         }
         let round = self.world.turn.round;
+        let betrayals = self.betrayals(player, enemy, round);
         self.cancel_pacts_of(player);
         self.end_ties(player, enemy);
         self.evacuate_diplomats(player, enemy);
@@ -145,6 +236,44 @@ impl<'a> WorldTransaction<'a> {
             }
         }
         self.minor_allies_join_war(player, enemy, rules);
+        self.remember_betrayals(player, enemy, &betrayals);
+    }
+
+    /// The treaties `player` breaks by declaring war on `enemy`, read before the war ends them
+    /// (Unciv DeclareWar.kt: `breakTreaties` for a friendship and a defensive pact, whatever the
+    /// kind of war; `handleCityStateDirectAttack` for the declarer's own allied city-state).
+    fn betrayals(&self, player: PlayerId, enemy: PlayerId, round: u32) -> Vec<Betrayal> {
+        let relations = &self.world.module.relations;
+        let mut betrayals = Vec::new();
+        if relations.are_friends(player, enemy, round) {
+            betrayals.push(Betrayal { kind: GrievanceKind::BetrayedFriendship, victim: BETRAYED_FRIEND_POINTS, witness: BETRAYED_FRIEND_WITNESS_POINTS });
+        }
+        if relations.has_pact(player, enemy, round) {
+            betrayals.push(Betrayal { kind: GrievanceKind::BetrayedPact, victim: BETRAYED_PACT_POINTS, witness: BETRAYED_PACT_WITNESS_POINTS });
+        }
+        let own_ally = self.world.players.is_city_state(enemy) && self.world.module.city_states.ally(enemy) == Some(player);
+        if own_ally {
+            betrayals.push(Betrayal { kind: GrievanceKind::BetrayedFriendship, victim: BETRAYED_ALLY_POINTS, witness: BETRAYED_ALLY_POINTS });
+        }
+        betrayals
+    }
+
+    /// Every living major that knows `betrayer` (the victim always does) holds the betrayals
+    /// against it (Unciv: `getKnownCivs` of the declarer; a city-state holds none).
+    fn remember_betrayals(&mut self, betrayer: PlayerId, victim: PlayerId, betrayals: &[Betrayal]) {
+        if betrayals.is_empty() {
+            return;
+        }
+        for i in 0..self.world.players.count() {
+            let observer = PlayerId(i as u8);
+            if observer != victim && !has_met(self.world, observer, betrayer) {
+                continue;
+            }
+            for betrayal in betrayals {
+                let points = if observer == victim { betrayal.victim } else { betrayal.witness };
+                self.add_grievance(observer, betrayer, betrayal.kind, points);
+            }
+        }
     }
 
     /// The one writer of war and peace between two players. A city-state's
@@ -478,6 +607,18 @@ impl<'a> WorldTransaction<'a> {
                 self.change_warmonger(observer, liberator, -offset * percent / 100);
             }
         }
+    }
+
+    /// `observer` holds `points` of opinion more against `offender` for `kind`; only a living
+    /// major keeps a grievance (a city-state keeps influence, barbarians keep nothing), and nobody
+    /// holds one against itself.
+    pub(crate) fn add_grievance(&mut self, observer: PlayerId, offender: PlayerId, kind: GrievanceKind, points: i32) {
+        let players = &self.world.players;
+        if observer == offender || !players.is_major(observer) || !players.is_alive(observer) {
+            return;
+        }
+        self.world.module.relations.add_grievance(observer, offender, kind, points * GRIEVANCE_POINT);
+        self.relations_changed(observer);
     }
 
     pub(crate) fn change_warmonger(&mut self, observer: PlayerId, player: PlayerId, delta: i32) {

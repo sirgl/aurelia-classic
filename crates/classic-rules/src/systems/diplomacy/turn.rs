@@ -1,5 +1,4 @@
-//! The diplomacy step of a player's end turn (after Science): the ties with nations that are
-//! gone, research agreements (accumulate, pay out at the end),
+//! The diplomacy step of a player's end turn (after Science): research agreements (accumulate, pay out at the end),
 //! open borders that expire, offers to it that lapse, the decay of its
 //! warmonger memory.
 
@@ -26,10 +25,10 @@ impl<'a> WorldTransaction<'a> {
             return;
         }
         let round = self.world.turn.round;
-        self.close_dead_ties();
         self.research_agreements(player, science.max(0) as u32, round, rules);
         self.expire_open_borders(player, round, rules);
         self.decay_warmonger(player, rules);
+        self.fade_grievances(player, rules);
         self.lapse_offers(player, round);
         self.world.module.relations.trades.retain(|t| round < t.until);
     }
@@ -46,26 +45,6 @@ impl<'a> WorldTransaction<'a> {
         }
     }
 
-    /// Every tie with a nation that is gone ends, both ways: its trades pay nothing (a dead
-    /// payer's step never runs again, a dead receiver cannot be paid) and the living party must
-    /// not count them. Runs at every turn end and at the settlement of the round.
-    pub(crate) fn close_dead_ties(&mut self) {
-        let players = &self.world.players;
-        let gone = |p: PlayerId| !players.is_alive(p);
-        let pairs: Vec<(PlayerId, PlayerId)> = self
-            .world
-            .module
-            .relations
-            .trades
-            .iter()
-            .filter(|t| gone(t.from) || gone(t.to))
-            .map(|t| (t.from, t.to))
-            .collect();
-        for (a, b) in pairs {
-            self.end_ties(a, b);
-        }
-    }
-
     /// The gold per turn of every running deal, settled once a round after every player's
     /// income is in the treasury (Civ V counts the deals in the net income of the round, so no
     /// order of the players decides who can pay). A payment is made in full from the payer's
@@ -77,7 +56,6 @@ impl<'a> WorldTransaction<'a> {
         if self.world.module.relations.is_pristine() {
             return;
         }
-        self.close_dead_ties();
         let round = self.world.turn.round;
         let mut due: Vec<(PlayerId, PlayerId, u32, u32)> = self
             .world
@@ -180,6 +158,17 @@ impl<'a> WorldTransaction<'a> {
             self.world.diplomacy.set_open(player, guest, false);
             self.expel_units(player, guest, rules);
             self.relations_changed(player);
+        }
+    }
+
+    /// Every grievance `observer` holds fades by its kind's rate at the game's pace (Unciv
+    /// `DiplomacyTurnManager.revertToZero`: 0.67 x rate / speed modifier, gone when the rate
+    /// reaches what is left).
+    fn fade_grievances(&mut self, observer: PlayerId, rules: &CompiledRuleset) {
+        let pace = self.world.settings().speed(rules).pace_percent;
+        let held: Vec<_> = self.world.module.relations.grievances.iter().filter(|g| g.observer == observer).copied().collect();
+        for g in held {
+            self.world.module.relations.add_grievance(observer, g.offender, g.kind, -g.kind.fading_at(pace));
         }
     }
 

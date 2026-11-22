@@ -422,6 +422,66 @@ fn decision(
 }
 
 impl<'a> WorldTransaction<'a> {
+    /// `dead` was eliminated (`systems::elimination`; own design, like the league itself, Unciv
+    /// has no host): it leaves every role of the league at once. Its proposals, its votes, the
+    /// votes for it in an election, its delegates and an embargo on it go; a host who died passes
+    /// the league to the living nation with the most delegates (the lowest id on a tie), and the
+    /// proposers are chosen anew: a dead nation holds no proposal slot and breaks no tie.
+    pub(crate) fn forget_in_congress(&mut self, dead: PlayerId, rules: &CompiledRuleset) {
+        if !self.world.module.congress.founded {
+            return;
+        }
+        self.drop_proposals_naming(dead);
+        let named = u32::from(dead.0);
+        let congress = &mut self.world.module.congress;
+        let proposals = &congress.proposals;
+        let elects = |vote: &Vote| proposals.get(usize::from(vote.proposal)).is_some_and(|p| p.kind.elects());
+        congress.votes.retain(|vote| vote.voter != dead && !(elects(vote) && vote.choice == named));
+        for table in [&mut congress.delegates, &mut congress.extra] {
+            if let Some(seats) = table.get_mut(usize::from(dead.0)) {
+                *seats = 0;
+            }
+        }
+        congress.active.retain(|a| !(a.kind == ResolutionKind::PlayerEmbargo && a.choice == named));
+        let host_died = congress.host == Some(dead);
+        let proposer_died = congress.proposers.contains(&dead);
+        if host_died {
+            let successor = crate::systems::city_states::majors(self.world)
+                .into_iter()
+                .max_by_key(|p| (delegates(self.world, rules, *p), std::cmp::Reverse(p.0)));
+            self.world.module.congress.host = successor;
+        }
+        if host_died || proposer_died {
+            self.assign_proposers(rules);
+        }
+    }
+
+    /// The proposals of `dead` and an embargo on it leave the table with their votes; the votes on
+    /// the later proposals follow theirs to its new place.
+    fn drop_proposals_naming(&mut self, dead: PlayerId) {
+        let named = u32::from(dead.0);
+        let congress = &mut self.world.module.congress;
+        let mut kept = Vec::new();
+        let mut new_index: Vec<Option<u8>> = Vec::new();
+        for proposal in congress.proposals.drain(..) {
+            let embargo = proposal.kind == ResolutionKind::PlayerEmbargo && proposal.choice == named;
+            if proposal.proposer == Some(dead) || embargo {
+                new_index.push(None);
+            } else {
+                new_index.push(Some(kept.len() as u8));
+                kept.push(proposal);
+            }
+        }
+        congress.proposals = kept;
+        congress.votes.retain_mut(|vote| match new_index.get(usize::from(vote.proposal)).copied().flatten() {
+            Some(index) => {
+                vote.proposal = index;
+                true
+            }
+            None => false,
+        });
+    }
+
     /// The league's turn, once a round (§6.1–6.3).
     pub(crate) fn congress_turn(&mut self, rules: &CompiledRuleset) {
         // Founding is checked at every end of turn (a game without a

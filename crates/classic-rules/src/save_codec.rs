@@ -34,8 +34,13 @@ use crate::persistence::SaveGameV1;
 /// play at Standard); 24: the rebellion countdowns of the barbarian section
 /// (`REVOLTS_SINCE`; older saves have none running); 25: the cities that
 /// sold a building this turn, in the player's economy record
-/// (`SALES_SINCE`; older saves have sold none).
-pub const CODEC_VERSION: u32 = 25;
+/// (`SALES_SINCE`; older saves have sold none); 26: the grievances of the
+/// relations section (`GRIEVANCES_SINCE`; older saves hold none).
+pub const CODEC_VERSION: u32 = 26;
+
+/// The codec version whose relations section gained the grievances; older
+/// saves read none.
+const GRIEVANCES_SINCE: u32 = 26;
 
 /// The codec version whose player economy record gained the cities that
 /// sold a building this turn; older saves read none.
@@ -277,6 +282,7 @@ impl Field for SavedRelations {
         self.denounced_until.put(out);
         self.open_until.put(out);
         self.warmonger.put(out);
+        self.grievances.put(out);
         self.trades.put(out);
         self.offers.put(out);
         self.next_offer.put(out);
@@ -293,6 +299,7 @@ impl Field for SavedRelations {
             denounced_until: Field::take(r)?,
             open_until: Field::take(r)?,
             warmonger: Field::take(r)?,
+            grievances: r.since(GRIEVANCES_SINCE)?,
             trades: Field::take(r)?,
             offers: Field::take(r)?,
             next_offer: Field::take(r)?,
