@@ -30,7 +30,7 @@ import mlx.nn as nn
 
 from .geometry import Geometry
 from .scene import Batch, load_lines
-from .sim import Sim, A_UNIT, A_CITY, A_END, A_ROUND, A_PAD, V_NONE, V_FORT, V_SETUP, V_FOUND, V_MOVE, V_ATTACK, V_STRIKE, g1, gn
+from .sim import first_index, Sim, A_UNIT, A_CITY, A_END, A_ROUND, A_PAD, V_NONE, V_FORT, V_SETUP, V_FOUND, V_MOVE, V_ATTACK, V_STRIKE, g1, gn
 
 I32 = mx.int32
 
@@ -108,7 +108,7 @@ def decide(sim, s, slot, mk, policy, net, key):
     else:
         score = net(features(sim, s, slot, mk))
     score = mx.where(legal, score, -1e9)
-    pick = mx.argmax(score, axis=1).astype(I32)
+    pick = first_index(score == mx.max(score, axis=1, keepdims=True))
     is_move = pick < L
     is_att = (pick >= L) & (pick < 2 * L)
     li = mx.where(is_move, pick, pick - L)
@@ -124,7 +124,7 @@ def kth_unit(s, side, k, sel=None):
         own = own & sel
     rank = mx.cumsum(own.astype(I32), axis=1) - 1
     hit = own & (rank == k)
-    return mx.where(mx.any(hit, axis=1), mx.argmax(hit.astype(I32), axis=1).astype(I32), -1)
+    return mx.where(mx.any(hit, axis=1), first_index(hit), -1)
 
 
 def in_contact(sim, s, side):
@@ -177,7 +177,7 @@ class Runner:
             cslot = mx.full((B,), c, dtype=I32)
             cm = sim.city_mask(s, side, cslot)
             score = mx.where(cm, mx.random.uniform(shape=cm.shape, key=key), -1.0)
-            tgt = mx.argmax(score, axis=1).astype(I32)
+            tgt = first_index(score == mx.max(score, axis=1, keepdims=True))
             ok = mx.any(cm, axis=1)
             a = {"typ": mx.full((B,), A_CITY, dtype=I32), "side": side, "slot": cslot, "verb": mx.where(ok, V_STRIKE, V_NONE), "tgt": tgt}
             return sim.step(s, a, {}, kinds=(A_CITY,))

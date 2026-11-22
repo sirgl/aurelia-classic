@@ -51,6 +51,21 @@ def gn(arr, idx):
     return mx.take_along_axis(arr, flat, axis=1).reshape(idx.shape)
 
 
+def first_index(mask, axis=-1):
+    """The first index where `mask` holds along `axis` (its length when none): MLX's argmax over a short
+    axis is ~40x slower than a min reduction, so the hot paths use this."""
+    n = mask.shape[axis]
+    shape = [1] * mask.ndim
+    shape[axis] = n
+    ids = mx.arange(n).reshape(shape)
+    return mx.min(mx.where(mask, ids, n), axis=axis).astype(I32)
+
+
+def argmin_last(x):
+    """argmin over the last axis (first of the ties), through min reductions."""
+    return first_index(x == mx.min(x, axis=-1, keepdims=True))
+
+
 def put1(arr, idx, val, where):
     """arr[b, idx[b]] = val[b] where `where`[b]."""
     N = arr.shape[1]
@@ -124,26 +139,33 @@ class Sim:
         emb = s["p_embarks"] & water
         return mx.where(emb, s["p_embarked_sight"], land)
 
+    def sources_see(self, src, radius, valid, tiles):
+        """[B, S, N]: does each source tile (radius, valid) [B, S] see each target tile [B, N]? Distances
+        and disc offsets from per-tile coordinates by broadcasting, the line-of-sight word gathered once
+        per source."""
+        geo = self.geo
+        R = geo.radius
+        sq = mx.take(geo.q, mx.maximum(src, 0)); sr = mx.take(geo.r, mx.maximum(src, 0))
+        tq = mx.take(geo.q, mx.maximum(tiles, 0)); tr = mx.take(geo.r, mx.maximum(tiles, 0))
+        dq = tq[:, None, :] - sq[:, :, None]
+        dr = tr[:, None, :] - sr[:, :, None]
+        d = (mx.abs(dq) + mx.abs(dr) + mx.abs(dq + dr)) // 2
+        inside = (mx.abs(dq) <= R) & (mx.abs(dr) <= R)
+        o = mx.take(geo.rel.reshape(-1), mx.clip(dq + R, 0, 2 * R) * (2 * R + 1) + mx.clip(dr + R, 0, 2 * R))
+        word = gn(self.los, src)  # [B, S]
+        bit = mx.right_shift(word[:, :, None], mx.maximum(o, 0).astype(mx.uint64)) & 1
+        ok = valid[:, :, None] & (src[:, :, None] >= 0) & (tiles[:, None, :] >= 0) & inside & (o >= 0) & (bit == 1)
+        return ok & (d <= radius[:, :, None])
+
     def seen_by(self, s, side, tiles):
         """Is each tile in `tiles` [B, N] visible to `side` [B]: own units' sight, own cities' sight, own
         territory and its neighbours (kernel `visibility.rs`)."""
-        B = self.B
-        U = s["u_alive"].shape[1]
         src = s["u_tile"]  # [B, U]
-        r = self.unit_sight(s)
         own = s["u_alive"] & (s["u_side"] == side[:, None]) & (src >= 0)
-        S = mx.broadcast_to(src[:, :, None], (B, U, tiles.shape[1]))
-        D = mx.broadcast_to(tiles[:, None, :], (B, U, tiles.shape[1]))
-        d = self.geo.distance(S, D)
-        see = own[:, :, None] & (d <= r[:, :, None]) & self.los_bit(S, D)
-        vis = mx.any(see, axis=1)
+        vis = mx.any(self.sources_see(src, self.unit_sight(s), own, tiles), axis=1)
         ct = self.cs["tile"]
-        C = ct.shape[1]
         cown = self.cs["alive"] & (s["c_owner"] == side[:, None]) & (ct >= 0)
-        Sc = mx.broadcast_to(ct[:, :, None], (B, C, tiles.shape[1]))
-        Dc = mx.broadcast_to(tiles[:, None, :], (B, C, tiles.shape[1]))
-        dc = self.geo.distance(Sc, Dc)
-        vis = vis | mx.any(cown[:, :, None] & (dc <= CITY_SIGHT) & self.los_bit(Sc, Dc), axis=1)
+        vis = vis | mx.any(self.sources_see(ct, mx.full(ct.shape, CITY_SIGHT, dtype=I32), cown, tiles), axis=1)
         # Own territory shows itself and its neighbours: the target or one of its neighbours is ours.
         tn = mx.take(self.geo.nbr, mx.maximum(tiles, 0), axis=0)  # [B, N, 6]
         owned_t = gn(s["owner"], tiles) == side[:, None]
@@ -233,7 +255,7 @@ class Sim:
         B, L = lt.shape
         geo = self.geo
         hit = lt == goal_tile[:, None]
-        gl = mx.argmax(hit.astype(I32), axis=1).astype(I32)
+        gl = mx.minimum(first_index(hit), L - 1)
         scale = mx.max(mx.where(mx.arange(L)[None, :] == 0, left, 0), axis=1)  # the start's moves
         g = mx.maximum(scale[:, None] - left, 0)
         h = geo.distance(lt, mx.broadcast_to(goal_tile[:, None], lt.shape)) * MOVE
@@ -245,7 +267,7 @@ class Sim:
         cand = mx.minimum(cand, full_l[:, :, None])
         valid = (cand == left[:, :, None]) & (left[:, :, None] >= 0) & (pred_local >= 0)
         pkey = mx.where(valid, gn(key, pred_local), 1 << 30)
-        best_d = mx.argmin(pkey, axis=2).astype(I32)  # [B, L]
+        best_d = argmin_last(pkey)  # [B, L]
         parent = mx.take_along_axis(pred_local, best_d[:, :, None], axis=2)[:, :, 0]
         parent = mx.where(mx.min(pkey, axis=2) < (1 << 30), parent, -1)
         # The path back from the goal.
@@ -258,7 +280,7 @@ class Sim:
         path = mx.stack(path[::-1], axis=1)  # start ... goal (repeats at the start)
         ptile = gn(lt, path)
         stop = gn(foreign.astype(I32), path) > 0
-        first = mx.argmax(stop.astype(I32), axis=1)
+        first = first_index(stop)
         any_stop = mx.any(stop, axis=1)
         prev = mx.where(any_stop, g1(path, mx.maximum(first - 1, 0)), gl)
         final_tile = g1(lt, prev)
