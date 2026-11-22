@@ -386,9 +386,13 @@ impl<'a> WorldTransaction<'a> {
                 core.interceptions_made = core.interceptions_made.saturating_add(1);
             }
         }
+        let Some(view) = self.world.units.get(unit) else {
+            return Ok(());
+        };
+        let mods = crate::effects::unit::unit_modifiers(self.world, rules, view.core);
         if let Some(core) = self.world.units.get_mut_core(unit) {
-            core.moves_left = 0;
-            core.attacks_made = core.attacks_made.saturating_add(1);
+            core.moves_left = core.moves_left.saturating_sub(crate::world::unit::MOVE_DENOMINATOR);
+            super::count_attack(core, &mods);
         }
         Ok(())
     }
