@@ -232,8 +232,6 @@ pub struct CallFixes {
     pub ranged: bool,
     /// The melee kind is chosen by strength squared per production cost.
     pub melee: bool,
-    /// The army is sized against the enemy units that can reach the target during the siege.
-    pub threat: bool,
     /// The press / hold / withdraw call at the walls (`siege_walls::call`).
     pub call: bool,
     /// The planning estimate of a city carries the defence its owner can have built (`siege_walls::default_defence`).
@@ -241,12 +239,14 @@ pub struct CallFixes {
 }
 
 impl CallFixes {
-    pub const NONE: CallFixes = CallFixes { ready: false, ranged: false, melee: false, threat: false, call: false, walls: false };
-    pub const ALL: CallFixes = CallFixes { ready: true, ranged: true, melee: true, threat: true, call: true, walls: true };
+    pub const NONE: CallFixes = CallFixes { ready: false, ranged: false, melee: false, call: false, walls: false };
+    pub const ALL: CallFixes = CallFixes { ready: true, ranged: true, melee: true, call: true, walls: true };
     /// What `siege-call` plays: the fixes that measured better on the tuning offsets 200-202 (300 solo pace games,
-    /// `runs/ops`): ranged units first and the press call. `ready` cut the losses and not the share, `melee` and
-    /// `threat` lowered both (see `LOG.md`); they stay in the code, off, for an ablation to switch on.
-    pub const DEFAULT: CallFixes = CallFixes { ready: false, ranged: true, melee: false, threat: false, call: true, walls: false };
+    /// `runs/ops`): ranged units first and the press call. `ready` cut the losses and not the share, `melee`
+    /// lowered both (see `LOG.md`); they stay in the code, off, for an ablation to switch on. (`threat`, sizing the
+    /// army against the units that reach the target during the siege, lowered both too and is gone with the
+    /// memory it kept outside the saved game.)
+    pub const DEFAULT: CallFixes = CallFixes { ready: false, ranged: true, melee: false, call: true, walls: false };
 
     pub fn any(self) -> bool {
         self != Self::NONE

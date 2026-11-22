@@ -67,6 +67,7 @@ Short descriptions in our own words of the main formulas; the code is the author
 - **Unit upkeep** (`derived::maintenance::unit_maintenance`). Every player keeps 3 (`FREE_UNITS`) units free, plus the difficulty's, the policies' and the garrison free units. With n paid units and p the turn over 500 (`ESTIMATED_END_TURN`) (at most 1), the gold per turn is (50 (`GOLD_PER_UNIT_TIMES100`) hundredths times n times (1 + 1 (`UNIT_COST_GROWTH_FACTOR`) p)) raised to the power (1 + p / 3 (`UNIT_COST_EXPONENT_DIVISOR`)), then the difficulty's unit cost percent applies.
 - **Game speed** (`kernel::rules::speeds`, table below). Every rule constant is written at Standard speed; a game of another speed multiplies each cost, length and interval Unciv scales by the speed's percent of the matching kind (production, gold, science, culture, faith, build time, pace, golden age, gold gift), takes its own peace, deal and pressure numbers, and plays to the last round of its calendar (Standard 500 (`STANDARD_MAX_ROUNDS`)).
 - **Golden age** (`systems::golden_age::golden_age_threshold`). The first golden age needs 500 (`GOLDEN_AGE_BASE_THRESHOLD`) happiness, every later one 250 (`GOLDEN_AGE_THRESHOLD_INCREASE`) more; the threshold grows by 1 (`GOLDEN_AGE_THRESHOLD_CITY_PERCENT`) percent per city, truncated. A golden age lasts 10 (`UNMODIFIED_GOLDEN_AGE_TURNS`) turns before modifiers.
+- **Elimination** (`systems::elimination::forget_eliminated`). A nation or city-state that loses its last city is eliminated, and every tie the rules keep with it ends at once, both ways: wars, peace treaties, deals and gold per turn, offers, embassies, open borders, pacts, friendships, research agreements, the memory of it (warmonger, denunciation), its standing with the city-states and the quests of it or about it, its roles in the World Congress (its proposals and votes, an embargo on it; a dead host passes the league to the living nation with the most delegates), its spies and the World Leader title. A city-state whose ally it was takes its next ally at once. What it did stays as history (great works, archaeology, a religion it founded).
 
 ## Rule constants by system
 
@@ -1476,9 +1477,9 @@ Tuning numbers of the computer players (`classic/crates/classic-rules/src/ai`). 
 
 | Name | Value | Meaning | Source | File |
 |---|---|---|---|---|
-| `NONE` | `CallFixes { ready: false, ranged: false, melee: false, threat: false, call: false, wall...` |  | own value (source not recorded) | `planner.rs` |
-| `ALL` | `CallFixes { ready: true, ranged: true, melee: true, threat: true, call: true, walls: tr...` |  | own value (source not recorded) | `planner.rs` |
-| `DEFAULT` | `CallFixes { ready: false, ranged: true, melee: false, threat: false, call: true, walls:...` | What `siege-call` plays: the fixes that measured better on the tuning offsets 200-202 (300 solo pace games, `runs/ops`): ranged units first and the press call. | own value (source not recorded) | `planner.rs` |
+| `NONE` | `CallFixes { ready: false, ranged: false, melee: false, call: false, walls: false }` |  | own value (source not recorded) | `planner.rs` |
+| `ALL` | `CallFixes { ready: true, ranged: true, melee: true, call: true, walls: true }` |  | own value (source not recorded) | `planner.rs` |
+| `DEFAULT` | `CallFixes { ready: false, ranged: true, melee: false, call: true, walls: false }` | What `siege-call` plays: the fixes that measured better on the tuning offsets 200-202 (300 solo pace games, `runs/ops`): ranged units first and the press call. | own value (source not recorded) | `planner.rs` |
 
 ### `planner_cities.rs`
 
