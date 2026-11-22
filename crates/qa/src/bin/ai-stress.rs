@@ -75,7 +75,7 @@ fn opts() -> Result<Opts, String> {
             "--scene" => o.scene = Some(PathBuf::from(value()?)),
             "--situations" => {
                 let list = value()?;
-                o.situations = if list == "all" { Situation::ALL.to_vec() } else { list.split(',').map(Situation::parse).collect::<Result<_, _>>()? };
+                o.situations = if list == "all" { Situation::all() } else { list.split(',').map(Situation::parse).collect::<Result<_, _>>()? };
             }
             "--variant" => o.variant = Some(value()?),
             "--situation" => o.situations = vec![Situation::parse(&value()?)?],
@@ -112,7 +112,7 @@ fn real() -> Result<(), String> {
         "table" => table(&o),
         "random" => random(&o, &rules),
         "gates" => {
-            print!("{}", gates::markdown());
+            print!("{}\n{}\n{}", gates::markdown(), stress::humans::gates::markdown(), stress::humans::gates::offence_markdown());
             Ok(())
         }
         other => Err(format!("unknown command {other}")),
@@ -198,7 +198,7 @@ fn report(o: &Opts) -> Result<(), String> {
 fn suite(o: &Opts, rules: &classic_rules::CompiledRuleset) -> Result<(), String> {
     let name = o.variant.clone().ok_or("--variant NAME")?;
     variant_of(o)?;
-    let situations = if o.situations == [Situation::A5, Situation::B1] { Situation::ALL.to_vec() } else { o.situations.clone() };
+    let situations = if o.situations == [Situation::A5, Situation::B1] { Situation::all() } else { o.situations.clone() };
     let mut arms = vec![name.clone()];
     if name != "standard" {
         arms.push("standard".to_owned());

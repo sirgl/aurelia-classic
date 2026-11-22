@@ -121,6 +121,8 @@ pub enum Script {
     /// P4W white-peace fishing (trick D8): `seat`, losing its war on `victim`, offers white peace
     /// every `every` rounds until the victim takes it.
     PeaceFishing { seat: u8, victim: u8, every: u32 },
+    /// A human trick (`humans::Order`).
+    Human(super::humans::Order),
 }
 
 impl Script {
@@ -134,6 +136,7 @@ impl Script {
             Script::SeaHunt { seat, victim, .. } => Script::SeaHunt { seat, victim, units },
             Script::AirStrike { seat, victim, .. } => Script::AirStrike { seat, victim, units },
             Script::Faith { seat, victim, .. } => Script::Faith { seat, victim, units },
+            Script::Human(order) => Script::Human(order.with_units(spawned)),
             other => other,
         }
     }
@@ -153,6 +156,7 @@ impl Script {
             Script::LuxuryThenWar { seat, victim, percent } => Box::new(deals::Betrayal::new(p(seat), p(victim), deals::Bait::Luxury { percent: *percent })),
             Script::BribeThenWar { seat, victim, third, gold } => Box::new(deals::Betrayal::new(p(seat), p(victim), deals::Bait::Bribe { third: p(third), gold: *gold })),
             Script::PeaceFishing { seat, victim, every } => Box::new(deals::PeaceFishing::new(p(seat), p(victim), *every)),
+            Script::Human(order) => order.start(),
         }
     }
 }
