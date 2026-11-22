@@ -69,9 +69,15 @@ pub fn effective_cities(auth: &AuthWorld, player: PlayerId) -> u32 {
 
 /// Culture cost of the next policy of `player` (rules.md).
 pub fn next_policy_cost(auth: &AuthWorld, rules: &CompiledRuleset, player: PlayerId) -> u32 {
+    policy_cost_after(auth, rules, player, 0)
+}
+
+/// Culture cost of the policy that comes after `more` further paid policies (a free policy does
+/// not count, `PlayerCulture::paid_policies`): what the player pays once the next ones are taken.
+pub fn policy_cost_after(auth: &AuthWorld, rules: &CompiledRuleset, player: PlayerId, more: u32) -> u32 {
     let mods = player_modifiers(auth, rules, player);
     let inputs = PolicyCostInputs {
-        paid_policies: auth.module().culture().of(player).paid_policies(),
+        paid_policies: auth.module().culture().of(player).paid_policies() + more,
         cities: effective_cities(auth, player),
         per_city_percent: crate::classic::world_size::policy_cost_per_city(WorldSize::of(auth.map().dimensions)),
         per_city_discount: mods.cost_percent[CostTarget::Module(ClassicCost::PolicyCityPenalty).index()],

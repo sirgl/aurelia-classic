@@ -186,6 +186,17 @@ impl ClassicUi {
         }
     }
 
+    /// A key of the policy screen: the focus moves, or the focused policy is taken. Always used
+    /// on that screen, so Enter never ends the turn from there.
+    fn civics_key(&mut self, id: &str) -> bool {
+        let Some(key) = crate::ui::screens::civics_focus::Move::of(id) else { return false };
+        let Some(view) = self.model.as_ref().and_then(|m| m.civics.as_ref()) else { return false };
+        if let Some(request) = self.screens.civics_key(view, key) {
+            self.request(request);
+        }
+        true
+    }
+
     /// Gives the selected unit the first of `orders` it has; false when it has none.
     fn unit_order(&mut self, orders: &[Action]) -> bool {
         let have: Vec<Action> = match self.hud.game.as_ref().and_then(|g| g.orders.as_ref()) {
@@ -414,7 +425,9 @@ impl ModuleUi for ClassicUi {
             (Screen::MatchSetup, false) if window.y < 480. => window,
             (Screen::MatchSetup, false) => egui::vec2(800., 400.),
             (Screen::MatchSetup, true) => egui::vec2(430., 760.),
-            (Screen::Civics, false) => egui::vec2(900., 520.),
+            // The policy screen switches to its two-tab layout below 1150 points of width.
+            (Screen::Civics, false) => egui::vec2(760., 380.),
+            (Screen::Civics, true) => egui::vec2(430., 640.),
             _ => egui::vec2(1150., 640.),
         }
     }
@@ -506,6 +519,7 @@ impl ModuleUi for ClassicUi {
                 }
             }
             "next-city" => return self.step_city(true),
+            _ if crate::ui::screens::civics_focus::Move::of(id).is_some() => return self.civics_key(id),
             "previous-city" => return self.step_city(false),
             _ => return false,
         }

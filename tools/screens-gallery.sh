@@ -32,7 +32,9 @@ cat > "$OUT/.table" <<TABLE
 10-technologies-opening|Screens|Technology tree, opening|AURELIA_GAME_SCREEN=research
 11-technologies-late|Screens|Technology tree, late game|$LATE AURELIA_GAME_SCREEN=research
 12-policies-opening|Screens|Policies, opening|AURELIA_GAME_SCREEN=civics
+12b-policies-mid|Screens|Policies, mid game: Liberty open, several to take|AURELIA_GAME_POLICY_CULTURE=420 AURELIA_GAME_POLICIES=core:policy/liberty,core:policy/liberty/republic AURELIA_GAME_SCREEN=civics
 13-policies-late|Screens|Policies, late game|$LATE AURELIA_GAME_SCREEN=civics
+13b-policies-ideology|Screens|Policies, late game: an ideology and tenets to take|$LATE AURELIA_GAME_POLICY_CULTURE=1800 AURELIA_GAME_IDEOLOGY=core:policy/freedom AURELIA_GAME_CIVICS_BRANCH=core:policy/freedom AURELIA_GAME_SCREEN=civics
 14-religion|Screens|Religion|$LATE AURELIA_GAME_SCREEN=religion
 15-culture|Screens|Culture and tourism|$LATE AURELIA_GAME_SCREEN=culture
 16-diplomacy|Screens|Diplomacy|$LATE AURELIA_GAME_SCREEN=diplomacy

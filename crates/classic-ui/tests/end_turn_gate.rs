@@ -162,7 +162,7 @@ fn a_policy_that_can_be_adopted_gates_the_turn_once() {
     stage.frame(Vec::new());
     assert_eq!(stage.screens.screen, Screen::Civics.into(), "the policies screen opened");
 
-    let branch = session(&mut stage).civics_view().branches.iter().find(|b| b.state == BranchState::Available).expect("a branch to unlock").id;
+    let branch = session(&mut stage).civics_view().branches.iter().find(|b| matches!(b.state, BranchState::Available(_))).expect("a branch to unlock").id;
     stage.module.request(GameRequest::UnlockBranch(branch));
     assert!(!session(&mut stage).civics_view().branches.iter().all(|b| b.state != BranchState::Open), "the branch is open");
     assert!(session(&mut stage).policy_pending(), "culture is left for more policies");

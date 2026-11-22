@@ -1,54 +1,120 @@
-//! Civics screen bound to the running game (`CivicsView`): the nine policy branches and the
-//! three ideologies with their real costs and states, the selected branch's tree, and the
-//! selected policy's details. Same frame, panels and policy artwork as the showcase gallery;
-//! every button is a typed `GameRequest` the core validates.
+//! Civics screen bound to the running game (`CivicsView`). Three parts: the branches with what
+//! each is for and how far it is, the selected branch's tree with every policy's effect and its
+//! own adopt button, and the "Available now" list: everything that may be taken this turn, from
+//! every branch, with its effect and one button. A phone-sized canvas shows the list and the
+//! branches as two tabs. Every button is a typed `GameRequest` the core validates; a policy is
+//! adopted with one click on the button that names its price.
 use super::*;
-use i18n::{t, tf};
+use super::civics_focus::{Reading, Zone};
 use crate::ui::model::{
-    Availability, BranchCard, BranchState, CivicsView, GameRequest, PolicyCard,
+    BranchCard, BranchState, CivicsView, Cost, GameRequest, Offer, OfferKind, PolicyCard,
+    PolicyState,
 };
+use i18n::{t, tf};
 
-const LIST_W: f32 = 250.0;
-const SIDE_W: f32 = 300.0;
-const NODE: egui::Vec2 = egui::Vec2::new(150.0, 104.0);
+/// A canvas at least this wide shows the branches, the tree and the offers side by side.
+const WIDE: f32 = 1150.0;
 const CULTURE: Color32 = Color32::from_rgb(214, 124, 196);
+const INK_DARK: Color32 = Color32::from_rgb(12, 26, 32);
+const ADOPTED_FILL: Color32 = Color32::from_rgb(31, 58, 52);
+const LOCKED_FILL: Color32 = Color32::from_rgb(19, 38, 44);
+const EDGE: Color32 = Color32::from_rgb(60, 78, 76);
+const NODE_MAX: egui::Vec2 = egui::Vec2::new(190.0, 120.0);
+const GAP: f32 = 8.0;
+
+/// The rectangles of one frame.
+struct Frame {
+    banner: Rect,
+    tabs: Option<Rect>,
+    list: Option<Rect>,
+    tree: Option<Rect>,
+    offers: Option<Rect>,
+    /// Offer cards side by side.
+    columns: usize,
+}
+
+fn frame(r: Rect, zone: Zone) -> Frame {
+    let wide = r.width() >= WIDE;
+    let banner_h = if r.height() >= 700.0 { 96.0 } else if wide { 72.0 } else { 58.0 };
+    let banner = Rect::from_min_size(r.min, vec2(r.width(), banner_h));
+    let mut body = Rect::from_min_max(pos2(r.left(), banner.bottom() + 10.0), r.max);
+    if !wide {
+        let tabs = Rect::from_min_size(body.min, vec2(body.width(), 28.0));
+        body.min.y = tabs.bottom() + 6.0;
+        return narrow(banner, tabs, body, zone);
+    }
+    let list_w = if r.width() >= 1400.0 { 300.0 } else { 272.0 };
+    let side_w = if r.width() >= 1400.0 { 340.0 } else { 316.0 };
+    let list = Rect::from_min_size(body.min, vec2(list_w, body.height()));
+    let side = Rect::from_min_max(pos2(body.right() - side_w, body.top()), body.max);
+    let tree = Rect::from_min_max(pos2(list.right() + 12.0, body.top()), pos2(side.left() - 12.0, body.bottom()));
+    Frame { banner, tabs: None, list: Some(list), tree: Some(tree), offers: Some(side), columns: 1 }
+}
+
+/// The phone layout: one tab at a time.
+fn narrow(banner: Rect, tabs: Rect, body: Rect, zone: Zone) -> Frame {
+    if zone == Zone::Offers {
+        let columns = ((body.width() / 330.0).floor() as usize).max(1);
+        return Frame { banner, tabs: Some(tabs), list: None, tree: None, offers: Some(body), columns };
+    }
+    let list = Rect::from_min_size(body.min, vec2(206.0, body.height()));
+    let tree = Rect::from_min_max(pos2(list.right() + 8.0, body.top()), body.max);
+    Frame { banner, tabs: Some(tabs), list: Some(list), tree: Some(tree), offers: None, columns: 1 }
+}
 
 pub(super) fn civics(ui: &mut egui::Ui, r: Rect, state: &mut ScreenState, view: &CivicsView) {
-    let top = Rect::from_min_size(r.min, vec2(r.width(), 96.0));
-    banner(ui, top, state, view);
-    let body = Rect::from_min_max(pos2(r.left(), top.bottom() + 14.0), r.max);
-    let list = Rect::from_min_size(body.min, vec2(LIST_W, body.height()));
-    let side = Rect::from_min_max(pos2(body.right() - SIDE_W, body.top()), body.max);
-    let tree = Rect::from_min_max(
-        pos2(list.right() + 14.0, body.top()),
-        pos2(side.left() - 14.0, body.bottom()),
-    );
-    let branch = selected_branch(state, view);
-    branch_list(ui, list, state, view, branch);
-    let Some(card) = view.branches.get(branch) else {
-        return;
-    };
-    branch_tree(ui, tree, state, card);
-    let policy = selected_policy(state, card);
-    policy_side(ui, side, state, card, policy);
+    let zone = state.civics.zone_in(view);
+    let frame = frame(r, zone);
+    banner(ui, frame.banner, state, view);
+    if let Some(tabs) = frame.tabs {
+        tab_row(ui, tabs, state, view, zone);
+    }
+    let selected = state.civics.branch_index(view);
+    if let Some(list) = frame.list {
+        branch_list(ui, list, state, view, selected, zone == Zone::Branches);
+    }
+    if let (Some(tree), Some(card)) = (frame.tree, view.branches.get(selected)) {
+        branch_tree(ui, tree, state, view, card, zone == Zone::Branches);
+    }
+    if let Some(side) = frame.offers {
+        offers_panel(ui, side, state, view, frame.columns, zone == Zone::Offers);
+    }
+}
+
+/// Asks the core for `request` unless an adoption went through a moment ago.
+fn take(state: &mut ScreenState, request: GameRequest) {
+    let now = web_time::Instant::now();
+    if state.civics.may_take(now) {
+        state.requests.push(request);
+        state.civics.taken(now);
+    }
 }
 
 fn banner(ui: &mut egui::Ui, r: Rect, state: &mut ScreenState, view: &CivicsView) {
     art(state, ui, r, "civics");
     darken(ui.painter(), r, 70, 170);
-    text(
-        ui.painter(),
-        r.min + vec2(24.0, 14.0),
-        t!("classic.ui.screen-civics.title"),
-        31.0,
-        CREAM,
-    );
-    let line = match view.turns {
+    let compact = r.height() < 90.0;
+    let (title_y, line_y, title_size) = if compact { (4.0, 36.0, 24.0) } else { (14.0, 60.0, 31.0) };
+    text(ui.painter(), r.min + vec2(24.0, title_y), t!("classic.ui.screen-civics.title"), title_size, CREAM);
+    text(ui.painter(), r.min + vec2(26.0, line_y), status_line(view), 14.0, CREAM);
+    let free = free_chip_text(view);
+    if free.is_empty() {
+        return;
+    }
+    let chip = Rect::from_min_size(pos2(r.right() - 230.0, r.center().y - 17.0), vec2(206.0, 34.0));
+    ui.painter().rect_filled(chip, 17.0, TEAL);
+    ui.painter().text(chip.center(), Align2::CENTER_CENTER, free, FontId::proportional(13.0), CREAM);
+}
+
+fn status_line(view: &CivicsView) -> String {
+    match view.turns {
         Some(0) => tf!("classic.ui.screen-civics.status-ready", culture = view.culture, per_turn = view.per_turn, cost = view.next_cost),
         Some(n) => tf!("classic.ui.screen-civics.status-turns", culture = view.culture, per_turn = view.per_turn, cost = view.next_cost, n = n),
         None => tf!("classic.ui.screen-civics.status-stalled", culture = view.culture, per_turn = view.per_turn, cost = view.next_cost),
-    };
-    text(ui.painter(), r.min + vec2(26.0, 60.0), line, 14.0, CREAM);
+    }
+}
+
+fn free_chip_text(view: &CivicsView) -> String {
     let mut free = Vec::new();
     if view.free_policies > 0 {
         free.push(tf!("classic.ui.screen-civics.free-policies", n = view.free_policies));
@@ -56,147 +122,285 @@ fn banner(ui: &mut egui::Ui, r: Rect, state: &mut ScreenState, view: &CivicsView
     if view.free_tenets > 0 {
         free.push(tf!("classic.ui.screen-civics.free-tenets", n = view.free_tenets));
     }
-    if !free.is_empty() {
-        let chip = Rect::from_min_size(pos2(r.right() - 220.0, r.top() + 30.0), vec2(196.0, 34.0));
-        ui.painter().rect_filled(chip, 17.0, TEAL);
-        ui.painter().text(
-            chip.center(),
-            Align2::CENTER_CENTER,
-            free.join(" · "),
-            FontId::proportional(13.0),
-            CREAM,
-        );
+    free.join(" · ")
+}
+
+/// The phone's two tabs.
+fn tab_row(ui: &mut egui::Ui, r: Rect, state: &mut ScreenState, view: &CivicsView, zone: Zone) {
+    let half = (r.width() - GAP) * 0.5;
+    let offers = Rect::from_min_size(r.min, vec2(half, r.height()));
+    let branches = Rect::from_min_size(pos2(offers.right() + GAP, r.top()), vec2(half, r.height()));
+    let label = tf!("classic.ui.screen-civics.tab-available", n = view.offers.len());
+    if button(ui, offers, &label, zone == Zone::Offers, !view.offers.is_empty()) {
+        state.civics.zone = Zone::Offers;
+    }
+    if button(ui, branches, t!("classic.ui.screen-civics.branches-tab"), zone == Zone::Branches, true) {
+        state.civics.zone = Zone::Branches;
     }
 }
 
-/// The branch the player looks at: the remembered choice, else the first open one, else the
-/// first available one, else the first branch.
-fn selected_branch(state: &ScreenState, view: &CivicsView) -> usize {
-    if let Some(id) = state.civics_branch {
-        if let Some(i) = view.branches.iter().position(|b| b.id == id) {
-            return i;
+// ---------------------------------------------------------------------------------------------
+// Text helpers
+
+/// The mark that ends a cut text (the font of the game has it).
+const ELLIPSIS: char = '\u{2026}';
+
+/// `value` in at most `rows` rows of `width`: lines break at spaces, and when the text does not
+/// fit the last line ends with an ellipsis at a word boundary (a word wider than the line is cut).
+/// Returns the height.
+fn clipped(p: &egui::Painter, at: egui::Pos2, value: &str, size: f32, color: Color32, width: f32, rows: usize) -> f32 {
+    let lines = wrap_lines(p, value, size, width.max(8.0), rows.max(1));
+    let scale = layer_scale(p);
+    let mut y = at.y;
+    for line in &lines {
+        let galley = layout(p, line, size, color);
+        let height = galley.size().y / scale;
+        let mut shape = egui::epaint::TextShape::new(pos2(at.x * scale, y * scale), galley, color);
+        if scale != 1.0 {
+            shape.transform(egui::emath::TSTransform::from_scaling(1.0 / scale));
+        }
+        p.add(shape);
+        y += height;
+    }
+    y - at.y
+}
+
+/// How much the layer of `p` is scaled on its way to the screen (a phone shrinks the screen's
+/// canvas as one layer, `client::shell::screens`). egui scales the finished text mesh with it, so a
+/// glyph laid out at `size` is drawn from a bitmap of `size` pixels and shrunk: the dots of an
+/// ellipsis, one pixel wide, vanish.
+fn layer_scale(p: &egui::Painter) -> f32 {
+    p.ctx().layer_transform_to_global(p.layer_id()).map_or(1.0, |t| t.scaling).max(0.1)
+}
+
+/// The text laid out at the size it is drawn at on the screen. Its measures are in screen points of
+/// the layer's scale: divide them by `layer_scale` for the layer's own.
+fn layout(p: &egui::Painter, value: &str, size: f32, color: Color32) -> std::sync::Arc<egui::Galley> {
+    p.layout_no_wrap(value.to_owned(), FontId::proportional(size * layer_scale(p)), color)
+}
+
+/// The width `clipped` gives `value`: measured the way it is drawn.
+fn text_width(p: &egui::Painter, value: &str, size: f32) -> f32 {
+    layout(p, value, size, Color32::WHITE).size().x / layer_scale(p)
+}
+
+/// The lines of `value` for `clipped`.
+fn wrap_lines(p: &egui::Painter, value: &str, size: f32, width: f32, rows: usize) -> Vec<String> {
+    let mut lines: Vec<String> = Vec::new();
+    let mut words = value.split_whitespace();
+    while let Some(word) = words.next() {
+        let last_row = lines.len() == rows;
+        let current = lines.last().cloned().unwrap_or_default();
+        let joined = if current.is_empty() { word.to_owned() } else { format!("{current} {word}") };
+        if text_width(p, &joined, size) <= width {
+            match lines.last_mut() {
+                Some(line) => *line = joined,
+                None => lines.push(joined),
+            }
+            continue;
+        }
+        if lines.is_empty() || !last_row {
+            // A new row; a first word wider than the row is cut.
+            lines.push(ellipsize(p, word, size, width));
+            continue;
+        }
+        let line = lines.pop().unwrap_or_default();
+        lines.push(with_ellipsis(p, &line, size, width));
+        break;
+    }
+    lines
+}
+
+/// `value`, or when it is wider than `width`, `with_ellipsis`.
+fn ellipsize(p: &egui::Painter, value: &str, size: f32, width: f32) -> String {
+    if text_width(p, value, size) <= width {
+        return value.to_owned();
+    }
+    with_ellipsis(p, value, size, width)
+}
+
+/// `value` closed with an ellipsis and cut to `width`: whole words dropped first, then letters.
+fn with_ellipsis(p: &egui::Painter, value: &str, size: f32, width: f32) -> String {
+    let body = value.trim_end_matches(['.', ELLIPSIS]).trim_end();
+    let mut words: Vec<&str> = body.split_whitespace().collect();
+    while words.len() > 1 {
+        let shown = format!("{}{ELLIPSIS}", words.join(" "));
+        if text_width(p, &shown, size) <= width {
+            return shown;
+        }
+        words.pop();
+    }
+    let mut cut = words.first().copied().unwrap_or("").to_owned();
+    while !cut.is_empty() && text_width(p, &format!("{cut}{ELLIPSIS}"), size) > width {
+        cut.pop();
+    }
+    format!("{cut}{ELLIPSIS}")
+}
+
+/// The first clause of an effect text: what it does in one line ("-25% culture needed ...").
+pub(super) fn short_effect(value: &str) -> String {
+    let cut = value.find(';').or_else(|| value.find(". ")).unwrap_or(value.len());
+    value[..cut].trim().trim_end_matches('.').to_owned()
+}
+
+/// What a branch is for: its opener's effect, then its finisher's, one line each clause.
+pub(super) fn purpose(card: &BranchCard) -> String {
+    let parts: Vec<String> = [&card.opener, &card.finisher]
+        .into_iter()
+        .flatten()
+        .map(|p| short_effect(&p.text))
+        .filter(|s| !s.is_empty())
+        .collect();
+    parts.join(" · ")
+}
+
+/// The whole of `purpose`, for the hover.
+fn purpose_full(card: &BranchCard) -> String {
+    let mut lines = Vec::new();
+    if let Some(opener) = &card.opener {
+        lines.push(format!("{}: {}", t!("classic.ui.screen-civics.opener"), opener.text));
+    }
+    if let Some(finisher) = &card.finisher {
+        lines.push(format!("{}: {}", t!("classic.ui.screen-civics.finisher"), finisher.text));
+    }
+    lines.join("\n")
+}
+
+/// Why `lock` holds, with the numbers the player needs.
+pub(super) fn lock_text(lock: crate::ui::model::Lock, view: &CivicsView) -> String {
+    if lock.is_culture() {
+        return tf!("classic.ui.screen-civics.needs-culture", cost = view.next_cost, have = view.culture);
+    }
+    lock.reason().to_owned()
+}
+
+/// The reason a policy is locked: a missing earlier policy is named.
+fn policy_reason(p: &PolicyCard, branch: &BranchCard, view: &CivicsView) -> Option<String> {
+    let PolicyState::Locked(lock) = p.state else { return None };
+    if lock == crate::ui::model::Lock::Policy(classic_rules::derived::culture::PolicyBlock::MissingPrerequisite) {
+        let missing = p.requires.iter().filter_map(|i| branch.policies.get(*i)).find(|q| !q.adopted());
+        if let Some(q) = missing {
+            return Some(tf!("classic.ui.screen-civics.needs-policy", name = q.name.as_str()));
         }
     }
-    let by = |s: &BranchState| view.branches.iter().position(|b| b.state == *s);
-    by(&BranchState::Open)
-        .or_else(|| by(&BranchState::Available))
-        .unwrap_or(0)
+    Some(lock_text(lock, view))
 }
 
-fn selected_policy<'a>(state: &ScreenState, card: &'a BranchCard) -> Option<&'a PolicyCard> {
-    let all = || {
-        card.opener
-            .iter()
-            .chain(card.policies.iter())
-            .chain(card.finisher.iter())
-    };
-    if let Some(id) = state.civics_policy {
-        if let Some(p) = all().find(|p| p.id == id) {
-            return Some(p);
+fn cost_label(verb: Verb, cost: Cost) -> String {
+    match (verb, cost) {
+        (Verb::Adopt, Cost::Culture(n)) => tf!("classic.ui.screen-civics.adopt-culture", n = n),
+        (Verb::Unlock, Cost::Culture(n)) => tf!("classic.ui.screen-civics.unlock-culture", n = n),
+        (Verb::Adopt, _) => t!("classic.ui.screen-civics.adopt-free").to_owned(),
+        (Verb::Unlock, _) => t!("classic.ui.screen-civics.unlock-free").to_owned(),
+        (Verb::Choose, _) => t!("classic.ui.screen-civics.choose").to_owned(),
+    }
+}
+
+#[derive(Clone, Copy)]
+enum Verb {
+    Adopt,
+    Unlock,
+    Choose,
+}
+
+impl Verb {
+    fn of(kind: OfferKind) -> Verb {
+        match kind {
+            OfferKind::Policy(_) => Verb::Adopt,
+            OfferKind::Unlock(_) => Verb::Unlock,
+            OfferKind::Ideology(_) => Verb::Choose,
         }
     }
-    card.policies
-        .iter()
-        .find(|p| p.availability.is_ready())
-        .or(card.opener.as_ref())
-        .or(card.policies.first())
 }
 
-fn branch_list(
-    ui: &mut egui::Ui,
-    r: Rect,
-    state: &mut ScreenState,
-    view: &CivicsView,
-    selected: usize,
-) {
+// ---------------------------------------------------------------------------------------------
+// The branch list
+
+fn branch_list(ui: &mut egui::Ui, r: Rect, state: &mut ScreenState, view: &CivicsView, selected: usize, focused: bool) {
     panel(ui.painter(), r);
-    let mut y = r.top() + 12.0;
-    let heading = |ui: &mut egui::Ui, y: &mut f32, label: &str| {
-        text(ui.painter(), pos2(r.left() + 16.0, *y), label, 10.0, GOLD);
-        *y += 20.0;
-    };
-    let row_h = ((r.height() - 64.0) / view.branches.len().max(1) as f32).min(44.0);
+    let headings = if view.branches.iter().any(|b| b.ideology) { 2.0 } else { 1.0 };
+    let rows = view.branches.len().max(1) as f32;
+    let row_h = ((r.height() - 18.0 * headings - 14.0) / rows).clamp(34.0, 56.0);
+    let mut y = r.top() + 8.0;
     let mut ideology_heading = false;
-    heading(ui, &mut y, t!("classic.ui.screen-civics.branches"));
+    text(ui.painter(), pos2(r.left() + 16.0, y), t!("classic.ui.screen-civics.branches"), 10.0, GOLD);
+    y += 18.0;
     for (i, branch) in view.branches.iter().enumerate() {
         if branch.ideology && !ideology_heading {
             ideology_heading = true;
-            y += 6.0;
-            heading(ui, &mut y, t!("classic.ui.screen-civics.ideologies"));
+            y += 4.0;
+            text(ui.painter(), pos2(r.left() + 16.0, y), t!("classic.ui.screen-civics.ideologies"), 10.0, GOLD);
+            y += 18.0;
         }
-        let row = Rect::from_min_size(pos2(r.left() + 8.0, y), vec2(r.width() - 16.0, row_h - 4.0));
-        if branch_row(ui, row, state, branch, i == selected) {
-            state.civics_branch = Some(branch.id);
-            state.civics_policy = None;
+        let row = Rect::from_min_size(pos2(r.left() + 6.0, y), vec2(r.width() - 12.0, row_h - 3.0));
+        if branch_row(ui, row, state, view, branch, i == selected && focused, i == selected) {
+            state.civics.pick_branch(branch.id);
         }
         y += row_h;
     }
 }
 
-fn branch_row(
-    ui: &mut egui::Ui,
-    row: Rect,
-    state: &mut ScreenState,
-    branch: &BranchCard,
-    selected: bool,
-) -> bool {
-    let response = ui.interact(
-        row,
-        ui.id().with(("civics_branch", branch.id.0)),
-        Sense::click(),
-    );
+fn branch_row(ui: &mut egui::Ui, row: Rect, state: &mut ScreenState, view: &CivicsView, branch: &BranchCard, focused: bool, selected: bool) -> bool {
+    let response = ui.interact(row, ui.id().with(("civics_branch", branch.id.0)), Sense::click());
     crate::ui::pedia_link::mark(ui, row, crate::ui::pedia::PediaRef::branch(branch.id));
-    let fill = if selected {
-        Color32::from_rgb(37, 65, 66)
-    } else if response.hovered() {
-        RAISED
-    } else {
-        PANEL
-    };
+    let fill = if selected { Color32::from_rgb(37, 65, 66) } else if response.hovered() { RAISED } else { PANEL };
     ui.painter().rect_filled(row, 4.0, fill);
-    let badge = Rect::from_center_size(pos2(row.left() + 20.0, row.center().y), vec2(32.0, 32.0));
-    emblem(
-        ui,
-        badge,
-        state,
-        &branch.art,
-        branch.state == BranchState::Open,
-    );
-    let (status, color) = branch_status(branch);
-    text(
-        ui.painter(),
-        pos2(row.left() + 44.0, row.top() + 3.0),
-        &branch.name,
-        15.0,
-        CREAM,
-    );
-    text(
-        ui.painter(),
-        pos2(row.left() + 44.0, row.top() + 21.0),
-        status,
-        10.0,
-        color,
-    );
+    if focused {
+        ui.painter().rect_stroke(row, 4.0, Stroke::new(1.4, GOLD), egui::StrokeKind::Inside);
+    }
+    let badge = Rect::from_center_size(pos2(row.left() + 20.0, row.center().y), vec2(30.0, 30.0));
+    emblem(ui, badge, state, &branch.art, !matches!(branch.state, BranchState::Locked(_)));
+    let ready = branch.adoptable().count() + usize::from(matches!(branch.state, BranchState::Available(_)));
+    if ready > 0 {
+        count_dot(ui, pos2(badge.right() - 1.0, badge.top() + 3.0), ready);
+    }
+    let left = row.left() + 46.0;
+    let name_color = if matches!(branch.state, BranchState::Locked(_)) { MUTED } else { CREAM };
+    text(ui.painter(), pos2(left, row.top() + 3.0), &branch.name, 14.0, name_color);
+    let (tag, tag_color) = branch_tag(branch, view);
+    let name_w = text_width(ui.painter(), &branch.name, 14.0);
+    let tag = ellipsize(ui.painter(), &tag, 10.5, (row.right() - 8.0 - row.left() - 46.0 - name_w - 8.0).max(40.0));
+    let tag_galley = ui.painter().layout_no_wrap(tag, FontId::proportional(10.5), tag_color);
+    let tag_x = row.right() - 8.0 - tag_galley.size().x;
+    ui.painter().galley(pos2(tag_x, row.top() + 5.0), tag_galley, tag_color);
+    let rows = if row.height() >= 48.0 { 2 } else { 1 };
+    let width = row.right() - 8.0 - left;
+    clipped(ui.painter(), pos2(left, row.top() + 21.0), &purpose(branch), 10.0, MUTED, width, rows);
+    response.clone().on_hover_text(format!("{}\n{}", branch_state_line(branch, view), purpose_full(branch)));
     response.clicked()
 }
 
-/// Short state line of a branch: progress when open, the reason when locked.
-fn branch_status(branch: &BranchCard) -> (String, Color32) {
-    let adopted = branch.policies.iter().filter(|p| p.adopted).count();
-    match &branch.state {
-        BranchState::Open if branch.ideology => (tf!("classic.ui.screen-civics.status-adopted-tenets", n = adopted), GOLD),
-        BranchState::Open => (
-            tf!("classic.ui.screen-civics.status-policies", adopted = adopted, total = branch.policies.len()),
-            GOLD,
-        ),
-        BranchState::Available if branch.ideology => (t!("classic.ui.screen-civics.can-be-chosen").to_owned(), CULTURE),
-        BranchState::Available => (t!("classic.ui.screen-civics.can-be-unlocked").to_owned(), CULTURE),
-        BranchState::Locked(reason) => match &branch.era {
-            Some(era) if reason == crate::game::reasons::branch(classic_rules::derived::culture::BranchBlock::EraTooEarly) => {
-                (tf!("classic.ui.screen-civics.from-era", era = era.to_uppercase()), MUTED)
-            }
-            _ => (reason.to_uppercase(), MUTED),
+/// A small badge with a number: how many things the branch has to take now.
+fn count_dot(ui: &egui::Ui, at: egui::Pos2, n: usize) {
+    ui.painter().circle_filled(at, 7.5, CULTURE);
+    ui.painter().text(at, Align2::CENTER_CENTER, n.to_string(), FontId::proportional(10.0), INK_DARK);
+}
+
+/// The short tag at the right of a branch row: progress, price, or what is missing.
+fn branch_tag(branch: &BranchCard, view: &CivicsView) -> (String, Color32) {
+    match branch.state {
+        BranchState::Open if branch.ideology => (tf!("classic.ui.screen-civics.tag-tenets", n = branch.adopted_count()), GOLD),
+        BranchState::Open => (tf!("classic.ui.screen-civics.tag-progress", adopted = branch.adopted_count(), total = branch.policies.len()), GOLD),
+        BranchState::Available(Cost::Culture(n)) => (tf!("classic.ui.screen-civics.tag-price", n = n), CULTURE),
+        BranchState::Available(_) => (t!("classic.ui.screen-civics.tag-free").to_owned(), CULTURE),
+        BranchState::Locked(lock) if lock.is_era() => (branch.era.clone().unwrap_or_default(), MUTED),
+        BranchState::Locked(lock) if lock.is_culture() => (tf!("classic.ui.screen-civics.tag-price", n = view.next_cost), MUTED),
+        BranchState::Locked(lock) => (lock.reason().to_owned(), MUTED),
+    }
+}
+
+/// The state of a branch in words (hover, and the tree's header).
+fn branch_state_line(branch: &BranchCard, view: &CivicsView) -> String {
+    match branch.state {
+        BranchState::Open if branch.ideology => tf!("classic.ui.screen-civics.status-adopted-tenets", n = branch.adopted_count()),
+        BranchState::Open => tf!("classic.ui.screen-civics.status-policies", adopted = branch.adopted_count(), total = branch.policies.len()),
+        BranchState::Available(_) if branch.ideology => t!("classic.ui.screen-civics.can-be-chosen").to_owned(),
+        BranchState::Available(_) => t!("classic.ui.screen-civics.can-be-unlocked").to_owned(),
+        BranchState::Locked(lock) if lock.is_era() => match &branch.era {
+            Some(era) => tf!("classic.ui.screen-civics.from-era", era = era.to_uppercase()),
+            None => lock.reason().to_uppercase(),
         },
+        BranchState::Locked(lock) => lock_text(lock, view),
     }
 }
 
@@ -205,419 +409,509 @@ fn emblem(ui: &mut egui::Ui, r: Rect, state: &mut ScreenState, art_id: &str, bri
     painter.circle_filled(r.center(), r.width() * 0.5, INK_DARK);
     match state.policy_art.texture_of(ui.ctx(), art_id) {
         Some(texture) => {
-            painter.image(
-                texture,
-                r,
-                Rect::from_min_max(pos2(0., 0.), pos2(1., 1.)),
-                Color32::from_gray(if bright { 255 } else { 170 }),
-            );
+            let tint = Color32::from_gray(if bright { 255 } else { 170 });
+            painter.image(texture, r, Rect::from_min_max(pos2(0., 0.), pos2(1., 1.)), tint);
         }
         None => {
-            painter.circle_stroke(
-                r.center(),
-                r.width() * 0.42,
-                Stroke::new(1.0, GOLD.gamma_multiply(0.5)),
-            );
+            painter.circle_stroke(r.center(), r.width() * 0.42, Stroke::new(1.0, GOLD.gamma_multiply(0.5)));
         }
     }
-    painter.circle_stroke(
-        r.center(),
-        r.width() * 0.5,
-        Stroke::new(
-            1.2,
-            if bright {
-                GOLD
-            } else {
-                Color32::from_rgb(70, 86, 84)
-            },
-        ),
-    );
+    let ring = if bright { GOLD } else { Color32::from_rgb(70, 86, 84) };
+    painter.circle_stroke(r.center(), r.width() * 0.5, Stroke::new(1.2, ring));
 }
 
-const INK_DARK: Color32 = Color32::from_rgb(12, 26, 32);
+// ---------------------------------------------------------------------------------------------
+// The tree
 
-fn branch_tree(ui: &mut egui::Ui, r: Rect, state: &mut ScreenState, branch: &BranchCard) {
+fn branch_tree(ui: &mut egui::Ui, r: Rect, state: &mut ScreenState, view: &CivicsView, branch: &BranchCard, focused: bool) {
     panel(ui.painter(), r);
-    let header = Rect::from_min_size(r.min, vec2(r.width(), 92.0));
-    branch_header(ui, header, state, branch);
-    let area = Rect::from_min_max(
-        pos2(r.left() + 12.0, header.bottom() + 6.0),
-        r.max - vec2(12.0, 12.0),
-    );
+    let header_h = if r.height() >= 420.0 { 84.0 } else { 62.0 };
+    let header = Rect::from_min_size(r.min, vec2(r.width(), header_h));
+    branch_header(ui, header, state, view, branch);
+    let mut area = Rect::from_min_max(pos2(r.left() + 10.0, header.bottom() + 2.0), r.max - vec2(10.0, 10.0));
+    if let Some((title, body)) = policy_reading(state, view, branch) {
+        let height = reading_strip(ui, area, area.bottom(), &title, &body);
+        area.max.y -= height + 6.0;
+    }
+    let focus = if focused { state.civics.policy_in(branch).map(|p| p.id) } else { None };
+    let nodes = Nodes { view, branch, focus };
     if branch.ideology {
-        tenet_rows(ui, area, state, branch);
+        tenet_rows(ui, area, state, &nodes);
     } else {
-        policy_grid(ui, area, state, branch);
+        policy_grid(ui, area, state, &nodes);
     }
 }
 
-fn branch_header(ui: &mut egui::Ui, r: Rect, state: &mut ScreenState, branch: &BranchCard) {
-    let badge = Rect::from_center_size(pos2(r.left() + 52.0, r.center().y), vec2(66.0, 66.0));
-    let locked = matches!(branch.state, BranchState::Locked(_));
-    emblem(ui, badge, state, &branch.art, !locked);
-    text(
-        ui.painter(),
-        pos2(r.left() + 98.0, r.top() + 18.0),
-        &branch.name,
-        26.0,
-        CREAM,
-    );
-    let (status, color) = branch_status(branch);
-    text(
-        ui.painter(),
-        pos2(r.left() + 99.0, r.top() + 54.0),
-        status,
-        11.0,
-        color,
-    );
-    let button_rect =
-        Rect::from_min_size(pos2(r.right() - 190.0, r.top() + 26.0), vec2(170.0, 38.0));
-    let (label, availability) = match (&branch.state, branch.ideology) {
-        (BranchState::Open, true) => (
-            t!("classic.ui.screen-civics.your-ideology").to_owned(),
-            Availability::Blocked(t!("classic.ui.screen-civics.chosen").into()),
-        ),
-        (BranchState::Open, false) => (
-            t!("classic.ui.screen-civics.branch-unlocked").to_owned(),
-            Availability::Blocked(t!("classic.ui.screen-civics.unlocked").into()),
-        ),
-        (BranchState::Available, true) => {
-            let label = if branch.free_tenets > 0 {
-                tf!("classic.ui.screen-civics.choose-ideology-free", n = branch.free_tenets)
-            } else {
-                t!("classic.ui.screen-civics.choose-ideology").to_owned()
-            };
-            (label, Availability::Ready)
-        }
-        (BranchState::Available, false) => (t!("classic.ui.screen-civics.unlock-branch").to_owned(), Availability::Ready),
-        (BranchState::Locked(reason), _) => {
-            (t!("classic.ui.screen-civics.locked").to_owned(), Availability::Blocked(reason.clone()))
-        }
-    };
-    let enabled = availability.is_ready();
-    let note = match &branch.state {
-        BranchState::Locked(reason) => Some(reason.as_str()),
-        _ => None,
-    };
-    let clicked = client::shell::kit::note_button(ui, button_rect, &label, false, enabled, note);
-    if let Availability::Blocked(reason) = &availability {
-        ui.interact(
-            button_rect,
-            ui.id().with(("civics_lock", branch.id.0)),
-            Sense::hover(),
-        )
-        .on_hover_text(reason);
+/// What a node needs to know about its branch.
+struct Nodes<'a> {
+    view: &'a CivicsView,
+    branch: &'a BranchCard,
+    /// The policy with the keyboard focus (None: the branch list has it).
+    focus: Option<classic_rules::ids::PolicyId>,
+}
+
+fn branch_header(ui: &mut egui::Ui, r: Rect, state: &mut ScreenState, view: &CivicsView, branch: &BranchCard) {
+    let size = (r.height() - 20.0).min(56.0);
+    let badge = Rect::from_center_size(pos2(r.left() + 14.0 + size * 0.5, r.center().y), vec2(size, size));
+    emblem(ui, badge, state, &branch.art, !matches!(branch.state, BranchState::Locked(_)));
+    let left = badge.right() + 14.0;
+    let button_w = 196.0;
+    text(ui.painter(), pos2(left, r.top() + 10.0), &branch.name, 22.0, CREAM);
+    let (line, color) = header_state(branch, view);
+    text(ui.painter(), pos2(left + 1.0, r.top() + 38.0), line, 11.0, color);
+    let text_left = left + 150.0_f32.min(r.width() * 0.2);
+    let reserved = if matches!(branch.state, BranchState::Available(_)) { button_w + 24.0 } else { 14.0 };
+    let width = r.right() - reserved - text_left;
+    if let (Some(opener), true) = (&branch.opener, width > 120.0) {
+        let label = t!("classic.ui.screen-civics.opener");
+        text(ui.painter(), pos2(text_left, r.top() + 12.0), label, 10.0, GOLD);
+        clipped(ui.painter(), pos2(text_left, r.top() + 26.0), &opener.text, 11.5, CREAM, width, 3);
+        ui.interact(Rect::from_min_size(pos2(text_left, r.top() + 8.0), vec2(width, r.height() - 16.0)), ui.id().with(("civics_opener", branch.id.0)), Sense::hover())
+            .on_hover_text(&opener.text);
     }
-    if clicked {
-        let request = if branch.ideology {
-            GameRequest::ChooseIdeology(branch.id)
-        } else {
-            GameRequest::UnlockBranch(branch.id)
-        };
-        state.requests.push(request);
+    header_action(ui, r, state, branch, button_w);
+}
+
+/// The state of the branch as a plain line: gold when open, pink when it may be taken, grey and
+/// the reason when locked.
+fn header_state(branch: &BranchCard, view: &CivicsView) -> (String, Color32) {
+    let line = branch_state_line(branch, view);
+    match branch.state {
+        BranchState::Open => (line, GOLD),
+        BranchState::Available(_) => (line, CULTURE),
+        BranchState::Locked(_) => (line, MUTED),
     }
 }
 
-/// Policies of a normal branch on their (column, row) grid, prerequisite lines between them,
-/// the finisher as a wide card under the tree.
-fn policy_grid(ui: &mut egui::Ui, area: Rect, state: &mut ScreenState, branch: &BranchCard) {
-    let columns = branch
-        .policies
-        .iter()
-        .map(|p| p.grid.0)
-        .max()
-        .unwrap_or(1)
-        .max(1) as f32;
-    let rows = branch
-        .policies
-        .iter()
-        .map(|p| p.grid.1)
-        .max()
-        .unwrap_or(1)
-        .max(1) as f32;
-    let finisher_h = 54.0;
-    let grid = Rect::from_min_max(
-        area.min,
-        pos2(area.right(), area.bottom() - finisher_h - 10.0),
-    );
-    let step_x = (grid.width() - NODE.x) / (columns - 1.0).max(1.0);
-    let step_y = (grid.height() - NODE.y) / (rows - 1.0).max(1.0);
+/// The one button of a header: unlock the branch or choose the ideology, only when that can be done.
+fn header_action(ui: &mut egui::Ui, r: Rect, state: &mut ScreenState, branch: &BranchCard, width: f32) {
+    let BranchState::Available(cost) = branch.state else { return };
+    let rect = Rect::from_min_size(pos2(r.right() - width - 12.0, r.center().y - 17.0), vec2(width, 34.0));
+    let label = if branch.ideology {
+        match branch.free_tenets {
+            0 => t!("classic.ui.screen-civics.choose-ideology").to_owned(),
+            n => tf!("classic.ui.screen-civics.choose-ideology-free", n = n),
+        }
+    } else {
+        cost_label(Verb::Unlock, cost)
+    };
+    if button(ui, rect, &label, true, true) {
+        let kind = if branch.ideology { OfferKind::Ideology(branch.id) } else { OfferKind::Unlock(branch.id) };
+        take(state, kind.request());
+    }
+}
+
+/// Policies of a normal branch on their rows, the prerequisite lines between them, the finisher
+/// as a wide card under the tree. Columns are the distinct columns of the branch (no empty ones).
+fn policy_grid(ui: &mut egui::Ui, area: Rect, state: &mut ScreenState, nodes: &Nodes) {
+    let branch = nodes.branch;
+    let finisher_h = if area.height() >= 330.0 { 54.0 } else { 42.0 };
+    let grid = Rect::from_min_max(area.min, pos2(area.right(), area.bottom() - finisher_h - 8.0));
+    let columns = distinct(branch.policies.iter().map(|p| p.grid.0));
+    let rows = distinct(branch.policies.iter().map(|p| p.grid.1));
+    let line_gap = 14.0;
+    let node_w = ((grid.width() - GAP * (columns.len().max(1) as f32 - 1.0)) / columns.len().max(1) as f32).min(NODE_MAX.x);
+    let node_h = ((grid.height() - line_gap * (rows.len().max(1) as f32 - 1.0)) / rows.len().max(1) as f32).min(NODE_MAX.y);
+    let used_w = node_w * columns.len() as f32 + GAP * (columns.len().max(1) as f32 - 1.0);
+    let left = grid.left() + (grid.width() - used_w) * 0.5;
     let place = |p: &PolicyCard| {
-        let x = grid.left() + (f32::from(p.grid.0.max(1)) - 1.0) * step_x;
-        let y = grid.top() + (f32::from(p.grid.1.max(1)) - 1.0) * step_y.min(NODE.y + 34.0);
-        Rect::from_min_size(pos2(x, y), NODE)
+        let c = columns.iter().position(|v| *v == p.grid.0).unwrap_or(0) as f32;
+        let row = rows.iter().position(|v| *v == p.grid.1).unwrap_or(0) as f32;
+        Rect::from_min_size(pos2(left + c * (node_w + GAP), grid.top() + row * (node_h + line_gap)), vec2(node_w, node_h))
     };
+    draw_links(ui, branch, &place);
     for p in &branch.policies {
-        for parent in &p.requires {
-            let Some(from) = branch.policies.get(*parent) else {
-                continue;
-            };
-            let (a, b) = (place(from).center_bottom(), place(p).center_top());
-            let mid = (a.y + b.y) * 0.5;
-            let color = if from.adopted {
-                GOLD
-            } else {
-                GOLD.gamma_multiply(0.35)
-            };
-            ui.painter().add(egui::Shape::line(
-                vec![a, pos2(a.x, mid), pos2(b.x, mid), b],
-                Stroke::new(2.0, color),
-            ));
-        }
-    }
-    for p in &branch.policies {
-        policy_node(ui, place(p), state, p);
+        policy_node(ui, place(p), state, nodes, p);
     }
     if let Some(finisher) = &branch.finisher {
-        let wide = Rect::from_min_size(
-            pos2(area.left(), area.bottom() - finisher_h),
-            vec2(area.width(), finisher_h),
-        );
+        let wide = Rect::from_min_size(pos2(area.left(), area.bottom() - finisher_h), vec2(area.width(), finisher_h));
         finisher_card(ui, wide, state, finisher);
     }
 }
 
-/// Ideology tenets in three tiers.
-fn tenet_rows(ui: &mut egui::Ui, area: Rect, state: &mut ScreenState, branch: &BranchCard) {
-    let row_h = area.height() / 3.0;
-    for tier in 1..=3u8 {
-        let top = area.top() + f32::from(tier - 1) * row_h;
-        text(
-            ui.painter(),
-            pos2(area.left(), top + 2.0),
-            tf!("classic.ui.screen-civics.level", tier = tier),
-            10.0,
-            GOLD,
-        );
-        let tenets: Vec<&PolicyCard> = branch.policies.iter().filter(|p| p.tier == tier).collect();
-        let count = tenets.len().max(1) as f32;
-        let width = ((area.width() - 8.0 * (count - 1.0)) / count).min(NODE.x);
-        for (i, p) in tenets.iter().enumerate() {
-            let node = Rect::from_min_size(
-                pos2(area.left() + i as f32 * (width + 8.0), top + 18.0),
-                vec2(width, (row_h - 26.0).min(NODE.y)),
-            );
-            policy_node(ui, node, state, p);
+/// The distinct values, sorted.
+fn distinct(values: impl Iterator<Item = u8>) -> Vec<u8> {
+    let mut all: Vec<u8> = values.collect();
+    all.sort_unstable();
+    all.dedup();
+    all
+}
+
+fn draw_links(ui: &egui::Ui, branch: &BranchCard, place: &dyn Fn(&PolicyCard) -> Rect) {
+    for p in &branch.policies {
+        for parent in &p.requires {
+            let Some(from) = branch.policies.get(*parent) else { continue };
+            let (a, b) = (place(from).center_bottom(), place(p).center_top());
+            let mid = (a.y + b.y) * 0.5;
+            let color = if from.adopted() { GOLD } else { GOLD.gamma_multiply(0.35) };
+            ui.painter().add(egui::Shape::line(vec![a, pos2(a.x, mid), pos2(b.x, mid), b], Stroke::new(2.0, color)));
         }
     }
 }
 
-fn policy_node(ui: &mut egui::Ui, node: Rect, state: &mut ScreenState, p: &PolicyCard) {
-    let response = ui.interact(
-        node,
-        ui.id().with(("civics_policy", p.id.0)),
-        Sense::click(),
-    );
-    crate::ui::pedia_link::mark(ui, node, crate::ui::pedia::PediaRef::policy(p.id));
-    if response.clicked() {
-        state.civics_policy = Some(p.id);
+/// Ideology tenets in three tiers.
+fn tenet_rows(ui: &mut egui::Ui, area: Rect, state: &mut ScreenState, nodes: &Nodes) {
+    let row_h = area.height() / 3.0;
+    for tier in 1..=3u8 {
+        let top = area.top() + f32::from(tier - 1) * row_h;
+        text(ui.painter(), pos2(area.left(), top + 2.0), tf!("classic.ui.screen-civics.level", tier = tier), 10.0, GOLD);
+        let tenets: Vec<&PolicyCard> = nodes.branch.policies.iter().filter(|p| p.tier == tier).collect();
+        let count = tenets.len().max(1) as f32;
+        let width = ((area.width() - GAP * (count - 1.0)) / count).min(NODE_MAX.x + 20.0);
+        for (i, p) in tenets.iter().enumerate() {
+            let at = pos2(area.left() + i as f32 * (width + GAP), top + 17.0);
+            policy_node(ui, Rect::from_min_size(at, vec2(width, (row_h - 22.0).min(NODE_MAX.y))), state, nodes, p);
+        }
     }
-    let chosen = state.civics_policy == Some(p.id);
-    let fill = if chosen {
-        Color32::from_rgb(37, 65, 66)
-    } else if response.hovered() {
-        Color32::from_rgb(31, 55, 58)
-    } else {
-        RAISED
-    };
-    ui.painter().rect_filled(node, 5.0, fill);
-    let edge = if p.adopted || chosen {
-        GOLD
-    } else {
-        Color32::from_rgb(60, 78, 76)
-    };
-    ui.painter().rect_stroke(
-        node,
-        5.0,
-        Stroke::new(if chosen { 1.6 } else { 1.0 }, edge),
-        egui::StrokeKind::Inside,
-    );
-    let size = (node.height() * 0.46).min(50.0);
-    let badge = Rect::from_center_size(
-        pos2(node.center().x, node.top() + 6.0 + size * 0.5),
-        vec2(size, size),
-    );
-    emblem(
-        ui,
-        badge,
-        state,
-        &p.art,
-        p.adopted || p.availability.is_ready(),
-    );
-    let galley = ui.painter().layout(
-        p.name.clone(),
-        FontId::proportional(13.0),
-        if p.adopted || p.availability.is_ready() {
-            CREAM
-        } else {
-            MUTED
-        },
-        node.width() - 10.0,
-    );
-    let name_y = badge.bottom() + 4.0;
-    ui.painter().galley(
-        pos2(node.center().x - galley.size().x * 0.5, name_y),
-        galley,
-        CREAM,
-    );
-    let (label, color) = policy_status(p);
-    ui.painter().text(
-        pos2(node.center().x, node.bottom() - 10.0),
-        Align2::CENTER_CENTER,
-        label,
-        FontId::proportional(9.0),
-        color,
-    );
 }
 
-fn policy_status(p: &PolicyCard) -> (&'static str, Color32) {
-    if p.adopted {
-        (t!("classic.ui.screen-civics.adopted"), GOLD)
-    } else if p.availability.is_ready() {
-        (t!("classic.ui.screen-civics.available"), CULTURE)
-    } else {
-        (t!("classic.ui.screen-civics.locked-caps"), MUTED)
+/// How a node is laid out for its size.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum NodeShape {
+    /// Emblem and name side by side, the effect under them, the state at the foot.
+    Full,
+    /// Narrow (many tenets in a row): the name under the emblem.
+    Stacked,
+    /// Short (a phone): one line of name with the button or nothing, one line of text.
+    Compact,
+}
+
+impl NodeShape {
+    fn of(node: Rect) -> NodeShape {
+        if node.height() < 78.0 {
+            NodeShape::Compact
+        } else if node.width() < 120.0 {
+            NodeShape::Stacked
+        } else {
+            NodeShape::Full
+        }
     }
+}
+
+/// One policy: emblem, name, its effect (the first lines of it; all of it on hover), and at the
+/// foot its state: adopted, the adopt button with the price, or why it is locked.
+fn policy_node(ui: &mut egui::Ui, node: Rect, state: &mut ScreenState, nodes: &Nodes, p: &PolicyCard) {
+    let response = ui.interact(node, ui.id().with(("civics_policy", p.id.0)), Sense::click());
+    crate::ui::pedia_link::mark(ui, node, crate::ui::pedia::PediaRef::policy(p.id));
+    if response.clicked() {
+        state.civics.tap_policy(p.id);
+    }
+    paint_node_frame(ui, node, p.state, nodes.focus == Some(p.id), response.hovered());
+    let shape = NodeShape::of(node);
+    let lit = matches!(p.state, PolicyState::Adopted | PolicyState::Adoptable(_));
+    let badge_size = if shape == NodeShape::Full { 30.0 } else { 22.0 };
+    let badge = Rect::from_min_size(node.min + vec2(7.0, if shape == NodeShape::Compact { 5.0 } else { 7.0 }), vec2(badge_size, badge_size));
+    emblem(ui, badge, state, &p.art, lit);
+    let name_color = if lit { CREAM } else { MUTED };
+    let body_top = match shape {
+        NodeShape::Full => {
+            let left = badge.right() + 7.0;
+            clipped(ui.painter(), pos2(left, node.top() + 8.0), &p.name, 13.0, name_color, node.right() - 6.0 - left, 2);
+            badge.bottom() + 6.0
+        }
+        NodeShape::Stacked => {
+            clipped(ui.painter(), pos2(node.left() + 8.0, badge.bottom() + 4.0), &p.name, 12.0, name_color, node.width() - 12.0, 1);
+            badge.bottom() + 22.0
+        }
+        NodeShape::Compact => {
+            let right = if p.price().is_some() { node.right() - 96.0 } else { node.right() - 6.0 };
+            let left = badge.right() + 6.0;
+            clipped(ui.painter(), pos2(left, node.top() + 7.0), &p.name, 12.0, name_color, right - left, 1);
+            node.top() + 30.0
+        }
+    };
+    let ink = if lit { Color32::from_rgb(214, 220, 206) } else { MUTED };
+    if shape == NodeShape::Compact {
+        compact_body(ui, node, state, nodes, p, body_top, ink);
+    } else {
+        let foot_h = 28.0;
+        let rows = (((node.bottom() - foot_h - 4.0 - body_top) / 13.0).floor() as usize).clamp(1, 4);
+        clipped(ui.painter(), pos2(node.left() + 8.0, body_top), &p.text, 10.5, ink, node.width() - 16.0, rows);
+        let foot = Rect::from_min_max(pos2(node.left() + 6.0, node.bottom() - foot_h), node.max - vec2(6.0, 4.0));
+        node_foot(ui, foot, state, nodes, p);
+    }
+    response.on_hover_text(node_hover(nodes, p));
+}
+
+/// The short node: the price button at the top right, one line below: why it is locked, else its effect.
+fn compact_body(ui: &mut egui::Ui, node: Rect, state: &mut ScreenState, nodes: &Nodes, p: &PolicyCard, top: f32, ink: Color32) {
+    if let PolicyState::Adoptable(cost) = p.state {
+        let button_rect = Rect::from_min_size(pos2(node.right() - 90.0, node.top() + 4.0), vec2(84.0, 22.0));
+        if button(ui, button_rect, &cost_label(Verb::Adopt, cost), true, true) {
+            take(state, GameRequest::AdoptPolicy(p.id));
+        }
+    }
+    let width = node.width() - 16.0;
+    match policy_reason(p, nodes.branch, nodes.view) {
+        Some(reason) => clipped(ui.painter(), pos2(node.left() + 8.0, top), &reason, 10.0, GOLD.gamma_multiply(0.9), width, 1),
+        None => clipped(ui.painter(), pos2(node.left() + 8.0, top), &p.text, 10.0, ink, width, 1),
+    };
+}
+
+fn paint_node_frame(ui: &egui::Ui, node: Rect, state: PolicyState, focused: bool, hovered: bool) {
+    let fill = match state {
+        PolicyState::Adopted => ADOPTED_FILL,
+        PolicyState::Adoptable(_) if hovered => Color32::from_rgb(34, 60, 62),
+        PolicyState::Adoptable(_) => RAISED,
+        PolicyState::Included | PolicyState::Locked(_) if hovered => Color32::from_rgb(25, 47, 52),
+        PolicyState::Included | PolicyState::Locked(_) => LOCKED_FILL,
+    };
+    let edge = match state {
+        PolicyState::Adopted => GOLD,
+        PolicyState::Adoptable(_) => CULTURE,
+        _ => EDGE,
+    };
+    ui.painter().rect_filled(node, 5.0, fill);
+    ui.painter().rect_stroke(node, 5.0, Stroke::new(1.0, edge), egui::StrokeKind::Inside);
+    if focused {
+        ui.painter().rect_stroke(node.expand(1.5), 6.0, Stroke::new(1.8, GOLD), egui::StrokeKind::Outside);
+    }
+}
+
+fn node_foot(ui: &mut egui::Ui, foot: Rect, state: &mut ScreenState, nodes: &Nodes, p: &PolicyCard) {
+    match p.state {
+        PolicyState::Adopted => {
+            text(ui.painter(), foot.left_center() + vec2(2.0, -6.0), t!("classic.ui.screen-civics.adopted"), 10.0, GOLD);
+        }
+        PolicyState::Adoptable(cost) => {
+            if button(ui, foot, &cost_label(Verb::Adopt, cost), true, true) {
+                take(state, GameRequest::AdoptPolicy(p.id));
+            }
+        }
+        PolicyState::Included => {
+            text(ui.painter(), foot.left_center() + vec2(2.0, -6.0), t!("classic.ui.screen-civics.included"), 10.0, MUTED);
+        }
+        PolicyState::Locked(lock) => {
+            let reason = policy_reason(p, nodes.branch, nodes.view).unwrap_or_default();
+            let color = if lock.is_culture() { GOLD } else { MUTED };
+            clipped(ui.painter(), foot.min + vec2(2.0, 1.0), &reason, 10.0, color, foot.width() - 4.0, 2);
+        }
+    }
+}
+
+fn node_hover(nodes: &Nodes, p: &PolicyCard) -> String {
+    let state = match p.state {
+        PolicyState::Adopted => t!("classic.ui.screen-civics.adopted").to_owned(),
+        PolicyState::Adoptable(_) => t!("classic.ui.screen-civics.available").to_owned(),
+        PolicyState::Included => t!("classic.ui.screen-civics.included").to_owned(),
+        PolicyState::Locked(_) => policy_reason(p, nodes.branch, nodes.view).unwrap_or_default(),
+    };
+    format!("{}\n{}\n{}", p.name, p.text, state)
 }
 
 fn finisher_card(ui: &mut egui::Ui, r: Rect, state: &mut ScreenState, p: &PolicyCard) {
     let response = ui.interact(r, ui.id().with(("civics_finisher", p.id.0)), Sense::click());
     crate::ui::pedia_link::mark(ui, r, crate::ui::pedia::PediaRef::policy(p.id));
     if response.clicked() {
-        state.civics_policy = Some(p.id);
+        state.civics.tap_policy(p.id);
     }
-    ui.painter().rect_filled(
-        r,
-        5.0,
-        if p.adopted {
-            Color32::from_rgb(44, 58, 42)
-        } else {
-            RAISED
-        },
-    );
-    ui.painter().rect_stroke(
-        r,
-        5.0,
-        Stroke::new(
-            1.0,
-            if p.adopted {
-                GOLD
-            } else {
-                Color32::from_rgb(60, 78, 76)
-            },
-        ),
-        egui::StrokeKind::Inside,
-    );
-    let title = if p.adopted {
-        t!("classic.ui.screen-civics.branch-completed")
-    } else {
-        t!("classic.ui.screen-civics.complete-branch")
-    };
-    text(ui.painter(), r.min + vec2(14.0, 9.0), title, 10.0, GOLD);
-    let width = r.width() - 28.0;
-    let summary = completion_sentence(&p.text);
-    paragraph(
-        ui.painter(),
-        r.min + vec2(14.0, 26.0),
-        &summary,
-        12.0,
-        CREAM,
-        width,
-    );
+    let done = p.adopted();
+    ui.painter().rect_filled(r, 5.0, if done { Color32::from_rgb(44, 58, 42) } else { LOCKED_FILL });
+    ui.painter().rect_stroke(r, 5.0, Stroke::new(1.0, if done { GOLD } else { EDGE }), egui::StrokeKind::Inside);
+    let title = if done { t!("classic.ui.screen-civics.branch-completed") } else { t!("classic.ui.screen-civics.complete-branch") };
+    text(ui.painter(), r.min + vec2(12.0, 6.0), title, 10.0, GOLD);
+    let rows = if r.height() >= 50.0 { 2 } else { 1 };
+    clipped(ui.painter(), r.min + vec2(12.0, 21.0), &p.text, 11.5, CREAM, r.width() - 24.0, rows);
+    response.on_hover_text(&p.text);
 }
 
-/// The sentence of a branch text about completing it ("Adopting all Policies ..."); a text
-/// in a language whose wording differs is shown whole.
-fn completion_sentence(text: &str) -> String {
-    for sentence in text.split_inclusive(". ") {
-        if sentence.starts_with("Adopting all") { // i18n-ok: matches the rule text
-            return sentence.trim().to_owned();
-        }
-    }
-    text.to_owned()
-}
+// ---------------------------------------------------------------------------------------------
+// Available now
 
-fn policy_side(
-    ui: &mut egui::Ui,
-    r: Rect,
-    state: &mut ScreenState,
-    branch: &BranchCard,
-    policy: Option<&PolicyCard>,
-) {
+fn offers_panel(ui: &mut egui::Ui, r: Rect, state: &mut ScreenState, view: &CivicsView, columns: usize, focused: bool) {
     panel(ui.painter(), r);
-    let Some(p) = policy else {
-        return;
-    };
-    let badge = Rect::from_center_size(pos2(r.center().x, r.top() + 70.0), vec2(104.0, 104.0));
-    emblem(ui, badge, state, &p.art, true);
-    ui.painter().text(
-        pos2(r.center().x, r.top() + 134.0),
-        Align2::CENTER_TOP,
-        &p.name,
-        FontId::proportional(24.0),
-        CREAM,
-    );
-    let role = if p.tier > 0 {
-        tf!("classic.ui.screen-civics.role-tenet", branch = branch.name.to_uppercase(), tier = p.tier)
-    } else if Some(p.id) == branch.opener.as_ref().map(|o| o.id) {
-        tf!("classic.ui.screen-civics.role-opener", branch = branch.name.to_uppercase())
-    } else if Some(p.id) == branch.finisher.as_ref().map(|o| o.id) {
-        tf!("classic.ui.screen-civics.role-finisher", branch = branch.name.to_uppercase())
-    } else {
-        tf!("classic.ui.screen-civics.role-policy", branch = branch.name.to_uppercase())
-    };
-    ui.painter().text(
-        pos2(r.center().x, r.top() + 168.0),
-        Align2::CENTER_TOP,
-        role,
-        FontId::proportional(10.0),
-        GOLD,
-    );
-    paragraph(
-        ui.painter(),
-        r.min + vec2(20.0, 196.0),
-        &p.text,
-        13.0,
-        MUTED,
-        r.width() - 40.0,
-    );
-    let action = Rect::from_min_size(
-        pos2(r.left() + 20.0, r.bottom() - 62.0),
-        vec2(r.width() - 40.0, 42.0),
-    );
-    let opener_or_finisher = branch.opener.as_ref().map(|o| o.id) == Some(p.id)
-        || branch.finisher.as_ref().map(|o| o.id) == Some(p.id);
-    let label = if p.adopted {
-        t!("classic.ui.screen-civics.adopted-button").to_owned()
-    } else if opener_or_finisher {
-        t!("classic.ui.screen-civics.comes-with-branch").to_owned()
-    } else {
-        t!("classic.ui.screen-civics.adopt-policy").to_owned()
-    };
-    let enabled = !p.adopted && !opener_or_finisher && p.availability.is_ready();
-    if button(ui, action, &label, false, enabled) {
-        state.requests.push(GameRequest::AdoptPolicy(p.id));
+    let title = r.min + vec2(16.0, 12.0);
+    text(ui.painter(), title, t!("classic.ui.screen-civics.available-title"), 11.0, GOLD);
+    if !view.offers.is_empty() {
+        count_dot(ui, pos2(r.left() + 140.0, r.top() + 19.0), view.offers.len());
     }
-    if let Availability::Blocked(reason) = &p.availability {
-        if !p.adopted && !opener_or_finisher {
-            paragraph(
-                ui.painter(),
-                pos2(action.left(), action.top() - 24.0),
-                reason,
-                12.0,
-                GOLD,
-                action.width(),
-            );
+    let touch = client::shell::theme::touch_wanted();
+    let hint_h = if touch { 0.0 } else { 20.0 };
+    let mut area = Rect::from_min_max(pos2(r.left() + 10.0, r.top() + 36.0), pos2(r.right() - 10.0, r.bottom() - hint_h - 8.0));
+    if let Some(note) = price_note(view) {
+        let height = clipped_height(ui.painter(), &note, 10.0, area.width() - 12.0, 2);
+        clipped(ui.painter(), pos2(area.left() + 6.0, area.bottom() - height), &note, 10.0, MUTED, area.width() - 12.0, 2);
+        area.max.y -= height + 6.0;
+    }
+    if let Some((title, body)) = offer_reading(state, view) {
+        let height = reading_strip(ui, area, area.bottom(), &title, &body);
+        area.max.y -= height + 6.0;
+    }
+    if view.offers.is_empty() {
+        nothing_to_take(ui, area, view);
+    } else {
+        offer_cards(ui, area, state, view, columns, focused);
+    }
+    if !touch {
+        let hint = ui.painter().layout_no_wrap(t!("classic.ui.screen-civics.keys-hint").to_owned(), FontId::proportional(10.0), MUTED);
+        ui.painter().galley(pos2(r.left() + 16.0, r.bottom() - hint_h), hint, MUTED);
+    }
+}
+
+/// Says that the price rises with each policy taken, when the core's numbers show it: something
+/// on offer is paid with culture (a branch's opener is a policy too) and the next one costs more.
+fn price_note(view: &CivicsView) -> Option<String> {
+    let paid = view.offers.iter().any(|o| matches!(o.cost, Cost::Culture(_)));
+    (paid && view.cost_after > view.next_cost).then(|| tf!("classic.ui.screen-civics.price-rises", now = view.next_cost, after = view.cost_after))
+}
+
+// ---------------------------------------------------------------------------------------------
+// Reading a card in full (a tap: there is no hover on a touch screen)
+
+/// The most rows the whole text of a card takes in the reading strip.
+const READING_ROWS: usize = 6;
+
+/// The tapped offer: its name and whole effect.
+fn offer_reading(state: &ScreenState, view: &CivicsView) -> Option<(String, String)> {
+    let Some(Reading::Offer(kind)) = state.civics.reading else { return None };
+    let offer = view.offers.iter().find(|o| o.kind == kind)?;
+    Some((offer.name.clone(), offer.text.clone()))
+}
+
+/// The tapped policy of `branch`: its name, whole effect and, when it is locked, why.
+fn policy_reading(state: &ScreenState, view: &CivicsView, branch: &BranchCard) -> Option<(String, String)> {
+    let Some(Reading::Policy(id)) = state.civics.reading else { return None };
+    let every = branch.opener.iter().chain(branch.policies.iter()).chain(branch.finisher.iter());
+    let policy = every.into_iter().find(|p| p.id == id)?;
+    let body = match policy_reason(policy, branch, view) {
+        Some(reason) => format!("{} · {reason}", policy.text),
+        None => policy.text.clone(),
+    };
+    Some((policy.name.clone(), body))
+}
+
+/// A strip across `area` ending at `bottom`, with the title and the whole of `body`. Returns its height.
+fn reading_strip(ui: &mut egui::Ui, area: Rect, bottom: f32, title: &str, body: &str) -> f32 {
+    let width = area.width() - 16.0;
+    let height = 26.0 + clipped_height(ui.painter(), body, 11.5, width, READING_ROWS) + 6.0;
+    let strip = Rect::from_min_max(pos2(area.left(), bottom - height), pos2(area.right(), bottom));
+    ui.painter().rect_filled(strip, 5.0, LOCKED_FILL);
+    ui.painter().rect_stroke(strip, 5.0, Stroke::new(1.0, GOLD), egui::StrokeKind::Inside);
+    text(ui.painter(), strip.min + vec2(8.0, 5.0), title, 11.0, GOLD);
+    clipped(ui.painter(), strip.min + vec2(8.0, 21.0), body, 11.5, CREAM, width, READING_ROWS);
+    height
+}
+
+/// The height `clipped` gives `value`.
+fn clipped_height(p: &egui::Painter, value: &str, size: f32, width: f32, rows: usize) -> f32 {
+    let lines = wrap_lines(p, value, size, width.max(8.0), rows.max(1));
+    lines.iter().map(|line| layout(p, line, size, Color32::WHITE).size().y / layer_scale(p)).sum()
+}
+
+/// The empty list: why, and how far the next policy is.
+fn nothing_to_take(ui: &mut egui::Ui, area: Rect, view: &CivicsView) {
+    let width = area.width() - 12.0;
+    clipped(ui.painter(), area.min + vec2(6.0, 4.0), t!("classic.ui.screen-civics.nothing-now"), 15.0, CREAM, width, 2);
+    let bar = Rect::from_min_size(area.min + vec2(6.0, 56.0), vec2(width, 10.0));
+    ui.painter().rect_filled(bar, 5.0, INK_DARK);
+    let share = if view.next_cost == 0 { 1.0 } else { (view.culture as f32 / view.next_cost as f32).clamp(0.0, 1.0) };
+    ui.painter().rect_filled(Rect::from_min_size(bar.min, vec2(bar.width() * share, bar.height())), 5.0, CULTURE);
+    let line = tf!("classic.ui.screen-civics.culture-bar", culture = view.culture, cost = view.next_cost);
+    clipped(ui.painter(), area.min + vec2(6.0, 72.0), &line, 12.0, MUTED, width, 2);
+}
+
+/// The list scrolls: the wheel, a drag, and the keyboard focus keeps its card in view.
+fn offer_cards(ui: &mut egui::Ui, area: Rect, state: &mut ScreenState, view: &CivicsView, columns: usize, focused: bool) {
+    let columns = columns.max(1);
+    let line_h = 6.0;
+    let rows_total = view.offers.len().div_ceil(columns);
+    let card_h = ((area.height() / rows_total as f32) - line_h).clamp(80.0, 100.0);
+    let content_h = rows_total as f32 * (card_h + line_h) - line_h;
+    let max_scroll = (content_h - area.height()).max(0.0);
+    let width = if max_scroll > 0.0 { area.width() - 8.0 } else { area.width() };
+    let card_w = (width - GAP * (columns as f32 - 1.0)) / columns as f32;
+    let current = state.civics.offer.min(view.offers.len() - 1);
+    let focus_row = (current / columns) as f32;
+    scroll_input(ui, area, state, max_scroll);
+    if focused && state.civics.followed != Some(current) {
+        let (top, bottom) = (focus_row * (card_h + line_h), focus_row * (card_h + line_h) + card_h);
+        let offset = state.civics.scroll;
+        state.civics.scroll = offset.min(top).max(bottom - area.height());
+    }
+    state.civics.followed = focused.then_some(current).or(state.civics.followed);
+    let offset = state.civics.scroll.clamp(0.0, max_scroll);
+    state.civics.scroll = offset;
+    let outer = ui.clip_rect();
+    ui.set_clip_rect(area.intersect(outer));
+    for (i, offer) in view.offers.iter().enumerate() {
+        let (c, row) = (i % columns, i / columns);
+        let at = pos2(area.left() + c as f32 * (card_w + GAP), area.top() + row as f32 * (card_h + line_h) - offset);
+        let card = Rect::from_min_size(at, vec2(card_w, card_h));
+        if card.bottom() < area.top() || card.top() > area.bottom() {
+            continue;
         }
+        offer_card(ui, card, state, view, offer, i, focused && i == current);
+    }
+    ui.set_clip_rect(outer);
+    if max_scroll > 0.0 {
+        scroll_bar(ui, area, offset, max_scroll, content_h);
+    }
+}
+
+/// The wheel and a drag (a finger) move the list.
+fn scroll_input(ui: &mut egui::Ui, area: Rect, state: &mut ScreenState, max_scroll: f32) {
+    if max_scroll <= 0.0 {
+        return;
+    }
+    let drag = ui.interact(area, ui.id().with("civics_offers_scroll"), Sense::drag());
+    let mut delta = -drag.drag_delta().y;
+    if ui.rect_contains_pointer(area) {
+        delta -= ui.input(|i| i.smooth_scroll_delta.y);
+    }
+    state.civics.scroll = (state.civics.scroll + delta).clamp(0.0, max_scroll);
+}
+
+fn scroll_bar(ui: &egui::Ui, area: Rect, offset: f32, max_scroll: f32, content_h: f32) {
+    let thumb_h = (area.height() * area.height() / content_h).max(24.0);
+    let top = area.top() + (area.height() - thumb_h) * offset / max_scroll;
+    let thumb = Rect::from_min_size(pos2(area.right() - 4.0, top), vec2(3.0, thumb_h));
+    ui.painter().rect_filled(thumb, 1.5, GOLD.gamma_multiply(0.6));
+}
+
+fn offer_card(ui: &mut egui::Ui, card: Rect, state: &mut ScreenState, view: &CivicsView, offer: &Offer, index: usize, focused: bool) {
+    let response = ui.interact(card, ui.id().with(("civics_offer", index)), Sense::click());
+    if response.clicked() {
+        state.civics.tap_offer(index, view);
+    }
+    ui.painter().rect_filled(card, 5.0, if response.hovered() { Color32::from_rgb(34, 60, 62) } else { RAISED });
+    ui.painter().rect_stroke(card, 5.0, Stroke::new(1.0, CULTURE), egui::StrokeKind::Inside);
+    if focused {
+        ui.painter().rect_stroke(card.expand(1.5), 6.0, Stroke::new(1.8, GOLD), egui::StrokeKind::Outside);
+    }
+    let badge = Rect::from_min_size(card.min + vec2(8.0, 8.0), vec2(38.0, 38.0));
+    emblem(ui, badge, state, &offer.art, true);
+    let button_rect = Rect::from_min_size(pos2(card.right() - 112.0, card.top() + 8.0), vec2(104.0, 28.0));
+    let left = badge.right() + 8.0;
+    clipped(ui.painter(), pos2(left, card.top() + 8.0), &offer.name, 14.0, CREAM, button_rect.left() - 6.0 - left, 1);
+    text(ui.painter(), pos2(left, card.top() + 27.0), offer_role(offer), 10.0, GOLD);
+    let top = badge.bottom() + 6.0;
+    let rows = (((card.bottom() - top - 12.0) / 14.0).floor() as usize).clamp(1, 4);
+    clipped(ui.painter(), pos2(card.left() + 10.0, top), &offer.text, 11.5, Color32::from_rgb(214, 220, 206), card.width() - 20.0, rows);
+    if button(ui, button_rect, &cost_label(Verb::of(offer.kind), offer.cost), true, true) {
+        take(state, offer.kind.request());
+    }
+    response.on_hover_text(format!("{}\n{}", offer.name, offer.text));
+}
+
+fn offer_role(offer: &Offer) -> String {
+    let branch = offer.branch.to_uppercase();
+    match offer.kind {
+        OfferKind::Policy(_) => tf!("classic.ui.screen-civics.role-policy", branch = branch),
+        OfferKind::Unlock(_) => tf!("classic.ui.screen-civics.role-opener", branch = branch),
+        OfferKind::Ideology(_) => tf!("classic.ui.screen-civics.role-ideology", branch = branch),
     }
 }
 
 /// Art ids the screen shows now (offscreen captures decode them synchronously).
 pub(super) fn visible_art(view: &CivicsView, state: &ScreenState) -> Vec<String> {
     let mut ids: Vec<String> = view.branches.iter().map(|b| b.art.clone()).collect();
-    let branch = selected_branch(state, view);
-    if let Some(card) = view.branches.get(branch) {
+    if let Some(card) = view.branches.get(state.civics.branch_index(view)) {
         ids.extend(card.policies.iter().map(|p| p.art.clone()));
     }
+    ids.extend(view.offers.iter().map(|o| o.art.clone()));
     ids
 }
+
+#[cfg(test)]
+#[path = "screen_civics_tests.rs"]
+mod tests;

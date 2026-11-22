@@ -560,8 +560,9 @@ fn civics_screen_unlocks_a_branch_with_the_culture_pool() {
     );
     assert_eq!(view.branches[0].name, "Tradition", "rule set order");
     assert_eq!(view.next_cost, 25);
+    assert!(view.cost_after > view.next_cost, "the core says the policy after this one costs more: {} then {}", view.next_cost, view.cost_after);
     let tradition = &view.branches[0];
-    assert_eq!(tradition.state, crate::ui::model::BranchState::Available);
+    assert_eq!(tradition.state, crate::ui::model::BranchState::Available(crate::ui::model::Cost::Culture(25)));
     let freedom = view.branches.iter().find(|b| b.name == "Freedom").unwrap();
     assert!(matches!(
         freedom.state,
@@ -572,13 +573,14 @@ fn civics_screen_unlocks_a_branch_with_the_culture_pool() {
     assert_eq!(view.branches[0].state, crate::ui::model::BranchState::Open);
     assert_eq!(view.culture, 5);
     assert_eq!(view.next_cost, 30, "the opener counts");
+    assert!(view.cost_after > 30);
     let aristocracy = view.branches[0]
         .policies
         .iter()
         .find(|p| p.name == "Aristocracy")
         .unwrap();
     assert!(
-        matches!(aristocracy.availability, Availability::Blocked(_)),
+        matches!(aristocracy.state, crate::ui::model::PolicyState::Locked(_)),
         "5 < 30 culture"
     );
 }
