@@ -14,12 +14,15 @@ use super::levers::Pass;
 use super::plan::{Net2Plan, OrderPhase, WarPlan};
 use super::weights::r;
 
+/// The switch of the raid (the stop rule of work/nets/tricks/GATES.md).
+pub const RAID: bool = true;
+
 /// The offence's levers on the turn's plan (`plan.war`'s order, `plan.offence`).
 pub fn apply(plan: &mut Net2Plan, pass: &Pass) {
     if let WarPlan::Order(order) = &mut plan.war {
         let fighting = matches!(order.phase, OrderPhase::Fighting { .. });
         let operating = pass.rivals.iter().find(|x| x.rival == order.rival).is_some_and(|x| x.inputs[r::OPERATING] > 0);
-        order.raid = fighting && !operating;
+        order.raid = RAID && fighting && !operating;
     }
 }
 

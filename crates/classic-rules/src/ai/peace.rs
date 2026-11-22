@@ -37,6 +37,35 @@ use crate::rules::CompiledRuleset;
 use crate::world::player::PlayerKind;
 use crate::world::relations::{DealItem, DealOffer, PeaceRefusal};
 
+/// What a foreign city of `population` citizens brings when it becomes ours without the fight: its worth less the
+/// unrest of a conquered city (the deal's price of a city, and the war order's, `ordered_case`).
+fn seen_city_worth(prices: &Prices, stakes: &Stakes, population: u32) -> Centi {
+    let unrest = (5 + i64::from(population.max(1))) * prices.happiness * stakes.unrest / 100;
+    city_worth(prices, population, 0) - unrest
+}
+
+/// What a `net2` war order on `enemy` promises (`net2::orders`, CHAIN.md D8): the capture of the order rival's easiest
+/// city it still holds (`Net2Plan::order_eases`, the aim first) at its ease, with no army cost (the order's army is the
+/// war machine's to form). The war machine's price of the capture and the deal's price of the city each cross 0 at some
+/// small sizes (HD8 #1: a city of 1 citizen priced 2 947 by the one and below 0 by the other, of 2 citizens the other way
+/// round): the larger of the two is the city's worth to a war that is to take it. None without an order on it or a
+/// city of it we have seen.
+fn ordered_case(brief: &TurnBrief, state: &AiState, prices: &Prices, stakes: &Stakes, enemy: PlayerId) -> Option<WarCase> {
+    let eases = crate::ai::operations::with_net2(brief, crate::ai::net2::plan::Part::War, |p| p.war_on(enemy).map(|_| p.order_eases.clone()))??;
+    let mut best: Option<WarCase> = None;
+    for (tile, ease) in eases {
+        let Some(city) = state.seen_cities().iter().find(|c| c.tile == tile && c.owner == enemy) else { continue };
+        let puppet = city.population < crate::ai::combat::ANNEX_POPULATION;
+        let captured = crate::ai::operations::captured_gain(prices, stakes, city.population, prices.rounds_left, puppet);
+        let worth = captured.max(seen_city_worth(prices, stakes, city.population));
+        let case = WarCase { gain: (worth * ease / 1000).max(0), cost: 0 };
+        if best.is_none_or(|b| case.gain > b.gain) {
+            best = Some(case);
+        }
+    }
+    best
+}
+
 /// What going on with a war against one enemy promises the player.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct WarProspect {
@@ -49,9 +78,17 @@ pub struct WarProspect {
 impl WarProspect {
     pub fn of(brief: &TurnBrief, state: &AiState, rules: &CompiledRuleset, prices: &Prices, stakes: &Stakes, enemy: PlayerId, view: Option<&crate::knowledge::view::PlayerView<'_>>) -> Self {
         // An operation against the enemy, else the raid on its land that still pays.
-        let attack = running_case(brief, state, rules, prices, stakes, enemy)
+        let mut attack = running_case(brief, state, rules, prices, stakes, enemy)
             .or_else(|| view.and_then(|v| crate::ai::raid::running_case(brief, state, rules, prices, v, enemy)))
             .unwrap_or_default();
+        // `net2`: the order decides the war, the case only ranks (`operations::order_decides`): a war with an order on
+        // the enemy is worth at least what the order promises (`ordered_case`), with no operation running or with one
+        // whose case is below it (its army's cost, a low chance). CHAIN.md D8; THE ONE place a war's going on is priced.
+        if let Some(ordered) = ordered_case(brief, state, prices, stakes, enemy).filter(|_| crate::ai::net2::orders::PRICES_PEACE) {
+            if ordered.value(stakes) > attack.value(stakes) {
+                attack = ordered;
+            }
+        }
         Self {
             attack,
             defence: expected_loss(brief, state, rules, prices, enemy),
@@ -146,38 +183,8 @@ impl<'i, 'o, 'a> Negotiation<'i, 'o, 'a> {
         let mut prospect = WarProspect::of(input.brief, input.state, input.rules, &self.prices, &self.stakes, enemy, Some(&input.observation.view));
         if input.brief.net2_for(crate::ai::net2::plan::Part::Peace).is_some_and(|p| p.makes_peace_with(enemy)) {
             prospect.attack = WarCase::default();
-        } else if let Some(ordered) = self.ordered_case(enemy) {
-            // The order decides the war, the case only ranks (`operations::order_decides`): an operation whose case
-            // is below the order's (its army's cost, a low chance) does not make the war worth less than the order.
-            if ordered.value(&self.stakes) > prospect.attack.value(&self.stakes) {
-                prospect.attack = ordered;
-            }
         }
         prospect
-    }
-
-    /// What a `net2` war order on `enemy` promises (`net2::orders`, CHAIN.md D8): the capture of the order rival's
-    /// easiest city it still holds (`Net2Plan::order_eases`, the aim first) — the city's worth as a deal prices a city
-    /// (`seen_city_worth`, its last seen size), at its ease — with no army cost (the order's army is the war
-    /// machine's to form). None without an order on it or a city of it we have seen.
-    fn ordered_case(&self, enemy: PlayerId) -> Option<WarCase> {
-        let input = self.input;
-        let eases = crate::ai::operations::with_net2(input.brief, crate::ai::net2::plan::Part::War, |p| p.war_on(enemy).map(|_| p.order_eases.clone()))??;
-        let mut best: Option<WarCase> = None;
-        for (tile, ease) in eases {
-            let Some(city) = input.state.seen_cities().iter().find(|c| c.tile == tile && c.owner == enemy) else { continue };
-            // The war machine's price of the capture and the deal's price of the city each cross 0 at some small sizes
-            // (HD8 #1: a city of 1 citizen priced 2 947 by the one and below 0 by the other, of 2 citizens the other way
-            // round): the larger of the two is the city's worth to a war that is to take it.
-            let puppet = city.population < crate::ai::combat::ANNEX_POPULATION;
-            let captured = crate::ai::operations::captured_gain(&self.prices, &self.stakes, city.population, self.prices.rounds_left, puppet);
-            let worth = captured.max(self.seen_city_worth(city.population));
-            let case = WarCase { gain: (worth * ease / 1000).max(0), cost: 0 };
-            if best.is_none_or(|b| case.gain > b.gain) {
-                best = Some(case);
-            }
-        }
-        best
     }
 
     /// `value` of an item that flows to us later (gold a turn, a resource, a neighbour's open borders), read by a
@@ -380,15 +387,10 @@ impl<'i, 'o, 'a> Negotiation<'i, 'o, 'a> {
             return Some(city_worth(&self.prices, own.population, 0));
         }
         let seen = obs.visible_foreign_cities.iter().find(|c| c.handle == city)?;
-        Some(self.seen_city_worth(seen.population))
+        Some(seen_city_worth(&self.prices, &self.stakes, seen.population))
     }
 
-    /// What a foreign city of `population` citizens brings when it becomes ours without the fight: its worth less
-    /// the unrest of a conquered city (the deal's price of a city, and the war order's, `ordered_case`).
-    fn seen_city_worth(&self, population: u32) -> Centi {
-        let unrest = (5 + i64::from(population.max(1))) * self.prices.happiness * self.stakes.unrest / 100;
-        city_worth(&self.prices, population, 0) - unrest
-    }
+
 
     pub fn accepts(&self, offer: &DealOffer) -> bool {
         self.value(offer.from, &offer.items) >= 0
