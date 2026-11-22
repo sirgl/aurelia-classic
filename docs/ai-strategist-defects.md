@@ -94,13 +94,29 @@ least 0.3 (below it the rival is in the race).
 | `Plan::threat` (rival, level) | `grand_strategy::Stakes::of`: each seen city of the rival carries a stake = the victory's prize × threat × its citizens over the rival's guessed citizens (a capture takes its share of the rival's race); `operations::odds_are_good` admits a staked city (the case decides); the peace answers read the same stakes (`peace`) |
 | `Plan::threat` at ≥ 0.5 | `diplomacy::denunciations`: the rival is denounced when not a friend; `diplomacy::proposals`: no friendship, research agreement or open borders offered to it; `diplomacy::item_value_priced`: a research agreement with it is refused |
 
+
+## 4. The weak neighbour (S-4 of `work/small-nets-design-2026-11-22.md`), gate written before its first run
+
+Added 22 Nov 02:30 by the coordinator's decision. The mirror of the city-state prey on nations:
+`prey_r` = unit(−0.8 + 1.5 weak_r + 0.8 near_r − 1.0 threat_to_us_r), `weak_r` = 1 − their soldiers over
+ours (the demographics' soldiers row of the rival model), `near_r` from the distance to its nearest seen city;
+outputs: the posture term prepare +1.5 × prey at prey ≥ 0.5, and stakes on its cities as for the threat.
+
+| gate | metric (exam A5, odd instances 1…59, mean over the three levels; `ai-stress run --situations a5`) | pass |
+|---|---|---|
+| P1 | `nobody_attacked`, edited | candidate ≤ `standard`'s − 0.15 |
+| P2 | `seat_cities`, edited − control | candidate ≥ `standard`'s |
+| P3 | `end_seat_win_weight`, edited − control | candidate ≥ `standard`'s − 0.03 |
+| P4 | A7 (we are the weak one) `wars_declared` delta, if the exam has A7 by the run | candidate ≤ `standard`'s |
+| P5 | whole games W1–W3 with S-4 in | as W1–W3 |
+
 ## Gates (written before the first run, not changed after)
 
 **Whole games.** `ai-tournament --candidate strategist-x --baseline standard --suite pace --speed quick`,
 offsets 1201 and 1203 (400 games, never tuned on); tuning on 1200 and 1202. The baseline of the defect
 metrics: the mirror `--candidate standard --baseline standard` on 1201 and 1203, and `standard`'s seats in
 the candidate's games. The defect metrics come from the read-only probe `AURELIA_DIPLO_PROBE`
-(`crates/qa/src/bench/diplo_probe.rs`, one JSON line per seat; summary `crates/qa/tools/diplo-summary.py`).
+(`crates/qa/src/bench/diplo_probe.rs`, one JSON line per seat; summary `tools/diplo-summary.py`).
 
 | gate | metric | pass |
 |---|---|---|
@@ -138,4 +154,22 @@ written here and the defect stops.
 
 ## Results
 
-Filled after the runs.
+### Baseline (`standard`, measured 22 Nov 01:20, build `d59d286` + the exam's harness)
+
+W4: `--solo standard --suite standard --speed quick` hash `d2d736c1273a82bb` (40 games). Mirror
+`--candidate standard --baseline standard`, pace Quick, offsets 1201 and 1203 (400 games, 2400 seats):
+real victories 67 of 400 games (diplomatic 9 + science 22 on 1201), AI ms p50 2.33.
+
+| metric | `standard` |
+|---|---:|
+| C1 wars on city-states / seat | 0.000 |
+| C2 city-state cities held at the end / seat | 0.031 |
+| tributes / seat | 2.83 |
+| C4 quests done / given | 12.6 % |
+| C3 allies at the end / seat | 1.35 (r132: 0.11) |
+| seats that reached the parts | 890 |
+| S1 lacking a part's copies then | 26.1 % (232): the defect shows, S1 is a gate |
+| S2 rounds a part waited for copies / such seat | 4.53 |
+
+The probe counts a quest by its city-state, nation, kind and start; 48.6 quests a seat are counted
+(the audit counted 24.8 by another method); the share done (12.6 %) is the audit's (12 %).
