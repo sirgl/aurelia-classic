@@ -124,9 +124,26 @@ impl<'i, 'o, 'a> Negotiation<'i, 'o, 'a> {
         &self.stakes
     }
 
+    /// The war with `enemy` as the player weighs it. A war `net2` wants peace in (`Net2Plan::peace_with`: no order
+    /// on it and no reason left) promises no attack: ending it costs nothing of ours, only the loss it still threatens.
     pub fn prospect(&self, enemy: PlayerId) -> WarProspect {
         let input = self.input;
-        WarProspect::of(input.brief, input.state, input.rules, &self.prices, &self.stakes, enemy, Some(&input.observation.view))
+        let mut prospect = WarProspect::of(input.brief, input.state, input.rules, &self.prices, &self.stakes, enemy, Some(&input.observation.view));
+        if input.brief.net2.as_ref().is_some_and(|p| p.makes_peace_with(enemy)) {
+            prospect.attack = WarCase::default();
+        }
+        prospect
+    }
+
+    /// `value` of an item that flows to us later (gold a turn, a resource, a neighbour's open borders), read by a
+    /// `net2` plan at the trust in the giver (§4.6, P4: the buyer who paid a sale that the seller then broke by war):
+    /// `trust`/1000 of it, nothing below `TRUST_MIN`. As today without a plan.
+    fn flows_later(&self, from: PlayerId, value: Centi) -> Centi {
+        match self.input.brief.net2.as_ref() {
+            Some(plan) if plan.trust(from) < crate::ai::net2::plan::TRUST_MIN => 0,
+            Some(plan) => value * plan.trust(from) / 1000,
+            None => value,
+        }
     }
 
     /// `gold` in hundredths of score points: a gold now is the price of a
@@ -146,7 +163,7 @@ impl<'i, 'o, 'a> Negotiation<'i, 'o, 'a> {
     /// give for the deal's rounds (`resource`); peace by giving up
     /// the war's prospect; an embassy we receive by the capital it reveals
     /// (`found`) on top of the advisor's scale; the rest by the advisor's
-    /// gold scale (`diplomacy::item_value_priced`) at the price of gold. Peace
+    /// gold scale (`diplomacy::item_value_with`) at the price of gold. Peace
     /// counts once, however many sides give it.
     pub fn value(&self, other: PlayerId, items: &[(PlayerId, DealItem)]) -> Centi {
         let me = self.obs().player;
@@ -164,11 +181,23 @@ impl<'i, 'o, 'a> Negotiation<'i, 'o, 'a> {
                     DealItem::GoldPerTurn(gold) => {
                         // The game speed's deal (`DEAL_DURATION` at Standard).
                         let rounds = self.input.observation.speed.deal_rounds.min(self.prices.rounds_left);
-                        sign * self.gold(i64::from(gold) * i64::from(rounds))
+                        let worth = self.gold(i64::from(gold) * i64::from(rounds));
+                        if receiving {
+                            self.flows_later(other, worth)
+                        } else {
+                            -worth
+                        }
                     }
                     // A city we cannot see is worth nothing we can tell; ours we always see.
                     DealItem::City(city) => sign * self.city(city).unwrap_or(0),
-                    DealItem::Resource { resource, amount } => self.resource(other, resource, amount, receiving),
+                    DealItem::Resource { resource, amount } => {
+                        let worth = self.resource(other, resource, amount, receiving);
+                        if receiving {
+                            self.flows_later(other, worth)
+                        } else {
+                            worth
+                        }
+                    }
                     DealItem::Embassy if receiving => self.found(other) + self.scale(other, *item, receiving),
                     _ => self.scale(other, *item, receiving),
                 }
@@ -177,15 +206,16 @@ impl<'i, 'o, 'a> Negotiation<'i, 'o, 'a> {
         peace + terms
     }
 
-    /// An item by the advisor's gold scale (`diplomacy::item_value_priced`) at
+    /// An item by the advisor's gold scale (`diplomacy::item_value_with`) at
     /// the price of gold.
     fn scale(&self, other: PlayerId, item: DealItem, receiving: bool) -> Centi {
         let agreements = crate::ai::diplomacy::agreement_prices(self.input);
         // `strategist-x`: no friendship, research agreement, pact or open borders for the rival running away.
-        if crate::ai::diplomacy::helps(item) && crate::ai::diplomacy::contained(self.input.brief) == Some(other) {
+        if crate::ai::diplomacy::helps(item) && crate::ai::diplomacy::denied(self.input.brief, other) {
             return self.gold(crate::ai::diplomacy::REFUSED);
         }
-        self.gold(crate::ai::diplomacy::item_value_priced(self.obs(), self.input.rules, agreements, other, item, receiving))
+        let value = crate::ai::diplomacy::item_value_with(self.obs(), self.input.rules, agreements, self.input.brief.net2.as_ref(), other, item, receiving);
+        self.gold(value)
     }
 
     /// What `amount` copies of `resource` received (`receiving`) from `other` or given to it for
@@ -229,7 +259,7 @@ impl<'i, 'o, 'a> Negotiation<'i, 'o, 'a> {
         }
         // `strategist-x`: no strategic copy for the rival running away (a part of its spaceship may
         // wait for it; Vox Populi's rule of no aluminium to a nation close to the spaceship, by class).
-        if !luxury && crate::ai::diplomacy::contained(self.input.brief) == Some(other) {
+        if !luxury && crate::ai::diplomacy::denied(self.input.brief, other) {
             return self.gold(crate::ai::diplomacy::REFUSED);
         }
         let lost = (amount - (free - 1).max(0)).clamp(0, amount);
