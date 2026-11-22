@@ -3,6 +3,9 @@
 //! player give the same commands — and pick the sensible order.
 
 use classic_rules::ClassicGame;
+#[path = "common/parallel.rs"]
+mod parallel;
+use parallel::parallel;
 use classic_content::core::core_rules;
 use classic_rules::ai::citizens::focus_commands;
 use classic_rules::ai::improvements::{best_worker_job, worker_commands};
@@ -365,8 +368,9 @@ fn the_ai_runs_trade_routes() {
     use classic_rules::ai::{AiDriver, AiSettings};
     use classic_rules::scenario::{generate_new_game, ScenarioConfig};
     let rules = rules();
-    let (mut games_with_routes, mut refused_total) = (0, 0);
-    for k in 0..12u64 {
+    let seeds: Vec<u64> = (0..12).collect();
+    // The twelve games are independent: they run side by side (they were 6 s in a row).
+    let results = parallel(&seeds, |&k| {
         let config = ScenarioConfig { seed: 0x7_4ADE + k, players: 4, width: 40, height: 28, cities: 0, units: 0, water_ratio: 20 };
         let mut game = generate_new_game(&rules, &config);
         let mut driver = AiDriver::new(AiSettings::for_rules(&rules, rules.default_difficulty()), Vec::new());
@@ -385,9 +389,10 @@ fn the_ai_runs_trade_routes() {
             .filter(|e| matches!(e.outcome, Outcome::Rejected(_)))
             .count();
         eprintln!("trade: seed {k}: most routes at once {most_routes}, refused {refused}");
-        games_with_routes += usize::from(most_routes > 0);
-        refused_total += refused;
-    }
+        (most_routes, refused)
+    });
+    let games_with_routes = results.iter().filter(|(routes, _)| *routes > 0).count();
+    let refused_total: usize = results.iter().map(|(_, refused)| refused).sum();
     assert!(games_with_routes >= 2, "the AI started trade routes in {games_with_routes} of 12 games");
     assert_eq!(refused_total, 0, "every route the AI picked was allowed");
 }

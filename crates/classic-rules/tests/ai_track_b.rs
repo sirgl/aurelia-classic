@@ -21,15 +21,17 @@ const ROUNDS: u32 = 200;
 /// Prophet in 160 rounds (2 games of 8 on this ruleset), so the religion
 /// is asserted over the set, not over one game: a single seed made the
 /// assertion hang on the butterfly effects of any rule change.
+#[path = "common/parallel.rs"]
+mod parallel;
+use parallel::parallel;
+
 const SEEDS: [u64; 9] = [0x7_B0B, 1, 2, 3, 4, 5, 6, 7, 8];
 
 #[test]
 fn ai_adopts_policies_and_founds_a_religion_in_a_classic_game() {
     let rules = compile_rules(core_rules()).unwrap();
-    let mut religions = 0;
-    for seed in SEEDS {
-        religions += one_game(&rules, seed);
-    }
+    // The nine games are independent: they run side by side (they were 8 s in a row).
+    let religions: usize = parallel(&SEEDS, |&seed| one_game(&rules, seed)).into_iter().sum();
     assert!(religions >= 1, "a religion is founded");
 }
 

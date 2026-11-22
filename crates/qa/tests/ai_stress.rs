@@ -111,7 +111,11 @@ fn a1_gift_makes_the_leader_research_faster() {
 fn an_instance_plays_the_same_twice() {
     let (rules, p) = (rules(), position());
     let run = || stress::run_instance(rules, &p, 0, &[Situation::B4, Situation::A5], None, false);
-    let (a, b) = (run(), run());
+    // The two plays are independent: they run side by side.
+    let (a, b) = std::thread::scope(|scope| {
+        let second = scope.spawn(run);
+        (run(), second.join().expect("the second play ran"))
+    });
     assert!(!a.rows.is_empty(), "something was built: {:?}", a.unbuilt);
     let json = |d: &stress::Done| serde_json::to_string(&d.rows).expect("rows serialise");
     assert_eq!(json(&a), json(&b));

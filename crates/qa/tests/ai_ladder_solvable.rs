@@ -44,8 +44,9 @@ fn first_turn(played: &selfplay::Played) -> bool {
     b.captured_round == Some(b.start_round)
 }
 
-#[test]
-fn an_unsolvable_scene_is_drawn_again_and_a_solvable_one_is_kept() {
+/// The scenes are independent games, so each of the four checks is its own test and they run in parallel
+/// (together they were one test of 21 s in a row).
+fn setup() -> (classic_rules::CompiledRuleset, Config, Config, Vec<selfplay::Job>) {
     let rules = ClassicBench::rules();
     let (on, off) = (config(&rules, true), config(&rules, false));
     // The scene numbers are those of the worlds with the balanced starts (4 November): before them the
@@ -53,10 +54,21 @@ fn an_unsolvable_scene_is_drawn_again_and_a_solvable_one_is_kept() {
     // worlds the teacher misses fewer scenes as drawn (10 of the first 200 scenes, the first of them 37), so
     // the scenes drawn again lie farther out: 40 and 37, again at attempts 1 and 6.
     let jobs = selfplay::jobs(&on, 49);
+    (rules, on, off, jobs)
+}
+
+#[test]
+fn a_scene_that_allows_no_capture_is_not_filtered() {
+    let (rules, on, off, jobs) = setup();
     // Scene 2 allows no first-turn capture (its ring short of the shots): not filtered, as without the flag.
     let open = selfplay::play(&rules, &on, &jobs[2]).unwrap();
     assert!(open.meta.ladder_draw.is_none());
     assert_eq!(open.journal, selfplay::play(&rules, &off, &jobs[2]).unwrap().journal);
+}
+
+#[test]
+fn a_solvable_scene_is_kept_as_drawn() {
+    let (rules, on, off, jobs) = setup();
     // Scene 1: taken as drawn: the same game with and without the flag.
     let kept = selfplay::play(&rules, &on, &jobs[1]).unwrap();
     let plain = selfplay::play(&rules, &off, &jobs[1]).unwrap();
@@ -65,6 +77,10 @@ fn an_unsolvable_scene_is_drawn_again_and_a_solvable_one_is_kept() {
     assert_eq!((d.attempt, d.draws, d.solved), (0, 1, true));
     assert_eq!(kept.journal, plain.journal, "a scene kept is played byte for byte as without the flag");
     assert_eq!(kept.meta.hash, plain.meta.hash);
+}
+
+fn an_unsolvable_scene_is_drawn_again(i: usize, attempt: u32) {
+    let (rules, on, off, jobs) = setup();
     // Scenes 48 and 37: the teacher misses them as drawn; drawn again (another scene for 48, another world for 37), it takes them.
     // Lost orders (kernel `OrderRemoved`, 11 November): the worlds play differently once the stock of a lost wonder is kept,
     // so the scenes the teacher misses moved: 40 and 37 at attempts 1 and 6 became 48 and 37 at attempts 1 and 5 (scan of
@@ -80,13 +96,21 @@ fn an_unsolvable_scene_is_drawn_again_and_a_solvable_one_is_kept() {
     // The tile price as Unciv (rules/purchase-holes, 14 November): one product of the speed and the purchase factors,
     // rounded once to the nearest gold, so the AI buys tiles at other prices and scene 37's solvable world is its
     // seventh again (attempt 6).
-    for (i, attempt) in [(48, 1), (37, 6)] {
-        let missed = selfplay::play(&rules, &off, &jobs[i]).unwrap();
-        assert!(!first_turn(&missed), "scene {i} as drawn is not taken in the first turn");
-        let again = selfplay::play(&rules, &on, &jobs[i]).unwrap();
-        let d = again.meta.ladder_draw.expect("the draw");
-        assert_eq!((d.attempt, d.solved), (attempt, true), "scene {i}");
-        assert!(first_turn(&again), "scene {i} drawn again is taken by the teacher in the first turn");
-        assert_eq!(again.meta.group, missed.meta.group, "the same group (GRPO)");
-    }
+    let missed = selfplay::play(&rules, &off, &jobs[i]).unwrap();
+    assert!(!first_turn(&missed), "scene {i} as drawn is not taken in the first turn");
+    let again = selfplay::play(&rules, &on, &jobs[i]).unwrap();
+    let d = again.meta.ladder_draw.expect("the draw");
+    assert_eq!((d.attempt, d.solved), (attempt, true), "scene {i}");
+    assert!(first_turn(&again), "scene {i} drawn again is taken by the teacher in the first turn");
+    assert_eq!(again.meta.group, missed.meta.group, "the same group (GRPO)");
+}
+
+#[test]
+fn scene_48_is_drawn_again_at_attempt_1() {
+    an_unsolvable_scene_is_drawn_again(48, 1);
+}
+
+#[test]
+fn scene_37_is_drawn_again_at_attempt_6() {
+    an_unsolvable_scene_is_drawn_again(37, 6);
 }

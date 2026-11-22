@@ -2,6 +2,9 @@
 //! the variants that play it, its unit automation in small scenes, and its
 //! determinism. The truth is read only to set the scenes and judge them.
 
+#[path = "common/parallel.rs"]
+mod parallel;
+use parallel::parallel;
 use classic_content::core::core_rules;
 use classic_rules::ai::driver::ClassicMind;
 use classic_rules::ai::state::SeenCity;
@@ -182,11 +185,13 @@ fn unciv_modules_inside_standard_change_only_their_family() {
         (applied, rejected)
     };
     let (standard, _) = play(ClassicMind::new(Variant::PreNext));
-    for v in Variant::ALL.into_iter().filter(|v| v.unciv().parts().any()) {
+    // The variants are independent games: they run side by side (they were 3 s in a row).
+    let variants: Vec<Variant> = Variant::ALL.into_iter().filter(|v| v.unciv().parts().any()).collect();
+    parallel(&variants, |&v| {
         let (dry, _) = play(ClassicMind::new(v).dry_unciv());
         assert!(dry == standard, "{}: deciding but not played, the game is `pre-next`'s", v.name());
         let (played, rejected) = play(ClassicMind::new(v));
         assert_eq!(rejected, 0, "{}: the rules refuse none of the orders", v.name());
         assert!(played != standard, "{}: its family changes the game", v.name());
-    }
+    });
 }

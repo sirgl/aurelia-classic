@@ -12,8 +12,8 @@
 #   * the tests of that crate and of every crate that depends on it (dev-dependencies too),
 #     in classic and in platform: a change in platform's kernel runs everything above the kernel;
 #   * the `pins` group of classic/.config/nextest.toml (the cheap pinned games), always;
-#   * only the fast tests: the nextest `default` profile leaves out the slow and GPU groups.
-#     `--profile full` takes them in.
+#   * the nextest `default` profile: every test but the GPU ones (there is no slow group any more).
+#     `--profile full` takes the GPU tests in.
 # Files outside the crates: assets/rules -> classic-rules and up, assets/{lang,visual,models} ->
 # classic-ui and up, docs/classic -> classic-content; other docs, tools/, nn/, saves/ and *.md
 # run only the pins; anything else (Cargo.lock, a root Cargo.toml, .cargo/, .config/) runs all.
