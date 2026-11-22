@@ -56,6 +56,10 @@ fn is_net2(player: PlayerId) -> bool {
 impl Pair {
     /// Runs `call` and adds its time to `player`'s side.
     fn timed<T>(&self, player: PlayerId, call: impl FnOnce() -> T) -> T {
+        // `NET2_SANITY_SPANS=net2|nets-x-site`: the spans of that side only (the executors' spans are shared code).
+        if let Ok(side) = std::env::var("NET2_SANITY_SPANS") {
+            prof::set_active((side == "net2") == is_net2(player));
+        }
         let start = std::time::Instant::now();
         let out = call();
         let side = usize::from(!is_net2(player));
@@ -78,11 +82,11 @@ impl AiMind<Classic> for Pair {
     type Near<'g> = LocalObservation<'g>;
 
     fn sense<'g>(&self, game: &'g GameState, rules: &'g CompiledRuleset, player: PlayerId) -> AIObservation<'g> {
-        self.mind(player).sense(game, rules, player)
+        self.timed(player, || self.mind(player).sense(game, rules, player))
     }
 
     fn sense_unit<'g>(&self, game: &'g GameState, rules: &'g CompiledRuleset, settings: &AiSettings, player: PlayerId, unit: UnitHandle) -> Option<LocalObservation<'g>> {
-        self.mind(player).sense_unit(game, rules, settings, player, unit)
+        self.timed(player, || self.mind(player).sense_unit(game, rules, settings, player, unit))
     }
 
     fn note_humans(&mut self, humans: &[PlayerId]) {
@@ -247,7 +251,7 @@ fn print_time(spent: &[u64; 2], records: &[prof::Record]) {
         }
     }
     sums.sort_by_key(|(_, ns, _)| std::cmp::Reverse(*ns));
-    for (name, ns, calls) in sums.iter().filter(|(n, _, _)| n.starts_with("net2/") || n.starts_with("classic/")).take(16) {
-        println!("    span {name}: {:.0} ms, {calls} calls, {:.1} % of net2's AI time", *ns as f64 / 1e6, *ns as f64 * 100.0 / spent[0].max(1) as f64);
+    for (name, ns, calls) in sums.iter().filter(|(n, _, _)| n.starts_with("net2/") || n.starts_with("classic/")).take(24) {
+        println!("    span {name}: {:.0} ms, {calls} calls", *ns as f64 / 1e6);
     }
 }
