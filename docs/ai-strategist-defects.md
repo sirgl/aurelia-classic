@@ -348,3 +348,16 @@ with tall first 59.9–60.6 % against 61.1 % without it) and it is the part that
 candidate, the capitals lost and the rebels. The threat stays as the bench-only variant
 `strategist-x-threat` for the commander's lane (its next step: why no operation forms on the leader).
 Measured by the gate R1–R4 above on offset 1555.
+
+### Gate of the hand edit, offset 1555 (400 pace games Quick, `strategist-x` = tall first alone, build `1433d1f`)
+
+| gate | result | pass |
+|---|---|---|
+| R1 victory-weighted share, pooled | 56.7 % (95 % CI 52.0–61.4); 56.5 % on 1555, 56.8 % on 1556; real victories 105 against 64 (diplomatic 38 / 29, science 67 / 35, time 94 / 137) | **no** (needs ≥ 58 %) |
+| R2 risings of rebels | 0 against `standard`'s 3 (turns below −20 happiness 3 against 20) | yes |
+| R3 capitals lost | 3 against 3 (1.0×) | yes |
+| R4 `standard`'s hash | `d2d736c1273a82bb` | yes |
+
+Wars declared 285 against 318, wars on it 321 against 282, cities captured 135 against 183, seats eliminated
+3 against 1. Points share 49.8 % (45.5–54.0): the score is lower (the paired final-score difference −62 and
+−74 a seat block), as for every tall-first build.
