@@ -225,8 +225,39 @@ fn damage(row: &Row) -> f64 {
     }
 }
 
+/// The share of the score the edit took at once (before any play).
+fn start_damage(row: &Row) -> f64 {
+    row.control.get("start_seat_score_share").copied().unwrap_or(0.0) - row.edited.get("start_seat_score_share").copied().unwrap_or(0.0)
+}
+
+/// The ranking of the samples by damage, and the worst sample of each of the first `distinct`
+/// combinations (the sorted kinds of their primitives) in that order.
+fn ranking(rows: &mut [Row], distinct: usize) -> String {
+    rows.sort_by(|a, b| damage(b).total_cmp(&damage(a)));
+    let combination = |r: &Row| r.info.get("combination").cloned().unwrap_or_default();
+    let mut md = String::from("| rank | damage | at once | after the edit | sample | position | combination | recipe |\n|---|---|---|---|---|---|---|---|\n");
+    for (rank, r) in rows.iter().enumerate().take(30) {
+        md.push_str(&format!("| {} | {:+.3} | {:+.3} | {:+.3} | {} | {} r{} | {} | {} |\n", rank + 1, damage(r), start_damage(r), damage(r) - start_damage(r), r.instance, r.position, r.round, combination(r), r.info.get("recipe").map_or("", String::as_str)));
+    }
+    let mut seen: Vec<String> = Vec::new();
+    md.push_str("\nThe worst distinct combinations (each at its worst sample; mean damage over all its samples):\n\n| combination | worst damage | samples | mean damage | mean after the edit |\n|---|---|---|---|---|\n");
+    for r in rows.iter() {
+        let c = combination(r);
+        if seen.contains(&c) || seen.len() == distinct {
+            continue;
+        }
+        let same: Vec<&Row> = rows.iter().filter(|x| combination(x) == c).collect();
+        let mean = same.iter().map(|x| damage(x)).sum::<f64>() / same.len() as f64;
+        let after = same.iter().map(|x| damage(x) - start_damage(x)).sum::<f64>() / same.len() as f64;
+        md.push_str(&format!("| {c} | {:+.3} | {} | {mean:+.3} | {after:+.3} |\n", damage(r), same.len()));
+        seen.push(c);
+    }
+    md
+}
+
 fn random(o: &Opts, rules: &classic_rules::CompiledRuleset) -> Result<(), String> {
     std::fs::create_dir_all(&o.out).map_err(|e| e.to_string())?;
+    let variant = variant_of(o)?;
     let logs = position::logs(&o.positions)?;
     let path = o.out.join("random.jsonl");
     let done: std::collections::BTreeSet<usize> = std::fs::read_to_string(&path).unwrap_or_default().lines().filter_map(|l| serde_json::from_str::<Row>(l).ok()).map(|r| r.instance).collect();
@@ -235,7 +266,13 @@ fn random(o: &Opts, rules: &classic_rules::CompiledRuleset) -> Result<(), String
     aurelia_qa::export::parallel(&samples, o.jobs, |&i| {
         let at = (position::mix(o.seed ^ 0xface ^ i as u64) % logs.len() as u64) as usize;
         let log = std::fs::canonicalize(&logs[at]).unwrap_or_else(|_| logs[at].clone());
-        let row = position::load(rules, &log, position::round_of(at, o.round, o.jitter)).and_then(|p| stress::run_random(rules, &p, i, o.seed, o.to_end));
+        let loaded = position::load(rules, &log, position::round_of(at, o.round, o.jitter));
+        let row = loaded.and_then(|mut p| {
+            if let Some(v) = variant {
+                p.variant = v;
+            }
+            stress::run_random(rules, &p, i, o.seed, o.to_end)
+        });
         match row {
             Ok(row) => {
                 let line = serde_json::to_string(&row).expect("a row serialises");
@@ -246,11 +283,7 @@ fn random(o: &Opts, rules: &classic_rules::CompiledRuleset) -> Result<(), String
     });
     let text = std::fs::read_to_string(&path).unwrap_or_default();
     let mut rows: Vec<Row> = text.lines().filter_map(|l| serde_json::from_str(l).ok()).collect();
-    rows.sort_by(|a, b| damage(b).total_cmp(&damage(a)));
-    let mut md = String::from("| rank | damage | sample | position | recipe |\n|---|---|---|---|---|\n");
-    for (rank, r) in rows.iter().enumerate().take(30) {
-        md.push_str(&format!("| {} | {:+.3} | {} | {} r{} | {} |\n", rank + 1, damage(r), r.instance, r.position, r.round, r.info.get("recipe").map_or("", String::as_str)));
-    }
+    let md = ranking(&mut rows, 10);
     std::fs::write(o.out.join("ranking.md"), &md).map_err(|e| e.to_string())?;
     println!("{} samples\n\n{md}", rows.len());
     Ok(())

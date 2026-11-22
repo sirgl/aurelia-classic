@@ -55,7 +55,10 @@ pub fn measure(roles: &Roles, rules: &CompiledRuleset, game: &GameState, watch: 
             m.insert("rival_cities_lost".into(), count(watch.captures.iter().filter(|c| c.from.0 == leader).count()));
         }
         Roles::Common { a, b, enemy } => common(&mut m, watch, (a, b, enemy), start, window),
-        Roles::Seat { .. } => {}
+        Roles::Seat { seat } => {
+            m.insert("seat_recaptures".into(), count(watch.captures.iter().filter(|c| c.to.0 == seat).count()));
+            m.insert("seat_cities_lost".into(), count(watch.captures.iter().filter(|c| c.from.0 == seat).count()));
+        }
         Roles::Sneak { seat, enemy, war_after } => sneak(&mut m, watch, (seat, enemy, war_after), start, window),
         Roles::Weak { seat } => weak(&mut m, watch, seat),
         Roles::Snipe { city, building, .. } => snipe(&mut m, watch, city, building),
@@ -91,6 +94,16 @@ pub fn measure(roles: &Roles, rules: &CompiledRuleset, game: &GameState, watch: 
             m.insert("war_rounds".into(), count(at_war.len()));
             m.insert("further_losses".into(), count(watch.captures.iter().filter(|c| c.from.0 == seat).count()));
         }
+        Roles::Zone { seat, .. } => {
+            m.insert("zone_dead".into(), f64::from(watch.tracked_dead) / watch.followed().max(1) as f64);
+            m.insert("seat_units_lost".into(), lost(watch, seat));
+        }
+        Roles::Hunt { seat, .. } => {
+            m.insert("seat_units_lost".into(), lost(watch, seat));
+            m.insert("at_sea_end".into(), watch.of(seat).last().map_or(0.0, |s| f64::from(s.at_sea)));
+        }
+        Roles::Air { seat, .. } => air(&mut m, watch, seat),
+        Roles::Pest { seat, pest } => pests(&mut m, game, watch, seat, pest),
         Roles::Host { .. } => {
             let dead = watch.hosts.last().is_some_and(|(_, host, alive)| host.is_some() && !alive);
             m.insert("host_dead_at_end".into(), flag(dead));
@@ -120,6 +133,14 @@ pub fn end_outcome(roles: &Roles, rules: &CompiledRuleset, game: &GameState) -> 
     m
 }
 
+/// The share of the score of all nations that the nations in focus hold.
+pub fn score_share(roles: &Roles, rules: &CompiledRuleset, game: &GameState) -> f64 {
+    let auth = game.view().auth;
+    let total: i64 = majors(game).iter().map(|p| classic_rules::world::victory::score(auth, rules, *p)).sum::<i64>().max(1);
+    let score: i64 = roles.focus(game).iter().map(|p| classic_rules::world::victory::score(auth, rules, *p)).sum();
+    score as f64 / total as f64
+}
+
 /// The outcome of the nations in focus: their cities, technologies and share of the score (means over
 /// the nations), whether one of them won by a real victory, and how many are alive.
 fn outcome(roles: &Roles, rules: &CompiledRuleset, game: &GameState, watch: &Watch) -> Measures {
@@ -141,6 +162,38 @@ fn outcome(roles: &Roles, rules: &CompiledRuleset, game: &GameState, watch: &Wat
     m.insert("seat_military".into(), last.iter().map(|s| f64::from(s.military)).sum::<f64>() / n);
     m.insert("seat_treasury".into(), last.iter().map(|s| f64::from(s.treasury)).sum::<f64>() / n);
     m
+}
+
+/// Military units of `seat` lost in the window.
+fn lost(watch: &Watch, seat: u8) -> f64 {
+    f64::from(watch.losses.get(&seat).copied().unwrap_or(0))
+}
+
+/// The seat's air war: its losses, its aircraft at the end and added, its orders to them.
+fn air(m: &mut Measures, watch: &Watch, seat: u8) {
+    let first = watch.of(seat).next().map_or(0.0, |s| f64::from(s.air));
+    let last = watch.of(seat).last().map_or(0.0, |s| f64::from(s.air));
+    let by_seat = |orders: &[(u32, PlayerId)]| orders.iter().filter(|(_, p)| p.0 == seat).count() as f64;
+    m.insert("seat_units_lost".into(), lost(watch, seat));
+    m.insert("seat_air_end".into(), last);
+    m.insert("seat_air_added".into(), last - first);
+    m.insert("seat_air_orders".into(), by_seat(&watch.air_orders));
+    m.insert("seat_interceptions".into(), by_seat(&watch.interceptions));
+}
+
+/// The pest's work on the seat: its cities that follow the pest's religion at the end, the seat's
+/// faith answers and spies sent home, and its technology lead over the pest.
+fn pests(m: &mut Measures, game: &GameState, watch: &Watch, seat: u8, pest: u8) {
+    let auth = game.view().auth;
+    let religion = auth.module().religion().player(PlayerId(pest)).religion;
+    let follows = |h: &classic_rules::ids::CityHandle| religion.is_some_and(|r| classic_rules::derived::religion::city_majority(auth, *h) == Some(classic_rules::world::religion::Creed::Religion(r)));
+    let converted = auth.indexes().cities_of(PlayerId(seat)).iter().filter(|h| follows(h)).count();
+    let by_seat = |orders: &[(u32, PlayerId)]| orders.iter().filter(|(_, p)| p.0 == seat).count() as f64;
+    let techs = |p: u8| auth.players().techs_of(PlayerId(p)).len() as f64;
+    m.insert("cities_converted".into(), converted as f64);
+    m.insert("faith_answers".into(), by_seat(&watch.faith_orders));
+    m.insert("spies_home".into(), by_seat(&watch.spies_home));
+    m.insert("tech_lead_over_pest".into(), techs(seat) - techs(pest));
 }
 
 /// The seat lost its own original capital in the window.

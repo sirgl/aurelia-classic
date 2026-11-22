@@ -18,6 +18,12 @@ use kernel::ai::plan::{role_of, AiRole};
 use kernel::ids::EntityId;
 use serde::{Deserialize, Serialize};
 
+mod deals;
+mod pests;
+mod war;
+
+pub(crate) use deals::luxury_to_sell;
+
 /// Commands one script may send in one turn (a guard against a plan that loops).
 const COMMANDS_A_TURN: usize = 120;
 
@@ -29,6 +35,22 @@ pub trait Seat {
     fn play(&mut self, game: &mut GameState, rules: &CompiledRuleset);
     /// What the script counted (merged into the arm's measures as `script_*`).
     fn counts(&self) -> BTreeMap<String, f64>;
+    /// Whether `command` of the seat's AI orders what the script plays (its units, its spies):
+    /// the play loop refuses it, so the AI leaves the script's part alone (wave 3).
+    fn holds(&self, _game: &GameState, _command: &Command) -> bool {
+        false
+    }
+}
+
+/// The command orders one of the units `held` (persistent ids).
+fn orders_one_of(game: &GameState, command: &Command, held: &[u64]) -> bool {
+    let Some(unit) = classic_rules::knowledge::actions::acting_unit(command) else { return false };
+    game.view().auth.units().get(unit).is_some_and(|u| held.contains(&u.core.id.0))
+}
+
+/// The handle of a living unit by its persistent id.
+fn handle(game: &GameState, id: u64) -> Option<UnitHandle> {
+    game.view().auth.units().handle_of(EntityId(id))
 }
 
 /// The adversary of a scene, as data.
@@ -51,23 +73,82 @@ pub enum Script {
     /// P8 alliance-sweep: every round `seat` gifts `percent` of its treasury to the city-state it is
     /// nearest to winning as an ally (the most influence of those it is not the ally of).
     Sweep { seat: u8, percent: u32 },
+    /// P6 kill-zone: the `units` of `seat` hold their tiles by its city nearest to `enemy`: the
+    /// ranged ones shoot the most wounded enemy in range, the melee ones finish a wounded enemy next
+    /// to them and go back to their tile, none advances; a civilian among them is the bait and
+    /// never moves. The seat's AI leaves them alone.
+    KillZone {
+        seat: u8,
+        enemy: u8,
+        #[serde(default)]
+        units: Vec<u64>,
+    },
+    /// P9 sea-hunter: the ships `units` of `seat` hunt `victim`'s units on the water (embarked
+    /// land units and ships): shoot or ram the nearest, else sail to it.
+    SeaHunt {
+        seat: u8,
+        victim: u8,
+        #[serde(default)]
+        units: Vec<u64>,
+    },
+    /// P10 air-nuke: the aircraft `units` of `seat` strike `victim` every round from their city:
+    /// bombers the victim's strongest unit in range (else its city), fighters stand on interception,
+    /// a nuclear weapon falls on the victim's largest city in range.
+    AirStrike {
+        seat: u8,
+        victim: u8,
+        #[serde(default)]
+        units: Vec<u64>,
+    },
+    /// P11 pests (faith): the missionaries and prophets `units` of `seat` walk to `victim`'s cities
+    /// that do not follow the seat's religion and spread it there.
+    Faith {
+        seat: u8,
+        victim: u8,
+        #[serde(default)]
+        units: Vec<u64>,
+    },
+    /// P12 pests (spies): the spies of `seat` go to `victim`'s largest cities, one a city, and
+    /// steal a technology whenever the seat has the right to.
+    Spies { seat: u8, victim: u8 },
+    /// P4L: `seat`, a friend, sells `victim` a luxury it lacks for a lump sum of `percent` of its
+    /// treasury (halved each round it is refused) and declares war the round after the sale (the
+    /// gold stays, the deal ends with the war).
+    LuxuryThenWar { seat: u8, victim: u8, percent: u32 },
+    /// P4B: `seat` pays `victim` (a friend) `gold` to declare war on `third`, then declares war on
+    /// `victim` once it is at war with `third`.
+    BribeThenWar { seat: u8, victim: u8, third: u8, gold: u32 },
 }
 
 impl Script {
-    /// The script with the units the edit spawned: a raid plays them.
+    /// The script with the units the edit spawned: a raid, a kill-zone, a hunt, a strike and a
+    /// faith script play them.
     pub fn with_units(self, spawned: &[u64]) -> Script {
+        let units = spawned.to_vec();
         match self {
-            Script::Raid { seat, victim, .. } => Script::Raid { seat, victim, units: spawned.to_vec() },
+            Script::Raid { seat, victim, .. } => Script::Raid { seat, victim, units },
+            Script::KillZone { seat, enemy, .. } => Script::KillZone { seat, enemy, units },
+            Script::SeaHunt { seat, victim, .. } => Script::SeaHunt { seat, victim, units },
+            Script::AirStrike { seat, victim, .. } => Script::AirStrike { seat, victim, units },
+            Script::Faith { seat, victim, .. } => Script::Faith { seat, victim, units },
             other => other,
         }
     }
 
     /// The state machine of the script.
     pub fn start(&self) -> Box<dyn Seat> {
+        let p = |x: &u8| PlayerId(*x);
         match self {
-            Script::Raid { seat, victim, units } => Box::new(Raid { seat: PlayerId(*seat), victim: PlayerId(*victim), units: units.clone(), captured: 0, pillaged: 0 }),
-            Script::SellThenWar { seat, victim, percent } => Box::new(SellThenWar { seat: PlayerId(*seat), victim: PlayerId(*victim), percent: *percent, stage: Stage::Offer, offers: 0 }),
-            Script::Sweep { seat, percent } => Box::new(Sweep { seat: PlayerId(*seat), percent: *percent, gifted: 0 }),
+            Script::Raid { seat, victim, units } => Box::new(Raid { seat: p(seat), victim: p(victim), units: units.clone(), captured: 0, pillaged: 0 }),
+            Script::SellThenWar { seat, victim, percent } => Box::new(SellThenWar { seat: p(seat), victim: p(victim), percent: *percent, stage: Stage::Offer, offers: 0 }),
+            Script::Sweep { seat, percent } => Box::new(Sweep { seat: p(seat), percent: *percent, gifted: 0 }),
+            Script::KillZone { seat, enemy, units } => Box::new(war::KillZone::new(p(seat), p(enemy), units.clone())),
+            Script::SeaHunt { seat, victim, units } => Box::new(war::SeaHunt::new(p(seat), p(victim), units.clone())),
+            Script::AirStrike { seat, victim, units } => Box::new(war::AirStrike::new(p(seat), p(victim), units.clone())),
+            Script::Faith { seat, victim, units } => Box::new(pests::Faith::new(p(seat), p(victim), units.clone())),
+            Script::Spies { seat, victim } => Box::new(pests::Spies::new(p(seat), p(victim))),
+            Script::LuxuryThenWar { seat, victim, percent } => Box::new(deals::Betrayal::new(p(seat), p(victim), deals::Bait::Luxury { percent: *percent })),
+            Script::BribeThenWar { seat, victim, third, gold } => Box::new(deals::Betrayal::new(p(seat), p(victim), deals::Bait::Bribe { third: p(third), gold: *gold })),
         }
     }
 }

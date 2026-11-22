@@ -72,6 +72,17 @@ finding (a human is much stronger than our AI):
 | B7 bankrupt, unhappy | treasury 0, one luxury kind gone | two kinds | all luxuries |
 | D2 | one level | | |
 | D3 losing war | 1 city and 50 % of the army | 2 and 75 % | 3 and 90 % |
+| P6 kill-zone | 3 units and a bait | 5 | 8 |
+| P9 sea-hunter | 1 warship | 2 | 4 |
+| P10 air-nuke | 2 bombers | 4 bombers, 2 fighters | + a nuclear weapon |
+| C1 air battle | 1 bomber and 1 fighter each side | 2 and 2 | 3 and 3 |
+| P11 faith pests | 2 missionaries | 4 | 6 and a great prophet |
+| P12 spy pests | 1 spy added | 2 | 3 |
+| B10 one vote short | 3 delegates short | 2 | 1 |
+| P4L luxury, then war | price 30 % of the treasury | 60 % | 90 % |
+| P4B bribed war | 300 gold | 600 | 1000 |
+| P1E early raid | 1 raider | 2 | 3 |
+| P7C wonder city lost | one level | | |
 
 ## The situations built
 
@@ -138,6 +149,98 @@ off the script's units, size L), P9 sea-hunter, P10 air-nuke, P11 pests (scripte
 missionaries and spies: each its own script, size M-L), C1 air battle (the air units of both sides and
 their bases), B10 one vote from a diplomatic victory (the congress's world-leader vote has no harness
 setter). They are the next scripts for the `Seat` hook.
+
+## Wave 3: the situations built
+
+Positions: `stress/runs/positions` (rounds 100-110; P1E rounds 30-50) for P6, P9, P4L, P4B, P1E, P7C;
+`stress/runs/positions-mid` (round 200, `--round 200 --jitter 0`) for P10, C1, B10, P11, P12 (aircraft, the
+United Nations, religions and spies belong to the later eras).
+
+- P6 kill-zone with bait (MT1-MT4, MT7): the nearest pair; the seat declares war on the defender (base). The
+  defender's own units on the free tiles 1-2 from its city nearest to the seat, the melee third nearest to
+  the seat, the ranged behind, and a worker three tiles out towards the seat (the bait). The `KillZone`
+  script: ranged units shoot the most wounded enemy in range, melee units finish an enemy at 50 hp or less
+  next to them and walk back to their tile, nobody advances, the bait never moves. Window 25.
+- P9 sea-hunter (MT5, N1): the nearest pair over the sea (else the nearest pair); the hunter's war and four
+  of the seat's land units at sea by its coastal city nearest to the hunter (base: both arms). The
+  hunter's strongest warship (else the rules' cheapest) 2-4 tiles from the army; the `SeaHunt` script
+  shoots or rams the nearest unit of the seat on the water, else sails next to it. Window 15.
+- P10 air-nuke (A1, A3): the nearest pair; the striker's war and, for both, the technologies of the first
+  aircraft with a ranged strength and their prerequisites (base). The striker's bombers, fighters and a
+  nuclear weapon in its city nearest to the seat; the `AirStrike` script: bombers hit the seat's
+  strongest unit in range (else its city), fighters stand on interception, the nuclear weapon falls on
+  the largest city in range. Window 20.
+- C1 air battle: the base of P10; the aircraft of both sides in their front cities, all played by the
+  AI. Window 20.
+- P11 faith pests (R1-R3): the nation with a religion of its own and the nation with the most cities
+  that do not follow it; missionaries (and at the strong level a great prophet) next to those cities;
+  the `Faith` script spreads, else walks next to the nearest city to convert. Window 25.
+- P12 spy pests (S1): the nation with the most technologies and its nearest rival; spies added to the
+  rival (`spies`); the `Spies` script puts one spy in each of the seat's largest cities and spends every
+  steal right. Window 30.
+- B10 one vote from a diplomatic victory: the leader by score; the World Congress sits as the United
+  Nations with the World Leader vote three rounds away (`united_nations`, base); the leader holds 3, 2,
+  1 delegates fewer than the vote needs (`short_of_victory`, the delegates a failed vote gives). Others
+  judged. Window 30.
+- P4L luxury, then war (D1): P4's friends; the `LuxuryThenWar` script sells a luxury the victim lacks for a
+  share of its treasury (halved after a refusal) and declares war the round after the sale. Window 20.
+- P4B bribed war (D4): P4's friends and a third nation at peace with both; the trickster gets the bribe
+  (`treasury`) and the `BribeThenWar` script offers it for the victim's war on the third, then declares
+  war on the victim. Window 25.
+- P1E early raid (MO7): P1 at rounds 30-50. Window 25.
+- P7C wonder city lost (V2): the city with the most world wonders goes to the nearest nation on its
+  landmass in a war (`capital_retaken` reads that city). Window 30.
+
+The wave adds the primitives `united_nations`, `short_of_victory` and `spies` (harness setters
+`debug_united_nations`, `debug_delegates_short_of_victory`, `debug_add_spies` of `ClassicGame`) and
+`Seat::holds`: what a script plays is its own. The play loop asks the driver for each command
+(`AiDriver::advance`) and refuses a command of the seat's AI that orders a unit (or a spy) the script holds
+(`CommandError::NotOwner`, as the rules refuse an order to another player's unit): the AI drops the unit
+for the turn and goes on. The watch adds each major's military units lost, aircraft and land units at sea
+per round, and the orders of aircraft, interceptions, faith answers and spies sent home.
+
+Every row now also holds `start_seat_score_share` (the share of the score of the nations in focus just
+after the edit) and `play_on_share` (what the window's play changed of it): the part of the damage the
+AI's own play adds to what the edit took at once.
+
+### R1-R5: the random mode's worst combinations, named
+
+`ai-stress random --variant nets-x-site --samples 240` on `stress/runs/positions`, played to the end of
+the game (`runs/random` of the wave-3 clone): 232 samples built. The worst sample of each distinct
+combination (the sorted kinds of its primitives), by the damage to the seat's end outcome (end score
+share plus a quarter of the victory weight, control minus edited):
+
+| combination | worst damage | at once | added by the play-on | samples | mean damage |
+|---|---|---|---|---|---|
+| deplete+riches+seize | +0.402 | +0.107 | +0.295 | 1 | +0.402 |
+| seize+seize | +0.402 | +0.104 | +0.298 | 2 | +0.266 |
+| seize | +0.401 | +0.091 | +0.311 | 10 | +0.126 |
+| boost+grab+war | +0.297 | +0.004 | +0.293 | 1 | +0.297 |
+| bankrupt+seize+war | +0.282 | +0.173 | +0.109 | 1 | +0.282 |
+| bankrupt+deplete+seize | +0.255 | +0.197 | +0.059 | 2 | +0.188 |
+
+`seize` alone is B4 and D3 already; the five others are named. One sample is noisy (a flipped victory
+weighs 0.25): the named situations measure each on all positions at three strengths. The parties are
+fixed by rule: the seat is the nearest pair's (by the instance), its nearest rival takes and grabs, the
+second nearest declares war (and takes in R2), the rival with the most score of the others gets the gift.
+
+- R1 deplete+riches+seize: the seat's strategic resources gone, its nearest rival takes 1/2/3 cities
+  (the capital first), the leader of the others earns +50/100/200 % gold a round.
+- R2 seize+seize, two fronts: the two nearest rivals take 1+1, 1+2, 2+3 cities.
+- R3 boost+grab+war: the nearest rival founds a city with a citadel at the border, the second declares
+  war, the leader of the others researches +25/50/100 %.
+- R4 bankrupt+seize+war: treasury and luxuries gone, the nearest rival takes 1/2/3 cities, the second
+  declares war.
+- R5 bankrupt+deplete+seize: treasury, luxuries and strategic resources gone, the nearest rival takes
+  1/2/3 cities.
+
+Their outcome gate is `play_on_share` (what the AI's play adds to the hit, against the control) and the
+end victory weight; `seat_recaptures` and `seat_cities_lost` are the behaviour.
+
+The random mode draws 1-3 of eleven primitives (disarm, invade, boost, seize, war, bankrupt, deplete, arm,
+riches, grab, sneak) and records the seat's share of the score just after the edit
+(`start_seat_score_share`): `ranking.md` gives each sample's damage, the part taken at once and the part
+the play-on added, and the worst sample of each distinct combination.
 
 ## The suite (a candidate variant against `standard`)
 
@@ -282,6 +385,75 @@ passes when its outcome gates pass at every level. `ai-stress gates` prints this
 | D3 | outcome | `end_seat_win_weight` | delta >= | -0.05 | -0.08 | -0.1 | none: scripted peace.rs |
 | D3 | behaviour | `peace` | edited >= | 0.4 | 0.5 | 0.6 | none: scripted peace.rs |
 | D3 | behaviour | `peace_round` | edited <= | 15 | 12 | 10 | none: scripted peace.rs |
+| P6 | outcome | `seat_military` | delta >= | -1 | -2 | -3 | commander, tactician (off); danger net (on: the fight fixes); scripted front.rs, siege_walls.rs |
+| P6 | outcome | `seat_score_share` | delta >= | -0.005 | -0.01 | -0.015 | commander, tactician (off); danger net (on: the fight fixes); scripted front.rs, siege_walls.rs |
+| P6 | outcome | `end_seat_win_weight` | delta >= | -0.02 | -0.03 | -0.05 | commander, tactician (off); danger net (on: the fight fixes); scripted front.rs, siege_walls.rs |
+| P6 | behaviour | `script_kills` | edited <= | 2 | 3 | 4 | commander, tactician (off); danger net (on: the fight fixes); scripted front.rs, siege_walls.rs |
+| P6 | behaviour | `zone_dead` | edited >= | 0.2 | 0.2 | 0.2 | commander, tactician (off); danger net (on: the fight fixes); scripted front.rs, siege_walls.rs |
+| P9 | outcome | `seat_military` | delta >= | -0.5 | -1 | -2 | commander (off); none: scripted fleet.rs, operations.rs |
+| P9 | outcome | `seat_score_share` | delta >= | -0.003 | -0.005 | -0.01 | commander (off); none: scripted fleet.rs, operations.rs |
+| P9 | behaviour | `script_sunk` | edited <= | 0.5 | 1 | 1.5 | commander (off); none: scripted fleet.rs, operations.rs |
+| P9 | behaviour | `at_sea_end` | delta <= | 0 | 0 | 0 | commander (off); none: scripted fleet.rs, operations.rs |
+| P10 | outcome | `seat_cities` | delta >= | -0.1 | -0.3 | -0.5 | none: scripted air.rs, strikes.rs |
+| P10 | outcome | `seat_score_share` | delta >= | -0.01 | -0.02 | -0.04 | none: scripted air.rs, strikes.rs |
+| P10 | outcome | `end_seat_win_weight` | delta >= | -0.03 | -0.05 | -0.08 | none: scripted air.rs, strikes.rs |
+| P10 | behaviour | `seat_air_added` | delta >= | 1 | 1 | 2 | none: scripted air.rs, strikes.rs |
+| P10 | behaviour | `seat_units_lost` | delta <= | 2 | 4 | 6 | none: scripted air.rs, strikes.rs |
+| C1 | outcome | `seat_score_share` | delta >= | -0.01 | -0.01 | -0.01 | none: scripted air.rs, strikes.rs |
+| C1 | outcome | `seat_cities` | delta >= | -0.2 | -0.2 | -0.2 | none: scripted air.rs, strikes.rs |
+| C1 | behaviour | `seat_air_orders` | edited >= | 2 | 4 | 6 | none: scripted air.rs, strikes.rs |
+| C1 | behaviour | `seat_interceptions` | edited >= | 1 | 1 | 1 | none: scripted air.rs, strikes.rs |
+| P11 | outcome | `seat_score_share` | delta >= | -0.005 | -0.01 | -0.015 | none: scripted religion.rs |
+| P11 | outcome | `end_seat_win_weight` | delta >= | -0.02 | -0.03 | -0.05 | none: scripted religion.rs |
+| P11 | behaviour | `cities_converted` | delta <= | 1 | 2 | 3 | none: scripted religion.rs |
+| P11 | behaviour | `faith_answers` | delta >= | 1 | 1 | 2 | none: scripted religion.rs |
+| P12 | outcome | `seat_score_share` | delta >= | -0.005 | -0.01 | -0.015 | none: scripted espionage.rs |
+| P12 | outcome | `tech_lead_over_pest` | delta >= | -1 | -2 | -3 | none: scripted espionage.rs |
+| P12 | outcome | `end_seat_win_weight` | delta >= | -0.02 | -0.03 | -0.05 | none: scripted espionage.rs |
+| P12 | behaviour | `script_stolen` | edited <= | 1 | 2 | 3 | none: scripted espionage.rs |
+| P12 | behaviour | `spies_home` | delta >= | 0.5 | 1 | 1 | none: scripted espionage.rs |
+| B10 | outcome | `leader_won` | edited <= | 0.2 | 0.35 | 0.5 | none: scripted (victory_watch.rs, vote guard, city_states.rs); strategist has no diplomacy outputs |
+| B10 | outcome | `seat_score_share` | delta >= | -0.01 | -0.02 | -0.03 | none: scripted (victory_watch.rs, vote guard, city_states.rs); strategist has no diplomacy outputs |
+| B10 | outcome | `end_seat_win_weight` | delta >= | -0.1 | -0.2 | -0.3 | none: scripted (victory_watch.rs, vote guard, city_states.rs); strategist has no diplomacy outputs |
+| B10 | behaviour | `leader_allies` | delta <= | 0 | 0 | 0 | none: scripted (victory_watch.rs, vote guard, city_states.rs); strategist has no diplomacy outputs |
+| B10 | behaviour | `wars_on_leader` | delta >= | 0.2 | 0.3 | 0.5 | none: scripted (victory_watch.rs, vote guard, city_states.rs); strategist has no diplomacy outputs |
+| B10 | behaviour | `gifts_others` | delta >= | 1 | 2 | 3 | none: scripted (victory_watch.rs, vote guard, city_states.rs); strategist has no diplomacy outputs |
+| P4L | outcome | `seat_score_share` | delta >= | -0.01 | -0.015 | -0.02 | none: scripted (peace.rs Negotiation::value, diplomacy.rs) |
+| P4L | outcome | `seat_treasury` | delta >= | -50 | -100 | -150 | none: scripted (peace.rs Negotiation::value, diplomacy.rs) |
+| P4L | outcome | `end_seat_win_weight` | delta >= | -0.02 | -0.03 | -0.05 | none: scripted (peace.rs Negotiation::value, diplomacy.rs) |
+| P4L | behaviour | `script_betrayed` | edited <= | 0.3 | 0.2 | 0.1 | none: scripted (peace.rs Negotiation::value, diplomacy.rs) |
+| P4B | outcome | `seat_cities` | delta >= | -0.2 | -0.3 | -0.5 | none: scripted (diplomacy.rs ThirdPartyWar price, peace.rs) |
+| P4B | outcome | `seat_score_share` | delta >= | -0.01 | -0.015 | -0.02 | none: scripted (diplomacy.rs ThirdPartyWar price, peace.rs) |
+| P4B | outcome | `end_seat_win_weight` | delta >= | -0.02 | -0.03 | -0.05 | none: scripted (diplomacy.rs ThirdPartyWar price, peace.rs) |
+| P4B | behaviour | `script_betrayed` | edited <= | 0.3 | 0.2 | 0.1 | none: scripted (diplomacy.rs ThirdPartyWar price, peace.rs) |
+| P1E | outcome | `seat_score_share` | delta >= | -0.005 | -0.01 | -0.02 | none: scripted (worker flight, settler escort); tactician, commander (off) |
+| P1E | outcome | `seat_cities` | delta >= | -0.1 | -0.2 | -0.3 | none: scripted (worker flight, settler escort); tactician, commander (off) |
+| P1E | outcome | `end_seat_win_weight` | delta >= | -0.02 | -0.03 | -0.05 | none: scripted (worker flight, settler escort); tactician, commander (off) |
+| P1E | behaviour | `civilians_end` | delta >= | -0.5 | -1 | -1.5 | none: scripted (worker flight, settler escort); tactician, commander (off) |
+| P1E | behaviour | `raiders_dead` | edited >= | 0.5 | 0.5 | 0.5 | none: scripted (worker flight, settler escort); tactician, commander (off) |
+| P7C | outcome | `seat_score_share` | delta >= | -0.04 | -0.04 | -0.04 | commander, scripted retake |
+| P7C | outcome | `seat_cities` | delta >= | -0.9 | -0.9 | -0.9 | commander, scripted retake |
+| P7C | outcome | `end_seat_win_weight` | delta >= | -0.05 | -0.05 | -0.05 | commander, scripted retake |
+| P7C | behaviour | `capital_retaken` | edited >= | 0.3 | 0.3 | 0.3 | commander, scripted retake |
+| R1 | outcome | `play_on_share` | delta >= | -0.01 | -0.02 | -0.03 | commander, scripted retake; strategist (economy) |
+| R1 | outcome | `end_seat_win_weight` | delta >= | -0.05 | -0.1 | -0.15 | commander, scripted retake; strategist (economy) |
+| R1 | behaviour | `seat_recaptures` | edited >= | 0.2 | 0.3 | 0.3 | commander, scripted retake; strategist (economy) |
+| R1 | behaviour | `seat_cities_lost` | delta <= | 0.5 | 0.8 | 1 | commander, scripted retake; strategist (economy) |
+| R2 | outcome | `play_on_share` | delta >= | -0.01 | -0.02 | -0.03 | commander, scripted retake; none: scripted peace.rs |
+| R2 | outcome | `end_seat_win_weight` | delta >= | -0.05 | -0.1 | -0.15 | commander, scripted retake; none: scripted peace.rs |
+| R2 | behaviour | `seat_recaptures` | edited >= | 0.2 | 0.3 | 0.3 | commander, scripted retake; none: scripted peace.rs |
+| R2 | behaviour | `seat_cities_lost` | delta <= | 0.5 | 0.8 | 1 | commander, scripted retake; none: scripted peace.rs |
+| R3 | outcome | `play_on_share` | delta >= | -0.01 | -0.02 | -0.03 | site net (off), danger net (on: the fight fixes); strategist |
+| R3 | outcome | `end_seat_win_weight` | delta >= | -0.05 | -0.1 | -0.15 | site net (off), danger net (on: the fight fixes); strategist |
+| R3 | behaviour | `seat_cities_lost` | delta <= | 0.5 | 0.8 | 1 | site net (off), danger net (on: the fight fixes); strategist |
+| R4 | outcome | `play_on_share` | delta >= | -0.01 | -0.02 | -0.03 | strategist; none: scripted peace.rs, retake |
+| R4 | outcome | `end_seat_win_weight` | delta >= | -0.05 | -0.1 | -0.15 | strategist; none: scripted peace.rs, retake |
+| R4 | behaviour | `seat_recaptures` | edited >= | 0.2 | 0.3 | 0.3 | strategist; none: scripted peace.rs, retake |
+| R4 | behaviour | `seat_cities_lost` | delta <= | 0.5 | 0.8 | 1 | strategist; none: scripted peace.rs, retake |
+| R5 | outcome | `play_on_share` | delta >= | -0.01 | -0.02 | -0.03 | strategist; none: scripted peace.rs, retake |
+| R5 | outcome | `end_seat_win_weight` | delta >= | -0.05 | -0.1 | -0.15 | strategist; none: scripted peace.rs, retake |
+| R5 | behaviour | `seat_recaptures` | edited >= | 0.2 | 0.3 | 0.3 | strategist; none: scripted peace.rs, retake |
+| R5 | behaviour | `seat_cities_lost` | delta <= | 0.5 | 0.8 | 1 | strategist; none: scripted peace.rs, retake |
 
 ## Saved scenes (for forks)
 
