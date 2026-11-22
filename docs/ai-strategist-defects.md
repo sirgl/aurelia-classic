@@ -110,6 +110,18 @@ outputs: the posture term prepare +1.5 × prey at prey ≥ 0.5, and stakes on it
 | P4 | A7 (we are the weak one) `wars_declared` delta, if the exam has A7 by the run | candidate ≤ `standard`'s |
 | P5 | whole games W1–W3 with S-4 in | as W1–W3 |
 
+## 5. Tall first (S-5, the coordinator's step-0 finding), gate written before its first run
+
+22 Nov 02:50. Dreams step 0 (pace Quick, offsets 300–301): a seat held to tall + science + peace took 65.2 %
+victory-weighted against `standard`, held to wide + science 34.5 %, with 0.6 cities fewer at round 198; the
+strategist locks wide on about 60 % of the seats (89 of 144 locks in the lane's traces). Edit: the wide style's
+logit −1.2 (`weights::threat::WIDE`, strategist-x only).
+
+| gate | metric | pass |
+|---|---|---|
+| Y1 | whole games, the candidate with the edit against the candidate without it (`AURELIA_X_PARTS` without `style`), tuning offset 1202 | weighted share of the one with the edit ≥ the one without |
+| Y2 | the accepted candidate | W1–W3 on 1201 and 1203 (never on 300–301) |
+
 ## Gates (written before the first run, not changed after)
 
 **Whole games.** `ai-tournament --candidate strategist-x --baseline standard --suite pace --speed quick`,
