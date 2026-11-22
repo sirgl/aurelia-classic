@@ -27,6 +27,12 @@ fn gift_value(info: &CityStateInfo, me: crate::ids::PlayerId) -> Option<i32> {
     Some(info.influence + if quest { 100 } else { 0 })
 }
 
+/// `net2`'s share of the gold for the city-states this turn (`Net2Plan::cs_gold_share`); 0 (today's reserve
+/// and ceiling) without a plan. THE ONE PLACE the gift paths read it.
+pub fn gold_share_of(brief: &crate::ai::planner::TurnBrief) -> crate::ai::strategy_net::Milli {
+    brief.net2.as_ref().map_or(0, |plan| plan.cs_gold_share)
+}
+
 /// The reserve the treasury keeps before it gifts, under a `net2` gold share for the city-states (design §4.7,
 /// `Net2Plan::cs_gold_share`, 0…1000): `GIFT_RESERVE` × (1000 − share) / 1000. Share 0 is today's reserve.
 pub fn reserve_for(share: crate::ai::strategy_net::Milli) -> u32 {
@@ -366,6 +372,6 @@ impl crate::ai::system::SystemAdvisor for CityStatesAdvisor {
         if priced {
             return Vec::new();
         }
-        crate::ai::combat::proposals(3, gift_orders_shared(input.observation, input.brief.net2.as_ref().map_or(0, |p| p.cs_gold_share)))
+        crate::ai::combat::proposals(3, gift_orders_shared(input.observation, gold_share_of(input.brief)))
     }
 }

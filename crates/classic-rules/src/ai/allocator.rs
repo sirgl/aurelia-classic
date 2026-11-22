@@ -110,6 +110,8 @@ pub struct Allocator {
     race: u8,
     /// What the seat knows of the wonder race (`ai::wonder_race`).
     known: crate::ai::wonder_race::Known,
+    /// `net2`'s share of the gold for the city-states (`Net2Plan::cs_gold_share`, 0…1000); 0 without a plan.
+    cs_gold_share: crate::ai::strategy_net::Milli,
     /// The unit net's turn (`ai::unit_net`): its commander's orders are offered. None: off.
     #[cfg(feature = "experimental-ai")]
     unit_net: Option<std::sync::Arc<crate::ai::unit_net::UnitNetTurn>>,
@@ -153,6 +155,7 @@ impl Allocator {
             strategy: brief.strategy.clone(),
             race: brief.wonder_race,
             known: if brief.wonder_race > 1 { crate::ai::wonder_race::Known::of(obs, brief, state) } else { Default::default() },
+            cs_gold_share: crate::ai::city_states::gold_share_of(brief),
             #[cfg(feature = "experimental-ai")]
             unit_net: brief.unit_net.clone(),
         }
@@ -426,9 +429,9 @@ impl Allocator {
     }
 
     /// Gold gifts to city-states the gold above the reserve pays
-    /// (`ai::city_states::priced_gifts`).
+    /// (`ai::city_states::priced_gifts_shared`, with `net2`'s share of the gold for them).
     fn gift_offers(&self, obs: &AIObservation<'_>, spendable: u32) -> Vec<Offer> {
-        crate::ai::city_states::priced_gifts(obs, &self.prices, spendable)
+        crate::ai::city_states::priced_gifts_shared(obs, &self.prices, spendable, self.cs_gold_share)
             .into_iter()
             .map(|gift| {
                 let command = Command::GiftGold { player: obs.player, city_state: gift.city_state, gold: gift.gold };

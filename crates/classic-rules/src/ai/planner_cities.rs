@@ -390,7 +390,7 @@ fn ordered_item(decision: &Decision) -> Option<ProductionItem> {
 
 /// Gold the empire keeps for emergencies (more in war).
 fn gold_reserve(obs: &AIObservation<'_>, brief: &TurnBrief) -> u32 {
-    emergency_reserve(obs, brief) + gift_reserve(obs) * reserve_factor(brief)
+    emergency_reserve(obs, brief) + gift_reserve(obs, brief) * reserve_factor(brief)
 }
 
 /// The reserve without the savings for city-state gifts. With the reserve
@@ -420,13 +420,15 @@ fn reserve_factor(brief: &TurnBrief) -> u32 {
     }
 }
 
-/// Met city-states: save for a gold gift (ai::city_states gifts above
-/// GIFT_RESERVE + SMALL_GIFT, so the AI saves for city-state gifts).
-fn gift_reserve(obs: &AIObservation<'_>) -> u32 {
+/// Met city-states: save for a gold gift (ai::city_states gifts above its
+/// reserve + SMALL_GIFT, so the AI saves for city-state gifts). The reserve is
+/// `GIFT_RESERVE`, lowered by `net2`'s share of the gold for the city-states
+/// (`city_states::reserve_for`).
+fn gift_reserve(obs: &AIObservation<'_>, brief: &TurnBrief) -> u32 {
     if obs.city_states.is_empty() {
         0
     } else {
-        crate::ai::city_states::GIFT_RESERVE + crate::ai::city_states::SMALL_GIFT
+        crate::ai::city_states::reserve_for(crate::ai::city_states::gold_share_of(brief)) + crate::ai::city_states::SMALL_GIFT
     }
 }
 
