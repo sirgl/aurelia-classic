@@ -889,6 +889,20 @@ pub enum Variant {
     /// fourteenth promotion (`StrategistX`, `StrategistXThreat`, `EconSite` and its hand edits, `NetsX`)
     /// keep playing as they were measured. Kept for the bench (`experimental-ai` only).
     PreNetsX,
+    /// `net2` (22 November, classic/docs/ai-net2.md, work/new-net-design-2026-11-22.md): the mind of
+    /// `NetsXSite` (the play of `standard`) with `net2` (`ai::net2`) in place of the strategist and its
+    /// site head in place of the guarded site score. A bench-only candidate (`experimental-ai`); it plays
+    /// as `NetsXSite` wherever `net2` has no say (`ClassicMind::new`).
+    Net2,
+    /// `net2-defence` (the offence addendum, work/new-net-offence-addendum-2026-11-22.md): `Net2` with the
+    /// offence switched off (`Variant::net2_offence`), the control of every offence measure. Until the
+    /// offence is built it plays exactly as `Net2`. Bench only (`experimental-ai`).
+    Net2Defence,
+    /// `tac2` (work/tactical-net-design-2026-11-22.md §6.2): the mind of `Standard` with the tactical unit
+    /// nets (`ai::unit_net`) in the scope of their tasks. Bench only (`experimental-ai`).
+    Tac2,
+    /// `net2-tac`: `Net2` with the tactical unit nets of `Tac2`. Bench only (`experimental-ai`).
+    Net2Tac,
 }
 
 /// The net's base: the expert the end-to-end net learns from and the mind it
@@ -909,7 +923,7 @@ const NUDGED_CANDIDATES: u32 = 40;
 
 impl Variant {
     /// The game's AI first.
-    pub const ALL: [Variant; 165] = [
+    pub const ALL: [Variant; 169] = [
         Variant::Standard,
         Variant::PreCamps,
         Variant::PreWorkers,
@@ -1075,6 +1089,10 @@ impl Variant {
         Variant::NetsXSite,
         Variant::StrategistXThreat,
         Variant::PreNetsX,
+        Variant::Net2,
+        Variant::Net2Defence,
+        Variant::Tac2,
+        Variant::Net2Tac,
     ];
 
     /// The parts of the strategist's wishes the variant plays (`strategy_net::wishes::Parts`): a property
@@ -1088,7 +1106,9 @@ impl Variant {
             Variant::StrategistX => Parts { threat: false, tall_first: true },
             Variant::StrategistXThreat => Parts { threat: true, tall_first: false },
             // `nets-x` and `nets-x-site` play `strategist-x`'s strategist under their own names.
-            Variant::NetsX | Variant::NetsXSite => Variant::StrategistX.strategist_parts(),
+            // `net2` and its relatives play `nets-x-site`'s strategist parts (tall first): `net2` replaces the
+            // strategist's pass, not its wishes' parts.
+            Variant::NetsX | Variant::NetsXSite | Variant::Net2 | Variant::Net2Defence | Variant::Tac2 | Variant::Net2Tac => Variant::StrategistX.strategist_parts(),
             _ => Parts::NONE,
         }
     }
@@ -1242,6 +1262,10 @@ impl Variant {
             Variant::NetsXSite => "nets-x-site",
             Variant::StrategistXThreat => "strategist-x-threat",
             Variant::PreNetsX => "pre-nets-x",
+            Variant::Net2 => "net2",
+            Variant::Net2Defence => "net2-defence",
+            Variant::Tac2 => "tac2",
+            Variant::Net2Tac => "net2-tac",
             Variant::ArmyFit => "army-fit",
             Variant::Camps => "camps",
             Variant::ArmyCamps => "army-camps",
@@ -1284,7 +1308,7 @@ impl Variant {
         cfg!(feature = "experimental-ai")
             || !matches!(
                 self,
-                Variant::Net | Variant::UnitNet | Variant::Hybrid | Variant::SiteNet | Variant::ChoiceNet | Variant::ChoiceNetProduction | Variant::ChoiceNetResearch | Variant::StandardScripted | Variant::PreCsGifts | Variant::Sharp | Variant::TallReal | Variant::Next | Variant::WonderCancel | Variant::WonderRace | Variant::NextW | Variant::NextRace | Variant::PreNext | Variant::WarPays | Variant::TacticianFit | Variant::WarMuster | Variant::SiegeCall | Variant::NextWar | Variant::Retake2 | Variant::NextWarRetake | Variant::VoteGuard | Variant::FieldCraft | Variant::RaidWar | Variant::Landless | Variant::LandlessPlan | Variant::NextX | Variant::PreNextX | Variant::StrategistX | Variant::StrategistXThreat | Variant::EconSite | Variant::EconSiteTall | Variant::EconSiteOwnLand | Variant::NetsX | Variant::NetsXSite | Variant::PreNetsX
+                Variant::Net | Variant::UnitNet | Variant::Hybrid | Variant::SiteNet | Variant::ChoiceNet | Variant::ChoiceNetProduction | Variant::ChoiceNetResearch | Variant::StandardScripted | Variant::PreCsGifts | Variant::Sharp | Variant::TallReal | Variant::Next | Variant::WonderCancel | Variant::WonderRace | Variant::NextW | Variant::NextRace | Variant::PreNext | Variant::WarPays | Variant::TacticianFit | Variant::WarMuster | Variant::SiegeCall | Variant::NextWar | Variant::Retake2 | Variant::NextWarRetake | Variant::VoteGuard | Variant::FieldCraft | Variant::RaidWar | Variant::Landless | Variant::LandlessPlan | Variant::NextX | Variant::PreNextX | Variant::StrategistX | Variant::StrategistXThreat | Variant::EconSite | Variant::EconSiteTall | Variant::EconSiteOwnLand | Variant::NetsX | Variant::NetsXSite | Variant::PreNetsX | Variant::Net2 | Variant::Net2Defence | Variant::Tac2 | Variant::Net2Tac
             )
     }
 
@@ -1538,9 +1562,22 @@ impl Variant {
     }
 
     /// Its tactical and operations layer is the unit net's (`ai::unit_net`,
-    /// `TurnBrief::unit_net`): `UnitNet` and `Hybrid`.
+    /// `TurnBrief::unit_net`): `UnitNet` and `Hybrid`, and the tactical candidates `Tac2` and `Net2Tac`.
     pub fn unit_net(self) -> bool {
-        matches!(self, Variant::UnitNet | Variant::Hybrid)
+        matches!(self, Variant::UnitNet | Variant::Hybrid | Variant::Tac2 | Variant::Net2Tac)
+    }
+
+    /// `net2` (`ai::net2`) decides the strategist's pass and the settlers' site score: `Net2`, its
+    /// control `Net2Defence` and `Net2Tac`. No other variant, `standard` and `pre-nets-x` among them.
+    pub fn net2(self) -> bool {
+        matches!(self, Variant::Net2 | Variant::Net2Defence | Variant::Net2Tac)
+    }
+
+    /// `net2`'s offence (work/new-net-offence-addendum-2026-11-22.md) plays: every `net2` variant but
+    /// `Net2Defence`. The offence is not built yet, so the answer changes nothing until it is; the
+    /// switch is here so that the control exists before the code it controls.
+    pub fn net2_offence(self) -> bool {
+        matches!(self, Variant::Net2 | Variant::Net2Tac)
     }
 
     /// Its free military units clear the barbarian camps near its cities (`ai::camps`):
@@ -2304,7 +2341,7 @@ mod tests {
         assert_eq!(Variant::from_name("hybrid"), Some(Variant::Hybrid));
         assert!(!Variant::UnitNet.strategy_net() && Variant::Hybrid.strategy_net());
         let on: Vec<Variant> = Variant::ALL.into_iter().filter(|v| v.unit_net()).collect();
-        assert_eq!(on, [Variant::UnitNet, Variant::Hybrid]);
+        assert_eq!(on, [Variant::UnitNet, Variant::Hybrid, Variant::Tac2, Variant::Net2Tac]);
     }
 
     #[test]

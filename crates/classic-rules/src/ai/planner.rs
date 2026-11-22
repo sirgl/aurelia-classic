@@ -488,6 +488,10 @@ pub struct TurnBrief {
     /// research, policies and the choice among the allocator's best orders follow it.
     /// None for the others.
     pub strategy: Option<std::sync::Arc<crate::ai::strategy_net::Plan>>,
+    /// The levers of `net2` (`ai::net2`) for the executors of the turn: the war order, peace wishes,
+    /// trust, guard, city-state share, embargo, escorts, generals and the site head's tall share. None
+    /// for every variant but `net2`'s, and every executor plays as before then (the design's §6.1).
+    pub net2: Option<crate::ai::net2::Net2Plan>,
     /// The unit net's turn (`ai::unit_net`, `Variant::unit_net`): the commander's
     /// operations, orders and plan; its tactician decides the units of a theatre.
     /// None for the others.
@@ -609,6 +613,7 @@ impl TurnBrief {
             trade_fit: false,
             unciv: crate::ai::unciv::UncivParts::NONE,
             strategy: None,
+            net2: None,
             #[cfg(feature = "experimental-ai")]
             unit_net: None,
         }
