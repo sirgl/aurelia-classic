@@ -268,6 +268,74 @@ pub fn row(d: &Demographic, living: u32, met: &[(PlayerId, i64)]) -> Vec<Guess> 
         .collect()
 }
 
+/// What the seat's sight says of one met rival's army (`soldiers`): the fixed estimator of `net2`
+/// (design §2.4).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SoldiersEvidence {
+    pub player: PlayerId,
+    /// A lower bound: the most of its military units seen at one time in the last 10 paced rounds.
+    pub lower: i64,
+    /// Its cities seen (an army scales with the cities it guards: `operations::known_power`'s own
+    /// assumption).
+    pub cities: u32,
+}
+
+/// The guess of every met rival's soldiers (the demographics row `Measure::Soldiers`), in the order of
+/// `evidence`. The score-shared `row` hides a disarmed neighbour of an average score: its share of the
+/// sum is the average's. Here:
+///
+/// 1. the demographics' `worst` is the exact value of one living nation. When it is below the seat's
+///    own, every nation is met, and exactly one met rival has a lower bound within it (the others are
+///    excluded by sight: they were seen with more units), that rival has `worst`, exactly;
+/// 2. the rest of the sum (`average × living − own − assigned`) is shared by the cities seen, not by
+///    score, with a nation not met counting the mean of the others; each value is clamped to
+///    `[max(worst, its lower bound), best]`.
+pub fn soldiers(d: &Demographic, living: u32, evidence: &[SoldiersEvidence]) -> Vec<Guess> {
+    let n = i64::from(living);
+    let others = n - 1;
+    if others <= 0 || evidence.is_empty() {
+        return evidence.iter().map(|_| Guess::default()).collect();
+    }
+    let own = d.value;
+    if others == 1 {
+        let value = if d.best > own { d.best } else { d.worst };
+        return evidence.iter().map(|_| Guess::exact(value)).collect();
+    }
+    let met = evidence.len() as i64;
+    let (sum_lo, sum_hi) = sum_range(d.average, n);
+    let (mut rest_lo, mut rest_hi) = (sum_lo - own, sum_hi - own);
+    // The one nation that has `worst`, when sight and the row say which it is.
+    let candidates: Vec<usize> = (0..evidence.len()).filter(|i| evidence[*i].lower <= d.worst).collect();
+    let assigned = (d.worst < own && met == others && candidates.len() == 1).then(|| candidates[0]);
+    let mut open: Vec<usize> = (0..evidence.len()).collect();
+    if let Some(a) = assigned {
+        open.retain(|i| *i != a);
+        rest_lo -= d.worst;
+        rest_hi -= d.worst;
+    }
+    // The nations of the share: the open rivals and the nations not met.
+    let unmet = (others - met).max(0);
+    let weight = |i: usize| i64::from(evidence[i].cities.max(1));
+    let open_weight: i64 = open.iter().map(|i| weight(*i)).sum();
+    let mean_weight = if open.is_empty() { 1 } else { (open_weight / open.len() as i64).max(1) };
+    let total_weight = open_weight + unmet * mean_weight;
+    let floor = |i: usize| d.worst.max(evidence[i].lower);
+    let floors: i64 = open.iter().map(|i| floor(*i)).sum::<i64>() + unmet * d.worst;
+    let mid = (rest_lo + rest_hi) / 2;
+    let slots = open.len() as i64 + unmet;
+    let mut out = vec![Guess::default(); evidence.len()];
+    if let Some(a) = assigned {
+        out[a] = Guess::exact(d.worst);
+    }
+    for &i in &open {
+        let lo = floor(i).max(rest_lo - (slots - 1) * d.best).min(d.best);
+        let hi = d.best.min(rest_hi - (floors - floor(i))).max(lo);
+        let share = if total_weight > 0 { mid * weight(i) / total_weight } else { mid / slots.max(1) };
+        out[i] = Guess { value: share.clamp(lo, hi), lo, hi };
+    }
+    out
+}
+
 /// The technology counts out of `total` whose share (percent, truncated) is within the literacy
 /// guess.
 pub fn techs_of_literacy(literacy: &Guess, total: i64) -> Guess {

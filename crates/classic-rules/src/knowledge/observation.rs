@@ -508,6 +508,26 @@ pub struct ObservedRoute {
 }
 
 impl<'a> LocalObservation<'a> {
+    /// The same observation cut to `radius` around the unit: what a sensor of that radius would have
+    /// collected (the same filters, the same order). A wider sensor for one decider (the unit net's
+    /// theatre) must not widen what the other deciders of the unit read: it reads `narrowed` to the
+    /// radius the others use. A radius at or above `self.radius` gives the observation itself.
+    pub fn narrowed(&self, radius: i32) -> Self {
+        let radius = radius.min(self.radius);
+        let dims = self.view.dimensions();
+        let at = self.unit.tile;
+        let near = |tile: TileId| dims.distance(at, tile).is_some_and(|d| d <= radius);
+        Self {
+            radius,
+            own_units: self.own_units.iter().filter(|u| near(u.tile)).copied().collect(),
+            own_cities: self.own_cities.iter().filter(|c| near(c.tile)).copied().collect(),
+            foreign_units: self.foreign_units.iter().filter(|u| near(u.tile)).copied().collect(),
+            foreign_cities: self.foreign_cities.iter().filter(|c| near(c.tile)).copied().collect(),
+            foreign_routes: self.foreign_routes.iter().filter(|r| near(r.tile)).copied().collect(),
+            ..self.clone()
+        }
+    }
+
     /// None when the unit is gone or belongs to another player.
     pub fn for_unit(
         auth: &'a AuthWorld,
