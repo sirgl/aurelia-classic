@@ -161,9 +161,13 @@ fn repeated_walks(variant: Variant, rounds: u32) -> usize {
         .count()
 }
 
+/// The control is a standard without the check that repeats such walks in this game: `pre-nets-x`, the
+/// standard before the fifteenth promotion (22 November). The game's AI since then (`nets-x-site`: its
+/// tall first and its site net found other cities) repeats none in these 200 rounds, so it cannot be the
+/// control any more.
 #[test]
 fn a_game_of_the_variant_repeats_few_walks() {
-    let standard = repeated_walks(Variant::Standard, 200);
+    let standard = repeated_walks(Variant::PreNetsX, 200);
     let checked = repeated_walks(Variant::EffectsChecked, 200);
     assert!(standard > 0, "the standard repeats walks that changed nothing");
     assert!(checked * 4 <= standard, "repeated walks: {checked} with the check, {standard} without");

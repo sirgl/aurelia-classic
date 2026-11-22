@@ -113,7 +113,11 @@ use kernel::replay::hash::authoritative_hash;
 /// - 14 November, the fourteenth promotion: `standard` plays as `next-x` (classic/docs/ai-strategy-net.md
 ///   "Promoted: next-x"); the smoke game's 70 rounds play the same: the benched `next-x` against itself
 ///   (`runs/px/bin-before`, main 4d43b0e) gave 2bfc4393a36c5fba, as the old `standard` did; the hash stays.
-const SMOKE_RESULT_HASH: &str = "2bfc4393a36c5fba";
+/// - 22 November, the fifteenth promotion: `standard` plays as `nets-x-site` (classic/docs/ai-strategy-net.md
+///   "Promoted: nets-x-site"); its tall first and its site net change the smoke game: 0c770e6ba5d4e5a8, the
+///   hash of the benched `nets-x-site` against itself (`ai-tournament-266bd4d`, `ai/nets-x` 266bd4d),
+///   measured; the old `standard` against itself (now `pre-nets-x`) gave the old 2bfc4393a36c5fba there.
+const SMOKE_RESULT_HASH: &str = "0c770e6ba5d4e5a8";
 
 fn pairing(candidate: &str) -> Pairing {
     Pairing { baseline: "standard".to_owned(), candidate: candidate.to_owned(), landless_seat: None }
