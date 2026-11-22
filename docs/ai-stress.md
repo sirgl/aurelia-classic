@@ -636,3 +636,188 @@ wave-2 clone): 36 instances of A6 and C2, 38 of P5 (the rest have no pair over t
 A disarmed nation over the sea is left alone to the end of the game: the real victories do not move (C2 not
 at all, A6 within one game in 36). The border grab costs cities in the window but not real victories, except
 at the strong level (citadels and war): -0.04, inside its gate.
+
+## Results of wave 3: the whole suite on `nets-x-site` and `standard` (window only)
+
+Run of 22 Nov 2026 (`runs/exam` of the wave-3 clone, binary of 4755e64, P3D and P4W of 5d610a4): every
+situation of waves 1-3 on both variants, `--instances 100 --no-end`; `stress/runs/positions` (rounds
+100-110, P2 and P1E 30-50) for all but P10, C1, B10, P11, P12 (`stress/runs/positions-mid`, round 200).
+`ai-stress table --variant nets-x-site --out runs/exam`. n is the instances built (of 100; the reasons are
+in `unbuilt.jsonl`). The end-of-game gates have no data here (`--no-end`); the failed wave-3 situations
+are played to the end below. This table is the work list for the nets.
+
+| situation | strength | n | nets-x-site | standard | nets-x-site outcome delta | standard outcome delta | nets-x-site behaviour | standard behaviour | owning net |
+|---|---|---|---|---|---|---|---|---|---|
+| A5 | mild | 81/81 | pass | FAIL (seat_cities) | cities +0.284 | cities +0.099 | 0/2: weak_captured 0.06, nobody_attacked 0.83 | 0/2: weak_captured 0.05, nobody_attacked 0.85 | strategist (posture), commander |
+| A5 | medium | 81/81 | FAIL (seat_cities) | FAIL (seat_cities) | cities +0.272 | cities +0.049 | 0/2: weak_captured 0.00, nobody_attacked 0.88 | 0/2: weak_captured -0.04, nobody_attacked 0.91 | strategist (posture), commander |
+| A5 | strong | 81/81 | FAIL (seat_cities) | FAIL (seat_cities) | cities +0.222 | cities +0.062 | 0/2: weak_captured 0.01, nobody_attacked 0.85 | 0/2: weak_captured -0.01, nobody_attacked 0.88 | strategist (posture), commander |
+| B1 | mild | 81/81 | pass | pass | cities +0.012; score_share -0.004 | cities -0.049; score_share -0.004 | 1/2: purchases -0.07 | 1/2: purchases -0.22 | tactician, commander, danger net |
+| B1 | medium | 81/81 | pass | pass | cities -0.049; score_share -0.007 | cities -0.062; score_share -0.007 | 1/2: purchases 0.09 | 1/2: purchases 0.02 | tactician, commander, danger net |
+| B1 | strong | 81/81 | pass | pass | cities +0.000; score_share -0.007 | cities -0.049; score_share -0.007 | 1/2: purchases -0.07 | 1/2: purchases -0.17 | tactician, commander, danger net |
+| A1 | mild | 100/100 | FAIL (seat_score_share) | FAIL (seat_score_share) | score_share -0.011; leader_won +0.000 | score_share -0.011; leader_won +0.000 | 1/4: wars_on_leader -0.02, denouncements_of_leader 0.06, research_pacts_others 0.10 | 1/4: wars_on_leader 0.00, denouncements_of_leader -0.01, research_pacts_others 0.02 | strategist (no diplomacy outputs) |
+| A1 | medium | 100/100 | pass | FAIL (seat_score_share) | score_share -0.020; leader_won +0.000 | score_share -0.022; leader_won +0.000 | 1/4: wars_on_leader -0.01, denouncements_of_leader 0.08, research_pacts_others 0.12 | 1/4: wars_on_leader 0.00, denouncements_of_leader -0.04, research_pacts_others 0.01 | strategist (no diplomacy outputs) |
+| A1 | strong | 100/100 | pass | pass | score_share -0.032; leader_won +0.000 | score_share -0.033; leader_won +0.000 | 1/4: wars_on_leader 0.00, denouncements_of_leader 0.01, research_pacts_others 0.06 | 1/4: wars_on_leader -0.02, denouncements_of_leader -0.06, research_pacts_others -0.01 | strategist (no diplomacy outputs) |
+| B4 | mild | 81/81 | FAIL (seat_cities, seat_score_share) | FAIL (seat_cities, seat_score_share) | cities -0.790; score_share -0.047 | cities -0.802; score_share -0.048 | 1/2: capital_retaken 0.23 | 1/2: capital_retaken 0.21 | commander, scripted retake |
+| B4 | medium | 81/81 | FAIL (seat_cities, seat_score_share) | FAIL (seat_cities, seat_score_share) | cities -1.519; score_share -0.073 | cities -1.543; score_share -0.074 | 1/2: capital_retaken 0.15 | 1/2: capital_retaken 0.15 | commander, scripted retake |
+| B4 | strong | 81/81 | FAIL (seat_cities, seat_score_share) | FAIL (seat_cities, seat_score_share) | cities -2.778; score_share -0.104 | cities -2.741; score_share -0.104 | 1/2: capital_retaken 0.05 | 1/2: capital_retaken 0.05 | commander, scripted retake |
+| B9 | mild | 100/100 | pass | pass | rival_wins_science +0.280 | rival_wins_science +0.270 | 0/1: rival_cities_lost 0.00 | 0/1: rival_cities_lost 0.00 | strategist |
+| B9 | medium | 100/100 | pass | pass | rival_wins_science +0.310 | rival_wins_science +0.300 | 0/1: rival_cities_lost 0.00 | 0/1: rival_cities_lost 0.00 | strategist |
+| B9 | strong | 100/100 | FAIL (rival_wins_science) | FAIL (rival_wins_science) | rival_wins_science +0.360 | rival_wins_science +0.330 | 0/1: rival_cities_lost 0.00 | 0/1: rival_cities_lost 0.00 | strategist |
+| D1 | one | 57/57 | FAIL (seat_cities) | FAIL (seat_cities) | cities -0.219 | cities -0.263 | 1/2: both_struck 0.00 | 1/2: both_struck 0.00 | none (no net for allied action) |
+| P3 | mild | 78/78 | pass | pass | cities -0.192; score_share -0.005 | cities -0.128; score_share -0.005 | 1/2: military_added_before_war 0.29 | 1/2: military_added_before_war 0.36 | danger net (on in standard: the fight fixes read it), tactician, commander (off); scripted defence.rs |
+| P3 | medium | 78/78 | pass | pass | cities -0.205; score_share -0.010 | cities -0.205; score_share -0.008 | 1/2: military_added_before_war 0.69 | 1/2: military_added_before_war 0.71 | danger net (on in standard: the fight fixes read it), tactician, commander (off); scripted defence.rs |
+| P3 | strong | 78/78 | pass | pass | cities -0.256; score_share -0.010 | cities -0.269; score_share -0.010 | 1/2: military_added_before_war 1.04 | 1/2: military_added_before_war 1.05 | danger net (on in standard: the fight fixes read it), tactician, commander (off); scripted defence.rs |
+| P2 | mild | 80/80 | pass | pass | alive +0.000; cities +0.062 | alive +0.000; cities -0.013 | 2/2 | 2/2 | danger net (on in standard: the fight fixes read it), tactician, commander (off); scripted defence.rs |
+| P2 | medium | 80/80 | pass | pass | alive +0.000; cities -0.050 | alive +0.000; cities -0.050 | 2/2 | 2/2 | danger net (on in standard: the fight fixes read it), tactician, commander (off); scripted defence.rs |
+| P2 | strong | 80/80 | pass | pass | alive +0.000; cities -0.087 | alive +0.000; cities -0.013 | 2/2 | 2/2 | danger net (on in standard: the fight fixes read it), tactician, commander (off); scripted defence.rs |
+| P7 | one | 92/92 | pass | pass | score_share -0.010 | score_share -0.012 | 2/2 | 2/2 | none: scripted wonder_race.rs; strategist production head |
+| P5 | mild | 77/77 | pass | pass | score_share -0.002; cities -0.052 | score_share -0.002; cities -0.078 | 0/2: forward_city_held 0.95, war_by_seat 0.05 | 0/2: forward_city_held 0.95, war_by_seat 0.09 | site net (off), danger net (on: the fight fixes); scripted defence.rs |
+| P5 | medium | 77/77 | pass | FAIL (seat_cities) | score_share -0.004; cities -0.078 | score_share -0.005; cities -0.208 | 0/2: forward_city_held 0.97, war_by_seat 0.10 | 0/2: forward_city_held 0.99, war_by_seat 0.09 | site net (off), danger net (on: the fight fixes); scripted defence.rs |
+| P5 | strong | 77/77 | pass | pass | score_share -0.006; cities -0.156 | score_share -0.007; cities -0.325 | 1/2: forward_city_held 1.00 | 1/2: forward_city_held 1.00 | site net (off), danger net (on: the fight fixes); scripted defence.rs |
+| P1 | mild | 81/81 | pass | pass | score_share -0.002; cities +0.037 | score_share -0.001; cities +0.025 | 2/3: pillaged_end 1.32 | 2/3: pillaged_end 1.23 | none: scripted (worker flight, settler escort); tactician, commander (off) |
+| P1 | medium | 81/81 | pass | pass | score_share -0.006; cities +0.025 | score_share -0.004; cities +0.111 | 3/3 | 3/3 | none: scripted (worker flight, settler escort); tactician, commander (off) |
+| P1 | strong | 81/81 | pass | pass | score_share -0.006; cities +0.037 | score_share -0.006; cities +0.049 | 3/3 | 3/3 | none: scripted (worker flight, settler escort); tactician, commander (off) |
+| P4 | mild | 78/78 | pass | pass | score_share -0.002; treasury -21.269 | score_share -0.002; treasury -8.885 | 0/1: script_sold_then_war 0.38 | 0/1: script_sold_then_war 0.40 | none: scripted (peace.rs Negotiation::value, diplomacy.rs) |
+| P4 | medium | 78/78 | pass | pass | score_share -0.002; treasury -24.859 | score_share -0.002; treasury -12.205 | 0/1: script_sold_then_war 0.42 | 0/1: script_sold_then_war 0.44 | none: scripted (peace.rs Negotiation::value, diplomacy.rs) |
+| P4 | strong | 78/78 | pass | pass | score_share -0.003; treasury -24.513 | score_share -0.003; treasury -11.231 | 0/1: script_sold_then_war 0.51 | 0/1: script_sold_then_war 0.51 | none: scripted (peace.rs Negotiation::value, diplomacy.rs) |
+| P8 | mild | 100/100 | pass | pass | score_share -0.001; leader_won +0.000 | score_share -0.000; leader_won +0.000 | 1/2: gifts_others -0.33 | 1/2: gifts_others -0.16 | none: scripted (city_states.rs, victory_watch.rs); strategist has no diplomacy outputs |
+| P8 | medium | 100/100 | pass | pass | score_share -0.000; leader_won +0.000 | score_share +0.000; leader_won +0.000 | 1/2: gifts_others -0.36 | 1/2: gifts_others -0.26 | none: scripted (city_states.rs, victory_watch.rs); strategist has no diplomacy outputs |
+| P8 | strong | 100/100 | pass | pass | score_share -0.004; leader_won +0.000 | score_share -0.001; leader_won +0.000 | 1/2: gifts_others -0.41 | 1/2: gifts_others -0.33 | none: scripted (city_states.rs, victory_watch.rs); strategist has no diplomacy outputs |
+| A2 | mild | 100/100 | pass | pass | cities +0.012; score_share +0.001 | cities -0.028; score_share -0.001 | 1/2: seat_military 0.03 | 1/2: seat_military 0.28 | strategist |
+| A2 | medium | 100/100 | pass | pass | cities +0.004; score_share +0.002 | cities -0.010; score_share +0.000 | 1/2: seat_military 0.07 | 1/2: seat_military 0.18 | strategist |
+| A2 | strong | 100/100 | pass | pass | cities +0.040; score_share +0.005 | cities -0.006; score_share +0.004 | 1/2: seat_military -0.02 | 1/2: seat_military -0.04 | strategist |
+| A3 | mild | 100/100 | pass | pass | score_share -0.001; leader_won +0.000 | score_share -0.001; leader_won +0.000 | 0/1: wars_on_leader 0.00 | 0/1: wars_on_leader -0.01 | strategist |
+| A3 | medium | 100/100 | pass | pass | score_share -0.000; leader_won +0.000 | score_share -0.001; leader_won +0.000 | 0/1: wars_on_leader 0.00 | 0/1: wars_on_leader -0.02 | strategist |
+| A3 | strong | 100/100 | pass | pass | score_share -0.003; leader_won +0.000 | score_share -0.003; leader_won +0.000 | 0/1: wars_on_leader 0.00 | 0/1: wars_on_leader -0.01 | strategist |
+| A4 | mild | 100/100 | pass | pass | score_share -0.003; leader_won +0.000 | score_share -0.002; leader_won +0.000 | 1/2: gifts_others -0.18 | 1/2: gifts_others -0.21 | none: scripted (city_states.rs, victory_watch.rs); strategist has no diplomacy outputs |
+| A4 | medium | 100/100 | pass | pass | score_share -0.004; leader_won +0.000 | score_share -0.002; leader_won +0.000 | 1/2: gifts_others -0.13 | 1/2: gifts_others -0.26 | none: scripted (city_states.rs, victory_watch.rs); strategist has no diplomacy outputs |
+| A4 | strong | 100/100 | pass | pass | score_share -0.005; leader_won +0.000 | score_share -0.003; leader_won +0.000 | 1/2: gifts_others -0.22 | 1/2: gifts_others -0.23 | none: scripted (city_states.rs, victory_watch.rs); strategist has no diplomacy outputs |
+| A6 | mild | 69/69 | FAIL (seat_cities) | FAIL (seat_cities) | cities +0.058 | cities +0.043 | 0/2: weak_captured 0.01, nobody_attacked 0.99 | 0/2: weak_captured 0.01, nobody_attacked 0.96 | commander; fleet none (fleet.rs) |
+| A6 | medium | 69/69 | pass | FAIL (seat_cities) | cities +0.217 | cities +0.087 | 0/2: weak_captured 0.01, nobody_attacked 0.99 | 0/2: weak_captured 0.01, nobody_attacked 0.97 | commander; fleet none (fleet.rs) |
+| A6 | strong | 69/69 | FAIL (seat_cities) | FAIL (seat_cities) | cities +0.188 | cities +0.058 | 0/2: weak_captured 0.01, nobody_attacked 0.99 | 0/2: weak_captured 0.01, nobody_attacked 0.96 | commander; fleet none (fleet.rs) |
+| A7 | mild | 100/100 | pass | pass | cities -0.080; score_share -0.000 | cities -0.050; score_share +0.000 | 1/2: seat_military -2.31 | 1/2: seat_military -2.30 | strategist |
+| A7 | medium | 100/100 | pass | pass | cities -0.080; score_share -0.001 | cities -0.110; score_share -0.001 | 1/2: seat_military -3.09 | 1/2: wars_declared 0.01 | strategist |
+| A7 | strong | 100/100 | pass | pass | cities -0.160; score_share -0.003 | cities -0.140; score_share -0.004 | 1/2: seat_military -4.06 | 2/2 | strategist |
+| B2 | mild | 77/77 | pass | pass | cities -0.130; score_share -0.006 | cities -0.169; score_share -0.005 | 1/2: purchases -2.77 | 1/2: purchases -2.65 | danger net (on in standard: the fight fixes read it), tactician, commander (off); scripted defence.rs |
+| B2 | medium | 77/77 | pass | pass | cities -0.182; score_share -0.007 | cities -0.208; score_share -0.008 | 1/2: purchases -2.86 | 1/2: purchases -2.66 | danger net (on in standard: the fight fixes read it), tactician, commander (off); scripted defence.rs |
+| B2 | strong | 77/77 | pass | pass | cities -0.169; score_share -0.008 | cities -0.195; score_share -0.009 | 1/2: purchases -2.83 | 1/2: purchases -2.83 | danger net (on in standard: the fight fixes read it), tactician, commander (off); scripted defence.rs |
+| B5 | mild | 77/77 | pass | pass | cities -0.130; score_share -0.006 | cities -0.169; score_share -0.005 | 1/2: purchases -2.77 | 1/2: purchases -2.65 | danger net (on in standard: the fight fixes read it), tactician, commander (off); scripted defence.rs |
+| B5 | medium | 77/77 | pass | pass | cities -0.182; score_share -0.007 | cities -0.208; score_share -0.008 | 1/2: purchases -2.86 | 1/2: purchases -2.66 | danger net (on in standard: the fight fixes read it), tactician, commander (off); scripted defence.rs |
+| B5 | strong | 77/77 | pass | pass | cities -0.169; score_share -0.008 | cities -0.195; score_share -0.009 | 1/2: purchases -2.83 | 1/2: purchases -2.83 | danger net (on in standard: the fight fixes read it), tactician, commander (off); scripted defence.rs |
+| B6 | mild | 100/100 | pass | pass | score_share -0.001; cities +0.000 | score_share -0.001; cities +0.020 | 1/1 | 1/1 | strategist; supply none |
+| B6 | medium | 100/100 | pass | pass | score_share -0.001; cities +0.010 | score_share -0.001; cities +0.090 | 1/1 | 1/1 | strategist; supply none |
+| B6 | strong | 100/100 | pass | pass | score_share -0.001; cities -0.050 | score_share -0.002; cities -0.020 | 1/1 | 1/1 | strategist; supply none |
+| B7 | mild | 100/100 | pass | pass | score_share -0.000; cities -0.060 | score_share -0.001; cities -0.090 | 2/2 | 2/2 | strategist |
+| B7 | medium | 100/100 | pass | pass | score_share -0.002; cities -0.100 | score_share -0.003; cities -0.060 | 2/2 | 2/2 | strategist |
+| B7 | strong | 100/100 | pass | pass | score_share -0.007; cities -0.230 | score_share -0.008; cities -0.190 | 1/2: unhappy_rounds 13.73 | 1/2: unhappy_rounds 13.74 | strategist |
+| C2 | mild | 69/69 | FAIL (seat_cities) | FAIL (seat_cities) | cities +0.058 | cities -0.043 | 0/1: weak_captured 0.00 | 0/1: weak_captured -0.01 | commander; fleet none (fleet.rs) |
+| C2 | medium | 69/69 | FAIL (seat_cities) | FAIL (seat_cities) | cities +0.029 | cities +0.000 | 0/1: weak_captured 0.00 | 0/1: weak_captured 0.00 | commander; fleet none (fleet.rs) |
+| C2 | strong | 69/69 | FAIL (seat_cities) | FAIL (seat_cities) | cities +0.043 | cities -0.014 | 0/1: weak_captured 0.00 | 0/1: weak_captured -0.01 | commander; fleet none (fleet.rs) |
+| D2 | one | 78/78 | pass | pass | cities -0.231 | cities -0.256 | 2/3: ally_struck 0.04 | 2/3: ally_struck 0.04 | none (no net for allied action) |
+| D3 | mild | 42/42 | pass | pass | alive +0.000; cities -0.500 | alive +0.000; cities -0.595 | 2/2 | 2/2 | none: scripted peace.rs |
+| D3 | medium | 42/42 | pass | pass | alive +0.000; cities -1.310 | alive +0.000; cities -1.190 | 1/2: peace_round 14.24 | 1/2: peace_round 14.95 | none: scripted peace.rs |
+| D3 | strong | 42/42 | pass | pass | alive -0.024; cities -2.024 | alive +0.000; cities -1.976 | 1/2: peace_round 15.00 | 1/2: peace_round 15.38 | none: scripted peace.rs |
+| P6 | mild | 73/73 | pass | pass | military -0.082; score_share +0.001 | military +0.342; score_share -0.000 | 2/2 | 2/2 | commander, tactician (off); danger net (on: the fight fixes); scripted front.rs, siege_walls.rs |
+| P6 | medium | 73/73 | pass | pass | military +0.151; score_share +0.000 | military +0.534; score_share +0.001 | 1/2: zone_dead 0.19 | 1/2: zone_dead 0.19 | commander, tactician (off); danger net (on: the fight fixes); scripted front.rs, siege_walls.rs |
+| P6 | strong | 73/73 | pass | pass | military +0.863; score_share -0.000 | military +0.822; score_share -0.000 | 1/2: zone_dead 0.12 | 1/2: zone_dead 0.12 | commander, tactician (off); danger net (on: the fight fixes); scripted front.rs, siege_walls.rs |
+| P9 | mild | 57/57 | pass | pass | military -0.193; score_share -0.000 | military -0.298; score_share -0.000 | 2/2 | 2/2 | commander (off); none: scripted fleet.rs, operations.rs |
+| P9 | medium | 57/57 | pass | pass | military -0.211; score_share +0.000 | military -0.509; score_share -0.000 | 2/2 | 2/2 | commander (off); none: scripted fleet.rs, operations.rs |
+| P9 | strong | 57/57 | pass | pass | military -0.737; score_share -0.001 | military -0.912; score_share -0.001 | 2/2 | 2/2 | commander (off); none: scripted fleet.rs, operations.rs |
+| P10 | mild | 81/81 | pass | pass | cities +0.000; score_share -0.000 | cities +0.025; score_share -0.000 | 1/2: seat_air_added 0.00 | 1/2: seat_air_added 0.00 | none: scripted air.rs, strikes.rs |
+| P10 | medium | 81/81 | pass | pass | cities +0.025; score_share -0.000 | cities -0.012; score_share -0.000 | 1/2: seat_air_added 0.00 | 1/2: seat_air_added 0.00 | none: scripted air.rs, strikes.rs |
+| P10 | strong | 81/81 | pass | pass | cities -0.012; score_share -0.003 | cities +0.025; score_share -0.003 | 1/2: seat_air_added 0.00 | 1/2: seat_air_added 0.00 | none: scripted air.rs, strikes.rs |
+| P11 | mild | 75/75 | pass | pass | score_share +0.000 | score_share -0.000 | 0/2: cities_converted 1.32, faith_answers 0.44 | 0/2: cities_converted 1.31, faith_answers 0.40 | none: scripted religion.rs |
+| P11 | medium | 75/75 | pass | pass | score_share +0.000 | score_share -0.000 | 1/2: faith_answers 0.59 | 0/2: cities_converted 2.05, faith_answers 0.55 | none: scripted religion.rs |
+| P11 | strong | 75/75 | pass | pass | score_share +0.000 | score_share -0.000 | 2/2 | 2/2 | none: scripted religion.rs |
+| P12 | mild | 100/100 | FAIL (tech_lead_over_pest) | FAIL (tech_lead_over_pest) | score_share -0.000; tech_lead_over_pest -1.210 | score_share -0.000; tech_lead_over_pest -1.310 | 0/2: script_stolen 1.64, spies_home 0.00 | 0/2: script_stolen 1.62, spies_home 0.00 | none: scripted espionage.rs |
+| P12 | medium | 100/100 | pass | pass | score_share -0.000; tech_lead_over_pest -1.220 | score_share -0.000; tech_lead_over_pest -1.300 | 1/2: spies_home 0.00 | 1/2: spies_home 0.00 | none: scripted espionage.rs |
+| P12 | strong | 100/100 | pass | pass | score_share -0.001; tech_lead_over_pest -1.220 | score_share -0.000; tech_lead_over_pest -1.320 | 1/2: spies_home 0.00 | 1/2: spies_home 0.00 | none: scripted espionage.rs |
+| C1 | mild | 81/81 | pass | pass | score_share +0.001; cities +0.062 | score_share +0.001; cities +0.049 | 2/2 | 2/2 | none: scripted air.rs, strikes.rs |
+| C1 | medium | 81/81 | pass | pass | score_share +0.001; cities +0.074 | score_share +0.000; cities -0.012 | 2/2 | 2/2 | none: scripted air.rs, strikes.rs |
+| C1 | strong | 81/81 | pass | pass | score_share +0.001; cities +0.136 | score_share +0.001; cities +0.086 | 2/2 | 2/2 | none: scripted air.rs, strikes.rs |
+| B10 | mild | 100/100 | pass | pass | leader_won +0.110; score_share +0.000 | leader_won +0.130; score_share +0.000 | 1/3: wars_on_leader 0.00, gifts_others 0.17 | 1/3: wars_on_leader 0.00, gifts_others 0.14 | none: scripted (victory_watch.rs, vote guard, city_states.rs); strategist has no diplomacy outputs |
+| B10 | medium | 100/100 | FAIL (leader_won) | FAIL (leader_won) | leader_won +0.370; score_share +0.000 | leader_won +0.390; score_share +0.000 | 1/3: wars_on_leader 0.00, gifts_others -1.59 | 1/3: wars_on_leader 0.00, gifts_others -1.56 | none: scripted (victory_watch.rs, vote guard, city_states.rs); strategist has no diplomacy outputs |
+| B10 | strong | 100/100 | FAIL (leader_won) | FAIL (leader_won) | leader_won +0.860; score_share +0.000 | leader_won +0.850; score_share +0.000 | 1/3: wars_on_leader 0.00, gifts_others -5.81 | 1/3: wars_on_leader 0.00, gifts_others -5.27 | none: scripted (victory_watch.rs, vote guard, city_states.rs); strategist has no diplomacy outputs |
+| P4L | mild | 74/74 | pass | pass | score_share -0.003; treasury -32.014 | score_share -0.003; treasury -19.527 | 0/1: script_betrayed 0.84 | 0/1: script_betrayed 0.84 | none: scripted (peace.rs Negotiation::value, diplomacy.rs) |
+| P4L | medium | 74/74 | pass | pass | score_share -0.003; treasury -28.176 | score_share -0.004; treasury -33.527 | 0/1: script_betrayed 0.84 | 0/1: script_betrayed 0.84 | none: scripted (peace.rs Negotiation::value, diplomacy.rs) |
+| P4L | strong | 74/74 | pass | pass | score_share -0.004; treasury -37.649 | score_share -0.004; treasury -34.338 | 0/1: script_betrayed 0.82 | 0/1: script_betrayed 0.82 | none: scripted (peace.rs Negotiation::value, diplomacy.rs) |
+| P4B | mild | 78/78 | pass | pass | cities -0.051; score_share -0.001 | cities -0.051; score_share -0.001 | 1/1 | 1/1 | none: scripted (diplomacy.rs ThirdPartyWar price, peace.rs) |
+| P4B | medium | 78/78 | pass | pass | cities -0.026; score_share -0.001 | cities -0.064; score_share -0.001 | 1/1 | 1/1 | none: scripted (diplomacy.rs ThirdPartyWar price, peace.rs) |
+| P4B | strong | 78/78 | pass | pass | cities -0.077; score_share -0.001 | cities -0.038; score_share -0.001 | 1/1 | 1/1 | none: scripted (diplomacy.rs ThirdPartyWar price, peace.rs) |
+| P1E | mild | 78/78 | pass | FAIL (seat_score_share) | score_share -0.003; cities -0.038 | score_share -0.008; cities -0.090 | 2/2 | 2/2 | none: scripted (worker flight, settler escort); tactician, commander (off) |
+| P1E | medium | 78/78 | pass | pass | score_share -0.008; cities -0.013 | score_share -0.010; cities -0.064 | 2/2 | 2/2 | none: scripted (worker flight, settler escort); tactician, commander (off) |
+| P1E | strong | 78/78 | pass | pass | score_share -0.014; cities -0.077 | score_share -0.014; cities -0.090 | 2/2 | 2/2 | none: scripted (worker flight, settler escort); tactician, commander (off) |
+| P7C | one | 66/66 | FAIL (seat_score_share) | FAIL (seat_score_share) | score_share -0.092; cities -0.682 | score_share -0.096; cities -0.864 | 0/1: capital_retaken 0.18 | 0/1: capital_retaken 0.17 | commander, scripted retake |
+| P3D | mild | 80/80 | pass | pass | cities -0.163; score_share -0.004 | cities -0.150; score_share -0.003 | 0/2: counter_by_3 0.72, military_added_before_war 0.51 | 0/2: counter_by_3 0.72, military_added_before_war 0.56 | danger net (on in standard: the fight fixes read it), tactician, commander (off); scripted defence.rs |
+| P3D | medium | 80/80 | pass | pass | cities -0.188; score_share -0.006 | cities -0.175; score_share -0.006 | 2/2 | 2/2 | danger net (on in standard: the fight fixes read it), tactician, commander (off); scripted defence.rs |
+| P3D | strong | 80/80 | pass | pass | cities -0.225; score_share -0.008 | cities -0.175; score_share -0.007 | 1/2: military_added_before_war 1.90 | 2/2 | danger net (on in standard: the fight fixes read it), tactician, commander (off); scripted defence.rs |
+| P4W | mild | 81/81 | pass | pass | cities +0.062; score_share +0.001 | cities +0.037; score_share +0.001 | 1/2: script_peace_made 1.00 | 1/2: script_peace_made 1.00 | none: scripted (peace.rs Negotiation::value, diplomacy.rs) |
+| P4W | medium | 81/81 | pass | pass | cities +0.062; score_share +0.001 | cities +0.037; score_share +0.001 | 1/2: script_peace_made 1.00 | 1/2: script_peace_made 1.00 | none: scripted (peace.rs Negotiation::value, diplomacy.rs) |
+| P4W | strong | 81/81 | pass | pass | cities +0.074; score_share +0.001 | cities +0.062; score_share +0.001 | 1/2: script_peace_made 1.00 | 1/2: script_peace_made 1.00 | none: scripted (peace.rs Negotiation::value, diplomacy.rs) |
+| R1 | mild | 81/81 | pass | pass | play_on_share +0.002 | play_on_share +0.005 | 2/2 | 2/2 | commander, scripted retake; strategist (economy) |
+| R1 | medium | 81/81 | pass | pass | play_on_share +0.004 | play_on_share +0.006 | 1/2: seat_recaptures 0.26 | 1/2: seat_recaptures 0.23 | commander, scripted retake; strategist (economy) |
+| R1 | strong | 81/81 | pass | pass | play_on_share -0.002 | play_on_share -0.000 | 1/2: seat_recaptures 0.17 | 1/2: seat_recaptures 0.15 | commander, scripted retake; strategist (economy) |
+| R2 | mild | 81/81 | pass | pass | play_on_share +0.000 | play_on_share +0.003 | 1/2: seat_recaptures 0.12 | 1/2: seat_recaptures 0.14 | commander, scripted retake; none: scripted peace.rs |
+| R2 | medium | 81/81 | pass | pass | play_on_share +0.009 | play_on_share +0.012 | 2/2 | 2/2 | commander, scripted retake; none: scripted peace.rs |
+| R2 | strong | 81/81 | pass | pass | play_on_share -0.004 | play_on_share -0.002 | 1/2: seat_recaptures 0.10 | 1/2: seat_recaptures 0.12 | commander, scripted retake; none: scripted peace.rs |
+| R3 | mild | 80/80 | pass | pass | play_on_share -0.003 | play_on_share +0.000 | 1/1 | 1/1 | site net (off), danger net (on: the fight fixes); strategist |
+| R3 | medium | 80/80 | pass | pass | play_on_share -0.004 | play_on_share +0.000 | 1/1 | 1/1 | site net (off), danger net (on: the fight fixes); strategist |
+| R3 | strong | 80/80 | pass | pass | play_on_share -0.004 | play_on_share -0.002 | 1/1 | 1/1 | site net (off), danger net (on: the fight fixes); strategist |
+| R4 | mild | 81/81 | pass | pass | play_on_share -0.007 | play_on_share -0.006 | 1/2: seat_recaptures 0.17 | 1/2: seat_recaptures 0.14 | strategist; none: scripted peace.rs, retake |
+| R4 | medium | 81/81 | pass | pass | play_on_share -0.003 | play_on_share -0.001 | 1/2: seat_recaptures 0.16 | 1/2: seat_recaptures 0.15 | strategist; none: scripted peace.rs, retake |
+| R4 | strong | 81/81 | pass | pass | play_on_share -0.003 | play_on_share -0.001 | 1/2: seat_recaptures 0.12 | 1/2: seat_recaptures 0.14 | strategist; none: scripted peace.rs, retake |
+| R5 | mild | 81/81 | FAIL (play_on_share) | pass | play_on_share -0.012 | play_on_share -0.008 | 1/2: seat_recaptures 0.16 | 1/2: seat_recaptures 0.15 | strategist; none: scripted peace.rs, retake |
+| R5 | medium | 81/81 | pass | pass | play_on_share -0.003 | play_on_share -0.001 | 1/2: seat_recaptures 0.17 | 1/2: seat_recaptures 0.16 | strategist; none: scripted peace.rs, retake |
+| R5 | strong | 81/81 | pass | pass | play_on_share -0.005 | play_on_share -0.002 | 1/2: seat_recaptures 0.12 | 1/2: seat_recaptures 0.12 | strategist; none: scripted peace.rs, retake |
+
+nets-x-site: 103 of 121 (situation, strength) pass their outcome gates.
+standard: 99 of 121.
+
+What the AI does wrong, in plain words (both variants unless named; the outcome FAILs first):
+
+- B10: a rival one or two delegates short of the World Leader wins the vote in 37-39 % (2 short) and
+  85-86 % (1 short) of positions more than the control, inside 30 rounds. Nobody declares war on it, and
+  the others make no more gifts to the city-states than in the control (0.2 more at 3 short; 1.6 and 5.8
+  fewer at 2 and 1 short, where the game ends sooner).
+  Owner: none (scripted `victory_watch.rs`, vote guard, `city_states.rs`); the strategist has no
+  diplomacy outputs.
+- P7C: the city with the world wonders, once taken, comes back in 17-18 % of positions; the seat ends the
+  window 0.09 of the score share down (gate -0.04). Owner: commander (off), scripted `retake.rs`.
+- P12: spies in the seat's largest cities steal 1.6 technologies in 30 rounds; the seat sends no spy home
+  (`spies_home` 0.00 at every strength) and its lead over the thief falls 1.2-1.3 technologies (gate -1
+  at the mild level). Owner: none, scripted `espionage.rs`.
+- P1E (`standard` only, mild): one raider at rounds 30-50 costs 0.008 of the score share (gate -0.005);
+  `nets-x-site` passes (-0.003). Owner: none, scripted worker flight and settler escort.
+- R5 (`nets-x-site` only, mild): bankrupt, without strategic resources and one city lost, the seat's own
+  play loses 0.012 more of the share than the control (gate -0.01); `standard` -0.008.
+- Waves 1-2, unchanged in kind: A6 and C2 (no invasion over the sea), B4 (the capital comes back in 5-21 %),
+  A5 (a disarmed neighbour is attacked in 9-15 % of positions), B9 strong (the space race is not stopped),
+  D1 (the two allies never strike together), A1 (no war, denunciation or pact against a science runaway),
+  P5 medium (`standard`).
+- Behaviour with no outcome FAIL: P10, the seat under bombing builds no aircraft (`seat_air_added` 0.00
+  with the technologies given); P11, missionaries convert 1.3-2.1 cities more than the control and the
+  seat answers 0.4-0.6 times (inquisitor, faith purchase); P4L, a friend's luxury is bought in 82-84 % of
+  positions and the war follows; P4W, the seat at war with a disarmed rival takes its white peace in every
+  position (it loses no city to it: the control makes peace as early); P6, the AI breaks 12-19 % of a
+  5-8 unit kill-zone in 25 rounds and loses no army to it; P3D mild, the counter-strike within 3 rounds in
+  72 % (gate 80 %) and 0.5 units added during the treaty (gate 1); R1, R2, R4, R5, the seat retakes
+  0.10-0.26 cities of those lost (gate 0.2-0.3).
+- Passed with margin: P9 (the army at sea loses 0.2-0.9 units, the hunters sink 0.1-0.8), C1 (the seat
+  flies and intercepts), P4B (the AI never takes a 300-1000 gold bribe for a war on a third nation), R3.
+
+### The failed wave-3 situations played to the end of the game
+
+`end.sh` (`runs/exam-end`): B10, P12 (30 instances, round 200), P1E, P7C, R5 (30 drawn, 21-24 built), both
+variants, each arm played to the end. `end_seat_win_weight` delta (edited minus control; se about 0.04-0.09):
+
+| situation | strength | nets-x-site | standard | gate | verdict (both) |
+|---|---|---|---|---|---|
+| B10 | mild / medium / strong | -0.47 / -0.50 / -0.53 | -0.50 / -0.50 / -0.53 | -0.1 / -0.2 / -0.3 | FAIL at all |
+| P7C | one | -0.107 | -0.107 | -0.05 | FAIL |
+| P1E | mild / medium / strong | -0.043 / -0.098 / -0.087 | -0.043 / -0.043 / -0.043 | -0.02 / -0.03 / -0.05 | FAIL (standard passes strong) |
+| R5 | mild / medium / strong | -0.052 each | -0.083 each | -0.05 / -0.1 / -0.15 | FAIL mild |
+| P12 | mild / medium / strong | -0.042 / 0.000 / -0.025 | +0.017 / +0.025 / +0.042 | -0.02 / -0.03 / -0.05 | nets-x-site FAIL mild |
+
+A leader even three delegates short of the World Leader vote ends the game with the victory in almost every
+game: the others' real or time victories fall from 0.53 to 0.00-0.07. One early raider costs the seat
+0.04-0.10 of its victory weight; a lost wonder city 0.11.

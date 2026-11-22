@@ -117,7 +117,7 @@ impl Spies {
     /// Every steal right spent on a technology of the victim the rules let the seat take.
     fn steal(&mut self, game: &mut GameState, rules: &CompiledRuleset) {
         while game.view().auth.module().espionage().steal_rights(self.seat, self.victim) > 0 {
-            let theirs: Vec<classic_rules::ids::TechId> = game.view().auth.players().techs_of(self.victim).iter().copied().collect();
+            let theirs: Vec<classic_rules::ids::TechId> = game.view().auth.players().techs_of(self.victim).to_vec();
             let mine = game.view().auth.players().techs_of(self.seat).to_vec();
             let taken = theirs.into_iter().filter(|t| !mine.contains(t)).any(|tech| game.execute(rules, Command::StealTechnology { player: self.seat, from: self.victim, tech }).is_ok());
             if !taken {

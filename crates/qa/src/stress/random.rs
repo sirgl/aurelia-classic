@@ -95,7 +95,7 @@ pub fn sample(rules: &CompiledRuleset, position: &Position, seed: u64) -> Result
 fn draw_primitive(draw: &dyn Fn(u64) -> u64, seat: PlayerId, rival: &dyn Fn(u64) -> PlayerId, salt: u64) -> Primitive {
     let strength = draw(salt + 1);
     match draw(salt) % KINDS {
-        0 => Primitive::Disarm { nation: if draw(salt + 2) % 2 == 0 { seat } else { rival(salt + 3) }, percent: 25 + strength % 76 },
+        0 => Primitive::Disarm { nation: if draw(salt + 2).is_multiple_of(2) { seat } else { rival(salt + 3) }, percent: 25 + strength % 76 },
         1 => Primitive::Invade { enemy: rival(salt + 3), units: 3 + (strength % 10) as usize },
         2 => Primitive::Boost { nation: rival(salt + 3), percent: 25 + (strength % 76) as u32 },
         3 => Primitive::Seize { taker: rival(salt + 3), cities: 1 + (strength % 3) as usize },

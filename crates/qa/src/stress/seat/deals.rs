@@ -64,7 +64,7 @@ impl Betrayal {
         let treasury = game.view().auth.players().treasury_of(self.victim);
         let items = match self.bait {
             Bait::Luxury { percent } => {
-                let price = (u64::from(treasury) * u64::from(percent) / 100 >> self.offers.min(6)) as u32;
+                let price = ((u64::from(treasury) * u64::from(percent) / 100) >> self.offers.min(6)) as u32;
                 let Some(resource) = luxury_to_sell(game, rules, self.seat, self.victim) else { return false };
                 if price < 10 {
                     return false;
@@ -168,7 +168,7 @@ impl Seat for PeaceFishing {
             return;
         }
         self.turns += 1;
-        if self.turns % self.every != 0 {
+        if !self.turns.is_multiple_of(self.every) {
             return;
         }
         self.offers += 1;
