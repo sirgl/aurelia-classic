@@ -245,3 +245,39 @@ every seat (`runs/stress-final`, `runs/stress-standard`; `tools/stress-gates.py`
 | T5 A1 / B9 end win weight Δ | 0.061 / −0.011 | −0.050 / 0.058 | no / yes |
 
 Defect 3 is moved (denunciations, no help to the leader, the leader wins less often) but not fixed: no war on it.
+
+## Review conditions (22 Nov, after the independent review `work/nets/lane-strategy/REVIEW.md`)
+
+Written before the runs below; the gates are not changed after them.
+
+**Finding 1 (fixed).** `operations::candidate` let any city with a capital stake above 0 past the odds gate
+(`odds_are_good`: at peace and at most 8 citizens) and gave it `DECISIVE_RANGE` (32) and the decisive form
+limit. A stake of the domination path (`Stakes::of_leanings`: every remaining capital of a seat on the
+domination path, and the last capital of anyone) is above 0 too, so `strategist-x` sent ordinary domination
+operations against large capitals and into running wars, where `war-pays` measured 9 % and 3 % captures. Now
+only a city of the rival running away is `CapitalStake::runaway`, set by one rule, `Stakes::with_plan` (the
+driver's turn stakes and `Stakes::of` both come through it; applied twice it adds nothing).
+
+**Ablations (step 2).** Purpose: the replication's gain is +61 science and +53 diplomatic victories, and
+the pledge adds nothing (59.9 % without it); which of the two remaining parts gives which victories, and
+which one costs the wars on the candidate (1225 against 820), the capitals lost and the rebels (118 turns
+below −20 happiness against 2). Each 400 pace games, Quick, against `standard`, offset 1550 (`--seed-offset
+1550 --repeat 2`), build with finding 1 fixed, probe on:
+
+| run | parts | question |
+|---|---|---|
+| A-style | `AURELIA_X_PARTS=style` (tall first alone) | does tall first give the science victories, and the happiness collapse? |
+| A-threat | `AURELIA_X_PARTS=threat` (the threat alone) | does the threat give the diplomatic victories (denunciations of the leader), and the wars on the candidate? |
+
+Reported for each: victory-weighted share and CI, victories by kind, wars declared and on it, capitals lost,
+turns below −20 happiness and risings. No pass mark: they explain, they do not accept.
+
+**Gate of a hand edit (step 4), if the trace of step 3 indicates one.** Offset 1555, 400 pace games Quick
+against `standard` (`--repeat 2`), never run before:
+
+| gate | metric | pass |
+|---|---|---|
+| R1 | victory-weighted share, pooled | ≥ 58 % |
+| R2 | risings of rebels, candidate | ≤ 2 × `standard`'s in the same games |
+| R3 | capitals lost, candidate | ≤ 1.5 × `standard`'s in the same games |
+| R4 | `--solo standard --suite standard --speed quick` hash | `d2d736c1273a82bb` |
