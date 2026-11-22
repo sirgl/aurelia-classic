@@ -61,10 +61,16 @@ pub fn set_net2_for_test(plan: Option<Net2Plan>) {
 }
 
 /// Reads the `net2` plan of the turn: None when the seat has none (every variant but `net2`), and then
-/// every reader of this part is inert. THE ONE PLACE the plan is fetched: part E (`TurnBrief::net2`)
-/// reads it here, `brief.net2.as_ref().map(read)`, with the test override still first.
-pub fn with_net2<T>(_brief: &TurnBrief, read: impl FnOnce(&Net2Plan) -> T) -> Option<T> {
-    NET2_OVERRIDE.with(|p| p.borrow().as_ref().map(read))
+/// every reader of this part is inert. THE ONE PLACE the plan is fetched: the brief's (`TurnBrief::net2`,
+/// filled by the driver after `net2::think`), unless a test set its own (`set_net2_for_test`).
+pub fn with_net2<T>(brief: &TurnBrief, read: impl FnOnce(&Net2Plan) -> T) -> Option<T> {
+    NET2_OVERRIDE.with(|p| {
+        let overridden = p.borrow();
+        match overridden.as_ref() {
+            Some(plan) => Some(read(plan)),
+            None => brief.net2.as_ref().map(read),
+        }
+    })
 }
 
 /// What `net2` says of the war this turn.
