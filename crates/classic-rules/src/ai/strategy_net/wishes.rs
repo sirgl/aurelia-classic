@@ -24,8 +24,8 @@ pub struct Wishes {
     pub threat: Option<Threat>,
 }
 
-/// The parts of `strategist-x` a variant plays (`Variant::strategist_parts`; the bench's ablations are
-/// the variants `strategist-x-style` and `strategist-x-threat`).
+/// The parts of the strategist's wishes a variant plays (`Variant::strategist_parts`: `strategist-x` plays
+/// tall first, the bench-only `strategist-x-threat` the threat).
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct Parts {
     /// The rival running away (`threat::assess`): the posture term, the stakes, the denunciation, the deals.
@@ -35,7 +35,7 @@ pub struct Parts {
 }
 
 impl Parts {
-    /// Every variant but `strategist-x` and its ablations.
+    /// Every variant but `strategist-x` and `strategist-x-threat`.
     pub const NONE: Parts = Parts { threat: false, tall_first: false };
 
     pub fn any(self) -> bool {

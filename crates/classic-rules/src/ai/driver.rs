@@ -171,7 +171,7 @@ impl ClassicMind {
             Variant::NextX => (Variant::Standard, Variant::Retake2),
             // `strategist-x` is `next-x` (the play of `standard`) with the strategist's new outputs;
             // `nets-x` is `strategist-x` under its own name, `nets-x-site` with the site net (`economy_nets`).
-            Variant::StrategistX | Variant::StrategistXStyle | Variant::StrategistXThreat | Variant::NetsX | Variant::NetsXSite => (Variant::Standard, Variant::Retake2),
+            Variant::StrategistX | Variant::StrategistXThreat | Variant::NetsX | Variant::NetsXSite => (Variant::Standard, Variant::Retake2),
             _ => (requested, requested),
         };
         let strategist = requested.strategist_parts();
@@ -230,7 +230,7 @@ impl ClassicMind {
         // war of `siege-call` under its own, `next-war-retake` as `Standard` with the war of
         // `retake2` under its own, `next-x` as `next-war-retake` with the guard and the landless
         // plan under its own.
-        let named = named.or(matches!(requested, Variant::NextW | Variant::NextWar | Variant::NextWarRetake | Variant::NextX | Variant::StrategistX | Variant::StrategistXStyle | Variant::StrategistXThreat | Variant::NetsX | Variant::NetsXSite).then_some(requested));
+        let named = named.or(matches!(requested, Variant::NextW | Variant::NextWar | Variant::NextWarRetake | Variant::NextX | Variant::StrategistX | Variant::StrategistXThreat | Variant::NetsX | Variant::NetsXSite).then_some(requested));
         // The game's AI since the fourteenth promotion and the standard before it carry their own names.
         let named = promoted.or(named);
         Self { advisors, variant, genome: None, humans: Vec::new(), walks: Default::default(), choice: None, #[cfg(feature = "experimental-ai")] net, book, named, walls, conquest: None, unciv, tall: None, sharp, tall_real, next, wonder_race, pays, fit, muster, call, retake2, vote_guard, field, raidw, landless, landless_plan, siege_mend: false, strategist }
@@ -326,7 +326,7 @@ impl ClassicMind {
     pub fn variant(&self) -> Variant {
         // The joint build's candidate, the game's AI since the fourteenth promotion (which plays as it)
         // and the standard before it carry the flags below under their own names.
-        if let Some(v @ (Variant::NextX | Variant::Standard | Variant::PreNextX | Variant::StrategistX | Variant::StrategistXStyle | Variant::StrategistXThreat | Variant::EconSite | Variant::EconSiteTall | Variant::EconSiteOwnLand | Variant::NetsX | Variant::NetsXSite)) = self.named {
+        if let Some(v @ (Variant::NextX | Variant::Standard | Variant::PreNextX | Variant::StrategistX | Variant::StrategistXThreat | Variant::EconSite | Variant::EconSiteTall | Variant::EconSiteOwnLand | Variant::NetsX | Variant::NetsXSite)) = self.named {
             return v;
         }
         if self.landless {
@@ -1171,6 +1171,20 @@ mod sharp_tests {
                 (m.walls.is_some(), m.unciv.is_some(), m.book.is_some(), m.tall, m.conquest, m.choice, m.genome.is_some()),
             )
         )
+    }
+
+    /// `strategist-x` (review conditions, 22 Nov): the mind of `next-x` with tall first alone, a property of
+    /// the variant (no environment switch); `strategist-x-threat` the same mind with the threat alone; `nets-x`
+    /// and `nets-x-site` play `strategist-x`'s parts; every other variant plays no part of the strategist's wishes.
+    #[test]
+    fn strategist_x_plays_next_x_with_tall_first_alone() {
+        use crate::ai::strategy_net::wishes::Parts;
+        let (standard, candidate, threat) = (ClassicMind::new(Variant::Standard), ClassicMind::new(Variant::StrategistX), ClassicMind::new(Variant::StrategistXThreat));
+        assert_eq!(mind_parts(&candidate), mind_parts(&standard));
+        assert_eq!(mind_parts(&threat), mind_parts(&standard));
+        assert_eq!((candidate.strategist, threat.strategist, standard.strategist), (Parts { threat: false, tall_first: true }, Parts { threat: true, tall_first: false }, Parts::NONE));
+        assert_eq!((candidate.variant(), threat.variant()), (Variant::StrategistX, Variant::StrategistXThreat));
+        assert!(Variant::ALL.iter().filter(|v| v.strategist_parts().any()).eq([Variant::StrategistX, Variant::StrategistXThreat, Variant::NetsX, Variant::NetsXSite].iter()));
     }
 
     /// The fourteenth promotion (14 November): the game's AI is the mind of `next-x` and names itself
