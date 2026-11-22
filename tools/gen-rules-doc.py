@@ -475,7 +475,7 @@ def formulas(v):
         "- **Elimination** (`systems::elimination::forget_eliminated`). A nation or city-state that loses "
         "its last city is eliminated, and every tie the rules keep with it ends at once, both ways: wars, "
         "peace treaties, deals and gold per turn, offers, embassies, open borders, pacts, friendships, research "
-        "agreements, the memory of it (warmonger, denunciation), its standing with the city-states and the "
+        "agreements, the memory of it (warmonger, denunciation, grievances), its standing with the city-states and the "
         "quests of it or about it, its roles in the World Congress (its proposals and votes, an embargo on it; "
         "a dead host passes the league to the living nation with the most delegates), its spies and the World "
         "Leader title. A city-state whose ally it was takes its next ally at once. What it did stays as "

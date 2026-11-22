@@ -96,6 +96,9 @@ pub struct SavedRelations {
     pub open_until: Vec<u32>,
     /// Warmonger memory (non-negative).
     pub warmonger: Vec<u32>,
+    /// Grievances (observer, offender, kind tag, amount), sorted; empty in saves older than
+    /// `save_codec::GRIEVANCES_SINCE`.
+    pub grievances: Vec<(u8, u8, u8, u32)>,
     pub trades: Vec<(u8, u8, (u8, u32, u16), u32)>,
     #[allow(clippy::type_complexity)]
     pub offers: Vec<(u32, u8, u8, u32, Vec<(u8, (u8, u32, u16))>)>,

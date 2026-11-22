@@ -46,6 +46,9 @@ classic.game.diplomacy.fact-they-grant-entry = Их границы открыт�
 classic.game.diplomacy.fact-we-denounced = Вы осудили их
 classic.game.diplomacy.fact-they-denounced = Они осудили вас
 classic.game.diplomacy.fact-warmonger = Вы помните их воинственность ({ $n })
+classic.game.diplomacy.fact-grievance-stolen-land = Вы помните, что они отобрали вашу землю ({ $n })
+classic.game.diplomacy.fact-grievance-betrayed-friendship = Вы помните, что они предали дружбу ({ $n })
+classic.game.diplomacy.fact-grievance-betrayed-pact = Вы помните, что они предали оборонительный союз ({ $n })
 classic.game.diplomacy.quantity-gold-now = { NUMBER($n) } золота сразу
 classic.game.diplomacy.quantity-gold-per-turn = { $n ->
     [one] { NUMBER($n) } золото

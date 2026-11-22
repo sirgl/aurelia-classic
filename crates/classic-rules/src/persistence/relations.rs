@@ -6,7 +6,7 @@ use crate::ids::{CityHandle, PlayerId, ResourceId};
 use crate::persistence::decode::DecodeError;
 use crate::persistence::schema::SavedRelations;
 use crate::rules::CompiledRuleset;
-use crate::world::relations::{DealItem, DealOffer, OngoingTrade, RelationsState, TradeFlow};
+use crate::world::relations::{DealItem, DealOffer, Grievance, GrievanceKind, OngoingTrade, RelationsState, TradeFlow};
 
 /// (tag, value, extra) of a deal item.
 fn encode_item(item: DealItem, city_ordinals: &[u32]) -> (u8, u32, u16) {
@@ -72,6 +72,7 @@ pub(crate) fn encode_relations(r: &RelationsState, city_ordinals: &[u32]) -> Sav
         denounced_until: r.denounced_until.clone(),
         open_until: r.open_until.clone(),
         warmonger: r.warmonger.iter().map(|w| *w as u32).collect(),
+        grievances: r.grievances.iter().map(|g| (g.observer.0, g.offender.0, g.kind.tag(), g.amount as u32)).collect(),
         trades: r
             .trades
             .iter()
@@ -132,6 +133,7 @@ pub(crate) fn decode_relations(
             Err(corrupt("player"))
         }
     };
+    let grievances = decode_grievances(&s.grievances, players)?;
     let mut trades = Vec::with_capacity(s.trades.len());
     for (from, to, (tag, value, extra), until) in &s.trades {
         let flow = match tag {
@@ -184,8 +186,28 @@ pub(crate) fn decode_relations(
             .iter()
             .map(|w| (*w).min(i32::MAX as u32) as i32)
             .collect(),
+        grievances,
         trades,
         offers,
         next_offer: s.next_offer,
     })
+}
+
+/// The grievances of a save: sorted, each once, above 0, between players of the game.
+fn decode_grievances(saved: &[(u8, u8, u8, u32)], players: usize) -> Result<Vec<Grievance>, DecodeError> {
+    let mut out: Vec<Grievance> = Vec::with_capacity(saved.len());
+    for (observer, offender, tag, amount) in saved {
+        let kind = GrievanceKind::from_tag(*tag).ok_or_else(|| corrupt("grievance kind"))?;
+        let amount = i32::try_from(*amount).map_err(|_| corrupt("grievance amount"))?;
+        let inside = usize::from(*observer) < players && usize::from(*offender) < players;
+        let next = Grievance { observer: PlayerId(*observer), offender: PlayerId(*offender), kind, amount };
+        let sorted = out.last().is_none_or(|last| {
+            (last.observer.0, last.offender.0, last.kind) < (next.observer.0, next.offender.0, next.kind)
+        });
+        if !inside || amount == 0 || !sorted {
+            return Err(corrupt("grievance"));
+        }
+        out.push(next);
+    }
+    Ok(out)
 }

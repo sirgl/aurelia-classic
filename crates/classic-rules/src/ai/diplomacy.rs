@@ -39,7 +39,7 @@ pub fn trusted(round: u32, r: &Relation) -> bool {
         && !recent_war
         && !r.they_denounced
         && !r.we_denounced
-        && r.warmonger < DISTRUST_WARMONGER
+        && r.remembered_against() < DISTRUST_WARMONGER
 }
 
 /// Gold value of a relation item for the AI receiving it (`receiving`) or giving it; gold,
@@ -250,12 +250,13 @@ pub fn luxury_swaps(obs: &AIObservation<'_>, rules: &CompiledRuleset, others: &[
     out
 }
 
-/// Denounce nations whose warmonger memory passed DENOUNCE_WARMONGER.
+/// Denounce nations whose warmonger memory and grievances (`Relation::remembered_against`) passed
+/// DENOUNCE_WARMONGER.
 pub fn denunciations(obs: &AIObservation<'_>) -> Vec<Command> {
     obs.relations
         .iter()
         .filter(|r| r.kind == PlayerKind::Major && !r.we_denounced && !r.friends)
-        .filter(|r| r.warmonger >= DENOUNCE_WARMONGER)
+        .filter(|r| r.remembered_against() >= DENOUNCE_WARMONGER)
         .map(|r| Command::Denounce {
             player: obs.player,
             target: r.other,

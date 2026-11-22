@@ -307,7 +307,7 @@ fn nothing_names_a_dead_nation_in_a_played_world() {
     let alive = |p: PlayerId| players.is_alive(p) && players.is_major(p);
     let (dead, friend, killer) = (PlayerId(0), PlayerId(1), PlayerId(2));
     assert!(alive(dead) && alive(friend) && alive(killer), "three nations live after 80 rounds");
-    tie_every_way(&mut game, &rules, dead, friend);
+    tie_every_way(&mut game, &rules, dead, friend, killer);
     assert!(!references_to(game.view().auth, dead).is_empty(), "the search finds the ties");
 
     let cities: Vec<CityHandle> = game.view().auth.indexes().cities_of(dead).to_vec();
@@ -330,9 +330,12 @@ fn play(game: &mut GameState, rules: &CompiledRuleset, driver: &mut AiDriver<cla
     }
 }
 
-/// Every tie the harness can make between `dead` and `friend`, and `dead` as the ally of every
-/// city-state and the World Leader.
-fn tie_every_way(game: &mut GameState, rules: &CompiledRuleset, dead: PlayerId, friend: PlayerId) {
+/// Every tie the harness can make between `dead` and `friend`, `dead` as the ally of every
+/// city-state and the World Leader, and `dead` at war with `killer`, its friend before (a
+/// betrayal everyone holds against it).
+fn tie_every_way(game: &mut GameState, rules: &CompiledRuleset, dead: PlayerId, friend: PlayerId, killer: PlayerId) {
+    let _ = game.debug_deal_item(rules, dead, killer, DealItem::Friendship);
+    game.debug_force_war(rules, dead, killer);
     for item in [DealItem::DefensivePact, DealItem::Friendship, DealItem::ResearchAgreement, DealItem::GoldPerTurn(1)] {
         let _ = game.debug_deal_item(rules, dead, friend, item);
     }

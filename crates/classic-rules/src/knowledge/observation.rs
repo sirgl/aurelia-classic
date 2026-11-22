@@ -128,12 +128,29 @@ pub struct Relation {
     pub they_denounced: bool,
     /// Our warmonger memory of them (public to us: it is our own).
     pub warmonger: i32,
+    /// What we hold against them, by reason (`GrievanceKind::index`), in `GRIEVANCE_POINT`s.
+    pub grievances: [i32; crate::world::relations::GRIEVANCE_KINDS],
     /// We may open our borders to them now (`Command::OpenBorders` would
     /// pass: technology, embassy, peace).
     pub can_open_borders: bool,
     /// Defensive pacts the other player has with nations we have met (the diplomacy
     /// overview lists them), not counting ours: a war on it brings these into the war.
     pub pacts_known: u8,
+}
+
+impl Relation {
+    /// What we hold against them in opinion points (Unciv's modifiers that sum into
+    /// `opinionOfOtherCiv`), all reasons together.
+    pub fn grievance_points(&self) -> f32 {
+        self.grievances.iter().sum::<i32>() as f32 / crate::world::relations::GRIEVANCE_POINT as f32
+    }
+
+    /// What we remember against them on the scale of the warmonger memory, where 100 distrusts and
+    /// 250 denounces: the warmonger memory plus the grievances, a point of opinion being ten of memory
+    /// (the AI of Unciv's opinion counts the memory as a tenth, `ai::unciv::Diplomat::opinion`).
+    pub fn remembered_against(&self) -> i32 {
+        self.warmonger + (self.grievance_points() * 10.0).round() as i32
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -848,6 +865,7 @@ fn relations(auth: &AuthWorld, view: &PlayerView<'_>, player: PlayerId) -> Vec<R
             we_denounced: r.denounced(player, other, round),
             they_denounced: r.denounced(other, player, round),
             warmonger: r.warmonger(player, other),
+            grievances: r.grievances_about(player, other),
             pacts_known: (0..auth.players().count())
                 .map(|q| PlayerId(q as u8))
                 .filter(|q| *q != player && *q != other && auth.players().is_major(*q) && auth.players().is_alive(*q))

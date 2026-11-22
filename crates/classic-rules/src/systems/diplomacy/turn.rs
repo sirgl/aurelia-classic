@@ -28,6 +28,7 @@ impl<'a> WorldTransaction<'a> {
         self.research_agreements(player, science.max(0) as u32, round, rules);
         self.expire_open_borders(player, round, rules);
         self.decay_warmonger(player, rules);
+        self.fade_grievances(player, rules);
         self.lapse_offers(player, round);
         self.world.module.relations.trades.retain(|t| round < t.until);
     }
@@ -157,6 +158,17 @@ impl<'a> WorldTransaction<'a> {
             self.world.diplomacy.set_open(player, guest, false);
             self.expel_units(player, guest, rules);
             self.relations_changed(player);
+        }
+    }
+
+    /// Every grievance `observer` holds fades by its kind's rate at the game's pace (Unciv
+    /// `DiplomacyTurnManager.revertToZero`: 0.67 x rate / speed modifier, gone when the rate
+    /// reaches what is left).
+    fn fade_grievances(&mut self, observer: PlayerId, rules: &CompiledRuleset) {
+        let pace = self.world.settings().speed(rules).pace_percent;
+        let held: Vec<_> = self.world.module.relations.grievances.iter().filter(|g| g.observer == observer).copied().collect();
+        for g in held {
+            self.world.module.relations.add_grievance(observer, g.offender, g.kind, -g.kind.fading_at(pace));
         }
     }
 
