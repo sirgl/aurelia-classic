@@ -166,6 +166,14 @@ pub trait ClassicGame {
     #[cfg(any(test, feature = "harness"))]
     fn debug_add_spies(&mut self, rules: &CompiledRuleset, player: PlayerId, count: u8);
 
+    /// Harness-only: the unit stands for the rest of its owner's turn as a resting unit stands. When
+    /// it has not moved this turn it heals now what the end of the turn would give it (`heal_amount`,
+    /// which gives nothing to a unit that moved), and its moves are spent, so no later order of the
+    /// turn moves it. The ai-stress exam's scripted seats hold their units this way: the seat's AI
+    /// plays the rest of the seat and does not touch them.
+    #[cfg(any(test, feature = "harness"))]
+    fn debug_hold_unit(&mut self, rules: &CompiledRuleset, unit: UnitHandle);
+
 
 
     fn outcome(&self) -> Option<crate::world::victory::Outcome>;
@@ -470,8 +478,20 @@ impl ClassicGame for GameState {
     fn debug_add_spies(&mut self, rules: &CompiledRuleset, player: PlayerId, count: u8) {
         let mut tx = WorldTransaction::new(self.world_mut());
         tx.add_spies(player, count, rules);
-        let journal = tx.commit().expect("debug_add_spies commit");
+        let journal = tx.commit(rules).expect("debug_add_spies commit");
         self.commit_journal(rules, &journal);
+    }
+
+    #[cfg(any(test, feature = "harness"))]
+    fn debug_hold_unit(&mut self, rules: &CompiledRuleset, unit: UnitHandle) {
+        let Some(core) = self.view().auth.units().get(unit).map(|u| *u.core) else {
+            return;
+        };
+        let heal = crate::systems::combat::heal::heal_amount(self.view().auth, rules, &core);
+        if heal > 0 {
+            self.debug_set_unit_hp(unit, core.hp.saturating_add(heal as u16));
+        }
+        self.debug_set_unit_moves(unit, 0);
     }
 
     #[cfg(any(test, feature = "harness"))]

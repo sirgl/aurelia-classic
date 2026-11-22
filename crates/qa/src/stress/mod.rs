@@ -13,6 +13,7 @@
 
 pub mod edit;
 pub mod gates;
+pub mod humans;
 pub mod metrics;
 pub mod play;
 pub mod position;
@@ -117,6 +118,8 @@ pub enum Situation {
     R3,
     R4,
     R5,
+    /// Defence against humans: a seat plays a strong human's trick (`humans`).
+    Human(humans::Trick),
 }
 
 impl Situation {
@@ -213,12 +216,19 @@ impl Situation {
             Situation::R3 => "r3",
             Situation::R4 => "r4",
             Situation::R5 => "r5",
+            Situation::Human(t) => t.name(),
         }
     }
 
+    /// Every situation: the catalogue's (`ALL`) and the human tricks.
+    pub fn all() -> Vec<Situation> {
+        Self::ALL.into_iter().chain(humans::Trick::every().into_iter().map(Situation::Human)).collect()
+    }
+
     pub fn parse(text: &str) -> Result<Self, String> {
-        let names: Vec<&str> = Self::ALL.iter().map(|s| s.name()).collect();
-        Self::ALL.into_iter().find(|s| s.name() == text.to_ascii_lowercase()).ok_or_else(|| format!("no situation {text} ({})", names.join(" ")))
+        let all = Self::all();
+        let names: Vec<&str> = all.iter().map(|s| s.name()).collect();
+        all.iter().copied().find(|s| s.name() == text.to_ascii_lowercase()).ok_or_else(|| format!("no situation {text} ({})", names.join(" ")))
     }
 
     /// 1: built in wave 1 (`scene`), 2: in wave 2 (`tricks`), 3: in wave 3 (`wave3`).
@@ -252,6 +262,7 @@ impl Situation {
     pub fn start(self, index: usize, round: u32, jitter: u32) -> u32 {
         match self {
             Situation::P2 | Situation::P1E => position::round_of(index, 30, 20),
+            Situation::Human(t) => t.start(index, round, jitter),
             _ => position::round_of(index, round, jitter),
         }
     }
@@ -299,6 +310,7 @@ impl Situation {
             Situation::P3D => 30,
             Situation::P4W => 25,
             Situation::R1 | Situation::R2 | Situation::R3 | Situation::R4 | Situation::R5 => 40,
+            Situation::Human(t) => t.window(),
         }
     }
 }

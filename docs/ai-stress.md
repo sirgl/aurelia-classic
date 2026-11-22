@@ -8,6 +8,18 @@ were written down before the first run and are not changed after seeing a result
 Code: `crates/qa/src/stress/` and `crates/qa/src/bin/ai-stress.rs`. Catalogue of the situations, with the
 expectation and the owning small net of each: `work/ai-scenarios.html`.
 
+## Contents (everything the exam holds, in one file)
+
+| Part | Situations | Sections |
+|---|---|---|
+| Wave 1 | A5 A1 B4 B9 B1 D1 C5 | Wave 1: the situations built; Results of wave 1; Measurement fixes after the first run |
+| Wave 2 | P1-P5 P7 P8 A2-A4 A6 A7 B2 B5-B7 C2 D2 D3 | Wave 2: the situations built; Results of wave 2; the failed situations played to the end |
+| Wave 3 | P6 P9-P12 C1 B10 P4L P4B P1E P7C P3D P4W R1-R5 | Wave 3: the situations built; Results of wave 3 |
+| Human tricks | `h*` defence, `o*` offence | Defence against humans; the offence; Results of the human tricks |
+
+`ai-stress gates` lists every situation of the four parts. Shared: How to run, What a row holds, Strengths, the
+suite, Gates, Saved scenes, Edits are data, the scripted adversary.
+
 ## How to run
 
 Every cargo build and every run goes through the resource broker (`work/res/res run --cpu 2 --name stress -- ...`).
@@ -86,7 +98,7 @@ finding (a human is much stronger than our AI):
 | P3D attack after the treaty | 4 units at the border | 7 | 10 |
 | P4W white-peace fishing | an offer every 3 rounds | 2 | every round |
 
-## The situations built
+## Wave 1: the situations built
 
 - A5: the two nations whose cities are nearest on one landmass; the weak one (alternating by instance) loses
   its military units (any domain, city defenders included); the neighbour is judged. Window 40 rounds.
@@ -517,9 +529,248 @@ Then the seat's AI plays its turn as usual: the units the script spent stay spen
 cities, its other units) is the AI's. The script is data in the saved scene (`script`); what it counted goes
 to the row as `script_*`.
 
+## Defence against humans (the `h*` tricks)
+
+A human plays far better than our AI and uses tricks the AI does not see coming
+(`work/human-playbook-research.md`, 91 tricks; `work/human-playbook-triage.md`). Each trick here is a small
+explicit plan (a state machine, `stress/humans/`) that plays ONE seat the way a strong human would; the game's
+AI plays every other seat and the rest of the trickster's seat (its cities, its research, its other units).
+The nation judged is the AI the trick targets, against the same position played on without the trick.
+
+Code: `crates/qa/src/stress/humans/` (`Situation::Human(Trick)`, `Roles::Human(Cast)`, `Script::Human(Order)`).
+A scripted army is raised by the edit in the human's own land, nearest to its target (the units a human would
+have built for the trick), and played by the script from the first round through `GameState::execute`. At the
+end of its part of the turn the script holds every unit it plays (`debug_hold_unit`, harness only: a unit that
+did not move heals what a resting unit heals, its moves are spent), so the seat's AI never moves them. A human
+in a campaign refuses the peace offered to it (`army::refuse_peace`).
+
+| trick | research ids | what the human does | strengths (mild / medium / strong) | window | positions |
+|---|---|---|---|---|---|
+| HMO1 rush | MO1 | war at once; archers walk to two tiles of the capital and shoot, melee take it when it is at half its hit points, then the next city | 2 archers + 1 melee / 3 + 2 / 4 + 2 (the cheapest ranged unit's technology given when the rusher has none) | 30 | rounds 50-70 |
+| HMO3 sneak | MO3, D12 | the seat's borders open to the human (base); the army walks in at peace to two tiles of the seat's city nearest to it, declares war when every unit is there (or after 8 rounds) and strikes the same turn | 2 ranged + 2 melee / 3 + 4 / 5 + 5 | 25 | rounds 100-110 |
+| HMO5 squat | MO5, D14 | at war (base); units walk to the seat's luxury and strategic tiles, pillage the improvement and stand on the tile fortified while they live | 2 / 3 / 5 melee units | 20 | 100-110 |
+| HMT2 bait | MT2, MT3 | at war (base); a worker (MT3) or a weak unit (MT2) two tiles before the seat's city nearest to the human, a force three to four tiles out; what comes out is picked off, an empty or half-broken city is taken | worker + 3 units / weak unit + 4 / both baits + 6 | 20 | 100-110 |
+| HMO8 vulture | MO8, M4 | an army waits at home; the first city the seat founds after the start is the target (war declared on it), then it waits again | 3 / 5 / 7 units | 40 | rounds 50-70 |
+| HD1 swindle | D1, D3, D6, E2 | friends (base); a luxury the seat lacks (else any it can spare, else its gold a turn) for a lump sum of the seat's treasury, the price halving at each refusal; war the turn after the seat paid; peace asked from the war's tenth round, friendship asked again, the next sale | 30 % / 60 % / 90 % of the seat's treasury | 40 | 100-110 |
+| HD2 drain | D2 | friends, the human's army (3 ranged + 3 melee) at the seat's border and its war in round 3 (all base: both arms); before the war the human's gold a turn for a lump sum of the seat's gold | 30 % / 60 % / 90 % | 20 | 100-110 |
+| HD8 beg | D8 | at war, the human losing (two cities to the seat, three quarters of its army gone: base); white peace asked every round | one | 25 | 100-110 |
+| HMO11 turtle | MO11, D18 | the score leader disbands its military units beyond a cap at the start of each turn; every other nation is judged | one unit per city / one per two cities / none | 40 | 100-110 |
+| HV1 sniper | V1, E5 | every world wonder the seat builds is completed by the sniper (the score leader but the seat) a few rounds before the seat would finish it | 3 / 2 / 1 rounds before | 30 | 100-110 |
+| HW2 lobby | W2, W3, W4 | the second nation by score, with gold, buys the city-states before each congress session, proposes an embargo on the leader, votes against it | +500 / +1000 / +2000 gold | 40 | rounds 200-210 |
+| HCS poach | CS2-CS5, S3, CS1 | a rich rival buys away the city-states allied to the seat (gold, coups) | +500 / +1000 / +2000 gold | 40 | 100-110 |
+
+`army_dead` is the share of the human's army dead at the end of the window; `military_added_before_war` the
+seat's military units at the human's declaration minus at the start; `script_*` what the script counted (0 in
+the control).
+
+Not built here: MT1 chokepoint hold (the core of P6 kill-zone, wave 3), R1-R4 and S1-S2 (P11 pests, wave 3),
+D4 (wave 3), A1-A3 air and nukes (P10, wave 3); the tricks the triage marks "no" or "no new exam".
+
+### Gates of the human tricks (written before the first run)
+
+| situation | kind | metric | test | mild | medium | strong | owning small net |
+|---|---|---|---|---|---|---|---|
+| HMO1 | outcome | `seat_alive` | delta >= | -0.02 | -0.05 | -0.1 | danger net (on: the fight fixes), tactician, commander (off); scripted defence.rs |
+| HMO1 | outcome | `seat_cities` | delta >= | -0.2 | -0.4 | -0.6 | danger net (on: the fight fixes), tactician, commander (off); scripted defence.rs |
+| HMO1 | outcome | `seat_score_share` | delta >= | -0.01 | -0.02 | -0.03 | danger net (on: the fight fixes), tactician, commander (off); scripted defence.rs |
+| HMO1 | outcome | `end_seat_win_weight` | delta >= | -0.03 | -0.05 | -0.08 | danger net (on: the fight fixes), tactician, commander (off); scripted defence.rs |
+| HMO1 | behaviour | `capital_lost` | edited <= | 0.1 | 0.2 | 0.3 | danger net (on: the fight fixes), tactician, commander (off); scripted defence.rs |
+| HMO1 | behaviour | `army_dead` | edited >= | 0.5 | 0.5 | 0.5 | danger net (on: the fight fixes), tactician, commander (off); scripted defence.rs |
+| HMO3 | outcome | `seat_cities` | delta >= | -0.3 | -0.5 | -0.8 | strategist (posture: no trust term for an army inside the borders), danger net (on: the fight fixes); scripted defence.rs |
+| HMO3 | outcome | `seat_score_share` | delta >= | -0.01 | -0.02 | -0.03 | strategist (posture: no trust term for an army inside the borders), danger net (on: the fight fixes); scripted defence.rs |
+| HMO3 | outcome | `end_seat_win_weight` | delta >= | -0.03 | -0.05 | -0.08 | strategist (posture: no trust term for an army inside the borders), danger net (on: the fight fixes); scripted defence.rs |
+| HMO3 | behaviour | `military_added_before_war` | delta >= | 1 | 1 | 2 | strategist (posture: no trust term for an army inside the borders), danger net (on: the fight fixes); scripted defence.rs |
+| HMO3 | behaviour | `army_dead` | edited >= | 0.5 | 0.5 | 0.5 | strategist (posture: no trust term for an army inside the borders), danger net (on: the fight fixes); scripted defence.rs |
+| HMO5 | outcome | `seat_score_share` | delta >= | -0.005 | -0.01 | -0.02 | tactician, commander (off); none: scripted (planner_workers.rs repair, defence.rs) |
+| HMO5 | outcome | `seat_cities` | delta >= | -0.1 | -0.2 | -0.3 | tactician, commander (off); none: scripted (planner_workers.rs repair, defence.rs) |
+| HMO5 | outcome | `end_seat_win_weight` | delta >= | -0.02 | -0.03 | -0.05 | tactician, commander (off); none: scripted (planner_workers.rs repair, defence.rs) |
+| HMO5 | behaviour | `army_dead` | edited >= | 0.5 | 0.5 | 0.5 | tactician, commander (off); none: scripted (planner_workers.rs repair, defence.rs) |
+| HMO5 | behaviour | `script_squat_share` | edited <= | 0.3 | 0.3 | 0.3 | tactician, commander (off); none: scripted (planner_workers.rs repair, defence.rs) |
+| HMO5 | behaviour | `unhappy_rounds` | delta <= | 3 | 5 | 8 | tactician, commander (off); none: scripted (planner_workers.rs repair, defence.rs) |
+| HMT2 | outcome | `seat_cities` | delta >= | -0.1 | -0.2 | -0.3 | danger net (on: the fight fixes), tactician, commander (off); scripted defence.rs |
+| HMT2 | outcome | `seat_score_share` | delta >= | -0.005 | -0.01 | -0.02 | danger net (on: the fight fixes), tactician, commander (off); scripted defence.rs |
+| HMT2 | outcome | `end_seat_win_weight` | delta >= | -0.02 | -0.03 | -0.05 | danger net (on: the fight fixes), tactician, commander (off); scripted defence.rs |
+| HMT2 | behaviour | `script_lured` | edited <= | 1 | 1 | 1 | danger net (on: the fight fixes), tactician, commander (off); scripted defence.rs |
+| HMT2 | behaviour | `army_dead` | edited >= | 0.5 | 0.5 | 0.5 | danger net (on: the fight fixes), tactician, commander (off); scripted defence.rs |
+| HMO8 | outcome | `seat_cities` | delta >= | -0.2 | -0.3 | -0.4 | site net (settling beside an army; on in nets-x-site), danger net (on: the fight fixes); scripted defence.rs |
+| HMO8 | outcome | `seat_score_share` | delta >= | -0.01 | -0.015 | -0.02 | site net (settling beside an army; on in nets-x-site), danger net (on: the fight fixes); scripted defence.rs |
+| HMO8 | outcome | `end_seat_win_weight` | delta >= | -0.03 | -0.05 | -0.08 | site net (settling beside an army; on in nets-x-site), danger net (on: the fight fixes); scripted defence.rs |
+| HMO8 | behaviour | `new_city_lost` | edited <= | 0.2 | 0.3 | 0.4 | site net (settling beside an army; on in nets-x-site), danger net (on: the fight fixes); scripted defence.rs |
+| HMO8 | behaviour | `army_dead` | edited >= | 0.5 | 0.5 | 0.5 | site net (settling beside an army; on in nets-x-site), danger net (on: the fight fixes); scripted defence.rs |
+| HD1 | outcome | `seat_treasury` | delta >= | -50 | -100 | -150 | none: scripted (peace.rs Negotiation::value: no memory of a betrayal, diplomacy.rs) |
+| HD1 | outcome | `seat_score_share` | delta >= | -0.01 | -0.015 | -0.02 | none: scripted (peace.rs Negotiation::value: no memory of a betrayal, diplomacy.rs) |
+| HD1 | outcome | `end_seat_win_weight` | delta >= | -0.02 | -0.03 | -0.05 | none: scripted (peace.rs Negotiation::value: no memory of a betrayal, diplomacy.rs) |
+| HD1 | behaviour | `script_paid` | edited <= | 0.3 | 0.2 | 0.1 | none: scripted (peace.rs Negotiation::value: no memory of a betrayal, diplomacy.rs) |
+| HD1 | behaviour | `script_paid_again` | edited <= | 0.05 | 0.05 | 0.05 | none: scripted (peace.rs Negotiation::value: no memory of a betrayal, diplomacy.rs) |
+| HD2 | outcome | `seat_cities` | delta >= | -0.1 | -0.2 | -0.3 | none: scripted (peace.rs Negotiation::value: no memory of a betrayal, diplomacy.rs) |
+| HD2 | outcome | `seat_score_share` | delta >= | -0.005 | -0.01 | -0.015 | none: scripted (peace.rs Negotiation::value: no memory of a betrayal, diplomacy.rs) |
+| HD2 | outcome | `end_seat_win_weight` | delta >= | -0.02 | -0.03 | -0.05 | none: scripted (peace.rs Negotiation::value: no memory of a betrayal, diplomacy.rs) |
+| HD2 | behaviour | `script_paid` | edited <= | 0.2 | 0.2 | 0.2 | none: scripted (peace.rs Negotiation::value: no memory of a betrayal, diplomacy.rs) |
+| HD2 | behaviour | `purchases` | delta >= | -1 | -1.5 | -2 | none: scripted (peace.rs Negotiation::value: no memory of a betrayal, diplomacy.rs) |
+| HD8 | outcome | `seat_cities` | delta >= | -0.3 | -0.3 | -0.3 | none: scripted (peace.rs Negotiation::answer) |
+| HD8 | outcome | `seat_score_share` | delta >= | -0.01 | -0.01 | -0.01 | none: scripted (peace.rs Negotiation::answer) |
+| HD8 | outcome | `end_seat_win_weight` | delta >= | -0.03 | -0.03 | -0.03 | none: scripted (peace.rs Negotiation::answer) |
+| HD8 | behaviour | `script_white_peace` | edited <= | 0.3 | 0.3 | 0.3 | none: scripted (peace.rs Negotiation::answer) |
+| HMO11 | outcome | `seat_cities` | delta >= | 0.05 | 0.1 | 0.15 | strategist (posture: war on a weak rich nation) |
+| HMO11 | outcome | `end_seat_win_weight` | delta >= | 0 | 0 | 0 | strategist (posture: war on a weak rich nation) |
+| HMO11 | behaviour | `turtle_attacked` | edited >= | 0.5 | 0.6 | 0.7 | strategist (posture: war on a weak rich nation) |
+| HMO11 | behaviour | `turtle_cities_lost` | delta >= | 0.2 | 0.35 | 0.5 | strategist (posture: war on a weak rich nation) |
+| HV1 | outcome | `seat_score_share` | delta >= | -0.02 | -0.03 | -0.03 | none: scripted wonder_race.rs; strategist production head |
+| HV1 | outcome | `end_seat_win_weight` | delta >= | -0.03 | -0.03 | -0.03 | none: scripted wonder_race.rs; strategist production head |
+| HV1 | behaviour | `stock_burned` | delta <= | 0 | 0 | 0 | none: scripted wonder_race.rs; strategist production head |
+| HW2 | outcome | `seat_score_share` | delta >= | -0.01 | -0.02 | -0.03 | none: scripted (congress.rs, city_states.rs, victory_watch.rs); strategist has no diplomacy outputs |
+| HW2 | outcome | `end_seat_win_weight` | delta >= | -0.05 | -0.1 | -0.15 | none: scripted (congress.rs, city_states.rs, victory_watch.rs); strategist has no diplomacy outputs |
+| HW2 | behaviour | `seat_allies` | delta >= | -1 | -1.5 | -2 | none: scripted (congress.rs, city_states.rs, victory_watch.rs); strategist has no diplomacy outputs |
+| HW2 | behaviour | `embargo_on_seat` | edited <= | 0.2 | 0.3 | 0.4 | none: scripted (congress.rs, city_states.rs, victory_watch.rs); strategist has no diplomacy outputs |
+| HW2 | behaviour | `gifts_by_seat` | delta >= | 1 | 1 | 1 | none: scripted (congress.rs, city_states.rs, victory_watch.rs); strategist has no diplomacy outputs |
+| HCS | outcome | `seat_score_share` | delta >= | -0.005 | -0.01 | -0.015 | none: scripted (city_states.rs, espionage.rs); strategist has no diplomacy outputs |
+| HCS | outcome | `end_seat_win_weight` | delta >= | -0.03 | -0.05 | -0.08 | none: scripted (city_states.rs, espionage.rs); strategist has no diplomacy outputs |
+| HCS | behaviour | `seat_allies` | delta >= | -0.5 | -1 | -1.5 | none: scripted (city_states.rs, espionage.rs); strategist has no diplomacy outputs |
+| HCS | behaviour | `gifts_by_seat` | delta >= | 1 | 1 | 1 | none: scripted (city_states.rs, espionage.rs); strategist has no diplomacy outputs |
+
+### The offence: can the AI play the tricks itself (`o*`)
+
+The same tricks turned round (`stress/humans/offence.rs`, `Trick::OFFENCE`): the AI seat judged is the one
+that COULD play the trick. The edit hands it the opportunity a strong human makes for himself; its own AI
+plays every seat (no script). The behaviour gates read whether it took the opportunity, the outcome gates
+whether it gained against the control without it. `Cast.human` is the rival here.
+
+| trick | research ids | the opportunity (edited arm only) | strengths (mild / medium / strong) | window | positions |
+|---|---|---|---|---|---|
+| OMO1 rush | MO1 | an archer army of the seat at home nearest to the nearest rival's capital, at peace | 2 ranged + 1 melee / 3 + 2 / 4 + 2 | 30 | rounds 50-70 |
+| OMO3 sneak | MO3 | the rival's borders open to the seat (base); the seat's army at home nearest to the rival's city | 2 + 2 / 3 + 4 / 5 + 5 | 25 | 100-110 |
+| OMO7 raid | MO6, MO7 | at war (base); the seat's fast units in the rival's countryside, 2-3 tiles from its cities | 2 / 3 / 5 | 20 | 100-110 |
+| OMO2 citadel | MO2, MO4 | great generals of the seat on its land nearest to the rival's city | 1 / 2 / 2 and the seat's war | 25 | 100-110 |
+| OMO8 vulture | MO8 | at war (base); the rival's new city 3-4 tiles from the seat's city | the city / + 1 ranged 1 melee / + 2 and 2 | 25 | 100-110 |
+| OW2 lobby | W2 | the seat, second by score, gets gold (the congress founded) | +500 / +1000 / +2000 | 40 | rounds 200 |
+| OCS poach | CS6 | the seat (the most score but the rival with the most city-state allies) gets gold | +500 / +1000 / +2000 | 40 | 100-110 |
+
+`war_on_rival`: the seat declared war on the rival; `rival_cities_taken`, `rival_capital_taken`: taken by the
+seat; `rival_civilians_end`, `rival_pillaged_end`: the rival's civilians and pillaged tiles at the end;
+`seat_citadels`: citadels in the seat's land; `embargo_proposals_by_seat`. HMO11 (the turtle) is already an
+offence exam: the others are judged on what they take from a defenceless leader.
+
+#### Offence gates (written before the first run)
+
+| situation | kind | metric | test | mild | medium | strong | owning small net |
+|---|---|---|---|---|---|---|---|
+| OMO1 | outcome | `seat_cities` | delta >= | 0.1 | 0.2 | 0.3 | strategist (posture, war stakes: no opportunity term), commander (off); scripted operations.rs |
+| OMO1 | outcome | `seat_score_share` | delta >= | 0 | 0.005 | 0.01 | strategist (posture, war stakes: no opportunity term), commander (off); scripted operations.rs |
+| OMO1 | outcome | `end_seat_win_weight` | delta >= | 0 | 0 | 0 | strategist (posture, war stakes: no opportunity term), commander (off); scripted operations.rs |
+| OMO1 | behaviour | `war_on_rival` | delta >= | 0.3 | 0.4 | 0.5 | strategist (posture, war stakes: no opportunity term), commander (off); scripted operations.rs |
+| OMO1 | behaviour | `rival_capital_taken` | edited >= | 0.1 | 0.2 | 0.3 | strategist (posture, war stakes: no opportunity term), commander (off); scripted operations.rs |
+| OMO3 | outcome | `seat_cities` | delta >= | 0.1 | 0.2 | 0.3 | strategist (posture, war stakes: no opportunity term), commander (off); scripted operations.rs |
+| OMO3 | outcome | `seat_score_share` | delta >= | 0 | 0.005 | 0.01 | strategist (posture, war stakes: no opportunity term), commander (off); scripted operations.rs |
+| OMO3 | outcome | `end_seat_win_weight` | delta >= | 0 | 0 | 0 | strategist (posture, war stakes: no opportunity term), commander (off); scripted operations.rs |
+| OMO3 | behaviour | `war_on_rival` | delta >= | 0.2 | 0.3 | 0.4 | strategist (posture, war stakes: no opportunity term), commander (off); scripted operations.rs |
+| OMO3 | behaviour | `rival_cities_taken` | delta >= | 0.1 | 0.2 | 0.3 | strategist (posture, war stakes: no opportunity term), commander (off); scripted operations.rs |
+| OMO7 | outcome | `seat_score_share` | delta >= | 0.002 | 0.004 | 0.006 | tactician, commander (off); none: scripted (field_craft.rs not in standard, operations.rs) |
+| OMO7 | outcome | `end_seat_win_weight` | delta >= | 0 | 0 | 0 | tactician, commander (off); none: scripted (field_craft.rs not in standard, operations.rs) |
+| OMO7 | behaviour | `rival_civilians_end` | delta <= | -0.5 | -1 | -1.5 | tactician, commander (off); none: scripted (field_craft.rs not in standard, operations.rs) |
+| OMO7 | behaviour | `rival_pillaged_end` | delta >= | 1 | 2 | 3 | tactician, commander (off); none: scripted (field_craft.rs not in standard, operations.rs) |
+| OMO2 | outcome | `seat_score_share` | delta >= | 0.002 | 0.003 | 0.005 | none: scripted great_people.rs (a general waits without a site) |
+| OMO2 | outcome | `end_seat_win_weight` | delta >= | 0 | 0 | 0 | none: scripted great_people.rs (a general waits without a site) |
+| OMO2 | behaviour | `seat_citadels` | delta >= | 0.5 | 1 | 1 | none: scripted great_people.rs (a general waits without a site) |
+| OMO2 | behaviour | `rival_cities_taken` | delta >= | 0 | 0 | 0.2 | none: scripted great_people.rs (a general waits without a site) |
+| OMO8 | outcome | `seat_cities` | delta >= | 0.2 | 0.4 | 0.5 | strategist (posture, war stakes: no opportunity term), commander (off); scripted operations.rs |
+| OMO8 | outcome | `seat_score_share` | delta >= | 0 | 0.005 | 0.01 | strategist (posture, war stakes: no opportunity term), commander (off); scripted operations.rs |
+| OMO8 | outcome | `end_seat_win_weight` | delta >= | 0 | 0 | 0 | strategist (posture, war stakes: no opportunity term), commander (off); scripted operations.rs |
+| OMO8 | behaviour | `rival_cities_taken` | delta >= | 0.3 | 0.5 | 0.6 | strategist (posture, war stakes: no opportunity term), commander (off); scripted operations.rs |
+| OW2 | outcome | `seat_score_share` | delta >= | 0 | 0.002 | 0.004 | none: scripted (city_states.rs gift_orders, congress.rs); strategist has no diplomacy outputs |
+| OW2 | outcome | `end_seat_win_weight` | delta >= | 0 | 0 | 0 | none: scripted (city_states.rs gift_orders, congress.rs); strategist has no diplomacy outputs |
+| OW2 | behaviour | `gifts_by_seat` | delta >= | 1 | 2 | 3 | none: scripted (city_states.rs gift_orders, congress.rs); strategist has no diplomacy outputs |
+| OW2 | behaviour | `seat_allies` | delta >= | 0.5 | 1 | 1.5 | none: scripted (city_states.rs gift_orders, congress.rs); strategist has no diplomacy outputs |
+| OW2 | behaviour | `embargo_proposals_by_seat` | delta >= | 0.2 | 0.3 | 0.4 | none: scripted (city_states.rs gift_orders, congress.rs); strategist has no diplomacy outputs |
+| OCS | outcome | `seat_score_share` | delta >= | 0 | 0.002 | 0.004 | none: scripted (city_states.rs gift_orders, congress.rs); strategist has no diplomacy outputs |
+| OCS | outcome | `end_seat_win_weight` | delta >= | 0 | 0 | 0 | none: scripted (city_states.rs gift_orders, congress.rs); strategist has no diplomacy outputs |
+| OCS | behaviour | `gifts_by_seat` | delta >= | 1 | 2 | 3 | none: scripted (city_states.rs gift_orders, congress.rs); strategist has no diplomacy outputs |
+| OCS | behaviour | `seat_allies` | delta >= | 0.5 | 1 | 1.5 | none: scripted (city_states.rs gift_orders, congress.rs); strategist has no diplomacy outputs |
+
 ## Results
 
-Wave 1 results are in the sections after wave 2's; the two waves' tables do not overlap.
+Results by wave: the human tricks (defence and offence), wave 2, wave 1 with its measurement fixes, wave 3. The tables of the waves do not overlap.
+
+## Results of the human tricks (22 Nov 2026)
+
+`ai-stress suite --variant nets-x-site` (and `standard`) on `stress/runs/positions` (rounds 100-110; the rush
+and the vulture at 50-70) and `positions-mid` (round 200: HW2, HCS, OW2, OCS), 100 instances window only, then
+40 (defence) and 30 (offence) played to the end of the game. The army tricks (HMO1, HMO3, HMT2, HMO8) are the
+run after `8d7a166` (the army gathers beyond the city's strike). The end-of-game victory weight is shown with
+its standard error; most of its deltas are within 1.5 of it. Summary and the plain-words list:
+`work/nets/stress4/HUMANS.md`.
+
+### Defence
+
+| trick | strength | n | nets-x-site | standard | nets-x-site outcome delta | standard outcome delta | behaviour nets-x-site / standard (! = gate failed) |
+|---|---|---|---|---|---|---|---|
+| HMO1 | mild | 80 | FAIL (score_share) | pass | alive +0.000; cities -0.025; score_share -0.011; end win_weight +0.055 (se 0.035, n 32) | alive +0.000; cities +0.013; score_share -0.008; end win_weight +0.047 (se 0.047, n 32) | capital_lost 0.00; army_dead 0.92 / capital_lost 0.00; army_dead 0.92 |
+| HMO1 | medium | 80 | pass | pass | alive +0.000; cities -0.050; score_share -0.015; end win_weight +0.000 (se 0.016, n 32) | alive +0.000; cities -0.025; score_share -0.013; end win_weight +0.008 (se 0.038, n 32) | capital_lost 0.00; army_dead 0.89 / capital_lost 0.00; army_dead 0.88 |
+| HMO1 | strong | 80 | pass | pass | alive +0.000; cities -0.062; score_share -0.017; end win_weight -0.031 (se 0.035, n 32) | alive +0.000; cities +0.025; score_share -0.014; end win_weight +0.016 (se 0.037, n 32) | capital_lost 0.00; army_dead 0.85 / capital_lost 0.00; army_dead 0.85 |
+| HMO3 | mild | 76 | pass | FAIL (end win_weight) | cities -0.250; score_share -0.008; end win_weight -0.008 (se 0.038, n 31) | cities -0.250; score_share -0.007; end win_weight -0.073 (se 0.045, n 31) | military_added_before_war -0.05!; army_dead 0.88 / military_added_before_war -0.01!; army_dead 0.88 |
+| HMO3 | medium | 76 | pass | FAIL (end win_weight) | cities -0.276; score_share -0.010; end win_weight -0.024 (se 0.035, n 31) | cities -0.342; score_share -0.010; end win_weight -0.081 (se 0.045, n 31) | military_added_before_war -0.07!; army_dead 0.87 / military_added_before_war -0.03!; army_dead 0.86 |
+| HMO3 | strong | 76 | pass | pass | cities -0.592; score_share -0.020; end win_weight +0.032 (se 0.058, n 31) | cities -0.605; score_share -0.020; end win_weight -0.073 (se 0.045, n 31) | military_added_before_war -0.04!; army_dead 0.82 / military_added_before_war 0.00!; army_dead 0.84 |
+| HMO5 | mild | 81 | pass | FAIL (end win_weight) | score_share -0.002; cities -0.062; end win_weight +0.055 (se 0.045, n 32) | score_share -0.001; cities -0.037; end win_weight -0.062 (se 0.045, n 32) | army_dead 0.63; script_squat_share 0.27; unhappy_rounds 1.09 / army_dead 0.64; script_squat_share 0.27; unhappy_rounds 0.96 |
+| HMO5 | medium | 81 | pass | FAIL (end win_weight) | score_share -0.003; cities -0.037; end win_weight +0.023 (se 0.032, n 32) | score_share -0.003; cities -0.025; end win_weight -0.031 (se 0.031, n 32) | army_dead 0.65; script_squat_share 0.23; unhappy_rounds 1.84 / army_dead 0.66; script_squat_share 0.23; unhappy_rounds 1.63 |
+| HMO5 | strong | 81 | pass | FAIL (end win_weight) | score_share -0.004; cities -0.025; end win_weight -0.016 (se 0.016, n 32) | score_share -0.004; cities -0.012; end win_weight -0.062 (se 0.045, n 32) | army_dead 0.72; script_squat_share 0.17; unhappy_rounds 2.12 / army_dead 0.71; script_squat_share 0.17; unhappy_rounds 2.00 |
+| HMT2 | mild | 81 | pass | FAIL (end win_weight) | cities -0.025; score_share -0.002; end win_weight -0.016 (se 0.011, n 32) | cities +0.000; score_share -0.001; end win_weight -0.047 (se 0.055, n 32) | script_lured 0.46; army_dead 0.47! / script_lured 0.46; army_dead 0.47! |
+| HMT2 | medium | 81 | pass | FAIL (end win_weight) | cities +0.000; score_share -0.003; end win_weight +0.016 (se 0.034, n 32) | cities +0.012; score_share -0.002; end win_weight -0.078 (se 0.044, n 32) | script_lured 0.80; army_dead 0.40! / script_lured 0.83; army_dead 0.39! |
+| HMT2 | strong | 81 | pass | FAIL (end win_weight) | cities -0.025; score_share -0.005; end win_weight -0.008 (se 0.008, n 32) | cities -0.049; score_share -0.004; end win_weight -0.070 (se 0.044, n 32) | script_lured 1.36!; army_dead 0.42! / script_lured 1.38!; army_dead 0.42! |
+| HMO8 | mild | 79 | pass | pass | cities -0.025; score_share -0.000; end win_weight +0.000 (se 0.016, n 32) | cities -0.076; score_share -0.004; end win_weight -0.016 (se 0.016, n 32) | army_dead 0.12! / army_dead 0.11! |
+| HMO8 | medium | 79 | pass | pass | cities -0.051; score_share -0.003; end win_weight -0.008 (se 0.014, n 32) | cities -0.038; score_share -0.005; end win_weight +0.000 (se 0.027, n 32) | army_dead 0.12! / army_dead 0.15! |
+| HMO8 | strong | 79 | pass | pass | cities -0.025; score_share -0.002; end win_weight -0.016 (se 0.011, n 32) | cities -0.063; score_share -0.004; end win_weight +0.031 (se 0.043, n 32) | army_dead 0.14! / army_dead 0.12! |
+| HD1 | mild | 78 | FAIL (end win_weight) | pass | treasury -15.756; score_share -0.002; end win_weight -0.032 (se 0.034, n 31) | treasury -33.846; score_share -0.002; end win_weight -0.016 (se 0.011, n 31) | script_paid 0.97!; script_paid_again 0.00 / script_paid 0.97!; script_paid_again 0.00 |
+| HD1 | medium | 78 | pass | pass | treasury -19.949; score_share -0.004; end win_weight +0.000 (se 0.046, n 31) | treasury -22.833; score_share -0.004; end win_weight -0.024 (se 0.048, n 31) | script_paid 0.97!; script_paid_again 0.00 / script_paid 0.97!; script_paid_again 0.00 |
+| HD1 | strong | 78 | pass | pass | treasury -13.077; score_share -0.004; end win_weight -0.040 (se 0.033, n 31) | treasury -22.897; score_share -0.003; end win_weight +0.016 (se 0.026, n 31) | script_paid 0.97!; script_paid_again 0.00 / script_paid 0.97!; script_paid_again 0.00 |
+| HD2 | mild | 78 | pass | FAIL (end win_weight) | cities -0.038; score_share -0.000; end win_weight -0.016 (se 0.011, n 31) | cities +0.013; score_share +0.000; end win_weight -0.032 (se 0.032, n 31) | script_paid 0.55!; purchases -0.31 / script_paid 0.56!; purchases -0.26 |
+| HD2 | medium | 78 | pass | pass | cities -0.038; score_share -0.000; end win_weight -0.024 (se 0.013, n 31) | cities +0.000; score_share +0.000; end win_weight +0.000 (se 0.000, n 31) | script_paid 0.78!; purchases -0.77 / script_paid 0.78!; purchases -0.82 |
+| HD2 | strong | 78 | pass | pass | cities -0.064; score_share -0.001; end win_weight -0.008 (se 0.014, n 31) | cities -0.013; score_share -0.001; end win_weight +0.000 (se 0.046, n 31) | script_paid 0.82!; purchases -1.08 / script_paid 0.82!; purchases -1.04 |
+| HD8 | one | 76 | pass | pass | cities +0.026; score_share +0.001; end win_weight +0.017 (se 0.030, n 29) | cities +0.026; score_share +0.001; end win_weight +0.043 (se 0.037, n 29) | script_white_peace 1.00! / script_white_peace 1.00! |
+| HMO11 | mild | 100 | FAIL (cities) | FAIL (cities) | cities +0.022; end win_weight +0.081 (se 0.057, n 40) | cities +0.012; end win_weight +0.037 (se 0.025, n 40) | turtle_attacked 0.02!; turtle_cities_lost -0.01! / turtle_attacked 0.02!; turtle_cities_lost 0.00! |
+| HMO11 | medium | 100 | FAIL (cities) | FAIL (cities) | cities +0.026; end win_weight +0.069 (se 0.045, n 40) | cities -0.004; end win_weight +0.125 (se 0.042, n 40) | turtle_attacked 0.02!; turtle_cities_lost 0.01! / turtle_attacked 0.03!; turtle_cities_lost 0.01! |
+| HMO11 | strong | 100 | FAIL (cities) | FAIL (cities) | cities +0.058; end win_weight +0.113 (se 0.043, n 40) | cities +0.022; end win_weight +0.113 (se 0.035, n 40) | turtle_attacked 0.04!; turtle_cities_lost 0.02! / turtle_attacked 0.06!; turtle_cities_lost 0.03! |
+| HV1 | mild | 92 | FAIL (score_share, end win_weight) | FAIL (score_share) | score_share -0.034; end win_weight -0.099 (se 0.044, n 38) | score_share -0.032; end win_weight -0.013 (se 0.033, n 38) | stock_burned -398.03 / stock_burned -400.21 |
+| HV1 | medium | 92 | FAIL (score_share, end win_weight) | FAIL (end win_weight) | score_share -0.032; end win_weight -0.092 (se 0.048, n 38) | score_share -0.029; end win_weight -0.059 (se 0.024, n 38) | stock_burned -394.50 / stock_burned -393.26 |
+| HV1 | strong | 92 | FAIL (end win_weight) | pass | score_share -0.028; end win_weight -0.112 (se 0.043, n 38) | score_share -0.027; end win_weight -0.020 (se 0.027, n 38) | stock_burned -372.14 / stock_burned -380.33 |
+| HW2 | mild | 73 | FAIL (end win_weight) | pass | score_share -0.000; end win_weight -0.105 (se 0.052, n 31) | score_share -0.000; end win_weight -0.008 (se 0.043, n 31) | allies -0.32; embargo_on_seat 0.75!; gifts_by_seat -0.36! / allies -0.18; embargo_on_seat 0.75!; gifts_by_seat -0.25! |
+| HW2 | medium | 73 | pass | pass | score_share -0.001; end win_weight +0.008 (se 0.068, n 31) | score_share +0.000; end win_weight +0.048 (se 0.036, n 31) | allies -0.41; embargo_on_seat 0.79!; gifts_by_seat -0.73! / allies -0.22; embargo_on_seat 0.78!; gifts_by_seat -0.66! |
+| HW2 | strong | 73 | pass | pass | score_share -0.001; end win_weight -0.073 (se 0.047, n 31) | score_share -0.000; end win_weight +0.000 (se 0.012, n 31) | allies -0.36; embargo_on_seat 0.84!; gifts_by_seat -0.88! / allies -0.23; embargo_on_seat 0.84!; gifts_by_seat -0.62! |
+| HCS | mild | 81 | FAIL (end win_weight) | FAIL (end win_weight) | score_share +0.000; end win_weight -0.055 (se 0.038, n 32) | score_share -0.000; end win_weight -0.039 (se 0.046, n 32) | allies -0.79!; gifts_by_seat -0.01! / allies -0.81!; gifts_by_seat -0.01! |
+| HCS | medium | 81 | FAIL (end win_weight) | pass | score_share +0.000; end win_weight -0.062 (se 0.043, n 32) | score_share -0.001; end win_weight +0.016 (se 0.056, n 32) | allies -0.79; gifts_by_seat -0.01! / allies -0.95; gifts_by_seat -0.22! |
+| HCS | strong | 81 | FAIL (end win_weight) | pass | score_share +0.001; end win_weight -0.086 (se 0.060, n 32) | score_share -0.001; end win_weight -0.062 (se 0.056, n 32) | allies -0.85; gifts_by_seat -0.01! / allies -0.96; gifts_by_seat -0.26! |
+
+### Offence ("used? gain?")
+
+| trick | strength | n | nets-x-site | standard | nets-x-site outcome delta | standard outcome delta | behaviour nets-x-site / standard (! = gate failed) |
+|---|---|---|---|---|---|---|---|
+| OMO1 | mild | 79 | FAIL (cities) | pass | cities +0.038; score_share +0.002; end win_weight +0.010 (se 0.024, n 24) | cities +0.101; score_share +0.004; end win_weight +0.042 (se 0.047, n 24) | war_on_rival 0.04!; rival_capital_taken 0.00! / war_on_rival 0.06!; rival_capital_taken 0.00! |
+| OMO1 | medium | 79 | FAIL (cities, score_share) | FAIL (cities) | cities +0.089; score_share +0.004; end win_weight +0.021 (se 0.062, n 24) | cities +0.101; score_share +0.005; end win_weight +0.021 (se 0.047, n 24) | war_on_rival 0.06!; rival_capital_taken 0.00! / war_on_rival 0.06!; rival_capital_taken 0.00! |
+| OMO1 | strong | 79 | FAIL (cities, score_share) | FAIL (cities, score_share) | cities +0.076; score_share +0.003; end win_weight +0.010 (se 0.018, n 24) | cities +0.127; score_share +0.006; end win_weight +0.031 (se 0.048, n 24) | war_on_rival 0.06!; rival_capital_taken 0.00! / war_on_rival 0.09!; rival_capital_taken 0.00! |
+| OMO3 | mild | 77 | FAIL (cities, score_share) | FAIL (cities) | cities -0.026; score_share -0.000; end win_weight +0.010 (se 0.010, n 24) | cities +0.000; score_share +0.001; end win_weight +0.031 (se 0.043, n 24) | war_on_rival 0.04!; rival_cities_taken -0.01! / war_on_rival 0.05!; rival_cities_taken 0.05! |
+| OMO3 | medium | 77 | FAIL (cities, score_share) | FAIL (cities, score_share) | cities -0.065; score_share -0.002; end win_weight +0.052 (se 0.045, n 24) | cities -0.091; score_share -0.000; end win_weight +0.021 (se 0.045, n 24) | war_on_rival 0.05!; rival_cities_taken -0.05! / war_on_rival 0.04!; rival_cities_taken 0.00! |
+| OMO3 | strong | 77 | FAIL (cities, score_share) | FAIL (cities, score_share) | cities -0.013; score_share -0.002; end win_weight +0.010 (se 0.018, n 24) | cities -0.013; score_share -0.000; end win_weight +0.000 (se 0.021, n 24) | war_on_rival 0.04!; rival_cities_taken -0.04! / war_on_rival 0.04!; rival_cities_taken -0.01! |
+| OMO7 | mild | 81 | FAIL (score_share) | FAIL (score_share, end win_weight) | score_share +0.002; end win_weight +0.010 (se 0.010, n 24) | score_share +0.001; end win_weight -0.031 (se 0.043, n 24) | rival_civilians_end -0.20!; rival_pillaged_end 0.12! / rival_civilians_end -0.09!; rival_pillaged_end 0.07! |
+| OMO7 | medium | 81 | FAIL (score_share) | FAIL (score_share, end win_weight) | score_share +0.002; end win_weight +0.042 (se 0.044, n 24) | score_share +0.001; end win_weight -0.031 (se 0.043, n 24) | rival_civilians_end -0.10!; rival_pillaged_end 0.10! / rival_civilians_end -0.15!; rival_pillaged_end 0.15! |
+| OMO7 | strong | 81 | FAIL (score_share) | FAIL (score_share) | score_share +0.001; end win_weight +0.042 (se 0.042, n 24) | score_share +0.001; end win_weight +0.021 (se 0.062, n 24) | rival_civilians_end -0.35!; rival_pillaged_end 0.01! / rival_civilians_end -0.27!; rival_pillaged_end 0.04! |
+| OMO2 | mild | 78 | FAIL (score_share) | FAIL (score_share, end win_weight) | score_share +0.001; end win_weight +0.010 (se 0.061, n 24) | score_share +0.001; end win_weight -0.062 (se 0.043, n 24) | citadels 0.45!; rival_cities_taken -0.04! / citadels 0.44!; rival_cities_taken 0.00 |
+| OMO2 | medium | 78 | FAIL (score_share, end win_weight) | FAIL (score_share) | score_share +0.001; end win_weight -0.010 (se 0.046, n 24) | score_share +0.000; end win_weight +0.021 (se 0.033, n 24) | citadels 0.87!; rival_cities_taken -0.05! / citadels 0.73!; rival_cities_taken -0.01! |
+| OMO2 | strong | 78 | FAIL (score_share) | FAIL (score_share, end win_weight) | score_share -0.001; end win_weight +0.010 (se 0.063, n 24) | score_share -0.002; end win_weight -0.073 (se 0.044, n 24) | citadels 0.91!; rival_cities_taken -0.09! / citadels 0.86!; rival_cities_taken -0.06! |
+| OMO8 | mild | 80 | FAIL (cities, score_share) | FAIL (cities, score_share) | cities +0.050; score_share -0.001; end win_weight +0.073 (se 0.059, n 24) | cities -0.037; score_share -0.001; end win_weight +0.010 (se 0.061, n 24) | rival_cities_taken 0.01! / rival_cities_taken 0.04! |
+| OMO8 | medium | 80 | FAIL (cities, score_share) | FAIL (cities, score_share, end win_weight) | cities +0.050; score_share -0.001; end win_weight +0.042 (se 0.044, n 24) | cities +0.013; score_share -0.001; end win_weight -0.031 (se 0.043, n 24) | rival_cities_taken 0.06! / rival_cities_taken 0.10! |
+| OMO8 | strong | 80 | FAIL (cities, score_share) | FAIL (cities, score_share) | cities +0.087; score_share +0.001; end win_weight +0.000 (se 0.015, n 24) | cities +0.113; score_share +0.001; end win_weight +0.104 (se 0.058, n 24) | rival_cities_taken 0.16! / rival_cities_taken 0.19! |
+| OW2 | mild | 73 | FAIL (end win_weight) | FAIL (end win_weight) | score_share +0.001; end win_weight -0.030 (se 0.042, n 25) | score_share +0.001; end win_weight -0.050 (se 0.041, n 25) | gifts_by_seat 0.75!; allies 0.16!; embargo_proposals_by_seat 0.00! / gifts_by_seat 0.55!; allies 0.04!; embargo_proposals_by_seat 0.00! |
+| OW2 | medium | 73 | FAIL (score_share, end win_weight) | FAIL (score_share, end win_weight) | score_share +0.001; end win_weight -0.020 (se 0.043, n 25) | score_share +0.001; end win_weight -0.070 (se 0.051, n 25) | gifts_by_seat 0.92!; allies 0.11!; embargo_proposals_by_seat 0.00! / gifts_by_seat 0.96!; allies 0.07!; embargo_proposals_by_seat 0.00! |
+| OW2 | strong | 73 | FAIL (score_share, end win_weight) | FAIL (score_share) | score_share +0.001; end win_weight -0.030 (se 0.042, n 25) | score_share +0.002; end win_weight +0.000 (se 0.014, n 25) | gifts_by_seat 1.60!; allies 0.18!; embargo_proposals_by_seat 0.00! / gifts_by_seat 1.51!; allies 0.14!; embargo_proposals_by_seat 0.00! |
+| OCS | mild | 81 | FAIL (score_share, end win_weight) | pass | score_share -0.000; end win_weight -0.043 (se 0.037, n 23) | score_share +0.000; end win_weight +0.022 (se 0.015, n 23) | gifts_by_seat 0.80!; allies 0.04! / gifts_by_seat 0.77!; allies 0.06! |
+| OCS | medium | 81 | FAIL (score_share, end win_weight) | FAIL (score_share) | score_share +0.000; end win_weight -0.022 (se 0.035, n 23) | score_share +0.000; end win_weight +0.000 (se 0.022, n 23) | gifts_by_seat 0.63!; allies 0.11! / gifts_by_seat 1.01!; allies 0.09! |
+| OCS | strong | 81 | FAIL (score_share, end win_weight) | FAIL (score_share) | score_share +0.001; end win_weight -0.011 (se 0.060, n 23) | score_share +0.001; end win_weight +0.033 (se 0.048, n 23) | gifts_by_seat 1.32!; allies 0.07! / gifts_by_seat 1.37!; allies 0.20! |
+
+In short: against humans the AI never preys on a defenceless rich leader (HMO11), does not arm against an army
+standing inside its open borders (HMO3), pays the betrayer (HD1, HD2), loses its wonders to a sniper
+(HV1; on `nets-x-site` about a tenth of a real victory), and lets a lobbyist pass an embargo on it (HW2). As
+offence it almost never uses an opportunity: a free army next to an early capital declares war in 4-9 % of
+positions and never takes it (OMO1), raiders inside the rival's land do not raid (OMO7), gold before a session
+buys no votes (OW2); only the great generals build their citadels (OMO2).
+
 ## Results of wave 2 (standard, window only)
 
 Run of 22 Nov 2026: `ai-stress suite --variant standard --positions stress/runs/positions --situations` (the 19
@@ -635,7 +886,6 @@ wave-2 clone): 36 instances of A6 and C2, 38 of P5 (the rest have no pair over t
 A disarmed nation over the sea is left alone to the end of the game: the real victories do not move (C2 not
 at all, A6 within one game in 36). The border grab costs cities in the window but not real victories, except
 at the strong level (citadels and war): -0.04, inside its gate.
-<<<<<<< HEAD
 ## Results of wave 1 (standard, window and end of game)
 
 Run on 22 November 2026: 100 positions of the pace suite (Small, six nations, Quick, standard AI, rounds 100-110;
@@ -787,7 +1037,6 @@ Damage = control minus edited of the seat's end score share plus a quarter of th
 | 8 | +0.214 | 14 | 13-pace-continents-small r107 | seat 1 / War { enemy: PlayerId(0) } + Seize { taker: PlayerId(4), cities: 2 } |
 | 9 | +0.196 | 176 | 6-pace-fractal-small r101 | seat 1 / Seize { taker: PlayerId(4), cities: 1 } |
 | 10 | +0.192 | 78 | 12-pace-continents-small r100 | seat 5 / Seize { taker: PlayerId(2), cities: 1 } |
-=======
 
 ## Results of wave 3: the whole suite on `nets-x-site` and `standard` (window only)
 
@@ -973,4 +1222,3 @@ variants, each arm played to the end. `end_seat_win_weight` delta (edited minus 
 A leader even three delegates short of the World Leader vote ends the game with the victory in almost every
 game: the others' real or time victories fall from 0.53 to 0.00-0.07. One early raider costs the seat
 0.04-0.10 of its victory weight; a lost wonder city 0.11.
->>>>>>> stress3/work/stress3
