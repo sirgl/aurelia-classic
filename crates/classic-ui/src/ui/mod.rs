@@ -1,5 +1,6 @@
 //! The classic screens and HUD panels. Widgets draw from read-only view models and return
 //! typed requests; they never mutate the game (`game::Session` applies the requests).
+pub mod art_pack;
 pub mod shortcuts;
 pub mod hud;
 pub mod model;
