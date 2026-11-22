@@ -909,6 +909,10 @@ pub enum Variant {
     /// `net2-off`: `Net2` with no part of `net2` playing; every decision is `nets-x-site`'s, the check that the
     /// ablation's fallback is exact. Bench only (`experimental-ai`).
     Net2Off,
+    /// `peace-fix` (work/nets/tricks/CHAIN.md D8, tac/runs/C1.md): `Standard` with the war's going on priced also
+    /// without an operation at peace time (`values_war_at_peace`), the fix alone for its own promotion gate. Bench only
+    /// (`experimental-ai`).
+    PeaceFix,
 }
 
 /// The net's base: the expert the end-to-end net learns from and the mind it
@@ -929,7 +933,7 @@ const NUDGED_CANDIDATES: u32 = 40;
 
 impl Variant {
     /// The game's AI first.
-    pub const ALL: [Variant; 180] = [
+    pub const ALL: [Variant; 181] = [
         Variant::Standard,
         Variant::PreCamps,
         Variant::PreWorkers,
@@ -1110,6 +1114,7 @@ impl Variant {
         Variant::Net2Without(crate::ai::net2::Part::Guard),
         Variant::Net2Without(crate::ai::net2::Part::Economy),
         Variant::Net2Off,
+        Variant::PeaceFix,
     ];
 
     /// The parts of the strategist's wishes the variant plays (`strategy_net::wishes::Parts`): a property
@@ -1125,7 +1130,7 @@ impl Variant {
             // `nets-x` and `nets-x-site` play `strategist-x`'s strategist under their own names.
             // `net2` and its relatives play `nets-x-site`'s strategist parts (tall first): `net2` replaces the
             // strategist's pass, not its wishes' parts.
-            Variant::NetsX | Variant::NetsXSite | Variant::Net2 | Variant::Net2Defence | Variant::Tac2 | Variant::Net2Tac | Variant::Net2Without(_) | Variant::Net2Off => Variant::StrategistX.strategist_parts(),
+            Variant::NetsX | Variant::NetsXSite | Variant::Net2 | Variant::Net2Defence | Variant::Tac2 | Variant::Net2Tac | Variant::Net2Without(_) | Variant::Net2Off | Variant::PeaceFix => Variant::StrategistX.strategist_parts(),
             _ => Parts::NONE,
         }
     }
@@ -1296,6 +1301,7 @@ impl Variant {
                 crate::ai::net2::Part::Economy => "net2-no-economy",
             },
             Variant::Net2Off => "net2-off",
+            Variant::PeaceFix => "peace-fix",
             Variant::ArmyFit => "army-fit",
             Variant::Camps => "camps",
             Variant::ArmyCamps => "army-camps",
@@ -1338,7 +1344,7 @@ impl Variant {
         cfg!(feature = "experimental-ai")
             || !matches!(
                 self,
-                Variant::Net | Variant::UnitNet | Variant::Hybrid | Variant::SiteNet | Variant::ChoiceNet | Variant::ChoiceNetProduction | Variant::ChoiceNetResearch | Variant::StandardScripted | Variant::PreCsGifts | Variant::Sharp | Variant::TallReal | Variant::Next | Variant::WonderCancel | Variant::WonderRace | Variant::NextW | Variant::NextRace | Variant::PreNext | Variant::WarPays | Variant::TacticianFit | Variant::WarMuster | Variant::SiegeCall | Variant::NextWar | Variant::Retake2 | Variant::NextWarRetake | Variant::VoteGuard | Variant::FieldCraft | Variant::RaidWar | Variant::Landless | Variant::LandlessPlan | Variant::NextX | Variant::PreNextX | Variant::StrategistX | Variant::StrategistXThreat | Variant::EconSite | Variant::EconSiteTall | Variant::EconSiteOwnLand | Variant::NetsX | Variant::NetsXSite | Variant::PreNetsX | Variant::Net2 | Variant::Net2Defence | Variant::Tac2 | Variant::Net2Tac | Variant::Net2Without(_) | Variant::Net2Off
+                Variant::Net | Variant::UnitNet | Variant::Hybrid | Variant::SiteNet | Variant::ChoiceNet | Variant::ChoiceNetProduction | Variant::ChoiceNetResearch | Variant::StandardScripted | Variant::PreCsGifts | Variant::Sharp | Variant::TallReal | Variant::Next | Variant::WonderCancel | Variant::WonderRace | Variant::NextW | Variant::NextRace | Variant::PreNext | Variant::WarPays | Variant::TacticianFit | Variant::WarMuster | Variant::SiegeCall | Variant::NextWar | Variant::Retake2 | Variant::NextWarRetake | Variant::VoteGuard | Variant::FieldCraft | Variant::RaidWar | Variant::Landless | Variant::LandlessPlan | Variant::NextX | Variant::PreNextX | Variant::StrategistX | Variant::StrategistXThreat | Variant::EconSite | Variant::EconSiteTall | Variant::EconSiteOwnLand | Variant::NetsX | Variant::NetsXSite | Variant::PreNetsX | Variant::Net2 | Variant::Net2Defence | Variant::Tac2 | Variant::Net2Tac | Variant::Net2Without(_) | Variant::Net2Off | Variant::PeaceFix
             )
     }
 
@@ -1619,6 +1625,13 @@ impl Variant {
     /// `net2`'s offence (work/new-net-offence-addendum-2026-11-22.md) plays: every `net2` variant but
     /// `Net2Defence`. The offence is not built yet, so the answer changes nothing until it is; the
     /// switch is here so that the control exists before the code it controls.
+    /// The war's going on is priced also without an operation at peace time (`TurnBrief::war_at_peace`,
+    /// `peace::WarProspect::of`): an assault group's case and `net2`'s war order. `peace-fix` (the fix alone), every
+    /// `net2` variant and the tactical candidates; not `standard`, until a promotion.
+    pub fn values_war_at_peace(self) -> bool {
+        matches!(self, Variant::PeaceFix | Variant::Tac2 | Variant::Net2Tac) || self.net2()
+    }
+
     pub fn net2_offence(self) -> bool {
         matches!(self, Variant::Net2 | Variant::Net2Tac | Variant::Net2Without(_) | Variant::Net2Off)
     }

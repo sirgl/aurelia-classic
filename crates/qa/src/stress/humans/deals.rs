@@ -249,11 +249,15 @@ pub struct BegPlay {
     order: Beg,
     asks: u32,
     white_peace: bool,
+    /// The peace came with the human's gold or gold a turn (the human seat's own AI offered it): not white.
+    paid_peace: bool,
+    /// The human's treasury and its running trades to the winner at its last turn of the war.
+    last: Option<(u32, usize)>,
 }
 
 impl BegPlay {
     pub fn new(order: Beg) -> Self {
-        BegPlay { order, asks: 0, white_peace: false }
+        BegPlay { order, asks: 0, white_peace: false, paid_peace: false, last: None }
     }
 }
 
@@ -263,22 +267,34 @@ impl Seat for BegPlay {
     }
 
     /// Every round of the war: white peace asked (the rules refuse it before the war's tenth round).
-    /// A peace that came after the human's last ask is a white peace.
+    /// A peace that came after the human's last ask is a white peace, unless the human paid for it: its treasury fell
+    /// by `LEAST_PRICE` or more since its last turn of the war, or a new trade of it to the winner runs (the human
+    /// seat's own AI offers peace with gold, and the winner may take that one; CHAIN.md D8, casebook E1).
     fn play(&mut self, game: &mut GameState, rules: &CompiledRuleset) {
         let (human, winner) = (PlayerId(self.order.seat), PlayerId(self.order.victim));
         if !game.view().auth.diplomacy().at_war(human, winner) {
-            if self.asks > 0 && !self.white_peace {
-                self.white_peace = true;
+            if self.asks > 0 && !self.white_peace && !self.paid_peace {
+                let paid = self.last.is_some_and(|(gold, deals)| treasury(game, human) + LEAST_PRICE <= gold || trades(game, human, winner) > deals);
+                if paid {
+                    self.paid_peace = true;
+                } else {
+                    self.white_peace = true;
+                }
             }
             return;
         }
         if ask(game, rules, human, winner, DealItem::Peace) {
             self.asks += 1;
         }
+        self.last = Some((treasury(game, human), trades(game, human, winner)));
     }
 
     fn counts(&self) -> BTreeMap<String, f64> {
-        BTreeMap::from([("script_asks".to_owned(), f64::from(self.asks)), ("script_white_peace".to_owned(), f64::from(u8::from(self.white_peace)))])
+        BTreeMap::from([
+            ("script_asks".to_owned(), f64::from(self.asks)),
+            ("script_white_peace".to_owned(), f64::from(u8::from(self.white_peace))),
+            ("script_paid_peace".to_owned(), f64::from(u8::from(self.paid_peace))),
+        ])
     }
 }
 

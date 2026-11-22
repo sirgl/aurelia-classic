@@ -408,6 +408,9 @@ pub struct TurnBrief {
     pub field_craft: bool,
     /// `raid-war` (`Variant::raid_war`): `Standard` with the pillaging of `ai::raid_war`.
     pub raid_war: bool,
+    /// The war's going on is priced also without an operation (`Variant::values_war_at_peace`, `peace::WarProspect::of`):
+    /// an assault group's case and `net2`'s war order (work/nets/tricks/CHAIN.md D8; tac/runs/C1.md).
+    pub war_at_peace: bool,
     /// `landless` (`Variant::landless`): the goal of a player with units and no city (`ai::landless`).
     pub landless: bool,
     /// `landless-plan` (`Variant::landless_plan`): the same goal, given to the empire's strategist
@@ -591,6 +594,7 @@ impl TurnBrief {
             sharp: false,
             field_craft: false,
             raid_war: false,
+            war_at_peace: false,
             landless: false,
             landless_plan: false,
             landless_goal: None,

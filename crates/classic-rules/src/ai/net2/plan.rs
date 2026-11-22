@@ -677,6 +677,10 @@ pub struct Net2Plan {
     /// The style share of tall (the site head's S9).
     pub tall_share: Milli,
     pub offence: Offence,
+    /// Every known city of the order's rival with its ease (`weights::EASE`), the easiest (the aim) first
+    /// (`net2/orders.rs`): what the order's war promises when no operation runs yet, read by the peace answer; when
+    /// the aimed city has just been taken the next one prices the war that goes on (CHAIN.md D8, HD8 #1 r114).
+    pub order_eases: Vec<(crate::ids::TileId, Milli)>,
 }
 
 /// The trust of a rival without a reading (a city-state, a stranger): a stranger is not yet a liar.

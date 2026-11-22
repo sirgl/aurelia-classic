@@ -17,9 +17,12 @@
 //! net stay their own.
 
 pub mod concepts;
+pub mod credit;
 pub mod inputs;
 pub mod levers;
 pub mod memory;
+pub mod offence;
+pub mod orders;
 pub mod plan;
 pub mod rival_inputs;
 pub mod site_head;
@@ -66,6 +69,8 @@ pub fn think(obs: &AIObservation<'_>, brief: &TurnBrief, state: &mut AiState, ru
     }
     let mut levers = after.plan;
     read_soldiers(&mut levers, &own.inputs);
+    // The offence whose inputs the pass has (`offence`; the driver clears it for `net2-defence`).
+    offence::apply(&mut levers, &pass);
     memory.net2 = Some(plan::Memory2 { core: pass.core.clone(), inputs: own.inputs });
     let _plan_span = prof::span("net2/plan_with_intent");
     let price_tilt = if parts.plays(Part::Economy) { after.price_tilt } else { [0; pd::N] };
