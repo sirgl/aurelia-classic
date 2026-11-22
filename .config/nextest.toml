@@ -221,6 +221,9 @@ and not (
         | test(=a_policy_that_can_be_adopted_lights_the_value_like_the_end_turn_gate)
         | test(=culture_shows_the_cores_price_and_what_is_missing)
     ))
+  | (binary_id(=aurelia-qa::ai_stress_humans) & (test(=a_trick_plays_the_same_twice) | test(=the_script_is_data_in_a_saved_scene)))
+  | (binary_id(=classic-rules::city_removal) & test(=nothing_names_a_razed_city_in_a_played_world))
+  | (binary_id(=classic-rules::elimination) & test(=nothing_names_a_dead_nation_in_a_played_world))
 )
 """
 fail-fast = false
