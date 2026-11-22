@@ -199,6 +199,12 @@ fn match_with_inbox() -> Stage<ClassicUi> {
     let session = stage.module.session.as_mut().expect("the match runs");
     let (game, rules) = session.harness_game();
     game.debug_meet_all();
+    // An embassy needs a city of each side: the capital of the player is founded already.
+    for player in [PlayerId(1), PlayerId(2)] {
+        let unit = game.view().auth.indexes().units_of(player)[0];
+        let tile = game.view().auth.units().get(unit).expect("a start unit").core.tile;
+        game.debug_found_city(&rules, player, tile);
+    }
     let writing = rules.technologies.iter().position(|t| t.key == "core:tech/writing").expect("writing");
     for player in [PlayerId(0), PlayerId(1), PlayerId(2)] {
         game.debug_learn(&rules, player, TechId(writing as u16));
@@ -206,7 +212,7 @@ fn match_with_inbox() -> Stage<ClassicUi> {
     }
     let offers = [
         (PlayerId(1), vec![(PlayerId(1), DealItem::Embassy), (PlayerId(0), DealItem::Embassy)]),
-        (PlayerId(2), vec![(PlayerId(2), DealItem::Gold(50))]),
+        (PlayerId(2), vec![(PlayerId(2), DealItem::Embassy), (PlayerId(0), DealItem::Embassy)]),
     ];
     for (from, items) in offers {
         while game.view().auth.active_player() != from {
