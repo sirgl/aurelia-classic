@@ -214,3 +214,34 @@ is the war probe's start checks on B9 #6.
 
 Accepted parts (`wishes::Parts::ACCEPTED`): threat, client, tall first. The supply and the prey stay in the code
 behind `AURELIA_X_PARTS` (their gates failed on tuning).
+
+### Acceptance (odd seeds, never tuned on): `strategist-x` (`8c33559`) against `standard`, pace Quick, offsets 1201 and 1203
+
+| gate | result | pass |
+|---|---|---|
+| W1 weighted share | 61.3 % (CI 54.8–67.3) on 1201, 59.1 % (51.5–67.3) on 1203; 400 games | yes |
+| W2 real victories | 102 against 52 (science 59 / 18, diplomatic 43 / 34) | yes |
+| W3 AI ms p50 | 2.37 / 2.46 and 2.24 / 2.33: 0.96 | yes |
+| W4 standard's hash | `d2d736c1273a82bb` (bin of 8c33559, 40 games) | yes |
+| S1 lacking a part's copies | 28.7 % against 29.6 % (the supply is not played) | no |
+| S2 waiting rounds | 5.37 against 4.89 | no |
+| C1 wars on city-states | 0.000 | no |
+| C2 city-state cities at the end | 0.079 (standard 0.036) | yes |
+| C3 allies at the end | 1.65 against 1.16 | yes |
+| C4 quests done | 12.9 % against 12.8 % (+0.1 point) | no |
+
+Defects 1 and 2 are not fixed by the accepted candidate (their parts failed on tuning and are not played); the
+candidate is accepted on W1–W3. Its gain comes from the threat and tall first (tuning table above).
+
+Exam, odd instances 1…59 (90 rows a situation, three levels), `strategist-x` on every seat against `standard` on
+every seat (`runs/stress-final`, `runs/stress-standard`; `tools/stress-gates.py`):
+
+| gate | standard | strategist-x | pass |
+|---|---:|---:|---|
+| T1 B9 rival wins by science (edited) | 0.311 | 0.256 | no (−0.055, needs −0.10) |
+| T2 B9 rival cities lost Δ | 0.000 | 0.000 | no |
+| T3 A1 wars on the leader Δ | −0.011 | 0.033 | no |
+| T4 A1 denunciations of the leader Δ | −0.022 | 0.478 | yes |
+| T5 A1 / B9 end win weight Δ | 0.061 / −0.011 | −0.050 / 0.058 | no / yes |
+
+Defect 3 is moved (denunciations, no help to the leader, the leader wins less often) but not fixed: no war on it.
