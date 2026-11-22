@@ -193,25 +193,25 @@ passes when its outcome gates pass at every level. `ai-stress gates` prints this
 | B9 | outcome | `end_seat_score_share` | delta >= | -0.02 | -0.04 | -0.06 | strategist |
 | D1 | outcome | `end_seat_win_weight` | delta >= | 0 | 0 | 0 | none |
 | D1 | outcome | `end_seat_score_share` | delta >= | 0 | 0 | 0 | none |
-| P3 | outcome | `seat_cities` | delta >= | -0.3 | -0.5 | -0.8 | danger net, tactician, commander (off in standard); scripted defence.rs |
-| P3 | outcome | `seat_score_share` | delta >= | -0.01 | -0.02 | -0.03 | danger net, tactician, commander (off in standard); scripted defence.rs |
-| P3 | outcome | `end_seat_win_weight` | delta >= | -0.03 | -0.05 | -0.08 | danger net, tactician, commander (off in standard); scripted defence.rs |
-| P3 | behaviour | `counter_by_3` | edited >= | 0.8 | 0.8 | 0.8 | danger net, tactician, commander (off in standard); scripted defence.rs |
-| P3 | behaviour | `military_added_before_war` | delta >= | 1 | 1 | 2 | danger net, tactician, commander (off in standard); scripted defence.rs |
-| P2 | outcome | `seat_alive` | delta >= | -0.02 | -0.05 | -0.1 | danger net, tactician, commander (off in standard); scripted defence.rs |
-| P2 | outcome | `seat_cities` | delta >= | -0.2 | -0.4 | -0.6 | danger net, tactician, commander (off in standard); scripted defence.rs |
-| P2 | outcome | `end_seat_win_weight` | delta >= | -0.03 | -0.05 | -0.08 | danger net, tactician, commander (off in standard); scripted defence.rs |
-| P2 | behaviour | `capital_lost` | edited <= | 0.1 | 0.2 | 0.3 | danger net, tactician, commander (off in standard); scripted defence.rs |
-| P2 | behaviour | `counter_by_3` | edited >= | 0.8 | 0.8 | 0.8 | danger net, tactician, commander (off in standard); scripted defence.rs |
+| P3 | outcome | `seat_cities` | delta >= | -0.3 | -0.5 | -0.8 | danger net (on in standard: the fight fixes read it), tactician, commander (off); scripted defence.rs |
+| P3 | outcome | `seat_score_share` | delta >= | -0.01 | -0.02 | -0.03 | danger net (on in standard: the fight fixes read it), tactician, commander (off); scripted defence.rs |
+| P3 | outcome | `end_seat_win_weight` | delta >= | -0.03 | -0.05 | -0.08 | danger net (on in standard: the fight fixes read it), tactician, commander (off); scripted defence.rs |
+| P3 | behaviour | `counter_by_3` | edited >= | 0.8 | 0.8 | 0.8 | danger net (on in standard: the fight fixes read it), tactician, commander (off); scripted defence.rs |
+| P3 | behaviour | `military_added_before_war` | delta >= | 1 | 1 | 2 | danger net (on in standard: the fight fixes read it), tactician, commander (off); scripted defence.rs |
+| P2 | outcome | `seat_alive` | delta >= | -0.02 | -0.05 | -0.1 | danger net (on in standard: the fight fixes read it), tactician, commander (off); scripted defence.rs |
+| P2 | outcome | `seat_cities` | delta >= | -0.2 | -0.4 | -0.6 | danger net (on in standard: the fight fixes read it), tactician, commander (off); scripted defence.rs |
+| P2 | outcome | `end_seat_win_weight` | delta >= | -0.03 | -0.05 | -0.08 | danger net (on in standard: the fight fixes read it), tactician, commander (off); scripted defence.rs |
+| P2 | behaviour | `capital_lost` | edited <= | 0.1 | 0.2 | 0.3 | danger net (on in standard: the fight fixes read it), tactician, commander (off); scripted defence.rs |
+| P2 | behaviour | `counter_by_3` | edited >= | 0.8 | 0.8 | 0.8 | danger net (on in standard: the fight fixes read it), tactician, commander (off); scripted defence.rs |
 | P7 | outcome | `seat_score_share` | delta >= | -0.03 | -0.03 | -0.03 | none: scripted wonder_race.rs; strategist production head |
 | P7 | outcome | `end_seat_win_weight` | delta >= | -0.03 | -0.03 | -0.03 | none: scripted wonder_race.rs; strategist production head |
 | P7 | behaviour | `hammers_burned` | edited <= | 0 | 0 | 0 | none: scripted wonder_race.rs; strategist production head |
 | P7 | behaviour | `lost_head_rounds` | edited <= | 1 | 1 | 1 | none: scripted wonder_race.rs; strategist production head |
-| P5 | outcome | `seat_score_share` | delta >= | -0.01 | -0.02 | -0.03 | site net, danger net (off); scripted defence.rs |
-| P5 | outcome | `seat_cities` | delta >= | -0.1 | -0.2 | -0.4 | site net, danger net (off); scripted defence.rs |
-| P5 | outcome | `end_seat_win_weight` | delta >= | -0.02 | -0.03 | -0.05 | site net, danger net (off); scripted defence.rs |
-| P5 | behaviour | `forward_city_held` | edited <= | 0.8 | 0.7 | 0.6 | site net, danger net (off); scripted defence.rs |
-| P5 | behaviour | `war_by_seat` | edited >= | 0.1 | 0.2 | 0 | site net, danger net (off); scripted defence.rs |
+| P5 | outcome | `seat_score_share` | delta >= | -0.01 | -0.02 | -0.03 | site net (off), danger net (on: the fight fixes); scripted defence.rs |
+| P5 | outcome | `seat_cities` | delta >= | -0.1 | -0.2 | -0.4 | site net (off), danger net (on: the fight fixes); scripted defence.rs |
+| P5 | outcome | `end_seat_win_weight` | delta >= | -0.02 | -0.03 | -0.05 | site net (off), danger net (on: the fight fixes); scripted defence.rs |
+| P5 | behaviour | `forward_city_held` | edited <= | 0.8 | 0.7 | 0.6 | site net (off), danger net (on: the fight fixes); scripted defence.rs |
+| P5 | behaviour | `war_by_seat` | edited >= | 0.1 | 0.2 | 0 | site net (off), danger net (on: the fight fixes); scripted defence.rs |
 | P1 | outcome | `seat_score_share` | delta >= | -0.005 | -0.01 | -0.02 | none: scripted (worker flight, settler escort); tactician, commander (off) |
 | P1 | outcome | `seat_cities` | delta >= | -0.1 | -0.2 | -0.3 | none: scripted (worker flight, settler escort); tactician, commander (off) |
 | P1 | outcome | `end_seat_win_weight` | delta >= | -0.02 | -0.03 | -0.05 | none: scripted (worker flight, settler escort); tactician, commander (off) |
@@ -253,16 +253,16 @@ passes when its outcome gates pass at every level. `ai-stress gates` prints this
 | A7 | outcome | `end_seat_win_weight` | delta >= | -0.03 | -0.05 | -0.08 | strategist |
 | A7 | behaviour | `wars_declared` | delta <= | 0 | 0 | 0 | strategist |
 | A7 | behaviour | `seat_military` | delta >= | -2 | -3 | -4 | strategist |
-| B2 | outcome | `seat_cities` | delta >= | -0.3 | -0.5 | -0.8 | danger net, tactician, commander (off in standard); scripted defence.rs |
-| B2 | outcome | `seat_score_share` | delta >= | -0.01 | -0.02 | -0.03 | danger net, tactician, commander (off in standard); scripted defence.rs |
-| B2 | outcome | `end_seat_win_weight` | delta >= | -0.03 | -0.05 | -0.08 | danger net, tactician, commander (off in standard); scripted defence.rs |
-| B2 | behaviour | `counter_by_3` | edited >= | 0.8 | 0.8 | 0.8 | danger net, tactician, commander (off in standard); scripted defence.rs |
-| B2 | behaviour | `purchases` | delta >= | 0.5 | 1 | 1 | danger net, tactician, commander (off in standard); scripted defence.rs |
-| B5 | outcome | `seat_cities` | delta >= | -0.3 | -0.5 | -0.8 | danger net, tactician, commander (off in standard); scripted defence.rs |
-| B5 | outcome | `seat_score_share` | delta >= | -0.01 | -0.02 | -0.03 | danger net, tactician, commander (off in standard); scripted defence.rs |
-| B5 | outcome | `end_seat_win_weight` | delta >= | -0.03 | -0.05 | -0.08 | danger net, tactician, commander (off in standard); scripted defence.rs |
-| B5 | behaviour | `counter_by_3` | edited >= | 0.8 | 0.8 | 0.8 | danger net, tactician, commander (off in standard); scripted defence.rs |
-| B5 | behaviour | `purchases` | delta >= | 0.5 | 1 | 1 | danger net, tactician, commander (off in standard); scripted defence.rs |
+| B2 | outcome | `seat_cities` | delta >= | -0.3 | -0.5 | -0.8 | danger net (on in standard: the fight fixes read it), tactician, commander (off); scripted defence.rs |
+| B2 | outcome | `seat_score_share` | delta >= | -0.01 | -0.02 | -0.03 | danger net (on in standard: the fight fixes read it), tactician, commander (off); scripted defence.rs |
+| B2 | outcome | `end_seat_win_weight` | delta >= | -0.03 | -0.05 | -0.08 | danger net (on in standard: the fight fixes read it), tactician, commander (off); scripted defence.rs |
+| B2 | behaviour | `counter_by_3` | edited >= | 0.8 | 0.8 | 0.8 | danger net (on in standard: the fight fixes read it), tactician, commander (off); scripted defence.rs |
+| B2 | behaviour | `purchases` | delta >= | 0.5 | 1 | 1 | danger net (on in standard: the fight fixes read it), tactician, commander (off); scripted defence.rs |
+| B5 | outcome | `seat_cities` | delta >= | -0.3 | -0.5 | -0.8 | danger net (on in standard: the fight fixes read it), tactician, commander (off); scripted defence.rs |
+| B5 | outcome | `seat_score_share` | delta >= | -0.01 | -0.02 | -0.03 | danger net (on in standard: the fight fixes read it), tactician, commander (off); scripted defence.rs |
+| B5 | outcome | `end_seat_win_weight` | delta >= | -0.03 | -0.05 | -0.08 | danger net (on in standard: the fight fixes read it), tactician, commander (off); scripted defence.rs |
+| B5 | behaviour | `counter_by_3` | edited >= | 0.8 | 0.8 | 0.8 | danger net (on in standard: the fight fixes read it), tactician, commander (off); scripted defence.rs |
+| B5 | behaviour | `purchases` | delta >= | 0.5 | 1 | 1 | danger net (on in standard: the fight fixes read it), tactician, commander (off); scripted defence.rs |
 | B6 | outcome | `seat_score_share` | delta >= | -0.01 | -0.015 | -0.02 | strategist; supply none |
 | B6 | outcome | `seat_cities` | delta >= | -0.2 | -0.3 | -0.4 | strategist; supply none |
 | B6 | outcome | `end_seat_win_weight` | delta >= | -0.02 | -0.03 | -0.05 | strategist; supply none |
@@ -341,16 +341,16 @@ sea for A6/C2, D3 needs more cities than it takes). The end-of-game gates have n
 
 | situation | strength | n | outcome | outcome delta | behaviour gates passed | owning net |
 |---|---|---|---|---|---|---|
-| P3 | mild | 78 | pass | cities -0.128; score_share -0.005 | 1/2: military_added_before_war 0.36 | danger net, tactician, commander (off in standard); scripted defence.rs |
-| P3 | medium | 78 | pass | cities -0.205; score_share -0.008 | 1/2: military_added_before_war 0.71 | danger net, tactician, commander (off in standard); scripted defence.rs |
-| P3 | strong | 78 | pass | cities -0.269; score_share -0.010 | 1/2: military_added_before_war 1.05 | danger net, tactician, commander (off in standard); scripted defence.rs |
-| P2 | mild | 80 | pass | alive +0.000; cities -0.013 | 2/2 | danger net, tactician, commander (off in standard); scripted defence.rs |
-| P2 | medium | 80 | pass | alive +0.000; cities -0.050 | 2/2 | danger net, tactician, commander (off in standard); scripted defence.rs |
-| P2 | strong | 80 | pass | alive +0.000; cities -0.013 | 2/2 | danger net, tactician, commander (off in standard); scripted defence.rs |
+| P3 | mild | 78 | pass | cities -0.128; score_share -0.005 | 1/2: military_added_before_war 0.36 | danger net (on in standard: the fight fixes read it), tactician, commander (off); scripted defence.rs |
+| P3 | medium | 78 | pass | cities -0.205; score_share -0.008 | 1/2: military_added_before_war 0.71 | danger net (on in standard: the fight fixes read it), tactician, commander (off); scripted defence.rs |
+| P3 | strong | 78 | pass | cities -0.269; score_share -0.010 | 1/2: military_added_before_war 1.05 | danger net (on in standard: the fight fixes read it), tactician, commander (off); scripted defence.rs |
+| P2 | mild | 80 | pass | alive +0.000; cities -0.013 | 2/2 | danger net (on in standard: the fight fixes read it), tactician, commander (off); scripted defence.rs |
+| P2 | medium | 80 | pass | alive +0.000; cities -0.050 | 2/2 | danger net (on in standard: the fight fixes read it), tactician, commander (off); scripted defence.rs |
+| P2 | strong | 80 | pass | alive +0.000; cities -0.013 | 2/2 | danger net (on in standard: the fight fixes read it), tactician, commander (off); scripted defence.rs |
 | P7 | one | 92 | pass | score_share -0.012 | 2/2 | none: scripted wonder_race.rs; strategist production head |
-| P5 | mild | 77 | pass | score_share -0.002; cities -0.078 | 0/2: forward_city_held 0.95, war_by_seat 0.09 | site net, danger net (off); scripted defence.rs |
-| P5 | medium | 77 | FAIL (seat_cities) | score_share -0.005; cities -0.208 | 0/2: forward_city_held 0.99, war_by_seat 0.09 | site net, danger net (off); scripted defence.rs |
-| P5 | strong | 77 | pass | score_share -0.007; cities -0.325 | 1/2: forward_city_held 1.00 | site net, danger net (off); scripted defence.rs |
+| P5 | mild | 77 | pass | score_share -0.002; cities -0.078 | 0/2: forward_city_held 0.95, war_by_seat 0.09 | site net (off), danger net (on: the fight fixes); scripted defence.rs |
+| P5 | medium | 77 | FAIL (seat_cities) | score_share -0.005; cities -0.208 | 0/2: forward_city_held 0.99, war_by_seat 0.09 | site net (off), danger net (on: the fight fixes); scripted defence.rs |
+| P5 | strong | 77 | pass | score_share -0.007; cities -0.325 | 1/2: forward_city_held 1.00 | site net (off), danger net (on: the fight fixes); scripted defence.rs |
 | P1 | mild | 81 | pass | score_share -0.001; cities +0.025 | 2/3: pillaged_end 1.23 | none: scripted (worker flight, settler escort); tactician, commander (off) |
 | P1 | medium | 81 | pass | score_share -0.004; cities +0.111 | 3/3 | none: scripted (worker flight, settler escort); tactician, commander (off) |
 | P1 | strong | 81 | pass | score_share -0.006; cities +0.049 | 3/3 | none: scripted (worker flight, settler escort); tactician, commander (off) |
@@ -375,12 +375,12 @@ sea for A6/C2, D3 needs more cities than it takes). The end-of-game gates have n
 | A7 | mild | 100 | pass | cities -0.050; score_share +0.000 | 1/2: seat_military -2.30 | strategist |
 | A7 | medium | 100 | pass | cities -0.110; score_share -0.001 | 1/2: wars_declared 0.01 | strategist |
 | A7 | strong | 100 | pass | cities -0.140; score_share -0.004 | 2/2 | strategist |
-| B2 | mild | 77 | pass | cities -0.169; score_share -0.005 | 1/2: purchases -2.65 | danger net, tactician, commander (off in standard); scripted defence.rs |
-| B2 | medium | 77 | pass | cities -0.208; score_share -0.008 | 1/2: purchases -2.66 | danger net, tactician, commander (off in standard); scripted defence.rs |
-| B2 | strong | 77 | pass | cities -0.195; score_share -0.009 | 1/2: purchases -2.83 | danger net, tactician, commander (off in standard); scripted defence.rs |
-| B5 | mild | 77 | pass | cities -0.169; score_share -0.005 | 1/2: purchases -2.65 | danger net, tactician, commander (off in standard); scripted defence.rs |
-| B5 | medium | 77 | pass | cities -0.208; score_share -0.008 | 1/2: purchases -2.66 | danger net, tactician, commander (off in standard); scripted defence.rs |
-| B5 | strong | 77 | pass | cities -0.195; score_share -0.009 | 1/2: purchases -2.83 | danger net, tactician, commander (off in standard); scripted defence.rs |
+| B2 | mild | 77 | pass | cities -0.169; score_share -0.005 | 1/2: purchases -2.65 | danger net (on in standard: the fight fixes read it), tactician, commander (off); scripted defence.rs |
+| B2 | medium | 77 | pass | cities -0.208; score_share -0.008 | 1/2: purchases -2.66 | danger net (on in standard: the fight fixes read it), tactician, commander (off); scripted defence.rs |
+| B2 | strong | 77 | pass | cities -0.195; score_share -0.009 | 1/2: purchases -2.83 | danger net (on in standard: the fight fixes read it), tactician, commander (off); scripted defence.rs |
+| B5 | mild | 77 | pass | cities -0.169; score_share -0.005 | 1/2: purchases -2.65 | danger net (on in standard: the fight fixes read it), tactician, commander (off); scripted defence.rs |
+| B5 | medium | 77 | pass | cities -0.208; score_share -0.008 | 1/2: purchases -2.66 | danger net (on in standard: the fight fixes read it), tactician, commander (off); scripted defence.rs |
+| B5 | strong | 77 | pass | cities -0.195; score_share -0.009 | 1/2: purchases -2.83 | danger net (on in standard: the fight fixes read it), tactician, commander (off); scripted defence.rs |
 | B6 | mild | 100 | pass | score_share -0.001; cities +0.020 | 1/1 | strategist; supply none |
 | B6 | medium | 100 | pass | score_share -0.001; cities +0.090 | 1/1 | strategist; supply none |
 | B6 | strong | 100 | pass | score_share -0.002; cities -0.020 | 1/1 | strategist; supply none |
@@ -404,11 +404,18 @@ What `standard` does wrong, in plain words (the outcome FAILs first, then the be
   the naval invasion is scripted `fleet.rs` with no net.
 - P5 medium: a forward city with a citadel on the seat's border costs it 0.21 cities in 30 rounds, and the
   AI never takes the forward city back (it stands in 95-100 % of positions) and declares war on the grabber
-  in 9 %. Owner: site net and danger net (off in `standard`); scripted `defence.rs`.
+  in 9 %. Owner: site net (off in `standard`) and danger net (on: `standard`'s fight fixes read it,
+  variant.rs `FightFix::all(Source::Net)`); scripted `defence.rs`.
 - P3: a foreign stack standing inside the borders at peace for three rounds is not answered: the seat adds
   0.4-1.0 military units before the war (gate 1-2). B2/B5: under a surprise war the seat buys 2.7 fewer
-  items than in the control. Owner: danger net (off).
-- B5 equals B2 row for row: the friendship in the base changes nothing the watch reads in 15 rounds.
+  items than in the control. Owner: danger net (on in `standard` through the fight fixes; only the separate
+  `danger_net()` switch is off), tactician and commander (off).
+- B5 equals B2 row for row, and it is not a harness fault (test
+  `b5_friendship_holds_in_the_control_and_the_war_ends_it`: the friendship is in the control's world and
+  hash, and the war removes it). Two facts make it so: the rules' war ends every tie and keeps no memory of
+  the betrayal (`systems/diplomacy` `end_ties`), so the edited arms of B5 and B2 are the same world; and
+  `standard` plays the control the same with or without the friendship for 15 rounds. Owner: none (rules:
+  no opinion memory; AI: friendship read by deals only).
 - P4: a friend's sale of open borders is paid for in 40-51 % of positions and the war follows. Owner:
   none, scripted `peace.rs` / `diplomacy.rs` (no counterparty risk).
 - P8, A4: a rival buying the city-states with gold is not answered: the others gift less than in the
