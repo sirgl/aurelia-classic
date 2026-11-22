@@ -93,7 +93,7 @@ pub fn table(variant: &str, candidate: &[Row], reference: Option<&[Row]>) -> Str
     } else {
         let _ = writeln!(out, "| situation | strength | n | {variant} | standard | {variant} outcome delta | standard outcome delta | {variant} behaviour | standard behaviour | owning net |\n|---|---|---|---|---|---|---|---|---|---|");
     }
-    for situation in Situation::ALL {
+    for situation in Situation::all() {
         for level in 0..situation.levels() {
             let key = (situation, level);
             let c = cand.get(&key).cloned().unwrap_or_default();

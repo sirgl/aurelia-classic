@@ -49,6 +49,13 @@ pub enum Change {
     Accord { giver: u8, receiver: u8, accord: Accord },
     /// The resources of the tiles gone (a lost strategic or luxury resource).
     Deplete { tiles: Vec<u32> },
+    /// Wave 3: the World Congress sits as the United Nations and the World Leader vote is on the
+    /// table of the session in `rounds` rounds (`host` hosts a congress that was not founded).
+    UnitedNations { host: u8, rounds: u32 },
+    /// Wave 3: `player` holds `short` delegates fewer than the World Leader vote needs.
+    ShortOfVictory { player: u8, short: u16 },
+    /// Wave 3: `count` new spies of `player`.
+    Spies { player: u8, count: u8 },
 }
 
 /// The deal items a scene makes (`Change::Accord`).
@@ -59,6 +66,8 @@ pub enum Accord {
     DefensivePact,
     /// The giver opens its borders to the receiver.
     OpenBorders,
+    /// Peace between the two, with its treaty (wave 3).
+    Peace,
 }
 
 /// What a per-round gift adds to (`Gift`).
@@ -142,6 +151,7 @@ pub fn apply(game: &mut GameState, rules: &CompiledRuleset, change: &Change) -> 
                 Accord::Friendship => DealItem::Friendship,
                 Accord::DefensivePact => DealItem::DefensivePact,
                 Accord::OpenBorders => DealItem::OpenBorders,
+                Accord::Peace => DealItem::Peace,
             };
             game.debug_deal_item(rules, PlayerId(*giver), PlayerId(*receiver), item)?;
         }
@@ -150,6 +160,11 @@ pub fn apply(game: &mut GameState, rules: &CompiledRuleset, change: &Change) -> 
                 game.debug_clear_resource(rules, TileId(*tile));
             }
         }
+        Change::UnitedNations { host, rounds } => game.debug_united_nations(rules, PlayerId(*host), *rounds),
+        Change::ShortOfVictory { player, short } => {
+            game.debug_delegates_short_of_victory(rules, PlayerId(*player), *short);
+        }
+        Change::Spies { player, count } => game.debug_add_spies(rules, PlayerId(*player), *count),
     }
     Ok(None)
 }

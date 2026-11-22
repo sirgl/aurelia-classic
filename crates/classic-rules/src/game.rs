@@ -150,6 +150,30 @@ pub trait ClassicGame {
     #[cfg(any(test, feature = "harness"))]
     fn debug_raise_citadel(&mut self, rules: &CompiledRuleset, owner: PlayerId, tile: TileId) -> bool;
 
+    /// Harness-only: the World Congress sits as the United Nations (founded, with `player` as its
+    /// host when it was not), and the World Leader vote is on the table of the session that opens
+    /// in `rounds` rounds (at least one).
+    #[cfg(any(test, feature = "harness"))]
+    fn debug_united_nations(&mut self, rules: &CompiledRuleset, host: PlayerId, rounds: u32);
+
+    /// Harness-only: `player` holds `short` delegates fewer than the World Leader vote needs, by
+    /// its permanent extra delegates (the ones a failed vote gives); never fewer than it holds now.
+    /// The delegates it holds after the change.
+    #[cfg(any(test, feature = "harness"))]
+    fn debug_delegates_short_of_victory(&mut self, rules: &CompiledRuleset, player: PlayerId, short: u16) -> u16;
+
+    /// Harness-only: `count` new spies of `player` at its starting rank, as an era grants them.
+    #[cfg(any(test, feature = "harness"))]
+    fn debug_add_spies(&mut self, rules: &CompiledRuleset, player: PlayerId, count: u8);
+
+    /// Harness-only: the unit stands for the rest of its owner's turn as a resting unit stands. When
+    /// it has not moved this turn it heals now what the end of the turn would give it (`heal_amount`,
+    /// which gives nothing to a unit that moved), and its moves are spent, so no later order of the
+    /// turn moves it. The ai-stress exam's scripted seats hold their units this way: the seat's AI
+    /// plays the rest of the seat and does not touch them.
+    #[cfg(any(test, feature = "harness"))]
+    fn debug_hold_unit(&mut self, rules: &CompiledRuleset, unit: UnitHandle);
+
 
 
     fn outcome(&self) -> Option<crate::world::victory::Outcome>;
@@ -420,6 +444,54 @@ impl ClassicGame for GameState {
         let journal = tx.commit(rules).expect("debug_raise_citadel commit");
         self.commit_journal(rules, &journal);
         true
+    }
+
+    #[cfg(any(test, feature = "harness"))]
+    fn debug_united_nations(&mut self, _rules: &CompiledRuleset, host: PlayerId, rounds: u32) {
+        let last = crate::systems::congress::SESSIONS.len() - 1;
+        let congress = &mut self.world_mut().module.congress;
+        if !congress.founded {
+            congress.founded = true;
+            congress.host = Some(host);
+        }
+        congress.special = last as u8;
+        congress.united_nations = true;
+        congress.leader_vote_due = true;
+        congress.session_round = None;
+        congress.votes.clear();
+        congress.turns_until_session = rounds.max(1);
+    }
+
+    #[cfg(any(test, feature = "harness"))]
+    fn debug_delegates_short_of_victory(&mut self, rules: &CompiledRuleset, player: PlayerId, short: u16) -> u16 {
+        let auth = self.view().auth;
+        let needed = crate::systems::congress::votes_needed(auth);
+        let now = crate::systems::congress::delegates(auth, rules, player);
+        let wanted = needed.saturating_sub(short);
+        if let Some(extra) = self.world_mut().module.congress.extra.get_mut(player.0 as usize) {
+            *extra = extra.saturating_add(wanted.saturating_sub(now));
+        }
+        crate::systems::congress::delegates(self.view().auth, rules, player)
+    }
+
+    #[cfg(any(test, feature = "harness"))]
+    fn debug_add_spies(&mut self, rules: &CompiledRuleset, player: PlayerId, count: u8) {
+        let mut tx = WorldTransaction::new(self.world_mut());
+        tx.add_spies(player, count, rules);
+        let journal = tx.commit(rules).expect("debug_add_spies commit");
+        self.commit_journal(rules, &journal);
+    }
+
+    #[cfg(any(test, feature = "harness"))]
+    fn debug_hold_unit(&mut self, rules: &CompiledRuleset, unit: UnitHandle) {
+        let Some(core) = self.view().auth.units().get(unit).map(|u| *u.core) else {
+            return;
+        };
+        let heal = crate::systems::combat::heal::heal_amount(self.view().auth, rules, &core);
+        if heal > 0 {
+            self.debug_set_unit_hp(unit, core.hp.saturating_add(heal as u16));
+        }
+        self.debug_set_unit_moves(unit, 0);
     }
 
     #[cfg(any(test, feature = "harness"))]

@@ -7,8 +7,10 @@ use classic_rules::ai::driver::ClassicMind;
 use classic_rules::ai::variant::Variant;
 use classic_rules::classic::Classic;
 use classic_rules::ids::PlayerId;
-use classic_rules::{ClassicGame, CompiledRuleset, GameState};
+use classic_rules::{ClassicGame, Command, CompiledRuleset, GameState};
 use kernel::ai::driver::AiDriver;
+use kernel::ai::{Advance, StepOutcome};
+use kernel::command::error::CommandError;
 
 use super::edit::{self, Change, Gift, Yield};
 use super::seat::{Script, Seat};
@@ -70,7 +72,9 @@ pub fn play_arm(rules: &CompiledRuleset, arm: Arm, variant: Variant, rounds: u32
 }
 
 /// One round by the driver, step by step; the script plays its part at the start of its seat's
-/// turn, before the seat's AI looks at the world.
+/// turn, before the seat's AI looks at the world. The units the script holds (`Seat::holds`) are
+/// the script's alone: an order of the seat's AI to one of them is refused, as the rules refuse an
+/// order to a unit that is not the player's, and the AI's turn goes on with its other units.
 fn play_round(rules: &CompiledRuleset, driver: &mut AiDriver<Classic, ClassicMind>, game: &mut GameState, seat: &mut Option<Box<dyn Seat>>) -> Result<(), String> {
     let mut scripted = false;
     loop {
@@ -81,13 +85,29 @@ fn play_round(rules: &CompiledRuleset, driver: &mut AiDriver<Classic, ClassicMin
                 scripted = true;
             }
         }
-        match driver.step(game, rules) {
-            kernel::ai::StepOutcome::RoundDone => return Ok(()),
-            kernel::ai::StepOutcome::Waiting if game.is_over() => return Ok(()),
-            kernel::ai::StepOutcome::Waiting => return Err(format!("round {} waits for a human", game.view().auth.turn().round)),
-            kernel::ai::StepOutcome::Worked | kernel::ai::StepOutcome::PlayerDone(_) => {}
+        driver.configure_game(game);
+        let outcome = match driver.advance(game, rules) {
+            Advance::Worked => StepOutcome::Worked,
+            Advance::RoundDone => StepOutcome::RoundDone,
+            Advance::Waiting => StepOutcome::Waiting,
+            Advance::Command(command) if held_by_script(game, seat, &command) => driver.executed(Err(CommandError::NotOwner)),
+            Advance::Command(command) | Advance::EndTurn(command) => {
+                let result = game.execute(rules, command);
+                driver.executed(result)
+            }
+        };
+        match outcome {
+            StepOutcome::RoundDone => return Ok(()),
+            StepOutcome::Waiting if game.is_over() => return Ok(()),
+            StepOutcome::Waiting => return Err(format!("round {} waits for a human", game.view().auth.turn().round)),
+            StepOutcome::Worked | StepOutcome::PlayerDone(_) => {}
         }
     }
+}
+
+/// The command orders what the script plays (`Seat::holds`).
+fn held_by_script(game: &GameState, seat: &Option<Box<dyn Seat>>, command: &Command) -> bool {
+    seat.as_ref().is_some_and(|script| script.holds(game, command))
 }
 
 /// The game played to its end by the same driver (the science gift stops with the window).
