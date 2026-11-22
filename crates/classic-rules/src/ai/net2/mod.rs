@@ -58,9 +58,21 @@ pub fn think(obs: &AIObservation<'_>, brief: &TurnBrief, state: &mut AiState, ru
         let shares = levers::shares(&intent);
         trace::turn(&trace::Record { player: obs.player.0, round: obs.round, pace: obs.speed.pace_percent, inputs: &inputs, held: &own.core, logits, tempered: net.sharp, pass: &pass, tilt: &tilt, shares: &shares, after: &after });
     }
+    let mut levers = after.plan;
+    read_soldiers(&mut levers, &own.inputs);
     memory.net2 = Some(plan::Memory2 { core: pass.core.clone(), inputs: own.inputs });
     let strategy = strategy_net::plan_with_intent(seat, state, memory, &situation, intent, &after.price_tilt, Wishes::default());
-    Plan2 { strategy, net2: after.plan }
+    Plan2 { strategy, net2: levers }
+}
+
+/// Part A's soldiers estimate of every rival read (§2.4 step 4), so that the war machine's `known_power`
+/// reads it from the plan and never decodes the memory.
+fn read_soldiers(levers: &mut Net2Plan, inputs: &inputs::InputMemory) {
+    for read in &mut levers.rivals {
+        if let Some(estimate) = inputs.soldiers_of(read.rival) {
+            read.soldiers = plan::Soldiers::Estimate { count: estimate.value, doubt: estimate.doubt() };
+        }
+    }
 }
 
 /// The carried net `net2` thinks with: the brief's, without the threat's posture term (§4.3: removed)

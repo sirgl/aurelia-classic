@@ -72,7 +72,7 @@ fn scene() -> (GameState, CompiledRuleset) {
 
 /// A reading of rival `p` with the given trust and help; the rest neutral.
 fn read(p: PlayerId, trust: i64, help: Help) -> RivalRead {
-    RivalRead { rival: p, weak: 0, reach: 0, menace: 0, distrust: 1000 - trust, prey: 0, runaway: 0, spoiler: 0, retake: 0, duty: 0, grabber: 0, border: 0, brake: 0, war_value: 0, war_kind: WarKind::Prey, trust, help }
+    RivalRead { rival: p, weak: 0, reach: 0, menace: 0, distrust: 1000 - trust, prey: 0, runaway: 0, spoiler: 0, retake: 0, duty: 0, grabber: 0, border: 0, brake: 0, war_value: 0, war_kind: WarKind::Prey, trust, help, soldiers: Default::default() }
 }
 
 fn plan(rivals: Vec<RivalRead>) -> Net2Plan {

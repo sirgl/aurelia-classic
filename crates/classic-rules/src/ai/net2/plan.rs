@@ -508,7 +508,22 @@ pub struct RivalRead {
     /// 1000 − distrust.
     pub trust: Milli,
     pub help: Help,
+    /// Part A's estimate of its soldiers (§2.4), for the war machine's `known_power`.
+    pub soldiers: Soldiers,
 }
+
+/// A rival's soldiers as part A's estimator reads them (§2.4, `inputs::SoldierRead`).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum Soldiers {
+    /// No estimate this turn (the read has not run, or the rival is not in it).
+    #[default]
+    Unread,
+    /// The estimated count and its doubt: the width of its range over its size, thousandths (0: exact).
+    Estimate { count: i64, doubt: Milli },
+}
+
+/// The doubt up to which the war machine counts the estimate instead of its army per city (§2.4 step 4).
+pub const SOLDIERS_DOUBT_MAX: Milli = 300;
 
 /// What the executors read (`TurnBrief::net2`).
 #[derive(Debug, Clone, Default, PartialEq, Eq)]

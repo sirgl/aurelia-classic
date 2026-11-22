@@ -28,7 +28,7 @@ use crate::ai::state::{
     WarPlan,
 };
 use crate::ai::grand_strategy::Stakes;
-use crate::ai::net2::plan::{Net2Plan, WarKind, WarOrder, WarPlan as OrderPlan};
+use crate::ai::net2::plan::{Net2Plan, Soldiers, WarKind, WarOrder, WarPlan as OrderPlan, SOLDIERS_DOUBT_MAX};
 use crate::ai::value::{Centi, Prices};
 use crate::ai::trace::{Actor, Reason};
 use crate::combat::city::{
@@ -1847,7 +1847,8 @@ pub const ARMY_PER_CITY_TENTHS: u64 = 26;
 /// The military power of `rival` as the player can know it (`unit_power`): the largest of its
 /// units in sight, its army remembered near our cities (`RelationMemory::threat`) and the army a
 /// nation of its known cities keeps (`ARMY_PER_CITY_TENTHS`) of its era's best melee unit
-/// (`era_strength`), since nothing tells the size of an army out of sight. `met_eras`: the era of
+/// (`era_strength`), since nothing tells the size of an army out of sight; with `net2`'s estimate of its
+/// soldiers (`estimated_soldiers`) that many of the era's best melee unit instead. `met_eras`: the era of
 /// every nation met.
 pub fn known_power(brief: &TurnBrief, state: &AiState, rules: &CompiledRuleset, rival: PlayerId, met_eras: &[(PlayerId, u8)]) -> u32 {
     let seen: u32 = brief.sightings.iter().filter(|s| s.owner == rival && s.military).map(|s| s.power).sum();
@@ -1855,8 +1856,22 @@ pub fn known_power(brief: &TurnBrief, state: &AiState, rules: &CompiledRuleset, 
     let cities = state.seen_cities().iter().filter(|c| c.owner == rival).count() as u64;
     let own_era = crate::ai::strategy_net::features::era_of(rules, &brief.techs);
     let their_era = met_eras.iter().find(|(p, _)| *p == rival).map_or(own_era, |(_, e)| usize::from(*e));
-    let kept = cities * ARMY_PER_CITY_TENTHS * era_strength(rules, their_era) / 10;
+    let kept = match estimated_soldiers(brief, rival) {
+        Some(soldiers) => soldiers * era_strength(rules, their_era),
+        None => cities * ARMY_PER_CITY_TENTHS * era_strength(rules, their_era) / 10,
+    };
     seen.max(threat).max(kept.min(u64::from(u32::MAX)) as u32)
+}
+
+/// `net2`'s estimate of `rival`'s soldiers (`RivalRead::soldiers`, design §2.4 step 4) when its doubt is small
+/// enough to count instead of the army per city: a disarmed neighbour then reads as disarmed. None without a
+/// plan, or with a doubtful estimate.
+fn estimated_soldiers(brief: &TurnBrief, rival: PlayerId) -> Option<u64> {
+    let soldiers = with_net2(brief, |plan| plan.rival(rival).map(|read| read.soldiers)).flatten()?;
+    match soldiers {
+        Soldiers::Estimate { count, doubt } if doubt <= SOLDIERS_DOUBT_MAX => Some(count.max(0) as u64),
+        _ => None,
+    }
 }
 
 /// The strength of the best melee unit the rules give by an era (its index): what an army of that

@@ -8,7 +8,7 @@ use crate::ai::strategy_net::{Intent, Milli, Tilt};
 use crate::ids::PlayerId;
 
 use super::concepts::{self, fire, Frame};
-use super::plan::{CityGuard, CityInputs, CoreMemory, Embargo, Escorts, Generals, Help, Inputs, Net2Plan, Offence, Opening, RivalRead, SpentWar, WarKind, WarOrder, WarPlan};
+use super::plan::{CityGuard, CityInputs, CoreMemory, Embargo, Escorts, Generals, Help, Inputs, Net2Plan, Offence, Opening, RivalRead, Soldiers, SpentWar, WarKind, WarOrder, WarPlan};
 use super::weights::{self as w, a, gate, q, r, s, y, Table};
 
 /// One rival's layer: its inputs and its concepts.
@@ -70,6 +70,7 @@ fn read_of(rival: PlayerId, inputs: &[Milli; r::N], c: &[Milli; q::N]) -> RivalR
         war_kind: kind,
         trust: ONE - c[q::DISTRUST],
         help,
+        soldiers: Soldiers::Unread,
     }
 }
 

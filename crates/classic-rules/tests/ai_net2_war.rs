@@ -177,3 +177,44 @@ fn the_retake_margin_falls_with_the_order_value() {
     assert_eq!(order_margin(1000), 125);
     assert_eq!(order_margin(5000), 125);
 }
+
+/// Design §2.4 step 4: `known_power` counts `net2`'s soldiers estimate of a rival instead of its army per city
+/// when the doubt is at most `SOLDIERS_DOUBT_MAX`: a disarmed rival with four known cities reads as one soldier,
+/// not as 2.6 a city. A doubtful estimate, or no plan, keeps the army per city.
+#[test]
+fn known_power_counts_the_soldiers_estimate_when_it_is_sure() {
+    use classic_rules::ai::net2::plan::{RivalRead, Soldiers, SOLDIERS_DOUBT_MAX};
+    use classic_rules::ai::operations::{era_strength, known_power, ARMY_PER_CITY_TENTHS};
+    use classic_rules::ai::planner::TurnBrief;
+    use classic_rules::ai::state::AiState;
+    use classic_rules::ClassicGame;
+    let rules = compile_rules(core_rules()).unwrap();
+    let game = scene(&rules);
+    let obs = game.ai_observation(&rules, AI);
+    let brief = TurnBrief::from_observation(&obs, &rules);
+    let mut state = AiState::new(AI, 0);
+    for q in [12, 14, 16, 18] {
+        state.see_city(SeenCity { tile: tile(&game, q, 10), owner: ENEMY, population: 3, last_seen_round: 0 });
+    }
+    let strength = era_strength(&rules, 0) as u32;
+    let per_city = (4 * ARMY_PER_CITY_TENTHS * u64::from(strength) / 10) as u32;
+    let with = |soldiers: Option<Soldiers>| {
+        let plan = soldiers.map(|soldiers| {
+            let read = RivalRead { soldiers, ..empty_read(ENEMY) };
+            Net2Plan { rivals: vec![read], ..Net2Plan::default() }
+        });
+        set_net2_for_test(plan);
+        let power = known_power(&brief, &state, &rules, ENEMY, &[(ENEMY, 0)]);
+        set_net2_for_test(None);
+        power
+    };
+    assert_eq!(with(None), per_city, "no plan: the army per city");
+    assert_eq!(with(Some(Soldiers::Unread)), per_city, "no estimate: the army per city");
+    assert_eq!(with(Some(Soldiers::Estimate { count: 1, doubt: 0 })), strength, "an exact estimate: one soldier");
+    assert_eq!(with(Some(Soldiers::Estimate { count: 1, doubt: SOLDIERS_DOUBT_MAX + 1 })), per_city, "a doubtful one: the army per city");
+}
+
+fn empty_read(rival: PlayerId) -> classic_rules::ai::net2::plan::RivalRead {
+    use classic_rules::ai::net2::plan::{Help, RivalRead};
+    RivalRead { rival, weak: 0, reach: 0, menace: 0, distrust: 0, prey: 0, runaway: 0, spoiler: 0, retake: 0, duty: 0, grabber: 0, border: 0, brake: 0, war_value: 0, war_kind: WarKind::Prey, trust: 1000, help: Help::Give, soldiers: Default::default() }
+}
