@@ -129,7 +129,7 @@ impl<'i, 'o, 'a> Negotiation<'i, 'o, 'a> {
     pub fn prospect(&self, enemy: PlayerId) -> WarProspect {
         let input = self.input;
         let mut prospect = WarProspect::of(input.brief, input.state, input.rules, &self.prices, &self.stakes, enemy, Some(&input.observation.view));
-        if input.brief.net2.as_ref().is_some_and(|p| p.makes_peace_with(enemy)) {
+        if input.brief.net2_for(crate::ai::net2::plan::Part::Peace).is_some_and(|p| p.makes_peace_with(enemy)) {
             prospect.attack = WarCase::default();
         }
         prospect
@@ -139,7 +139,7 @@ impl<'i, 'o, 'a> Negotiation<'i, 'o, 'a> {
     /// `net2` plan at the trust in the giver (§4.6, P4: the buyer who paid a sale that the seller then broke by war):
     /// `trust`/1000 of it, nothing below `TRUST_MIN`. As today without a plan.
     fn flows_later(&self, from: PlayerId, value: Centi) -> Centi {
-        match self.input.brief.net2.as_ref() {
+        match self.input.brief.net2_for(crate::ai::net2::plan::Part::Deals) {
             Some(plan) if plan.trust(from) < crate::ai::net2::plan::TRUST_MIN => 0,
             Some(plan) => value * plan.trust(from) / 1000,
             None => value,
@@ -214,7 +214,7 @@ impl<'i, 'o, 'a> Negotiation<'i, 'o, 'a> {
         if crate::ai::diplomacy::helps(item) && crate::ai::diplomacy::denied(self.input.brief, other) {
             return self.gold(crate::ai::diplomacy::REFUSED);
         }
-        let value = crate::ai::diplomacy::item_value_with(self.obs(), self.input.rules, agreements, self.input.brief.net2.as_ref(), other, item, receiving);
+        let value = crate::ai::diplomacy::item_value_with(self.obs(), self.input.rules, agreements, self.input.brief.net2_for(crate::ai::net2::plan::Part::Deals), other, item, receiving);
         self.gold(value)
     }
 

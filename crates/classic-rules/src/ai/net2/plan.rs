@@ -567,9 +567,81 @@ pub enum Soldiers {
 /// The doubt up to which the war machine counts the estimate instead of its army per city (§2.4 step 4).
 pub const SOLDIERS_DOUBT_MAX: Milli = 300;
 
+// ---- the parts of `net2` (net2/GAP.md: the ablation) ----
+
+/// A part of `net2`: the levers that one bench variant `net2-no-<part>` gives back to `nets-x-site`'s play
+/// (the ablation that finds where the real victories go). Every reader of the plan names its part
+/// (`operations::with_net2`); `net2::think` reads the parts that live inside the net.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum Part {
+    /// The intent's tilt (every term of `weights::TILT` but the war order's) and the tall first.
+    Strategy,
+    /// The war order: `net2` orders no war and the war machine picks as `nets-x-site`; with it go the order's
+    /// posture terms, the retake margin and the soldiers estimate in `known_power`.
+    War,
+    /// Trust, the help denied and the refusals that follow, the price of a third-party war, no denunciation.
+    Deals,
+    /// The peace wish (`Net2Plan::peace_with`).
+    Peace,
+    /// The city-state gold share.
+    CityStates,
+    /// The congress: the embargo, the World Leader ballot and the stances.
+    Congress,
+    /// The site head.
+    Sites,
+    /// The escorts of an overseas order and the Great Generals held.
+    Fleet,
+    /// The guard levels of the cities and the rules' zone damage in the danger read.
+    Guard,
+    /// The tilt of the military price.
+    Economy,
+}
+
+impl Part {
+    pub const ALL: [Part; 10] = [Part::Strategy, Part::War, Part::Deals, Part::Peace, Part::CityStates, Part::Congress, Part::Sites, Part::Fleet, Part::Guard, Part::Economy];
+
+    pub fn name(self) -> &'static str {
+        match self {
+            Part::Strategy => "strategy",
+            Part::War => "war",
+            Part::Deals => "deals",
+            Part::Peace => "peace",
+            Part::CityStates => "cs",
+            Part::Congress => "congress",
+            Part::Sites => "sites",
+            Part::Fleet => "fleet",
+            Part::Guard => "guard",
+            Part::Economy => "economy",
+        }
+    }
+}
+
+/// The parts of `net2` a seat plays.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum Parts {
+    #[default]
+    All,
+    /// Every part but one (`net2-no-<part>`).
+    Without(Part),
+    /// No part: every reader plays as `nets-x-site` (`net2-off`, the check of the ablation itself).
+    Nothing,
+}
+
+impl Parts {
+    pub fn plays(self, part: Part) -> bool {
+        match self {
+            Parts::All => true,
+            Parts::Without(off) => off != part,
+            Parts::Nothing => false,
+        }
+    }
+}
+
 /// What the executors read (`TurnBrief::net2`).
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Net2Plan {
+    /// The parts that play: a reader of a part that does not finds no plan (`operations::with_net2`).
+    pub parts: Parts,
     pub round: u32,
     pub war: WarPlan,
     /// Rivals at war with us we want peace with (§4.4).

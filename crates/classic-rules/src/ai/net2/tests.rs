@@ -6,7 +6,7 @@ use crate::ai::strategy_net::{intent_from, Held, Intent, Logits, Milli, Net, Til
 use crate::ids::{EntityId, PlayerId, TileId};
 
 use super::levers::{self, After, Pass};
-use super::plan::{AimWhy, OrderPhase, CityInputs, CoreMemory, Embargo, Escorts, Generals, Help, Inputs, Opening, RivalInputs, SeatInputs, SpentWar, TargetInputs, WarAim, WarKind, WarOrder, WarPlan};
+use super::plan::{AimWhy, OrderPhase, CityInputs, Parts, CoreMemory, Embargo, Escorts, Generals, Help, Inputs, Opening, RivalInputs, SeatInputs, SpentWar, TargetInputs, WarAim, WarKind, WarOrder, WarPlan};
 use super::weights::{a, q};
 
 const ROUND: u32 = 100;
@@ -38,7 +38,7 @@ fn inputs(seat: SeatInputs, rivals: Vec<RivalInputs>, cities: Vec<CityInputs>) -
 }
 
 fn pass_of(inputs: &Inputs, held: &CoreMemory, round: u32) -> Pass {
-    levers::before_intent(inputs, &carried(), held, round, PACE)
+    levers::before_intent(inputs, &carried(), held, round, PACE, Parts::All)
 }
 
 fn pass(inputs: &Inputs) -> Pass {
@@ -463,7 +463,7 @@ fn generated_line(rng: &mut Lcg) -> String {
     let spread = |rng: &mut Lcg| rng.below(6001) as Milli - 3000;
     let logits = Logits { concepts: k, style: [spread(rng), spread(rng), spread(rng)], aim: [spread(rng), spread(rng), spread(rng), spread(rng)], posture: [spread(rng), spread(rng), spread(rng), spread(rng)], style_margin: 1150 };
     let tempered = rng.below(2) == 0;
-    let pass = levers::before_intent(&inputs, &k, &held, round, PACE);
+    let pass = levers::before_intent(&inputs, &k, &held, round, PACE, Parts::All);
     let tilt = levers::tilt(&pass);
     let net = Net { sharp: tempered, ..Net::default() };
     let intent: Intent = intent_from(&logits, &inputs.situation, Held::default(), 3, 200, PACE, net, &tilt);

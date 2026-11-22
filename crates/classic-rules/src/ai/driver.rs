@@ -116,8 +116,9 @@ pub struct ClassicMind {
     /// (`Variant::strategist_parts`, `TurnBrief::strategist`).
     strategist: crate::ai::strategy_net::wishes::Parts,
     /// `Variant::Net2` and its relatives (`Variant::net2`): `net2::think` takes the strategist's turn
-    /// and its plan reaches the executors through `TurnBrief::net2`; the settlers read its site head.
-    net2: bool,
+    /// and its plan reaches the executors through `TurnBrief::net2`; the settlers read its site head. The
+    /// parts it plays (`Variant::net2_parts`: all but in the ablation's `net2-no-<part>`); None: no `net2`.
+    net2: Option<crate::ai::net2::Parts>,
     /// `Variant::Net2` plays the offence of the addendum (`Variant::net2_offence`); `Net2Defence` does not.
     net2_offence: bool,
     /// `Variant::Tac2` and `Variant::Net2Tac`: the mind plays the tactical unit nets (`unit_net_on`).
@@ -170,13 +171,13 @@ impl ClassicMind {
             Variant::PreNextX => (Variant::Standard, Some(Variant::PreNextX)),
             // `net2`, its control and the tactical candidates play as `standard` (the play of `nets-x-site`)
             // under their own names; `net2::think` and the unit nets are switched on below.
-            Variant::Net2 | Variant::Net2Defence | Variant::Net2Tac | Variant::Tac2 => (Variant::NetsXSite, Some(variant)),
+            Variant::Net2 | Variant::Net2Defence | Variant::Net2Tac | Variant::Tac2 | Variant::Net2Without(_) | Variant::Net2Off => (Variant::NetsXSite, Some(variant)),
             // The economy nets' candidates (classic/docs/ai-econ-nets.md) play as `standard` under their own
             // names, with their nets on (`economy_nets`).
             Variant::EconSite | Variant::EconSiteTall | Variant::EconSiteOwnLand => (Variant::NextX, Some(variant)),
             other => (other, None),
         };
-        let (net2, net2_offence, tactical_nets) = (promoted.is_some_and(Variant::net2), promoted.is_some_and(Variant::net2_offence), matches!(promoted, Some(Variant::Tac2 | Variant::Net2Tac)));
+        let (net2, net2_offence, tactical_nets) = (promoted.and_then(Variant::net2_parts), promoted.is_some_and(Variant::net2_offence), matches!(promoted, Some(Variant::Tac2 | Variant::Net2Tac)));
         let requested = variant;
         // `next-war-retake` is `next-war` with the retake of `retake2` (its flag on top of the war of
         // `siege-call`).
@@ -298,7 +299,7 @@ impl ClassicMind {
         advisors.register(crate::classic::ClassicSystem::Diplomacy, Box::new(crate::ai::diplomacy::DiplomacyAdvisor { embassies: variant.values_embassies() }));
         // The net plays on `NET_BASE`: its siege too.
         let walls = variant.siege_walls().then(|| Box::new(crate::ai::siege_walls::SiegeWalls::new().joined(variant.siege_join())));
-        Self { advisors, variant, genome: None, humans: Vec::new(), walks: Default::default(), choice: None, net: Some(Box::new(net)), book: None, named: None, walls, conquest: None, unciv: None, tall: None, sharp: false, tall_real: false, next: false, wonder_race: 0, pays: false, fit: false, muster: false, call: false, retake2: false, vote_guard: false, field: false, raidw: false, landless: false, landless_plan: false, siege_mend: false, strategist: crate::ai::strategy_net::wishes::Parts::NONE, net2: false, net2_offence: false, tactical_nets: false }
+        Self { advisors, variant, genome: None, humans: Vec::new(), walks: Default::default(), choice: None, net: Some(Box::new(net)), book: None, named: None, walls, conquest: None, unciv: None, tall: None, sharp: false, tall_real: false, next: false, wonder_race: 0, pays: false, fit: false, muster: false, call: false, retake2: false, vote_guard: false, field: false, raidw: false, landless: false, landless_plan: false, siege_mend: false, strategist: crate::ai::strategy_net::wishes::Parts::NONE, net2: None, net2_offence: false, tactical_nets: false }
     }
 
     /// The net's part (`Variant::Net`), if any.
@@ -345,7 +346,7 @@ impl ClassicMind {
     pub fn variant(&self) -> Variant {
         // The joint build's candidate, the game's AI since the fourteenth promotion (which plays as it)
         // and the standard before it carry the flags below under their own names.
-        if let Some(v @ (Variant::NextX | Variant::Standard | Variant::PreNextX | Variant::PreNetsX | Variant::StrategistX | Variant::StrategistXThreat | Variant::EconSite | Variant::EconSiteTall | Variant::EconSiteOwnLand | Variant::NetsX | Variant::NetsXSite | Variant::Net2 | Variant::Net2Defence | Variant::Tac2 | Variant::Net2Tac)) = self.named {
+        if let Some(v @ (Variant::NextX | Variant::Standard | Variant::PreNextX | Variant::PreNetsX | Variant::StrategistX | Variant::StrategistXThreat | Variant::EconSite | Variant::EconSiteTall | Variant::EconSiteOwnLand | Variant::NetsX | Variant::NetsXSite | Variant::Net2 | Variant::Net2Defence | Variant::Tac2 | Variant::Net2Tac | Variant::Net2Without(_) | Variant::Net2Off)) = self.named {
             return v;
         }
         if self.landless {
@@ -407,7 +408,7 @@ impl ClassicMind {
     fn economy_nets(&self) -> Variant {
         match self.named {
             Some(v @ (Variant::EconSite | Variant::EconSiteTall | Variant::EconSiteOwnLand)) => v,
-            Some(Variant::NetsXSite | Variant::Standard | Variant::Net2 | Variant::Net2Defence | Variant::Tac2 | Variant::Net2Tac) => Variant::EconSite,
+            Some(Variant::NetsXSite | Variant::Standard | Variant::Net2 | Variant::Net2Defence | Variant::Tac2 | Variant::Net2Tac | Variant::Net2Without(_) | Variant::Net2Off) => Variant::EconSite,
             _ => self.variant,
         }
     }
@@ -419,7 +420,7 @@ impl ClassicMind {
 
     /// `net2` (`ai::net2`) decides the strategist's turn and the sites of this mind (`Variant::net2`).
     pub fn plays_net2(&self) -> bool {
-        self.net2
+        self.net2.is_some()
     }
 
     /// The mind retakes a lost city (`TurnBrief::retake`, `ai::retake`): `retake2` and
@@ -988,8 +989,8 @@ impl ClassicMind {
                 };
                 // `net2` takes the strategist's turn: its plan is the strategist's for the economy heads
                 // (`TurnBrief::strategy`) and its levers go to the executors (`TurnBrief::net2`).
-                let plan = if self.net2 {
-                    let crate::ai::net2::plan::Plan2 { strategy, net2 } = crate::ai::net2::think(observation, &brief, state, rules, &prices, &stakes);
+                let plan = if let Some(parts) = self.net2 {
+                    let crate::ai::net2::plan::Plan2 { strategy, net2 } = crate::ai::net2::think(observation, &brief, state, rules, &prices, &stakes, parts);
                     brief.net2 = Some(net2);
                     // The defence watch was made before `net2` thought: its dangers take the plan's guard
                     // levels now, before the city planner and `defence::arm` read them.
@@ -1242,7 +1243,7 @@ mod sharp_tests {
         assert_eq!(mind_parts(&threat), mind_parts(&standard));
         assert_eq!((candidate.strategist, threat.strategist, standard.strategist), (Parts { threat: false, tall_first: true }, Parts { threat: true, tall_first: false }, Parts::NONE));
         assert_eq!((candidate.variant(), threat.variant()), (Variant::StrategistX, Variant::StrategistXThreat));
-        assert!(Variant::ALL.iter().filter(|v| v.strategist_parts().any()).eq([Variant::StrategistX, Variant::NetsX, Variant::NetsXSite, Variant::StrategistXThreat, Variant::Net2, Variant::Net2Defence, Variant::Tac2, Variant::Net2Tac].iter()));
+        assert!(Variant::ALL.iter().filter(|v| v.strategist_parts().any()).eq([Variant::StrategistX, Variant::NetsX, Variant::NetsXSite, Variant::StrategistXThreat, Variant::Net2, Variant::Net2Defence, Variant::Tac2, Variant::Net2Tac].iter().chain(Variant::ALL.iter().filter(|v| matches!(v, Variant::Net2Without(_) | Variant::Net2Off)))));
     }
 
     /// The fourteenth promotion (14 November): the game's AI is the mind of `next-x` and names itself

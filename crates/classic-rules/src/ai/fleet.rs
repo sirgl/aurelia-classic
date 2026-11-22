@@ -55,7 +55,7 @@ pub fn wanted_with(obs: &AIObservation<'_>, state: &AiState, escorts: Escorts) -
 
 /// The escorts of the turn's `net2` plan; `Escorts::AsToday` without a plan.
 pub fn escorts_of(brief: &TurnBrief) -> Escorts {
-    crate::ai::operations::with_net2(brief, |plan| plan.escorts).unwrap_or_default()
+    crate::ai::operations::with_net2(brief, crate::ai::net2::plan::Part::Fleet, |plan| plan.escorts).unwrap_or_default()
 }
 
 fn is_warship(rules: &CompiledRuleset, kind: UnitKindId) -> bool {

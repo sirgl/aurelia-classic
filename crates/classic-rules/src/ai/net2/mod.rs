@@ -32,16 +32,18 @@ mod tests;
 use crate::ai::grand_strategy::Stakes;
 use crate::ai::planner::TurnBrief;
 use crate::ai::state::AiState;
+use crate::ai::strategy_net::weights::pd;
 use crate::ai::strategy_net::{self, wishes::Wishes, Memory, Net, Seat};
 use crate::ai::value::Prices;
 use crate::knowledge::observation::AIObservation;
 use crate::rules::CompiledRuleset;
 
-pub use plan::{Net2Plan, Plan2};
+pub use plan::{Net2Plan, Part, Parts, Plan2};
 
 /// The turn of `net2` for a seat, at the place of `strategy_net::think` (`driver.rs`): the same
 /// arguments; the strategist's plan with `net2`'s intent and prices, and the levers.
-pub fn think(obs: &AIObservation<'_>, brief: &TurnBrief, state: &mut AiState, rules: &CompiledRuleset, prices: &Prices, stakes: &Stakes) -> Plan2 {
+/// `parts`: the parts of `net2` the seat plays (`plan::Parts`; a part that does not play is `nets-x-site`'s).
+pub fn think(obs: &AIObservation<'_>, brief: &TurnBrief, state: &mut AiState, rules: &CompiledRuleset, prices: &Prices, stakes: &Stakes, parts: Parts) -> Plan2 {
     let _span = prof::span("net2/think");
     let seat = Seat { obs, brief, rules, prices };
     let mut memory = Memory::decode(&state.mind_memory);
@@ -51,9 +53,9 @@ pub fn think(obs: &AIObservation<'_>, brief: &TurnBrief, state: &mut AiState, ru
         let _span = prof::span("net2/inputs");
         inputs::read(obs, brief, state, rules, &situation.features, &situation.rivals, &mut own.inputs)
     };
-    let net = net_of(brief);
+    let net = net_of(brief, parts);
     let carried = strategy_net::concepts_net(&situation.features, net);
-    let pass = levers::before_intent(&inputs, &carried, &own.core, obs.round, obs.speed.pace_percent);
+    let pass = levers::before_intent(&inputs, &carried, &own.core, obs.round, obs.speed.pace_percent, parts);
     let tilt = levers::tilt(&pass);
     let logits = std::env::var_os("NET2_TRACE").map(|_| strategy_net::logits_net(&situation.features, &memory.held, net));
     let intent = strategy_net::intent_step(seat, &mut memory, &situation, net, &tilt);
@@ -66,7 +68,8 @@ pub fn think(obs: &AIObservation<'_>, brief: &TurnBrief, state: &mut AiState, ru
     read_soldiers(&mut levers, &own.inputs);
     memory.net2 = Some(plan::Memory2 { core: pass.core.clone(), inputs: own.inputs });
     let _plan_span = prof::span("net2/plan_with_intent");
-    let strategy = strategy_net::plan_with_intent(seat, state, memory, &situation, intent, &after.price_tilt, Wishes::default());
+    let price_tilt = if parts.plays(Part::Economy) { after.price_tilt } else { [0; pd::N] };
+    let strategy = strategy_net::plan_with_intent(seat, state, memory, &situation, intent, &price_tilt, Wishes::default());
     Plan2 { strategy, net2: levers }
 }
 
@@ -81,7 +84,8 @@ fn read_soldiers(levers: &mut Net2Plan, inputs: &inputs::InputMemory) {
 }
 
 /// The carried net `net2` thinks with: the brief's, without the threat's posture term (§4.3: removed)
-/// and without the tall first (its −1200 is `net2`'s own term, `weights::TILT`).
-pub fn net_of(brief: &TurnBrief) -> Net {
-    Net { open: brief.war_open, sharp: brief.sharp, pays: brief.war_pays, threat: 0, tall_first: false }
+/// and without the tall first (its −1200 is `net2`'s own term, `weights::TILT`); when the strategy is not
+/// `net2`'s part, with the tall first, as `nets-x-site` thinks.
+pub fn net_of(brief: &TurnBrief, parts: Parts) -> Net {
+    Net { open: brief.war_open, sharp: brief.sharp, pays: brief.war_pays, threat: 0, tall_first: !parts.plays(Part::Strategy) }
 }

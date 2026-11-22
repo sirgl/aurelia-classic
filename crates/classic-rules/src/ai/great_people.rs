@@ -137,7 +137,7 @@ pub fn general_commands(obs: &AIObservation<'_>, rules: &CompiledRuleset, genera
 
 /// The `net2` plan's `Generals` of the turn (`AsToday` without a plan).
 pub fn generals_of(brief: &crate::ai::planner::TurnBrief) -> Generals {
-    crate::ai::operations::with_net2(brief, |plan| plan.generals).unwrap_or_default()
+    crate::ai::operations::with_net2(brief, crate::ai::net2::plan::Part::Fleet, |plan| plan.generals).unwrap_or_default()
 }
 
 /// Own tiles this close to an own city are building sites.

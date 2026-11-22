@@ -28,7 +28,7 @@ use crate::ai::state::{
     WarPlan,
 };
 use crate::ai::grand_strategy::Stakes;
-use crate::ai::net2::plan::{Net2Plan, Soldiers, WarKind, WarOrder, WarPlan as OrderPlan, SOLDIERS_DOUBT_MAX};
+use crate::ai::net2::plan::{Net2Plan, Part, Soldiers, WarKind, WarOrder, WarPlan as OrderPlan, SOLDIERS_DOUBT_MAX};
 use crate::ai::value::{Centi, Prices};
 use crate::ai::trace::{Actor, Reason};
 use crate::combat::city::{
@@ -60,15 +60,20 @@ pub fn set_net2_for_test(plan: Option<Net2Plan>) {
     NET2_OVERRIDE.with(|p| *p.borrow_mut() = plan);
 }
 
-/// Reads the `net2` plan of the turn: None when the seat has none (every variant but `net2`), and then
-/// every reader of this part is inert. THE ONE PLACE the plan is fetched: the brief's (`TurnBrief::net2`,
-/// filled by the driver after `net2::think`), unless a test set its own (`set_net2_for_test`).
-pub fn with_net2<T>(brief: &TurnBrief, read: impl FnOnce(&Net2Plan) -> T) -> Option<T> {
+/// Reads the `net2` plan of the turn for a reader of `part`: None when the seat has none (every variant but
+/// `net2`) or does not play that part (`Parts`, the ablation's `net2-no-<part>`), and then the reader plays as
+/// `nets-x-site`. THE ONE PLACE the plan is fetched: the brief's (`TurnBrief::net2`, filled by the driver after
+/// `net2::think`), unless a test set its own (`set_net2_for_test`).
+pub fn with_net2<T>(brief: &TurnBrief, part: Part, read: impl FnOnce(&Net2Plan) -> T) -> Option<T> {
     NET2_OVERRIDE.with(|p| {
         let overridden = p.borrow();
-        match overridden.as_ref() {
-            Some(plan) => Some(read(plan)),
-            None => brief.net2.as_ref().map(read),
+        let plan = match overridden.as_ref() {
+            Some(plan) => Some(plan),
+            None => brief.net2.as_ref(),
+        };
+        match plan {
+            Some(plan) if plan.parts.plays(part) => Some(read(plan)),
+            _ => None,
         }
     })
 }
@@ -85,7 +90,7 @@ pub enum Net2War {
 
 impl Net2War {
     pub fn of(brief: &TurnBrief) -> Net2War {
-        with_net2(brief, |plan| match plan.war {
+        with_net2(brief, Part::War, |plan| match plan.war {
             OrderPlan::Order(order) => Net2War::Order(order),
             _ => Net2War::NoWar,
         })
@@ -1884,7 +1889,7 @@ pub fn known_power(brief: &TurnBrief, state: &AiState, rules: &CompiledRuleset, 
 /// enough to count instead of the army per city: a disarmed neighbour then reads as disarmed. None without a
 /// plan, or with a doubtful estimate.
 fn estimated_soldiers(brief: &TurnBrief, rival: PlayerId) -> Option<u64> {
-    let soldiers = with_net2(brief, |plan| plan.rival(rival).map(|read| read.soldiers)).flatten()?;
+    let soldiers = with_net2(brief, Part::War, |plan| plan.rival(rival).map(|read| read.soldiers)).flatten()?;
     match soldiers {
         Soldiers::Estimate { count, doubt } if doubt <= SOLDIERS_DOUBT_MAX => Some(count.max(0) as u64),
         _ => None,
@@ -2619,7 +2624,7 @@ mod war_trace {
         };
         let ordered = if war.order().is_some() { verdicts(war) } else { Vec::new() };
         let shadow = verdicts(Net2War::Absent);
-        let reads: Vec<String> = with_net2(brief, |p| {
+        let reads: Vec<String> = with_net2(brief, Part::War, |p| {
             p.rivals.iter().map(|r| format!("{{\"r\":{},\"weak\":{},\"reach\":{},\"prey\":{},\"spoiler\":{},\"retake\":{},\"wv\":{},\"kind\":\"{}\"}}", r.rival.0, r.weak, r.reach, r.prey, r.spoiler, r.retake, r.war_value, r.war_kind.name())).collect()
         })
         .unwrap_or_default();

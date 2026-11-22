@@ -200,8 +200,11 @@ fn only_the_net2_variants_think_with_net2() {
         assert_eq!(mind.plays_net2(), variant.net2(), "{}", variant.name());
     }
     let named: Vec<&str> = Variant::ALL.into_iter().filter(|v| v.net2()).map(|v| v.name()).collect();
-    assert_eq!(named, ["net2", "net2-defence", "net2-tac"]);
-    for name in ["net2", "net2-defence", "tac2", "net2-tac"] {
+    assert_eq!(
+        named,
+        ["net2", "net2-defence", "net2-tac", "net2-no-strategy", "net2-no-war", "net2-no-deals", "net2-no-peace", "net2-no-cs", "net2-no-congress", "net2-no-sites", "net2-no-fleet", "net2-no-guard", "net2-no-economy", "net2-off"]
+    );
+    for name in ["net2", "net2-defence", "tac2", "net2-tac", "net2-no-war", "net2-off"] {
         let variant = Variant::from_name(name).unwrap_or_else(|| panic!("{name}"));
         assert_eq!(ClassicMind::new(variant).variant(), variant, "{name}");
     }

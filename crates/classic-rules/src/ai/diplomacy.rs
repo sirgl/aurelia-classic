@@ -321,7 +321,7 @@ pub fn contained(brief: &crate::ai::planner::TurnBrief) -> Option<PlayerId> {
 
 /// The rival we give no help: the strategist's runaway (`contained`) or the one `net2` denies (`Net2Plan::denies_help`).
 pub fn denied(brief: &crate::ai::planner::TurnBrief, rival: PlayerId) -> bool {
-    contained(brief) == Some(rival) || brief.net2.as_ref().is_some_and(|p| p.denies_help(rival))
+    contained(brief) == Some(rival) || brief.net2_for(crate::ai::net2::plan::Part::Deals).is_some_and(|p| p.denies_help(rival))
 }
 
 /// An item that helps its receiver run: friendship, a research agreement, a pact, open borders.
@@ -372,10 +372,10 @@ impl crate::ai::system::SystemAdvisor for DiplomacyAdvisor {
             .collect::<Vec<_>>();
         let mut out = crate::ai::combat::proposals(40, answers);
         let my_round = (obs.round + u32::from(obs.player.0)) % PROPOSAL_INTERVAL == 0;
-        let net2 = input.brief.net2.as_ref();
+        let net2 = input.brief.net2_for(crate::ai::net2::plan::Part::Deals);
         // `net2`: a peace it wants is offered in every round, not every fifth (design §4.4).
         if !my_round {
-            if let Some(plan) = net2.filter(|p| !p.peace_with.is_empty()) {
+            if let Some(plan) = input.brief.net2_for(crate::ai::net2::plan::Part::Peace).filter(|p| !p.peace_with.is_empty()) {
                 let wanted = crate::ai::peace::peace_offers(input).into_iter().filter(|c| matches!(c, Command::ProposeDeal { to, .. } if plan.makes_peace_with(*to) && !input.brief.retaking_from(*to)));
                 out.extend(crate::ai::combat::proposals(5, wanted.collect::<Vec<_>>()));
             }

@@ -8,8 +8,8 @@ use crate::ai::strategy_net::{Intent, Milli, Tilt};
 use crate::ids::PlayerId;
 
 use super::concepts::{self, fire, Frame};
-use super::plan::{AimWhy, OrderPhase, CityGuard, CityInputs, CoreMemory, Embargo, Escorts, Generals, Help, Inputs, Net2Plan, Offence, Opening, RivalRead, Soldiers, SpentWar, TargetInputs, WarAim, WarKind, WarOrder, WarPlan};
-use super::weights::{self as w, a, gate, q, r, s, y, Table};
+use super::plan::{AimWhy, OrderPhase, CityGuard, Part, Parts, CityInputs, CoreMemory, Embargo, Escorts, Generals, Help, Inputs, Net2Plan, Offence, Opening, RivalRead, Soldiers, SpentWar, TargetInputs, WarAim, WarKind, WarOrder, WarPlan};
+use super::weights::{self as w, a, gate, q, r, s, y, Src, Table, Term};
 
 /// One rival's layer: its inputs and its concepts.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -31,10 +31,13 @@ pub struct Pass {
     pub aggregates: [Milli; a::N],
     /// The ease of every target (`Inputs::targets`' order).
     pub eases: Vec<Milli>,
+    /// The parts of `net2` that play (the ablation, `plan::Parts`).
+    pub parts: Parts,
 }
 
-/// The pass before the intent: the seat's and the rivals' concepts, the war order (from `held`), the aggregates.
-pub fn before_intent(inputs: &Inputs, carried: &[Milli; kc::N], held: &CoreMemory, round: u32, pace: u32) -> Pass {
+/// The pass before the intent: the seat's and the rivals' concepts, the war order (from `held`; none when the
+/// war is not `net2`'s part, `Part::War`), the aggregates.
+pub fn before_intent(inputs: &Inputs, carried: &[Milli; kc::N], held: &CoreMemory, round: u32, pace: u32, parts: Parts) -> Pass {
     let seat_row = inputs.seat.row();
     let seat = concepts::seat(&inputs.situation, carried, &seat_row);
     let eases: Vec<Milli> = inputs.targets.iter().map(concepts::ease).collect();
@@ -46,10 +49,10 @@ pub fn before_intent(inputs: &Inputs, carried: &[Milli; kc::N], held: &CoreMemor
         reads.push(read_of(rival.rival, &row, &concepts));
         rivals.push(RivalPass { rival: rival.rival, inputs: row, concepts });
     }
-    let mut core = war_plan(held, &reads, &rivals, inputs.seat.war_gain, round, pace);
+    let mut core = if parts.plays(Part::War) { war_plan(held, &reads, &rivals, inputs.seat.war_gain, round, pace) } else { CoreMemory::default() };
     core.war = aimed(core.war, &inputs.targets, &eases);
     let aggregates = aggregates_of(&reads, &rivals, &core.war, inputs.situation[fe::AT_WAR]);
-    Pass { carried: *carried, seat, rivals, reads, core, aggregates, eases }
+    Pass { carried: *carried, seat, rivals, reads, core, aggregates, eases, parts }
 }
 
 /// `soft_r` (R27): the largest ease of `rival`'s targets, 0 without one.
@@ -234,11 +237,14 @@ fn aggregates_of(reads: &[RivalRead], rivals: &[RivalPass], war: &WarPlan, at_wa
     out
 }
 
-/// The terms of `weights::TILT` on the carried logits.
+/// The terms of `weights::TILT` on the carried logits, of the parts that play.
 pub fn tilt(pass: &Pass) -> Tilt {
     let frame = Frame { s: &pass.seat, a: &pass.aggregates, ..Frame::default() };
     let mut out = Tilt::NONE;
     for (table, at, term) in w::TILT {
+        if !pass.parts.plays(tilt_part(term)) {
+            continue;
+        }
         let add = term.w * frame.shaped(term) / ONE;
         match table {
             Table::Style => out.style[*at] += add,
@@ -247,6 +253,15 @@ pub fn tilt(pass: &Pass) -> Tilt {
         }
     }
     out
+}
+
+/// The part a tilt term belongs to: the war order's posture terms (the order's value, no order) are the war's,
+/// the others the strategy's.
+fn tilt_part(term: &Term) -> Part {
+    match term.src {
+        Src::A(a::ORDER_AT_PEACE | a::ORDER_AT_WAR | a::NO_ORDER) => Part::War,
+        _ => Part::Strategy,
+    }
 }
 
 /// The intent's shares in `weights::y`'s order.
@@ -285,6 +300,7 @@ pub fn after_intent(pass: &Pass, intent: &Intent, inputs: &Inputs, round: u32) -
     price_tilt[pd::MILITARY] = fire(&w::MILITARY, &Frame { s: &pass.seat, a: &pass.aggregates, y: &y, ..Frame::default() });
     let at_war = inputs.situation[fe::AT_WAR] > 0;
     let plan = Net2Plan {
+        parts: pass.parts,
         round,
         war: pass.core.war,
         peace_with,

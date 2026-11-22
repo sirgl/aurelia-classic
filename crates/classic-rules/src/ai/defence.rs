@@ -163,7 +163,7 @@ impl Watch {
     pub fn apply_net2(&mut self, brief: &TurnBrief, own_cities: &[OwnCity]) {
         for danger in &mut self.dangers {
             let Some(city) = own_cities.iter().find(|c| c.tile == danger.city) else { continue };
-            if let Some(level) = crate::ai::operations::with_net2(brief, |plan| plan.guard_of(city.id)) {
+            if let Some(level) = crate::ai::operations::with_net2(brief, crate::ai::net2::plan::Part::Guard, |plan| plan.guard_of(city.id)) {
                 danger.level = level;
             }
         }
@@ -187,7 +187,7 @@ pub fn watch(obs: &AIObservation<'_>, brief: &TurnBrief, state: &AiState, rules:
         let attacker = strongest(&near.hostile);
         let capital = attacker.map_or(0, |attacker| capital_share(obs, brief, rules, city.tile, attacker, &mut race));
         let stake = operations::city_worth(prices, city.population, 0) + capital;
-        dangers.push(Danger { city: city.tile, threat: near.threat, guard: near.guard, planned: near.own + defenders(brief, state, rules, city.tile), stake, attacker, level: crate::ai::operations::with_net2(brief, |plan| plan.guard_of(city.id)).unwrap_or(0) });
+        dangers.push(Danger { city: city.tile, threat: near.threat, guard: near.guard, planned: near.own + defenders(brief, state, rules, city.tile), stake, attacker, level: crate::ai::operations::with_net2(brief, crate::ai::net2::plan::Part::Guard, |plan| plan.guard_of(city.id)).unwrap_or(0) });
     }
     dangers.sort_by_key(|d| (Reverse(d.loss(d.guard)), d.city));
     let defender = if dangers.is_empty() { None } else { Arsenal::of(brief, rules).melee };

@@ -160,7 +160,7 @@ const GUARD_MARGIN_PERCENT: u64 = 175;
 /// rises from the value that starts an order (550) to 1000, a capital in the captor's hands (retake 1200 · R19
 /// in `retake_r`). Without such an order the margin is the fitted one.
 fn margin_percent(brief: &TurnBrief, captor: PlayerId) -> u64 {
-    crate::ai::operations::with_net2(brief, |plan| plan.war_on(captor).filter(|o| o.kind == crate::ai::net2::plan::WarKind::Retake).map(|o| o.value))
+    crate::ai::operations::with_net2(brief, crate::ai::net2::plan::Part::War, |plan| plan.war_on(captor).filter(|o| o.kind == crate::ai::net2::plan::WarKind::Retake).map(|o| o.value))
         .flatten()
         .map_or(GUARD_MARGIN_PERCENT, order_margin)
 }

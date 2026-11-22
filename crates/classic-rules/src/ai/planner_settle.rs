@@ -705,7 +705,7 @@ fn choose_site(
     let limit = tools.settings.budget.candidates;
     let rules = tools.rules;
     let brief = view.brief;
-    let rivals: Vec<(TileId, crate::ids::PlayerId)> = match (&brief.net2, brief.site_net) {
+    let rivals: Vec<(TileId, crate::ids::PlayerId)> = match (brief.net2_for(crate::ai::net2::plan::Part::Sites), brief.site_net) {
         (Some(_), SiteNetPlay::Fitted) => state.seen_cities().iter().map(|c| (c.tile, c.owner)).collect(),
         _ => Vec::new(),
     };
@@ -724,7 +724,7 @@ fn choose_site(
         let tall = !brief.tall_sites.is_empty();
         // `net2`'s seats (a plan in the brief) score a site by its head; `standard` and every other variant
         // keep the guarded `net_score` (`TurnBrief::net2` is None for them).
-        let quality = match (&brief.net2, brief.site_net) {
+        let quality = match (brief.net2_for(crate::ai::net2::plan::Part::Sites), brief.site_net) {
             (Some(plan), SiteNetPlay::Fitted) => SiteQuality::Head(inputs, HeadRead { plan, rivals: &rivals }),
             _ => match brief.site_net {
                 SiteNetPlay::Off if tall => SiteQuality::Science(&brief.tall_sites),

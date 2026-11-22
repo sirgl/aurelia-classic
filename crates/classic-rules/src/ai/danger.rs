@@ -440,7 +440,7 @@ impl<'v, 'a> Threats<'v, 'a> {
         sources.extend(own_cities.iter());
         let posture = Posture { bodies: own_tiles, sources };
         let wars = enemies.len() as i32;
-        let zone = crate::ai::operations::with_net2(brief, |_| ()).map(|()| Zone { view });
+        let zone = crate::ai::operations::with_net2(brief, crate::ai::net2::plan::Part::Guard, |_| ()).map(|()| Zone { view });
         Self { near, fields, posture, own, own_cities, foes, foe_cities, enemies, wars, round, targets, zone }
     }
 

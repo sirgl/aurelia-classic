@@ -507,6 +507,13 @@ fn known_percent(view: &crate::knowledge::view::PlayerView<'_>) -> u32 {
 }
 
 impl TurnBrief {
+    /// The `net2` plan for a reader of `part`: None without a plan or when the seat does not play that part
+    /// (`net2::plan::Parts`), and the reader plays as `nets-x-site` then. For the readers that keep the plan;
+    /// the others read it through `operations::with_net2`, which also sees a test's plan.
+    pub fn net2_for(&self, part: crate::ai::net2::plan::Part) -> Option<&crate::ai::net2::Net2Plan> {
+        self.net2.as_ref().filter(|plan| plan.parts.plays(part))
+    }
+
     pub fn from_observation(obs: &AIObservation<'_>, rules: &CompiledRuleset) -> Self {
         let units: Vec<UnitBrief> = obs.own_units.iter().map(|u| unit_brief(rules, u)).collect();
         let military_power = units

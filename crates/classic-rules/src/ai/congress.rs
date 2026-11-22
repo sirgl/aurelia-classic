@@ -325,11 +325,51 @@ impl crate::ai::system::SystemAdvisor for CongressAdvisor {
         let obs = input.observation;
         crate::ai::strategy_net::trace::watch(obs);
         let weights = Weights::of(input.state.strategy.current);
-        let net2 = input.brief.net2.as_ref();
-        let mut out = crate::ai::combat::proposals(8, vote_orders_with(obs, input.brief.vote_guard, net2));
-        out.extend(crate::ai::combat::proposals(6, proposal_orders_with(obs, input.rules, &weights, net2)));
+        let net2 = input.brief.net2_for(crate::ai::net2::plan::Part::Congress);
+        let votes = vote_orders_with(obs, input.brief.vote_guard, net2);
+        let proposed = proposal_orders_with(obs, input.rules, &weights, net2);
+        vote_trace::seat(obs, input.brief.net2.is_some(), &votes, &proposed);
+        let mut out = crate::ai::combat::proposals(8, votes);
+        out.extend(crate::ai::combat::proposals(6, proposed));
         out.extend(crate::ai::combat::proposals(5, project_orders(obs)));
         out
+    }
+}
+
+/// Scratch trace of the congress (`NET2_CONGRESS_TRACE=<file>`, net2/GAP.md): every seat's ballot on the World
+/// Leader vote and every proposal it makes, one JSON line each, with the public delegates table. It decides nothing.
+mod vote_trace {
+    use super::*;
+    use std::io::Write as _;
+
+    fn thread() -> String {
+        format!("{:?}", std::thread::current().id()).replace(|c: char| !c.is_ascii_digit(), "")
+    }
+
+    pub(super) fn seat(obs: &AIObservation<'_>, net2_seat: bool, votes: &[Command], proposed: &[Command]) {
+        let Some(path) = std::env::var_os("NET2_CONGRESS_TRACE") else { return };
+        let Some(info) = &obs.congress else { return };
+        let table: Vec<String> = info.delegates.iter().map(|(p, n)| format!("[{},{n}]", p.0)).collect();
+        let mut lines = Vec::new();
+        for vote in votes {
+            if let Command::CastVotes { proposal, choice, delegates, .. } = vote {
+                let Some(p) = info.proposals.get(usize::from(*proposal)) else { continue };
+                if p.kind == ResolutionKind::DiplomaticVictory {
+                    lines.push(format!("{{\"ev\":\"leader\",\"th\":{},\"r\":{},\"p\":{},\"net2\":{net2_seat},\"needed\":{},\"choice\":{choice},\"cast\":{delegates},\"del\":[{}]}}", thread(), obs.round, obs.player.0, info.needed, table.join(",")));
+                }
+            }
+        }
+        for command in proposed {
+            if let Command::ProposeResolution { kind, choice, repeal, .. } = command {
+                lines.push(format!("{{\"ev\":\"propose\",\"th\":{},\"r\":{},\"p\":{},\"net2\":{net2_seat},\"kind\":\"{kind:?}\",\"choice\":{choice},\"repeal\":{repeal}}}", thread(), obs.round, obs.player.0));
+            }
+        }
+        if lines.is_empty() {
+            return;
+        }
+        if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open(path) {
+            let _ = f.write_all(format!("{}\n", lines.join("\n")).as_bytes());
+        }
     }
 }
 
