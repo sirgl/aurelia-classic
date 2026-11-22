@@ -169,11 +169,12 @@ impl ClassicMind {
             // `next-x` (the joint build) is `next-war-retake` with the guard of `vote-guard` and the plan of
             // `landless-plan` (both below).
             Variant::NextX => (Variant::Standard, Variant::Retake2),
-            // `strategist-x` is `next-x` (the play of `standard`) with the strategist's new outputs.
-            Variant::StrategistX => (Variant::Standard, Variant::Retake2),
+            // `strategist-x` is `next-x` (the play of `standard`) with the strategist's new outputs;
+            // `nets-x` is `strategist-x` under its own name, `nets-x-site` with the site net (`economy_nets`).
+            Variant::StrategistX | Variant::NetsX | Variant::NetsXSite => (Variant::Standard, Variant::Retake2),
             _ => (requested, requested),
         };
-        let strategist_x = requested == Variant::StrategistX;
+        let strategist_x = matches!(requested, Variant::StrategistX | Variant::NetsX | Variant::NetsXSite);
         let joint = requested == Variant::NextX || strategist_x;
         // `vote-guard` is `standard` (the flags of `next-w`) with the guard on.
         let vote_guard = flags.vote_guard() || joint;
@@ -229,7 +230,7 @@ impl ClassicMind {
         // war of `siege-call` under its own, `next-war-retake` as `Standard` with the war of
         // `retake2` under its own, `next-x` as `next-war-retake` with the guard and the landless
         // plan under its own.
-        let named = named.or(matches!(requested, Variant::NextW | Variant::NextWar | Variant::NextWarRetake | Variant::NextX | Variant::StrategistX).then_some(requested));
+        let named = named.or(matches!(requested, Variant::NextW | Variant::NextWar | Variant::NextWarRetake | Variant::NextX | Variant::StrategistX | Variant::NetsX | Variant::NetsXSite).then_some(requested));
         // The game's AI since the fourteenth promotion and the standard before it carry their own names.
         let named = promoted.or(named);
         Self { advisors, variant, genome: None, humans: Vec::new(), walks: Default::default(), choice: None, #[cfg(feature = "experimental-ai")] net, book, named, walls, conquest: None, unciv, tall: None, sharp, tall_real, next, wonder_race, pays, fit, muster, call, retake2, vote_guard, field, raidw, landless, landless_plan, siege_mend: false, strategist_x }
@@ -325,7 +326,7 @@ impl ClassicMind {
     pub fn variant(&self) -> Variant {
         // The joint build's candidate, the game's AI since the fourteenth promotion (which plays as it)
         // and the standard before it carry the flags below under their own names.
-        if let Some(v @ (Variant::NextX | Variant::Standard | Variant::PreNextX | Variant::StrategistX | Variant::EconSite | Variant::EconSiteTall | Variant::EconSiteOwnLand)) = self.named {
+        if let Some(v @ (Variant::NextX | Variant::Standard | Variant::PreNextX | Variant::StrategistX | Variant::EconSite | Variant::EconSiteTall | Variant::EconSiteOwnLand | Variant::NetsX | Variant::NetsXSite)) = self.named {
             return v;
         }
         if self.landless {
@@ -381,11 +382,12 @@ impl ClassicMind {
     }
 
     /// The variant whose economy nets the mind plays (`Variant::site_net`, `Variant::choice_mode`): an
-    /// economy nets' candidate (`econ-site` and its hand edits) plays `standard` with its own; every
-    /// other mind its variant's.
+    /// economy nets' candidate (`econ-site` and its hand edits) plays `standard` with its own,
+    /// `nets-x-site` with `econ-site`'s; every other mind its variant's.
     fn economy_nets(&self) -> Variant {
         match self.named {
             Some(v @ (Variant::EconSite | Variant::EconSiteTall | Variant::EconSiteOwnLand)) => v,
+            Some(Variant::NetsXSite) => Variant::EconSite,
             _ => self.variant,
         }
     }
@@ -1217,6 +1219,25 @@ mod sharp_tests {
             assert_eq!((mind.variant(), mind.economy_nets().site_net(), mind.economy_nets().choice_mode()), (v, site, choice), "{}", v.name());
             assert_eq!(Variant::from_name(v.name()), cfg!(feature = "experimental-ai").then_some(v));
         }
+    }
+
+    /// `nets-x` is the mind of `strategist-x` (lane A's strategist) under its own name, and `nets-x-site`
+    /// the same with the settlers of `econ-site` (lane C's site net); the lanes' variants keep their minds.
+    #[test]
+    fn nets_x_is_strategist_x_and_nets_x_site_adds_the_site_net() {
+        use crate::ai::site_net::SiteNetPlay;
+        let strategist = ClassicMind::new(Variant::StrategistX);
+        let site = ClassicMind::new(Variant::EconSite);
+        assert_eq!(mind_parts(&site), mind_parts(&ClassicMind::new(Variant::Standard)));
+        assert!(strategist.strategist_x && !site.strategist_x);
+        for (v, site_net) in [(Variant::NetsX, SiteNetPlay::Off), (Variant::NetsXSite, SiteNetPlay::Fitted)] {
+            let mind = ClassicMind::new(v);
+            assert_eq!(mind_parts(&mind), mind_parts(&strategist), "{}", v.name());
+            assert!(mind.strategist_x, "{}", v.name());
+            assert_eq!((mind.variant(), mind.economy_nets().site_net()), (v, site_net), "{}", v.name());
+            assert_eq!(Variant::from_name(v.name()), cfg!(feature = "experimental-ai").then_some(v));
+        }
+        assert_eq!(strategist.economy_nets().site_net(), SiteNetPlay::Off);
     }
 
     /// `landless` is `Standard` in every switch (the flags of `next-w` included) but for its own flag

@@ -857,6 +857,13 @@ pub enum Variant {
     /// `EconSite` whose net reads no foreign tiles in a site's radius
     /// (`site_net::SiteNetPlay::OwnLand`; a hand edit, classic/docs/ai-econ-nets.md).
     EconSiteOwnLand,
+    /// `nets-x` (22 November, small-nets-design-2026-11-22.md X-1): the small nets that passed their lanes'
+    /// gates in one mind; tonight only `StrategistX`'s strategist (lane A) passed, so it plays as
+    /// `StrategistX` under its own name (`experimental-ai` only).
+    NetsX,
+    /// `NetsX` whose settlers are `EconSite`'s (lane C: the site net as fitted, with its guard against
+    /// rivals and the walk); measured beside `NetsX` for information (`experimental-ai` only).
+    NetsXSite,
 }
 
 /// The net's base: the expert the end-to-end net learns from and the mind it
@@ -877,7 +884,7 @@ const NUDGED_CANDIDATES: u32 = 40;
 
 impl Variant {
     /// The game's AI first.
-    pub const ALL: [Variant; 161] = [
+    pub const ALL: [Variant; 163] = [
         Variant::Standard,
         Variant::PreCamps,
         Variant::PreWorkers,
@@ -1039,6 +1046,8 @@ impl Variant {
         Variant::EconSite,
         Variant::EconSiteTall,
         Variant::EconSiteOwnLand,
+        Variant::NetsX,
+        Variant::NetsXSite,
     ];
 
     pub fn name(self) -> &'static str {
@@ -1186,6 +1195,8 @@ impl Variant {
             Variant::EconSite => "econ-site",
             Variant::EconSiteTall => "econ-site-tall",
             Variant::EconSiteOwnLand => "econ-site-own-land",
+            Variant::NetsX => "nets-x",
+            Variant::NetsXSite => "nets-x-site",
             Variant::ArmyFit => "army-fit",
             Variant::Camps => "camps",
             Variant::ArmyCamps => "army-camps",
@@ -1226,7 +1237,7 @@ impl Variant {
         cfg!(feature = "experimental-ai")
             || !matches!(
                 self,
-                Variant::Net | Variant::UnitNet | Variant::Hybrid | Variant::SiteNet | Variant::ChoiceNet | Variant::ChoiceNetProduction | Variant::ChoiceNetResearch | Variant::StandardScripted | Variant::PreCsGifts | Variant::Sharp | Variant::TallReal | Variant::Next | Variant::WonderCancel | Variant::WonderRace | Variant::NextW | Variant::NextRace | Variant::PreNext | Variant::WarPays | Variant::TacticianFit | Variant::WarMuster | Variant::SiegeCall | Variant::NextWar | Variant::Retake2 | Variant::NextWarRetake | Variant::VoteGuard | Variant::FieldCraft | Variant::RaidWar | Variant::Landless | Variant::LandlessPlan | Variant::NextX | Variant::PreNextX | Variant::StrategistX | Variant::EconSite | Variant::EconSiteTall | Variant::EconSiteOwnLand
+                Variant::Net | Variant::UnitNet | Variant::Hybrid | Variant::SiteNet | Variant::ChoiceNet | Variant::ChoiceNetProduction | Variant::ChoiceNetResearch | Variant::StandardScripted | Variant::PreCsGifts | Variant::Sharp | Variant::TallReal | Variant::Next | Variant::WonderCancel | Variant::WonderRace | Variant::NextW | Variant::NextRace | Variant::PreNext | Variant::WarPays | Variant::TacticianFit | Variant::WarMuster | Variant::SiegeCall | Variant::NextWar | Variant::Retake2 | Variant::NextWarRetake | Variant::VoteGuard | Variant::FieldCraft | Variant::RaidWar | Variant::Landless | Variant::LandlessPlan | Variant::NextX | Variant::PreNextX | Variant::StrategistX | Variant::EconSite | Variant::EconSiteTall | Variant::EconSiteOwnLand | Variant::NetsX | Variant::NetsXSite
             )
     }
 
