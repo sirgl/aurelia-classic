@@ -15,7 +15,6 @@ use classic_rules::derived::standing::{victory_warnings, VictoryWarning};
 use classic_rules::transaction::journal::{AppliedCommand, PlayerChange};
 use classic_rules::ids::PlayerId;
 use classic_rules::world::city::{CityCore, CityStatus};
-use classic_rules::world::relations::OfferLapse;
 use i18n::{t, tf};
 
 /// A foreign unit this close to a city of the player is at its border.
@@ -275,6 +274,7 @@ impl Session {
 mod tests {
     use classic_rules::ids::{CityHandle, PlayerId};
     use classic_rules::transaction::journal::ChangeJournal;
+    use classic_rules::world::relations::OfferLapse;
     use classic_rules::{ClassicGame, Command};
 
     use super::*;
