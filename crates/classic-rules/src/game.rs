@@ -91,6 +91,10 @@ pub trait ClassicGame {
     #[cfg(any(test, feature = "harness"))]
     fn debug_set_victory_options(&mut self, options: crate::world::victory::VictoryOptions);
 
+    /// The World Leader title (as the United Nations' vote gives it), no victory test.
+    #[cfg(any(test, feature = "harness"))]
+    fn debug_set_world_leader(&mut self, leader: Option<PlayerId>);
+
     #[cfg(any(test, feature = "harness"))]
     fn debug_add_project(&mut self, player: PlayerId, project: crate::rules::content::ProjectId);
 
@@ -191,7 +195,7 @@ impl ClassicGame for GameState {
     fn debug_force_war(&mut self, rules: &CompiledRuleset, player: PlayerId, enemy: PlayerId) {
         let mut tx = WorldTransaction::new(self.world_mut());
         let _ = tx.declare_war(player, enemy, rules);
-        let journal = tx.commit().expect("debug_force_war commit");
+        let journal = tx.commit(rules).expect("debug_force_war commit");
         self.commit_journal(rules, &journal);
     }
 
@@ -200,7 +204,7 @@ impl ClassicGame for GameState {
     fn debug_adopt_policy(&mut self, rules: &CompiledRuleset, player: PlayerId, policy: crate::ids::PolicyId) {
         let mut tx = WorldTransaction::new(self.world_mut());
         tx.debug_adopt_policy(player, policy, rules);
-        let journal = tx.commit().expect("debug_adopt_policy commit");
+        let journal = tx.commit(rules).expect("debug_adopt_policy commit");
         self.commit_journal(rules, &journal);
     }
 
@@ -209,7 +213,7 @@ impl ClassicGame for GameState {
     fn debug_start_golden_age(&mut self, rules: &CompiledRuleset, player: PlayerId, turns: u16) {
         let mut tx = WorldTransaction::new(self.world_mut());
         tx.start_golden_age(player, turns);
-        let journal = tx.commit().expect("debug_start_golden_age commit");
+        let journal = tx.commit(rules).expect("debug_start_golden_age commit");
         self.commit_journal(rules, &journal);
     }
 
@@ -217,7 +221,7 @@ impl ClassicGame for GameState {
     fn debug_complete_building(&mut self, rules: &CompiledRuleset, city: CityHandle, building: BuildingKindId) {
         let mut tx = WorldTransaction::new(self.world_mut());
         tx.debug_complete_building(city, building, rules);
-        let journal = tx.commit().expect("debug_complete_building commit");
+        let journal = tx.commit(rules).expect("debug_complete_building commit");
         self.commit_journal(rules, &journal);
     }
 
@@ -238,7 +242,7 @@ impl ClassicGame for GameState {
     fn debug_discover(&mut self, rules: &CompiledRuleset, player: PlayerId, tech: crate::ids::TechId) {
         let mut tx = WorldTransaction::new(self.world_mut());
         tx.learn(player, tech, rules);
-        let journal = tx.commit().expect("debug_discover commit");
+        let journal = tx.commit(rules).expect("debug_discover commit");
         self.commit_journal(rules, &journal);
     }
 
@@ -250,7 +254,7 @@ impl ClassicGame for GameState {
         }
         let mut tx = WorldTransaction::new(self.world_mut());
         tx.start_project(project);
-        let journal = tx.commit().expect("debug_start_league_project commit");
+        let journal = tx.commit(rules).expect("debug_start_league_project commit");
         self.commit_journal(rules, &journal);
     }
 
@@ -265,7 +269,7 @@ impl ClassicGame for GameState {
     ) {
         let mut tx = WorldTransaction::new(self.world_mut());
         tx.contribute_to_project(player, project, production);
-        let journal = tx.commit().expect("debug_contribute_to_league_project commit");
+        let journal = tx.commit(rules).expect("debug_contribute_to_league_project commit");
         self.commit_journal(rules, &journal);
     }
 
@@ -288,7 +292,7 @@ impl ClassicGame for GameState {
     fn debug_place_camp(&mut self, rules: &CompiledRuleset, tile: TileId) {
         let mut tx = WorldTransaction::new(self.world_mut());
         tx.place_empty_camp(tile, rules);
-        let journal = tx.commit().expect("debug_place_camp commit");
+        let journal = tx.commit(rules).expect("debug_place_camp commit");
         self.commit_journal(rules, &journal);
     }
 
@@ -297,7 +301,7 @@ impl ClassicGame for GameState {
     fn debug_set_influence(&mut self, rules: &CompiledRuleset, city_state: PlayerId, major: PlayerId, influence: i32) {
         let mut tx = WorldTransaction::new(self.world_mut());
         tx.set_influence(city_state, major, influence * 100, rules);
-        let journal = tx.commit().expect("debug_set_influence commit");
+        let journal = tx.commit(rules).expect("debug_set_influence commit");
         self.commit_journal(rules, &journal);
     }
 
@@ -307,12 +311,17 @@ impl ClassicGame for GameState {
         self.world_mut().module.victory.options = options;
     }
 
+    #[cfg(any(test, feature = "harness"))]
+    fn debug_set_world_leader(&mut self, leader: Option<PlayerId>) {
+        self.world_mut().module.victory.world_leader = leader;
+    }
+
 
     #[cfg(any(test, feature = "harness"))]
     fn debug_capture_city(&mut self, rules: &CompiledRuleset, city: CityHandle, conqueror: PlayerId) {
         let mut tx = WorldTransaction::new(self.world_mut());
         tx.capture_city(city, conqueror, rules).expect("debug_capture_city: the city exists");
-        let journal = tx.commit().expect("debug_capture_city commit");
+        let journal = tx.commit(rules).expect("debug_capture_city commit");
         self.commit_journal(rules, &journal);
     }
 
@@ -396,7 +405,7 @@ impl ClassicGame for GameState {
     fn debug_deal_item(&mut self, rules: &CompiledRuleset, giver: PlayerId, receiver: PlayerId, item: crate::world::relations::DealItem) -> Result<(), String> {
         let mut tx = WorldTransaction::new(self.world_mut());
         tx.run_item(giver, receiver, item, rules).map_err(|e| format!("{e:?}"))?;
-        let journal = tx.commit().expect("debug_deal_item commit");
+        let journal = tx.commit(rules).expect("debug_deal_item commit");
         self.commit_journal(rules, &journal);
         Ok(())
     }
@@ -408,7 +417,7 @@ impl ClassicGame for GameState {
         };
         let mut tx = WorldTransaction::new(self.world_mut());
         tx.raise_citadel(owner, tile, citadel, rules);
-        let journal = tx.commit().expect("debug_raise_citadel commit");
+        let journal = tx.commit(rules).expect("debug_raise_citadel commit");
         self.commit_journal(rules, &journal);
         true
     }

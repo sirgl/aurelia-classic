@@ -257,16 +257,15 @@ impl RelationsState {
         balance
     }
 
-    /// Gold per turn `player` pays (negative) or receives by deals. A deal with a nation that
-    /// is no longer `alive` pays nothing either way (its trades are closed at the next
-    /// turn end, `close_dead_ties`) and is not counted.
-    pub fn gold_per_turn(&self, player: PlayerId, round: u32, alive: impl Fn(PlayerId) -> bool) -> i32 {
+    /// Gold per turn `player` pays (negative) or receives by deals (a dead nation has none: its
+    /// deals end at its death, `systems::elimination`).
+    pub fn gold_per_turn(&self, player: PlayerId, round: u32) -> i32 {
         let mut total = 0;
         for t in &self.trades {
             let TradeFlow::GoldPerTurn(gold) = t.flow else {
                 continue;
             };
-            if round >= t.until || !alive(t.from) || !alive(t.to) {
+            if round >= t.until {
                 continue;
             }
             if t.to == player {

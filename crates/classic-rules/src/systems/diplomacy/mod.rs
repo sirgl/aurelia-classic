@@ -18,7 +18,7 @@ use crate::rules::CompiledRuleset;
 use crate::classic::ClassicChange;
 use crate::transaction::journal::PlayerChange;
 use crate::transaction::transaction::WorldTransaction;
-use crate::world::relations::RelationsState;
+use crate::world::relations::{DealItem, RelationsState};
 use crate::world::player::ClassicPlayers;
 
 /// Rounds a timed deal lasts at Standard speed: gold per turn, resources,
@@ -91,6 +91,84 @@ pub const MEDIAN_TECH_PERCENT: u32 = 50;
 const WARMONGER_PERCENT: [i32; 8] = [50, 60, 70, 80, 90, 100, 100, 100];
 
 impl<'a> WorldTransaction<'a> {
+    /// `dead` was eliminated (`systems::elimination`): its wars, treaties, deals and offers end
+    /// and nobody remembers it (peace treaty, war, denunciation, warmonger), both ways.
+    pub(crate) fn forget_in_relations(&mut self, dead: PlayerId) {
+        for i in 0..self.world.players.count() {
+            let other = PlayerId(i as u8);
+            if other == dead {
+                continue;
+            }
+            if self.world.diplomacy.at_war(dead, other) {
+                self.set_war_state(dead, other, false);
+            }
+            if self.tied(dead, other) {
+                self.end_ties(dead, other);
+            }
+            self.forget_memories(dead, other);
+        }
+        self.withdraw_offers_naming(dead);
+    }
+
+    /// A tie `end_ties` ends holds between `a` and `b`.
+    fn tied(&self, a: PlayerId, b: PlayerId) -> bool {
+        let relations = &self.world.module.relations;
+        let slots = [relations.slot(a, b), relations.slot(b, a)];
+        let set = |table: &[u32]| slots.iter().flatten().any(|i| table[*i] != 0);
+        let trading = relations.trades.iter().any(|t| (t.from, t.to) == (a, b) || (t.from, t.to) == (b, a));
+        trading
+            || set(&relations.research_until)
+            || set(&relations.research_points)
+            || set(&relations.pact_until)
+            || set(&relations.friends_until)
+            || set(&relations.open_until)
+            || slots.iter().flatten().any(|i| relations.embassy[*i] != 0)
+            || self.world.diplomacy.grants_entry(a, b)
+            || self.world.diplomacy.grants_entry(b, a)
+    }
+
+    /// The peace treaty, the war's start, the denunciation and the warmonger memory of the pair
+    /// are forgotten.
+    fn forget_memories(&mut self, dead: PlayerId, other: PlayerId) {
+        let relations = &mut self.world.module.relations;
+        let slots = [relations.slot(dead, other), relations.slot(other, dead)];
+        let mut changed = false;
+        for i in slots.into_iter().flatten() {
+            for table in [&mut relations.peace_until, &mut relations.war_since, &mut relations.denounced_until] {
+                changed |= table[i] != 0;
+                table[i] = 0;
+            }
+            changed |= relations.warmonger[i] != 0;
+            relations.warmonger[i] = 0;
+        }
+        if changed {
+            self.relations_changed(other);
+        }
+    }
+
+    /// The offers of `dead`, to it or naming it (a war or a peace with it) are withdrawn; a
+    /// living proposer is told as of a lapsed offer (`ClassicChange::OfferLapsed`).
+    fn withdraw_offers_naming(&mut self, dead: PlayerId) {
+        let names = |offer: &crate::world::relations::DealOffer| {
+            offer.from == dead
+                || offer.to == dead
+                || offer.items.iter().any(|(giver, item)| {
+                    let third = matches!(item, DealItem::ThirdPartyWar(p) | DealItem::ThirdPartyPeace(p) if *p == dead);
+                    *giver == dead || third
+                })
+        };
+        let offers = &mut self.world.module.relations.offers;
+        let (withdrawn, kept): (Vec<_>, Vec<_>) = offers.drain(..).partition(names);
+        *offers = kept;
+        for offer in withdrawn {
+            if offer.from != dead {
+                let peace = offer.items.iter().any(|(_, item)| *item == DealItem::Peace);
+                self.journal.module_changes.push(ClassicChange::OfferLapsed { from: offer.from, to: offer.to, peace });
+                self.relations_changed(offer.from);
+            }
+        }
+    }
+
     /// War (§5.1): the declarer's pacts end, every deal between the two
     /// ends (research without payout), embassies close, friendship breaks,
     /// the victim's defensive partners join, observers remember the

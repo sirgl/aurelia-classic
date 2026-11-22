@@ -146,6 +146,12 @@ pub struct ReligionState {
 }
 
 impl ReligionState {
+    /// The state without its founded religions (their founders are history: `world::references`).
+    #[cfg(any(test, feature = "harness"))]
+    pub(crate) fn without_founders(&self) -> Self {
+        Self { religions: Vec::new(), ..self.clone() }
+    }
+
     pub fn new(players: usize, seed: u64) -> Self {
         Self {
             players: vec![PlayerFaith::default(); players],

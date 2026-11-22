@@ -12,6 +12,8 @@ pub mod military;
 pub mod player_economy;
 pub mod module;
 pub mod player;
+#[cfg(any(test, feature = "harness"))]
+pub mod references;
 pub mod relations;
 pub mod religion;
 pub mod state;
