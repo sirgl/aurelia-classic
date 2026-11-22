@@ -88,6 +88,16 @@ four times the headroom of a loaded machine. The pins keep their own limit of 30
 ends a test at 5 minutes, which is a hang. `python3 tools/test-budget.py` reports the fast tier's wall
 time at 4 threads, its CPU seconds and the slowest tests, and fails when the tier does not fit 30 s.
 
+### The art pack
+
+The run-time art pack (`assets/visual/generated`) is not in git (README, "Running the game"). Nine tests need it:
+the art catalogue, the pedia's art keys, the action sheets, a great work's art, and the city and research
+snapshots (three languages). `classic_ui::ui::art_pack` is that group: a test of it starts with
+`if art_pack::skip(name) { return; }`, and on a clone without the pack it prints
+`art pack missing: see README` and passes; with the pack it runs in its tier as any test. The pack is
+missing only when its `.pack-version` file is absent: a pack that is there but incomplete fails the tests
+(`art_pack::tests`). Copy the pack from another clone (`cp -c -R`) to run them.
+
 ### The pins
 
 The `pins` group is in the fast tier whatever its tests take, and `tools/test-changed.sh` always runs it.
