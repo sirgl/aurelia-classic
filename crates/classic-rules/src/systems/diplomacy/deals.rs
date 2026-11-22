@@ -443,7 +443,7 @@ impl<'a> WorldTransaction<'a> {
         Ok(())
     }
 
-    fn run_item(
+    pub(crate) fn run_item(
         &mut self,
         giver: PlayerId,
         receiver: PlayerId,
