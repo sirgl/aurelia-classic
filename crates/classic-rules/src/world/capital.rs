@@ -19,7 +19,7 @@
 use crate::ids::{BuildingKindId, CityHandle, PlayerId};
 use crate::rules::content::BuildingKind;
 use crate::rules::CompiledRuleset;
-use crate::world::city::{CityCore, CityStatus};
+use crate::world::city::{CityCore, CityStatus, CityWrite};
 use crate::world::state::AuthWorld;
 
 /// The palace of the ruleset, as a building id (the building of kind Palace; None without one).
@@ -30,6 +30,15 @@ pub fn palace_building(rules: &CompiledRuleset) -> Option<BuildingKindId> {
 /// The city holds a building of kind Palace.
 pub fn holds_palace(rules: &CompiledRuleset, core: &CityCore) -> bool {
     crate::world::city::is_capital(rules, core)
+}
+
+/// The city gets the palace. The handle comes from the nation's own city list, so it is live: a stale
+/// one is a broken invariant of the world, and the game stops there.
+pub fn give_palace(auth: &mut AuthWorld, city: CityHandle, palace: BuildingKindId) {
+    match auth.cities.add_building(city, palace) {
+        CityWrite::Applied => {}
+        CityWrite::TargetGone | CityWrite::QueueFull => panic!("give_palace: the city {city:?} is listed for its owner but gone"),
+    }
 }
 
 /// The city loses its palace.
@@ -114,7 +123,7 @@ pub fn repair_palaces(auth: &mut AuthWorld, rules: &CompiledRuleset) {
             }
         }
         if let Some(city) = heir {
-            let _ = auth.cities.add_building(city, palace);
+            give_palace(auth, city, palace);
         }
     }
 }

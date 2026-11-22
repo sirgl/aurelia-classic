@@ -11,8 +11,8 @@ use crate::ids::{CityHandle, PlayerId};
 use crate::rules::CompiledRuleset;
 use crate::transaction::journal::{CityChange, PlayerChange};
 use crate::transaction::transaction::WorldTransaction;
-use crate::world::capital::{holds_palace, next_capital, palace_building, remove_palace};
-use crate::world::city::{CityStatus, CityWrite};
+use crate::world::capital::{give_palace, holds_palace, next_capital, palace_building, palace_cities, remove_palace};
+use crate::world::city::CityStatus;
 
 impl<'a> WorldTransaction<'a> {
     /// A city leaves its owner (a transfer): it keeps no palace. The owner's next capital is found
@@ -38,21 +38,29 @@ impl<'a> WorldTransaction<'a> {
         let Some(palace) = palace_building(rules) else {
             return;
         };
-        if self.world.indexes.cities_of(owner).is_empty() || !crate::world::capital::palace_cities(self.world, rules, owner).is_empty() {
+        let has_cities = !self.world.indexes.cities_of(owner).is_empty();
+        if !has_cities || !palace_cities(self.world, rules, owner).is_empty() {
             return;
         }
         let Some(city) = next_capital(self.world, rules, owner) else {
             return;
         };
-        if let Some(core) = self.world.cities.get_mut(city) {
-            if core.status == CityStatus::Puppet {
-                core.status = CityStatus::Occupied;
-                self.journal.city_changes.push(CityChange::StatusChanged { city });
-            }
-        }
-        if let CityWrite::Applied = self.world.cities.add_building(city, palace) {
-            self.journal.city_changes.push(CityChange::BuildingAdded { city, building: palace });
-            self.journal.player_changes.push(PlayerChange::EffectsChanged { player: owner });
+        self.annex_new_capital(city);
+        give_palace(self.world, city, palace);
+        self.journal.city_changes.push(CityChange::BuildingAdded { city, building: palace });
+        self.journal.player_changes.push(PlayerChange::EffectsChanged { player: owner });
+    }
+
+    /// The city becomes the capital: a puppet is annexed (Unciv `moveCapitalToNextLargest`) and a
+    /// burning city stops burning (`moveCapitalTo`: `isBeingRazed = false`); a capital cannot be
+    /// destroyed, so a city left burning would never finish.
+    fn annex_new_capital(&mut self, city: CityHandle) {
+        let Some(core) = self.world.cities.get_mut(city) else {
+            return;
+        };
+        if matches!(core.status, CityStatus::Puppet | CityStatus::Razing) {
+            core.status = CityStatus::Occupied;
+            self.journal.city_changes.push(CityChange::StatusChanged { city });
         }
     }
 }

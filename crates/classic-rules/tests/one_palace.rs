@@ -165,8 +165,7 @@ fn a_city_given_in_a_deal_brings_no_palace_and_the_giver_gets_a_new_one() {
     assert_one_palace_each(&game, &rules);
 }
 
-/// A liberated city returns to its founder without a palace when the founder has one; a founder
-/// with no city gets one in it (Unciv `liberateCity`, "Resurrection!").
+/// A liberated city returns to its founder, who holds a palace already, without one.
 #[test]
 fn a_liberated_city_comes_back_without_a_palace() {
     let (mut game, rules) = two_nations();
@@ -268,4 +267,121 @@ fn whole_games_keep_one_palace_per_nation_every_round() {
         assert!(moved >= 3, "the games moved capitals: {moved}");
         assert_one_palace_each(&game, &rules);
     }
+}
+
+fn end_round(game: &mut GameState, rules: &CompiledRuleset) {
+    let round = game.view().auth.turn().round;
+    while game.view().auth.turn().round == round {
+        let active = game.view().auth.active_player();
+        game.execute(rules, Command::EndTurn { player: active }).unwrap();
+    }
+}
+
+/// P0 with its original capital, a second city `a` that holds the palace (the original capital
+/// lost it, as after a conquest), and a third `b`; P1 with a city and a missile three tiles away.
+fn palace_in_a_second_city() -> (GameState, CompiledRuleset, CityHandle, CityHandle) {
+    let rules = compile_rules(core_rules()).unwrap();
+    let mut game = GameState::new(&rules, GameConfig { players: 2, width: 30, height: 20, rng_seed: 7 });
+    let original = game.debug_found_city(&rules, P0, tile(&game, 3, 3));
+    let a = game.debug_found_city(&rules, P0, tile(&game, 9, 3));
+    let b = game.debug_found_city(&rules, P0, tile(&game, 9, 8));
+    game.debug_found_city(&rules, P1, tile(&game, 12, 3));
+    game.debug_meet_all();
+    let palace = palace_building(&rules).unwrap();
+    game.debug_remove_building(original, palace);
+    game.debug_add_building(&rules, a, palace);
+    game.debug_set_population(&rules, a, 1);
+    game.debug_set_population(&rules, b, 3);
+    assert_eq!(palaces(&game, &rules, P0), vec![a]);
+    (game, rules, a, b)
+}
+
+/// A nuked capital (`remove_city`) hands the palace on (Unciv `City.destroyCity`).
+#[test]
+fn a_nuked_capital_hands_its_palace_on() {
+    let (mut game, rules, a, b) = palace_in_a_second_city();
+    let kind = classic_rules::ids::UnitKindId(rules.units.iter().position(|u| u.key == "core:unit/nuclear-missile").unwrap() as u16);
+    until_active(&mut game, &rules, P1);
+    game.execute(&rules, Command::DeclareWar { player: P1, enemy: P0 }).unwrap();
+    let missile = game.debug_spawn_unit(&rules, P1, tile(&game, 12, 3), kind);
+    let at = game.view().auth.cities().get(a).unwrap().tile;
+    game.debug_reveal(P1, &[at]);
+    game.execute(&rules, Command::Nuke { unit: missile, target: at }).unwrap();
+    assert!(game.view().auth.cities().get(a).is_none(), "the capital is destroyed");
+    assert_eq!(palaces(&game, &rules, P0), vec![b]);
+    assert_one_palace_each(&game, &rules);
+}
+
+/// A capital that is taken and razed: the palace goes to the next city at the capture, the burning
+/// city ends, and nobody is left with two or none.
+#[test]
+fn a_razed_capital_hands_its_palace_on() {
+    let (mut game, rules, a, b) = palace_in_a_second_city();
+    until_active(&mut game, &rules, P1);
+    game.debug_capture_city(&rules, a, P1);
+    game.execute(&rules, Command::DecideCity { player: P1, city: a, decision: CityDecision::Raze }).unwrap();
+    assert_eq!(palaces(&game, &rules, P0), vec![b]);
+    for _ in 0..10 {
+        end_round(&mut game, &rules);
+        assert_eq!(palace_problem(game.view().auth, &rules), None);
+    }
+    assert!(game.view().auth.cities().get(a).is_none(), "the city burned down");
+    assert_one_palace_each(&game, &rules);
+}
+
+/// The city that gets the palace stops burning (Unciv `moveCapitalTo`: `isBeingRazed = false`): a
+/// capital cannot be destroyed, so a burning one would never finish.
+#[test]
+fn a_burning_city_that_becomes_the_capital_stops_burning() {
+    let (mut game, rules, a, b) = palace_in_a_second_city();
+    game.debug_set_city_status(b, CityStatus::Razing);
+    until_active(&mut game, &rules, P1);
+    game.debug_capture_city(&rules, a, P1);
+    assert_eq!(palaces(&game, &rules, P0), vec![b]);
+    assert_eq!(game.view().auth.cities().get(b).unwrap().status, CityStatus::Occupied);
+    assert_one_palace_each(&game, &rules);
+}
+
+/// Unciv's "Resurrection!" (a liberated city of a nation with no city is its capital) cannot happen
+/// here: a nation that loses its last city is eliminated, and its city cannot be liberated
+/// (`validate_decide_city`: "nobody to liberate"). The palace rule has nothing to do on that path.
+#[test]
+fn the_last_city_of_an_eliminated_nation_cannot_be_liberated() {
+    let (mut game, rules) = two_nations();
+    let only = game.view().auth.indexes().cities_of(P1)[0];
+    until_active(&mut game, &rules, P0);
+    game.debug_capture_city(&rules, only, P0);
+    assert!(game.view().auth.indexes().cities_of(P1).is_empty());
+    let liberate = game.execute(&rules, Command::DecideCity { player: P0, city: only, decision: CityDecision::Liberate });
+    assert!(liberate.is_err(), "{liberate:?}");
+    assert_one_palace_each(&game, &rules);
+}
+
+/// A game the AIs played, with captures and a deal in it, saved and loaded: nothing is repaired
+/// (the same hash), and it plays on alike.
+#[test]
+fn a_played_game_loads_unchanged_and_plays_on_alike() {
+    let rules = compile_rules(core_rules()).unwrap();
+    let config = ScenarioConfig { seed: 0x5EED_C17E, players: 4, width: 40, height: 28, cities: 0, units: 0, water_ratio: 15 };
+    let victories = VictoryOptions { disabled: VictoryKind::Domination.bit(), ..VictoryOptions::default() };
+    let options = NewGameOptions { city_states: 3, victories, ..NewGameOptions::default() };
+    let mut game = generate_new_game_with(&rules, &config, None, options);
+    let settings = AiSettings::for_rules(&rules, rules.default_difficulty());
+    let mut driver = AiDriver::with_mind(settings, Vec::new(), ClassicMind::new(Variant::Standard));
+    play(&mut game, &rules, &mut driver, 60);
+    let capital = game.view().auth.indexes().cities_of(P1)[0];
+    until_active(&mut game, &rules, P0);
+    game.debug_capture_city(&rules, capital, P0);
+    play(&mut game, &rules, &mut driver, 5);
+    let bytes = to_bytes(&classic_rules::persistence::encode::encode(&game, &rules));
+    let save = from_bytes(&bytes).expect("the bytes read");
+    let mut loaded = classic_rules::persistence::decode::decode(&save, &rules).expect("the save loads");
+    assert_eq!(authoritative_hash(&loaded), authoritative_hash(&game), "the load repaired nothing");
+    let mut game = game;
+    for _ in 0..3 {
+        end_round(&mut game, &rules);
+        end_round(&mut loaded, &rules);
+    }
+    assert_eq!(authoritative_hash(&loaded), authoritative_hash(&game));
+    assert_one_palace_each(&loaded, &rules);
 }
