@@ -30,6 +30,14 @@ fn dig_rule(block: DigBlock) -> CommandError {
 }
 
 impl<'a> WorldTransaction<'a> {
+    /// `dead` was eliminated (`systems::elimination`): its digs and the finds it had to choose
+    /// for are gone (the record of the tile stays: history).
+    pub(crate) fn forget_in_archaeology(&mut self, dead: PlayerId) {
+        let archaeology = self.world.module.tourism.archaeology_mut();
+        archaeology.digs.retain(|dig| dig.player != dead);
+        archaeology.pending.retain(|pending| pending.player != dead);
+    }
+
     /// A battle on `tile` (attacker `first`, defender `second`) is written
     /// into the tile's history until the sites appear.
     pub(crate) fn record_battle(

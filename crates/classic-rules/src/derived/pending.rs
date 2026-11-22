@@ -14,13 +14,17 @@
 //! a unit that can be promoted         Promotion
 //! a great person with no order        GreatPerson
 //! a unit with moves and no order      UnitOrder
+//! delegates left in an open session   CongressVotes   (until the Congress screen is looked at this turn)
+//! an offer waiting for the answer     OfferWaiting    (until the diplomacy screen is looked at this turn)
+//! a spy with no city                  IdleSpy         (until the espionage screen is looked at this turn)
 //! ```
 //!
 //! An item is in the list only if there is a command that the core accepts and that clears it: the end of
 //! the turn waits for the list, so an item the player cannot clear would lock the turn.
 //!
-//! A unit the player put to rest (skip, sleep) has an order. Spies and the vote of the congress only
-//! hint in Unciv and are not here.
+//! A unit the player put to rest (skip, sleep) has an order. The Congress vote, an offer and an idle spy can be
+//! declined, and no command says so: they are asked for until the player has looked at their screen this turn
+//! (`HandledThisTurn`), so the list never locks the turn.
 
 use crate::combat::experience::promotion_ready;
 use crate::derived::culture::{branch_statuses, policy_statuses};
@@ -31,6 +35,7 @@ use crate::ids::{CityHandle, PlayerId, UnitHandle};
 use crate::rules::content::BeliefCategory;
 use crate::rules::CompiledRuleset;
 use crate::world::city::CityStatus;
+use crate::world::espionage::SpyState;
 use crate::world::state::AuthWorld;
 use crate::world::unit::{Stance, UnitCore};
 
@@ -57,6 +62,12 @@ pub enum PendingAction {
     GreatPerson(UnitHandle),
     /// A unit has moves left and no order.
     UnitOrder(UnitHandle),
+    /// A Congress session is open, the player has delegates left and a proposal to put them on.
+    CongressVotes,
+    /// An offer of another nation waits for the player's answer (its id).
+    OfferWaiting(u32),
+    /// A spy has no city (its index in the player's spies).
+    IdleSpy(u8),
 }
 
 /// What the player already settled this turn without a trace in the game state.
@@ -66,6 +77,12 @@ pub struct HandledThisTurn<'a> {
     pub policy_chosen: bool,
     /// Units told to skip the turn or to sleep.
     pub resting: &'a [UnitHandle],
+    /// The Congress screen was opened this turn.
+    pub congress_seen: bool,
+    /// The diplomacy screen (where offers are answered) was opened this turn.
+    pub offers_seen: bool,
+    /// The espionage screen was opened this turn.
+    pub spies_seen: bool,
 }
 
 /// The actions `player` owes, in the order the end-of-turn button asks for them. Before the first city
@@ -74,14 +91,14 @@ pub struct HandledThisTurn<'a> {
 pub fn pending_actions(auth: &AuthWorld, rules: &CompiledRuleset, player: PlayerId, handled: HandledThisTurn<'_>) -> Vec<PendingAction> {
     let mut pending = Vec::new();
     if !auth.indexes().cities_of(player).is_empty() {
-        pending.extend(choices(auth, rules, player, handled.policy_chosen));
+        pending.extend(choices(auth, rules, player, handled));
     }
     pending.extend(unit_actions(auth, rules, player, handled.resting));
     pending
 }
 
 /// The choices of a player with a city: free picks, cities, research, policy, faith.
-fn choices(auth: &AuthWorld, rules: &CompiledRuleset, player: PlayerId, policy_chosen: bool) -> Vec<PendingAction> {
+fn choices(auth: &AuthWorld, rules: &CompiledRuleset, player: PlayerId, handled: HandledThisTurn<'_>) -> Vec<PendingAction> {
     let mut pending = Vec::new();
     if !next_great_person_options(auth, rules, player).is_empty() {
         pending.push(PendingAction::FreeGreatPerson);
@@ -93,13 +110,37 @@ fn choices(auth: &AuthWorld, rules: &CompiledRuleset, player: PlayerId, policy_c
     if research_pending(auth, rules, player) {
         pending.push(PendingAction::Research);
     }
-    if !policy_chosen && policy_pending(auth, rules, player) {
+    if !handled.policy_chosen && policy_pending(auth, rules, player) {
         pending.push(PendingAction::Policy);
     }
     if pantheon_pending(auth, rules, player) {
         pending.push(PendingAction::Pantheon);
     }
+    if !handled.congress_seen && congress_pending(auth, player) {
+        pending.push(PendingAction::CongressVotes);
+    }
+    if !handled.offers_seen {
+        if let Some(offer) = auth.module().relations().offers().iter().find(|o| o.to == player) {
+            pending.push(PendingAction::OfferWaiting(offer.id));
+        }
+    }
+    if !handled.spies_seen {
+        if let Some(spy) = auth.module().espionage().spies_of(player).iter().position(|s| s.state == SpyState::Unassigned) {
+            pending.push(PendingAction::IdleSpy(spy as u8));
+        }
+    }
     pending
+}
+
+/// A session is open and the player may still put delegates on a proposal (the vote would be accepted).
+pub fn congress_pending(auth: &AuthWorld, player: PlayerId) -> bool {
+    let congress = auth.module().congress();
+    congress.in_session()
+        && congress.delegates_left(player) > 0
+        && (0..congress.proposals().len()).any(|index| {
+            let choice = if congress.proposals()[index].kind.elects() { u32::from(player.0) } else { crate::systems::congress::YES };
+            crate::systems::congress::vote_problem(auth, player, index as u8, choice, 1).is_none()
+        })
 }
 
 /// No technology is being researched although one can be.

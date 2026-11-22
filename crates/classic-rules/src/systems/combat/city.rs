@@ -468,25 +468,34 @@ impl<'a> WorldTransaction<'a> {
                 .push(CityChange::PopulationChanged { city });
             return;
         }
-        self.remove_city(city, rules);
+        // Unciv `City.destroyCity` asks `canBeDestroyed()`: a city that became a holy city or its
+        // owner's capital while it burned keeps its last citizens and burns on.
+        if crate::combat::city::can_be_destroyed(self.world, rules, city, false) {
+            self.remove_city(city, rules);
+        }
     }
 
-    /// Raze a city completely: its tiles become unowned, its units go,
-    /// the city leaves the store.
+    /// Raze a city completely. Every record of the rules that names it goes first (one cleaner
+    /// per owner of the state: spies and the thefts, trade routes, offers, the city's slots of faith
+    /// and great works), then the kernel removes it (tiles, indexes, timed effects, the store).
+    /// The guard: `world::references::references_to_city` must be empty after (tests/city_removal.rs).
     pub(crate) fn remove_city(&mut self, city: CityHandle, rules: &CompiledRuleset) {
-        self.evict_spies(city);
-        self.clear_city_trade_routes(city, rules);
-        let Some(core) = self.world.cities.get(city) else {
+        if self.world.cities.get(city).is_none() {
             return;
-        };
-        let (owner, tile) = (core.owner, core.tile);
-        crate::transaction::journal::release_city_tiles(&mut *self.0.world, &mut self.0.journal, city);
-        self.world.indexes.unindex_city_owner(owner, city);
-        self.world.indexes.unindex_city_tile(tile);
-        self.world.cities.remove(city);
-        self.journal
-            .city_changes
-            .push(CityChange::Removed { city, owner, tile });
+        }
+        // Every path that destroys a city asks `can_be_destroyed` first (razing, the decision, a
+        // nuke): a holy city is never removed, so no religion names a removed city.
+        debug_assert!(
+            self.world.module.religion.holy_city_of(city).is_none(),
+            "a holy city is never removed (can_be_destroyed)"
+        );
+        self.evict_spies(city);
+        self.forget_thefts_in(city);
+        self.clear_city_trade_routes(city, rules);
+        self.withdraw_offers_of_city(city);
+        self.world.module.religion.forget_city(city);
+        self.world.module.tourism.forget_city(city);
+        crate::transaction::journal::remove_city(&mut *self.0.world, &mut self.0.journal, city);
     }
 
     /// End of the conqueror's turn: an undecided city becomes a puppet.

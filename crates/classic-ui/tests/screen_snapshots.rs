@@ -193,3 +193,53 @@ fn an_update_with_the_art_pack_and_a_plain_run_are_not_refused() {
     assert_eq!(update_refusal(true, &present), None);
     assert_eq!(update_refusal(false, Path::new("/nonexistent/.pack-version")), None);
 }
+
+/// Two rivals leave an offer each in the inbox of the player; the player ended no turn since, so
+/// both wait on the diplomacy screen with the turn to answer by.
+fn match_with_inbox() -> Stage<ClassicUi> {
+    use classic_rules::ids::{PlayerId, TechId};
+    use classic_rules::world::relations::DealItem;
+    use classic_rules::{ClassicGame, Command};
+    let mut stage = opened_match();
+    let session = stage.module.session.as_mut().expect("the match runs");
+    let (game, rules) = session.harness_game();
+    game.debug_meet_all();
+    // An embassy needs a city of each side: the capital of the player is founded already.
+    for player in [PlayerId(1), PlayerId(2)] {
+        let unit = game.view().auth.indexes().units_of(player)[0];
+        let tile = game.view().auth.units().get(unit).expect("a start unit").core.tile;
+        game.debug_found_city(&rules, player, tile);
+    }
+    let writing = rules.technologies.iter().position(|t| t.key == "core:tech/writing").expect("writing");
+    for player in [PlayerId(0), PlayerId(1), PlayerId(2)] {
+        game.debug_learn(&rules, player, TechId(writing as u16));
+        game.debug_earn(player, 200);
+    }
+    let offers = [
+        (PlayerId(1), vec![(PlayerId(1), DealItem::Embassy), (PlayerId(0), DealItem::Embassy)]),
+        (PlayerId(2), vec![(PlayerId(2), DealItem::Embassy), (PlayerId(0), DealItem::Embassy)]),
+    ];
+    for (from, items) in offers {
+        while game.view().auth.active_player() != from {
+            let active = game.view().auth.active_player();
+            game.execute(&rules, Command::EndTurn { player: active }).expect("the turn ends");
+        }
+        game.execute(&rules, Command::ProposeDeal { from, to: PlayerId(0), items }).expect("the offer is made");
+    }
+    while game.view().auth.active_player() != PlayerId(0) {
+        let active = game.view().auth.active_player();
+        game.execute(&rules, Command::EndTurn { player: active }).expect("the turn ends");
+    }
+    session.refresh_after_harness();
+    stage.apply_module_actions();
+    stage
+}
+
+#[test]
+fn diplomacy_inbox() {
+    let mut stage = match_with_inbox();
+    stage.open(Screen::Diplomacy.into());
+    let snapshot = stage.snapshot();
+    assert!(snapshot.contains("Answer by turn"), "the offers wait with their turn: {snapshot}");
+    check(&mut stage, "classic-diplomacy-inbox");
+}

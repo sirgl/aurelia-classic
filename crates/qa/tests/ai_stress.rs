@@ -245,3 +245,41 @@ fn b5_friendship_holds_in_the_control_and_the_war_ends_it() {
     let (b2_control, _) = scene::arms(rules, &p, &b2, &scene::edit_of(Situation::B2, 0, rules, &p, &b2).expect("the edit")).expect("the arms");
     assert_ne!(hash(&control.game), hash(&b2_control.game), "the friendship is in the world's hash");
 }
+
+#[test]
+fn the_kill_zone_bait_is_left_alone_by_its_seat_ai() {
+    let (rules, p) = (rules(), position());
+    let plan = scene::plan(Situation::P6, rules, &p, 0).expect("two nations share the smoke map");
+    let mild = scene::edit_of(Situation::P6, 0, rules, &p, &plan).expect("the edit");
+    let (_, edited) = scene::arms(rules, &p, &plan, &mild).expect("the arms");
+    let Some(stress::seat::Script::KillZone { units, .. }) = edited.script.clone() else { panic!("the edited arm has the kill-zone") };
+    assert_eq!(units.len(), 4, "three zone units and the bait");
+    let bait = *units.last().expect("the bait is spawned last");
+    let at = |g: &classic_rules::GameState| g.view().auth.units().handle_of(kernel::ids::EntityId(bait)).and_then(|h| g.view().auth.units().get(h)).map(|u| (u.core.tile, u.core.owner));
+    let start = at(&edited.game).expect("the bait stands");
+    let played = play::play_arm(rules, edited, p.variant, 3, false).expect("plays");
+    let now = at(&played.window);
+    assert!(now.is_none() || now == Some(start), "the bait never moves: its seat's AI leaves it alone ({start:?} -> {now:?})");
+}
+
+#[test]
+fn the_world_leader_vote_can_be_set_one_delegate_short() {
+    let (rules, p) = (rules(), position());
+    let (a, _) = two(&p);
+    let mut game = p.game.clone();
+    game.debug_united_nations(rules, a, 3);
+    let short_one = game.debug_delegates_short_of_victory(rules, a, 1);
+    let needed = game.ai_observation(rules, a).congress.expect("the congress sits").needed;
+    assert_eq!(short_one + 1, needed, "one delegate short of the World Leader");
+    assert_eq!(game.debug_delegates_short_of_victory(rules, a, 3), short_one, "never fewer than it holds");
+}
+
+#[test]
+fn spies_are_added_to_a_nation() {
+    let (rules, p) = (rules(), position());
+    let (a, _) = two(&p);
+    let mut game = p.game.clone();
+    let before = game.view().auth.module().espionage().spies_of(a).len();
+    edit::apply(&mut game, rules, &edit::Change::Spies { player: a.0, count: 2 }).expect("spies");
+    assert_eq!(game.view().auth.module().espionage().spies_of(a).len(), before + 2);
+}

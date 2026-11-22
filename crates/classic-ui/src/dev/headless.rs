@@ -28,7 +28,7 @@
 //! chosen, but nothing is queued: the end-turn button asks for the production), AURELIA_GAME_PARADE (set: one unit of every
 //! kind around the start), AURELIA_GAME_ZOOM (camera zoom), AURELIA_VISUAL_SIZE (WxH),
 //! AURELIA_VISUAL_HOVER_PIXEL (x,y: physical pointer for tooltip and route preview),
-//! AURELIA_GAME_SHORTCUTS (set: the keyboard shortcuts overlay is open), AURELIA_GAME_REPORT (set: the "Report a bug" dialog is open), AURELIA_GAME_SAVES (list | delete | name: the "Load game" list, with the first confirmation of the selected save asked (delete), or the "Save game" naming dialog; AURELIA_GAME_SAVES_SELECT=<row>; the saves are those of AURELIA_SAVE_DIR), AURELIA_GAME_UI_SCALE (0.75..1.5), AURELIA_GAME_SETTINGS_TAB (audio | graphics | game | controls),
+//! AURELIA_GAME_SHORTCUTS (set: the keyboard shortcuts overlay is open), AURELIA_GAME_STATUS (a shell error text: the toast; AURELIA_GAME_STATUS_SINK=menu: the main menu's line, as before), AURELIA_GAME_REPORT (set: the "Report a bug" dialog is open), AURELIA_GAME_SAVES (list | delete | name: the "Load game" list, with the first confirmation of the selected save asked (delete), or the "Save game" naming dialog; AURELIA_GAME_SAVES_SELECT=<row>; the saves are those of AURELIA_SAVE_DIR), AURELIA_GAME_UI_SCALE (0.75..1.5), AURELIA_GAME_SETTINGS_TAB (audio | graphics | game | controls),
 //! AURELIA_GAME_SHOWCASE=world (the world art showcase: one capture per view, saved as
 //! <path stem>-<view>.png) with AURELIA_GAME_ERAS (eras of players 0..=3, default 7,1,3,5).
 //! `--bench-world` measures frame time and world-object rebuilds on a dense late-game map.
@@ -36,6 +36,7 @@
 //! it, saved as <path stem>-NN.png (AURELIA_GAME_SEQUENCE_FRAMES, default 14;
 //! AURELIA_GAME_SEQUENCE=embark|disembark: a warrior steps from the shore onto the water, or back;
 //! AURELIA_GAME_SEQUENCE_STEP seconds per frame, default 0.08).
+//! AURELIA_BENCH_FRAMES=n (with `--screenshot`): n more frames of the captured state, timed (`time_frames`).
 //! `--bench-animation` measures frames while units walk (AURELIA_BENCH_MAP, AURELIA_BENCH_UNITS).
 //! `--bench-ui` measures the UI slice of a frame (models, egui, tessellation; no GPU) on the
 //! heaviest screens of an empire of AURELIA_BENCH_CITIES cities (default 100).
@@ -395,8 +396,29 @@ pub fn screenshot(path: &str) {
     for _ in 0..frames {
         run.frame();
     }
+    let timed = env_number("AURELIA_BENCH_FRAMES", 0) as usize;
+    if timed > 0 {
+        time_frames(&mut run, timed);
+    }
     println!("turn {}  hash {:x}", turn(&run.app), hash(&run.app));
     save_capture(&run.core, &run.texture, run.size.0, run.size.1, path);
+}
+
+/// AURELIA_BENCH_FRAMES=n with `--screenshot`: n more frames of the captured state, timed: the
+/// whole frame (CPU and the wait for the GPU) and its UI part (egui with the screens and the
+/// shell's passes over them, `FrameStages::ui_ms`). Ten frames first are not counted.
+fn time_frames(run: &mut Offscreen, count: usize) {
+    for _ in 0..10 {
+        run.frame();
+    }
+    let mut whole = Vec::with_capacity(count);
+    let mut ui = Vec::with_capacity(count);
+    for _ in 0..count {
+        whole.push(run.frame());
+        ui.push(run.app.stages.ui_ms);
+    }
+    report("frame", &whole, 0);
+    report("frame UI", &ui, 0);
 }
 
 /// AURELIA_GAME_DEPOSITS: strategic resources next to the capital (harness, like
@@ -624,7 +646,8 @@ fn overdraw_iron(
 /// `<path stem>-tNNN.png` with its turn time and resident memory printed
 /// (the QA soak of the game with presentation, classic/docs/QA.md).
 fn play_turns(run: &mut Offscreen, path: &str) {
-    if std::env::var("AURELIA_GAME_AUTOPLAY").is_ok() {
+    let autoplay = std::env::var("AURELIA_GAME_AUTOPLAY").is_ok();
+    if autoplay {
         if let Some(session) = run.app.module.session.as_mut() {
             session.autoplay();
         }
@@ -653,6 +676,20 @@ fn play_turns(run: &mut Offscreen, path: &str) {
             save_capture(&run.core, &run.texture, run.size.0, run.size.1, &format!("{stem}-t{index:03}.png"));
         }
     }
+    if autoplay {
+        if let Some(session) = run.app.module.session.as_mut() {
+            end_autoplay(session);
+        }
+    }
+}
+
+/// The scripted turns are over: the observed player is the human again and the AI turns that
+/// are left run to their end now, so the capture frames that follow run no AI. A seat left to
+/// the AI would play a few turns in every frame's wall-time slice on the worker thread, and the
+/// captured world would depend on timing.
+fn end_autoplay(session: &mut crate::game::Session) {
+    session.end_autoplay();
+    session.finish_ai_turns();
 }
 
 /// The process memory after a bench phase; the heap peak then restarts.
@@ -844,9 +881,34 @@ pub(super) fn env_float(name: &str, default: f32) -> f32 {
     std::env::var(name).ok().and_then(|v| v.parse().ok()).unwrap_or(default)
 }
 
+/// AURELIA_GAME_POLICY_CULTURE=n: the player's culture pool gets n more, and AURELIA_GAME_IDEOLOGY=key
+/// (e.g. `core:policy/freedom`) gives the player that ideology, as a late game would (the policy screen
+/// with several things to take). Both come before AURELIA_GAME_POLICIES. AURELIA_GAME_CIVICS_BRANCH=key
+/// opens the policy screen on that branch.
+fn grant_policy_state(app: &mut GameApp) {
+    let Some(session) = app.module.session.as_mut() else {
+        return;
+    };
+    let me = session.me();
+    let culture = env_number("AURELIA_GAME_POLICY_CULTURE", 0);
+    let ideology = std::env::var("AURELIA_GAME_IDEOLOGY").ok();
+    let (game, rules) = session.harness_game();
+    if culture > 0 {
+        game.debug_grant_culture(me, culture as u32);
+    }
+    if let Some(key) = ideology {
+        match rules.module.policy_branches.iter().position(|b| b.key == key) {
+            Some(i) => game.debug_set_ideology(&rules, me, classic_rules::rules::content::PolicyBranchId(i as u16)),
+            None => println!("AURELIA_GAME_IDEOLOGY: unknown key {key}"),
+        }
+    }
+    session.refresh_after_harness();
+}
+
 /// AURELIA_GAME_POLICIES=key,key,...: unlock these branches and adopt these policies in order
 /// (content keys, e.g. `core:policy/tradition,core:policy/tradition/aristocracy`).
 fn adopt_policies(app: &mut GameApp) {
+    grant_policy_state(app);
     let Ok(list) = std::env::var("AURELIA_GAME_POLICIES") else {
         return;
     };
@@ -1047,6 +1109,14 @@ fn show_screen(app: &mut GameApp, capital: Option<u32>) {
     if let Ok(tab) = std::env::var("AURELIA_GAME_SETTINGS_TAB") { app.screens.capture_settings_tab(&app.ctx, &tab); }
     app.screens.capture_navigation(std::env::var("AURELIA_GAME_NAVIGATION").as_deref() == Ok("1"));
     app.screens.shortcuts.open = std::env::var_os("AURELIA_GAME_SHORTCUTS").is_some();
+    // A shell error as play raises it (AURELIA_GAME_STATUS=<text>): the toast over the screen; with
+    // AURELIA_GAME_STATUS_SINK=menu the old sink, the main menu's line, for the picture of "before".
+    if let Ok(text) = std::env::var("AURELIA_GAME_STATUS") {
+        match std::env::var("AURELIA_GAME_STATUS_SINK").as_deref() {
+            Ok("menu") => app.screens.menu_status = Some(text),
+            _ => app.screens.error(text),
+        }
+    }
     // AURELIA_GAME_REPORT (set: the "Report a bug" dialog is open; `saved`: its file is made too).
     if let Ok(report) = std::env::var("AURELIA_GAME_REPORT") {
         app.apply(client::shell::module::ShellAction::ReportBug);
@@ -1079,9 +1149,21 @@ fn show_screen(app: &mut GameApp, capital: Option<u32>) {
     app.screens.preload_screen_art(&app.ctx, &mut app.module);
     app.module.hud.preload_action_art(&app.ctx);
     if screen == Screen::Civics {
+        if let Ok(key) = std::env::var("AURELIA_GAME_CIVICS_BRANCH") {
+            let rules = screens::game_rules();
+            match rules.module.policy_branches.iter().position(|b| b.key == key) {
+                Some(i) => app.module.screens.capture_civics_branch(classic_rules::rules::content::PolicyBranchId(i as u16)),
+                None => println!("AURELIA_GAME_CIVICS_BRANCH: unknown key {key}"),
+            }
+        }
         if let Some(session) = app.module.session.as_mut() {
             let mut model = session.screen_model();
-            model.civics = Some(session.civics_view());
+            let view = session.civics_view();
+            // AURELIA_GAME_CIVICS_SCROLL=points scrolls the list; AURELIA_GAME_CIVICS_TAP=offer|policy taps a card.
+            let scroll = env_number("AURELIA_GAME_CIVICS_SCROLL", 0) as f32;
+            let tap = std::env::var("AURELIA_GAME_CIVICS_TAP").ok();
+            app.module.screens.capture_civics_view(&view, scroll, tap.as_deref());
+            model.civics = Some(view);
             app.module.screens.preload_civics_art(&app.ctx, &model);
         }
     }
@@ -1820,4 +1902,45 @@ pub(super) fn open_pedia(app: &mut GameApp, page: Option<crate::ui::pedia::Pedia
 fn open_overview(app: &mut GameApp, tab: crate::ui::screens::OverviewTab) {
     app.module.screens.open_overview(tab);
     app.apply_module_actions();
+}
+
+#[cfg(test)]
+mod tests {
+    use std::time::Duration;
+
+    use super::end_autoplay;
+    use crate::game::Session;
+    use crate::ui::model::GameRequest;
+    use crate::ui::screens::{game_rules, prepare_match, MapSize, MatchRequest};
+
+    /// A match autoplayed for `turns` end turns, as `play_turns` does it.
+    fn autoplayed(turns: u32) -> Session {
+        let request = MatchRequest { nation: "core:nation/rome".into(), seed: 20260928, size: MapSize::Small, players: 3, water: 25 };
+        let mut session = Session::new(prepare_match(request).expect("world").game, game_rules());
+        session.autoplay();
+        for _ in 0..turns {
+            session.request(GameRequest::EndTurn);
+            session.finish_ai_turns();
+        }
+        session
+    }
+
+    /// After the scripted turns no AI is left to run in the capture frames: nothing is busy, and
+    /// frames (3 ms slices of the AI) change nothing. Two runs of the same state end in one hash.
+    #[test]
+    fn the_capture_frames_after_autoplay_run_no_ai() {
+        let mut hashes = Vec::new();
+        for _ in 0..2 {
+            let mut session = autoplayed(6);
+            end_autoplay(&mut session);
+            assert!(!session.ai_busy(), "the AI still has a turn to play when the capture is saved");
+            let settled = session.world_hash();
+            for _ in 0..50 {
+                session.tick_ai(Duration::from_millis(3));
+            }
+            assert_eq!(session.world_hash(), settled, "a capture frame changed the world");
+            hashes.push(settled);
+        }
+        assert_eq!(hashes[0], hashes[1]);
+    }
 }

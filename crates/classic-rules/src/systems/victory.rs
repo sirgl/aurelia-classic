@@ -199,6 +199,14 @@ fn time_leader(auth: &AuthWorld, rules: &CompiledRuleset) -> Option<PlayerId> {
 }
 
 impl<'a> WorldTransaction<'a> {
+    /// `dead` was eliminated (`systems::elimination`): it is no longer the World Leader.
+    pub(crate) fn forget_in_victory(&mut self, dead: PlayerId) {
+        let victory = &mut self.world.module.victory;
+        if victory.world_leader == Some(dead) {
+            victory.world_leader = None;
+        }
+    }
+
     /// Domination after a capture (no ten-round wait).
     pub(crate) fn test_domination(&mut self, rules: &CompiledRuleset) {
         self.test_victory_kinds(&[VictoryKind::Domination], rules);

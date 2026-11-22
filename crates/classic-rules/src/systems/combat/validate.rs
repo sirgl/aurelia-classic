@@ -178,6 +178,10 @@ pub(crate) fn validate_decide_city(
         CityDecision::Raze if core.original_capital => {
             return Err(violation("an original capital cannot be razed"));
         }
+        // Unciv `City.canBeDestroyed(true)`: a holy city cannot be razed (`AllowRazeHolyCity` off).
+        CityDecision::Raze if !crate::combat::city::can_be_destroyed(view.auth, rules, city, true) => {
+            return Err(violation("a holy city cannot be razed"));
+        }
         CityDecision::Raze if crate::derived::grants::holds_unique_luxury(view.auth, rules, core) => {
             return Err(violation("a city with a unique luxury cannot be razed"));
         }
@@ -446,7 +450,7 @@ pub(crate) fn validate_air_sweep(
     if !crate::systems::combat::air::can_air_sweep(auth, rules, unit) {
         return Err(AirOrderBlock::CannotSweep.into());
     }
-    if core.moves_left == 0 || core.attacks_made > 0 {
+    if crate::combat::exchange::attacks_left(auth, rules, &core) == 0 {
         return Err(AirOrderBlock::NoAttacksLeft.into());
     }
     let range = rules

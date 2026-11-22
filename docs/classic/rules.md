@@ -8,17 +8,17 @@
 
 ## Summary
 
-Rule constants: 506 (AI constants: 966; 14 constants of engine plumbing in `platform/crates/kernel/src/persistence/`, `platform/crates/kernel/src/test_module.rs`, `platform/crates/kernel/src/math.rs`, `platform/crates/kernel/src/module.rs`, `classic/crates/classic-rules/src/save_codec.rs`, `classic/crates/classic-rules/src/fixtures.rs` are not listed).
+Rule constants: 518 (AI constants: 966; 14 constants of engine plumbing in `platform/crates/kernel/src/persistence/`, `platform/crates/kernel/src/test_module.rs`, `platform/crates/kernel/src/math.rs`, `platform/crates/kernel/src/module.rs`, `classic/crates/classic-rules/src/save_codec.rs`, `classic/crates/classic-rules/src/fixtures.rs` are not listed).
 
 | Source | Rule constants | AI constants |
 |---|---|---|
-| Unciv | 260 | 0 |
+| Unciv | 267 | 0 |
 | own design | 72 | 11 |
 | own formula (expansion-only system; Unciv has no equivalent) | 0 | 0 |
-| own value | 14 | 4 |
+| own value | 15 | 4 |
 | own value (unverified) | 17 | 4 |
-| own value (source not recorded) | 143 | 947 |
-| total | 506 | 966 |
+| own value (source not recorded) | 147 | 947 |
+| total | 518 | 966 |
 
 Sections:
 
@@ -67,6 +67,7 @@ Short descriptions in our own words of the main formulas; the code is the author
 - **Unit upkeep** (`derived::maintenance::unit_maintenance`). Every player keeps 3 (`FREE_UNITS`) units free, plus the difficulty's, the policies' and the garrison free units. With n paid units and p the turn over 500 (`ESTIMATED_END_TURN`) (at most 1), the gold per turn is (50 (`GOLD_PER_UNIT_TIMES100`) hundredths times n times (1 + 1 (`UNIT_COST_GROWTH_FACTOR`) p)) raised to the power (1 + p / 3 (`UNIT_COST_EXPONENT_DIVISOR`)), then the difficulty's unit cost percent applies.
 - **Game speed** (`kernel::rules::speeds`, table below). Every rule constant is written at Standard speed; a game of another speed multiplies each cost, length and interval Unciv scales by the speed's percent of the matching kind (production, gold, science, culture, faith, build time, pace, golden age, gold gift), takes its own peace, deal and pressure numbers, and plays to the last round of its calendar (Standard 500 (`STANDARD_MAX_ROUNDS`)).
 - **Golden age** (`systems::golden_age::golden_age_threshold`). The first golden age needs 500 (`GOLDEN_AGE_BASE_THRESHOLD`) happiness, every later one 250 (`GOLDEN_AGE_THRESHOLD_INCREASE`) more; the threshold grows by 1 (`GOLDEN_AGE_THRESHOLD_CITY_PERCENT`) percent per city, truncated. A golden age lasts 10 (`UNMODIFIED_GOLDEN_AGE_TURNS`) turns before modifiers.
+- **Elimination** (`systems::elimination::forget_eliminated`). A nation or city-state that loses its last city is eliminated, and every tie the rules keep with it ends at once, both ways: wars, peace treaties, deals and gold per turn, offers, embassies, open borders, pacts, friendships, research agreements, the memory of it (warmonger, denunciation, grievances), its standing with the city-states and the quests of it or about it, its roles in the World Congress (its proposals and votes, an embargo on it; a dead host passes the league to the living nation with the most delegates), its spies, the thefts it did or suffered and the World Leader title. A city-state whose ally it was takes its next ally at once. What it did stays as history (great works, archaeology, a religion it founded).
 
 ## Rule constants by system
 
@@ -244,7 +245,7 @@ Every `pub const` of the rule code, by system. Value as written in the code; mea
 
 ### Combat, experience and healing
 
-74 constants (Unciv 61, own value (unverified) 4, own value (source not recorded) 9). Files: `classic/crates/classic-rules/src/combat/damage.rs`, `classic/crates/classic-rules/src/combat/experience.rs`, `classic/crates/classic-rules/src/combat/strength.rs`, `classic/crates/classic-rules/src/combat/terrain.rs`, `classic/crates/classic-rules/src/systems/airlift.rs`, `classic/crates/classic-rules/src/systems/combat/actions.rs`, `classic/crates/classic-rules/src/systems/combat/air.rs`, `classic/crates/classic-rules/src/systems/combat/heal.rs`, `classic/crates/classic-rules/src/systems/combat/upgrade.rs`, `classic/crates/classic-rules/src/systems/combat/validate.rs`, `classic/crates/classic-rules/src/systems/paradrop.rs`, `classic/crates/classic-rules/src/systems/plunder.rs`, `platform/crates/kernel/src/effects/unit.rs`.
+75 constants (Unciv 61, own value 1, own value (unverified) 4, own value (source not recorded) 9). Files: `classic/crates/classic-rules/src/combat/damage.rs`, `classic/crates/classic-rules/src/combat/experience.rs`, `classic/crates/classic-rules/src/combat/strength.rs`, `classic/crates/classic-rules/src/combat/terrain.rs`, `classic/crates/classic-rules/src/systems/airlift.rs`, `classic/crates/classic-rules/src/systems/combat/actions.rs`, `classic/crates/classic-rules/src/systems/combat/air.rs`, `classic/crates/classic-rules/src/systems/combat/heal.rs`, `classic/crates/classic-rules/src/systems/combat/upgrade.rs`, `classic/crates/classic-rules/src/systems/combat/validate.rs`, `classic/crates/classic-rules/src/systems/paradrop.rs`, `classic/crates/classic-rules/src/systems/plunder.rs`, `platform/crates/kernel/src/effects/unit.rs`.
 
 | Name | Value | Meaning | Source | File |
 |---|---|---|---|---|
@@ -300,6 +301,7 @@ Every `pub const` of the rule code, by system. Value as written in the code; mea
 | `NUKE_LEVEL2_ELIM_POPULATION_THRESHOLD` | `5` | Unciv: battle/Nuke.kt (a strength-2 nuke destroys a city under 5 citizens), equal. | Unciv: battle/Nuke.kt (a strength-2 nuke destroys a city under 5 citizens), equal | `actions.rs` |
 | `NUKE_FALLOUT_PROB` | `50` | Unciv: battle/Nuke.kt (fallout chance 0.5), equal. | Unciv: battle/Nuke.kt (fallout chance 0.5), equal | `actions.rs` |
 | `CITADEL_CITY_STATE_INFLUENCE` | `15` | Influence a city-state loses with the player whose culture bomb takes one of its tiles. | Unciv: UniqueTriggerActivation.kt (`OneTimeTakeOverTilesInRadius`, `addInfluence(-15f)`); equal | `actions.rs` |
+| `CITADEL_CITY_REACH` | `crate::world::city::CULTURE_RADIUS_MAX as i32` | Furthest distance from a city of the owner at which a culture bomb gives that city a tile: the city's culture radius (`CULTURE_RADIUS_MAX`; a city's tiles lie within it, `validate` and the capture of a city rely on it). | own value (differs from Unciv: Unciv gives the tile to the city nearest to the citadel whatever the distance, here a tile no cit...) | `actions.rs` |
 | `RAZING_CITY_EXTRA_DISTANCE` | `5` | Extra distance of a razing city when the culture bomb picks the city that gets the tiles. | Unciv: UniqueTriggerActivation.kt (`cityPriority`); equal | `actions.rs` |
 | `REBASE_RANGE_PERCENT` | `200` | Rebase range of an air unit, in percent of its range. | Unciv: MapUnit.getAirUnitMovementRange, twice the range; equal | `air.rs` |
 | `CITY_AIR_UNIT_CAPACITY` | `6` | Air slots of a city before buildings add more. | Unciv: ModConstants, cityAirUnitCapacity, 6; equal | `air.rs` |
@@ -470,12 +472,13 @@ Every `pub const` of the rule code, by system. Value as written in the code; mea
 
 ### Diplomacy
 
-15 constants (Unciv 5, own value 6, own value (source not recorded) 4). Files: `classic/crates/classic-rules/src/systems/diplomacy/deals.rs`, `classic/crates/classic-rules/src/systems/diplomacy/mod.rs`.
+16 constants (Unciv 5, own value 5, own value (source not recorded) 6). Files: `classic/crates/classic-rules/src/systems/diplomacy/deals.rs`, `classic/crates/classic-rules/src/systems/diplomacy/mod.rs`.
 
 | Name | Value | Meaning | Source | File |
 |---|---|---|---|---|
 | `MAX_DEAL_ITEMS` | `12` | At most this many items in one deal. | own value | `deals.rs` |
-| `OFFER_ROUNDS` | `1` | An offer waits this many rounds for its answer. | own value | `deals.rs` |
+| `OFFER_ROUNDS` | `1` | An offer to an AI waits this many rounds for its answer; the AI answers at the start of its turn. | own value (source not recorded) | `deals.rs` |
+| `INBOX_ROUNDS` | `10` | An offer to a human waits this many rounds in the inbox. | own value (source not recorded) | `deals.rs` |
 | `EMBASSY_REVEAL_RADIUS` | `2` | An embassy reveals the tiles this close to the host's capital (our rule: public descriptions name the capital and the tiles around it, no number). | own value (source not recorded) | `deals.rs` |
 | `ALL` | `[ DealBlock::NotOurDeal, DealBlock::GoldNeedsFriendship, DealBlock::NotEnoughGold, Deal...` |  | own value (source not recorded) | `deals.rs` |
 | `MIN_WAR_ROUNDS_BEFORE_PEACE` | `10` | Rounds a war between two nations lasts before either may end it: no peace deal until then (the original game's ten turns). | own value (source not recorded) | `deals.rs` |
@@ -492,7 +495,7 @@ Every `pub const` of the rule code, by system. Value as written in the code; mea
 
 ### Espionage
 
-21 constants (Unciv 17, own design 2, own value (source not recorded) 2). Files: `classic/crates/classic-rules/src/systems/espionage.rs`, `classic/crates/classic-rules/src/world/espionage.rs`.
+22 constants (Unciv 17, own design 2, own value (source not recorded) 3). Files: `classic/crates/classic-rules/src/systems/espionage.rs`, `classic/crates/classic-rules/src/world/espionage.rs`.
 
 | Name | Value | Meaning | Source | File |
 |---|---|---|---|---|
@@ -517,6 +520,7 @@ Every `pub const` of the rule code, by system. Value as written in the code; mea
 | `ALL` | `[ SpyBlock::Dead, SpyBlock::NoSuchCity, SpyBlock::NotMet, SpyBlock::Occupied, SpyBlock:...` |  | own value (source not recorded) | `espionage.rs` |
 | `ALL` | `[ SpyState::Unassigned, SpyState::Travelling, SpyState::Surveillance, SpyState::Gatheri...` |  | own value (source not recorded) | `espionage.rs` |
 | `MAX_RANK` | `2` | Highest spy rank (0 = recruit .. | Unciv: models/ModConstants.kt (`maxSpyRank` 3: three ranks), equal | `espionage.rs` |
+| `MAX_THEFTS_KEPT` | `32` | The thefts the world remembers: the newest ones, so the record stays small. | own value (source not recorded) | `espionage.rs` |
 
 ### Trade routes
 
@@ -731,7 +735,7 @@ Every `pub const` of the rule code, by system. Value as written in the code; mea
 
 ### Other rule constants
 
-17 constants (Unciv 11, own value (source not recorded) 6). Files: `classic/crates/classic-rules/src/derived/building_sale.rs`, `classic/crates/classic-rules/src/derived/disband.rs`, `classic/crates/classic-rules/src/derived/standing.rs`, `classic/crates/classic-rules/src/knowledge/actions.rs`, `classic/crates/classic-rules/src/systems/revolts.rs`, `classic/crates/classic-rules/src/world/mod.rs`.
+26 constants (Unciv 18, own value 1, own value (source not recorded) 7). Files: `classic/crates/classic-rules/src/derived/building_sale.rs`, `classic/crates/classic-rules/src/derived/disband.rs`, `classic/crates/classic-rules/src/derived/standing.rs`, `classic/crates/classic-rules/src/knowledge/actions.rs`, `classic/crates/classic-rules/src/systems/revolts.rs`, `classic/crates/classic-rules/src/world/mod.rs`, `classic/crates/classic-rules/src/world/relations.rs`.
 
 | Name | Value | Meaning | Source | File |
 |---|---|---|---|---|
@@ -752,6 +756,15 @@ Every `pub const` of the rule code, by system. Value as written in the code; mea
 | `REBEL_TILE_DEFENCE` | `4` | Unciv: TurnManager.rateTileForRevoltSpawn (+4 defence bonus); equal. | Unciv: TurnManager.rateTileForRevoltSpawn (+4 defence bonus); equal | `revolts.rs` |
 | `REBEL_PLACE_RINGS` | `10` | Rings searched around the rising tile for a free tile per rebel. | Unciv: TileMap.placeUnitNearTile (10 tries over the neighbours of the tiles tried); equal | `revolts.rs` |
 | `PUPPET_RESISTS` | `true` | Whether a puppet city is in resistance after its capture as an annexed one is (the owner's decision on the rule; Civ V: a captured city resists whether puppeted or annexed). | own value (source not recorded) | `mod.rs` |
+| `GRIEVANCE_KINDS` | `3` | How many kinds of grievance there are. | own value (source not recorded) | `relations.rs` |
+| `STOLEN_TILE_POINTS` | `10` | Opinion points a taken tile costs its former owner. | Unciv: UniqueTriggerActivation.kt (`OneTimeTakeOverTilesInRadius`, `StealingTerritory` -10); equal | `relations.rs` |
+| `BETRAYED_FRIEND_POINTS` | `40` | Opinion points the victim of a betrayed friendship holds. | Unciv: DeclareWar.kt (`breakTreaties`, -40 for the target, times the Loyal focus of the default personal... | `relations.rs` |
+| `BETRAYED_FRIEND_WITNESS_POINTS` | `20` | Opinion points every other nation that knows the betrayer of a friendship holds. | Unciv: DeclareWar.kt (`breakTreaties`, -20); equal | `relations.rs` |
+| `BETRAYED_PACT_POINTS` | `20` | Opinion points the victim of a betrayed defensive pact holds. | Unciv: DeclareWar.kt (`breakTreaties`, -20 for the target); equal | `relations.rs` |
+| `BETRAYED_PACT_WITNESS_POINTS` | `10` | Opinion points every other nation that knows the betrayer of a defensive pact holds. | Unciv: DeclareWar.kt (`breakTreaties`, -10); equal | `relations.rs` |
+| `BETRAYED_ALLY_POINTS` | `10` | Opinion points every nation that knows it holds against a nation that declared war on its own allied city-state. | Unciv: DeclareWar.kt (`handleCityStateDirectAttack`, `BetrayedDeclarationOfFriendship` -10); equal | `relations.rs` |
+| `GRIEVANCE_POINT` | `10_000` | Units one opinion point is kept in for a grievance, so that a fading of 0.67 x 1/4 a turn is exact. | own value | `relations.rs` |
+| `GRIEVANCE_FADING_PERCENT` | `67` | Percent of its rate a grievance fades by, divided by the speed's pace. | Unciv: DiplomacyTurnManager.kt (`SPEED_ADJUSTMENT_NORMALIZATION_FACTOR` 0.67, `revertToZero`); equal | `relations.rs` |
 
 ## AI constants
 
@@ -1476,9 +1489,9 @@ Tuning numbers of the computer players (`classic/crates/classic-rules/src/ai`). 
 
 | Name | Value | Meaning | Source | File |
 |---|---|---|---|---|
-| `NONE` | `CallFixes { ready: false, ranged: false, melee: false, threat: false, call: false, wall...` |  | own value (source not recorded) | `planner.rs` |
-| `ALL` | `CallFixes { ready: true, ranged: true, melee: true, threat: true, call: true, walls: tr...` |  | own value (source not recorded) | `planner.rs` |
-| `DEFAULT` | `CallFixes { ready: false, ranged: true, melee: false, threat: false, call: true, walls:...` | What `siege-call` plays: the fixes that measured better on the tuning offsets 200-202 (300 solo pace games, `runs/ops`): ranged units first and the press call. | own value (source not recorded) | `planner.rs` |
+| `NONE` | `CallFixes { ready: false, ranged: false, melee: false, call: false, walls: false }` |  | own value (source not recorded) | `planner.rs` |
+| `ALL` | `CallFixes { ready: true, ranged: true, melee: true, call: true, walls: true }` |  | own value (source not recorded) | `planner.rs` |
+| `DEFAULT` | `CallFixes { ready: false, ranged: true, melee: false, call: true, walls: false }` | What `siege-call` plays: the fixes that measured better on the tuning offsets 200-202 (300 solo pace games, `runs/ops`): ranged units first and the press call. | own value (source not recorded) | `planner.rs` |
 
 ### `planner_cities.rs`
 

@@ -81,3 +81,7 @@ classic.ui.hud-game.city-state-close = Close (Esc)
 
 classic.ui.hud-game.rebels-ahead = Below { $threshold } happiness rebels rise in your land: { NUMBER($left) } unhappiness to go
 classic.ui.hud-game.rebels-now = Below { $threshold } happiness: rebels rise in your land every few turns
+classic.ui.hud-game.rivals-more = and { $n } more
+classic.ui.hud-game.city-states-row = City-states: { $met } met
+classic.ui.hud-game.city-states-row-war = City-states: { $met } met, { $war } at war
+classic.ui.hud-game.city-states-row-hint = Open the city-states screen

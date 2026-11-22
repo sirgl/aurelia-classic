@@ -17,7 +17,7 @@ use render::unit_models::UnitModelBook;
 use render::world::state::RenderWorld;
 use render::world_models::WorldBook;
 
-use crate::game::{PendingAction, Session};
+use crate::game::{Looked, PendingAction, Session};
 use crate::ui::shortcuts;
 use crate::ui::hud::{Action, ClassicHud, PanelClicks, TopTarget};
 use crate::ui::model::{GameRequest, ScreenModel};
@@ -186,6 +186,17 @@ impl ClassicUi {
         }
     }
 
+    /// A key of the policy screen: the focus moves, or the focused policy is taken. Always used
+    /// on that screen, so Enter never ends the turn from there.
+    fn civics_key(&mut self, id: &str) -> bool {
+        let Some(key) = crate::ui::screens::civics_focus::Move::of(id) else { return false };
+        let Some(view) = self.model.as_ref().and_then(|m| m.civics.as_ref()) else { return false };
+        if let Some(request) = self.screens.civics_key(view, key) {
+            self.request(request);
+        }
+        true
+    }
+
     /// Gives the selected unit the first of `orders` it has; false when it has none.
     fn unit_order(&mut self, orders: &[Action]) -> bool {
         let have: Vec<Action> = match self.hud.game.as_ref().and_then(|g| g.orders.as_ref()) {
@@ -229,6 +240,9 @@ impl ClassicUi {
         if clicks.open_research {
             self.screens.open(Screen::Research);
         }
+        if clicks.open_city_states {
+            self.screens.open(Screen::CityStates);
+        }
         if clicks.open_results {
             self.screens.open(Screen::GameEnd);
         }
@@ -270,6 +284,9 @@ impl ClassicUi {
             PendingAction::FreeTechnology | PendingAction::Research => self.screens.open(Screen::Research),
             PendingAction::Policy => self.screens.open(Screen::Civics),
             PendingAction::Pantheon => self.screens.open(Screen::Religion),
+            PendingAction::CongressVotes => self.open_looked(Screen::Congress, Looked::Congress),
+            PendingAction::OfferWaiting(_) => self.open_looked(Screen::Diplomacy, Looked::Offers),
+            PendingAction::IdleSpy(_) => self.open_looked(Screen::Espionage, Looked::Spies),
             PendingAction::EmptyProduction(_) => {
                 if let Some(tile) = tile {
                     self.request(GameRequest::SelectCity(tile.0));
@@ -286,6 +303,14 @@ impl ClassicUi {
                 self.screens.open(Screen::Map);
                 self.focus(Focus::Unit(unit));
             }
+        }
+    }
+
+    /// Open a screen and note that the player looked at it this turn.
+    fn open_looked(&mut self, screen: Screen, looked: Looked) {
+        self.screens.open(screen);
+        if let Some(session) = &mut self.session {
+            session.looked_at(looked);
         }
     }
 
@@ -400,7 +425,9 @@ impl ModuleUi for ClassicUi {
             (Screen::MatchSetup, false) if window.y < 480. => window,
             (Screen::MatchSetup, false) => egui::vec2(800., 400.),
             (Screen::MatchSetup, true) => egui::vec2(430., 760.),
-            (Screen::Civics, false) => egui::vec2(900., 520.),
+            // The policy screen switches to its two-tab layout below 1150 points of width.
+            (Screen::Civics, false) => egui::vec2(760., 380.),
+            (Screen::Civics, true) => egui::vec2(430., 640.),
             _ => egui::vec2(1150., 640.),
         }
     }
@@ -414,7 +441,17 @@ impl ModuleUi for ClassicUi {
     }
 
     fn screen_opened(&mut self, screen: ScreenId, from: ShellScreen) {
-        self.screens.opened(Screen::of(screen), from.into());
+        let screen = Screen::of(screen);
+        let looked = match screen {
+            Screen::Congress => Some(Looked::Congress),
+            Screen::Diplomacy => Some(Looked::Offers),
+            Screen::Espionage => Some(Looked::Spies),
+            _ => None,
+        };
+        if let (Some(looked), Some(session)) = (looked, &mut self.session) {
+            session.looked_at(looked);
+        }
+        self.screens.opened(screen, from.into());
     }
 
     fn draw_screen(&mut self, ui: &mut egui::Ui, body: Rect, _: ScreenId, shell: ShellFlags, scene: Option<&RenderWorld>) {
@@ -482,6 +519,7 @@ impl ModuleUi for ClassicUi {
                 }
             }
             "next-city" => return self.step_city(true),
+            _ if crate::ui::screens::civics_focus::Move::of(id).is_some() => return self.civics_key(id),
             "previous-city" => return self.step_city(false),
             _ => return false,
         }
@@ -833,6 +871,9 @@ fn pending_texts(action: PendingAction) -> (&'static str, &'static str) {
         PendingAction::Promotion(_) => (t!("classic.module.end-turn-promotion"), t!("classic.module.end-turn-promotion-tip")),
         PendingAction::GreatPerson(_) => (t!("classic.module.end-turn-great-person"), t!("classic.module.end-turn-great-person-tip")),
         PendingAction::UnitOrder(_) => (t!("classic.module.end-turn-unit-order"), t!("classic.module.end-turn-unit-order-tip")),
+        PendingAction::CongressVotes => (t!("classic.module.end-turn-congress"), t!("classic.module.end-turn-congress-tip")),
+        PendingAction::OfferWaiting(_) => (t!("classic.module.end-turn-offer"), t!("classic.module.end-turn-offer-tip")),
+        PendingAction::IdleSpy(_) => (t!("classic.module.end-turn-spy"), t!("classic.module.end-turn-spy-tip")),
     }
 }
 

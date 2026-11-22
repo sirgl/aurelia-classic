@@ -11,6 +11,44 @@
   of the points (counting a win by a real victory in full and a win on the turn limit as a quarter) and wins 238 games by
   a real victory against 113. A computer turn takes no longer than before.
 - Saves made by the previous version still load.
+- A loaded game now plays on exactly as it would have without the save: the computer players keep no memory outside it.
+
+### Rules
+
+- **A destroyed nation leaves nothing behind.** When a nation or city-state loses its last city, every tie with it ends at
+  once: wars, treaties, deals and gold per turn, offers, embassies, open borders, research agreements, its spies, its votes
+  and seats in the World Congress, and the World Leader title. A city-state that was its ally picks its next ally at once.
+- A holy city can no longer be razed or destroyed by a nuke, as in Unciv; a burning city that becomes a holy city
+  keeps its last citizen.
+- **World Congress:** when the host is destroyed, the league passes to the living nation with the most delegates; a
+  destroyed nation can no longer win a vote.
+- **Nations remember wrongs.** Taking a neighbour's land with a citadel costs its opinion of you (10 per tile). Declaring
+  war on a nation you declared friendship with, on a defensive pact partner or on your own allied city-state angers the
+  victim and every nation that knows you. These grudges fade over time and are shown on the diplomacy screen.
+- **Offers wait for your answer.** An offer to you now stays in the diplomacy inbox for up to ten turns, and you are told
+  when one lapses and why: it ran out, a war began, the other nation is gone, or its terms can no longer be met. The
+  computer players no longer repeat an offer that is still waiting for you.
+- A unit that may attack more than once a turn keeps its remaining moves after an attack while it has attacks left; an
+  air sweep counts as an attack.
+- **Spies:** when you notice a theft from your city you are told, and by whom when your people find out; when a spy is
+  caught, both nations are told.
+- New notices: a Congress proposal dropped from the agenda, the first meeting with a nation and the gold it brings,
+  city-state quests given and done, a world wonder built, a nation destroyed.
+
+### Interface
+
+- **A new policies screen.** A list shows everything you can adopt this turn, with its effect and one button that names
+  the price, and says when the next policy will cost more. Every branch shows what it is for and its progress, every policy
+  its effect and why it is locked. Arrow keys and Enter adopt without the mouse; a short pause after each adoption stops a
+  double click from buying the next card. On a phone the screen has two tabs, and a tap shows the whole text of a card.
+- Sharper text on phones on every screen: thin letters and the "…" of a cut line no longer fade.
+- Technologies you cannot research yet look locked and say what they need; the ones you can start now are marked.
+- A new or loaded game opens with the map zoomed to the land you know.
+- The panel of met nations lists nations only (city-states are one row that opens their screen), with the reasons in
+  tooltips; notices stay inside their panel.
+- An error during play, such as a failed autosave, shows as a message over the game instead of on the main menu.
+- The End turn button also reminds you of Congress votes to cast, offers waiting for an answer and spies with no task.
+- The arrow symbol is no longer missing from texts in any language.
 
 ## 0.3.0
 

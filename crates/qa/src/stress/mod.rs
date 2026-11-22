@@ -13,6 +13,7 @@
 
 pub mod edit;
 pub mod gates;
+pub mod humans;
 pub mod metrics;
 pub mod play;
 pub mod position;
@@ -22,6 +23,7 @@ pub mod seat;
 pub mod suite;
 pub mod tricks;
 pub mod watch;
+pub mod wave3;
 
 use std::collections::BTreeMap;
 
@@ -83,10 +85,45 @@ pub enum Situation {
     D2,
     /// A losing war: cities and army lost to the enemy.
     D3,
+    // Wave 3.
+    /// Kill-zone: the enemy holds a fortified line with a bait by its city; we are at war with it (scripted).
+    P6,
+    /// Sea-hunter: our army at sea, enemy ships hunt it (scripted).
+    P9,
+    /// Air and nuclear strikes on us (scripted bombers, fighters, a nuclear weapon).
+    P10,
+    /// Pests, faith: enemy missionaries and a prophet convert our cities (scripted).
+    P11,
+    /// Pests, spies: enemy spies steal our technologies (scripted; the spy half of group P11).
+    P12,
+    /// Air battle: both sides at war with bombers and fighters (no script).
+    C1,
+    /// A rival one vote short of the diplomatic victory.
+    B10,
+    /// Deal cycle, luxury: a friend sells us a luxury for a lump sum, then declares war (scripted).
+    P4L,
+    /// Bribed war: a friend pays us to declare war on a third nation, then declares war on us (scripted).
+    P4B,
+    /// Early raid: raiders take our workers and settlers in rounds 30-50 (scripted).
+    P1E,
+    /// The city that holds our world wonders is captured.
+    P7C,
+    /// Attack right after the peace treaty ends: the enemy's army waits at the border (trick D10).
+    P3D,
+    /// White-peace fishing: the enemy we are beating offers white peace every few rounds (scripted).
+    P4W,
+    /// The worst combinations of the random mode, named (`wave3::promoted`).
+    R1,
+    R2,
+    R3,
+    R4,
+    R5,
+    /// Defence against humans: a seat plays a strong human's trick (`humans`).
+    Human(humans::Trick),
 }
 
 impl Situation {
-    pub const ALL: [Situation; 26] = [
+    pub const ALL: [Situation; 44] = [
         Situation::A5,
         Situation::B1,
         Situation::A1,
@@ -113,6 +150,24 @@ impl Situation {
         Situation::C2,
         Situation::D2,
         Situation::D3,
+        Situation::P6,
+        Situation::P9,
+        Situation::P10,
+        Situation::P11,
+        Situation::P12,
+        Situation::C1,
+        Situation::B10,
+        Situation::P4L,
+        Situation::P4B,
+        Situation::P1E,
+        Situation::P7C,
+        Situation::P3D,
+        Situation::P4W,
+        Situation::R1,
+        Situation::R2,
+        Situation::R3,
+        Situation::R4,
+        Situation::R5,
     ];
 
     pub fn name(self) -> &'static str {
@@ -143,18 +198,61 @@ impl Situation {
             Situation::C2 => "c2",
             Situation::D2 => "d2",
             Situation::D3 => "d3",
+            Situation::P6 => "p6",
+            Situation::P9 => "p9",
+            Situation::P10 => "p10",
+            Situation::P11 => "p11",
+            Situation::P12 => "p12",
+            Situation::C1 => "c1",
+            Situation::B10 => "b10",
+            Situation::P4L => "p4l",
+            Situation::P4B => "p4b",
+            Situation::P1E => "p1e",
+            Situation::P7C => "p7c",
+            Situation::P3D => "p3d",
+            Situation::P4W => "p4w",
+            Situation::R1 => "r1",
+            Situation::R2 => "r2",
+            Situation::R3 => "r3",
+            Situation::R4 => "r4",
+            Situation::R5 => "r5",
+            Situation::Human(t) => t.name(),
         }
     }
 
-    pub fn parse(text: &str) -> Result<Self, String> {
-        let names: Vec<&str> = Self::ALL.iter().map(|s| s.name()).collect();
-        Self::ALL.into_iter().find(|s| s.name() == text.to_ascii_lowercase()).ok_or_else(|| format!("no situation {text} ({})", names.join(" ")))
+    /// Every situation: the catalogue's (`ALL`) and the human tricks.
+    pub fn all() -> Vec<Situation> {
+        Self::ALL.into_iter().chain(humans::Trick::every().into_iter().map(Situation::Human)).collect()
     }
 
-    /// 1: built in wave 1 (`scene`), 2: in wave 2 (`tricks`).
+    pub fn parse(text: &str) -> Result<Self, String> {
+        let all = Self::all();
+        let names: Vec<&str> = all.iter().map(|s| s.name()).collect();
+        all.iter().copied().find(|s| s.name() == text.to_ascii_lowercase()).ok_or_else(|| format!("no situation {text} ({})", names.join(" ")))
+    }
+
+    /// 1: built in wave 1 (`scene`), 2: in wave 2 (`tricks`), 3: in wave 3 (`wave3`).
     pub fn wave(self) -> u8 {
         match self {
             Situation::A5 | Situation::B1 | Situation::A1 | Situation::B4 | Situation::B9 | Situation::D1 | Situation::C5 => 1,
+            Situation::P6
+            | Situation::P9
+            | Situation::P10
+            | Situation::P11
+            | Situation::P12
+            | Situation::C1
+            | Situation::B10
+            | Situation::P4L
+            | Situation::P4B
+            | Situation::P1E
+            | Situation::P7C
+            | Situation::P3D
+            | Situation::P4W
+            | Situation::R1
+            | Situation::R2
+            | Situation::R3
+            | Situation::R4
+            | Situation::R5 => 3,
             _ => 2,
         }
     }
@@ -163,7 +261,8 @@ impl Situation {
     /// at rounds 30 to 50 whatever the run asks.
     pub fn start(self, index: usize, round: u32, jitter: u32) -> u32 {
         match self {
-            Situation::P2 => position::round_of(index, 30, 20),
+            Situation::P2 | Situation::P1E => position::round_of(index, 30, 20),
+            Situation::Human(t) => t.start(index, round, jitter),
             _ => position::round_of(index, round, jitter),
         }
     }
@@ -197,6 +296,21 @@ impl Situation {
             Situation::C2 => 40,
             Situation::D2 => 25,
             Situation::D3 => 30,
+            Situation::P6 => 25,
+            Situation::P9 => 15,
+            Situation::P10 => 20,
+            Situation::P11 => 25,
+            Situation::P12 => 30,
+            Situation::C1 => 20,
+            Situation::B10 => 30,
+            Situation::P4L => 20,
+            Situation::P4B => 25,
+            Situation::P1E => 25,
+            Situation::P7C => 30,
+            Situation::P3D => 30,
+            Situation::P4W => 25,
+            Situation::R1 | Situation::R2 | Situation::R3 | Situation::R4 | Situation::R5 => 40,
+            Situation::Human(t) => t.window(),
         }
     }
 }
@@ -286,7 +400,9 @@ fn run_situation(rules: &classic_rules::CompiledRuleset, position: &position::Po
     let start = position.round;
     let edits: Vec<scene::Edit> = (0..situation.levels()).map(|l| scene::edit_of(situation, l, rules, position, &plan)).collect::<Result<_, _>>()?;
     let (control_arm, _) = scene::arms(rules, position, &plan, &edits[0])?;
-    let control = measure_arm(rules, &plan, play::play_arm(rules, control_arm, position.variant, window, to_end)?, start, window);
+    let control_start = metrics::score_share(&plan.roles, rules, &control_arm.game);
+    let mut control = measure_arm(rules, &plan, play::play_arm(rules, control_arm, position.variant, window, to_end)?, start, window);
+    with_start(&mut control, control_start);
     for (level, edit) in edits.iter().enumerate() {
         let (_, edited_arm) = scene::arms(rules, position, &plan, edit)?;
         let world = kernel::replay::hash::authoritative_hash(&edited_arm.game);
@@ -306,7 +422,9 @@ fn run_situation(rules: &classic_rules::CompiledRuleset, position: &position::Po
             };
             save_scene(dir, &saved)?;
         }
-        let edited = measure_arm(rules, &plan, play::play_arm(rules, edited_arm, position.variant, window, to_end)?, start, window);
+        let edited_start = metrics::score_share(&plan.roles, rules, &edited_arm.game);
+        let mut edited = measure_arm(rules, &plan, play::play_arm(rules, edited_arm, position.variant, window, to_end)?, start, window);
+        with_start(&mut edited, edited_start);
         let mut info = plan.info.clone();
         info.insert("roles".to_owned(), format!("{:?}", plan.roles));
         rows.push(Row { situation: situation.name().to_owned(), instance, level: level as u8, position: position.name.clone(), round: start, window, edited, control: control.clone(), info });
@@ -322,6 +440,15 @@ fn measure_arm(rules: &classic_rules::CompiledRuleset, plan: &scene::Plan, playe
         m.extend(metrics::end_outcome(&plan.roles, rules, end));
     }
     m
+}
+
+/// The share of the score the nations in focus held at the start of the arm (after the edit), and
+/// what the play-on changed of it (`play_on_share`): the part of the damage the AI's own play adds
+/// to what the edit took at once.
+fn with_start(m: &mut metrics::Measures, start_share: f64) {
+    let after = m.get("seat_score_share").copied().unwrap_or(start_share);
+    m.insert("start_seat_score_share".to_owned(), start_share);
+    m.insert("play_on_share".to_owned(), after - start_share);
 }
 
 /// `<dir>/<situation>-<instance>-L<level>.json`.
@@ -349,14 +476,19 @@ pub fn rebuild(rules: &classic_rules::CompiledRuleset, saved: &Saved) -> Result<
 /// One random sample on a position (`random::sample`): the control and the edited arm played, the
 /// row's `situation` is "random", its `instance` the sample's number and `info.recipe` the edit.
 pub fn run_random(rules: &classic_rules::CompiledRuleset, position: &position::Position, sample: usize, seed: u64, to_end: bool) -> Result<Row, String> {
-    let (plan, edit, recipe) = random::sample(rules, position, position::mix(seed ^ sample as u64))?;
+    let (plan, edit, recipe, combination) = random::sample(rules, position, position::mix(seed ^ sample as u64))?;
     let window = 40;
     let start = position.round;
     let (control_arm, edited_arm) = scene::arms(rules, position, &plan, &edit)?;
-    let control = measure_arm(rules, &plan, play::play_arm(rules, control_arm, position.variant, window, to_end)?, start, window);
-    let edited = measure_arm(rules, &plan, play::play_arm(rules, edited_arm, position.variant, window, to_end)?, start, window);
+    let start_share = |game: &classic_rules::GameState| metrics::score_share(&plan.roles, rules, game);
+    let (control_start, edited_start) = (start_share(&control_arm.game), start_share(&edited_arm.game));
+    let mut control = measure_arm(rules, &plan, play::play_arm(rules, control_arm, position.variant, window, to_end)?, start, window);
+    let mut edited = measure_arm(rules, &plan, play::play_arm(rules, edited_arm, position.variant, window, to_end)?, start, window);
+    with_start(&mut control, control_start);
+    with_start(&mut edited, edited_start);
     let mut info = plan.info.clone();
     info.insert("recipe".to_owned(), recipe);
+    info.insert("combination".to_owned(), combination);
     info.insert("changes".to_owned(), serde_json::to_string(&edit.changes).map_err(|e| e.to_string())?);
     info.insert("gift".to_owned(), serde_json::to_string(&edit.gift).map_err(|e| e.to_string())?);
     Ok(Row { situation: "random".to_owned(), instance: sample, level: 0, position: position.name.clone(), round: start, window, edited, control, info })

@@ -10,6 +10,7 @@
 //! systems of tracks A and B).
 
 use super::{majors, type_of};
+use crate::classic::ClassicChange;
 use crate::ids::{BuildingKindId, PlayerId, ResourceId, TileId};
 use crate::rules::content::{BuildingKind, CityStateTrait, ResourceClass};
 use crate::rules::CompiledRuleset;
@@ -697,6 +698,7 @@ impl<'a> WorldTransaction<'a> {
             end,
         });
         self.relations_changed(major);
+        self.journal.module_changes.push(ClassicChange::QuestGiven { city_state, player: major, kind });
     }
 
     /// Completed quests pay their reward (most influence first); void ones
@@ -729,6 +731,7 @@ impl<'a> WorldTransaction<'a> {
         });
         for q in done {
             self.change_influence(q.city_state, q.major, reward(q.kind) * 100, rules);
+            self.journal.module_changes.push(ClassicChange::QuestDone { city_state: q.city_state, player: q.major, kind: q.kind });
         }
     }
 
@@ -756,6 +759,7 @@ impl<'a> WorldTransaction<'a> {
             let wins = matches!(q.kind, QuestKind::ContestTechs { .. }) && gained(self, q) == best;
             if wins {
                 self.change_influence(q.city_state, q.major, reward(q.kind) * 100, rules);
+                self.journal.module_changes.push(ClassicChange::QuestDone { city_state: q.city_state, player: q.major, kind: q.kind });
             }
         }
         self.world.module.city_states.quests.retain(|q| {

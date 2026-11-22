@@ -397,8 +397,7 @@ fn check_ready(me: &Fighter<'_>, rules: &CompiledRuleset) -> Result<(), PlanErro
     if me.core.moves_left == 0 {
         return Err(PlanError::NoMovesLeft);
     }
-    let attacks = 1 + me.mods.stat(UnitStat::AttacksPerTurn).max(0) as u8;
-    if me.core.attacks_made >= attacks {
+    if me.core.attacks_made >= attacks_allowed(&me.mods) {
         return Err(PlanError::NoAttacksLeft);
     }
     Ok(())
@@ -774,6 +773,13 @@ pub fn attacks_left(
         return 0;
     }
     let mods = crate::effects::unit::unit_modifiers(auth, rules, core);
-    let attacks = 1 + mods.stat(UnitStat::AttacksPerTurn).clamp(0, 9) as u8;
-    attacks.saturating_sub(core.attacks_made)
+    attacks_allowed(&mods).saturating_sub(core.attacks_made)
+}
+
+/// Attacks a unit may make in one turn: one, and one more for each `AttacksPerTurn` it has
+/// (Unciv `maxAttacksPerTurn`). The only place the limit is computed: the attack validators, the
+/// air sweep and the end of an attack (`finish_attack`, which keeps the moves while attacks remain)
+/// all read it.
+pub fn attacks_allowed(mods: &crate::effects::unit::UnitModifiers) -> u8 {
+    1 + mods.stat(UnitStat::AttacksPerTurn).clamp(0, 9) as u8
 }

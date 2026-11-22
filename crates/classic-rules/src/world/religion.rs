@@ -146,6 +146,12 @@ pub struct ReligionState {
 }
 
 impl ReligionState {
+    /// The state without its founded religions (their founders are history: `world::references`).
+    #[cfg(any(test, feature = "harness"))]
+    pub(crate) fn without_founders(&self) -> Self {
+        Self { religions: Vec::new(), ..self.clone() }
+    }
+
     pub fn new(players: usize, seed: u64) -> Self {
         Self {
             players: vec![PlayerFaith::default(); players],
@@ -230,6 +236,13 @@ impl ReligionState {
 
     pub(crate) fn add_religion(&mut self, religion: FoundedReligion) {
         self.religions.push(religion);
+    }
+
+    /// The city is razed: its slot holds no pressure any more (the slot is never reused).
+    pub(crate) fn forget_city(&mut self, city: CityHandle) {
+        if let Some(slot) = self.cities.get_mut(city.index as usize) {
+            *slot = CityFaith::default();
+        }
     }
 
     pub(crate) fn city_mut(&mut self, city: CityHandle) -> &mut CityFaith {

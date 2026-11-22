@@ -91,6 +91,10 @@ pub trait ClassicGame {
     #[cfg(any(test, feature = "harness"))]
     fn debug_set_victory_options(&mut self, options: crate::world::victory::VictoryOptions);
 
+    /// The World Leader title (as the United Nations' vote gives it), no victory test.
+    #[cfg(any(test, feature = "harness"))]
+    fn debug_set_world_leader(&mut self, leader: Option<PlayerId>);
+
     #[cfg(any(test, feature = "harness"))]
     fn debug_add_project(&mut self, player: PlayerId, project: crate::rules::content::ProjectId);
 
@@ -146,6 +150,30 @@ pub trait ClassicGame {
     #[cfg(any(test, feature = "harness"))]
     fn debug_raise_citadel(&mut self, rules: &CompiledRuleset, owner: PlayerId, tile: TileId) -> bool;
 
+    /// Harness-only: the World Congress sits as the United Nations (founded, with `player` as its
+    /// host when it was not), and the World Leader vote is on the table of the session that opens
+    /// in `rounds` rounds (at least one).
+    #[cfg(any(test, feature = "harness"))]
+    fn debug_united_nations(&mut self, rules: &CompiledRuleset, host: PlayerId, rounds: u32);
+
+    /// Harness-only: `player` holds `short` delegates fewer than the World Leader vote needs, by
+    /// its permanent extra delegates (the ones a failed vote gives); never fewer than it holds now.
+    /// The delegates it holds after the change.
+    #[cfg(any(test, feature = "harness"))]
+    fn debug_delegates_short_of_victory(&mut self, rules: &CompiledRuleset, player: PlayerId, short: u16) -> u16;
+
+    /// Harness-only: `count` new spies of `player` at its starting rank, as an era grants them.
+    #[cfg(any(test, feature = "harness"))]
+    fn debug_add_spies(&mut self, rules: &CompiledRuleset, player: PlayerId, count: u8);
+
+    /// Harness-only: the unit stands for the rest of its owner's turn as a resting unit stands. When
+    /// it has not moved this turn it heals now what the end of the turn would give it (`heal_amount`,
+    /// which gives nothing to a unit that moved), and its moves are spent, so no later order of the
+    /// turn moves it. The ai-stress exam's scripted seats hold their units this way: the seat's AI
+    /// plays the rest of the seat and does not touch them.
+    #[cfg(any(test, feature = "harness"))]
+    fn debug_hold_unit(&mut self, rules: &CompiledRuleset, unit: UnitHandle);
+
 
 
     fn outcome(&self) -> Option<crate::world::victory::Outcome>;
@@ -191,7 +219,7 @@ impl ClassicGame for GameState {
     fn debug_force_war(&mut self, rules: &CompiledRuleset, player: PlayerId, enemy: PlayerId) {
         let mut tx = WorldTransaction::new(self.world_mut());
         let _ = tx.declare_war(player, enemy, rules);
-        let journal = tx.commit().expect("debug_force_war commit");
+        let journal = tx.commit(rules).expect("debug_force_war commit");
         self.commit_journal(rules, &journal);
     }
 
@@ -200,7 +228,7 @@ impl ClassicGame for GameState {
     fn debug_adopt_policy(&mut self, rules: &CompiledRuleset, player: PlayerId, policy: crate::ids::PolicyId) {
         let mut tx = WorldTransaction::new(self.world_mut());
         tx.debug_adopt_policy(player, policy, rules);
-        let journal = tx.commit().expect("debug_adopt_policy commit");
+        let journal = tx.commit(rules).expect("debug_adopt_policy commit");
         self.commit_journal(rules, &journal);
     }
 
@@ -209,7 +237,7 @@ impl ClassicGame for GameState {
     fn debug_start_golden_age(&mut self, rules: &CompiledRuleset, player: PlayerId, turns: u16) {
         let mut tx = WorldTransaction::new(self.world_mut());
         tx.start_golden_age(player, turns);
-        let journal = tx.commit().expect("debug_start_golden_age commit");
+        let journal = tx.commit(rules).expect("debug_start_golden_age commit");
         self.commit_journal(rules, &journal);
     }
 
@@ -217,7 +245,7 @@ impl ClassicGame for GameState {
     fn debug_complete_building(&mut self, rules: &CompiledRuleset, city: CityHandle, building: BuildingKindId) {
         let mut tx = WorldTransaction::new(self.world_mut());
         tx.debug_complete_building(city, building, rules);
-        let journal = tx.commit().expect("debug_complete_building commit");
+        let journal = tx.commit(rules).expect("debug_complete_building commit");
         self.commit_journal(rules, &journal);
     }
 
@@ -238,7 +266,7 @@ impl ClassicGame for GameState {
     fn debug_discover(&mut self, rules: &CompiledRuleset, player: PlayerId, tech: crate::ids::TechId) {
         let mut tx = WorldTransaction::new(self.world_mut());
         tx.learn(player, tech, rules);
-        let journal = tx.commit().expect("debug_discover commit");
+        let journal = tx.commit(rules).expect("debug_discover commit");
         self.commit_journal(rules, &journal);
     }
 
@@ -250,7 +278,7 @@ impl ClassicGame for GameState {
         }
         let mut tx = WorldTransaction::new(self.world_mut());
         tx.start_project(project);
-        let journal = tx.commit().expect("debug_start_league_project commit");
+        let journal = tx.commit(rules).expect("debug_start_league_project commit");
         self.commit_journal(rules, &journal);
     }
 
@@ -265,7 +293,7 @@ impl ClassicGame for GameState {
     ) {
         let mut tx = WorldTransaction::new(self.world_mut());
         tx.contribute_to_project(player, project, production);
-        let journal = tx.commit().expect("debug_contribute_to_league_project commit");
+        let journal = tx.commit(rules).expect("debug_contribute_to_league_project commit");
         self.commit_journal(rules, &journal);
     }
 
@@ -288,7 +316,7 @@ impl ClassicGame for GameState {
     fn debug_place_camp(&mut self, rules: &CompiledRuleset, tile: TileId) {
         let mut tx = WorldTransaction::new(self.world_mut());
         tx.place_empty_camp(tile, rules);
-        let journal = tx.commit().expect("debug_place_camp commit");
+        let journal = tx.commit(rules).expect("debug_place_camp commit");
         self.commit_journal(rules, &journal);
     }
 
@@ -297,7 +325,7 @@ impl ClassicGame for GameState {
     fn debug_set_influence(&mut self, rules: &CompiledRuleset, city_state: PlayerId, major: PlayerId, influence: i32) {
         let mut tx = WorldTransaction::new(self.world_mut());
         tx.set_influence(city_state, major, influence * 100, rules);
-        let journal = tx.commit().expect("debug_set_influence commit");
+        let journal = tx.commit(rules).expect("debug_set_influence commit");
         self.commit_journal(rules, &journal);
     }
 
@@ -307,12 +335,17 @@ impl ClassicGame for GameState {
         self.world_mut().module.victory.options = options;
     }
 
+    #[cfg(any(test, feature = "harness"))]
+    fn debug_set_world_leader(&mut self, leader: Option<PlayerId>) {
+        self.world_mut().module.victory.world_leader = leader;
+    }
+
 
     #[cfg(any(test, feature = "harness"))]
     fn debug_capture_city(&mut self, rules: &CompiledRuleset, city: CityHandle, conqueror: PlayerId) {
         let mut tx = WorldTransaction::new(self.world_mut());
         tx.capture_city(city, conqueror, rules).expect("debug_capture_city: the city exists");
-        let journal = tx.commit().expect("debug_capture_city commit");
+        let journal = tx.commit(rules).expect("debug_capture_city commit");
         self.commit_journal(rules, &journal);
     }
 
@@ -396,7 +429,7 @@ impl ClassicGame for GameState {
     fn debug_deal_item(&mut self, rules: &CompiledRuleset, giver: PlayerId, receiver: PlayerId, item: crate::world::relations::DealItem) -> Result<(), String> {
         let mut tx = WorldTransaction::new(self.world_mut());
         tx.run_item(giver, receiver, item, rules).map_err(|e| format!("{e:?}"))?;
-        let journal = tx.commit().expect("debug_deal_item commit");
+        let journal = tx.commit(rules).expect("debug_deal_item commit");
         self.commit_journal(rules, &journal);
         Ok(())
     }
@@ -408,9 +441,57 @@ impl ClassicGame for GameState {
         };
         let mut tx = WorldTransaction::new(self.world_mut());
         tx.raise_citadel(owner, tile, citadel, rules);
-        let journal = tx.commit().expect("debug_raise_citadel commit");
+        let journal = tx.commit(rules).expect("debug_raise_citadel commit");
         self.commit_journal(rules, &journal);
         true
+    }
+
+    #[cfg(any(test, feature = "harness"))]
+    fn debug_united_nations(&mut self, _rules: &CompiledRuleset, host: PlayerId, rounds: u32) {
+        let last = crate::systems::congress::SESSIONS.len() - 1;
+        let congress = &mut self.world_mut().module.congress;
+        if !congress.founded {
+            congress.founded = true;
+            congress.host = Some(host);
+        }
+        congress.special = last as u8;
+        congress.united_nations = true;
+        congress.leader_vote_due = true;
+        congress.session_round = None;
+        congress.votes.clear();
+        congress.turns_until_session = rounds.max(1);
+    }
+
+    #[cfg(any(test, feature = "harness"))]
+    fn debug_delegates_short_of_victory(&mut self, rules: &CompiledRuleset, player: PlayerId, short: u16) -> u16 {
+        let auth = self.view().auth;
+        let needed = crate::systems::congress::votes_needed(auth);
+        let now = crate::systems::congress::delegates(auth, rules, player);
+        let wanted = needed.saturating_sub(short);
+        if let Some(extra) = self.world_mut().module.congress.extra.get_mut(player.0 as usize) {
+            *extra = extra.saturating_add(wanted.saturating_sub(now));
+        }
+        crate::systems::congress::delegates(self.view().auth, rules, player)
+    }
+
+    #[cfg(any(test, feature = "harness"))]
+    fn debug_add_spies(&mut self, rules: &CompiledRuleset, player: PlayerId, count: u8) {
+        let mut tx = WorldTransaction::new(self.world_mut());
+        tx.add_spies(player, count, rules);
+        let journal = tx.commit(rules).expect("debug_add_spies commit");
+        self.commit_journal(rules, &journal);
+    }
+
+    #[cfg(any(test, feature = "harness"))]
+    fn debug_hold_unit(&mut self, rules: &CompiledRuleset, unit: UnitHandle) {
+        let Some(core) = self.view().auth.units().get(unit).map(|u| *u.core) else {
+            return;
+        };
+        let heal = crate::systems::combat::heal::heal_amount(self.view().auth, rules, &core);
+        if heal > 0 {
+            self.debug_set_unit_hp(unit, core.hp.saturating_add(heal as u16));
+        }
+        self.debug_set_unit_moves(unit, 0);
     }
 
     #[cfg(any(test, feature = "harness"))]

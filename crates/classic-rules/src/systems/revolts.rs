@@ -66,6 +66,11 @@ pub const REBEL_TILE_DEFENCE: i32 = 4;
 pub const REBEL_PLACE_RINGS: usize = 10;
 
 impl<'a> WorldTransaction<'a> {
+    /// `dead` was eliminated (`systems::elimination`): its rebels never rise.
+    pub(crate) fn forget_in_revolts(&mut self, dead: PlayerId) {
+        self.world.module.barbarians.set_revolt(dead, None);
+    }
+
     /// The rebellion step of a nation's resolution (§ module docs).
     pub(crate) fn revolt_turn(&mut self, player: PlayerId, rules: &CompiledRuleset) {
         if !self.world.players.is_major(player) {

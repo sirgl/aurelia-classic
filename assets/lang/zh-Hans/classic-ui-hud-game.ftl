@@ -57,3 +57,7 @@ classic.ui.hud-game.city-state-close = 关闭（Esc）
 
 classic.ui.hud-game.rebels-ahead = 幸福低于{ $threshold }时，你的领土上会爆发叛乱：还差{ NUMBER($left) }点不满
 classic.ui.hud-game.rebels-now = 幸福低于{ $threshold }：你的领土上每隔几回合就会爆发叛乱
+classic.ui.hud-game.rivals-more = 另有 { $n } 个
+classic.ui.hud-game.city-states-row = 城邦：已遇见 { $met } 个
+classic.ui.hud-game.city-states-row-war = 城邦：已遇见 { $met } 个，{ $war } 个交战中
+classic.ui.hud-game.city-states-row-hint = 打开城邦界面

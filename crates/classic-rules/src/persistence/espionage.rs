@@ -5,14 +5,11 @@
 use crate::ids::CityHandle;
 use crate::persistence::decode::DecodeError;
 use crate::persistence::schema::{SavedEspionage, SavedSpy};
-use crate::world::espionage::{EspionageState, Spy, SpyState};
+use crate::persistence::encode::CityOrdinals;
+use crate::world::espionage::{EspionageState, Spy, SpyState, Theft};
 
-fn encode_spy(spy: &Spy, city_ordinals: &[u32]) -> SavedSpy {
-    let city = spy
-        .city
-        .and_then(|c| city_ordinals.get(c.index as usize))
-        .map(|o| o + 1)
-        .unwrap_or(0);
+fn encode_spy(spy: &Spy, city_ordinals: &CityOrdinals) -> SavedSpy {
+    let city = spy.city.and_then(|c| city_ordinals.of(c)).map_or(0, |o| o + 1);
     (
         (spy.name, spy.rank, spy.state.tag(), city),
         (spy.amount as u64, spy.rate as u64, spy.goal as u64),
@@ -20,7 +17,7 @@ fn encode_spy(spy: &Spy, city_ordinals: &[u32]) -> SavedSpy {
     )
 }
 
-pub(crate) fn encode_espionage(state: &EspionageState, city_ordinals: &[u32]) -> SavedEspionage {
+pub(crate) fn encode_espionage(state: &EspionageState, city_ordinals: &CityOrdinals) -> SavedEspionage {
     SavedEspionage {
         spies: state
             .all_spies()
@@ -30,6 +27,14 @@ pub(crate) fn encode_espionage(state: &EspionageState, city_ordinals: &[u32]) ->
         steal_rights: state.all_steal_rights().to_vec(),
         renaissance_granted: state.renaissance_granted(),
         era_granted: state.era_granted().to_vec(),
+        thefts: state
+            .all_thefts()
+            .iter()
+            .filter_map(|t| {
+                let city = city_ordinals.of(t.city)? + 1;
+                Some((t.round, t.victim.0, t.thief.map(|p| p.0 + 1).unwrap_or(0), city))
+            })
+            .collect(),
     }
 }
 
@@ -72,11 +77,25 @@ pub(crate) fn decode_espionage(
         .iter()
         .map(|list| list.iter().map(|s| decode_spy(s, cities)).collect())
         .collect::<Result<Vec<Vec<Spy>>, _>>()?;
+    let thefts = saved
+        .thefts
+        .iter()
+        .map(|&(round, victim, thief, city)| {
+            let corrupt = |what: &str| DecodeError::Corrupt(format!("espionage: {what}"));
+            if usize::from(victim) >= players || usize::from(thief) > players || city == 0 {
+                return Err(corrupt("theft"));
+            }
+            let city = *cities.get(city as usize - 1).ok_or_else(|| corrupt("theft city"))?;
+            let thief = thief.checked_sub(1).map(crate::ids::PlayerId);
+            Ok(Theft { round, victim: crate::ids::PlayerId(victim), thief, city })
+        })
+        .collect::<Result<Vec<Theft>, DecodeError>>()?;
     Ok(EspionageState::from_parts(
         players,
         spies,
         saved.steal_rights.clone(),
         saved.renaissance_granted,
         saved.era_granted.clone(),
+        thefts,
     ))
 }

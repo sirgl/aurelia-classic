@@ -1,0 +1,178 @@
+screen Diplomacy 1366x768
+widgets
+  click "AURELIA / Diplomacy / Back to map / Navigate / Diplomacy / 2 nations met  ·  204…" 0,0 1366x768
+  click "Back to map" 1208,15 132x36
+  click "Navigate" 1080,15 116x36
+  click "Venice / Enrico Dandolo / At peace" 34,222 270x64
+  click "Denmark / Harald Bluetooth / At peace" 34,292 270x64
+  click "Accept" 1072,304 121x28
+  click "Refuse" 1201,304 121x28
+  click "Accept" 1072,430 121x28
+  click "Refuse" 1201,430 121x28
+  click "Declare war" 342,382 222x34
+  click "Denounce" 572,382 222x34
+  spinbutton "1" 342,505 40x18 value 1
+  click "Gold per turn" 342,531 222x30
+  spinbutton "1" 342,564 40x18 value 1
+  click "Embassy" 342,590 222x30
+  scrollbar "" 554,472 10x131
+  spinbutton "1" 572,505 40x18 value 1
+  click "Gold per turn" 572,531 222x30
+  spinbutton "1" 572,564 40x18 value 1
+  click "Embassy" 572,590 222x30
+  scrollbar "" 784,472 10x131
+  click "Declaration of friendship" 802,548 222x30
+  scrollbar "" 1014,472 10x131
+painted
+  clip 0,0 1366x768
+    rect 0,0 1366x768 fill #09161c
+    text "AURELIA" 26,19 89x26 #c1a263 23px
+    text "Diplomacy" 166,22 94x23 #efe9d3 20px
+    rect 1208,15 132x36 fill #192f34 r4
+    rect 1208,15 132x36 stroke 1 #344849 r4
+    text "Back to map" 1236,25 76x16 #efe9d3 14px
+    rect 1080,15 116x36 fill #192f34 r4
+    rect 1080,15 116x36 stroke 1 #344849 r4
+    text "Navigate" 1110,25 56x16 #efe9d3 14px
+    line 24,65 -> 1342,65 stroke 1 #c1a36466
+    rect 24,80 1318x92 fill #11242b r7
+    rect 24,80 1318x92 stroke 1 #344849 r7
+    text "Diplomacy" 48,92 145x36 #efe9d3 31px
+    text "2 nations met  ·  204 gold in your treasury  ·  2 offers waiting" 50,138 371x16 #c1a263 14px
+    rect 24,186 290x545 fill #11242b r7
+    rect 24,186 290x545 stroke 1 #344849 r7
+    text "NATIONS MET" 40,200 63x11 #c1a263 10px
+  clip 24,222 290x501
+    rect 34,222 270x64 fill #254142 r5
+    rect 34,222 270x64 stroke 1.3 #c1a263 r5
+    rect 38,226 56x56 fill #11242b
+    text "Venice" 104,228 47x18 #efe9d3 16px
+    text "Enrico Dandolo" 104,249 75x13 #92a8aa 11px
+    text "At peace" 104,266 43x13 #89bc53 11px
+    rect 34,292 270x64 fill #192f34 r5
+    rect 38,296 56x56 fill #11242b
+    text "Denmark" 104,298 65x18 #efe9d3 16px
+    text "Harald Bluetooth" 104,319 84x13 #92a8aa 11px
+    text "At peace" 104,336 43x13 #89bc53 11px
+  clip 0,0 1366x768
+    rect 1052,186 290x545 fill #11242b r7
+    rect 1052,186 290x545 stroke 1 #344849 r7
+    text "OFFERS TO YOU" 1068,200 73x11 #c1a263 10px
+  clip 1052,222 290x501
+    rect 1062,222 270x118 fill #192f34 r5
+    text "Venice" 1072,230 44x17 #efe9d3 15px
+    text "Answer by turn 11" 1072,250 81x11 #92a8aa 10px
+    text "You receive: Embassy" 1072,268 113x14 #efe9d3 12px
+    text "You give: Embassy" 1072,285 97x14 #efe9d3 12px
+    rect 1072,304 121x28 fill #192f34 r4
+    rect 1072,304 121x28 stroke 1 #344849 r4
+    text "Accept" 1111,310 43x16 #efe9d3 14px
+    rect 1201,304 121x28 fill #192f34 r4
+    rect 1201,304 121x28 stroke 1 #344849 r4
+    text "Refuse" 1240,310 43x16 #efe9d3 14px
+    rect 1062,348 270x118 fill #192f34 r5
+    text "Denmark" 1072,356 61x17 #efe9d3 15px
+    text "Answer by turn 11" 1072,376 81x11 #92a8aa 10px
+    text "You receive: Embassy" 1072,394 113x14 #efe9d3 12px
+    text "You give: Embassy" 1072,411 97x14 #efe9d3 12px
+    rect 1072,430 121x28 fill #192f34 r4
+    rect 1072,430 121x28 stroke 1 #344849 r4
+    text "Accept" 1111,436 43x16 #efe9d3 14px
+    rect 1201,430 121x28 fill #192f34 r4
+    rect 1201,430 121x28 stroke 1 #344849 r4
+    text "Refuse" 1240,436 43x16 #efe9d3 14px
+  clip 0,0 1366x768
+    rect 328,186 710x545 fill #11242b r7
+    rect 328,186 710x545 stroke 1 #344849 r7
+    rect 339,197 174x174 fill #09161c r3
+    rect 339,197 174x174 stroke 1.5 #c1a263 r3
+    rect 342,200 168x168 fill #11242b
+    text "Artwork arriving" 368,275 116x18 #92a8aa 16px
+    text "Venice" 530,200 83x32 #efe9d3 28px
+    text "Enrico Dandolo" 530,236 102x17 #c1a263 15px
+    text "At peace" 530,260 55x16 #89bc53 14px
+    text "Score 70  ·  203 gold" 530,282 107x14 #92a8aa 12px
+    text "No treaties" 530,306 59x14 #efe9d3 12px
+    rect 342,382 222x34 fill #192f34 r4
+    rect 342,382 222x34 stroke 1 #344849 r4
+    text "Declare war" 416,391 74x16 #efe9d3 14px
+    rect 572,382 222x34 fill #192f34 r4
+    rect 572,382 222x34 stroke 1 #344849 r4
+    text "Denounce" 651,391 64x16 #efe9d3 14px
+    rect 802,382 222x34 fill #192f34 r4
+    rect 802,382 222x34 stroke 1 #344849 r4
+    text "Open borders" 873,386 80x15 #92a8aa 13px
+    text "Needs Civil Service" 867,401 92x13 #d66054 11px
+    text "NEGOTIATE A DEAL" 342,432 95x13 #c1a263 11px
+    text "YOU GIVE" 342,454 43x11 #c1a263 10px
+  clip 342,472 222x131
+    rect 342,472 222x30 fill #192f34 r4
+    rect 342,472 222x30 stroke 1 #344849 r4
+    text "Gold" 440,475 27x15 #92a8aa 13px
+    text "Gold is given to friends" 397,488 112x13 #d66054 11px
+    rect 342,505 40x18 fill #3c3c3c r2
+    text "1" 358,507 8x15 #ebe7d5 13px
+    text "of 204" 390,509 29x11 #92a8aa 10px
+    rect 342,531 222x30 fill #192f34 r4
+    rect 342,531 222x30 stroke 1 #344849 r4
+    text "Gold per turn" 411,538 84x16 #efe9d3 14px
+    rect 342,564 40x18 fill #3c3c3c r2
+    text "1" 358,566 8x15 #ebe7d5 13px
+    text "of 4" 390,568 18x11 #92a8aa 10px
+    rect 342,590 222x30 fill #192f34 r4
+    rect 342,590 222x30 stroke 1 #344849 r4
+    text "Embassy" 426,597 54x16 #efe9d3 14px
+    mesh 2tri 342,583 222x20
+  clip 0,0 1366x768
+    text "YOU RECEIVE" 572,454 60x11 #c1a263 10px
+  clip 572,472 222x131
+    rect 572,472 222x30 fill #192f34 r4
+    rect 572,472 222x30 stroke 1 #344849 r4
+    text "Gold" 670,475 27x15 #92a8aa 13px
+    text "Gold is given to friends" 627,488 112x13 #d66054 11px
+    rect 572,505 40x18 fill #3c3c3c r2
+    text "1" 588,507 8x15 #ebe7d5 13px
+    text "of 203" 620,509 29x11 #92a8aa 10px
+    rect 572,531 222x30 fill #192f34 r4
+    rect 572,531 222x30 stroke 1 #344849 r4
+    text "Gold per turn" 641,538 84x16 #efe9d3 14px
+    rect 572,564 40x18 fill #3c3c3c r2
+    text "1" 588,566 8x15 #ebe7d5 13px
+    text "of 3" 620,568 18x11 #92a8aa 10px
+    rect 572,590 222x30 fill #192f34 r4
+    rect 572,590 222x30 stroke 1 #344849 r4
+    text "Embassy" 656,597 54x16 #efe9d3 14px
+    mesh 2tri 572,583 222x20
+  clip 0,0 1366x768
+    text "AGREEMENTS" 802,454 62x11 #c1a263 10px
+  clip 802,472 222x131
+    rect 802,472 222x30 fill #192f34 r4
+    rect 802,472 222x30 stroke 1 #344849 r4
+    text "Defensive pact" 870,475 86x15 #92a8aa 13px
+    text "Chivalry unlocks alliances" 852,488 122x13 #d66054 11px
+    rect 802,510 222x30 fill #192f34 r4
+    rect 802,510 222x30 stroke 1 #344849 r4
+    text "Research agreement" 853,513 120x15 #92a8aa 13px
+    text "Education unlocks agreements" 838,526 150x13 #d66054 11px
+    rect 802,548 222x30 fill #192f34 r4
+    rect 802,548 222x30 stroke 1 #344849 r4
+    text "Declaration of friendship" 836,555 154x16 #efe9d3 14px
+    rect 802,586 222x30 fill #192f34 r4
+    rect 802,586 222x30 stroke 1 #344849 r4
+    text "Peace treaty" 877,589 72x15 #92a8aa 13px
+    mesh 2tri 802,583 222x20
+  clip 0,0 1366x768
+    rect 342,611 682x38 fill #09161c r4
+  clip 350,619 666x22
+    text "Select items above to build your offer." 350,619 220x15 #92a8aa 13px
+  clip 0,0 1366x768
+    text "Select at least one item." 342,655 117x13 #92a8aa 11px
+    rect 342,685 100x32 fill #192f34 r4
+    rect 342,685 100x32 stroke 1 #344849 r4
+    text "Clear offer" 359,693 66x16 #92a8aa 14px
+    rect 450,685 574x32 fill #192f34 r4
+    rect 450,685 574x32 stroke 1 #344849 r4
+    text "Propose deal" 696,693 82x16 #92a8aa 14px
+art
+  art:denmark
+  art:venice

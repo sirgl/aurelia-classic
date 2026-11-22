@@ -76,7 +76,7 @@ impl Session {
         if missing.is_empty() {
             TechStatus::Available
         } else {
-            TechStatus::Locked(format!("Requires {}", missing.join(", ")))
+            TechStatus::Locked(tf!("classic.game.research.requires", names = missing.join(", ")))
         }
     }
 

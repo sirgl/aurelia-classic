@@ -208,8 +208,8 @@ impl<'a> WorldTransaction<'a> {
 
     /// Commit invariants that hold after any mutation (elimination), then
     /// the journal for derived systems.
-    pub fn commit(self) -> Result<ChangeJournal, CommandError> {
-        Ok(self.0.commit())
+    pub fn commit(self, rules: &CompiledRuleset) -> Result<ChangeJournal, CommandError> {
+        Ok(self.0.commit(rules))
     }
 
     /// Commit of a game command: elimination, and the turn moves on when

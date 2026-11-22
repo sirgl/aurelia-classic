@@ -20,6 +20,8 @@ pub struct SavedEspionage {
     pub steal_rights: Vec<u8>,
     pub renaissance_granted: bool,
     pub era_granted: Vec<u8>,
+    /// The thefts found out: (round, victim, thief + 1 or 0, city ordinal + 1).
+    pub thefts: Vec<(u32, u8, u8, u32)>,
 }
 
 /// World Congress: founded, host, special session, United Nations, timer,
@@ -96,6 +98,9 @@ pub struct SavedRelations {
     pub open_until: Vec<u32>,
     /// Warmonger memory (non-negative).
     pub warmonger: Vec<u32>,
+    /// Grievances (observer, offender, kind tag, amount), sorted; empty in saves older than
+    /// `save_codec::GRIEVANCES_SINCE`.
+    pub grievances: Vec<(u8, u8, u8, u32)>,
     pub trades: Vec<(u8, u8, (u8, u32, u16), u32)>,
     #[allow(clippy::type_complexity)]
     pub offers: Vec<(u32, u8, u8, u32, Vec<(u8, (u8, u32, u16))>)>,

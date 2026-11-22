@@ -58,7 +58,7 @@ const fn gate(situation: Situation, kind: Kind, metric: &'static str, test: Test
 }
 
 use Kind::{Behaviour as B, Outcome as O};
-use Situation::{A1, A2, A3, A4, A5, A6, A7, B1, B2, B4, B5, B6, B7, B9, C2, C5, D1, D2, D3, P1, P2, P3, P4, P5, P7, P8};
+use Situation::{A1, A2, A3, A4, A5, A6, A7, B1, B10, B2, B4, B5, B6, B7, B9, C1, C2, C5, D1, D2, D3, P1, P10, P11, P12, P1E, P2, P3, P4, P4B, P4L, P5, P6, P3D, P4W, P7, P7C, P8, P9, R1, R2, R3, R4, R5};
 use Test::{DeltaAtLeast as DGE, DeltaAtMost as DLE, EditedAtLeast as EGE, EditedAtMost as ELE};
 
 pub const GATES: &[Gate] = &[
@@ -187,6 +187,86 @@ pub const GATES: &[Gate] = &[
     gate(D3, O, "end_seat_win_weight", DGE, [-0.05, -0.08, -0.1], NET_PEACE),
     gate(D3, B, "peace", EGE, [0.4, 0.5, 0.6], NET_PEACE),
     gate(D3, B, "peace_round", ELE, [15.0, 12.0, 10.0], NET_PEACE),
+    // Wave 3 (written before its first run, 22 Nov 2026).
+    gate(P6, O, "seat_military", DGE, [-1.0, -2.0, -3.0], NET_ZONE),
+    gate(P6, O, "seat_score_share", DGE, [-0.005, -0.01, -0.015], NET_ZONE),
+    gate(P6, O, "end_seat_win_weight", DGE, [-0.02, -0.03, -0.05], NET_ZONE),
+    gate(P6, B, "script_kills", ELE, [2.0, 3.0, 4.0], NET_ZONE),
+    gate(P6, B, "zone_dead", EGE, [0.2, 0.2, 0.2], NET_ZONE),
+    gate(P9, O, "seat_military", DGE, [-0.5, -1.0, -2.0], NET_HUNT),
+    gate(P9, O, "seat_score_share", DGE, [-0.003, -0.005, -0.01], NET_HUNT),
+    gate(P9, B, "script_sunk", ELE, [0.5, 1.0, 1.5], NET_HUNT),
+    gate(P9, B, "at_sea_end", DLE, [0.0, 0.0, 0.0], NET_HUNT),
+    gate(P10, O, "seat_cities", DGE, [-0.1, -0.3, -0.5], NET_AIR),
+    gate(P10, O, "seat_score_share", DGE, [-0.01, -0.02, -0.04], NET_AIR),
+    gate(P10, O, "end_seat_win_weight", DGE, [-0.03, -0.05, -0.08], NET_AIR),
+    gate(P10, B, "seat_air_added", DGE, [1.0, 1.0, 2.0], NET_AIR),
+    gate(P10, B, "seat_units_lost", DLE, [2.0, 4.0, 6.0], NET_AIR),
+    gate(C1, O, "seat_score_share", DGE, [-0.01, -0.01, -0.01], NET_AIR),
+    gate(C1, O, "seat_cities", DGE, [-0.2, -0.2, -0.2], NET_AIR),
+    gate(C1, B, "seat_air_orders", EGE, [2.0, 4.0, 6.0], NET_AIR),
+    gate(C1, B, "seat_interceptions", EGE, [1.0, 1.0, 1.0], NET_AIR),
+    gate(P11, O, "seat_score_share", DGE, [-0.005, -0.01, -0.015], NET_FAITH),
+    gate(P11, O, "end_seat_win_weight", DGE, [-0.02, -0.03, -0.05], NET_FAITH),
+    gate(P11, B, "cities_converted", DLE, [1.0, 2.0, 3.0], NET_FAITH),
+    gate(P11, B, "faith_answers", DGE, [1.0, 1.0, 2.0], NET_FAITH),
+    gate(P12, O, "seat_score_share", DGE, [-0.005, -0.01, -0.015], NET_SPIES),
+    gate(P12, O, "tech_lead_over_pest", DGE, [-1.0, -2.0, -3.0], NET_SPIES),
+    gate(P12, O, "end_seat_win_weight", DGE, [-0.02, -0.03, -0.05], NET_SPIES),
+    gate(P12, B, "script_stolen", ELE, [1.0, 2.0, 3.0], NET_SPIES),
+    gate(P12, B, "spies_home", DGE, [0.5, 1.0, 1.0], NET_SPIES),
+    gate(B10, O, "leader_won", ELE, [0.2, 0.35, 0.5], NET_VOTE),
+    gate(B10, O, "seat_score_share", DGE, [-0.01, -0.02, -0.03], NET_VOTE),
+    gate(B10, O, "end_seat_win_weight", DGE, [-0.1, -0.2, -0.3], NET_VOTE),
+    gate(B10, B, "leader_allies", DLE, [0.0, 0.0, 0.0], NET_VOTE),
+    gate(B10, B, "wars_on_leader", DGE, [0.2, 0.3, 0.5], NET_VOTE),
+    gate(B10, B, "gifts_others", DGE, [1.0, 2.0, 3.0], NET_VOTE),
+    gate(P4L, O, "seat_score_share", DGE, [-0.01, -0.015, -0.02], NET_DEALS),
+    gate(P4L, O, "seat_treasury", DGE, [-50.0, -100.0, -150.0], NET_DEALS),
+    gate(P4L, O, "end_seat_win_weight", DGE, [-0.02, -0.03, -0.05], NET_DEALS),
+    gate(P4L, B, "script_betrayed", ELE, [0.3, 0.2, 0.1], NET_DEALS),
+    gate(P4B, O, "seat_cities", DGE, [-0.2, -0.3, -0.5], NET_BRIBE),
+    gate(P4B, O, "seat_score_share", DGE, [-0.01, -0.015, -0.02], NET_BRIBE),
+    gate(P4B, O, "end_seat_win_weight", DGE, [-0.02, -0.03, -0.05], NET_BRIBE),
+    gate(P4B, B, "script_betrayed", ELE, [0.3, 0.2, 0.1], NET_BRIBE),
+    gate(P1E, O, "seat_score_share", DGE, [-0.005, -0.01, -0.02], NET_RAID),
+    gate(P1E, O, "seat_cities", DGE, [-0.1, -0.2, -0.3], NET_RAID),
+    gate(P1E, O, "end_seat_win_weight", DGE, [-0.02, -0.03, -0.05], NET_RAID),
+    gate(P1E, B, "civilians_end", DGE, [-0.5, -1.0, -1.5], NET_RAID),
+    gate(P1E, B, "raiders_dead", EGE, [0.5, 0.5, 0.5], NET_RAID),
+    gate(P7C, O, "seat_score_share", DGE, [-0.04, -0.04, -0.04], "commander, scripted retake"),
+    gate(P7C, O, "seat_cities", DGE, [-0.9, -0.9, -0.9], "commander, scripted retake"),
+    gate(P7C, O, "end_seat_win_weight", DGE, [-0.05, -0.05, -0.05], "commander, scripted retake"),
+    gate(P7C, B, "capital_retaken", EGE, [0.3, 0.3, 0.3], "commander, scripted retake"),    gate(P3D, O, "seat_cities", DGE, [-0.3, -0.5, -0.8], NET_DEFENCE),
+    gate(P3D, O, "seat_score_share", DGE, [-0.01, -0.02, -0.03], NET_DEFENCE),
+    gate(P3D, O, "end_seat_win_weight", DGE, [-0.03, -0.05, -0.08], NET_DEFENCE),
+    gate(P3D, B, "counter_by_3", EGE, [0.8, 0.8, 0.8], NET_DEFENCE),
+    gate(P3D, B, "military_added_before_war", DGE, [1.0, 1.0, 2.0], NET_DEFENCE),
+    gate(P4W, O, "seat_cities", DGE, [-0.1, -0.15, -0.2], NET_DEALS),
+    gate(P4W, O, "seat_score_share", DGE, [-0.005, -0.0075, -0.01], NET_DEALS),
+    gate(P4W, O, "end_seat_win_weight", DGE, [-0.02, -0.03, -0.05], NET_DEALS),
+    gate(P4W, B, "script_peace_made", ELE, [0.3, 0.4, 0.5], NET_DEALS),
+    gate(P4W, B, "cities_taken", DGE, [-0.1, -0.15, -0.2], NET_DEALS),
+    // R1-R5, promoted from the random mode on nets-x-site (written before their first run).
+    gate(R1, O, "play_on_share", DGE, [-0.01, -0.02, -0.03], NET_R_LOSS),
+    gate(R1, O, "end_seat_win_weight", DGE, [-0.05, -0.1, -0.15], NET_R_LOSS),
+    gate(R1, B, "seat_recaptures", EGE, [0.2, 0.3, 0.3], NET_R_LOSS),
+    gate(R1, B, "seat_cities_lost", DLE, [0.5, 0.8, 1.0], NET_R_LOSS),
+    gate(R2, O, "play_on_share", DGE, [-0.01, -0.02, -0.03], NET_R_FRONTS),
+    gate(R2, O, "end_seat_win_weight", DGE, [-0.05, -0.1, -0.15], NET_R_FRONTS),
+    gate(R2, B, "seat_recaptures", EGE, [0.2, 0.3, 0.3], NET_R_FRONTS),
+    gate(R2, B, "seat_cities_lost", DLE, [0.5, 0.8, 1.0], NET_R_FRONTS),
+    gate(R3, O, "play_on_share", DGE, [-0.01, -0.02, -0.03], NET_R_GRAB),
+    gate(R3, O, "end_seat_win_weight", DGE, [-0.05, -0.1, -0.15], NET_R_GRAB),
+    gate(R3, B, "seat_cities_lost", DLE, [0.5, 0.8, 1.0], NET_R_GRAB),
+    gate(R4, O, "play_on_share", DGE, [-0.01, -0.02, -0.03], NET_R_BROKE),
+    gate(R4, O, "end_seat_win_weight", DGE, [-0.05, -0.1, -0.15], NET_R_BROKE),
+    gate(R4, B, "seat_recaptures", EGE, [0.2, 0.3, 0.3], NET_R_BROKE),
+    gate(R4, B, "seat_cities_lost", DLE, [0.5, 0.8, 1.0], NET_R_BROKE),
+    gate(R5, O, "play_on_share", DGE, [-0.01, -0.02, -0.03], NET_R_BROKE),
+    gate(R5, O, "end_seat_win_weight", DGE, [-0.05, -0.1, -0.15], NET_R_BROKE),
+    gate(R5, B, "seat_recaptures", EGE, [0.2, 0.3, 0.3], NET_R_BROKE),
+    gate(R5, B, "seat_cities_lost", DLE, [0.5, 0.8, 1.0], NET_R_BROKE),
 ];
 
 const NET_DEFENCE: &str = "danger net (on in standard: the fight fixes read it), tactician, commander (off); scripted defence.rs";
@@ -197,16 +277,32 @@ const NET_DEALS: &str = "none: scripted (peace.rs Negotiation::value, diplomacy.
 const NET_SWEEP: &str = "none: scripted (city_states.rs, victory_watch.rs); strategist has no diplomacy outputs";
 const NET_SEA: &str = "commander; fleet none (fleet.rs)";
 const NET_PEACE: &str = "none: scripted peace.rs";
+const NET_ZONE: &str = "commander, tactician (off); danger net (on: the fight fixes); scripted front.rs, siege_walls.rs";
+const NET_HUNT: &str = "commander (off); none: scripted fleet.rs, operations.rs";
+const NET_AIR: &str = "none: scripted air.rs, strikes.rs";
+const NET_FAITH: &str = "none: scripted religion.rs";
+const NET_SPIES: &str = "none: scripted espionage.rs";
+const NET_VOTE: &str = "none: scripted (victory_watch.rs, vote guard, city_states.rs); strategist has no diplomacy outputs";
+const NET_R_LOSS: &str = "commander, scripted retake; strategist (economy)";
+const NET_R_FRONTS: &str = "commander, scripted retake; none: scripted peace.rs";
+const NET_R_GRAB: &str = "site net (off), danger net (on: the fight fixes); strategist";
+const NET_R_BROKE: &str = "strategist; none: scripted peace.rs, retake";
+const NET_BRIBE: &str = "none: scripted (diplomacy.rs ThirdPartyWar price, peace.rs)";
 
 /// The gates of one situation.
 pub fn of(situation: Situation) -> impl Iterator<Item = &'static Gate> {
-    GATES.iter().filter(move |g| g.situation == situation)
+    GATES.iter().chain(super::humans::gates::GATES).chain(super::humans::gates::OFFENCE).filter(move |g| g.situation == situation)
 }
 
 /// The gates as the document's table.
 pub fn markdown() -> String {
+    markdown_of(GATES)
+}
+
+/// A table of gates as the document holds it.
+pub fn markdown_of(gates: &[Gate]) -> String {
     let mut out = String::from("| situation | kind | metric | test | mild | medium | strong | owning small net |\n|---|---|---|---|---|---|---|---|\n");
-    for g in GATES {
+    for g in gates {
         let kind = if g.kind == Kind::Outcome { "outcome" } else { "behaviour" };
         let _ = writeln!(out, "| {} | {kind} | `{}` | {} | {} | {} | {} | {} |", g.situation.name().to_uppercase(), g.metric, g.test.symbol(), g.threshold[0], g.threshold[1], g.threshold[2], g.net);
     }

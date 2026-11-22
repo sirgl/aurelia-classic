@@ -11,3 +11,4 @@ classic.game.research.unlock-improvement = Improvement: { $name }
 classic.game.research.unlock-improvement-only = Improvement: { $name } ({ $nation } only)
 classic.game.research.unlock-project = Project: { $name }
 classic.game.research.unlock-resource = Reveals: { $name }
+classic.game.research.requires = Requires { $names }

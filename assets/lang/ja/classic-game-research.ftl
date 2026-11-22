@@ -12,3 +12,4 @@ classic.game.research.unlock-improvement = 改良：{ $name }
 classic.game.research.unlock-improvement-only = 改良：{ $name }（{ $nation }のみ）
 classic.game.research.unlock-project = プロジェクト：{ $name }
 classic.game.research.unlock-resource = 発見：{ $name }
+classic.game.research.requires = 必要：{ $names }

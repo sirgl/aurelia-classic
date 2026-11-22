@@ -51,6 +51,7 @@ pub(crate) mod diplomacy;
 pub(crate) mod disband;
 pub(crate) mod economy;
 pub(crate) mod effects;
+pub(crate) mod elimination;
 pub(crate) mod golden_age;
 pub(crate) mod grants;
 pub(crate) mod great_people;

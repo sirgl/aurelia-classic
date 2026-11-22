@@ -37,6 +37,8 @@ mod progress;
 mod game_screens;
 #[path = "screen_civics.rs"]
 mod civics_screen;
+#[path = "civics_focus.rs"]
+pub(crate) mod civics_focus;
 #[path = "world_symbols.rs"]
 pub(crate) mod world_symbols;
 #[path = "screen_religion.rs"]
@@ -262,9 +264,8 @@ pub struct ScreenState {
     policy: usize,
     adopted: BTreeSet<usize>,
     policy_points: u32,
-    /// Civics screen of the game: the branch and the policy looked at.
-    civics_branch: Option<classic_rules::rules::content::PolicyBranchId>,
-    civics_policy: Option<classic_rules::ids::PolicyId>,
+    /// Civics screen of the game: where the focus is (branch, policy, offer) and the keys.
+    civics: civics_focus::Focus,
     /// Religion screen of the game: the beliefs and religion picked.
     faith_picks: religion_screen::FaithPicks,
     /// Diplomacy screen: the nation looked at, the deal drafted, leader art.
@@ -305,8 +306,7 @@ impl Default for ScreenState {
             policy: 0,
             adopted: BTreeSet::new(),
             policy_points: 2,
-            civics_branch: None,
-            civics_policy: None,
+            civics: Default::default(),
             faith_picks: Default::default(),
             diplomacy: Default::default(),
             spy: 0,
@@ -517,6 +517,38 @@ impl ScreenState {
             self.preload_art(ctx, &names);
         }
     }
+    /// Offscreen captures: the policy screen shows this branch.
+    pub fn capture_civics_branch(&mut self, id: classic_rules::rules::content::PolicyBranchId) {
+        self.civics.pick_branch(id);
+    }
+
+    /// Offscreen captures: the list of offers is scrolled by `scroll` points, and `tap` taps to read
+    /// the offer N ("offer" is "offer:0") or the first policy to adopt of the shown branch ("policy").
+    pub fn capture_civics_view(&mut self, view: &crate::ui::model::CivicsView, scroll: f32, tap: Option<&str>) {
+        self.civics.scroll = scroll;
+        // The scroll stays where it was put: the list does not follow the keyboard focus back to the top.
+        self.civics.followed = Some(self.civics.offer);
+        match tap {
+            Some(offer) if offer.starts_with("offer") => {
+                let index = offer.strip_prefix("offer:").and_then(|n| n.parse().ok()).unwrap_or(0);
+                self.civics.tap_offer(index, view);
+            }
+            Some("policy") => {
+                let card = view.branches.get(self.civics.branch_index(view));
+                if let Some(policy) = card.and_then(|c| c.adoptable().next()) {
+                    self.civics.tap_policy(policy.id);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    /// A key of the policy screen: the request it takes, if it took something. The pause after a
+    /// take is timed from the moment of the key itself.
+    pub fn civics_key(&mut self, view: &crate::ui::model::CivicsView, key: civics_focus::Move) -> Option<GameRequest> {
+        self.civics.apply(view, key, web_time::Instant::now())
+    }
+
     /// Offscreen captures: decode the art the game's Civics screen shows now.
     pub fn preload_civics_art(&mut self, ctx: &egui::Context, model: &ScreenModel) {
         if let Some(view) = &model.civics {
@@ -560,6 +592,10 @@ impl ScreenState {
         // it comes back where the player left it.
         if screen == Screen::Research && from != Screen::Encyclopedia {
             self.research_opened = true;
+        }
+        // The policy screen opens on what may be taken now (the end-turn button waits for it).
+        if screen == Screen::Civics && from != Screen::Encyclopedia {
+            self.civics.zone = civics_focus::Zone::Auto;
         }
         // Every new game starts from a fresh seed; coming back from a reference page keeps the form.
         if screen == Screen::MatchSetup && from != Screen::Encyclopedia {

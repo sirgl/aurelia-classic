@@ -12,3 +12,4 @@ classic.game.research.unlock-improvement = Aménagement : { $name }
 classic.game.research.unlock-improvement-only = Aménagement : { $name } ({ $nation } uniquement)
 classic.game.research.unlock-project = Projet : { $name }
 classic.game.research.unlock-resource = Révèle : { $name }
+classic.game.research.requires = Nécessite : { $names }

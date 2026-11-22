@@ -39,7 +39,7 @@ pub fn trusted(round: u32, r: &Relation) -> bool {
         && !recent_war
         && !r.they_denounced
         && !r.we_denounced
-        && r.warmonger < DISTRUST_WARMONGER
+        && r.remembered_against() < DISTRUST_WARMONGER
 }
 
 /// Gold value of a relation item for the AI receiving it (`receiving`) or giving it; gold,
@@ -137,13 +137,13 @@ pub fn proposals_priced(obs: &AIObservation<'_>, rules: &CompiledRuleset, agreem
         // proposals): what it settles is not in this observation yet, so a
         // proposal of the same items would be refused (an embassy that
         // exists, friends already).
-        if obs.offers_to_us.iter().any(|o| o.from == r.other) {
+        if obs.offers_to_us.iter().any(|o| o.from == r.other) || obs.waiting_on(r.other) {
             continue;
         }
         // An offer of this partner is answered in the same turn: the
         // observation would be stale for a proposal (the core refused
         // "embassy exists" when both sides proposed the same exchange).
-        if obs.offers_to_us.iter().any(|o| o.from == r.other) {
+        if obs.offers_to_us.iter().any(|o| o.from == r.other) || obs.waiting_on(r.other) {
             continue;
         }
         let items: Vec<(PlayerId, DealItem)> = if r.at_war {
@@ -233,7 +233,7 @@ pub fn luxury_swaps(obs: &AIObservation<'_>, rules: &CompiledRuleset, others: &[
     let proposed = |other: PlayerId| others.iter().any(|c| matches!(c, Command::ProposeDeal { to, .. } if *to == other));
     let mut out = Vec::new();
     for r in &obs.relations {
-        let busy = r.at_war || proposed(r.other) || obs.offers_to_us.iter().any(|o| o.from == r.other);
+        let busy = r.at_war || proposed(r.other) || obs.offers_to_us.iter().any(|o| o.from == r.other) || obs.waiting_on(r.other);
         if r.kind != PlayerKind::Major || busy || spares.is_empty() {
             continue;
         }
@@ -250,12 +250,13 @@ pub fn luxury_swaps(obs: &AIObservation<'_>, rules: &CompiledRuleset, others: &[
     out
 }
 
-/// Denounce nations whose warmonger memory passed DENOUNCE_WARMONGER.
+/// Denounce nations whose warmonger memory and grievances (`Relation::remembered_against`) passed
+/// DENOUNCE_WARMONGER.
 pub fn denunciations(obs: &AIObservation<'_>) -> Vec<Command> {
     obs.relations
         .iter()
         .filter(|r| r.kind == PlayerKind::Major && !r.we_denounced && !r.friends)
-        .filter(|r| r.warmonger >= DENOUNCE_WARMONGER)
+        .filter(|r| r.remembered_against() >= DENOUNCE_WARMONGER)
         .map(|r| Command::Denounce {
             player: obs.player,
             target: r.other,

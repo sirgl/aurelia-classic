@@ -137,14 +137,16 @@ fn between_two_humans_the_offer_waits_for_the_answer() {
     assert!(!at_war(&game, P0, P1));
 }
 
-/// Unanswered, the offer lapses (after `deals::OFFER_ROUNDS`, one round) and the war goes on:
-/// nobody's silence makes peace.
+/// Unanswered, the offer lapses (after `INBOX_ROUNDS` in the inbox of a human) and the war goes
+/// on: nobody's silence makes peace.
 #[test]
 fn an_unanswered_offer_lapses_and_the_war_goes_on() {
     let rules = compile_rules(core_rules()).unwrap();
     let mut game = old_war(&rules);
     game.execute(&rules, white_peace(P0, P1)).unwrap();
     rounds(&mut game, &rules, 2);
+    assert_eq!(game.view().auth.module().relations().offers().len(), 1, "it waits in the inbox");
+    rounds(&mut game, &rules, classic_rules::INBOX_ROUNDS);
     assert!(game.view().auth.module().relations().offers().is_empty(), "the offer lapsed");
     assert!(at_war(&game, P0, P1));
 }

@@ -12,7 +12,7 @@ use classic_rules::rules::content::CityStateId;
 use classic_rules::world::congress::{votes_needed_for, ResolutionKind, SESSIONS, YES};
 use classic_rules::world::player::PlayerKind;
 use classic_rules::world::state::GameConfig;
-use classic_rules::world::victory::VictoryKind;
+use classic_rules::world::victory::{VictoryKind, VictoryOptions};
 use classic_rules::{compile_rules, Command, CompiledRuleset, GameState};
 use classic_rules::world::player::ClassicKind;
 
@@ -391,4 +391,153 @@ fn the_ai_without_delegates_or_session_casts_nothing() {
     }
     assert!(!game.view().auth.module().congress().in_session());
     assert!(vote_orders(&game.ai_observation(&rules, P0)).is_empty(), "no session");
+}
+
+/// Two nations and a city-state as in `world()`, with domination off so that the last nation
+/// standing does not end the game when the other one is eliminated.
+fn world_without_domination() -> (GameState, CompiledRuleset) {
+    let (mut game, rules) = world();
+    game.debug_set_victory_options(VictoryOptions { disabled: VictoryKind::Domination.bit(), ..VictoryOptions::default() });
+    (game, rules)
+}
+
+/// `killer` takes the only city of `victim`, next to which it spawns warriors.
+fn eliminate(game: &mut GameState, rules: &CompiledRuleset, killer: PlayerId, victim: PlayerId, next_to: (i32, i32)) {
+    until_active(game, rules, killer);
+    let warrior = UnitKindId(rules.units.iter().position(|u| u.key == "core:unit/warrior").unwrap() as u16);
+    game.execute(rules, Command::DeclareWar { player: killer, enemy: victim }).unwrap();
+    for _ in 0..8 {
+        let Some(city) = game.view().auth.indexes().cities_of(victim).first().copied() else {
+            break;
+        };
+        let attacker = game.debug_spawn_unit(rules, killer, tile(game, next_to.0, next_to.1), warrior);
+        let core = game.view().auth.cities().get(city).unwrap();
+        let max = classic_rules::combat::city::max_hit_points(game.view().auth, rules, core);
+        game.debug_set_city_damage(city, max - 1);
+        let _ = game.execute(rules, Command::AttackCity { attacker, city });
+    }
+    assert!(!game.view().auth.players().is_alive(victim), "{victim:?} is eliminated");
+}
+
+/// The league founded by P0 (the host), whose only city P1 takes.
+fn league_whose_host_is_eliminated() -> (GameState, CompiledRuleset) {
+    let (mut game, rules) = world_without_domination();
+    game.debug_learn(&rules, P0, tech(&rules, "core:tech/printing-press"));
+    end_round(&mut game, &rules);
+    assert_eq!(game.view().auth.module().congress().host(), Some(P0));
+    eliminate(&mut game, &rules, P1, P0, (4, 3));
+    (game, rules)
+}
+
+/// A host who is eliminated hands the league over at the league's next turn (to the living nation with
+/// the most delegates), and no dead nation keeps a proposal slot or the tie-break.
+#[test]
+fn a_host_who_is_eliminated_gives_the_league_to_a_living_nation() {
+    let (mut game, rules) = league_whose_host_is_eliminated();
+    // The league's turn of the round of the elimination has run already; the next one hands over.
+    end_round(&mut game, &rules);
+    end_round(&mut game, &rules);
+    let congress = game.view().auth.module().congress();
+    assert_eq!(congress.host(), Some(P1), "proposers {:?}", congress.proposers());
+    assert_eq!(congress.proposers(), &[P1]);
+    assert_eq!(classic_rules::world::congress::delegates(game.view().auth, &rules, P1), 3, "the new host's seat");
+    for _ in 0..60 {
+        end_round(&mut game, &rules);
+    }
+    let congress = game.view().auth.module().congress();
+    assert_eq!(congress.host(), Some(P1));
+    assert!(congress.proposers().iter().all(|p| game.view().auth.players().is_alive(*p)), "{:?}", congress.proposers());
+}
+
+/// A nation elected host who dies before the tally does not become host, and the vote for a
+/// dead World Leader candidate counts for nobody.
+#[test]
+fn an_elected_host_who_dies_before_the_tally_does_not_become_host() {
+    let (mut game, rules) = world_without_domination();
+    game.debug_learn(&rules, P0, tech(&rules, "core:tech/printing-press"));
+    end_round(&mut game, &rules);
+    for i in 0..rules.technologies.len() {
+        game.debug_learn(&rules, P0, TechId(i as u16));
+    }
+    for _ in 0..6 {
+        if game.view().auth.module().congress().in_session() {
+            break;
+        }
+        end_round(&mut game, &rules);
+    }
+    let congress = game.view().auth.module().congress();
+    assert_eq!(congress.proposals()[0].kind, ResolutionKind::ChangeHost, "{:?}", congress.proposals());
+    until_active(&mut game, &rules, P0);
+    let delegates = game.view().auth.module().congress().delegates_left(P0);
+    game.execute(&rules, Command::CastVotes { player: P0, proposal: 0, choice: u32::from(P1.0), delegates }).unwrap();
+    eliminate(&mut game, &rules, P0, P1, (23, 15));
+    for _ in 0..3 {
+        end_round(&mut game, &rules);
+    }
+    let congress = game.view().auth.module().congress();
+    assert!(!congress.in_session());
+    assert_eq!(congress.host(), Some(P0), "the dead candidate did not win; proposers {:?}", congress.proposers());
+}
+
+/// One whole round; the module changes of it.
+fn round_changes(game: &mut GameState, rules: &CompiledRuleset) -> Vec<classic_rules::classic::ClassicChange> {
+    let round = game.view().auth.turn().round;
+    let mut changes = Vec::new();
+    while game.view().auth.turn().round == round {
+        let active = game.view().auth.active_player();
+        let result = game.execute(rules, Command::EndTurn { player: active }).unwrap();
+        changes.extend(result.changes().module_changes.iter().copied());
+    }
+    changes
+}
+
+/// A nation's proposal leaves the list in two ways only: the session it waited for opens and
+/// decides it, or the World Leader vote replaces the agenda and it is dropped, told with
+/// `ClassicChange::ProposalDropped`. Over 250 rounds of a United Nations (18 proposals) it never
+/// vanishes unannounced, and the session order (timer, finish, open) survives a save and a load in
+/// the middle of a session. (The drop itself did not occur in this game: the 14 November
+/// hypothesis "the timer adds a vote into an open session" is not reproducible, as the audit said.)
+#[test]
+fn a_proposal_never_vanishes_unannounced_and_a_save_in_a_session_plays_on_alike() {
+    use classic_rules::classic::ClassicChange;
+    let (mut game, rules) = world();
+    for i in 0..rules.technologies.len() {
+        game.debug_learn(&rules, P0, TechId(i as u16));
+        game.debug_learn(&rules, P1, TechId(i as u16));
+    }
+    end_round(&mut game, &rules);
+    assert!(game.view().auth.module().congress().united_nations());
+    let own = |g: &GameState| g.view().auth.module().congress().proposals().iter().filter(|p| p.proposer.is_some()).count();
+    let (mut proposed, mut saved_in_session) = (0, false);
+    for _ in 0..250 {
+        for player in [P0, P1] {
+            until_active(&mut game, &rules, player);
+            let congress = game.view().auth.module().congress();
+            if congress.in_session() || !congress.proposers().contains(&player) {
+                continue;
+            }
+            let kind = ResolutionKind::StandingArmyTax;
+            if game.execute(&rules, Command::ProposeResolution { player, kind, choice: 0, repeal: false }).is_ok() {
+                proposed += 1;
+            }
+        }
+        let (waiting, was_open) = (own(&game), game.view().auth.module().congress().in_session());
+        if was_open && !saved_in_session {
+            saved_in_session = true;
+            let save = classic_rules::persistence::encode::encode(&game, &rules);
+            let mut loaded = classic_rules::persistence::decode::decode(&save, &rules).unwrap();
+            assert_eq!(authoritative_hash(&loaded), authoritative_hash(&game));
+            round_changes(&mut loaded, &rules);
+            round_changes(&mut game, &rules);
+            assert_eq!(authoritative_hash(&loaded), authoritative_hash(&game), "the save plays the round alike");
+            continue;
+        }
+        let changes = round_changes(&mut game, &rules);
+        let told = changes.iter().any(|c| matches!(c, ClassicChange::ProposalDropped { .. }));
+        if waiting > 0 && !was_open && own(&game) == 0 && !game.view().auth.module().congress().in_session() {
+            assert!(told, "{waiting} proposals vanished without a word");
+        }
+    }
+    assert!(proposed >= 5, "nations proposed: {proposed}");
+    assert!(saved_in_session, "a session was open at some point");
 }

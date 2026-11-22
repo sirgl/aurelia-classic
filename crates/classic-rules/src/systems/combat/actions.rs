@@ -14,6 +14,7 @@ use crate::rules::effects::UnitAbility;
 use crate::rules::CompiledRuleset;
 use crate::transaction::journal::{CityChange, TileChange};
 use crate::transaction::transaction::WorldTransaction;
+use crate::world::relations::{GrievanceKind, STOLEN_TILE_POINTS};
 use crate::world::unit::{MOVE_DENOMINATOR, UNIT_MAX_HP};
 use crate::classic::content::GREAT_PERSON_IMPROVEMENT;
 
@@ -179,12 +180,13 @@ impl<'a> WorldTransaction<'a> {
     /// the owner's cities that hold a tile next to or among the taken ones,
     /// the nearest to `tile` (a razing city counts 5 tiles farther), else
     /// the owner's nearest city; with no city nothing is taken. A city-state
-    /// that loses a tile loses 15 influence with the taker per tile. Unciv:
-    /// UniqueTriggerActivation.kt `OneTimeTakeOverTilesInRadius` (Citadel:
-    /// "Gain control over [all] tiles in a [1]-tile radius"); equal, but the
-    /// opinion of a major that loses tiles (Unciv: −10 per tile,
-    /// `StealingTerritory`) is not kept: there is no opinion memory of that
-    /// shape (`systems::diplomacy`).
+    /// that loses a tile loses 15 influence with the taker per tile; a major
+    /// that loses a tile holds a grievance against the taker, 10 opinion
+    /// points per tile, fading by itself (`GrievanceKind::StolenLand`).
+    /// Unciv: UniqueTriggerActivation.kt `OneTimeTakeOverTilesInRadius`
+    /// (Citadel: "Gain control over [all] tiles in a [1]-tile radius"; the
+    /// `StealingTerritory` modifier, −10 per tile; −15 influence of a
+    /// city-state); equal. Third nations hold nothing (as in Unciv).
     pub(crate) fn take_over_tiles(&mut self, owner: PlayerId, tile: TileId, radius: i32, rules: &CompiledRuleset) {
         if radius < 0 {
             return;
@@ -197,7 +199,6 @@ impl<'a> WorldTransaction<'a> {
             return;
         }
         let cities = take_over_cities(self.world, owner, tile, &taken);
-        let max = i32::from(crate::world::city::CULTURE_RADIUS_MAX);
         let mut guests = Vec::new();
         for near in taken {
             // A tile goes to the first city, in the order of Unciv's `cityPriority`, that holds it
@@ -205,7 +206,7 @@ impl<'a> WorldTransaction<'a> {
             // city's tiles lie within `CULTURE_RADIUS_MAX`, `validate` and the capture of a city
             // rely on it).
             let Some(city) = cities.iter().copied().find(|c| {
-                self.world.cities.get(*c).is_some_and(|core| dims.distance(core.tile, near).is_some_and(|d| d <= max))
+                self.world.cities.get(*c).is_some_and(|core| dims.distance(core.tile, near).is_some_and(|d| d <= CITADEL_CITY_REACH))
             }) else {
                 continue;
             };
@@ -213,6 +214,9 @@ impl<'a> WorldTransaction<'a> {
             crate::transaction::journal::claim_tile(&mut *self.0.world, &mut self.0.journal, city, near);
             if let Some(victim) = from.filter(|&v| crate::world::player::ClassicPlayers::is_city_state(&self.world.players, v)) {
                 self.change_influence(victim, owner, -CITADEL_CITY_STATE_INFLUENCE * 100, rules);
+            }
+            if let Some(victim) = from {
+                self.add_grievance(victim, owner, GrievanceKind::StolenLand, STOLEN_TILE_POINTS);
             }
             // Unciv takeOwnership: a barbarian encampment on the tile is removed.
             self.remove_camp_at(near);
@@ -397,9 +401,11 @@ impl<'a> WorldTransaction<'a> {
         let Some(core) = self.world.cities.get(city) else {
             return;
         };
-        let capital = core.original_capital;
         let pop = core.population;
-        if !capital && (level > 2 || (level == 2 && pop < NUKE_LEVEL2_ELIM_POPULATION_THRESHOLD)) {
+        // Unciv Nuke.doNukeExplosionDamageToCity: `canBeDestroyed(true)`; an original capital or a
+        // holy city survives with the damage and the losses below.
+        let destroyed = level > 2 || (level == 2 && pop < NUKE_LEVEL2_ELIM_POPULATION_THRESHOLD);
+        if destroyed && crate::combat::city::can_be_destroyed(self.world, rules, city, true) {
             self.remove_city(city, rules);
             return;
         }
@@ -450,6 +456,14 @@ pub fn citadel_of(rules: &CompiledRuleset) -> Option<crate::ids::ImprovementId> 
 /// of its tiles. Unciv: UniqueTriggerActivation.kt
 /// (`OneTimeTakeOverTilesInRadius`, `addInfluence(-15f)`); equal.
 pub const CITADEL_CITY_STATE_INFLUENCE: i32 = 15;
+
+/// Furthest distance from a city of the owner at which a culture bomb gives that city a tile: the
+/// city's culture radius (`CULTURE_RADIUS_MAX`; a city's tiles lie within it, `validate` and the
+/// capture of a city rely on it). Differs from Unciv: Unciv gives the tile to the city nearest to
+/// the citadel whatever the distance, here a tile no city reaches stays as it was, so a citadel 5
+/// tiles from its city takes its own tile and the tiles around it that lie within 5 of the city,
+/// not the ones at 6 (`tests/review_citadel_holes2.rs`, `tests/citadel_opinion.rs`).
+pub const CITADEL_CITY_REACH: i32 = crate::world::city::CULTURE_RADIUS_MAX as i32;
 
 /// Extra distance of a razing city when the culture bomb picks the city
 /// that gets the tiles. Unciv: UniqueTriggerActivation.kt (`cityPriority`);

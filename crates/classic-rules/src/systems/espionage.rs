@@ -14,7 +14,8 @@ use crate::rules::effects::{CompiledEffect, Modifier, Selector};
 use crate::rules::stats::{EspionageStat, Stat};
 use crate::rules::CompiledRuleset;
 use crate::transaction::transaction::WorldTransaction;
-use crate::world::espionage::{Spy, SpyState, MAX_RANK};
+use crate::classic::ClassicChange;
+use crate::world::espionage::{Spy, SpyState, Theft, MAX_RANK};
 use crate::world::state::AuthWorld;
 use crate::world::player::ClassicPlayers;
 
@@ -300,6 +301,24 @@ pub fn move_problem(
 }
 
 impl<'a> WorldTransaction<'a> {
+    /// `dead` was eliminated (`systems::elimination`): its spies are gone (Unciv:
+    /// `removeAllSpies` at `Civilization.destroy`), nobody may steal from it, nor it from anyone, and
+    /// no record of a theft names it (a dead victim's AI reads none; a living victim's AI no
+    /// longer weighs a dead thief).
+    pub(crate) fn forget_in_espionage(&mut self, dead: PlayerId) {
+        let players = self.world.players.count();
+        let espionage = &mut self.world.module.espionage;
+        if let Some(spies) = espionage.spies.get_mut(usize::from(dead.0)) {
+            spies.clear();
+        }
+        for i in 0..players {
+            let other = PlayerId(i as u8);
+            espionage.set_steal_rights(dead, other, 0);
+            espionage.set_steal_rights(other, dead, 0);
+        }
+        espionage.thefts.retain(|theft| theft.victim != dead && theft.thief != Some(dead));
+    }
+
     /// The `Espionage` turn step: spies granted by the era, every spy
     /// processed.
     pub(crate) fn espionage_turn(&mut self, player: PlayerId, rules: &CompiledRuleset) {
@@ -476,6 +495,7 @@ impl<'a> WorldTransaction<'a> {
         let roll = self.world.rng.events.below(300) as i64;
         let catch = player_stat(self.world, rules, owner, EspionageStat::CatchPercent);
         let outcome = detection(roll, spy.rank, counter.map(|(_, rank)| rank), catch);
+        self.report_theft(player, owner, city, outcome);
         if outcome == Detection::Killed {
             if let Some((i, _)) = counter {
                 if let Some(c) = self.world.module.espionage.spy_mut(owner, i) {
@@ -510,6 +530,25 @@ impl<'a> WorldTransaction<'a> {
         };
         self.relations_changed(player);
         spy
+    }
+
+    /// What the victim learns of a theft (§7.5, Unciv `stealTech`): nothing when it went
+    /// undetected; that a theft happened when detected; the thief too when identified; that a spy
+    /// was caught when killed. The journal tells both nations; the victim's AI reads the record.
+    fn report_theft(&mut self, thief: PlayerId, victim: PlayerId, city: CityHandle, outcome: Detection) {
+        let identified = match outcome {
+            Detection::Undetected => return,
+            Detection::Killed => {
+                self.journal.module_changes.push(ClassicChange::SpyKilled { thief, victim, city });
+                return;
+            }
+            Detection::Detected => false,
+            Detection::Identified => true,
+        };
+        self.journal.module_changes.push(ClassicChange::TheftDetected { thief, victim, city, identified });
+        let round = self.world.turn.round;
+        let thief = identified.then_some(thief);
+        self.world.module.espionage.record_theft(Theft { round, victim, thief, city });
     }
 
     /// Recompute the steal rate of spies gathering intelligence; their
@@ -752,6 +791,11 @@ impl<'a> WorldTransaction<'a> {
                 };
             }
         }
+    }
+
+    /// The city is razed: no record of a theft names it (`remove_city`).
+    pub(crate) fn forget_thefts_in(&mut self, city: CityHandle) {
+        self.world.module.espionage.thefts.retain(|theft| theft.city != city);
     }
 
     /// War sends the diplomats of both sides home.

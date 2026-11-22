@@ -1,5 +1,4 @@
-//! The diplomacy step of a player's end turn (after Science): the ties with nations that are
-//! gone, research agreements (accumulate, pay out at the end),
+//! The diplomacy step of a player's end turn (after Science): research agreements (accumulate, pay out at the end),
 //! open borders that expire, offers to it that lapse, the decay of its
 //! warmonger memory.
 
@@ -10,8 +9,14 @@ use crate::systems::diplomacy::{
     WARMONGER_DECAY,
 };
 use crate::transaction::transaction::WorldTransaction;
-use crate::world::relations::TradeFlow;
+use crate::systems::diplomacy::deals::offer_problem;
+use crate::world::relations::{DealItem, DealOffer, OfferLapse, TradeFlow};
 use crate::classic::ClassicChange;
+
+/// Does `offer` ask for peace?
+fn is_peace(offer: &DealOffer) -> bool {
+    offer.items.iter().any(|(_, item)| *item == DealItem::Peace)
+}
 
 impl<'a> WorldTransaction<'a> {
     /// `science`: the player's science of this turn (research agreements
@@ -26,44 +31,67 @@ impl<'a> WorldTransaction<'a> {
             return;
         }
         let round = self.world.turn.round;
-        self.close_dead_ties();
         self.research_agreements(player, science.max(0) as u32, round, rules);
         self.expire_open_borders(player, round, rules);
         self.decay_warmonger(player, rules);
+        self.fade_grievances(player, rules);
+        self.sweep_inbox(rules);
         self.lapse_offers(player, round);
         self.world.module.relations.trades.retain(|t| round < t.until);
     }
 
-    /// The offers to `player` that nobody answered in time leave the list; their proposers are told
-    /// (`ClassicChange::OfferLapsed`).
+    /// The offers to the AI `player` that it did not answer in time leave the list; their proposers
+    /// are told (`ClassicChange::OfferLapsed`). The offers to a human go through `sweep_inbox`.
     fn lapse_offers(&mut self, player: PlayerId, round: u32) {
         let offers = &mut self.world.module.relations.offers;
         let (lapsed, kept): (Vec<_>, Vec<_>) = offers.drain(..).partition(|o| o.to == player && round >= o.expires);
         *offers = kept;
         for offer in lapsed {
-            let peace = offer.items.iter().any(|(_, i)| *i == crate::world::relations::DealItem::Peace);
-            self.journal.module_changes.push(ClassicChange::OfferLapsed { from: offer.from, to: offer.to, peace });
+            let peace = is_peace(&offer);
+            self.journal.module_changes.push(ClassicChange::OfferLapsed {
+                from: offer.from,
+                to: offer.to,
+                peace,
+                reason: OfferLapse::Expired,
+            });
         }
     }
 
-    /// Every tie with a nation that is gone ends, both ways: its trades pay nothing (a dead
-    /// payer's step never runs again, a dead receiver cannot be paid) and the living party must
-    /// not count them. Runs at every turn end and at the settlement of the round.
-    pub(crate) fn close_dead_ties(&mut self) {
-        let players = &self.world.players;
-        let gone = |p: PlayerId| !players.is_alive(p);
-        let pairs: Vec<(PlayerId, PlayerId)> = self
-            .world
-            .module
-            .relations
-            .trades
-            .iter()
-            .filter(|t| gone(t.from) || gone(t.to))
-            .map(|t| (t.from, t.to))
-            .collect();
-        for (a, b) in pairs {
-            self.end_ties(a, b);
+    /// Takes every offer to a human out of the inbox that cannot be answered any more, and says
+    /// why (`ClassicChange::OfferLapsed`). The offers to an AI are not swept: it answers each at
+    /// the start of its turn, so they lapse by their round only (`offer_lifetime`).
+    fn sweep_inbox(&mut self, rules: &CompiledRuleset) {
+        let offers = self.world.module.relations.offers.clone();
+        for offer in offers {
+            if self.world.settings().is_ai(offer.to) {
+                continue;
+            }
+            let Some(reason) = self.lapse_reason(&offer, rules) else { continue };
+            self.world.module.relations.offers.retain(|o| o.id != offer.id);
+            self.relations_changed(offer.to);
+            self.journal
+                .module_changes
+                .push(ClassicChange::OfferLapsed { from: offer.from, to: offer.to, peace: is_peace(&offer), reason });
         }
+    }
+
+    /// Why `offer` can no longer be answered, if it cannot. The first cause in the order the
+    /// player would name it: the nation is gone, the war began, the term ran out, the terms fail.
+    fn lapse_reason(&self, offer: &DealOffer, rules: &CompiledRuleset) -> Option<OfferLapse> {
+        let players = &self.world.players;
+        if !players.is_alive(offer.from) || !players.is_alive(offer.to) {
+            return Some(OfferLapse::NationGone);
+        }
+        if !is_peace(offer) && self.world.diplomacy().at_war(offer.from, offer.to) {
+            return Some(OfferLapse::WarBegan);
+        }
+        if self.world.turn.round >= offer.expires {
+            return Some(OfferLapse::Expired);
+        }
+        if offer_problem(self.world, rules, offer.from, offer.to, &offer.items).is_some() {
+            return Some(OfferLapse::NoLongerPossible);
+        }
+        None
     }
 
     /// The gold per turn of every running deal, settled once a round after every player's
@@ -77,7 +105,6 @@ impl<'a> WorldTransaction<'a> {
         if self.world.module.relations.is_pristine() {
             return;
         }
-        self.close_dead_ties();
         let round = self.world.turn.round;
         let mut due: Vec<(PlayerId, PlayerId, u32, u32)> = self
             .world
@@ -180,6 +207,17 @@ impl<'a> WorldTransaction<'a> {
             self.world.diplomacy.set_open(player, guest, false);
             self.expel_units(player, guest, rules);
             self.relations_changed(player);
+        }
+    }
+
+    /// Every grievance `observer` holds fades by its kind's rate at the game's pace (Unciv
+    /// `DiplomacyTurnManager.revertToZero`: 0.67 x rate / speed modifier, gone when the rate
+    /// reaches what is left).
+    fn fade_grievances(&mut self, observer: PlayerId, rules: &CompiledRuleset) {
+        let pace = self.world.settings().speed(rules).pace_percent;
+        let held: Vec<_> = self.world.module.relations.grievances.iter().filter(|g| g.observer == observer).copied().collect();
+        for g in held {
+            self.world.module.relations.add_grievance(observer, g.offender, g.kind, -g.kind.fading_at(pace));
         }
     }
 

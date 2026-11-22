@@ -77,3 +77,7 @@ classic.ui.hud-game.city-state-close = Закрыть (Esc)
 
 classic.ui.hud-game.rebels-ahead = Ниже { $threshold } счастья в ваших землях поднимаются мятежники: до этого { NUMBER($left) } недовольства
 classic.ui.hud-game.rebels-now = Счастье ниже { $threshold }: каждые несколько ходов в ваших землях поднимаются мятежники
+classic.ui.hud-game.rivals-more = и ещё { $n }
+classic.ui.hud-game.city-states-row = Города-государства: встречено { $met }
+classic.ui.hud-game.city-states-row-war = Города-государства: встречено { $met }, в войне { $war }
+classic.ui.hud-game.city-states-row-hint = Открыть экран городов-государств

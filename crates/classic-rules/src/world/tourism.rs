@@ -249,6 +249,22 @@ pub struct TourismParts {
 }
 
 impl TourismState {
+    /// The state without its history: the creators of great works and who fought or built on a
+    /// tile (archaeology records and sites), `world::references`.
+    #[cfg(any(test, feature = "harness"))]
+    pub(crate) fn without_history(&self) -> Self {
+        let mut state = self.clone();
+        state.works.clear();
+        state.archaeology.records.clear();
+        state.archaeology.sites.clear();
+        for pending in &mut state.archaeology.pending {
+            // The record of a pending find is history too; who chooses is not.
+            pending.site.record.first = pending.player;
+            pending.site.record.second = None;
+        }
+        state
+    }
+
     pub fn new(players: usize, seed: u64) -> Self {
         let player = PlayerTourism {
             influence: vec![0; players],
@@ -316,6 +332,13 @@ impl TourismState {
     pub(crate) fn add_work(&mut self, work: GreatWork) -> GreatWorkId {
         self.works.push(work);
         GreatWorkId(self.works.len() as u32 - 1)
+    }
+
+    /// The city is razed: the works in its slots are lost with it (the slot is never reused).
+    pub(crate) fn forget_city(&mut self, city: CityHandle) {
+        if let Some(slot) = self.cities.get_mut(city.index as usize) {
+            *slot = CityWorks::default();
+        }
     }
 
     pub(crate) fn city_mut(&mut self, city: CityHandle) -> &mut CityWorks {

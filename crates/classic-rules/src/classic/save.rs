@@ -65,7 +65,7 @@ fn corrupt(msg: impl Into<String>) -> DecodeError {
 }
 
 pub(crate) fn encode(world: &ClassicWorld, auth: &AuthWorld) -> SavedClassic {
-    let city_ordinals = crate::persistence::encode::city_ordinals(auth);
+    let city_ordinals = crate::persistence::encode::CityOrdinals::new(auth);
     SavedClassic {
         trade_routes: crate::persistence::trade::encode_routes(auth),
         military: world

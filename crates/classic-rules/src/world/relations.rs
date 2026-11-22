@@ -62,8 +62,125 @@ pub struct DealOffer {
     pub to: PlayerId,
     /// (giver, item); a mutual item is listed once.
     pub items: Vec<(PlayerId, DealItem)>,
-    /// The offer lapses at the end of this round.
+    /// The offer lapses when the round reaches this value (`systems::diplomacy::deals::offer_lifetime`).
     pub expires: u32,
+}
+
+/// Why an observer holds a grievance against another player: a wrong the observer remembers,
+/// in opinion points that fade by themselves. The warmonger memory (`RelationsState::warmonger`)
+/// is the world's memory of an aggressor; a grievance is the memory of the one who was wronged.
+/// Each kind names its fading (Unciv `DiplomaticModifiers`: the `revertToZero` rate of
+/// `DiplomacyTurnManager.nextTurnDiplomaticModifiers`); its trigger names the points.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum GrievanceKind {
+    /// A tile of the observer's land was taken by a culture bomb (the citadel). Unciv:
+    /// `StealingTerritory`, -10 per tile (`UniqueTriggerActivation.kt`, `OneTimeTakeOverTilesInRadius`),
+    /// fading by 1/4 a turn (`DiplomacyTurnManager.kt`).
+    StolenLand,
+    /// The offender declared war on a nation it had declared friendship with, or on its own
+    /// allied city-state. Unciv: `BetrayedDeclarationOfFriendship` (DeclareWar.kt
+    /// `breakTreaties`, `handleCityStateDirectAttack`), fading by 1/8 a turn.
+    BetrayedFriendship,
+    /// The offender declared war on its defensive pact partner. Unciv: `BetrayedDefensivePact`
+    /// (DeclareWar.kt `breakTreaties`; it adds to the friendship's), fading by 1/16 a turn.
+    BetrayedPact,
+}
+
+/// How many kinds of grievance there are.
+pub const GRIEVANCE_KINDS: usize = 3;
+
+/// Opinion points a taken tile costs its former owner. Unciv: UniqueTriggerActivation.kt
+/// (`OneTimeTakeOverTilesInRadius`, `StealingTerritory` -10); equal.
+pub const STOLEN_TILE_POINTS: i32 = 10;
+
+/// Opinion points the victim of a betrayed friendship holds. Unciv: DeclareWar.kt
+/// (`breakTreaties`, -40 for the target, times the Loyal focus of the default personality, 1); equal.
+pub const BETRAYED_FRIEND_POINTS: i32 = 40;
+
+/// Opinion points every other nation that knows the betrayer of a friendship holds. Unciv:
+/// DeclareWar.kt (`breakTreaties`, -20); equal.
+pub const BETRAYED_FRIEND_WITNESS_POINTS: i32 = 20;
+
+/// Opinion points the victim of a betrayed defensive pact holds. Unciv: DeclareWar.kt
+/// (`breakTreaties`, -20 for the target); equal.
+pub const BETRAYED_PACT_POINTS: i32 = 20;
+
+/// Opinion points every other nation that knows the betrayer of a defensive pact holds. Unciv:
+/// DeclareWar.kt (`breakTreaties`, -10); equal.
+pub const BETRAYED_PACT_WITNESS_POINTS: i32 = 10;
+
+/// Opinion points every nation that knows it holds against a nation that declared war on its own
+/// allied city-state. Unciv: DeclareWar.kt (`handleCityStateDirectAttack`,
+/// `BetrayedDeclarationOfFriendship` -10); equal.
+pub const BETRAYED_ALLY_POINTS: i32 = 10;
+
+/// Units one opinion point is kept in for a grievance, so that a fading of 0.67 x 1/4 a turn is exact.
+/// Own value (storage only: the opinion modifiers of Unciv are floats).
+pub const GRIEVANCE_POINT: i32 = 10_000;
+
+/// Percent of its rate a grievance fades by, divided by the speed's pace. Unciv:
+/// DiplomacyTurnManager.kt (`SPEED_ADJUSTMENT_NORMALIZATION_FACTOR` 0.67, `revertToZero`); equal.
+pub const GRIEVANCE_FADING_PERCENT: i32 = 67;
+
+impl GrievanceKind {
+    pub fn all() -> [GrievanceKind; GRIEVANCE_KINDS] {
+        [GrievanceKind::StolenLand, GrievanceKind::BetrayedFriendship, GrievanceKind::BetrayedPact]
+    }
+
+    pub fn index(self) -> usize {
+        match self {
+            GrievanceKind::StolenLand => 0,
+            GrievanceKind::BetrayedFriendship => 1,
+            GrievanceKind::BetrayedPact => 2,
+        }
+    }
+
+    /// What the grievance fades by in a round at Standard pace, in [`GRIEVANCE_POINT`]s.
+    pub const fn fading(self) -> i32 {
+        match self {
+            GrievanceKind::StolenLand => GRIEVANCE_POINT / 4,
+            GrievanceKind::BetrayedFriendship => GRIEVANCE_POINT / 8,
+            GrievanceKind::BetrayedPact => GRIEVANCE_POINT / 16,
+        }
+    }
+
+    /// What the grievance fades by in a round at the pace `pace_percent` (Standard 100).
+    pub fn fading_at(self, pace_percent: u32) -> i32 {
+        let pace = i64::from(pace_percent.max(1));
+        (i64::from(self.fading()) * i64::from(GRIEVANCE_FADING_PERCENT) / pace) as i32
+    }
+
+    /// The saved tag; `from_tag` is its inverse.
+    pub fn tag(self) -> u8 {
+        self.index() as u8
+    }
+
+    pub fn from_tag(tag: u8) -> Option<GrievanceKind> {
+        Self::all().get(usize::from(tag)).copied()
+    }
+}
+
+/// What `observer` holds against `offender` for one reason, in [`GRIEVANCE_POINT`]s (always > 0).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Grievance {
+    pub observer: PlayerId,
+    pub offender: PlayerId,
+    pub kind: GrievanceKind,
+    pub amount: i32,
+}
+
+/// Why an offer left the list of its receiver without an answer. Not stored: the journal tells it
+/// (`ClassicChange::OfferLapsed`) and the screen of the receiver says it once.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum OfferLapse {
+    /// Nobody answered before the round it expires.
+    Expired,
+    /// The proposer or the receiver is gone from the game.
+    NationGone,
+    /// The two nations are at war now, and the offer is not a peace.
+    WarBegan,
+    /// The terms cannot be met any more (a city changed hands, the gold is spent, the peace is made).
+    NoLongerPossible,
 }
 
 /// Why an offer that makes peace was refused, and what would turn the refusal into a yes.
@@ -122,6 +239,8 @@ pub struct RelationsState {
     pub(crate) open_until: Vec<u32>,
     /// Warmonger memory of observer a about player b (directed, ≥ 0).
     pub(crate) warmonger: Vec<i32>,
+    /// Grievances, sorted by (observer, offender, kind), one entry for each, all above 0.
+    pub(crate) grievances: Vec<Grievance>,
     pub(crate) trades: Vec<OngoingTrade>,
     pub(crate) offers: Vec<DealOffer>,
     pub(crate) next_offer: u32,
@@ -142,6 +261,7 @@ impl RelationsState {
             denounced_until: vec![0; n],
             open_until: vec![0; n],
             warmonger: vec![0; n],
+            grievances: Vec::new(),
             trades: Vec::new(),
             offers: Vec::new(),
             next_offer: 0,
@@ -212,6 +332,41 @@ impl RelationsState {
         self.slot(a, b).map(|i| self.warmonger[i]).unwrap_or(0)
     }
 
+    /// What observer `a` holds against `b` for `kind`, in [`GRIEVANCE_POINT`]s.
+    pub fn grievance(&self, a: PlayerId, b: PlayerId, kind: GrievanceKind) -> i32 {
+        self.grievances
+            .iter()
+            .find(|g| g.observer == a && g.offender == b && g.kind == kind)
+            .map_or(0, |g| g.amount)
+    }
+
+    /// What observer `a` holds against `b` by reason (index = `GrievanceKind::index`).
+    pub fn grievances_about(&self, a: PlayerId, b: PlayerId) -> [i32; GRIEVANCE_KINDS] {
+        GrievanceKind::all().map(|kind| self.grievance(a, b, kind))
+    }
+
+    pub fn grievances(&self) -> &[Grievance] {
+        &self.grievances
+    }
+
+    /// Adds `delta` (any sign) to what `observer` holds against `offender` for `kind`; at 0 the
+    /// grievance is gone.
+    pub(crate) fn add_grievance(&mut self, observer: PlayerId, offender: PlayerId, kind: GrievanceKind, delta: i32) {
+        let key = |g: &Grievance| (g.observer.0, g.offender.0, g.kind);
+        match self.grievances.binary_search_by_key(&(observer.0, offender.0, kind), key) {
+            Ok(i) => {
+                let amount = self.grievances[i].amount.saturating_add(delta).max(0);
+                if amount == 0 {
+                    self.grievances.remove(i);
+                } else {
+                    self.grievances[i].amount = amount;
+                }
+            }
+            Err(i) if delta > 0 => self.grievances.insert(i, Grievance { observer, offender, kind, amount: delta }),
+            Err(_) => {}
+        }
+    }
+
     pub fn trades(&self) -> &[OngoingTrade] {
         &self.trades
     }
@@ -257,16 +412,15 @@ impl RelationsState {
         balance
     }
 
-    /// Gold per turn `player` pays (negative) or receives by deals. A deal with a nation that
-    /// is no longer `alive` pays nothing either way (its trades are closed at the next
-    /// turn end, `close_dead_ties`) and is not counted.
-    pub fn gold_per_turn(&self, player: PlayerId, round: u32, alive: impl Fn(PlayerId) -> bool) -> i32 {
+    /// Gold per turn `player` pays (negative) or receives by deals (a dead nation has none: its
+    /// deals end at its death, `systems::elimination`).
+    pub fn gold_per_turn(&self, player: PlayerId, round: u32) -> i32 {
         let mut total = 0;
         for t in &self.trades {
             let TradeFlow::GoldPerTurn(gold) = t.flow else {
                 continue;
             };
-            if round >= t.until || !alive(t.from) || !alive(t.to) {
+            if round >= t.until {
                 continue;
             }
             if t.to == player {

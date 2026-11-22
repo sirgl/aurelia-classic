@@ -101,9 +101,14 @@ fn the_game_without_the_feature_plays_nets_x_site() {
 /// Re-pinned for the fifteenth promotion (22 November): every seat played by `nets-x-site` with the
 /// feature on `ai/nets-x` 266bd4d (`Variant::NetsXSite`): 84 gifts, 14 votes; the old `standard`
 /// (`next-x`, now `pre-nets-x`) gave `CITY_STATES_OLD_STANDARD` there (69 gifts, 9 votes), as pinned before.
-const CITY_STATES_NETS_X_SITE: u64 = 0x3b75_e0a9_1881_0fcb;
+/// Re-pinned for the grievances and the record of thefts (release/fixes, 22 November): `nets-x-site`
+/// with the feature gives the same d7a7a2695f354aa9 (124 gifts, 14 votes), `pre-nets-x` 45ce4b825a460c90
+/// (85 gifts, 9 votes). With both switched off the game gives the pins before again (3b75e0a918810fcb,
+/// 84 gifts; 0c9850c68098e5a6, 69 gifts); the grievances alone change the play (84 -> 124 gifts), the
+/// thefts only the hash.
+const CITY_STATES_NETS_X_SITE: u64 = 0xd7a7_a269_5f35_4aa9;
 /// The same case played by the old `standard` (now `pre-nets-x`), same source.
-const CITY_STATES_OLD_STANDARD: u64 = 0x0c98_50c6_8098_e5a6;
+const CITY_STATES_OLD_STANDARD: u64 = 0x45ce_4b82_5a46_0c90;
 const CITY_STATES_ROUNDS: usize = 420;
 
 /// The longer case of the promotion's review: city-states, gifts and votes are played in the game

@@ -44,6 +44,9 @@ pub struct Session {
     /// the core has no such state; it only removes the unit from "needs orders".
     pub(super) skipped: Vec<UnitHandle>,
     pub(super) sleeping: Vec<UnitHandle>,
+    /// The round in which the player last opened the Congress, the diplomacy and the espionage
+    /// screen (`Looked`): what the end of the turn asks about them is answered by looking.
+    pub(super) looked: [Option<u32>; 3],
     pub(super) notices: Vec<Notice>,
     pub(super) message: Option<String>,
     pub(super) path_cache: Option<super::path::PathCache>,
@@ -64,6 +67,8 @@ pub struct Session {
     /// What each nation that refused the player's peace asks for it, as it said (`PeaceRefusal`).
     /// UI-only: the next refusal replaces it, an accepted peace removes it.
     pub(super) peace_asks: Vec<(PlayerId, classic_rules::world::relations::PeaceRefusal)>,
+    /// The round each nation's units were last told at the border (`news.rs`).
+    pub(super) border_told: Vec<(PlayerId, u32)>,
     /// A war or a denunciation waiting for the player's yes (`super::confirm`). UI-only.
     pub(super) confirm: Option<super::confirm::Confirmation>,
 }
@@ -129,6 +134,7 @@ impl Session {
             city_strike: None,
             skipped: Vec::new(),
             sleeping: Vec::new(),
+            looked: [None; 3],
             notices: Vec::new(),
             message: None,
             path_cache: None,
@@ -139,6 +145,7 @@ impl Session {
             ruins_later: None,
             city_state_open: None,
             peace_asks: Vec::new(),
+            border_told: Vec::new(),
             confirm: None,
         };
         if observer.is_none() {
@@ -728,6 +735,7 @@ impl Session {
         self.sleeping.clear();
         self.notices.clear();
         self.peace_asks.clear();
+        self.border_told.clear();
         self.confirm = None;
         self.message = None;
         self.path_cache = None;

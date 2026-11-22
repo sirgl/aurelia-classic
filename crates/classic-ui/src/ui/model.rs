@@ -3,6 +3,7 @@
 //! `game::Session` builds these from the authoritative `GameState` (observer knowledge only);
 //! widgets never see `GameState` and never mutate anything. One frame: model in, requests out.
 use classic_rules::command::CityDecision;
+use classic_rules::derived::culture::{BranchBlock, IdeologyBlock, Payment, PolicyBlock};
 use classic_rules::ids::{
     BeliefId, CityHandle, PlayerId, PolicyId, ProductionItem, PromotionId, TechId, TileId,
     UnitHandle,
@@ -198,6 +199,8 @@ pub struct Rival {
     /// The nation refused the player's peace and said what it asks.
     pub peace_ask: Option<PeaceAsk>,
     pub open_borders: Availability,
+    /// A city-state, not a nation: the map's panel sums these up in one row.
+    pub city_state: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -355,6 +358,66 @@ pub struct ResearchView {
     pub per_turn: u32,
 }
 
+/// What taking a policy, a branch or an ideology costs.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Cost {
+    Culture(u32),
+    FreePolicy,
+    FreeTenet,
+    /// Choosing an ideology costs nothing.
+    Nothing,
+}
+
+impl From<Payment> for Cost {
+    fn from(payment: Payment) -> Self {
+        match payment {
+            Payment::Culture(n) => Cost::Culture(n),
+            Payment::FreePolicy => Cost::FreePolicy,
+            Payment::FreeTenet => Cost::FreeTenet,
+        }
+    }
+}
+
+/// Why a policy, a branch or an ideology cannot be taken now (the core's verdict, not a text).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Lock {
+    Policy(PolicyBlock),
+    Branch(BranchBlock),
+    Ideology(IdeologyBlock),
+}
+
+impl Lock {
+    /// The core's reason in the player's language.
+    pub fn reason(self) -> &'static str {
+        match self {
+            Lock::Policy(block) => crate::game::reasons::policy(block),
+            Lock::Branch(block) => crate::game::reasons::branch(block),
+            Lock::Ideology(block) => crate::game::reasons::ideology(block),
+        }
+    }
+
+    /// The only thing missing is culture: waiting fixes it.
+    pub fn is_culture(self) -> bool {
+        matches!(self, Lock::Policy(PolicyBlock::NotEnoughCulture) | Lock::Branch(BranchBlock::NotEnoughCulture))
+    }
+
+    /// The branch waits for a later era.
+    pub fn is_era(self) -> bool {
+        matches!(self, Lock::Branch(BranchBlock::EraTooEarly))
+    }
+}
+
+/// The state of one policy, tenet, opener or finisher.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PolicyState {
+    Adopted,
+    /// May be adopted now, for this price.
+    Adoptable(Cost),
+    /// An opener or a finisher that has not come yet: it comes with the branch.
+    Included,
+    Locked(Lock),
+}
+
 /// One policy, tenet, opener or finisher on the Civics screen.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PolicyCard {
@@ -369,17 +432,30 @@ pub struct PolicyCard {
     pub tier: u8,
     /// Positions in the branch's `policies` that must be adopted first.
     pub requires: Vec<usize>,
-    pub adopted: bool,
-    pub availability: Availability,
+    pub state: PolicyState,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+impl PolicyCard {
+    pub fn adopted(&self) -> bool {
+        self.state == PolicyState::Adopted
+    }
+
+    /// The price when the policy may be adopted now.
+    pub fn price(&self) -> Option<Cost> {
+        match self.state {
+            PolicyState::Adoptable(cost) => Some(cost),
+            _ => None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BranchState {
     /// Unlocked (or the chosen ideology).
     Open,
-    /// May be unlocked (or chosen) now.
-    Available,
-    Locked(String),
+    /// May be unlocked (or chosen) now, for this price.
+    Available(Cost),
+    Locked(Lock),
 }
 
 /// A policy branch or an ideology.
@@ -399,17 +475,110 @@ pub struct BranchCard {
     pub free_tenets: u8,
 }
 
+impl BranchCard {
+    pub fn adopted_count(&self) -> usize {
+        self.policies.iter().filter(|p| p.adopted()).count()
+    }
+
+    /// The policies and tenets that may be adopted now.
+    pub fn adoptable(&self) -> impl Iterator<Item = &PolicyCard> {
+        self.policies.iter().filter(|p| p.price().is_some())
+    }
+}
+
+/// What one click on the Civics screen takes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum OfferKind {
+    Policy(PolicyId),
+    /// Unlock a branch: its opener comes with it.
+    Unlock(PolicyBranchId),
+    Ideology(PolicyBranchId),
+}
+
+impl OfferKind {
+    /// The request the core validates.
+    pub fn request(self) -> GameRequest {
+        match self {
+            OfferKind::Policy(id) => GameRequest::AdoptPolicy(id),
+            OfferKind::Unlock(id) => GameRequest::UnlockBranch(id),
+            OfferKind::Ideology(id) => GameRequest::ChooseIdeology(id),
+        }
+    }
+}
+
+/// One thing the player can take this turn (the "Available now" list): a policy of an open
+/// branch, a branch to unlock, an ideology to choose.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Offer {
+    pub kind: OfferKind,
+    pub name: String,
+    /// The branch it belongs to.
+    pub branch: String,
+    pub art: String,
+    /// What it does (a branch: what its opener does).
+    pub text: String,
+    pub cost: Cost,
+}
+
+impl Offer {
+    /// The branch an unlock or ideology offer is about (tests).
+    #[cfg(test)]
+    pub(crate) fn branch_id(&self) -> PolicyBranchId {
+        match self.kind {
+            OfferKind::Unlock(id) | OfferKind::Ideology(id) => id,
+            OfferKind::Policy(_) => panic!("a policy offer has no branch id"),
+        }
+    }
+
+    /// Every offer of the branches, in screen order: policies of open branches, then branches
+    /// to unlock, then ideologies.
+    pub fn all(branches: &[BranchCard]) -> Vec<Offer> {
+        let mut out = Vec::new();
+        for card in branches {
+            for (policy, cost) in card.policies.iter().filter_map(|p| p.price().map(|cost| (p, cost))) {
+                out.push(Offer {
+                    kind: OfferKind::Policy(policy.id),
+                    name: policy.name.clone(),
+                    branch: card.name.clone(),
+                    art: policy.art.clone(),
+                    text: policy.text.clone(),
+                    cost,
+                });
+            }
+        }
+        for card in branches {
+            let BranchState::Available(cost) = card.state else { continue };
+            let kind = if card.ideology { OfferKind::Ideology(card.id) } else { OfferKind::Unlock(card.id) };
+            out.push(Offer {
+                kind,
+                name: card.name.clone(),
+                branch: card.name.clone(),
+                art: card.art.clone(),
+                text: card.opener.as_ref().map(|o| o.text.clone()).unwrap_or_default(),
+                cost,
+            });
+        }
+        out.sort_by_key(|offer| matches!(offer.kind, OfferKind::Ideology(_)));
+        out
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CivicsView {
     pub culture: u32,
     pub per_turn: u32,
     pub next_cost: u32,
+    /// What the policy after the next one costs once this one is paid for (the core's, a free
+    /// policy leaves the price as it is).
+    pub cost_after: u32,
     /// Turns until the pool covers the next policy (None: no culture income).
     pub turns: Option<u32>,
     pub free_policies: u16,
     pub free_tenets: u16,
     /// Normal branches, then ideologies, table order.
     pub branches: Vec<BranchCard>,
+    /// Everything that may be taken now (`Offer::all`).
+    pub offers: Vec<Offer>,
 }
 
 /// A belief card: name, game text and artwork (an atlas id).
@@ -704,4 +873,79 @@ pub enum GameRequest {
         destination: CityHandle,
         kind: classic_rules::world::trade::RouteKind,
     },
+}
+
+/// A hand-made policy screen for the tests of the screen and its focus.
+#[cfg(test)]
+pub(crate) mod civics_sample {
+    use super::*;
+
+    pub fn policy(id: u16, name: &str, text: &str, grid: (u8, u8), requires: Vec<usize>, state: PolicyState) -> PolicyCard {
+        PolicyCard { id: PolicyId(id), name: name.into(), art: format!("test/{name}"), text: text.into(), grid, tier: 0, requires, state }
+    }
+
+    pub fn branch(id: u16, name: &str, state: BranchState, opener: &str, finisher: &str, policies: Vec<PolicyCard>) -> BranchCard {
+        let card = |id: u16, text: &str| policy(id, name, text, (0, 0), vec![], PolicyState::Included);
+        BranchCard {
+            id: PolicyBranchId(id),
+            name: name.into(),
+            art: name.to_lowercase(),
+            ideology: false,
+            era: None,
+            state,
+            opener: Some(card(100 + id, opener)),
+            finisher: Some(card(200 + id, finisher)),
+            policies,
+            free_tenets: 0,
+        }
+    }
+
+    /// Liberty open (Republic adopted, Citizenship may be adopted, Meritocracy waits for it),
+    /// Tradition may be unlocked, Honor waits for an era, Freedom is an ideology not yet due.
+    pub fn view() -> CivicsView {
+        let adoptable = PolicyState::Adoptable(Cost::Culture(45));
+        let liberty = branch(
+            1,
+            "Liberty",
+            BranchState::Open,
+            "+1 culture in every city",
+            "When adopted: a free great person of your choice",
+            vec![
+                policy(10, "Republic", "+1 production in every city; +5% growth", (1, 1), vec![], PolicyState::Adopted),
+                policy(11, "Citizenship", "+25% worker speed; a free Worker", (2, 1), vec![], adoptable),
+                policy(12, "Meritocracy", "+1 happiness per city with a connection", (2, 2), vec![1], PolicyState::Locked(Lock::Policy(PolicyBlock::MissingPrerequisite))),
+            ],
+        );
+        let tradition = branch(
+            0,
+            "Tradition",
+            BranchState::Available(Cost::Culture(45)),
+            "-25% culture needed for border growth; +3 culture in the capital",
+            "+15% growth in every city; a free Aqueduct",
+            vec![policy(20, "Aristocracy", "+15% wonder production", (1, 1), vec![], PolicyState::Locked(Lock::Policy(PolicyBlock::BranchLocked)))],
+        );
+        let mut honor = branch(
+            2,
+            "Honor",
+            BranchState::Locked(Lock::Branch(BranchBlock::EraTooEarly)),
+            "+25% combat bonus against barbarians",
+            "Great generals appear faster",
+            vec![],
+        );
+        honor.era = Some("Classical era".into());
+        let mut freedom = branch(3, "Freedom", BranchState::Locked(Lock::Ideology(IdeologyBlock::TooEarly)), "+1 culture per specialist", "-", vec![]);
+        freedom.ideology = true;
+        let branches = vec![tradition, liberty, honor, freedom];
+        CivicsView {
+            culture: 120,
+            per_turn: 6,
+            next_cost: 45,
+            cost_after: 75,
+            turns: Some(0),
+            free_policies: 0,
+            free_tenets: 0,
+            offers: Offer::all(&branches),
+            branches,
+        }
+    }
 }

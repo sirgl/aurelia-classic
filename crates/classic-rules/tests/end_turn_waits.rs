@@ -92,7 +92,7 @@ fn a_policy_waits_once_a_turn() {
     assert_eq!(pending(&game, &rules), vec![]);
     game.debug_grant_culture(P0, 1000);
     assert_eq!(pending(&game, &rules), vec![PendingAction::Policy]);
-    let chosen = HandledThisTurn { policy_chosen: true, resting: &[] };
+    let chosen = HandledThisTurn { policy_chosen: true, ..Default::default() };
     assert_eq!(pending_actions(game.view().auth, &rules, P0, chosen), vec![]);
 }
 
@@ -123,7 +123,7 @@ fn a_unit_the_player_rested_has_its_order() {
     let (mut game, rules, capital) = setup();
     settle_city_and_research(&mut game, &rules, capital);
     let warrior = spawn(&mut game, &rules, "core:unit/warrior");
-    let rested = HandledThisTurn { policy_chosen: false, resting: &[warrior] };
+    let rested = HandledThisTurn { resting: &[warrior], ..Default::default() };
     assert_eq!(pending_actions(game.view().auth, &rules, P0, rested), vec![]);
 }
 
@@ -238,4 +238,98 @@ fn an_annexed_conquest_in_resistance_is_not_asked_until_it_can_build() {
     assert!(pending(&game, &rules).contains(&PendingAction::EmptyProduction(city)), "the resistance is over: it asks");
     game.execute(&rules, Command::EnqueueProduction { player: P0, city, item: warrior }).unwrap();
     assert!(!pending(&game, &rules).contains(&PendingAction::EmptyProduction(city)));
+}
+
+// --- Decisions the player may decline: asked for until the screen has been looked at this turn ---
+
+fn round_of(game: &GameState) -> u32 {
+    game.view().auth.turn().round
+}
+
+fn end_round(game: &mut GameState, rules: &CompiledRuleset) {
+    let round = round_of(game);
+    while round_of(game) == round {
+        let active = game.view().auth.active_player();
+        game.execute(rules, Command::EndTurn { player: active }).unwrap();
+    }
+}
+
+fn until_active(game: &mut GameState, rules: &CompiledRuleset, player: PlayerId) {
+    for _ in 0..4 {
+        let active = game.view().auth.active_player();
+        if active == player {
+            return;
+        }
+        game.execute(rules, Command::EndTurn { player: active }).unwrap();
+    }
+    panic!("{player:?} never became active");
+}
+
+fn tech(rules: &CompiledRuleset, key: &str) -> classic_rules::ids::TechId {
+    classic_rules::ids::TechId(rules.technologies.iter().position(|t| t.key == key).unwrap() as u16)
+}
+
+fn seen(game: &GameState, rules: &CompiledRuleset, handled: HandledThisTurn<'_>) -> Vec<PendingAction> {
+    pending_actions(game.view().auth, rules, P0, handled)
+}
+
+#[test]
+fn an_idle_spy_is_asked_for_until_it_has_a_city_or_the_screen_was_looked_at() {
+    let (mut game, rules, capital) = setup();
+    settle_city_and_research(&mut game, &rules, capital);
+    game.debug_meet_all();
+    game.debug_learn(&rules, P0, tech(&rules, "core:tech/acoustics"));
+    end_round(&mut game, &rules);
+    until_active(&mut game, &rules, P0);
+    assert!(pending(&game, &rules).contains(&PendingAction::IdleSpy(0)), "{:?}", pending(&game, &rules));
+    let looked = HandledThisTurn { spies_seen: true, ..Default::default() };
+    assert!(!seen(&game, &rules, looked).iter().any(|a| matches!(a, PendingAction::IdleSpy(_))), "looking at the screen answers it");
+    let theirs = game.view().auth.indexes().cities_of(P1)[0];
+    game.execute(&rules, Command::MoveSpy { player: P0, spy: 0, city: Some(theirs), diplomat: false }).unwrap();
+    assert!(!pending(&game, &rules).iter().any(|a| matches!(a, PendingAction::IdleSpy(_))), "a spy on its way is not idle");
+}
+
+#[test]
+fn delegates_left_in_an_open_session_are_asked_for_until_cast_or_the_screen_was_looked_at() {
+    use classic_rules::world::congress::{ResolutionKind, YES};
+    let (mut game, rules, capital) = setup();
+    settle_city_and_research(&mut game, &rules, capital);
+    game.debug_meet_all();
+    game.debug_learn(&rules, P0, tech(&rules, "core:tech/printing-press"));
+    end_round(&mut game, &rules);
+    until_active(&mut game, &rules, P0);
+    game.execute(&rules, Command::ProposeResolution { player: P0, kind: ResolutionKind::StandingArmyTax, choice: 0, repeal: false }).unwrap();
+    for _ in 0..60 {
+        if game.view().auth.module().congress().in_session() {
+            break;
+        }
+        end_round(&mut game, &rules);
+    }
+    until_active(&mut game, &rules, P0);
+    assert!(game.view().auth.module().congress().in_session(), "the session opened");
+    assert!(pending(&game, &rules).contains(&PendingAction::CongressVotes), "{:?}", pending(&game, &rules));
+    let looked = HandledThisTurn { congress_seen: true, ..Default::default() };
+    assert!(!seen(&game, &rules, looked).contains(&PendingAction::CongressVotes));
+    let left = game.view().auth.module().congress().delegates_left(P0);
+    game.execute(&rules, Command::CastVotes { player: P0, proposal: 0, choice: YES, delegates: left }).unwrap();
+    assert!(!pending(&game, &rules).contains(&PendingAction::CongressVotes), "every delegate is cast");
+}
+
+#[test]
+fn an_offer_waiting_is_asked_for_until_answered_or_the_screen_was_looked_at() {
+    use classic_rules::world::relations::DealItem;
+    let (mut game, rules, capital) = setup();
+    settle_city_and_research(&mut game, &rules, capital);
+    game.debug_meet_all();
+    for player in [P0, P1] {
+        game.debug_learn(&rules, player, tech(&rules, "core:tech/writing"));
+    }
+    until_active(&mut game, &rules, P1);
+    game.execute(&rules, Command::ProposeDeal { from: P1, to: P0, items: vec![(P1, DealItem::Embassy)] }).unwrap();
+    let waiting = pending(&game, &rules);
+    let [PendingAction::OfferWaiting(id)] = waiting.as_slice() else { panic!("one offer waits: {waiting:?}") };
+    let looked = HandledThisTurn { offers_seen: true, ..Default::default() };
+    assert_eq!(seen(&game, &rules, looked), vec![]);
+    game.execute(&rules, Command::RespondDeal { player: P0, offer: *id, accept: false, why: Default::default() }).unwrap();
+    assert_eq!(pending(&game, &rules), vec![], "answered");
 }

@@ -8,9 +8,10 @@ use classic_rules::PlayerQueries;
 use classic_rules::ClassicGame;
 use classic_rules::ids::PlayerId;
 use classic_rules::knowledge::observation::Relation;
+use classic_rules::world::relations::{GrievanceKind, GRIEVANCE_POINT};
 use classic_rules::rules::content::ResourceClass;
 use classic_rules::world::player::PlayerKind;
-use classic_rules::world::relations::{DealItem, DealOffer, PeaceRefusal};
+use classic_rules::world::relations::{DealItem, DealOffer, OfferLapse, PeaceRefusal};
 use classic_rules::Command;
 use i18n::{t, tf};
 
@@ -78,6 +79,7 @@ impl Session {
             borders_open,
             peace: self.peace_availability(player),
             peace_by_offer: self.peace_by_offer(player),
+            city_state: !self.peace_by_offer(player),
             peace_ask: self.peace_ask(player),
             open_borders: self.open_borders_availability(me, player),
         }
@@ -198,6 +200,13 @@ impl Session {
                         continue;
                     };
                     self.notify(NoticeKind::Diplomacy, text);
+                    continue;
+                }
+                if let classic_rules::classic::ClassicChange::OfferLapsed { from, to, reason, .. } = *change {
+                    if to == me {
+                        let text = offer_lapsed_notice(&self.player_name(from), reason);
+                        self.notify(NoticeKind::Diplomacy, text);
+                    }
                     continue;
                 }
                 let classic_rules::classic::ClassicChange::OfferAnswered { from, to, accepted, peace } = *change else { continue };
@@ -574,7 +583,24 @@ fn treaties(relation: &Relation) -> Vec<String> {
     if relation.warmonger > 0 {
         out.push(tf!("classic.game.diplomacy.fact-warmonger", n = relation.warmonger));
     }
+    for kind in GrievanceKind::all() {
+        let amount = relation.grievances[kind.index()];
+        if amount > 0 {
+            out.push(grievance_fact(kind, amount));
+        }
+    }
     out
+}
+
+/// What the player holds against a nation, for one reason: `amount` in opinion points, rounded up so
+/// that a grievance that has not faded yet never reads as 0.
+fn grievance_fact(kind: GrievanceKind, amount: i32) -> String {
+    let points = (amount + GRIEVANCE_POINT - 1) / GRIEVANCE_POINT;
+    match kind {
+        GrievanceKind::StolenLand => tf!("classic.game.diplomacy.fact-grievance-stolen-land", n = points),
+        GrievanceKind::BetrayedFriendship => tf!("classic.game.diplomacy.fact-grievance-betrayed-friendship", n = points),
+        GrievanceKind::BetrayedPact => tf!("classic.game.diplomacy.fact-grievance-betrayed-pact", n = points),
+    }
 }
 
 
@@ -732,4 +758,15 @@ mod peace_tests {
         assert_eq!(reason, "Peace with a nation is a deal: offer it, and it makes peace if it accepts");
         assert!(matches!(session.peace_command(PlayerId(2)), Command::ProposeDeal { .. }));
     }
+}
+
+/// The notice of an offer that left the inbox unanswered.
+fn offer_lapsed_notice(name: &str, reason: OfferLapse) -> String {
+    let why = match reason {
+        OfferLapse::Expired => t!("classic.game.diplomacy.offer-lapse-expired"),
+        OfferLapse::NationGone => t!("classic.game.diplomacy.offer-lapse-gone"),
+        OfferLapse::WarBegan => t!("classic.game.diplomacy.offer-lapse-war"),
+        OfferLapse::NoLongerPossible => t!("classic.game.diplomacy.offer-lapse-impossible"),
+    };
+    tf!("classic.game.diplomacy.notice-offer-lapsed", name = name, reason = why)
 }
