@@ -418,6 +418,7 @@ fn heuristic(view: &PlayerView<'_>, rules: &CompiledRuleset, player: PlayerId, t
         reserved: &[],
         danger: &[],
         tile_memo: Default::default(),
+        supply: Default::default(),
     };
     let score = ctx.score(tile);
     out[HEURISTIC] = score.unwrap_or(0);

@@ -76,6 +76,9 @@ pub struct SiteContext<'v, 'a> {
     /// `tile_score` of the land tiles seen so far in this context: the
     /// candidates of one search share most of the tiles of their areas.
     pub tile_memo: TileScoreMemo,
+    /// The copies the strategist's goal lacks (`ship-supply`, `Prices::supply`): a site whose
+    /// work tiles hold their deposits is worth their hammers (`supply_score`). Empty elsewhere.
+    pub supply: crate::ai::supply::SiteSupply,
 }
 
 /// Scores of land tiles for one `SiteContext` (the view does not change
@@ -229,6 +232,29 @@ impl SiteContext<'_, '_> {
             score += self.resource_score(resource);
         }
         score
+    }
+
+    /// `ship-supply`: the deposits on the site's work tiles of the copies the goal lacks, at the
+    /// weight a work tile's production has in `score_legal` (3 for the work radius, 2 a hammer in
+    /// `land_tile_score`): the hammers the copies let the goal build, a round over the rounds left.
+    /// 0 without a shortage.
+    pub fn supply_score(&self, site: TileId) -> i32 {
+        if !self.supply.need.any() {
+            return 0;
+        }
+        let mut hammers = 0;
+        for near in crate::math::hex_disc(self.view.dimensions(), site, CITY_WORK_RADIUS) {
+            let known = self.view.tile(near);
+            let Some(snapshot) = known.snapshot() else { continue };
+            if snapshot.owner.is_some_and(|o| o != self.player) {
+                continue;
+            }
+            if let Some(resource) = snapshot.resource {
+                hammers += self.supply.need.hammers(resource, crate::ai::supply::deposit_copies(self.rules, resource));
+            }
+        }
+        let per_round = 3 * 2 * hammers / i64::from(self.supply.rounds_left.max(1));
+        per_round.min(i64::from(i32::MAX)) as i32
     }
 
     fn resource_score(&self, resource: crate::ids::ResourceId) -> i32 {
@@ -430,7 +456,7 @@ impl SiteSearch<'_, '_, '_> {
             SiteQuality::Heuristic => heuristic,
             SiteQuality::Net(inputs) => self.ctx.net_score(tile, inputs, heuristic),
             SiteQuality::Science(bonuses) => heuristic + crate::ai::tall::site_bonus(self.ctx.view, self.ctx.rules, tile, bonuses),
-        };
+        } + self.ctx.supply_score(tile);
         let turns = crate::ai::planner_map::turns_for(points, self.moves_max) as i32;
         let value = score - crate::ai::genome::get_i32(crate::ai::genome::Knob::SettleTravelCost) * turns;
         self.sites.push(Site { tile, score, value });
@@ -628,6 +654,7 @@ pub fn with_context<R>(
         reserved: &reserved,
         danger: &danger,
         tile_memo: Default::default(),
+        supply: view.brief.prices.map_or_else(Default::default, |p| crate::ai::supply::SiteSupply::of(&p)),
     };
     f(&ctx)
 }

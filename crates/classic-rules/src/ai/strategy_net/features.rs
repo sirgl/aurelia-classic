@@ -184,6 +184,7 @@ pub fn survey(obs: &AIObservation<'_>, rules: &CompiledRuleset, state: &AiState)
             reserved: &[],
             danger: &[],
             tile_memo: Default::default(),
+            supply: Default::default(),
         };
         let mut sites: Vec<(i32, TileId)> = hex_disc(dims, capital, ROOM_RADIUS).filter_map(|t| ctx.score(t).filter(|s| *s >= SITE_MIN_SCORE).map(|s| (s, t))).collect();
         sites.sort_by_key(|(s, t)| (std::cmp::Reverse(*s), *t));

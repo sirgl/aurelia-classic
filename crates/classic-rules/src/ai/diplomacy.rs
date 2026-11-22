@@ -263,6 +263,30 @@ pub fn denunciations(obs: &AIObservation<'_>) -> Vec<Command> {
         .collect()
 }
 
+/// The gold-scale value of an item the AI refuses outright (`item_value_priced`'s untrusted).
+pub const REFUSED: i64 = -1000;
+
+/// `strategist-x`: the rival the strategist names running away at a threat of at least
+/// `weights::threat::DENOUNCE` (`Plan::wishes`), if any.
+pub fn contained(brief: &crate::ai::planner::TurnBrief) -> Option<PlayerId> {
+    let threat = brief.strategy.as_ref()?.wishes.threat?;
+    (threat.level >= crate::ai::strategy_net::weights::threat::DENOUNCE.0).then_some(threat.rival)
+}
+
+/// An item that helps its receiver run: friendship, a research agreement, a pact, open borders.
+pub fn helps(item: DealItem) -> bool {
+    matches!(item, DealItem::Friendship | DealItem::ResearchAgreement | DealItem::DefensivePact | DealItem::OpenBorders)
+}
+
+/// The denunciation of the contained rival (`contained`) when not yet denounced and not a friend.
+fn denounce_contained(obs: &AIObservation<'_>, rival: Option<PlayerId>) -> Vec<Command> {
+    obs.relations
+        .iter()
+        .filter(|r| Some(r.other) == rival && !r.we_denounced && !r.friends && !r.at_war)
+        .map(|r| Command::Denounce { player: obs.player, target: r.other })
+        .collect()
+}
+
 /// Rounds between two rounds of proposals of one player.
 pub const PROPOSAL_INTERVAL: u32 = 5;
 
@@ -297,22 +321,29 @@ impl crate::ai::system::SystemAdvisor for DiplomacyAdvisor {
         let mut out = crate::ai::combat::proposals(40, answers);
         let my_round = (obs.round + u32::from(obs.player.0)) % PROPOSAL_INTERVAL == 0;
         if my_round {
+            let contained = contained(input.brief);
             let deals: Vec<Command> = proposals_priced(obs, input.rules, agreement_prices(input))
                 .into_iter()
                 .filter(|c| !proposes_peace(c))
+                .filter(|c| !matches!(c, Command::ProposeDeal { to, items, .. } if Some(*to) == contained && items.iter().any(|(_, i)| helps(*i))))
                 .collect();
             let priced = input.brief.prices.is_some_and(|p| p.model == crate::ai::value::PriceModel::Uses);
             let swaps = if priced { luxury_swaps(obs, input.rules, &deals) } else { Vec::new() };
             let asked: Vec<PlayerId> = deals.iter().chain(&swaps).filter_map(partner).collect();
             out.extend(crate::ai::combat::proposals(5, deals));
             out.extend(crate::ai::combat::proposals(5, swaps));
+            let supply = crate::ai::peace::supply_offers(input, &asked);
+            let asked: Vec<PlayerId> = asked.into_iter().chain(supply.iter().filter_map(partner)).collect();
+            out.extend(crate::ai::combat::proposals(5, supply));
             if self.embassies {
                 out.extend(crate::ai::combat::proposals(5, crate::ai::peace::embassy_offers(input, &asked)));
             }
             // `retake`: no peace is offered to the holder of a city being retaken.
             let peace = crate::ai::peace::peace_offers(input).into_iter().filter(|c| !matches!(c, Command::ProposeDeal { to, .. } if input.brief.retaking_from(*to)));
             out.extend(crate::ai::combat::proposals(5, peace.collect::<Vec<_>>()));
-            out.extend(crate::ai::combat::proposals(5, denunciations(obs)));
+            let mut denounced = denunciations(obs);
+            denounced.extend(denounce_contained(obs, contained).into_iter().filter(|_| obs.relations.iter().all(|r| Some(r.other) != contained || r.warmonger < DENOUNCE_WARMONGER)));
+            out.extend(crate::ai::combat::proposals(5, denounced));
         }
         out
     }

@@ -203,8 +203,9 @@ pub struct PricedGift {
 /// is a project: the gold to raise the influence to the allies' threshold,
 /// then a point a round to hold it (influence falls a point a round), for
 /// the ally's and the friend's bonuses and the happiness of the ally's
-/// luxuries the empire lacks each round to the end, and (`Prices::delegate`, `next`) its
-/// delegates toward the World Leader vote. A gift is worth its share of the project's value per
+/// luxuries the empire lacks each round to the end, (`Prices::delegate`, `next`) its
+/// delegates toward the World Leader vote, and (`Prices::supply`, `ship-supply`) the ally's copies
+/// the strategist's goal lacks. A gift is worth its share of the project's value per
 /// gold.
 pub fn priced_gifts(obs: &AIObservation<'_>, prices: &crate::ai::value::Prices, gold: u32) -> Vec<PricedGift> {
     use crate::knowledge::public::PlayerQueries;
@@ -231,6 +232,8 @@ pub fn priced_gifts(obs: &AIObservation<'_>, prices: &crate::ai::value::Prices, 
             .map(|d| d.module.happiness)
             .sum();
         let round = round_value(prices, &terms.friends, 0, cities) + round_value(prices, &terms.allies, lacking, cities);
+        // `ship-supply`: the ally's copies the strategist's goal lacks (`Prices::supply`).
+        let supply = supply_worth(obs, prices, info.player);
         let invest = info.quests.iter().any(|q| matches!(q, QuestKind::Invest));
         // A quest for gold pays its influence for any gift (`Invest` only makes a gift worth more).
         let quest = info.quests.iter().any(|q| matches!(q, QuestKind::GiveGold { .. }));
@@ -245,7 +248,7 @@ pub fn priced_gifts(obs: &AIObservation<'_>, prices: &crate::ai::value::Prices, 
                 // The last turn before the session opens: one lump that takes the alliance whole, or
                 // nothing (a gift that does not reach it is thrown away, and a rival answers a small one).
                 if t.rounds <= 1 {
-                    let votes = prices.delegate * ally_delegates() + t.worth;
+                    let votes = prices.delegate * ally_delegates() + t.worth + supply;
                     out.push(PricedGift { city_state: info.player, gold: t.package, value: round * rounds + votes, contested: true });
                     continue;
                 }
@@ -257,12 +260,19 @@ pub fn priced_gifts(obs: &AIObservation<'_>, prices: &crate::ai::value::Prices, 
             let points = i64::from(crate::world::city_states::gold_gift_influence_at(&obs.speed, obs.round, size, invest, 0).max(1));
             let climb = i64::from((target - info.influence).max(0) + 1);
             let project_gold = (climb + hold) * i64::from(size) / points;
-            let votes = prices.delegate * ally_delegates() + guard;
+            let votes = prices.delegate * ally_delegates() + guard + supply;
             let value = (round * rounds + votes) * i64::from(size) / project_gold.max(1);
             out.push(PricedGift { city_state: info.player, gold: size, value, contested: guard > 0 });
         }
     }
     out
+}
+
+/// What the copies a city-state's alliance would give are worth to the goal that lacks them
+/// (`Prices::supply`, `ai::supply`): its own copies of each resource short, by the hammers they let
+/// the goal build. 0 without a shortage.
+fn supply_worth(obs: &AIObservation<'_>, prices: &crate::ai::value::Prices, city_state: crate::ids::PlayerId) -> crate::ai::value::Centi {
+    prices.supply.offered_by(obs, city_state).into_iter().map(|(resource, copies)| prices.supply.worth(resource, copies, prices)).sum()
 }
 
 /// One round of a city-state level's bonuses (food in hundredths) and of
@@ -285,6 +295,21 @@ pub fn pledge_orders(obs: &AIObservation<'_>) -> Vec<Command> {
             city_state: info.player,
             pledge: true,
         })
+        .collect()
+}
+
+/// `strategist-x`: a pledge to every city-state the strategist courts (`Stance::client` at least
+/// `weights::stance::ACTS`) at influence above 0, not yet pledged and not at war: its resting point
+/// rises and its pledge quest is done (the friends are pledged to by `pledge_orders`). Not at 0: there
+/// the city-state is a tribute source, and a pledge blocks the tribute (tributes 2.8 → 0.9 a seat with
+/// pledges at 0, tuning offset 1200).
+pub fn client_pledges(obs: &AIObservation<'_>, wishes: &crate::ai::strategy_net::wishes::Wishes) -> Vec<Command> {
+    let acts = crate::ai::strategy_net::weights::stance::ACTS.0;
+    obs.city_states
+        .iter()
+        .filter(|info| !info.friends && !info.pledged && !info.at_war && info.influence > 0)
+        .filter(|info| wishes.stance(info.player).is_some_and(|s| s.client >= acts))
+        .map(|info| Command::PledgeProtection { player: obs.player, city_state: info.player, pledge: true })
         .collect()
 }
 
@@ -329,6 +354,9 @@ impl crate::ai::system::SystemAdvisor for CityStatesAdvisor {
         let obs = input.observation;
         let mut out = crate::ai::combat::proposals(20, buyout_orders(obs));
         out.extend(crate::ai::combat::proposals(15, pledge_orders(obs)));
+        if let Some(plan) = input.brief.strategy.as_ref().filter(|_| input.brief.strategist_x) {
+            out.extend(crate::ai::combat::proposals(15, client_pledges(obs, &plan.wishes)));
+        }
         out.extend(crate::ai::combat::proposals(5, tribute_orders(obs)));
         out
     }

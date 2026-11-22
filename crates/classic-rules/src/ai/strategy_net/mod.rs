@@ -34,8 +34,11 @@ pub mod heads;
 pub mod layers;
 pub mod model;
 pub mod sharp;
+pub mod stance;
+pub mod threat;
 pub mod trace;
 pub mod weights;
+pub mod wishes;
 
 use crate::ai::state::AiState;
 use crate::ai::value::Prices;
@@ -87,6 +90,11 @@ pub struct Net {
     /// `war-pays`: the window of any era needs a war that pays (`fe::PAYS`), it is a condition, not a term;
     /// an operation forming does not tilt the posture (`weights::open::POSTURE`: it cost a point, see the doc).
     pub pays: bool,
+    /// `strategist-x`: the threat of the rival running away (`threat::assess`, 0…1000), a term of the
+    /// posture (`weights::threat::POSTURE`); 0 in every other net.
+    pub threat: Milli,
+    /// `strategist-x`: the wide style needs a strong reason (`weights::threat::WIDE`); false elsewhere.
+    pub tall_first: bool,
 }
 
 impl Net {
@@ -132,7 +140,7 @@ pub fn concepts(features: &[Milli; fe::N]) -> [Milli; kc::N] {
 /// The concepts; with `open` (`war-open`) the strike window is the larger of the early one and
 /// the window of any era (`weights::open::WINDOW`). No later concept reads the window.
 pub fn concepts_of(features: &[Milli; fe::N], open: bool) -> [Milli; kc::N] {
-    concepts_net(features, Net { open, sharp: false, pays: false })
+    concepts_net(features, Net { open, sharp: false, pays: false, threat: 0, tall_first: false })
 }
 
 /// The concepts of a net: `concepts_of`, with `sharp`'s terms (`sharp::w::CONCEPTS`) when `sharp`.
@@ -172,12 +180,12 @@ pub fn intent(features: &[Milli; fe::N], held: Held, cities: u32, rounds_left: u
 /// `intent`; with `open` the net of `war-open` (`weights::open`): the window of any era, the
 /// war machine's operation in the posture, the opportunity in the style and the aim.
 pub fn intent_of(features: &[Milli; fe::N], held: Held, cities: u32, rounds_left: u32, pace: u32, open: bool) -> Intent {
-    intent_net(features, held, cities, rounds_left, pace, Net { open, sharp: false, pays: false })
+    intent_net(features, held, cities, rounds_left, pace, Net { open, sharp: false, pays: false, threat: 0, tall_first: false })
 }
 
 /// `intent_of` for `war-pays`: `war-open`'s net whose window of any era needs a war that pays.
 pub fn intent_pays(features: &[Milli; fe::N], held: Held, cities: u32, rounds_left: u32, pace: u32) -> Intent {
-    intent_net(features, held, cities, rounds_left, pace, Net { open: true, sharp: false, pays: true })
+    intent_net(features, held, cities, rounds_left, pace, Net { open: true, sharp: false, pays: true, threat: 0, tall_first: false })
 }
 
 /// The logits of a table with `sharp`'s terms added (`sharp::w`), and its bias for `at`.
@@ -228,10 +236,13 @@ pub fn intent_net(features: &[Milli; fe::N], held: Held, cities: u32, rounds_lef
             // the opportunity itself (`weights::open::STYLE`), not the window it opens for a few
             // reviews (with the window the conquest style held 35 % of the traced reviews and its
             // prices cost the economy; tuning offsets 200–201).
-            let lock_concepts = concepts_net(&at_lock, Net { open: false, sharp: net.sharp, pays: false });
+            let lock_concepts = concepts_net(&at_lock, Net { open: false, sharp: net.sharp, pays: false, threat: 0, tall_first: false });
             let mut style_logits = logits_of(&weights::STYLE, extra_style(weights::open::STYLE), &at_lock, &lock_concepts);
             if net.sharp {
                 style_logits = sharp_style(style_logits, &at_lock, &lock_concepts);
+            }
+            if net.tall_first {
+                style_logits[1] += weights::threat::WIDE.0;
             }
             let margin = if survival(features, &concepts) { weights::HYSTERESIS } else { weights::STYLE_LOCK };
             (softmax(&temper(<[Milli; 3]>::try_from(style_logits).expect("three styles"), sharp::w::STYLE_TEMPERATURE)), margin)
@@ -240,6 +251,9 @@ pub fn intent_net(features: &[Milli; fe::N], held: Held, cities: u32, rounds_lef
             let mut style_logits = logits_of(&weights::STYLE, extra_style(weights::open::STYLE), features, &concepts);
             if net.sharp {
                 style_logits = sharp_style(style_logits, features, &concepts);
+            }
+            if net.tall_first {
+                style_logits[1] += weights::threat::WIDE.0;
             }
             (softmax(&temper(<[Milli; 3]>::try_from(style_logits).expect("three styles"), sharp::w::STYLE_TEMPERATURE)), weights::HYSTERESIS)
         }
@@ -251,7 +265,10 @@ pub fn intent_net(features: &[Milli; fe::N], held: Held, cities: u32, rounds_lef
     // The model of the rivals (`weights::rival`, every weight 0 until trained).
     let aim_logits = sharpened(aim_logits, weights::rival::AIM, features, &concepts);
     let aim = softmax(&temper4(<[Milli; 4]>::try_from(aim_logits).expect("four aims"), sharp::w::AIM_TEMPERATURE));
-    let posture_logits = sharpened(logits_of(&weights::POSTURE, extra_posture(weights::open::POSTURE), features, &concepts), weights::rival::POSTURE, features, &concepts);
+    let mut posture_logits = sharpened(logits_of(&weights::POSTURE, extra_posture(weights::open::POSTURE), features, &concepts), weights::rival::POSTURE, features, &concepts);
+    for (at, w, _) in weights::threat::POSTURE {
+        posture_logits[*at] += w * net.threat / ONE;
+    }
     let posture = softmax(&temper4(<[Milli; 4]>::try_from(posture_logits).expect("four postures"), sharp::w::POSTURE_TEMPERATURE));
     let style_pick = hold(&style, held.style, margin);
     let aim_pick = hold(&aim, held.aim, weights::HYSTERESIS);
@@ -319,6 +336,23 @@ pub fn price_mult(intent: &Intent) -> [Milli; pd::N] {
     }
     mult[pd::FOOD] = ONE;
     mult
+}
+
+/// Layer 2's supply price (`ship-supply`, `ai::supply`): the multiplier of a missing strategic copy's
+/// hammers by the intent's rows (`weights::SUPPLY_ROWS`).
+pub fn supply_mult(intent: &Intent) -> Milli {
+    let rows = rows(intent);
+    let mut mult = ONE;
+    for (row, w, _) in weights::SUPPLY_ROWS {
+        mult += rows[*row] * w / ONE;
+    }
+    mult.clamp(weights::PRICE_MIN, weights::PRICE_MAX)
+}
+
+/// How far the supply wish is open (0…1000) by the ship's progress (`weights::SUPPLY_OPEN`).
+pub fn supply_open(features: &[Milli; fe::N]) -> Milli {
+    let (from, full, _) = weights::SUPPLY_OPEN;
+    ((features[fe::SPACE_OWN] - from) * ONE / (full - from).max(1)).clamp(0, ONE)
 }
 
 /// The allocator's prices the net multiplies (centi-points of the score,
@@ -413,6 +447,8 @@ pub struct Plan {
     pub growth: Vec<(u64, [Milli; 6])>,
     /// The net of `war-open` (`TurnBrief::war_open`): its army is the war machine's.
     pub war_open: bool,
+    /// `strategist-x`: the wishes to the planners (supply, threat, city-states); empty elsewhere.
+    pub wishes: wishes::Wishes,
 }
 
 impl Plan {
@@ -791,7 +827,10 @@ pub fn think(obs: &AIObservation<'_>, brief: &crate::ai::planner::TurnBrief, sta
         memory.rival_book.record(obs.player, &rivals, pace);
     }
     let rounds_left = prices.rounds_left;
-    let net = Net { open: brief.war_open, sharp: brief.sharp, pays: brief.war_pays };
+    // `strategist-x`: the rival running away (`threat`), a term of the posture.
+    let parts = wishes::Parts::of_env();
+    let threat = if brief.strategist_x && parts.threat { threat::assess(&rivals) } else { None };
+    let net = Net { open: brief.war_open, sharp: brief.sharp, pays: brief.war_pays, threat: threat.map_or(0, |t| t.level), tall_first: brief.strategist_x && parts.style };
     let mut intent = intent_net(&situation, memory.held, cities, rounds_left, pace, net);
     // The style is locked when the first branch may be opened after the
     // first survey of the surroundings, at the latest `LOCK_MAX_ROUNDS`.
@@ -867,7 +906,15 @@ pub fn think(obs: &AIObservation<'_>, brief: &crate::ai::planner::TurnBrief, sta
         let allowance = (intent.style[1] * weights::CITY_CEILING_WIDE + intent.style[2] * weights::CITY_CEILING_CONQUEST) / ONE / ONE;
         city_target = city_target.min(model + allowance as u32).max(cities);
     }
-    let plan = Plan { round, features: situation, intent, mult, goals: review.goals.clone(), target, city_target, growth: review.growth.clone(), war_open: brief.war_open };
+    let wishes = if brief.strategist_x {
+        let open = supply_open(&situation);
+        let supply = if parts.supply && open > 0 { crate::ai::supply::SupplyNeed::of(obs, rules).priced(supply_mult(&intent) * open / ONE) } else { Default::default() };
+        let city_states = if parts.stance { stance::of(obs, &intent) } else { Vec::new() };
+        wishes::Wishes { supply, threat, city_states }
+    } else {
+        wishes::Wishes::default()
+    };
+    let plan = Plan { round, features: situation, intent, mult, goals: review.goals.clone(), target, city_target, growth: review.growth.clone(), war_open: brief.war_open, wishes };
     trace::turn(obs.player.0, &plan, review_due, rules);
     if review_due {
         trace::rivals(obs.player.0, &rivals);

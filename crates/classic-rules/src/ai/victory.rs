@@ -521,6 +521,11 @@ impl crate::ai::system::SystemAdvisor for VictoryAdvisor {
         &self,
         input: &crate::ai::system::AdvisorInput<'_, '_>,
     ) -> Vec<crate::ai::system::Proposal> {
-        crate::ai::combat::proposals(12, spaceship_orders_with(input.observation, input.rules, input.brief.space_finish))
+        let mut orders = spaceship_orders_with(input.observation, input.rules, input.brief.space_finish);
+        // `ship-supply`: a unit holding a copy a part waits for is disbanded (`ai::supply`).
+        if let Some(prices) = input.brief.prices {
+            orders.extend(crate::ai::supply::release_orders(input.observation, input.rules, &prices.supply));
+        }
+        crate::ai::combat::proposals(12, orders)
     }
 }

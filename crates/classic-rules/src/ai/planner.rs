@@ -434,6 +434,9 @@ pub struct TurnBrief {
     /// The seat takes the alliances of a rival that would win the World Leader vote
     /// (`Variant::vote_guard`, `ai::victory_watch`).
     pub vote_guard: bool,
+    /// `strategist-x` (`Variant::StrategistX`): the strategist emits the goal's supply, a stance toward
+    /// each city-state and the rival running away (`strategy_net::Plan`), and the planners read them.
+    pub strategist_x: bool,
     /// The wonder-race switch (`Variant::wonder_race`): 0 off, 1 lost wonder orders are dropped, 2
     /// the wonder's price is the chance to finish it first (`ai::wonder_race`).
     pub wonder_race: u8,
@@ -585,6 +588,7 @@ impl TurnBrief {
             tall_real: false,
             next: false,
             vote_guard: false,
+            strategist_x: false,
             wonder_race: 0,
             war_pays: false,
             tactician_fit: false,

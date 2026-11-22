@@ -841,6 +841,12 @@ pub enum Variant {
     /// were measured (`NextW`'s flags or `PreNext`); none plays on `PreNextX`. Kept for the bench
     /// (`experimental-ai` only).
     PreNextX,
+    /// `strategist-x` (lane A, 22 November, classic/docs/ai-strategist-defects.md): `Standard` whose
+    /// strategist emits three outputs more, each read by the scripted planners: the copies its goal's
+    /// items lack (`Plan::supply`, `ai::supply`), a stance toward each city-state (`Plan::city_states`)
+    /// and the rival running away (`Plan::threat`). A bench-only candidate, `experimental-ai` only;
+    /// `Standard` does not change.
+    StrategistX,
 }
 
 /// The net's base: the expert the end-to-end net learns from and the mind it
@@ -861,7 +867,7 @@ const NUDGED_CANDIDATES: u32 = 40;
 
 impl Variant {
     /// The game's AI first.
-    pub const ALL: [Variant; 157] = [
+    pub const ALL: [Variant; 158] = [
         Variant::Standard,
         Variant::PreCamps,
         Variant::PreWorkers,
@@ -1019,6 +1025,7 @@ impl Variant {
         Variant::LandlessPlan,
         Variant::NextX,
         Variant::PreNextX,
+        Variant::StrategistX,
     ];
 
     pub fn name(self) -> &'static str {
@@ -1162,6 +1169,7 @@ impl Variant {
             Variant::LandlessPlan => "landless-plan",
             Variant::NextX => "next-x",
             Variant::PreNextX => "pre-next-x",
+            Variant::StrategistX => "strategist-x",
             Variant::ArmyFit => "army-fit",
             Variant::Camps => "camps",
             Variant::ArmyCamps => "army-camps",
@@ -1202,7 +1210,7 @@ impl Variant {
         cfg!(feature = "experimental-ai")
             || !matches!(
                 self,
-                Variant::Net | Variant::UnitNet | Variant::Hybrid | Variant::SiteNet | Variant::ChoiceNet | Variant::ChoiceNetProduction | Variant::ChoiceNetResearch | Variant::StandardScripted | Variant::PreCsGifts | Variant::Sharp | Variant::TallReal | Variant::Next | Variant::WonderCancel | Variant::WonderRace | Variant::NextW | Variant::NextRace | Variant::PreNext | Variant::WarPays | Variant::TacticianFit | Variant::WarMuster | Variant::SiegeCall | Variant::NextWar | Variant::Retake2 | Variant::NextWarRetake | Variant::VoteGuard | Variant::FieldCraft | Variant::RaidWar | Variant::Landless | Variant::LandlessPlan | Variant::NextX | Variant::PreNextX
+                Variant::Net | Variant::UnitNet | Variant::Hybrid | Variant::SiteNet | Variant::ChoiceNet | Variant::ChoiceNetProduction | Variant::ChoiceNetResearch | Variant::StandardScripted | Variant::PreCsGifts | Variant::Sharp | Variant::TallReal | Variant::Next | Variant::WonderCancel | Variant::WonderRace | Variant::NextW | Variant::NextRace | Variant::PreNext | Variant::WarPays | Variant::TacticianFit | Variant::WarMuster | Variant::SiegeCall | Variant::NextWar | Variant::Retake2 | Variant::NextWarRetake | Variant::VoteGuard | Variant::FieldCraft | Variant::RaidWar | Variant::Landless | Variant::LandlessPlan | Variant::NextX | Variant::PreNextX | Variant::StrategistX
             )
     }
 

@@ -738,6 +738,7 @@ fn known_sites(obs: &AIObservation<'_>, state: &AiState, tools: &mut PlanTools<'
         reserved: &reserved,
         danger: &danger,
         tile_memo: Default::default(),
+        supply: Default::default(),
     };
     let moves = settler_moves(tools.rules);
     let limit = tools.settings.budget.candidates;

@@ -513,6 +513,13 @@ impl Stakes {
     /// game), every one on the domination path; known ones as targets,
     /// the others as what finding them is worth.
     pub fn of(obs: &AIObservation<'_>, brief: &TurnBrief, state: &AiState, personality: &Personality) -> Self {
+        let threat = brief.strategy.as_ref().and_then(|plan| plan.wishes.threat);
+        let stakes = Self::of_leanings(obs, brief, state, personality);
+        stakes.with_threat(obs, state, threat)
+    }
+
+    /// `of` without the strategist's threat.
+    fn of_leanings(obs: &AIObservation<'_>, brief: &TurnBrief, state: &AiState, personality: &Personality) -> Self {
         let mut stakes = Self {
             appetite: leaning(personality.aggression),
             unrest: leaning(Personality::MAX - personality.war_tolerance),
@@ -554,6 +561,29 @@ impl Stakes {
     pub fn finding(&self, host: PlayerId) -> Centi {
         let stake: Centi = self.unfound.iter().filter(|c| c.founder == host && c.holder == host).map(|c| c.value).sum();
         stake * FAR_CAPITAL_CHANCE / 1000
+    }
+
+    /// `strategist-x`: the race of the rival the strategist names running away (`Plan::wishes`,
+    /// `strategy_net::threat`). Each seen city of it carries a stake: the prize of a victory × the
+    /// threat × the city's citizens over the citizens of the rival's seen cities (a capture takes its
+    /// share of the rival's race), added to a capital's stake on the same tile. None: unchanged.
+    pub fn with_threat(mut self, obs: &AIObservation<'_>, state: &AiState, threat: Option<crate::ai::strategy_net::wishes::Threat>) -> Self {
+        let Some(threat) = threat else { return self };
+        let cities: Vec<_> = state.seen_cities().iter().filter(|c| c.owner == threat.rival).collect();
+        let citizens: i64 = cities.iter().map(|c| i64::from(c.population.max(1))).sum();
+        if citizens == 0 {
+            return self;
+        }
+        let race = obs.view.race();
+        let prize = prize(&race, obs) * threat.level / 1000;
+        for city in cities {
+            let value = prize * i64::from(city.population.max(1)) / citizens;
+            match self.capitals.iter_mut().find(|c| c.tile == city.tile) {
+                Some(stake) => stake.value += value,
+                None => self.capitals.push(CapitalStake { tile: city.tile, decisive: false, value }),
+            }
+        }
+        self
     }
 
     fn add(&mut self, capital: &CapitalStanding, decisive: bool, value: Centi) {
@@ -701,6 +731,7 @@ mod tests {
             content_founding: false,
             true_effects: false,
             space: None,
+            supply: crate::ai::supply::SupplyNeed::default(),
             pace: 100,
             city_cap: None,
             gift_cap: true,

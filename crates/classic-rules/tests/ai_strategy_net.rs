@@ -165,7 +165,7 @@ fn plan(rules: &CompiledRuleset, features: &[i64; fe::N], model: &Model) -> Plan
     let mut mult = price_mult(&intent);
     let review = goals::review(model, rules, &intent, &mut mult, &base(), 1, false);
     let target = review.goals.iter().filter(|g| !g.path.is_empty()).max_by_key(|g| g.rate).and_then(|g| g.path.last().copied());
-    Plan { round: 1, features: *features, city_target: 1 + intent.more_cities, intent, mult, goals: review.goals, target, growth: review.growth, war_open: false }
+    Plan { round: 1, features: *features, city_target: 1 + intent.more_cities, intent, mult, goals: review.goals, target, growth: review.growth, war_open: false, wishes: Default::default() }
 }
 
 fn grassland_capital(rules: &CompiledRuleset) -> ToyMap {
@@ -767,7 +767,7 @@ fn goal_through(path: Vec<TechId>, worth: i64) -> Goal {
 
 fn plan_with(goals: Vec<Goal>, target: Option<TechId>) -> Plan {
     let i: Intent = intent(&neutral(&[]), Held::default(), 1, 198, 67);
-    Plan { round: 1, features: neutral(&[]), mult: price_mult(&i), intent: i, goals, target, city_target: 1, growth: Vec::new(), war_open: false }
+    Plan { round: 1, features: neutral(&[]), mult: price_mult(&i), intent: i, goals, target, city_target: 1, growth: Vec::new(), war_open: false, wishes: Default::default() }
 }
 
 /// Scenario 18: A goal behind a bridge technology worth nothing itself: the bridge first.
@@ -1067,7 +1067,7 @@ fn sharp_prices_follow_the_held_choice() {
     use classic_rules::ai::strategy_net::{intent_net, Net};
     let f = great_land_no_room();
     let blend = intent(&f, Held::default(), 1, 198, 67);
-    let sharp = intent_net(&f, Held::default(), 1, 198, 67, Net { open: false, sharp: true, pays: false });
+    let sharp = intent_net(&f, Held::default(), 1, 198, 67, Net { open: false, sharp: true, pays: false, threat: 0, tall_first: false });
     assert_eq!(blend.style_pick, 0, "tall: {:?}", blend.style);
     assert_eq!(sharp.style_pick, 0, "tall: {:?}", sharp.style);
     assert!(sharp.style[0] > blend.style[0], "a sharper share: {:?} against {:?}", sharp.style, blend.style);
@@ -1091,7 +1091,7 @@ fn sharp_the_leader_moves_the_style() {
     };
     let scholar = with(&[(fe::T_EXPANSION, 400), (fe::T_SCIENCE, 900), (fe::T_WONDERS, 600)]);
     let settler = with(&[(fe::T_EXPANSION, 900), (fe::T_SCIENCE, 400), (fe::T_WONDERS, 400)]);
-    let net = Net { open: false, sharp: true, pays: false };
+    let net = Net { open: false, sharp: true, pays: false, threat: 0, tall_first: false };
     let (s, w) = (intent_net(&scholar, Held::default(), 1, 198, 67, net), intent_net(&settler, Held::default(), 1, 198, 67, net));
     assert_eq!(s.style_pick, 0, "the scholar plays tall: {:?}", s.style);
     assert_eq!(w.style_pick, 1, "the settler plays wide: {:?}", w.style);

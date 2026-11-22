@@ -112,6 +112,9 @@ pub struct ClassicMind {
     landless_plan: bool,
     /// The siege layer's mends on every turn, cities or not (`TurnBrief::siege_mend`, `mended`): the tests' switch.
     siege_mend: bool,
+    /// `Variant::StrategistX`: the strategist's outputs for the goal's supply, the city-states and the
+    /// rival running away (`TurnBrief::strategist_x`).
+    strategist_x: bool,
 }
 
 /// The environment variable that makes the game's AI another variant
@@ -163,9 +166,12 @@ impl ClassicMind {
             // `next-x` (the joint build) is `next-war-retake` with the guard of `vote-guard` and the plan of
             // `landless-plan` (both below).
             Variant::NextX => (Variant::Standard, Variant::Retake2),
+            // `strategist-x` is `next-x` (the play of `standard`) with the strategist's new outputs.
+            Variant::StrategistX => (Variant::Standard, Variant::Retake2),
             _ => (requested, requested),
         };
-        let joint = requested == Variant::NextX;
+        let strategist_x = requested == Variant::StrategistX;
+        let joint = requested == Variant::NextX || strategist_x;
         // `vote-guard` is `standard` (the flags of `next-w`) with the guard on.
         let vote_guard = flags.vote_guard() || joint;
         // `landless` is `Standard` in every switch but its own (`TurnBrief::landless`).
@@ -220,10 +226,10 @@ impl ClassicMind {
         // war of `siege-call` under its own, `next-war-retake` as `Standard` with the war of
         // `retake2` under its own, `next-x` as `next-war-retake` with the guard and the landless
         // plan under its own.
-        let named = named.or(matches!(requested, Variant::NextW | Variant::NextWar | Variant::NextWarRetake | Variant::NextX).then_some(requested));
+        let named = named.or(matches!(requested, Variant::NextW | Variant::NextWar | Variant::NextWarRetake | Variant::NextX | Variant::StrategistX).then_some(requested));
         // The game's AI since the fourteenth promotion and the standard before it carry their own names.
         let named = promoted.or(named);
-        Self { advisors, variant, genome: None, humans: Vec::new(), walks: Default::default(), choice: None, #[cfg(feature = "experimental-ai")] net, book, named, walls, conquest: None, unciv, tall: None, sharp, tall_real, next, wonder_race, pays, fit, muster, call, retake2, vote_guard, field, raidw, landless, landless_plan, siege_mend: false }
+        Self { advisors, variant, genome: None, humans: Vec::new(), walks: Default::default(), choice: None, #[cfg(feature = "experimental-ai")] net, book, named, walls, conquest: None, unciv, tall: None, sharp, tall_real, next, wonder_race, pays, fit, muster, call, retake2, vote_guard, field, raidw, landless, landless_plan, siege_mend: false, strategist_x }
     }
 
     /// A league book that may play on another base (`book_on`): a duel book
@@ -269,7 +275,7 @@ impl ClassicMind {
         advisors.register(crate::classic::ClassicSystem::Diplomacy, Box::new(crate::ai::diplomacy::DiplomacyAdvisor { embassies: variant.values_embassies() }));
         // The net plays on `NET_BASE`: its siege too.
         let walls = variant.siege_walls().then(|| Box::new(crate::ai::siege_walls::SiegeWalls::new().joined(variant.siege_join())));
-        Self { advisors, variant, genome: None, humans: Vec::new(), walks: Default::default(), choice: None, net: Some(Box::new(net)), book: None, named: None, walls, conquest: None, unciv: None, tall: None, sharp: false, tall_real: false, next: false, wonder_race: 0, pays: false, fit: false, muster: false, call: false, retake2: false, vote_guard: false, field: false, raidw: false, landless: false, landless_plan: false, siege_mend: false }
+        Self { advisors, variant, genome: None, humans: Vec::new(), walks: Default::default(), choice: None, net: Some(Box::new(net)), book: None, named: None, walls, conquest: None, unciv: None, tall: None, sharp: false, tall_real: false, next: false, wonder_race: 0, pays: false, fit: false, muster: false, call: false, retake2: false, vote_guard: false, field: false, raidw: false, landless: false, landless_plan: false, siege_mend: false, strategist_x: false }
     }
 
     /// The net's part (`Variant::Net`), if any.
@@ -316,7 +322,7 @@ impl ClassicMind {
     pub fn variant(&self) -> Variant {
         // The joint build's candidate, the game's AI since the fourteenth promotion (which plays as it)
         // and the standard before it carry the flags below under their own names.
-        if let Some(v @ (Variant::NextX | Variant::Standard | Variant::PreNextX)) = self.named {
+        if let Some(v @ (Variant::NextX | Variant::Standard | Variant::PreNextX | Variant::StrategistX)) = self.named {
             return v;
         }
         if self.landless {
@@ -819,6 +825,7 @@ impl ClassicMind {
         brief.tall_real = self.tall_real;
         brief.next = self.next;
         brief.vote_guard = self.vote_guard;
+        brief.strategist_x = self.strategist_x;
         brief.wonder_race = self.wonder_race;
         // `tall-real` finishes its spaceship by the space plan where the science victory fits the
         // game (`victory::space_plan`, `ai::tall_real`), on every seat; `next` too: the plan on its
@@ -887,7 +894,7 @@ impl ClassicMind {
         }
         let kind = observation.view.own_kind();
         let major = kind == PlayerKind::Major;
-        let stakes = if self.variant.has_leaders() && major {
+        let mut stakes = if self.variant.has_leaders() && major {
             lead(observation, &mut brief, state, rules)
         } else {
             Stakes::neutral()
@@ -928,11 +935,20 @@ impl ClassicMind {
                 }
                 if let Some(p) = brief.prices.as_mut() {
                     p.city_cap = Some(plan.city_target);
+                    // `strategist-x`: the copies its goal lacks, as the strategist prices them (`ai::supply`).
+                    p.supply = plan.wishes.supply;
                 }
                 brief.tall_cities = Some(plan.city_target);
                 // `tall-real`'s tall play orders the science buildings first (`tall::BuildingOrder::Science`).
                 if plan.intent.tall_real {
                     brief.building_order = crate::ai::tall::BuildingOrder::Science;
+                }
+                // `strategist-x`: the war's stakes carry the race of the rival running away
+                // (`Stakes::with_threat`); the city-states it marks as prey are the war machine's too.
+                if brief.strategist_x {
+                    stakes = stakes.with_threat(observation, state, plan.wishes.threat);
+                    let prey: Vec<_> = observation.relations.iter().filter(|r| plan.wishes.stance(r.other).is_some_and(|s| s.prey >= crate::ai::strategy_net::weights::stance::ACTS.0) && !brief.relations.iter().any(|b| b.other == r.other)).copied().collect();
+                    brief.relations.extend(prey);
                 }
                 brief.strategy = Some(std::sync::Arc::new(plan));
             }

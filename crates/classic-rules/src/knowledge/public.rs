@@ -129,6 +129,10 @@ pub trait PlayerQueries {
     /// empty for a player not met.
     fn tradeable_luxuries(&self, other: crate::ids::PlayerId) -> Vec<(crate::ids::ResourceId, i32)>;
 
+    /// The copies of `resource` a player the player met (a nation or a city-state) could give in a
+    /// deal now, as the trade screen lists them; 0 for a player not met.
+    fn tradeable_copies(&self, other: crate::ids::PlayerId, resource: crate::ids::ResourceId) -> i32;
+
     /// The routes a new trade unit of `kind` in the player's own `city`
     /// could start now (`derived::trade::prospects`); empty for another
     /// player's city.
@@ -604,6 +608,14 @@ impl PlayerQueries for PlayerView<'_> {
             self.rules().resources.get(r.0 as usize).is_some_and(|d| d.class == Some(crate::rules::content::ResourceClass::Luxury))
         };
         ledger.known().filter(luxury).map(|r| (r, ledger.tradeable(r))).filter(|(_, n)| *n > 0).collect()
+    }
+
+    fn tradeable_copies(&self, other: crate::ids::PlayerId, resource: crate::ids::ResourceId) -> i32 {
+        let auth = self.world(Sensor).auth;
+        if other == self.player() || !crate::derived::tourism::met(auth, self.player(), other) {
+            return 0;
+        }
+        crate::derived::resources::resource_ledger(auth, self.rules(), other).tradeable(resource).max(0)
     }
 
     fn city_state_terms(&self, city_state: crate::ids::PlayerId) -> Option<CityStateTerms> {

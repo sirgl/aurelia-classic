@@ -490,7 +490,7 @@ impl Allocator {
     }
 
     /// Tiles the cities may buy: land points, and a resource's yields and
-    /// happiness. Looked at only when the gold buys a tile.
+    /// happiness, and the copies of a deposit the goal lacks (`Prices::supply`). Looked at only when the gold buys a tile.
     fn tile_offers(&self, obs: &AIObservation<'_>, spendable: u32) -> Vec<Offer> {
         let mut out = Vec::new();
         if spendable < crate::world::territory::PLOT_BASE_COST {
@@ -525,6 +525,9 @@ impl Allocator {
                 + self.prices.gold * i64::from(def.yields.gold + improved.gold);
             yields / 3 + self.prices.happiness * i64::from(luxury_happiness(obs, self.prices.model, snapshot.resource, def.module.happiness)) / 2
         });
+        // `ship-supply`: a deposit of a copy the goal lacks (`ai::supply`).
+        let supply = snapshot.resource.map_or(0, |r| self.prices.supply.worth(r, crate::ai::supply::deposit_copies(rules, r), &self.prices));
+        let extra = extra + supply;
         self.prices.score.land + extra
     }
 }

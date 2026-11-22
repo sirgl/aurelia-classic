@@ -98,6 +98,7 @@ pub mod field_craft;
 pub mod landless;
 pub mod raid_war;
 pub mod raid;
+pub mod supply;
 pub mod policies;
 pub mod policy_branches;
 pub mod promo_fit;

@@ -1692,6 +1692,10 @@ pub fn city_worth_ranked(prices: &Prices, population: u32, rounds: u32, rival: i
 /// one the time victory compares us with), half when it is only ahead of us, nothing when it is
 /// behind us; `RIVAL_PERCENT` without it or with no scores known.
 pub fn rival_percent(brief: &TurnBrief, rival: PlayerId) -> i64 {
+    // `strategist-x`: a city-state's loss is no rival's (its score is nobody's in the race).
+    if brief.strategist_x && brief.relation(rival).is_some_and(|r| r.kind != crate::world::player::PlayerKind::Major) {
+        return 0;
+    }
     let score = |p: PlayerId| brief.scores.iter().find(|(q, _)| *q == p).map(|(_, s)| *s);
     let (Some(ours), Some(theirs)) = (score(brief.player), score(rival)) else { return RIVAL_PERCENT };
     if !brief.war.siege.rank || brief.war_pays {
@@ -1766,13 +1770,19 @@ fn candidate(
     horizon: Horizon,
     gate: WarGate<'_>,
 ) -> Option<Candidate> {
-    if brief.war_pays && !odds_are_good(city, horizon) {
+    // `strategist-x`: a city carrying the race of the rival running away is weighed by its case, not
+    // turned away by the odds (`Stakes::with_threat`).
+    let staked = brief.strategist_x && matches!(gate, WarGate::Value(_, stakes) if stakes.capital(city.tile).is_some_and(|s| s.value > 0));
+    if brief.war_pays && !odds_are_good(city, horizon) && !staked {
         return None;
     }
     let muster = brief.nearest_city(brief.dims, city.tile)?;
     let distance = brief.dims.distance(muster.tile, city.tile)?;
     let decisive = gate.decisive(city.tile);
-    if distance > if decisive { DECISIVE_RANGE } else { OBJECTIVE_RANGE } {
+    // `strategist-x`: a city carrying the race of the rival running away is reached from as far as a capture
+    // that wins the game (the leader's cities lay beyond `OBJECTIVE_RANGE` of the seats that met it in the
+    // exam's traces: their army postured to prepare and no operation formed, B9 instance 6).
+    if distance > if decisive || staked { DECISIVE_RANGE } else { OBJECTIVE_RANGE } {
         return None;
     }
     let threat = threat_to(brief, rules, state, &arsenal, city.owner, city.tile);

@@ -166,6 +166,9 @@ pub struct Prices {
     /// speeds in the city (`Prices::producing`; variant `space-finish`,
     /// classic/docs/ai-science-victory.md). None: the planner's flat value.
     pub space: Option<SpaceDemand>,
+    /// The strategic copies the strategist's goal lacks and their worth (`ai::supply`, `ship-supply`);
+    /// empty: no copy is priced above its units.
+    pub supply: crate::ai::supply::SupplyNeed,
     /// The game speed's pace percent (`SpeedValues::pace_percent`): the
     /// rounds a tile, a citizen or a technology takes are Standard rounds
     /// × it (`Prices::paced`).
@@ -324,6 +327,7 @@ impl Prices {
             content_founding: false,
             true_effects,
             space: None,
+            supply: crate::ai::supply::SupplyNeed::default(),
             pace: obs.speed.pace_percent,
             city_cap: None,
             gift_cap,
@@ -455,7 +459,7 @@ impl Prices {
             .sum();
         let upkeep = i64::from(def.maintenance) * self.gold;
         let wonder = if def.wonder { self.score.wonder } else { 0 };
-        self.later(effects - upkeep, delay) + wonder
+        self.later(effects - upkeep, delay) + wonder + self.building_supply(def)
     }
 
     /// One effect: yields of the city's own size modelled here, the rest by
@@ -553,7 +557,30 @@ impl Prices {
             .sum();
         let upkeep = i64::from(def.maintenance) * self.gold;
         let wonder = if def.wonder { self.score.wonder } else { 0 };
-        self.later(effects - upkeep, delay) + wonder
+        self.later(effects - upkeep, delay) + wonder + self.building_supply(def)
+    }
+
+    /// `ship-supply`: what a building does to the copies the strategist's goal lacks (`Prices::supply`):
+    /// the copies it gives (`Stat::ResourceCopies`) fill the shortage, the copies it consumes deepen
+    /// it, unless the building is an item of the goal itself (a speeder of the parts: its copy is in
+    /// the need). 0 without a shortage.
+    fn building_supply(&self, def: &crate::rules::compiled::BuildingDefinition) -> Centi {
+        if !self.supply.any() {
+            return 0;
+        }
+        let speeder = def.effects.passive_city.iter().any(|e| matches!(e.condition, Condition::Producing(crate::rules::effects::ProductionFilter::SpaceshipParts)));
+        let set = &def.effects;
+        let gives: Centi = set
+            .passive_player
+            .iter()
+            .chain(&set.passive_city)
+            .map(|e| match e.modifier {
+                Modifier::AddStat { stat: crate::rules::stats::Stat::ResourceCopies(resource), amount } => self.supply.worth(resource, amount, self),
+                _ => 0,
+            })
+            .sum();
+        let takes: Centi = if speeder { 0 } else { def.consumes_resources.iter().map(|(resource, n)| self.supply.worth(*resource, i32::from(*n), self)).sum() };
+        gives - takes
     }
 
     /// A production percent toward some items (`Condition::Producing`)
@@ -1621,6 +1648,7 @@ mod tests {
             content_founding: false,
             true_effects: false,
             space: None,
+            supply: crate::ai::supply::SupplyNeed::default(),
             pace: 100,
             city_cap: None,
             gift_cap: true,

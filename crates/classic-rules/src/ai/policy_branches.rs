@@ -250,6 +250,7 @@ impl Land {
             reserved: &[],
             danger: &[],
             tile_memo: Default::default(),
+            supply: Default::default(),
         };
         let mut sites: Vec<(i32, TileId)> = hex_disc(dims, capital, ROOM_RADIUS)
             .filter_map(|tile| ctx.score(tile).filter(|s| *s >= SITE_MIN_SCORE).map(|s| (s, tile)))
