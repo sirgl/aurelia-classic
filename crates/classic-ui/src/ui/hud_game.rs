@@ -306,16 +306,44 @@ fn research_lines(game: &HudModel) -> (String, String, f32) {
     (research.name.clone(), detail, share.min(1.0))
 }
 
-/// Known nations with peace and open-borders buttons (under the notices).
-pub(super) fn diplomacy(ctx: &egui::Context, screen: Rect, game: &HudModel) -> Vec<GameRequest> {
-    let mut requests = Vec::new();
-    if game.rivals.is_empty() || screen.width() < 800. {
-        return requests;
+/// The most nation rows the panel shows; the rest are one line.
+const MAX_NATION_ROWS: usize = 8;
+
+/// The panel's rows: the nations met (at most `MAX_NATION_ROWS`), how many more there are, and
+/// the city-states met, which take one row of their own.
+#[derive(Debug, PartialEq, Eq)]
+pub(super) struct PanelRows {
+    pub nations: Vec<usize>,
+    pub more: usize,
+    pub city_states: usize,
+    pub city_states_at_war: usize,
+}
+
+pub(super) fn panel_rows(rivals: &[Rival]) -> PanelRows {
+    let nations: Vec<usize> = rivals.iter().enumerate().filter(|(_, r)| !r.city_state).map(|(i, _)| i).collect();
+    let city_states: Vec<&Rival> = rivals.iter().filter(|r| r.city_state).collect();
+    PanelRows {
+        more: nations.len().saturating_sub(MAX_NATION_ROWS),
+        nations: nations.into_iter().take(MAX_NATION_ROWS).collect(),
+        city_states: city_states.len(),
+        city_states_at_war: city_states.iter().filter(|r| r.at_war).count(),
     }
+}
+
+/// Known nations with peace and open-borders buttons (under the notices), and one row for the
+/// city-states met. Returns the requests and whether the city-states row was clicked.
+pub(super) fn diplomacy(ctx: &egui::Context, screen: Rect, game: &HudModel) -> (Vec<GameRequest>, bool) {
+    let mut requests = Vec::new();
+    let mut open_city_states = false;
+    if game.rivals.is_empty() || screen.width() < 800. {
+        return (requests, false);
+    }
+    let rows = panel_rows(&game.rivals);
+    let line_count = rows.nations.len() + usize::from(rows.more > 0) + usize::from(rows.city_states > 0);
     // The frame sizes itself to the rivals: its size is the last frame's.
-    let size = layout::last_size(ctx, "game_diplomacy").unwrap_or(vec2(302.0, 22.0 + game.rivals.len() as f32 * 22.0));
+    let size = layout::last_size(ctx, "game_diplomacy").unwrap_or(vec2(302.0, 22.0 + line_count as f32 * 22.0));
     let home = Rect::from_min_size(pos2(screen.right() - 316.0, 96.0), size);
-    let Some(r) = place(ctx, Panel::at("game_diplomacy", Anchor::TopRight, home).priority(50).collapsible()) else { return requests };
+    let Some(r) = place(ctx, Panel::at("game_diplomacy", Anchor::TopRight, home).priority(50).collapsible()) else { return (requests, false) };
     egui::Area::new("game_diplomacy".into())
         .fixed_pos(r.min)
         .show(ctx, |ui| {
@@ -325,16 +353,29 @@ pub(super) fn diplomacy(ctx: &egui::Context, screen: Rect, game: &HudModel) -> V
                 .inner_margin(egui::Margin::same(10))
                 .show(ui, |ui| {
                     ui.set_width(280.0);
-                    for rival in &game.rivals {
-                        rival_row(ui, rival, &mut requests);
+                    for &index in &rows.nations {
+                        rival_row(ui, &game.rivals[index], &mut requests);
+                    }
+                    if rows.more > 0 {
+                        ui.label(egui::RichText::new(tf!("classic.ui.hud-game.rivals-more", n = rows.more)).color(MUTED).size(11.0));
+                    }
+                    if rows.city_states > 0 {
+                        let line = if rows.city_states_at_war > 0 {
+                            tf!("classic.ui.hud-game.city-states-row-war", met = rows.city_states, war = rows.city_states_at_war)
+                        } else {
+                            tf!("classic.ui.hud-game.city-states-row", met = rows.city_states)
+                        };
+                        let button = ui.add(egui::Button::new(egui::RichText::new(line).color(LIGHT).size(12.0)).frame(false));
+                        open_city_states = button.on_hover_text(t!("classic.ui.hud-game.city-states-row-hint")).clicked();
                     }
                 });
         });
-    requests
+    (requests, open_city_states)
 }
 
+/// A nation's row: its state and the buttons it can use now. A button the rules block stays
+/// grey and says why on hover (a reason as a line of its own, five times over, was noise).
 fn rival_row(ui: &mut egui::Ui, rival: &Rival, requests: &mut Vec<GameRequest>) {
-    let mut reasons = Vec::new();
     ui.horizontal(|ui| {
         let color = if rival.at_war {
             Color32::from_rgb(214, 96, 84)
@@ -348,34 +389,30 @@ fn rival_row(ui: &mut egui::Ui, rival: &Rival, requests: &mut Vec<GameRequest>) 
         };
         ui.label(egui::RichText::new(line).color(color).size(12.0));
         let peace = if rival.peace_by_offer { t!("classic.ui.hud-game.offer-peace") } else { t!("classic.ui.hud-game.make-peace") };
-        if rival.at_war && small_button(ui, peace, &rival.peace, &mut reasons) {
+        if rival.at_war && small_button(ui, peace, &rival.peace, None) {
             requests.push(GameRequest::MakePeace(rival.player));
         }
         // The nation refused and named its price: the paid offer stands beside the white one.
         if let Some(ask) = rival.peace_ask.as_ref().filter(|_| rival.at_war) {
-            if small_button(ui, &tf!("classic.ui.hud-game.offer-peace-gold", price = ask.price), &ask.offer, &mut reasons) {
+            if small_button(ui, &tf!("classic.ui.hud-game.offer-peace-gold", price = ask.price), &ask.offer, Some(ask.reason.as_str())) {
                 requests.push(GameRequest::PeaceForGold(rival.player));
             }
-            reasons.insert(0, ask.reason.clone());
         }
-        if !rival.borders_open && small_button(ui, t!("classic.ui.hud-game.open-borders"), &rival.open_borders, &mut reasons) {
+        if !rival.borders_open && small_button(ui, t!("classic.ui.hud-game.open-borders"), &rival.open_borders, None) {
             requests.push(GameRequest::OpenBorders(rival.player));
         }
     });
-    for reason in reasons {
-        ui.label(egui::RichText::new(reason).color(Color32::from_rgb(225, 151, 128)).size(10.0));
-    }
 }
 
-/// A small button; when the rules block it, its reason is collected to stand under the row.
-fn small_button(ui: &mut egui::Ui, label: &str, availability: &Availability, reasons: &mut Vec<String>) -> bool {
+/// A small button; when the rules block it, the reason is its hover text.
+fn small_button(ui: &mut egui::Ui, label: &str, availability: &Availability, hint: Option<&str>) -> bool {
     let response = ui.add_enabled(availability.is_ready(), egui::Button::new(label).small());
     match availability {
-        Availability::Blocked(reason) => {
-            reasons.push(tf!("classic.ui.hud-game.blocked-reason", action = label, reason = reason.as_str()));
-            response.on_disabled_hover_text(reason).clicked()
-        }
-        Availability::Ready => response.clicked(),
+        Availability::Blocked(reason) => response.on_disabled_hover_text(tf!("classic.ui.hud-game.blocked-reason", action = label, reason = reason.as_str())).clicked(),
+        Availability::Ready => match hint {
+            Some(hint) => response.on_hover_text(hint).clicked(),
+            None => response.clicked(),
+        },
     }
 }
 
@@ -412,7 +449,7 @@ pub(super) fn notices(ctx: &egui::Context, screen: Rect, game: &HudModel) -> Opt
     let r = place(ctx, Panel::at("game_notices", Anchor::TopRight, home).priority(70).collapsible())?;
     egui::Area::new("game_notices".into())
         .fixed_pos(r.min)
-        .show(ctx, |ui| clicked = notices::show(ui, 300.0, &rows).and_then(|i| game.notices[i].tile));
+        .show(ctx, |ui| clicked = notices::show_clipped(ui, 300.0, &rows).and_then(|i| game.notices[i].tile));
     clicked
 }
 
@@ -790,5 +827,36 @@ mod tests {
         let stalled = progress_line(saving(Goal::Pantheon, 12, 25, false), 0);
         assert!(stalled.contains("13 more faith for the pantheon: —"), "{stalled}");
         assert!(progress_line(saving(Goal::Reformation, 0, 0, true), 0).contains("Reformation"));
+    }
+}
+
+#[cfg(test)]
+mod panel_tests {
+    use super::*;
+
+    fn rival(player: u8, city_state: bool, at_war: bool) -> Rival {
+        Rival {
+            player,
+            name: format!("P{player}"),
+            at_war,
+            borders_open: false,
+            peace: Availability::Ready,
+            peace_by_offer: !city_state,
+            peace_ask: None,
+            open_borders: Availability::Blocked("Needs an embassy".into()),
+            city_state,
+        }
+    }
+
+    /// Five city-states met in the first 18 turns were five rows with a red reason each.
+    #[test]
+    fn city_states_are_one_row_and_the_nations_are_listed_up_to_the_cap() {
+        let mut rivals: Vec<Rival> = (1..=3).map(|p| rival(p, false, false)).collect();
+        rivals.extend((10..15).map(|p| rival(p, true, p == 12)));
+        let rows = panel_rows(&rivals);
+        assert_eq!(rows, PanelRows { nations: vec![0, 1, 2], more: 0, city_states: 5, city_states_at_war: 1 });
+        let many: Vec<Rival> = (1..=11).map(|p| rival(p, false, false)).collect();
+        let rows = panel_rows(&many);
+        assert_eq!((rows.nations.len(), rows.more, rows.city_states), (MAX_NATION_ROWS, 3, 0));
     }
 }

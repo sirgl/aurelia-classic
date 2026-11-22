@@ -58,6 +58,8 @@ pub struct PanelClicks {
     pub open_research: bool,
     /// The end-of-game panel asks for the results screen.
     pub open_results: bool,
+    /// The city-states row of the nations panel was clicked.
+    pub open_city_states: bool,
     /// A notice was clicked: its tile.
     pub center_on: Option<u32>,
 }
@@ -174,7 +176,9 @@ impl ClassicHud {
         }
         if let Some(game) = &self.game {
             clicks.center_on = game_widgets::notices(ctx, screen, game);
-            clicks.requests.extend(game_widgets::diplomacy(ctx, screen, game));
+            let (requests, open_city_states) = game_widgets::diplomacy(ctx, screen, game);
+            clicks.requests.extend(requests);
+            clicks.open_city_states = open_city_states;
             clicks.requests.extend(game_widgets::capture(ctx, screen, game));
             clicks.requests.extend(game_widgets::ruins(ctx, screen, game));
             clicks.requests.extend(game_widgets::city_state(ctx, screen, game));

@@ -69,3 +69,7 @@ classic.ui.hud-game.city-state-close = Fermer (Échap)
 
 classic.ui.hud-game.rebels-ahead = Sous { $threshold } de bonheur, des rebelles se soulèvent sur vos terres : encore { NUMBER($left) } de mécontentement avant cela
 classic.ui.hud-game.rebels-now = Bonheur sous { $threshold } : des rebelles se soulèvent sur vos terres tous les quelques tours
+classic.ui.hud-game.rivals-more = et { $n } de plus
+classic.ui.hud-game.city-states-row = Cités-États : { $met } rencontrées
+classic.ui.hud-game.city-states-row-war = Cités-États : { $met } rencontrées, { $war } en guerre
+classic.ui.hud-game.city-states-row-hint = Ouvrir l'écran des cités-États

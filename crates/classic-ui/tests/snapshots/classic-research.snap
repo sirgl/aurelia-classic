@@ -13,25 +13,25 @@ widgets
   button "Information" 504,144 77x15
   click "Animal Husbandry / 0/35 science / +2 / 1" 50,286 218x62
   click "Archery / 35 science / +3" 50,358 218x62
-  click "Bronze Working / 55 science / +8" 332,358 218x62
-  click "Calendar / 55 science / +2" 332,502 218x62
-  click "Construction / 105 science / +5" 614,358 218x62
-  click "Currency / 175 science / +3" 896,358 218x62
-  click "Drama and Poetry / 175 science / +3" 614,646 218x62
-  click "Engineering / 175 science / +2" 896,430 218x62
-  click "Horseback Riding / 105 science / +7" 614,214 218x62
-  click "Iron Working / 175 science / +6" 614,430 218x62
-  click "Masonry / 55 science / +4" 332,430 218x62
-  click "Mathematics / 105 science / +4" 614,286 218x62
+  click "Bronze Working / Requires Mining / +8" 332,358 218x62
+  click "Calendar / Requires Pottery / +2" 332,502 218x62
+  click "Construction / Requires Masonry, The Wheel / +5" 614,358 218x62
+  click "Currency / Requires Mathematics / +3" 896,358 218x62
+  click "Drama and Poetry / Requires Writing / +3" 614,646 218x62
+  click "Engineering / Requires Mathematics, Construction / +2" 896,430 218x62
+  click "Horseback Riding / Requires The Wheel, Trapping / +7" 614,214 218x62
+  click "Iron Working / Requires Bronze Working / +6" 614,430 218x62
+  click "Masonry / Requires Mining / +4" 332,430 218x62
+  click "Mathematics / Requires The Wheel / +4" 614,286 218x62
   click "Mining / 35 science" 50,430 218x62
-  click "Optics / 85 science / +1" 614,502 218x62
-  click "Philosophy / 175 science / +4" 614,574 218x62
+  click "Optics / Requires Sailing / +1" 614,502 218x62
+  click "Philosophy / Requires Calendar, Writing / +4" 614,574 218x62
   click "Pottery / 35 science / +2" 50,502 218x62
-  click "Sailing / 55 science / +5" 332,574 218x62
-  click "The Wheel / 55 science / +5" 332,286 218x62
-  click "Theology / 275 science" 1178,430 218x62
-  click "Trapping / 55 science / +1" 332,214 218x62
-  click "Writing / 55 science / +3" 332,646 218x62
+  click "Sailing / Requires Pottery / +5" 332,574 218x62
+  click "The Wheel / Requires Animal Husbandry, Archery / +5" 332,286 218x62
+  click "Theology / Requires Philosophy, Drama and Poetry" 1178,430 218x62
+  click "Trapping / Requires Animal Husbandry / +1" 332,214 218x62
+  click "Writing / Requires Pottery / +3" 332,646 218x62
   scrollbar "" 32,713 1302x10
 painted
   clip 0,0 1366x768
@@ -85,7 +85,7 @@ painted
     circle 255,300 r9 fill #c1a263
     text "1" 252,295 6x11 #09161c 10px
     rect 50,358 218x62 fill #192f34 r5
-    rect 50,358 218x62 stroke 1 #455d60 r5
+    rect 50,358 218x62 stroke 1 #3f7d7c r5
     rect 57,367 44x44 fill #182f35
     circle 79,389 r9.7 stroke 1 #5c6859
     text "Archery" 109,366 45x15 #efe9d3 13px
@@ -93,124 +93,136 @@ painted
     rect 219,393 19x19 fill #182f35
     circle 229,403 r4.2 stroke 1 #5c6859
     text "+3" 242,396 11x11 #92a8aa 10px
-    rect 332,358 218x62 fill #192f34 r5
-    rect 332,358 218x62 stroke 1 #455d60 r5
+    rect 332,358 218x62 fill #14262b r5
+    rect 332,358 218x62 stroke 1 #344649 r5
     rect 339,367 44x44 fill #182f35
     circle 361,389 r9.7 stroke 1 #5c6859
     text "Bronze Working" 391,366 93x15 #efe9d3 13px
-    text "55 science" 391,389 51x13 #92a8aa 11px
+    text "Requires Mining" 391,389 79x13 #92a8aa 11px
+    rect 333,359 216x60 fill #101d2173 r5
     rect 501,393 19x19 fill #182f35
     circle 511,403 r4.2 stroke 1 #5c6859
     text "+8" 524,396 11x11 #92a8aa 10px
-    rect 332,502 218x62 fill #192f34 r5
-    rect 332,502 218x62 stroke 1 #455d60 r5
+    rect 332,502 218x62 fill #14262b r5
+    rect 332,502 218x62 stroke 1 #344649 r5
     rect 339,511 44x44 fill #182f35
     circle 361,533 r9.7 stroke 1 #5c6859
     text "Calendar" 391,510 51x15 #efe9d3 13px
-    text "55 science" 391,533 51x13 #92a8aa 11px
+    text "Requires Pottery" 391,533 82x13 #92a8aa 11px
+    rect 333,503 216x60 fill #101d2173 r5
     rect 501,537 19x19 fill #182f35
     circle 511,547 r4.2 stroke 1 #5c6859
     text "+2" 524,540 11x11 #92a8aa 10px
-    rect 614,358 218x62 fill #192f34 r5
-    rect 614,358 218x62 stroke 1 #455d60 r5
+    rect 614,358 218x62 fill #14262b r5
+    rect 614,358 218x62 stroke 1 #344649 r5
     rect 621,367 44x44 fill #182f35
     circle 643,389 r9.7 stroke 1 #5c6859
     text "Construction" 673,366 75x15 #efe9d3 13px
-    text "105 science" 673,389 57x13 #92a8aa 11px
+    text "Requires Masonry, The Wheel" 673,389 100x13 #92a8aa 11px
+    rect 615,359 216x60 fill #101d2173 r5
     rect 783,393 19x19 fill #182f35
     circle 793,403 r4.2 stroke 1 #5c6859
     text "+5" 806,396 11x11 #92a8aa 10px
-    rect 896,358 218x62 fill #192f34 r5
-    rect 896,358 218x62 stroke 1 #455d60 r5
+    rect 896,358 218x62 fill #14262b r5
+    rect 896,358 218x62 stroke 1 #344649 r5
     rect 903,367 44x44 fill #182f35
     circle 925,389 r9.7 stroke 1 #5c6859
     text "Currency" 955,366 52x15 #efe9d3 13px
-    text "175 science" 955,389 57x13 #92a8aa 11px
+    text "Requires Mathematics" 955,389 97x13 #92a8aa 11px
+    rect 897,359 216x60 fill #101d2173 r5
     rect 1065,393 19x19 fill #182f35
     circle 1075,403 r4.2 stroke 1 #5c6859
     text "+3" 1088,396 11x11 #92a8aa 10px
-    rect 614,646 218x62 fill #192f34 r5
-    rect 614,646 218x62 stroke 1 #455d60 r5
+    rect 614,646 218x62 fill #14262b r5
+    rect 614,646 218x62 stroke 1 #344649 r5
     rect 621,655 44x44 fill #182f35
     circle 643,677 r9.7 stroke 1 #5c6859
     text "Drama and Poetry" 673,654 105x15 #efe9d3 13px
-    text "175 science" 673,677 57x13 #92a8aa 11px
+    text "Requires Writing" 673,677 82x13 #92a8aa 11px
+    rect 615,647 216x60 fill #101d2173 r5
     rect 783,681 19x19 fill #182f35
     circle 793,691 r4.2 stroke 1 #5c6859
     text "+3" 806,684 11x11 #92a8aa 10px
-    rect 896,430 218x62 fill #192f34 r5
-    rect 896,430 218x62 stroke 1 #455d60 r5
+    rect 896,430 218x62 fill #14262b r5
+    rect 896,430 218x62 stroke 1 #344649 r5
     rect 903,439 44x44 fill #182f35
     circle 925,461 r9.7 stroke 1 #5c6859
     text "Engineering" 955,438 70x15 #efe9d3 13px
-    text "175 science" 955,461 57x13 #92a8aa 11px
+    text "Requires Mathematics, Construction" 955,461 97x13 #92a8aa 11px
+    rect 897,431 216x60 fill #101d2173 r5
     rect 1065,465 19x19 fill #182f35
     circle 1075,475 r4.2 stroke 1 #5c6859
     text "+2" 1088,468 11x11 #92a8aa 10px
-    rect 614,214 218x62 fill #192f34 r5
-    rect 614,214 218x62 stroke 1 #455d60 r5
+    rect 614,214 218x62 fill #14262b r5
+    rect 614,214 218x62 stroke 1 #344649 r5
     rect 621,223 44x44 fill #182f35
     circle 643,245 r9.7 stroke 1 #5c6859
     text "Horseback Riding" 673,222 100x15 #efe9d3 13px
-    text "105 science" 673,245 57x13 #92a8aa 11px
+    text "Requires The Wheel, Trapping" 673,245 99x13 #92a8aa 11px
+    rect 615,215 216x60 fill #101d2173 r5
     rect 783,249 19x19 fill #182f35
     circle 793,259 r4.2 stroke 1 #5c6859
     text "+7" 806,252 11x11 #92a8aa 10px
-    rect 614,430 218x62 fill #192f34 r5
-    rect 614,430 218x62 stroke 1 #455d60 r5
+    rect 614,430 218x62 fill #14262b r5
+    rect 614,430 218x62 stroke 1 #344649 r5
     rect 621,439 44x44 fill #182f35
     circle 643,461 r9.7 stroke 1 #5c6859
     text "Iron Working" 673,438 75x15 #efe9d3 13px
-    text "175 science" 673,461 57x13 #92a8aa 11px
+    text "Requires Bronze Working" 673,461 93x13 #92a8aa 11px
+    rect 615,431 216x60 fill #101d2173 r5
     rect 783,465 19x19 fill #182f35
     circle 793,475 r4.2 stroke 1 #5c6859
     text "+6" 806,468 11x11 #92a8aa 10px
-    rect 332,430 218x62 fill #192f34 r5
-    rect 332,430 218x62 stroke 1 #455d60 r5
+    rect 332,430 218x62 fill #14262b r5
+    rect 332,430 218x62 stroke 1 #344649 r5
     rect 339,439 44x44 fill #182f35
     circle 361,461 r9.7 stroke 1 #5c6859
     text "Masonry" 391,438 50x15 #efe9d3 13px
-    text "55 science" 391,461 51x13 #92a8aa 11px
+    text "Requires Mining" 391,461 79x13 #92a8aa 11px
+    rect 333,431 216x60 fill #101d2173 r5
     rect 501,465 19x19 fill #182f35
     circle 511,475 r4.2 stroke 1 #5c6859
     text "+4" 524,468 11x11 #92a8aa 10px
-    rect 614,286 218x62 fill #192f34 r5
-    rect 614,286 218x62 stroke 1 #455d60 r5
+    rect 614,286 218x62 fill #14262b r5
+    rect 614,286 218x62 stroke 1 #344649 r5
     rect 621,295 44x44 fill #182f35
     circle 643,317 r9.7 stroke 1 #5c6859
     text "Mathematics" 673,294 75x15 #efe9d3 13px
-    text "105 science" 673,317 57x13 #92a8aa 11px
+    text "Requires The Wheel" 673,317 98x13 #92a8aa 11px
+    rect 615,287 216x60 fill #101d2173 r5
     rect 783,321 19x19 fill #182f35
     circle 793,331 r4.2 stroke 1 #5c6859
     text "+4" 806,324 11x11 #92a8aa 10px
     rect 50,430 218x62 fill #192f34 r5
-    rect 50,430 218x62 stroke 1 #455d60 r5
+    rect 50,430 218x62 stroke 1 #3f7d7c r5
     rect 57,439 44x44 fill #182f35
     circle 79,461 r9.7 stroke 1 #5c6859
     text "Mining" 109,438 40x15 #efe9d3 13px
     text "35 science" 109,461 51x13 #92a8aa 11px
     rect 219,465 19x19 fill #182f35
     circle 229,475 r4.2 stroke 1 #5c6859
-    rect 614,502 218x62 fill #192f34 r5
-    rect 614,502 218x62 stroke 1 #455d60 r5
+    rect 614,502 218x62 fill #14262b r5
+    rect 614,502 218x62 stroke 1 #344649 r5
     rect 621,511 44x44 fill #182f35
     circle 643,533 r9.7 stroke 1 #5c6859
     text "Optics" 673,510 37x15 #efe9d3 13px
-    text "85 science" 673,533 51x13 #92a8aa 11px
+    text "Requires Sailing" 673,533 77x13 #92a8aa 11px
+    rect 615,503 216x60 fill #101d2173 r5
     rect 783,537 19x19 fill #182f35
     circle 793,547 r4.2 stroke 1 #5c6859
     text "+1" 806,540 11x11 #92a8aa 10px
-    rect 614,574 218x62 fill #192f34 r5
-    rect 614,574 218x62 stroke 1 #455d60 r5
+    rect 614,574 218x62 fill #14262b r5
+    rect 614,574 218x62 stroke 1 #344649 r5
     rect 621,583 44x44 fill #182f35
     circle 643,605 r9.7 stroke 1 #5c6859
     text "Philosophy" 673,582 63x15 #efe9d3 13px
-    text "175 science" 673,605 57x13 #92a8aa 11px
+    text "Requires Calendar, Writing" 673,605 101x13 #92a8aa 11px
+    rect 615,575 216x60 fill #101d2173 r5
     rect 783,609 19x19 fill #182f35
     circle 793,619 r4.2 stroke 1 #5c6859
     text "+4" 806,612 11x11 #92a8aa 10px
     rect 50,502 218x62 fill #192f34 r5
-    rect 50,502 218x62 stroke 1 #455d60 r5
+    rect 50,502 218x62 stroke 1 #3f7d7c r5
     rect 57,511 44x44 fill #182f35
     circle 79,533 r9.7 stroke 1 #5c6859
     text "Pottery" 109,510 44x15 #efe9d3 13px
@@ -218,45 +230,50 @@ painted
     rect 219,537 19x19 fill #182f35
     circle 229,547 r4.2 stroke 1 #5c6859
     text "+2" 242,540 11x11 #92a8aa 10px
-    rect 332,574 218x62 fill #192f34 r5
-    rect 332,574 218x62 stroke 1 #455d60 r5
+    rect 332,574 218x62 fill #14262b r5
+    rect 332,574 218x62 stroke 1 #344649 r5
     rect 339,583 44x44 fill #182f35
     circle 361,605 r9.7 stroke 1 #5c6859
     text "Sailing" 391,582 38x15 #efe9d3 13px
-    text "55 science" 391,605 51x13 #92a8aa 11px
+    text "Requires Pottery" 391,605 82x13 #92a8aa 11px
+    rect 333,575 216x60 fill #101d2173 r5
     rect 501,609 19x19 fill #182f35
     circle 511,619 r4.2 stroke 1 #5c6859
     text "+5" 524,612 11x11 #92a8aa 10px
-    rect 332,286 218x62 fill #192f34 r5
-    rect 332,286 218x62 stroke 1 #455d60 r5
+    rect 332,286 218x62 fill #14262b r5
+    rect 332,286 218x62 stroke 1 #344649 r5
     rect 339,295 44x44 fill #182f35
     circle 361,317 r9.7 stroke 1 #5c6859
     text "The Wheel" 391,294 62x15 #efe9d3 13px
-    text "55 science" 391,317 51x13 #92a8aa 11px
+    text "Requires Animal Husbandry, Archery" 391,317 99x13 #92a8aa 11px
+    rect 333,287 216x60 fill #101d2173 r5
     rect 501,321 19x19 fill #182f35
     circle 511,331 r4.2 stroke 1 #5c6859
     text "+5" 524,324 11x11 #92a8aa 10px
-    rect 1178,430 218x62 fill #192f34 r5
-    rect 1178,430 218x62 stroke 1 #455d60 r5
+    rect 1178,430 218x62 fill #14262b r5
+    rect 1178,430 218x62 stroke 1 #344649 r5
     rect 1185,439 44x44 fill #182f35
     circle 1207,461 r9.7 stroke 1 #5c6859
     text "Theology" 1237,438 54x15 #efe9d3 13px
-    text "275 science" 1237,461 57x13 #92a8aa 11px
-    rect 332,214 218x62 fill #192f34 r5
-    rect 332,214 218x62 stroke 1 #455d60 r5
+    text "Requires Philosophy, Drama and Poetry" 1237,461 98x13 #92a8aa 11px
+    rect 1179,431 216x60 fill #101d2173 r5
+    rect 332,214 218x62 fill #14262b r5
+    rect 332,214 218x62 stroke 1 #344649 r5
     rect 339,223 44x44 fill #182f35
     circle 361,245 r9.7 stroke 1 #5c6859
     text "Trapping" 391,222 51x15 #efe9d3 13px
-    text "55 science" 391,245 51x13 #92a8aa 11px
+    text "Requires Animal Husbandry" 391,245 99x13 #92a8aa 11px
+    rect 333,215 216x60 fill #101d2173 r5
     rect 501,249 19x19 fill #182f35
     circle 511,259 r4.2 stroke 1 #5c6859
     text "+1" 524,252 11x11 #92a8aa 10px
-    rect 332,646 218x62 fill #192f34 r5
-    rect 332,646 218x62 stroke 1 #455d60 r5
+    rect 332,646 218x62 fill #14262b r5
+    rect 332,646 218x62 stroke 1 #344649 r5
     rect 339,655 44x44 fill #182f35
     circle 361,677 r9.7 stroke 1 #5c6859
     text "Writing" 391,654 43x15 #efe9d3 13px
-    text "55 science" 391,677 51x13 #92a8aa 11px
+    text "Requires Pottery" 391,677 82x13 #92a8aa 11px
+    rect 333,647 216x60 fill #101d2173 r5
     rect 501,681 19x19 fill #182f35
     circle 511,691 r4.2 stroke 1 #5c6859
     text "+3" 524,684 11x11 #92a8aa 10px
