@@ -533,8 +533,7 @@ impl Offer {
     pub fn all(branches: &[BranchCard]) -> Vec<Offer> {
         let mut out = Vec::new();
         for card in branches {
-            for policy in card.adoptable() {
-                let Some(cost) = policy.price() else { continue };
+            for (policy, cost) in card.policies.iter().filter_map(|p| p.price().map(|cost| (p, cost))) {
                 out.push(Offer {
                     kind: OfferKind::Policy(policy.id),
                     name: policy.name.clone(),
@@ -567,6 +566,9 @@ pub struct CivicsView {
     pub culture: u32,
     pub per_turn: u32,
     pub next_cost: u32,
+    /// What the policy after the next one costs once this one is paid for (the core's, a free
+    /// policy leaves the price as it is).
+    pub cost_after: u32,
     /// Turns until the pool covers the next policy (None: no culture income).
     pub turns: Option<u32>,
     pub free_policies: u16,
@@ -936,6 +938,7 @@ pub(crate) mod civics_sample {
             culture: 120,
             per_turn: 6,
             next_cost: 45,
+            cost_after: 75,
             turns: Some(0),
             free_policies: 0,
             free_tenets: 0,

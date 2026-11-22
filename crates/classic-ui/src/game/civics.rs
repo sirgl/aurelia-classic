@@ -2,7 +2,7 @@
 //! three culture requests (unlock a branch, adopt a policy, choose an ideology).
 use classic_rules::derived::culture::{
     branch_statuses, culture_overview, culture_per_turn, era_index, ideology_status,
-    policy_statuses, BranchBlock, PolicyBlock,
+    policy_cost_after, policy_statuses, BranchBlock, PolicyBlock,
 };
 use classic_rules::ids::PolicyId;
 use classic_rules::rules::content::{PolicyBranchId, PolicyBranchKind, PolicyRole};
@@ -57,6 +57,7 @@ impl Session {
             culture: overview.culture,
             per_turn,
             next_cost: overview.next_policy_cost,
+            cost_after: policy_cost_after(auth, rules, me, 1),
             turns,
             free_policies: overview.free_policies,
             free_tenets: overview.free_tenets,

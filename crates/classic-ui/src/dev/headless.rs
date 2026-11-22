@@ -1113,7 +1113,12 @@ fn show_screen(app: &mut GameApp, capital: Option<u32>) {
         }
         if let Some(session) = app.module.session.as_mut() {
             let mut model = session.screen_model();
-            model.civics = Some(session.civics_view());
+            let view = session.civics_view();
+            // AURELIA_GAME_CIVICS_SCROLL=points scrolls the list; AURELIA_GAME_CIVICS_TAP=offer|policy taps a card.
+            let scroll = env_number("AURELIA_GAME_CIVICS_SCROLL", 0) as f32;
+            let tap = std::env::var("AURELIA_GAME_CIVICS_TAP").ok();
+            app.module.screens.capture_civics_view(&view, scroll, tap.as_deref());
+            model.civics = Some(view);
             app.module.screens.preload_civics_art(&app.ctx, &model);
         }
     }

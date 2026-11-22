@@ -5,7 +5,7 @@
 //! branches as two tabs. Every button is a typed `GameRequest` the core validates; a policy is
 //! adopted with one click on the button that names its price.
 use super::*;
-use super::civics_focus::Zone;
+use super::civics_focus::{Reading, Zone};
 use crate::ui::model::{
     BranchCard, BranchState, CivicsView, Cost, GameRequest, Offer, OfferKind, PolicyCard,
     PolicyState,
@@ -63,7 +63,6 @@ fn narrow(banner: Rect, tabs: Rect, body: Rect, zone: Zone) -> Frame {
 }
 
 pub(super) fn civics(ui: &mut egui::Ui, r: Rect, state: &mut ScreenState, view: &CivicsView) {
-    state.civics.now = ui.input(|i| i.time);
     let zone = state.civics.zone_in(view);
     let frame = frame(r, zone);
     banner(ui, frame.banner, state, view);
@@ -84,9 +83,10 @@ pub(super) fn civics(ui: &mut egui::Ui, r: Rect, state: &mut ScreenState, view: 
 
 /// Asks the core for `request` unless an adoption went through a moment ago.
 fn take(state: &mut ScreenState, request: GameRequest) {
-    if state.civics.may_take() {
+    let now = web_time::Instant::now();
+    if state.civics.may_take(now) {
         state.requests.push(request);
-        state.civics.taken();
+        state.civics.taken(now);
     }
 }
 
@@ -428,7 +428,11 @@ fn branch_tree(ui: &mut egui::Ui, r: Rect, state: &mut ScreenState, view: &Civic
     let header_h = if r.height() >= 420.0 { 84.0 } else { 62.0 };
     let header = Rect::from_min_size(r.min, vec2(r.width(), header_h));
     branch_header(ui, header, state, view, branch);
-    let area = Rect::from_min_max(pos2(r.left() + 10.0, header.bottom() + 2.0), r.max - vec2(10.0, 10.0));
+    let mut area = Rect::from_min_max(pos2(r.left() + 10.0, header.bottom() + 2.0), r.max - vec2(10.0, 10.0));
+    if let Some((title, body)) = policy_reading(state, view, branch) {
+        let height = reading_strip(ui, area, area.bottom(), &title, &body);
+        area.max.y -= height + 6.0;
+    }
     let focus = if focused { state.civics.policy_in(branch).map(|p| p.id) } else { None };
     let nodes = Nodes { view, branch, focus };
     if branch.ideology {
@@ -590,7 +594,7 @@ fn policy_node(ui: &mut egui::Ui, node: Rect, state: &mut ScreenState, nodes: &N
     let response = ui.interact(node, ui.id().with(("civics_policy", p.id.0)), Sense::click());
     crate::ui::pedia_link::mark(ui, node, crate::ui::pedia::PediaRef::policy(p.id));
     if response.clicked() {
-        state.civics.pick_policy(p.id);
+        state.civics.tap_policy(p.id);
     }
     paint_node_frame(ui, node, p.state, nodes.focus == Some(p.id), response.hovered());
     let shape = NodeShape::of(node);
@@ -699,7 +703,7 @@ fn finisher_card(ui: &mut egui::Ui, r: Rect, state: &mut ScreenState, p: &Policy
     let response = ui.interact(r, ui.id().with(("civics_finisher", p.id.0)), Sense::click());
     crate::ui::pedia_link::mark(ui, r, crate::ui::pedia::PediaRef::policy(p.id));
     if response.clicked() {
-        state.civics.pick_policy(p.id);
+        state.civics.tap_policy(p.id);
     }
     let done = p.adopted();
     ui.painter().rect_filled(r, 5.0, if done { Color32::from_rgb(44, 58, 42) } else { LOCKED_FILL });
@@ -721,17 +725,77 @@ fn offers_panel(ui: &mut egui::Ui, r: Rect, state: &mut ScreenState, view: &Civi
     if !view.offers.is_empty() {
         count_dot(ui, pos2(r.left() + 140.0, r.top() + 19.0), view.offers.len());
     }
-    let hint_h = 20.0;
-    let area = Rect::from_min_max(pos2(r.left() + 10.0, r.top() + 36.0), pos2(r.right() - 10.0, r.bottom() - hint_h - 8.0));
+    let touch = client::shell::theme::touch_wanted();
+    let hint_h = if touch { 0.0 } else { 20.0 };
+    let mut area = Rect::from_min_max(pos2(r.left() + 10.0, r.top() + 36.0), pos2(r.right() - 10.0, r.bottom() - hint_h - 8.0));
+    if let Some(note) = price_note(view) {
+        let height = clipped_height(ui.painter(), &note, 10.0, area.width() - 12.0, 2);
+        clipped(ui.painter(), pos2(area.left() + 6.0, area.bottom() - height), &note, 10.0, MUTED, area.width() - 12.0, 2);
+        area.max.y -= height + 6.0;
+    }
+    if let Some((title, body)) = offer_reading(state, view) {
+        let height = reading_strip(ui, area, area.bottom(), &title, &body);
+        area.max.y -= height + 6.0;
+    }
     if view.offers.is_empty() {
         nothing_to_take(ui, area, view);
     } else {
         offer_cards(ui, area, state, view, columns, focused);
     }
-    if !client::shell::theme::touch_wanted() {
+    if !touch {
         let hint = ui.painter().layout_no_wrap(t!("classic.ui.screen-civics.keys-hint").to_owned(), FontId::proportional(10.0), MUTED);
         ui.painter().galley(pos2(r.left() + 16.0, r.bottom() - hint_h), hint, MUTED);
     }
+}
+
+/// Says that the price rises with each policy taken, when the core's numbers show it: something
+/// on offer is paid with culture (a branch's opener is a policy too) and the next one costs more.
+fn price_note(view: &CivicsView) -> Option<String> {
+    let paid = view.offers.iter().any(|o| matches!(o.cost, Cost::Culture(_)));
+    (paid && view.cost_after > view.next_cost).then(|| tf!("classic.ui.screen-civics.price-rises", now = view.next_cost, after = view.cost_after))
+}
+
+// ---------------------------------------------------------------------------------------------
+// Reading a card in full (a tap: there is no hover on a touch screen)
+
+/// The most rows the whole text of a card takes in the reading strip.
+const READING_ROWS: usize = 6;
+
+/// The tapped offer: its name and whole effect.
+fn offer_reading(state: &ScreenState, view: &CivicsView) -> Option<(String, String)> {
+    let Some(Reading::Offer(kind)) = state.civics.reading else { return None };
+    let offer = view.offers.iter().find(|o| o.kind == kind)?;
+    Some((offer.name.clone(), offer.text.clone()))
+}
+
+/// The tapped policy of `branch`: its name, whole effect and, when it is locked, why.
+fn policy_reading(state: &ScreenState, view: &CivicsView, branch: &BranchCard) -> Option<(String, String)> {
+    let Some(Reading::Policy(id)) = state.civics.reading else { return None };
+    let every = branch.opener.iter().chain(branch.policies.iter()).chain(branch.finisher.iter());
+    let policy = every.into_iter().find(|p| p.id == id)?;
+    let body = match policy_reason(policy, branch, view) {
+        Some(reason) => format!("{} · {reason}", policy.text),
+        None => policy.text.clone(),
+    };
+    Some((policy.name.clone(), body))
+}
+
+/// A strip across `area` ending at `bottom`, with the title and the whole of `body`. Returns its height.
+fn reading_strip(ui: &mut egui::Ui, area: Rect, bottom: f32, title: &str, body: &str) -> f32 {
+    let width = area.width() - 16.0;
+    let height = 26.0 + clipped_height(ui.painter(), body, 11.5, width, READING_ROWS) + 6.0;
+    let strip = Rect::from_min_max(pos2(area.left(), bottom - height), pos2(area.right(), bottom));
+    ui.painter().rect_filled(strip, 5.0, LOCKED_FILL);
+    ui.painter().rect_stroke(strip, 5.0, Stroke::new(1.0, GOLD), egui::StrokeKind::Inside);
+    text(ui.painter(), strip.min + vec2(8.0, 5.0), title, 11.0, GOLD);
+    clipped(ui.painter(), strip.min + vec2(8.0, 21.0), body, 11.5, CREAM, width, READING_ROWS);
+    height
+}
+
+/// The height `clipped` gives `value`.
+fn clipped_height(p: &egui::Painter, value: &str, size: f32, width: f32, rows: usize) -> f32 {
+    let lines = wrap_lines(p, value, size, width.max(8.0), rows.max(1));
+    lines.iter().map(|line| layout(p, line, size, Color32::WHITE).size().y / layer_scale(p)).sum()
 }
 
 /// The empty list: why, and how far the next policy is.
@@ -746,32 +810,68 @@ fn nothing_to_take(ui: &mut egui::Ui, area: Rect, view: &CivicsView) {
     clipped(ui.painter(), area.min + vec2(6.0, 72.0), &line, 12.0, MUTED, width, 2);
 }
 
+/// The list scrolls: the wheel, a drag, and the keyboard focus keeps its card in view.
 fn offer_cards(ui: &mut egui::Ui, area: Rect, state: &mut ScreenState, view: &CivicsView, columns: usize, focused: bool) {
     let columns = columns.max(1);
     let line_h = 6.0;
     let rows_total = view.offers.len().div_ceil(columns);
     let card_h = ((area.height() / rows_total as f32) - line_h).clamp(80.0, 100.0);
-    let fit = ((area.height() + line_h) / (card_h + line_h)).floor().max(1.0) as usize * columns;
-    let shown = view.offers.len().min(fit);
-    let card_w = (area.width() - GAP * (columns as f32 - 1.0)) / columns as f32;
+    let content_h = rows_total as f32 * (card_h + line_h) - line_h;
+    let max_scroll = (content_h - area.height()).max(0.0);
+    let width = if max_scroll > 0.0 { area.width() - 8.0 } else { area.width() };
+    let card_w = (width - GAP * (columns as f32 - 1.0)) / columns as f32;
     let current = state.civics.offer.min(view.offers.len() - 1);
-    for (i, offer) in view.offers.iter().take(shown).enumerate() {
-        let (c, row) = (i % columns, i / columns);
-        let at = pos2(area.left() + c as f32 * (card_w + GAP), area.top() + row as f32 * (card_h + line_h));
-        let card = Rect::from_min_size(at, vec2(card_w, card_h));
-        offer_card(ui, card, state, offer, i, focused && i == current);
+    let focus_row = (current / columns) as f32;
+    scroll_input(ui, area, state, max_scroll);
+    if focused && state.civics.followed != Some(current) {
+        let (top, bottom) = (focus_row * (card_h + line_h), focus_row * (card_h + line_h) + card_h);
+        let offset = state.civics.scroll;
+        state.civics.scroll = offset.min(top).max(bottom - area.height());
     }
-    if shown < view.offers.len() {
-        let rest = tf!("classic.ui.screen-civics.more-offers", n = view.offers.len() - shown);
-        let y = area.top() + (shown.div_ceil(columns)) as f32 * (card_h + line_h);
-        text(ui.painter(), pos2(area.left() + 6.0, y), rest, 11.0, MUTED);
+    state.civics.followed = focused.then_some(current).or(state.civics.followed);
+    let offset = state.civics.scroll.clamp(0.0, max_scroll);
+    state.civics.scroll = offset;
+    let outer = ui.clip_rect();
+    ui.set_clip_rect(area.intersect(outer));
+    for (i, offer) in view.offers.iter().enumerate() {
+        let (c, row) = (i % columns, i / columns);
+        let at = pos2(area.left() + c as f32 * (card_w + GAP), area.top() + row as f32 * (card_h + line_h) - offset);
+        let card = Rect::from_min_size(at, vec2(card_w, card_h));
+        if card.bottom() < area.top() || card.top() > area.bottom() {
+            continue;
+        }
+        offer_card(ui, card, state, view, offer, i, focused && i == current);
+    }
+    ui.set_clip_rect(outer);
+    if max_scroll > 0.0 {
+        scroll_bar(ui, area, offset, max_scroll, content_h);
     }
 }
 
-fn offer_card(ui: &mut egui::Ui, card: Rect, state: &mut ScreenState, offer: &Offer, index: usize, focused: bool) {
+/// The wheel and a drag (a finger) move the list.
+fn scroll_input(ui: &mut egui::Ui, area: Rect, state: &mut ScreenState, max_scroll: f32) {
+    if max_scroll <= 0.0 {
+        return;
+    }
+    let drag = ui.interact(area, ui.id().with("civics_offers_scroll"), Sense::drag());
+    let mut delta = -drag.drag_delta().y;
+    if ui.rect_contains_pointer(area) {
+        delta -= ui.input(|i| i.smooth_scroll_delta.y);
+    }
+    state.civics.scroll = (state.civics.scroll + delta).clamp(0.0, max_scroll);
+}
+
+fn scroll_bar(ui: &egui::Ui, area: Rect, offset: f32, max_scroll: f32, content_h: f32) {
+    let thumb_h = (area.height() * area.height() / content_h).max(24.0);
+    let top = area.top() + (area.height() - thumb_h) * offset / max_scroll;
+    let thumb = Rect::from_min_size(pos2(area.right() - 4.0, top), vec2(3.0, thumb_h));
+    ui.painter().rect_filled(thumb, 1.5, GOLD.gamma_multiply(0.6));
+}
+
+fn offer_card(ui: &mut egui::Ui, card: Rect, state: &mut ScreenState, view: &CivicsView, offer: &Offer, index: usize, focused: bool) {
     let response = ui.interact(card, ui.id().with(("civics_offer", index)), Sense::click());
     if response.clicked() {
-        state.civics.pick_offer(index);
+        state.civics.tap_offer(index, view);
     }
     ui.painter().rect_filled(card, 5.0, if response.hovered() { Color32::from_rgb(34, 60, 62) } else { RAISED });
     ui.painter().rect_stroke(card, 5.0, Stroke::new(1.0, CULTURE), egui::StrokeKind::Inside);

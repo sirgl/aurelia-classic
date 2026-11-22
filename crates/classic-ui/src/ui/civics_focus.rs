@@ -7,9 +7,11 @@
 use crate::ui::model::{BranchCard, BranchState, CivicsView, GameRequest, OfferKind, PolicyCard};
 use classic_rules::ids::PolicyId;
 use classic_rules::rules::content::PolicyBranchId;
+use std::time::Duration;
+use web_time::Instant;
 
-/// A second adoption right after the first is ignored for this long (seconds): the next card
-/// slides under the pointer, and a double click or a held Enter must not buy it too.
+/// A second adoption right after the first is ignored for this long: the next card slides under
+/// the pointer, and a double click or a held Enter must not buy it too.
 pub const QUIET: f64 = 0.35;
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -53,9 +55,23 @@ pub struct Focus {
     pub branch: Option<PolicyBranchId>,
     pub policy: Option<PolicyId>,
     pub offer: usize,
-    /// The screen clock of the last frame, and the time before which a take is ignored.
-    pub now: f64,
-    pub quiet_until: f64,
+    /// Before this moment a take is ignored. The moment is read where the input arrives (the click
+    /// in the draw, the key in the shell's key routing), on one clock: the shell routes keys before
+    /// it draws and draws nothing while idle, so a clock written by the draw is stale at a key.
+    pub quiet_until: Option<Instant>,
+    /// How far the "Available now" list is scrolled (points), and the offer the scroll last
+    /// followed: the keyboard focus moves the list only when it moves to another offer.
+    pub scroll: f32,
+    pub followed: Option<usize>,
+    /// The policy or offer a tap opened to read in full.
+    pub reading: Option<Reading>,
+}
+
+/// What the player tapped to read the whole text of.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Reading {
+    Policy(PolicyId),
+    Offer(OfferKind),
 }
 
 impl Focus {
@@ -100,6 +116,7 @@ impl Focus {
         self.zone = Zone::Branches;
         self.branch = Some(id);
         self.policy = None;
+        self.reading = None;
     }
 
     pub fn pick_policy(&mut self, id: PolicyId) {
@@ -112,18 +129,38 @@ impl Focus {
         self.offer = index;
     }
 
-    /// Whether a take may go through now (the quiet time after the last one is over).
-    pub fn may_take(&self) -> bool {
-        self.now >= self.quiet_until
+    /// A tap on a node: it gets the focus and its whole text is shown; a second tap hides it.
+    pub fn tap_policy(&mut self, id: PolicyId) {
+        self.pick_policy(id);
+        self.toggle_reading(Reading::Policy(id));
     }
 
-    /// A take went through: nothing is taken for a moment.
-    pub fn taken(&mut self) {
-        self.quiet_until = self.now + QUIET;
+    /// A tap on an offer card.
+    pub fn tap_offer(&mut self, index: usize, view: &CivicsView) {
+        self.pick_offer(index);
+        if let Some(offer) = view.offers.get(index) {
+            self.toggle_reading(Reading::Offer(offer.kind));
+        }
     }
 
-    /// One key. The request to send when the key took something; the focus moves otherwise.
-    pub fn apply(&mut self, view: &CivicsView, key: Move) -> Option<GameRequest> {
+    fn toggle_reading(&mut self, what: Reading) {
+        self.reading = if self.reading == Some(what) { None } else { Some(what) };
+    }
+
+    /// Whether a take may go through at `now` (the quiet time after the last one is over).
+    pub fn may_take(&self, now: Instant) -> bool {
+        self.quiet_until.is_none_or(|until| now >= until)
+    }
+
+    /// A take went through at `now`: nothing is taken for a moment.
+    pub fn taken(&mut self, now: Instant) {
+        self.quiet_until = Some(now + Duration::from_secs_f64(QUIET));
+        self.reading = None;
+    }
+
+    /// One key, pressed at `now`. The request to send when the key took something; the focus moves
+    /// otherwise.
+    pub fn apply(&mut self, view: &CivicsView, key: Move, now: Instant) -> Option<GameRequest> {
         let zone = self.zone_in(view);
         match key {
             Move::SwitchZone => {
@@ -144,11 +181,12 @@ impl Focus {
                 }
                 None
             }
-            Move::Take if !self.may_take() => None,
+            Move::Take if !self.may_take(now) => None,
             Move::Take => {
                 let request = self.take(view, zone);
                 if request.is_some() {
-                    self.taken();
+                    self.taken(now);
+                    self.move_on(view, zone);
                 }
                 request
             }
@@ -174,6 +212,23 @@ impl Focus {
             None => 0,
         };
         self.pick_policy(card.policies[to].id);
+    }
+
+    /// After a take the focus leaves what was taken, so the next Enter acts: in the branches it goes
+    /// to the next policy that may be adopted, else to the list; the offers list keeps its place
+    /// (the next card slides into it).
+    fn move_on(&mut self, view: &CivicsView, zone: Zone) {
+        if zone != Zone::Branches {
+            return;
+        }
+        let Some(card) = view.branches.get(self.branch_index(view)) else { return };
+        let Some(taken) = self.policy_in(card).filter(|p| p.price().is_some()).map(|p| p.id) else { return };
+        let next = card.adoptable().find(|p| p.id != taken).map(|p| p.id);
+        self.policy = next;
+        if next.is_none() && view.offers.len() > 1 {
+            self.zone = Zone::Offers;
+            self.offer = 0;
+        }
     }
 
     fn take(&self, view: &CivicsView, zone: Zone) -> Option<GameRequest> {

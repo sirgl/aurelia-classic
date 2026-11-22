@@ -4,9 +4,13 @@ use crate::ui::model::{BranchState, Lock};
 use classic_rules::derived::culture::BranchBlock;
 use classic_rules::ids::PolicyId;
 
+static START: std::sync::LazyLock<web_time::Instant> = std::sync::LazyLock::new(web_time::Instant::now);
+
 /// One frame of the screen at `size`.
 fn frame(ctx: &egui::Context, state: &mut ScreenState, view: &CivicsView, size: egui::Vec2, events: Vec<egui::Event>) -> egui::FullOutput {
-    let raw = egui::RawInput { screen_rect: Some(Rect::from_min_size(egui::Pos2::ZERO, size)), events, ..Default::default() };
+    // The input carries the real time, as the shell's frames do.
+    let time = Some(START.elapsed().as_secs_f64());
+    let raw = egui::RawInput { screen_rect: Some(Rect::from_min_size(egui::Pos2::ZERO, size)), events, time, ..Default::default() };
     let mut output = ctx.run_ui(raw, |ui| {
         let body = Rect::from_min_max(pos2(24.0, 80.0), pos2(size.x - 24.0, size.y - 38.0));
         civics(ui, body, state, view);
@@ -187,4 +191,145 @@ fn a_cut_line_with_its_ellipsis_fits_the_width_at_the_touch_scale() {
     assert!(t.galley.size().x <= width * SCALE + 0.01, "{} wider than {}", t.galley.size().x, width * SCALE);
     let laid_out = t.galley.job.sections[0].format.font_id.size;
     assert!((laid_out - size * SCALE).abs() < 1e-3, "laid out at {laid_out}, drawn at {}", size * SCALE);
+}
+
+fn pause_over() {
+    std::thread::sleep(std::time::Duration::from_secs_f64(civics_focus::QUIET + 0.05));
+}
+
+/// The pause after a take runs on one clock, whoever took: the shell routes a key before it draws
+/// and draws nothing while idle, so a clock written by the draw is stale at the next key.
+#[test]
+fn enter_after_the_pause_of_a_mouse_take_takes_with_no_frame_between() {
+    let view = view();
+    let size = SIZES[0];
+    let ctx = egui::Context::default();
+    let mut state = ScreenState::default();
+    let output = settled(&ctx, &mut state, &view, size);
+    click(&ctx, &mut state, &view, size, centres(&output, "Adopt · 45")[0]);
+    assert_eq!(state.requests.len(), 1);
+    pause_over();
+    assert!(state.civics_key(&view, civics_focus::Move::Take).is_some(), "Enter after the pause of a mouse take is a take, not swallowed");
+}
+
+#[test]
+fn a_held_enter_after_an_idle_spell_buys_once() {
+    let view = view();
+    let size = SIZES[0];
+    let ctx = egui::Context::default();
+    let mut state = ScreenState::default();
+    settled(&ctx, &mut state, &view, size);
+    pause_over();
+    assert!(state.civics_key(&view, civics_focus::Move::Take).is_some());
+    settled(&ctx, &mut state, &view, size);
+    assert!(state.civics_key(&view, civics_focus::Move::Take).is_none(), "the redraw after the first take must not end the pause");
+}
+
+/// The sample with `n` more things to take, each with a long effect.
+fn crowded(n: usize) -> CivicsView {
+    let mut view = view();
+    let template = view.offers[0].clone();
+    for i in 0..n {
+        let text = format!("Effect {i}: +25% worker speed; a free Worker; and every Worker you own works faster on roads and rails for the rest of the game, even far from home");
+        view.offers.push(Offer { kind: OfferKind::Policy(PolicyId(100 + i as u16)), name: format!("Policy {i}"), text, ..template.clone() });
+    }
+    view
+}
+
+fn words(output: &egui::FullOutput) -> String {
+    let rows: Vec<String> = output.shapes.iter().filter_map(|s| match &s.shape { egui::Shape::Text(t) => Some(t.galley.text().to_owned()), _ => None }).collect();
+    rows.join(" ")
+}
+
+fn wheel(ctx: &egui::Context, state: &mut ScreenState, view: &CivicsView, size: egui::Vec2, at: egui::Pos2, down: f32) {
+    frame(ctx, state, view, size, vec![egui::Event::PointerMoved(at)]);
+    let event = egui::Event::MouseWheel { unit: egui::MouseWheelUnit::Point, delta: vec2(0.0, -down), modifiers: egui::Modifiers::NONE, phase: egui::TouchPhase::Move };
+    frame(ctx, state, view, size, vec![event]);
+    // egui eases a wheel notch over a few frames of real time.
+    for _ in 0..12 {
+        std::thread::sleep(std::time::Duration::from_millis(30));
+        frame(ctx, state, view, size, vec![]);
+    }
+}
+
+#[test]
+fn the_available_list_scrolls_with_the_wheel() {
+    let view = crowded(13);
+    assert_eq!(view.offers.len(), 15);
+    let ctx = egui::Context::default();
+    let mut state = ScreenState::default();
+    let size = SIZES[1];
+    let before = settled(&ctx, &mut state, &view, size);
+    assert!(!words(&before).contains("Policy 12"), "the last offer is below the list");
+    let list = centres(&before, "Policy 0")[0];
+    wheel(&ctx, &mut state, &view, size, list, 4000.0);
+    let after = settled(&ctx, &mut state, &view, size);
+    assert!(words(&after).contains("Policy 12"), "the wheel brings the last offer into view");
+    assert!(!words(&after).contains("Policy 0 "), "and the first leaves it");
+}
+
+#[test]
+fn the_keyboard_focus_keeps_its_card_in_view() {
+    let view = crowded(13);
+    let ctx = egui::Context::default();
+    let mut state = ScreenState::default();
+    let size = SIZES[1];
+    settled(&ctx, &mut state, &view, size);
+    for _ in 0..14 {
+        state.civics_key(&view, civics_focus::Move::Next);
+    }
+    let output = settled(&ctx, &mut state, &view, size);
+    let at = centres(&output, "Policy 12");
+    assert_eq!(at.len(), 1, "the focused (last) card is drawn");
+    assert!(at[0].y < size.y - 38.0, "and inside the screen, not below the list: {:?}", at[0]);
+    for _ in 0..14 {
+        state.civics_key(&view, civics_focus::Move::Previous);
+    }
+    let output = settled(&ctx, &mut state, &view, size);
+    assert!(!centres(&output, "Citizenship").is_empty(), "back at the top the first card is in view");
+}
+
+#[test]
+fn a_tap_on_a_card_shows_its_whole_text_and_adopts_nothing() {
+    let mut view = view();
+    let long = "+25% worker speed; a free Worker; and every Worker you own works faster on roads and rails for the rest of the game, even far from home";
+    view.offers[0].text = long.into();
+    let ctx = egui::Context::default();
+    let mut state = ScreenState::default();
+    let size = SIZES[0];
+    let output = settled(&ctx, &mut state, &view, size);
+    assert!(!words(&output).contains("even far from home"), "the card cuts the effect");
+    let card = centres(&output, "Citizenship").into_iter().max_by(|a, b| a.x.total_cmp(&b.x)).expect("the card's name");
+    click(&ctx, &mut state, &view, size, card);
+    assert!(state.requests.is_empty(), "a tap on the card is not an adoption");
+    let output = settled(&ctx, &mut state, &view, size);
+    assert!(words(&output).contains("even far from home"), "the whole effect is shown after the tap");
+    click(&ctx, &mut state, &view, size, card);
+    assert!(!words(&settled(&ctx, &mut state, &view, size)).contains("even far from home"), "a second tap hides it");
+}
+
+#[test]
+fn a_tap_on_a_node_shows_its_whole_text_with_the_reason_when_locked() {
+    let view = view();
+    let ctx = egui::Context::default();
+    let mut state = ScreenState::default();
+    let size = SIZES[0];
+    state.civics.tap_policy(PolicyId(12));
+    let output = settled(&ctx, &mut state, &view, size);
+    let text = words(&output);
+    assert!(text.contains("+1 happiness per city with a connection · Needs Citizenship first"), "{text}");
+    state.civics.pick_branch(classic_rules::rules::content::PolicyBranchId(0));
+    assert!(!words(&settled(&ctx, &mut state, &view, size)).contains("with a connection · Needs"), "another branch closes it");
+}
+
+#[test]
+fn the_list_says_the_next_price_is_higher_when_the_core_says_so() {
+    let mut view = view();
+    let ctx = egui::Context::default();
+    let mut state = ScreenState::default();
+    let output = settled(&ctx, &mut state, &view, SIZES[0]);
+    assert!(words(&output).contains("raises the next price: 45 now, 75 after it"));
+    view.cost_after = view.next_cost;
+    let output = settled(&ctx, &mut state, &view, SIZES[0]);
+    assert!(!words(&output).contains("raises the next price"), "no note when the price stays");
 }
