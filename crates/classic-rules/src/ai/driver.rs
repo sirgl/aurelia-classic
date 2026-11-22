@@ -990,7 +990,11 @@ impl ClassicMind {
                 // `net2` takes the strategist's turn: its plan is the strategist's for the economy heads
                 // (`TurnBrief::strategy`) and its levers go to the executors (`TurnBrief::net2`).
                 let plan = if let Some(parts) = self.net2 {
-                    let crate::ai::net2::plan::Plan2 { strategy, net2 } = crate::ai::net2::think(observation, &brief, state, rules, &prices, &stakes, parts);
+                    let crate::ai::net2::plan::Plan2 { strategy, mut net2 } = crate::ai::net2::think(observation, &brief, state, rules, &prices, &stakes, parts);
+                    // `net2-defence`, the control of the offence, plays none of its levers.
+                    if !self.net2_offence {
+                        crate::ai::net2::offence::clear(&mut net2);
+                    }
                     brief.net2 = Some(net2);
                     // The defence watch was made before `net2` thought: its dangers take the plan's guard
                     // levels now, before the city planner and `defence::arm` read them.

@@ -422,6 +422,7 @@ impl Allocator {
             }
             if let Command::GiftGold { city_state, gold, .. } = offer.command {
                 crate::ai::strategy_net::trace::gift(obs, city_state, gold, offer.value as i64);
+                crate::ai::tricks_trace::line(|| format!("{{\"ev\":\"gift\",\"r\":{},\"p\":{},\"cs\":{},\"gold\":{gold},\"value\":{},\"share\":{}}}", obs.round, obs.player.0, city_state.0, offer.value, self.cs_gold_share));
             }
             out.push(Decision::act(offer.actor, reason, offer.command));
         }

@@ -658,6 +658,9 @@ pub struct Net2Plan {
     /// The style share of tall (the site head's S9).
     pub tall_share: Milli,
     pub offence: Offence,
+    /// The ease (`weights::EASE`) of the city the war order aims at, 0 without an aim (`net2/orders.rs`): what the
+    /// order's war promises when no operation runs yet, read by the peace answer (CHAIN.md D8).
+    pub aim_ease: Milli,
 }
 
 /// The trust of a rival without a reading (a city-state, a stranger): a stranger is not yet a liar.

@@ -118,15 +118,18 @@ fn p4_a_distrusted_partners_later_flows_are_worth_nothing_and_the_sale_is_refuse
     assert!(today > 0, "the flows are worth something to the seat: {today}");
     // The gold that today's value allows: the most the seat pays and still says yes.
     let most = (1..2000u32).take_while(|g| value(&game, &rules, None, &pays(*g)) >= 0).last().expect("some price passes");
+    // A lump of our gold for flows later is a credit: only the rounds a peace treaty guarantees count, whatever the
+    // trust (`net2::credit`, work/nets/tricks/CHAIN.md D1/D2: the swindler of the first sale is trusted fully).
     let full = value(&game, &rules, Some(plan(vec![read(P1, 1000, Help::Give)])), &pays(most));
-    assert_eq!(full, value(&game, &rules, None, &pays(most)), "a rival we trust fully: as today");
+    assert!(full < 0, "a rival we trust fully: the lump is not paid ({full})");
     let mid = value(&game, &rules, Some(plan(vec![read(P1, 700, Help::Give)])), &flows);
     assert!(0 < mid && mid < today, "trust 700 prices {mid} of {today}");
     let low = plan(vec![read(P1, TRUST_MIN - 1, Help::Give)]);
     assert_eq!(value(&game, &rules, Some(low.clone()), &flows), 0, "below TRUST_MIN nothing flows");
     assert!(value(&game, &rules, Some(low), &pays(most)) < 0, "the sale that passed today is refused");
-    // A stranger without a reading is not yet a liar.
-    assert_eq!(value(&game, &rules, Some(plan(vec![])), &pays(most)), value(&game, &rules, None, &pays(most)));
+    // A stranger without a reading is not yet a liar: its flows alone are priced as today; a lump for them is a credit.
+    assert_eq!(value(&game, &rules, Some(plan(vec![])), &flows), today);
+    assert!(value(&game, &rules, Some(plan(vec![])), &pays(most)) < 0);
 }
 
 /// What we give first stays priced as it was: the trust discounts what we receive later, not what we pay.

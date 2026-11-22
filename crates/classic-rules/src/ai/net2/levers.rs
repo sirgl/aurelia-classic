@@ -312,6 +312,7 @@ pub fn after_intent(pass: &Pass, intent: &Intent, inputs: &Inputs, round: u32) -
         generals: if pass.core.war.order().is_none() && !at_war { Generals::Hold } else { Generals::AsToday },
         tall_share: intent.style[0],
         offence: Offence::default(),
+        aim_ease: super::orders::aim_ease(&pass.core.war, &inputs.targets, &pass.eases),
     };
     After { plan, price_tilt, peace }
 }

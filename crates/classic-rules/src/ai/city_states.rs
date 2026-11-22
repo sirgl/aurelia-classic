@@ -45,6 +45,24 @@ pub fn ceiling_for(ceiling: i32, share: crate::ai::strategy_net::Milli) -> i32 {
     (i64::from(ceiling) * (1000 + share.clamp(0, 1000)) / 1000) as i32
 }
 
+/// `net2`'s contested city-state (its input G10, design §2.2: "cheap flips"): allied to another nation, not at war
+/// with us, and our influence trails the ally's by under `FRIENDS_THRESHOLD` points. The ally's influence is not on
+/// the screen: at least the alliance's threshold, and the mean of our own alliances when we hold some (the same
+/// estimate as `guard_targets`). Some(the influence to pass); None: not contested. THE ONE definition: `net2`'s
+/// input counts these, and the gift executor (`priced_gifts_shared`) offers them while the plan shares gold with
+/// the city-states (CHAIN.md: the input counted them and the executor skipped every city-state allied to another).
+pub fn contested_beat(obs: &AIObservation<'_>, info: &CityStateInfo) -> Option<i32> {
+    use crate::knowledge::public::PlayerQueries;
+    let me = obs.player;
+    if info.at_war || !info.ally.is_some_and(|a| a != me) {
+        return None;
+    }
+    let held: Vec<i32> = obs.city_states.iter().filter(|c| c.ally == Some(me)).map(|c| c.influence).collect();
+    let threshold = obs.view.city_state_terms(info.player).map_or(ALLIES_THRESHOLD, |t| t.allies_at);
+    let leader = if held.is_empty() { threshold } else { (held.iter().map(|v| i64::from(*v)).sum::<i64>() / held.len() as i64) as i32 }.max(threshold);
+    (leader - info.influence < crate::world::city_states::FRIENDS_THRESHOLD).then_some(leader.max(info.influence))
+}
+
 /// One gold gift a turn to the most valuable city-state while the treasury
 /// is above the reserve.
 pub fn gift_orders(obs: &AIObservation<'_>) -> Vec<Command> {
@@ -251,7 +269,9 @@ pub fn priced_gifts_shared(obs: &AIObservation<'_>, prices: &crate::ai::value::P
     for info in &obs.city_states {
         let free = info.ally.is_none_or(|a| a == obs.player);
         let contest = targets.iter().find(|t| t.city_state == info.player);
-        let Some(terms) = obs.view.city_state_terms(info.player).filter(|_| (free || contest.is_some()) && !info.at_war) else { continue };
+        // `net2`: a contested city-state (its input G10) is a target while the plan shares gold with the city-states.
+        let flip = if share > 0 && contest.is_none() { contested_beat(obs, info) } else { None };
+        let Some(terms) = obs.view.city_state_terms(info.player).filter(|_| (free || contest.is_some() || flip.is_some()) && !info.at_war) else { continue };
         let lacking: i32 = obs
             .view
             .tradeable_luxuries(info.player)
@@ -264,7 +284,7 @@ pub fn priced_gifts_shared(obs: &AIObservation<'_>, prices: &crate::ai::value::P
         let invest = info.quests.iter().any(|q| matches!(q, QuestKind::Invest));
         // A quest for gold pays its influence for any gift (`Invest` only makes a gift worth more).
         let quest = info.quests.iter().any(|q| matches!(q, QuestKind::GiveGold { .. }));
-        if contest.is_none() && prices.gift_cap && !quest && info.influence >= ceiling_for(gift_ceiling(terms.allies_at, lead), share) {
+        if contest.is_none() && flip.is_none() && prices.gift_cap && !quest && info.influence >= ceiling_for(gift_ceiling(terms.allies_at, lead), share) {
             continue;
         }
         let (target, hold, guard) = match contest {
@@ -281,7 +301,8 @@ pub fn priced_gifts_shared(obs: &AIObservation<'_>, prices: &crate::ai::value::P
                 }
                 (t.beat, i64::from(t.rounds), t.worth)
             }
-            None => (terms.allies_at, rounds, 0),
+            // A contested alliance is taken by passing the ally's estimated influence, then held as our own.
+            None => (flip.unwrap_or(terms.allies_at), rounds, 0),
         };
         for size in [SMALL_GIFT, MEDIUM_GIFT].into_iter().filter(|g| *g <= gold) {
             let points = i64::from(crate::world::city_states::gold_gift_influence_at(&obs.speed, obs.round, size, invest, 0).max(1));

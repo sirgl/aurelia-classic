@@ -19,7 +19,6 @@ use crate::ai::strategy_net::weights::fe;
 use crate::ai::strategy_net::Milli;
 use crate::ids::{PlayerId, TileId};
 use crate::knowledge::observation::AIObservation;
-use crate::knowledge::public::PlayerQueries;
 use crate::rules::content::Domain;
 use crate::rules::CompiledRuleset;
 use crate::world::player::PlayerKind;
@@ -719,17 +718,8 @@ fn unhappy_trend(memory: &InputMemory, now: u32, happiness: i32, window: u32) ->
 /// threshold, and the mean of our own alliances when we hold some (as `city_states::guard_targets`
 /// reads it). A city-state at war with us is not counted.
 fn contested_city_states(obs: &AIObservation<'_>) -> i64 {
-    let me = obs.player;
-    let held: Vec<i32> = obs.city_states.iter().filter(|c| c.ally == Some(me)).map(|c| c.influence).collect();
-    obs.city_states
-        .iter()
-        .filter(|c| !c.at_war && c.ally.is_some_and(|a| a != me))
-        .filter(|c| {
-            let threshold = obs.view.city_state_terms(c.player).map_or(crate::world::city_states::ALLIES_THRESHOLD, |t| t.allies_at);
-            let leader = if held.is_empty() { threshold } else { (held.iter().map(|v| i64::from(*v)).sum::<i64>() / held.len() as i64) as i32 }.max(threshold);
-            leader - c.influence < crate::world::city_states::FRIENDS_THRESHOLD
-        })
-        .count() as i64
+    // One definition with the gift executor that acts on the input (`city_states::contested_beat`).
+    obs.city_states.iter().filter(|c| crate::ai::city_states::contested_beat(obs, c).is_some()).count() as i64
 }
 
 /// The guard's inputs per own city (§4.5).

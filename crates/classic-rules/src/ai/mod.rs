@@ -96,6 +96,7 @@ pub mod planner_strategy;
 pub mod planner_units;
 pub mod planner_value;
 pub mod planner_workers;
+pub mod tricks_trace;
 pub mod field_craft;
 pub mod landless;
 pub mod raid_war;
