@@ -21,6 +21,7 @@
 use crate::ai::planner::{Decision, PlanTools, UnitView};
 use crate::ai::planner_map::{explore, Blockers, KnownMap, SearchLimit, Visit};
 use crate::ai::site::SiteInputs;
+use crate::ai::site_net::SiteNetPlay;
 use crate::ai::planner_units::{move_along, nearest_safe_tile, threatened};
 use crate::ai::state::{AiState, Reservation, UnitTask};
 use crate::ai::trace::{Actor, Reason};
@@ -284,20 +285,51 @@ impl SiteContext<'_, '_> {
     /// site's `score_legal` (a feature of the net: `site::site_features`
     /// asks the same of a context without reservations and danger, legal
     /// wherever this one is).
-    fn net_score(&self, tile: TileId, inputs: &SiteInputs<'_>, heuristic: i32) -> i32 {
+    /// `read` says how (`NetRead`).
+    fn net_score(&self, tile: TileId, inputs: &SiteInputs<'_>, read: &NetRead<'_>, heuristic: i32) -> i32 {
         #[cfg(feature = "experimental-ai")]
         {
             let _span = prof::span("classic/site_net");
-            let features = crate::ai::site::site_features_with(self.view, self.rules, self.player, tile, inputs, Some(heuristic));
-            return crate::ai::site_net::planner_score(crate::ai::site_net::predict(&features)) + self.distance_score(tile);
+            let mut features = crate::ai::site::site_features_with(self.view, self.rules, self.player, tile, inputs, Some(heuristic));
+            if let NetRead::OwnLand = read {
+                features[crate::ai::site::FOREIGN_TILES] = 0;
+            }
+            let score = crate::ai::site_net::planner_score(crate::ai::site_net::predict(&features)) + self.distance_score(tile);
+            return match read {
+                NetRead::Science(bonuses) => score + crate::ai::tall::site_bonus(self.view, self.rules, tile, bonuses),
+                NetRead::Fitted | NetRead::OwnLand => score,
+            };
         }
         // Without the site net's table (`experimental-ai`) a site is worth its heuristic.
         #[cfg(not(feature = "experimental-ai"))]
         {
-            let _ = (tile, inputs);
+            let _ = (tile, inputs, read);
             heuristic
         }
     }
+}
+
+/// The shadow tool's record (`ai::econ_shadow`): the site net's best site against the one the
+/// standard quality (the science bonus on a tall seat, else the land score) ranks first.
+fn shadow_site(ctx: &SiteContext<'_, '_>, view: &UnitView<'_, '_>, tools: &mut PlanTools<'_>, limit: u32, net: &[Site]) {
+    let (unit, brief) = (view.local.unit, view.brief);
+    let quality = if brief.tall_sites.is_empty() { SiteQuality::Heuristic } else { SiteQuality::Science(&brief.tall_sites) };
+    let standard = best_sites_by(ctx, unit.tile, unit.moves_max, tools, limit, &quality);
+    let (Some(net), Some(standard)) = (net.first(), standard.first()) else {
+        return;
+    };
+    let dims = ctx.view.dimensions();
+    let case = |site: &Site| {
+        let nearest = |tiles: &[TileId]| tiles.iter().filter_map(|t| dims.distance(*t, site.tile)).min();
+        crate::ai::econ_shadow::SiteCase {
+            tile: site.tile,
+            own_distance: nearest(ctx.own_cities),
+            foreign_distance: nearest(ctx.foreign_cities),
+            heuristic: ctx.score(site.tile).unwrap_or(0),
+            value: site.value,
+        }
+    };
+    crate::ai::econ_shadow::push(crate::ai::econ_shadow::Case::Site { player: ctx.player, round: brief.round, settler: unit.id.0, net: case(net), standard: case(standard) });
 }
 
 /// The score terms of a site's distances to the nearest own and foreign
@@ -326,12 +358,25 @@ pub fn distance_terms(own: Option<i32>, foreign: Option<i32>) -> i32 {
 pub enum SiteQuality<'c> {
     /// `SiteContext::score`.
     Heuristic,
-    /// The site net on the site's features with these inputs
+    /// The site net on the site's features with these inputs, read so
     /// (`SiteContext::net_score`, `Variant::site_net`).
-    Net(SiteInputs<'c>),
+    Net(SiteInputs<'c>, NetRead<'c>),
     /// `SiteContext::score` plus what the science buildings whose site
     /// condition the site meets add (`ai::tall`, `TurnBrief::tall_sites`).
     Science(&'c [(crate::ids::BuildingKindId, i32)]),
+}
+
+/// How a search reads the site net (`site_net::SiteNetPlay` with the seat's
+/// science bonuses).
+#[derive(Debug, Clone, Copy)]
+pub enum NetRead<'c> {
+    /// The net's answer as fitted.
+    Fitted,
+    /// The answer plus what the science buildings whose site condition the
+    /// site meets add (`ai::tall::site_bonus`, `TurnBrief::tall_sites`).
+    Science(&'c [(crate::ids::BuildingKindId, i32)]),
+    /// The answer with the input `foreign_tiles` read as 0.
+    OwnLand,
 }
 
 /// The best sites reachable from `origin` over the known map, best first
@@ -454,7 +499,7 @@ impl SiteSearch<'_, '_, '_> {
         self.worth_a_city += 1;
         let score = match self.quality {
             SiteQuality::Heuristic => heuristic,
-            SiteQuality::Net(inputs) => self.ctx.net_score(tile, inputs, heuristic),
+            SiteQuality::Net(inputs, read) => self.ctx.net_score(tile, inputs, read, heuristic),
             SiteQuality::Science(bonuses) => heuristic + crate::ai::tall::site_bonus(self.ctx.view, self.ctx.rules, tile, bonuses),
         } + self.ctx.supply_score(tile);
         let turns = crate::ai::planner_map::turns_for(points, self.moves_max) as i32;
@@ -586,21 +631,27 @@ fn choose_site(
         // The site net reads what the site dataset recorded at a founding
         // (`aurelia-qa` `site`): the brief's nation, technologies and
         // excess happiness, the decision's round and the context's cities.
-        let quality = if brief.site_net {
-            SiteQuality::Net(SiteInputs {
-                nation: brief.nation,
-                techs: &brief.techs,
-                own_cities: ctx.own_cities,
-                foreign_cities: ctx.foreign_cities,
-                round: view.local.round,
-                excess_happiness: brief.happiness,
-            })
-        } else if !brief.tall_sites.is_empty() {
-            SiteQuality::Science(&brief.tall_sites)
-        } else {
-            SiteQuality::Heuristic
+        let inputs = SiteInputs {
+            nation: brief.nation,
+            techs: &brief.techs,
+            own_cities: ctx.own_cities,
+            foreign_cities: ctx.foreign_cities,
+            round: view.local.round,
+            excess_happiness: brief.happiness,
         };
-        best_sites_by(ctx, unit.tile, unit.moves_max, tools, limit, &quality)
+        let tall = !brief.tall_sites.is_empty();
+        let quality = match brief.site_net {
+            SiteNetPlay::Off if tall => SiteQuality::Science(&brief.tall_sites),
+            SiteNetPlay::Off => SiteQuality::Heuristic,
+            SiteNetPlay::Tall if tall => SiteQuality::Net(inputs, NetRead::Science(&brief.tall_sites)),
+            SiteNetPlay::Fitted | SiteNetPlay::Tall => SiteQuality::Net(inputs, NetRead::Fitted),
+            SiteNetPlay::OwnLand => SiteQuality::Net(inputs, NetRead::OwnLand),
+        };
+        let sites = best_sites_by(ctx, unit.tile, unit.moves_max, tools, limit, &quality);
+        if brief.site_net != SiteNetPlay::Off && crate::ai::econ_shadow::enabled() {
+            shadow_site(ctx, view, tools, limit, &sites);
+        }
+        sites
     });
     let Some(site) = sites.first() else {
         state.clear_task(unit.id);

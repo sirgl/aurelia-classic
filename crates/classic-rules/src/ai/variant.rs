@@ -847,6 +847,16 @@ pub enum Variant {
     /// and the rival running away (`Plan::threat`). A bench-only candidate, `experimental-ai` only;
     /// `Standard` does not change.
     StrategistX,
+    /// `Standard` (the play of the fourteenth promotion, `ClassicMind::new`) whose settlers value a site
+    /// worth a city by the site net (`site_net`, as `SiteNet` did on its older base); every other
+    /// decision is `Standard`'s (classic/docs/ai-econ-nets.md; `experimental-ai` only).
+    EconSite,
+    /// `EconSite` whose tall seats keep the science bonus of their sites on top of the net
+    /// (`site_net::SiteNetPlay::Tall`; a hand edit, classic/docs/ai-econ-nets.md).
+    EconSiteTall,
+    /// `EconSite` whose net reads no foreign tiles in a site's radius
+    /// (`site_net::SiteNetPlay::OwnLand`; a hand edit, classic/docs/ai-econ-nets.md).
+    EconSiteOwnLand,
 }
 
 /// The net's base: the expert the end-to-end net learns from and the mind it
@@ -867,7 +877,7 @@ const NUDGED_CANDIDATES: u32 = 40;
 
 impl Variant {
     /// The game's AI first.
-    pub const ALL: [Variant; 158] = [
+    pub const ALL: [Variant; 161] = [
         Variant::Standard,
         Variant::PreCamps,
         Variant::PreWorkers,
@@ -1026,6 +1036,9 @@ impl Variant {
         Variant::NextX,
         Variant::PreNextX,
         Variant::StrategistX,
+        Variant::EconSite,
+        Variant::EconSiteTall,
+        Variant::EconSiteOwnLand,
     ];
 
     pub fn name(self) -> &'static str {
@@ -1170,6 +1183,9 @@ impl Variant {
             Variant::NextX => "next-x",
             Variant::PreNextX => "pre-next-x",
             Variant::StrategistX => "strategist-x",
+            Variant::EconSite => "econ-site",
+            Variant::EconSiteTall => "econ-site-tall",
+            Variant::EconSiteOwnLand => "econ-site-own-land",
             Variant::ArmyFit => "army-fit",
             Variant::Camps => "camps",
             Variant::ArmyCamps => "army-camps",
@@ -1210,7 +1226,7 @@ impl Variant {
         cfg!(feature = "experimental-ai")
             || !matches!(
                 self,
-                Variant::Net | Variant::UnitNet | Variant::Hybrid | Variant::SiteNet | Variant::ChoiceNet | Variant::ChoiceNetProduction | Variant::ChoiceNetResearch | Variant::StandardScripted | Variant::PreCsGifts | Variant::Sharp | Variant::TallReal | Variant::Next | Variant::WonderCancel | Variant::WonderRace | Variant::NextW | Variant::NextRace | Variant::PreNext | Variant::WarPays | Variant::TacticianFit | Variant::WarMuster | Variant::SiegeCall | Variant::NextWar | Variant::Retake2 | Variant::NextWarRetake | Variant::VoteGuard | Variant::FieldCraft | Variant::RaidWar | Variant::Landless | Variant::LandlessPlan | Variant::NextX | Variant::PreNextX | Variant::StrategistX
+                Variant::Net | Variant::UnitNet | Variant::Hybrid | Variant::SiteNet | Variant::ChoiceNet | Variant::ChoiceNetProduction | Variant::ChoiceNetResearch | Variant::StandardScripted | Variant::PreCsGifts | Variant::Sharp | Variant::TallReal | Variant::Next | Variant::WonderCancel | Variant::WonderRace | Variant::NextW | Variant::NextRace | Variant::PreNext | Variant::WarPays | Variant::TacticianFit | Variant::WarMuster | Variant::SiegeCall | Variant::NextWar | Variant::Retake2 | Variant::NextWarRetake | Variant::VoteGuard | Variant::FieldCraft | Variant::RaidWar | Variant::Landless | Variant::LandlessPlan | Variant::NextX | Variant::PreNextX | Variant::StrategistX | Variant::EconSite | Variant::EconSiteTall | Variant::EconSiteOwnLand
             )
     }
 
@@ -1746,10 +1762,16 @@ impl Variant {
         }
     }
 
-    /// Its settlers value the sites by the site net
-    /// (`TurnBrief::site_net`).
-    pub fn site_net(self) -> bool {
-        self.scripted() == Variant::SiteNet
+    /// How its settlers read the site net (`TurnBrief::site_net`): as fitted for `SiteNet` and
+    /// `EconSite`, with a hand edit for `EconSiteTall` and `EconSiteOwnLand`.
+    pub fn site_net(self) -> crate::ai::site_net::SiteNetPlay {
+        use crate::ai::site_net::SiteNetPlay;
+        match self.scripted() {
+            Variant::SiteNet | Variant::EconSite => SiteNetPlay::Fitted,
+            Variant::EconSiteTall => SiteNetPlay::Tall,
+            Variant::EconSiteOwnLand => SiteNetPlay::OwnLand,
+            _ => SiteNetPlay::Off,
+        }
     }
 
     /// It builds the spaceship where it is finished soonest and prices a

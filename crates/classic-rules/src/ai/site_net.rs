@@ -27,6 +27,24 @@ use super::site::SITE_FEATURES;
 #[cfg(feature = "experimental-ai")]
 use super::site_weights;
 
+/// How the settlers read the site net (`TurnBrief::site_net`, `Variant::site_net`;
+/// classic/docs/ai-econ-nets.md "Hand edits").
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum SiteNetPlay {
+    /// The planner's own quality of a site (`planner_settle::SiteQuality::Heuristic` or `Science`).
+    #[default]
+    Off,
+    /// The net as fitted, in place of the land score and of a tall seat's science bonus.
+    Fitted,
+    /// The net as fitted, plus a tall seat's science bonus (`ai::tall::site_bonus`) where the
+    /// strategist's tall plan asks for one: the bonus is the plan's, which the net never saw.
+    Tall,
+    /// The net with its input `foreign_tiles` read as 0: the tiles another player owns in the
+    /// radius are tiles the city cannot work, yet the fitted net pays for them (+0.2 citizens for
+    /// ten), a trace of where such sites lay in its games, not of what they give.
+    OwnLand,
+}
+
 /// The f32 net's answer on one row of the test games, kept beside the
 /// weights: the integer inference is checked against it.
 #[derive(Debug, Clone, Copy)]

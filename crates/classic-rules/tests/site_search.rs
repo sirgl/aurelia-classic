@@ -119,7 +119,7 @@ fn the_capped_count_and_the_tile_memo_change_no_answer() {
 #[cfg(feature = "experimental-ai")]
 #[test]
 fn the_site_net_values_the_sites_the_score_admits() {
-    use classic_rules::ai::planner_settle::{best_sites_by, SiteQuality};
+    use classic_rules::ai::planner_settle::{best_sites_by, NetRead, SiteQuality};
     use classic_rules::ai::site::{site_features, site_features_with, SiteInputs};
     let rules = compile_rules(core_rules()).unwrap();
     let settings = AiSettings::for_rules(&rules, rules.default_difficulty());
@@ -162,8 +162,8 @@ fn the_site_net_values_the_sites_the_score_admits() {
                 best_sites_by(&context, origin, moves, &mut tools, limit, quality)
             };
             let by_score = search(&SiteQuality::Heuristic);
-            let by_net = search(&SiteQuality::Net(inputs));
-            assert_eq!(by_net, search(&SiteQuality::Net(inputs)), "round {round} player {p}: deterministic");
+            let by_net = search(&SiteQuality::Net(inputs, NetRead::Fitted));
+            assert_eq!(by_net, search(&SiteQuality::Net(inputs, NetRead::Fitted)), "round {round} player {p}: deterministic");
             let tiles = |sites: &[classic_rules::ai::planner_settle::Site]| {
                 let mut t: Vec<TileId> = sites.iter().map(|s| s.tile).collect();
                 t.sort();

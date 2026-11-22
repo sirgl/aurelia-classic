@@ -82,6 +82,8 @@ const CENTRE: usize = FEATURES + FEATURE_SLOTS;
 const TILES: usize = CENTRE + 4;
 const EMPIRE: usize = TILES + 6;
 const HEURISTIC: usize = EMPIRE + 5;
+/// The index of `foreign_tiles` (a hand edit of the site net reads it as 0: `site_net::SiteNetPlay::OwnLand`).
+pub const FOREIGN_TILES: usize = TILES + 2;
 
 /// Number of site features.
 pub const SITE_FEATURES: usize = HEURISTIC + 2;

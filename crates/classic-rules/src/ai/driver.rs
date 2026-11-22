@@ -155,6 +155,9 @@ impl ClassicMind {
         let (variant, promoted) = match variant {
             Variant::Standard => (Variant::NextX, Some(Variant::Standard)),
             Variant::PreNextX => (Variant::Standard, Some(Variant::PreNextX)),
+            // The economy nets' candidates (classic/docs/ai-econ-nets.md) play as `standard` under their own
+            // names, with their nets on (`economy_nets`).
+            Variant::EconSite | Variant::EconSiteTall | Variant::EconSiteOwnLand => (Variant::NextX, Some(variant)),
             other => (other, None),
         };
         let requested = variant;
@@ -322,7 +325,7 @@ impl ClassicMind {
     pub fn variant(&self) -> Variant {
         // The joint build's candidate, the game's AI since the fourteenth promotion (which plays as it)
         // and the standard before it carry the flags below under their own names.
-        if let Some(v @ (Variant::NextX | Variant::Standard | Variant::PreNextX | Variant::StrategistX)) = self.named {
+        if let Some(v @ (Variant::NextX | Variant::Standard | Variant::PreNextX | Variant::StrategistX | Variant::EconSite | Variant::EconSiteTall | Variant::EconSiteOwnLand)) = self.named {
             return v;
         }
         if self.landless {
@@ -375,6 +378,16 @@ impl ClassicMind {
             return Variant::WarPays;
         }
         self.named.unwrap_or(self.variant)
+    }
+
+    /// The variant whose economy nets the mind plays (`Variant::site_net`, `Variant::choice_mode`): an
+    /// economy nets' candidate (`econ-site` and its hand edits) plays `standard` with its own; every
+    /// other mind its variant's.
+    fn economy_nets(&self) -> Variant {
+        match self.named {
+            Some(v @ (Variant::EconSite | Variant::EconSiteTall | Variant::EconSiteOwnLand)) => v,
+            _ => self.variant,
+        }
     }
 
     /// The mind retakes a lost city (`TurnBrief::retake`, `ai::retake`): `retake2` and
@@ -801,7 +814,7 @@ impl ClassicMind {
         brief.air = self.variant.air_arm();
         brief.danger_net = self.variant.danger_net();
         brief.priced_stops = self.variant.priced_stops();
-        brief.site_net = self.variant.site_net();
+        brief.site_net = self.economy_nets().site_net();
         brief.effects = self.variant.effect_checks();
         brief.levers = self.variant.science_levers();
         brief.space_finish = self.variant.space_finish();
@@ -847,7 +860,7 @@ impl ClassicMind {
         (brief.tall, brief.building_order) = self.tall.unwrap_or_else(|| (self.variant.tall(), self.variant.building_order()));
         brief.conquest = self.conquest.unwrap_or_else(|| self.variant.conquest());
         brief.unciv = self.unciv.as_ref().map_or(crate::ai::unciv::UncivParts::NONE, |u| u.played_parts());
-        brief.choice = self.choice.unwrap_or_else(|| self.variant.choice_mode());
+        brief.choice = self.choice.unwrap_or_else(|| self.economy_nets().choice_mode());
         brief.workers = self.variant.workers_fit();
         brief.fight = self.variant.fight_fix();
         brief.no_idle_cities = self.variant.no_idle_cities();
@@ -1182,6 +1195,28 @@ mod sharp_tests {
         // A book on `standard` plays on `pre-next`, as before the promotion.
         let tall = ClassicMind::book_on(Variant::TallBook, Variant::Standard).unwrap();
         assert_eq!((tall.variant, tall.pays, tall.vote_guard, tall.landless_plan), (Variant::PreNext, false, false, false));
+    }
+
+    /// The economy nets' candidates (classic/docs/ai-econ-nets.md) are the mind of `standard` under their
+    /// names with their nets on, and nothing else: `standard` keeps both nets off.
+    #[test]
+    fn econ_variants_play_standard_with_their_nets() {
+        use crate::ai::choice::ChoiceMode;
+        use crate::ai::site_net::SiteNetPlay;
+        let standard = ClassicMind::new(Variant::Standard);
+        assert_eq!((standard.economy_nets().site_net(), standard.economy_nets().choice_mode()), (SiteNetPlay::Off, ChoiceMode::Off));
+        // The input `OwnLand` reads as 0.
+        assert_eq!(crate::ai::site::SITE_NAMES[crate::ai::site::FOREIGN_TILES], "foreign_tiles");
+        for (v, site, choice) in [
+            (Variant::EconSite, SiteNetPlay::Fitted, ChoiceMode::Off),
+            (Variant::EconSiteTall, SiteNetPlay::Tall, ChoiceMode::Off),
+            (Variant::EconSiteOwnLand, SiteNetPlay::OwnLand, ChoiceMode::Off),
+        ] {
+            let mind = ClassicMind::new(v);
+            assert_eq!(mind_parts(&mind), mind_parts(&standard), "{}", v.name());
+            assert_eq!((mind.variant(), mind.economy_nets().site_net(), mind.economy_nets().choice_mode()), (v, site, choice), "{}", v.name());
+            assert_eq!(Variant::from_name(v.name()), cfg!(feature = "experimental-ai").then_some(v));
+        }
     }
 
     /// `landless` is `Standard` in every switch (the flags of `next-w` included) but for its own flag

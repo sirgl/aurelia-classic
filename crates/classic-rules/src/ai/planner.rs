@@ -371,9 +371,9 @@ pub struct TurnBrief {
     /// The own stops the AI replaces by the price or risk of the rules
     /// (`planner_cities::PricedStops`, `Variant::priced_stops`).
     pub priced_stops: crate::ai::planner_cities::PricedStops,
-    /// The settlers value a site worth a city by the site net
-    /// (`ai::site_net`, `Variant::site_net`).
-    pub site_net: bool,
+    /// How the settlers value a site worth a city: by the site net or not
+    /// (`ai::site_net::SiteNetPlay`, `Variant::site_net`).
+    pub site_net: crate::ai::site_net::SiteNetPlay,
     /// Which orders are judged by their effect (`ai::effects`,
     /// `Variant::effect_checks`).
     pub effects: crate::ai::effects::EffectChecks,
@@ -567,7 +567,7 @@ impl TurnBrief {
             fight: crate::ai::combat::FightFix::NONE,
             siege: crate::ai::siege_tactics::SiegeTactics::NONE,
             priced_stops: crate::ai::planner_cities::PricedStops::NONE,
-            site_net: false,
+            site_net: crate::ai::site_net::SiteNetPlay::Off,
             effects: crate::ai::effects::EffectChecks::NONE,
             levers: crate::ai::science_levers::ScienceLevers::NONE,
             space_finish: false,

@@ -54,6 +54,7 @@ pub mod choice_net;
 #[cfg(feature = "experimental-ai")]
 mod choice_weights;
 pub mod citizens;
+pub mod econ_shadow;
 pub mod city_states;
 pub mod combat;
 pub mod congress;
