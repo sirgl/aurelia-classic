@@ -80,6 +80,7 @@ pub mod improvements;
 pub mod infamy;
 pub mod legal;
 pub mod net;
+pub mod net2;
 #[cfg(feature = "experimental-ai")]
 pub mod net_e2e;
 pub mod operations;
@@ -95,6 +96,7 @@ pub mod planner_strategy;
 pub mod planner_units;
 pub mod planner_value;
 pub mod planner_workers;
+pub mod tricks_trace;
 pub mod field_craft;
 pub mod landless;
 pub mod raid_war;

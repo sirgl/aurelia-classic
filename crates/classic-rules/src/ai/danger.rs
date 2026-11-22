@@ -278,6 +278,37 @@ pub struct Threats<'v, 'a> {
     pub round: u32,
     /// The modelled targets: their tiles and how far they strike.
     targets: Vec<(TileId, i32)>,
+    /// `net2`: the rules' fixed end-of-turn damage is added to a unit's exposure (`zone_damage_at`); read
+    /// only when the seat has a plan, so no other variant's danger moves.
+    zone: Option<Zone<'v, 'a>>,
+}
+
+/// What `zone_damage_at` reads: the player's view and the players at war with it.
+#[derive(Clone)]
+struct Zone<'v, 'a> {
+    view: &'v PlayerView<'a>,
+}
+
+/// The rules' fixed damage a unit takes for ending its turn on `tile` (MT10, tactical design §2.4): the strongest
+/// unpillaged improvement next to it whose land belongs to a player at war with us hurts it by its
+/// `nearby_enemy_damage` (a citadel: 30; the strongest one, they do not add up), `actions::citadel_damage`.
+/// What the view does not know it does not count: a tile out of sight reads its improvement from memory,
+/// which keeps no pillage (`PlayerView::known_pillaged`). The mountains' 50 (`mountain_damage`) turn on the
+/// unit's own ability to cross them, which the observation does not carry for a unit kind: not counted here.
+/// ONE implementation of the rule for the scripted path; the tactical nets' `zone_damage::at` (tactical design
+/// T2) is the same rule and replaces this body when it lands.
+pub fn zone_damage_at(view: &PlayerView<'_>, rules: &CompiledRuleset, enemies: &[PlayerId], tile: TileId) -> u16 {
+    let mut damage = 0;
+    for near in view.dimensions().neighbors(tile) {
+        let known = view.tile(near);
+        let Some(snapshot) = known.snapshot() else { continue };
+        let Some(improvement) = snapshot.improvement else { continue };
+        let hurt = rules.improvements.get(improvement.0 as usize).map_or(0, |d| d.nearby_enemy_damage);
+        if hurt > damage && !view.known_pillaged(near) && snapshot.owner.is_some_and(|o| enemies.contains(&o)) {
+            damage = hurt;
+        }
+    }
+    damage
 }
 
 /// The farthest a target strikes from where it stands: its range and the
@@ -409,7 +440,8 @@ impl<'v, 'a> Threats<'v, 'a> {
         sources.extend(own_cities.iter());
         let posture = Posture { bodies: own_tiles, sources };
         let wars = enemies.len() as i32;
-        Self { near, fields, posture, own, own_cities, foes, foe_cities, enemies, wars, round, targets }
+        let zone = crate::ai::operations::with_net2(brief, crate::ai::net2::plan::Part::Guard, |_| ()).map(|()| Zone { view });
+        Self { near, fields, posture, own, own_cities, foes, foe_cities, enemies, wars, round, targets, zone }
     }
 
     fn distance(&self, a: TileId, b: TileId) -> i32 {
@@ -627,7 +659,7 @@ impl<'v, 'a> Threats<'v, 'a> {
         let stats = KindStats::of(rules, unit.kind);
         let scene = self.scene(place);
         let blows: i32 = self.blows_at(&stats, unit, place, &scene).iter().map(|(_, _, b)| i32::from(*b)).sum();
-        let exposure = blows + i32::from(self.fog_at(&stats, unit, place, &scene));
+        let exposure = blows + i32::from(self.fog_at(&stats, unit, place, &scene)) + i32::from(self.zone_at(rules, place.tile));
         let hp = i32::from(unit.hp);
         Danger { damage: exposure.min(hp).max(0) as u16, death_permille: if exposure >= hp { 1000 } else { 0 } }
     }
@@ -639,12 +671,36 @@ impl<'v, 'a> Threats<'v, 'a> {
     pub fn danger_by(&self, source: Source, rules: &CompiledRuleset, unit: &OwnUnit, place: &Place<'_>) -> Danger {
         match source {
             Source::Search => self.search_danger(rules, unit, place),
-            Source::Net => self.net_danger(rules, unit, place).unwrap_or_else(|| {
-                let stats = KindStats::of(rules, unit.kind);
-                let fog = self.fog_at(&stats, unit, place, &self.scene(place));
-                Danger { damage: fog.min(unit.hp), death_permille: 0 }
-            }),
+            Source::Net => {
+                let danger = self.net_danger(rules, unit, place).unwrap_or_else(|| {
+                    let stats = KindStats::of(rules, unit.kind);
+                    let fog = self.fog_at(&stats, unit, place, &self.scene(place));
+                    Danger { damage: fog.min(unit.hp), death_permille: 0 }
+                });
+                self.with_zone(rules, unit, place, danger)
+            }
         }
+    }
+
+    /// The rules' fixed damage at the tile (`zone_damage_at`); 0 without a `net2` plan. A unit in an own city is
+    /// next to no enemy citadel that hurts it: the city's tile is ours, the rule reads the neighbours' owners.
+    fn zone_at(&self, rules: &CompiledRuleset, tile: TileId) -> u16 {
+        match &self.zone {
+            Some(zone) => zone_damage_at(zone.view, rules, &self.enemies, tile),
+            None => 0,
+        }
+    }
+
+    /// The net's danger with the fixed damage added outside the learned part: it is not a guess, and the net
+    /// was not trained on it. The unit dies when the damage and the net's own expectation reach its health.
+    fn with_zone(&self, rules: &CompiledRuleset, unit: &OwnUnit, place: &Place<'_>, danger: Danger) -> Danger {
+        let zone = self.zone_at(rules, place.tile);
+        if zone == 0 || self.own_cities.contains(&place.tile) {
+            return danger;
+        }
+        let damage = danger.damage.saturating_add(zone).min(unit.hp);
+        let lethal = danger.damage.saturating_add(zone) >= unit.hp;
+        Danger { damage, death_permille: if lethal { 1000 } else { danger.death_permille } }
     }
 
     /// The fog's expected blow on the unit at the place.

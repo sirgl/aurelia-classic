@@ -278,6 +278,40 @@ impl SiteContext<'_, '_> {
         }
     }
 
+    /// The inputs of `net2`'s site head for a tile (design §3.4, S1–S9): the fitted site net's answer, the
+    /// land score and the distance terms of `net_score`, the nearest rival city and its menace, the armies in
+    /// sight, the turns of travel, the gap a tall seat fills, and the tall share. `heuristic` is the site's
+    /// `score_legal` and `turns` the settler's travel to it.
+    fn head_inputs(&self, tile: TileId, inputs: &SiteInputs<'_>, read: &HeadRead<'_>, heuristic: i32, turns: i32) -> crate::ai::net2::plan::SiteInputs {
+        let _span = prof::span("classic/site_head");
+        let features = crate::ai::site::site_features_with(self.view, self.rules, self.player, tile, inputs, Some(heuristic));
+        let dims = self.view.dimensions();
+        let dist = self.distance_score(tile);
+        let nearest_rival = read.rivals.iter().filter_map(|(t, owner)| dims.distance(*t, tile).map(|d| (d, *owner))).min_by_key(|(d, owner)| (*d, owner.0));
+        let (rival_gap, rival_menace) = match nearest_rival {
+            Some((d, owner)) => (i64::from((RIVAL_SAFE_DISTANCE - d).max(0)), read.plan.menace_of(owner)),
+            None => (0, 0),
+        };
+        let army = self.danger.iter().filter(|t| dims.distance(**t, tile).is_some_and(|d| d <= ARMY_RANGE)).count() as i64;
+        // Lane C's gap (classic/docs/ai-econ-nets.md M1): three or more tiles from every city, within five of two of ours.
+        let near_own = self.own_cities.iter().filter(|t| dims.distance(**t, tile).is_some_and(|d| d <= FILL_REACH)).count();
+        let nearest_city = self.own_cities.iter().chain(self.foreign_cities).filter_map(|t| dims.distance(*t, tile)).min();
+        let fill = if near_own >= 2 && nearest_city.is_none_or(|d| d >= FILL_MIN_SPACING) { 1000 } else { 0 };
+        crate::ai::net2::plan::SiteInputs {
+            pop50: i64::from(crate::ai::site_net::planner_score(crate::ai::site_net::predict(&features))),
+            land: i64::from(heuristic - dist),
+            dist: i64::from(dist),
+            rival_gap,
+            rival_menace,
+            army,
+            travel: i64::from(turns),
+            fill,
+            tall: read.plan.tall_share,
+            // S10 belongs to the offence (addendum §2.5), not built: 0 is today's behaviour.
+            claim: 0,
+        }
+    }
+
     /// The danger a site on the site net's path is in, in score points (0 or below): the net
     /// does not read the distance to a rival city (its answer is flat from 3 to 10 tiles,
     /// `ai-econ-shadow --probe`) nor the armies in sight, and `distance_terms` only takes 15
@@ -298,6 +332,61 @@ impl SiteContext<'_, '_> {
         risk
     }
 }
+
+/// Scratch trace of `net2`'s site head (`NET2_SITE_TRACE=<file>`, net2/GAP.md): per settler decision the site the
+/// head ranks first and the one it ranks first without its two own terms (the rival's menace on the gap penalty, S5,
+/// and the gap a tall seat fills, S8·S9), which is the guarded `net_score` of `nets-x-site`. It decides nothing.
+mod site_trace {
+    use super::*;
+    use std::cell::RefCell;
+    use std::io::Write as _;
+
+    type Candidate = (TileId, i64, i64, crate::ai::strategy_net::Milli, i64, crate::ai::strategy_net::Milli);
+
+    thread_local! {
+        static SEEN: RefCell<Vec<Candidate>> = const { RefCell::new(Vec::new()) };
+    }
+
+    fn on() -> bool {
+        std::env::var_os("NET2_SITE_TRACE").is_some()
+    }
+
+    pub(super) fn begin() {
+        if on() {
+            SEEN.with(|s| s.borrow_mut().clear());
+        }
+    }
+
+    pub(super) fn candidate(tile: TileId, head: &crate::ai::net2::plan::SiteInputs) {
+        if !on() {
+            return;
+        }
+        let plain = crate::ai::net2::plan::SiteInputs { rival_menace: 0, fill: 0, ..*head };
+        let entry = (tile, crate::ai::net2::site_head::score(head), crate::ai::net2::site_head::score(&plain), head.rival_menace, head.rival_gap, head.fill * head.tall / 1000);
+        SEEN.with(|s| s.borrow_mut().push(entry));
+    }
+
+    pub(super) fn decided(brief: &crate::ai::planner::TurnBrief, cities: usize, chosen: Option<TileId>) {
+        let Some(path) = std::env::var_os("NET2_SITE_TRACE") else { return };
+        let seen = SEEN.with(|s| std::mem::take(&mut *s.borrow_mut()));
+        let head = seen.iter().find(|c| Some(c.0) == chosen).copied();
+        let plain = seen.iter().max_by_key(|c| (c.2, std::cmp::Reverse(c.0 .0))).copied();
+        let (Some(head), Some(plain)) = (head, plain) else { return };
+        let apart = brief.dims.distance(head.0, plain.0).unwrap_or(-1);
+        let line = format!(
+            "{{\"r\":{},\"p\":{},\"cities\":{cities},\"same\":{},\"apart\":{apart},\"head\":[{},{},{},{},{},{}],\"plain\":[{},{},{},{},{},{}]}}\n",
+            brief.round, brief.player.0, head.0 == plain.0, head.0 .0, head.1, head.2, head.3, head.4, head.5, plain.0 .0, plain.1, plain.2, plain.3, plain.4, plain.5
+        );
+        if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open(path) {
+            let _ = f.write_all(line.as_bytes());
+        }
+    }
+}
+
+/// Tiles within which two own cities make a site a gap to fill (`SiteContext::head_inputs`, S8).
+pub const FILL_REACH: i32 = 5;
+/// Tiles from every city a gap site keeps at least (S8).
+pub const FILL_MIN_SPACING: i32 = 3;
 
 /// Tiles from the nearest rival city a site on the net's path is free of `rival_risk`.
 pub const RIVAL_SAFE_DISTANCE: i32 = 7;
@@ -379,6 +468,18 @@ pub enum SiteQuality<'c> {
     /// `SiteContext::score` plus what the science buildings whose site
     /// condition the site meets add (`ai::tall`, `TurnBrief::tall_sites`).
     Science(&'c [(crate::ids::BuildingKindId, i32)]),
+    /// `net2`'s site head (`net2::site_head::score`) on the same inputs as `Net`: the fitted net's answer
+    /// bounded around the land score, the guard terms as the head's hand weights, the rival's menace.
+    Head(SiteInputs<'c>, HeadRead<'c>),
+}
+
+/// What `net2`'s site head reads besides the site's own inputs (`SiteQuality::Head`).
+#[derive(Debug, Clone, Copy)]
+pub struct HeadRead<'c> {
+    /// The turn's levers (`TurnBrief::net2`): the menace of the rival, the tall share.
+    pub plan: &'c crate::ai::net2::Net2Plan,
+    /// The remembered foreign cities with their owners (`AiState::seen_cities`): the menace is the owner's.
+    pub rivals: &'c [(TileId, crate::ids::PlayerId)],
 }
 
 /// How a search reads the site net (`site_net::SiteNetPlay` with the seat's
@@ -512,17 +613,26 @@ impl SiteSearch<'_, '_, '_> {
             return Visit::Continue;
         }
         self.worth_a_city += 1;
-        let score = match self.quality {
-            SiteQuality::Heuristic => heuristic,
-            SiteQuality::Net(inputs, read) => self.ctx.net_score(tile, inputs, read, heuristic),
-            SiteQuality::Science(bonuses) => heuristic + crate::ai::tall::site_bonus(self.ctx.view, self.ctx.rules, tile, bonuses),
-        };
         let turns = crate::ai::planner_map::turns_for(points, self.moves_max) as i32;
-        let travel_risk = match self.quality {
-            SiteQuality::Net(..) => NET_TRAVEL_RISK,
-            SiteQuality::Heuristic | SiteQuality::Science(_) => 0,
+        let (score, value) = if let SiteQuality::Head(inputs, read) = self.quality {
+            // The head carries the walk itself (S7, −40 a turn): the site's score is the head's without it.
+            let mut head = self.ctx.head_inputs(tile, inputs, read, heuristic, 0);
+            let score = crate::ai::net2::site_head::score(&head);
+            head.travel = i64::from(turns);
+            site_trace::candidate(tile, &head);
+            (score as i32, crate::ai::net2::site_head::score(&head) as i32)
+        } else {
+            let score = match self.quality {
+                SiteQuality::Heuristic | SiteQuality::Head(..) => heuristic,
+                SiteQuality::Net(inputs, read) => self.ctx.net_score(tile, inputs, read, heuristic),
+                SiteQuality::Science(bonuses) => heuristic + crate::ai::tall::site_bonus(self.ctx.view, self.ctx.rules, tile, bonuses),
+            };
+            let travel_risk = match self.quality {
+                SiteQuality::Net(..) => NET_TRAVEL_RISK,
+                SiteQuality::Heuristic | SiteQuality::Science(_) | SiteQuality::Head(..) => 0,
+            };
+            (score, score - (crate::ai::genome::get_i32(crate::ai::genome::Knob::SettleTravelCost) + travel_risk) * turns)
         };
-        let value = score - (crate::ai::genome::get_i32(crate::ai::genome::Knob::SettleTravelCost) + travel_risk) * turns;
         self.sites.push(Site { tile, score, value });
         Visit::Continue
     }
@@ -646,6 +756,10 @@ fn choose_site(
     let limit = tools.settings.budget.candidates;
     let rules = tools.rules;
     let brief = view.brief;
+    let rivals: Vec<(TileId, crate::ids::PlayerId)> = match (brief.net2_for(crate::ai::net2::plan::Part::Sites), brief.site_net) {
+        (Some(_), SiteNetPlay::Fitted) => state.seen_cities().iter().map(|c| (c.tile, c.owner)).collect(),
+        _ => Vec::new(),
+    };
     let sites = with_context(view, state, rules, |ctx| {
         // The site net reads what the site dataset recorded at a founding
         // (`aurelia-qa` `site`): the brief's nation, technologies and
@@ -659,14 +773,21 @@ fn choose_site(
             excess_happiness: brief.happiness,
         };
         let tall = !brief.tall_sites.is_empty();
-        let quality = match brief.site_net {
-            SiteNetPlay::Off if tall => SiteQuality::Science(&brief.tall_sites),
-            SiteNetPlay::Off => SiteQuality::Heuristic,
-            SiteNetPlay::Tall if tall => SiteQuality::Net(inputs, NetRead::Science(&brief.tall_sites)),
-            SiteNetPlay::Fitted | SiteNetPlay::Tall => SiteQuality::Net(inputs, NetRead::Fitted),
-            SiteNetPlay::OwnLand => SiteQuality::Net(inputs, NetRead::OwnLand),
+        // `net2`'s seats (a plan in the brief) score a site by its head; `standard` and every other variant
+        // keep the guarded `net_score` (`TurnBrief::net2` is None for them).
+        let quality = match (brief.net2_for(crate::ai::net2::plan::Part::Sites), brief.site_net) {
+            (Some(plan), SiteNetPlay::Fitted) => SiteQuality::Head(inputs, HeadRead { plan, rivals: &rivals }),
+            _ => match brief.site_net {
+                SiteNetPlay::Off if tall => SiteQuality::Science(&brief.tall_sites),
+                SiteNetPlay::Off => SiteQuality::Heuristic,
+                SiteNetPlay::Tall if tall => SiteQuality::Net(inputs, NetRead::Science(&brief.tall_sites)),
+                SiteNetPlay::Fitted | SiteNetPlay::Tall => SiteQuality::Net(inputs, NetRead::Fitted),
+                SiteNetPlay::OwnLand => SiteQuality::Net(inputs, NetRead::OwnLand),
+            },
         };
+        site_trace::begin();
         let sites = best_sites_by(ctx, unit.tile, unit.moves_max, tools, limit, &quality);
+        site_trace::decided(brief, ctx.own_cities.len(), sites.first().map(|s| s.tile));
         if brief.site_net != SiteNetPlay::Off && crate::ai::econ_shadow::enabled() {
             shadow_site(ctx, view, tools, limit, &sites);
         }

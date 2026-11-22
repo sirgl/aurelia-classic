@@ -7,6 +7,7 @@
 use crate::ai::value::Prices;
 use crate::knowledge::public::PlayerQueries;
 use crate::command::Command;
+use crate::ai::net2::plan::{Net2Plan, TRUST_MIN};
 use crate::ids::PlayerId;
 use crate::knowledge::observation::{AIObservation, Relation};
 use crate::rules::CompiledRuleset;
@@ -42,6 +43,24 @@ pub fn trusted(round: u32, r: &Relation) -> bool {
         && r.remembered_against() < DISTRUST_WARMONGER
 }
 
+/// The gold-scale value of a third party's war that we would declare for a deal (`DealItem::ThirdPartyWar`
+/// given by us). Flat `REFUSED` for every target (the scripted AI's price, compensable by gold) while no
+/// `net2` plan reads; with one, a target we are bound to is out of any price (`PROTECTED`):
+/// our ally or friend among the city-states (the CS3 bribe: gold bought a war on the seat's own ally), a
+/// pledged protégé, and a nation we are friends with or have a pact or a research agreement with.
+fn third_party_war(obs: &AIObservation<'_>, net2: Option<&Net2Plan>, target: PlayerId) -> i64 {
+    if net2.is_none() {
+        return REFUSED;
+    }
+    let bound_city_state = obs.city_states.iter().any(|c| c.player == target && (c.ally == Some(obs.player) || c.friends || c.pledged));
+    let bound_nation = relation(obs, target).is_some_and(|r| r.friends || r.defensive_pact || r.research_agreement);
+    if bound_city_state || bound_nation {
+        PROTECTED
+    } else {
+        REFUSED
+    }
+}
+
 /// Gold value of a relation item for the AI receiving it (`receiving`) or giving it; gold,
 /// gold a turn, resources and cities are the leader's estimate's (`ai::peace::Negotiation`).
 /// A research agreement is priced by the beakers the rules pay for it when
@@ -49,16 +68,30 @@ pub fn trusted(round: u32, r: &Relation) -> bool {
 /// `science_levers::agreement_gold`): what the pool of the smaller of the two
 /// sciences pays at the end, at the beaker's price in gold, less the gold it
 /// costs. Without them a flat 100.
-pub(crate) fn item_value_priced(
+///
+/// `item_value_with`, read by a `net2` plan (`net2`: None plays as today):
+/// - an item that helps a rival run (`helps`) is out of any price for the rival the plan denies help
+///   (`Net2Plan::denies_help`, §4.6), whichever side gives it;
+/// - open borders of a rival we trust less than `TRUST_MIN` are not given and not bought (§4.6: the road of the
+///   sneak attack, D12, MO3);
+/// - a third party's war is priced by its target (`third_party_war`).
+pub(crate) fn item_value_with(
     obs: &AIObservation<'_>,
     rules: &CompiledRuleset,
     agreements: Option<&Prices>,
+    net2: Option<&Net2Plan>,
     other: PlayerId,
     item: DealItem,
     receiving: bool,
 ) -> i64 {
     let r = relation(obs, other);
     let trust = r.is_some_and(|r| trusted(obs.round, r));
+    if net2.is_some_and(|p| helps(item) && p.denies_help(other)) {
+        return REFUSED;
+    }
+    if net2.is_some_and(|p| item == DealItem::OpenBorders && p.trust(other) < TRUST_MIN) {
+        return if receiving { 0 } else { REFUSED };
+    }
     match item {
         // Priced by the leader's estimate, not here (`ai::peace::Negotiation::value`): gold and
         // gold a turn at the price of gold, a city by its worth, a resource by what it gives.
@@ -98,7 +131,8 @@ pub(crate) fn item_value_priced(
         }
         // Peace is valued by what the war promises (`ai::peace::Negotiation::value`).
         DealItem::Peace => 0,
-        DealItem::ThirdPartyWar(_) => -1000,
+        DealItem::ThirdPartyWar(target) if !receiving => third_party_war(obs, net2, target),
+        DealItem::ThirdPartyWar(_) => REFUSED,
         DealItem::ThirdPartyPeace(_) => 0,
     }
 }
@@ -124,9 +158,15 @@ pub fn proposals(obs: &AIObservation<'_>, rules: &CompiledRuleset) -> Vec<Comman
 }
 
 /// `proposals`, a research agreement proposed when it pays for its gold at
-/// the turn's prices (`agreements`, `item_value_priced`) and the treasury
+/// the turn's prices (`agreements`, `item_value_with`) and the treasury
 /// covers its cost; without them, when the treasury covers its cost and 50.
 pub fn proposals_priced(obs: &AIObservation<'_>, rules: &CompiledRuleset, agreements: Option<&Prices>) -> Vec<Command> {
+    proposals_with(obs, rules, agreements, None)
+}
+
+/// `proposals_priced`, read by a `net2` plan: no item that helps (`helps`) is proposed to a rival the plan denies
+/// help, and no open borders to a rival below `TRUST_MIN` (design §4.6). None plays as today.
+pub fn proposals_with(obs: &AIObservation<'_>, rules: &CompiledRuleset, agreements: Option<&Prices>, net2: Option<&Net2Plan>) -> Vec<Command> {
     let me = obs.player;
     let mut out = Vec::new();
     for r in &obs.relations {
@@ -185,6 +225,9 @@ pub fn proposals_priced(obs: &AIObservation<'_>, rules: &CompiledRuleset, agreem
         } else {
             continue;
         };
+        if net2.is_some_and(|p| items.iter().any(|(_, i)| helps(*i) && p.denies_help(r.other) || *i == DealItem::OpenBorders && p.trust(r.other) < TRUST_MIN)) {
+            continue;
+        }
         let possible = items.iter().all(|(giver, item)| {
             let receiver = if *giver == me { r.other } else { me };
             obs.view
@@ -264,14 +307,22 @@ pub fn denunciations(obs: &AIObservation<'_>) -> Vec<Command> {
         .collect()
 }
 
-/// The gold-scale value of an item the AI refuses outright (`item_value_priced`'s untrusted).
+/// The gold-scale value of an item the AI refuses outright (`item_value_with`'s untrusted).
 pub const REFUSED: i64 = -1000;
+
+/// The value of a deal item that no gold buys: a war on the ally the seat is bound to (`third_party_war`).
+pub const PROTECTED: i64 = -100_000;
 
 /// `strategist-x`: the rival the strategist names running away at a threat of at least
 /// `weights::threat::DENOUNCE` (`Plan::wishes`), if any.
 pub fn contained(brief: &crate::ai::planner::TurnBrief) -> Option<PlayerId> {
     let threat = brief.strategy.as_ref()?.wishes.threat?;
     (threat.level >= crate::ai::strategy_net::weights::threat::DENOUNCE.0).then_some(threat.rival)
+}
+
+/// The rival we give no help: the strategist's runaway (`contained`) or the one `net2` denies (`Net2Plan::denies_help`).
+pub fn denied(brief: &crate::ai::planner::TurnBrief, rival: PlayerId) -> bool {
+    contained(brief) == Some(rival) || brief.net2_for(crate::ai::net2::plan::Part::Deals).is_some_and(|p| p.denies_help(rival))
 }
 
 /// An item that helps its receiver run: friendship, a research agreement, a pact, open borders.
@@ -322,9 +373,17 @@ impl crate::ai::system::SystemAdvisor for DiplomacyAdvisor {
             .collect::<Vec<_>>();
         let mut out = crate::ai::combat::proposals(40, answers);
         let my_round = (obs.round + u32::from(obs.player.0)) % PROPOSAL_INTERVAL == 0;
+        let net2 = input.brief.net2_for(crate::ai::net2::plan::Part::Deals);
+        // `net2`: a peace it wants is offered in every round, not every fifth (design §4.4).
+        if !my_round {
+            if let Some(plan) = input.brief.net2_for(crate::ai::net2::plan::Part::Peace).filter(|p| !p.peace_with.is_empty()) {
+                let wanted = crate::ai::peace::peace_offers(input).into_iter().filter(|c| matches!(c, Command::ProposeDeal { to, .. } if plan.makes_peace_with(*to) && !input.brief.retaking_from(*to)));
+                out.extend(crate::ai::combat::proposals(5, wanted.collect::<Vec<_>>()));
+            }
+        }
         if my_round {
             let contained = contained(input.brief);
-            let deals: Vec<Command> = proposals_priced(obs, input.rules, agreement_prices(input))
+            let deals: Vec<Command> = proposals_with(obs, input.rules, agreement_prices(input), net2)
                 .into_iter()
                 .filter(|c| !proposes_peace(c))
                 .filter(|c| !matches!(c, Command::ProposeDeal { to, items, .. } if Some(*to) == contained && items.iter().any(|(_, i)| helps(*i))))
@@ -340,8 +399,11 @@ impl crate::ai::system::SystemAdvisor for DiplomacyAdvisor {
             // `retake`: no peace is offered to the holder of a city being retaken.
             let peace = crate::ai::peace::peace_offers(input).into_iter().filter(|c| !matches!(c, Command::ProposeDeal { to, .. } if input.brief.retaking_from(*to)));
             out.extend(crate::ai::combat::proposals(5, peace.collect::<Vec<_>>()));
-            let mut denounced = denunciations(obs);
-            denounced.extend(denounce_contained(obs, contained));
+            // `net2`: no denunciation at all (decided: a denunciation brought no votes and the wars on the seat).
+            let mut denounced = if net2.is_some() { Vec::new() } else { denunciations(obs) };
+            if net2.is_none() {
+                denounced.extend(denounce_contained(obs, contained));
+            }
             out.extend(crate::ai::combat::proposals(5, denounced));
         }
         out

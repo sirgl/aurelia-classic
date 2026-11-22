@@ -91,7 +91,7 @@ pub const MEDIAN_TECH_PERCENT: u32 = 50;
 
 /// Percent by which the warmonger weight is scaled, per era index (later
 /// eras weigh more). Own value (see `WARMONGER_ATTACKED_WEIGHT`).
-const WARMONGER_PERCENT: [i32; 8] = [50, 60, 70, 80, 90, 100, 100, 100];
+pub const WARMONGER_PERCENT: [i32; 8] = [50, 60, 70, 80, 90, 100, 100, 100];
 
 /// A treaty a declaration of war breaks: what its victim and every other nation that knows the
 /// betrayer hold against it, in opinion points.
