@@ -1,0 +1,11 @@
+# Part C report (war executors), commit 9b00026 on work/net2-c (after B's c3abf05)
+
+Built (all inert with no net2 plan; standard `8460fdf4e1b4bad1`, pre-nets-x `d2d736c1273a82bb`, both re-run at 9b00026):
+- operations.rs: `with_net2`, `Net2War`; `targets_for` (order = the rival's cities, Retake = lost cities first, `aim`, NoWar = no target, war age from the order, `waits_own_cooldown` -> only the treaty); `candidate` (odds gate passed by `passes_odds_at_war` kinds at war and Retake always; distance DECISIVE_RANGE; value gate not applied to Retake/Spoiler/Duty); `start` (Retake bypasses Recover/Defend strategy; ease ranking and `recruit` call via `TacticalHints`); `advance` ends a Forming army whose order is gone; `posture_permits` = the order.
+- Sea (open point 2): staging already crosses water for an embarking walker (the known map's profile embarks). Added `Routes::with_legs`, `Stage { embark, land, to_embark }`; an Overseas order musters on the boarding shore. Overseas stays ON. Not built: the landing step itself (tactical H9); units still cross by their own moves.
+- retake.rs: envelope-safe memory (local `Memory::of/store`), `lost_tiles`, margin 175->125 by order value (`order_margin`).
+- defence.rs: `Danger::level`, saving x (1+level), `Watch::apply_net2`. fleet.rs: `wanted_with`, `shortfall_for`, `escorts_of`. danger.rs: `zone_damage_at` (citadel, strongest, unpillaged, at war) added in `search_danger` and the net source, not in the learned row; mountain 50 not counted (needs the unit's ability). great_people.rs: `general_commands` (Hold -> nearest city).
+- Open point 3 (B9 #6): not traced end to end (no net2 variant yet). Cause by reading the start path: no candidate formed because (1) `posture_permits` needed posture_pick >= 2, (2) `value >= 0`, (3) the odds gate. Now the order is the permission and Retake/Spoiler/Duty are not turned away by gate or value. Run `STRESS_STRATEGY_TRACE=1` on B9 #6 with `net2` once E lands.
+
+Tests: `ai_net2_war` 3 ok (sea leg across a strait; Overseas order forms an operation, empty plan forms none; margin), lib 402 ok, ai_landings 3, ai_retake 16, ai_defence 4, ai_danger 5 ok. Not tested: zone damage, generals, ease/call hints, B4/A5 worked cases.
+Left: wiring (NEEDS-FROM-B.md), those tests, the end-to-end B9/B4/A6 runs.
