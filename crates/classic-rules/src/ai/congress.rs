@@ -247,8 +247,12 @@ pub fn vote_orders_with(obs: &AIObservation<'_>, guard: bool, net2: Option<&Net2
 /// Delegates per proposal, in the order of `proposals`: all of them on the World Leader vote when
 /// it is on the table (it needs the whole seat, a share of it cannot win), else an even split in
 /// which the remainder goes to the first proposals, so that no delegate is left uncast and, with
-/// fewer delegates than proposals, the first ones get one each.
+/// fewer delegates than proposals, the first ones get one each. No proposal (a `net2` seat abstains on
+/// every one): no share.
 fn shares(proposals: &[Proposal], delegates_left: u16) -> Vec<u16> {
+    if proposals.is_empty() {
+        return Vec::new();
+    }
     if let Some(vote) = proposals.iter().position(|p| p.kind == ResolutionKind::DiplomaticVictory) {
         let mut shares = vec![0; proposals.len()];
         shares[vote] = delegates_left;
@@ -313,5 +317,26 @@ impl crate::ai::system::SystemAdvisor for CongressAdvisor {
         out.extend(crate::ai::combat::proposals(6, proposal_orders_with(obs, input.rules, &weights, net2)));
         out.extend(crate::ai::combat::proposals(5, project_orders(obs)));
         out
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn proposal(kind: ResolutionKind) -> Proposal {
+        Proposal { kind, choice: 0, proposer: None, repeal: false }
+    }
+
+    /// The delegates are split over the proposals voted; a seat that abstains on every proposal (`net2`'s
+    /// `stance`) votes on none, and the split of no proposal is empty, not a division by zero (G2 of the
+    /// integration, 22 Nov: two games panicked here).
+    #[test]
+    fn the_split_of_no_proposal_is_empty() {
+        assert_eq!(shares(&[], 7), Vec::<u16>::new());
+        let two = [proposal(ResolutionKind::PlayerEmbargo), proposal(ResolutionKind::PlayerEmbargo)];
+        assert_eq!(shares(&two, 7), vec![4, 3]);
+        let with_vote = [proposal(ResolutionKind::PlayerEmbargo), proposal(ResolutionKind::DiplomaticVictory)];
+        assert_eq!(shares(&with_vote, 7), vec![0, 7]);
     }
 }
