@@ -775,3 +775,22 @@ pub(crate) fn is_free(state: &AiState, unit: crate::ids::EntityId) -> bool {
         Some(UnitTask::Defend { .. } | UnitTask::Escort { .. } | UnitTask::Scout { .. } | UnitTask::Settle { .. } | UnitTask::Improve { .. })
     )
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn city(tile: u32, owner: u8) -> SeenCity {
+        SeenCity { tile: TileId(tile), owner: PlayerId(owner), first_seen: 0, open: None }
+    }
+
+    #[test]
+    fn a_city_taken_costs_the_rules_conquest_offset() {
+        // 9 known foreign cities, 3 of the victim's, 1 of ours: 1000 × 52 / (10 × 3) = 1733 points before the era.
+        let mut known: Vec<SeenCity> = (0..6).map(|i| city(i, 2)).collect();
+        known.extend((6..9).map(|i| city(i, 1)));
+        assert_eq!(conquest_offset(&known, 1, PlayerId(1)), 1733);
+        // An unknown victim counts as one city: the offset is not divided by zero.
+        assert_eq!(conquest_offset(&known, 1, PlayerId(4)), 5200);
+    }
+}
