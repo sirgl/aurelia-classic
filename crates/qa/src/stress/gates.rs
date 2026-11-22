@@ -189,9 +189,9 @@ pub const GATES: &[Gate] = &[
     gate(D3, B, "peace_round", ELE, [15.0, 12.0, 10.0], NET_PEACE),
 ];
 
-const NET_DEFENCE: &str = "danger net, tactician, commander (off in standard); scripted defence.rs";
+const NET_DEFENCE: &str = "danger net (on in standard: the fight fixes read it), tactician, commander (off); scripted defence.rs";
 const NET_WONDER: &str = "none: scripted wonder_race.rs; strategist production head";
-const NET_BORDER: &str = "site net, danger net (off); scripted defence.rs";
+const NET_BORDER: &str = "site net (off), danger net (on: the fight fixes); scripted defence.rs";
 const NET_RAID: &str = "none: scripted (worker flight, settler escort); tactician, commander (off)";
 const NET_DEALS: &str = "none: scripted (peace.rs Negotiation::value, diplomacy.rs)";
 const NET_SWEEP: &str = "none: scripted (city_states.rs, victory_watch.rs); strategist has no diplomacy outputs";

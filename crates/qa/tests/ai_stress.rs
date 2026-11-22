@@ -225,3 +225,19 @@ fn every_situation_builds_or_says_why() {
         }
     }
 }
+
+#[test]
+fn b5_friendship_holds_in_the_control_and_the_war_ends_it() {
+    let (rules, p) = (rules(), position());
+    let plan = scene::plan(Situation::B5, rules, &p, 0).expect("the smoke pair is at peace");
+    let scene::Roles::Sneak { seat, enemy, .. } = plan.roles else { panic!("B5 plans a sneak war") };
+    let mild = scene::edit_of(Situation::B5, 0, rules, &p, &plan).expect("the edit");
+    let (control, edited) = scene::arms(rules, &p, &plan, &mild).expect("the arms");
+    let (s, e) = (classic_rules::ids::PlayerId(seat), classic_rules::ids::PlayerId(enemy));
+    let friends = |g: &classic_rules::GameState| g.view().auth.module().relations().are_friends(s, e, g.view().auth.turn().round);
+    assert!(friends(&control.game), "the control keeps the friendship of the base");
+    assert!(!friends(&edited.game), "the war ends the friendship (end_ties): the rules keep no memory of it");
+    let b2 = scene::plan(Situation::B2, rules, &p, 0).expect("B2 plans where B5 does");
+    let (b2_control, _) = scene::arms(rules, &p, &b2, &scene::edit_of(Situation::B2, 0, rules, &p, &b2).expect("the edit")).expect("the arms");
+    assert_ne!(hash(&control.game), hash(&b2_control.game), "the friendship is in the world's hash");
+}
