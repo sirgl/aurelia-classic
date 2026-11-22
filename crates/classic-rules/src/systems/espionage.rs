@@ -302,7 +302,9 @@ pub fn move_problem(
 
 impl<'a> WorldTransaction<'a> {
     /// `dead` was eliminated (`systems::elimination`): its spies are gone (Unciv:
-    /// `removeAllSpies` at `Civilization.destroy`) and nobody may steal from it, nor it from anyone.
+    /// `removeAllSpies` at `Civilization.destroy`), nobody may steal from it, nor it from anyone, and
+    /// no record of a theft names it (a dead victim's AI reads none; a living victim's AI no
+    /// longer weighs a dead thief).
     pub(crate) fn forget_in_espionage(&mut self, dead: PlayerId) {
         let players = self.world.players.count();
         let espionage = &mut self.world.module.espionage;
@@ -314,6 +316,7 @@ impl<'a> WorldTransaction<'a> {
             espionage.set_steal_rights(dead, other, 0);
             espionage.set_steal_rights(other, dead, 0);
         }
+        espionage.thefts.retain(|theft| theft.victim != dead && theft.thief != Some(dead));
     }
 
     /// The `Espionage` turn step: spies granted by the era, every spy

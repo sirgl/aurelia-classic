@@ -188,3 +188,18 @@ fn only_place(bytes: &[u8], part: &[u8], what: &str) -> usize {
     assert_eq!(bytes.windows(part.len()).filter(|w| *w == part).count(), 1, "{what} is in the save only once");
     at
 }
+
+/// A theft names neither its victim nor its thief once that nation is eliminated
+/// (`systems::elimination`): the victim's AI is gone, and no living AI weighs a dead thief.
+#[test]
+fn the_thefts_of_or_from_an_eliminated_nation_are_forgotten() {
+    let mut heist = (0..60)
+        .filter_map(first_heist)
+        .find(|h| h.game.view().auth.module().espionage().thefts_against(P1).next().is_some())
+        .expect("some seed has a theft that is found out");
+    heist.game.debug_capture_city(&heist.rules, heist.city, P0);
+    assert!(!heist.game.view().auth.players().is_alive(P1), "the victim had one city");
+    assert_eq!(heist.game.view().auth.module().espionage().all_thefts(), [], "no theft names the dead victim");
+    let names = classic_rules::world::references::references_to(heist.game.view().auth, P1);
+    assert!(names.iter().all(|n| !n.starts_with("espionage")), "{names:?}");
+}

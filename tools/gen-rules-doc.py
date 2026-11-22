@@ -477,8 +477,8 @@ def formulas(v):
         "peace treaties, deals and gold per turn, offers, embassies, open borders, pacts, friendships, research "
         "agreements, the memory of it (warmonger, denunciation, grievances), its standing with the city-states and the "
         "quests of it or about it, its roles in the World Congress (its proposals and votes, an embargo on it; "
-        "a dead host passes the league to the living nation with the most delegates), its spies and the World "
-        "Leader title. A city-state whose ally it was takes its next ally at once. What it did stays as "
+        "a dead host passes the league to the living nation with the most delegates), its spies, the thefts "
+        "it did or suffered and the World Leader title. A city-state whose ally it was takes its next ally at once. What it did stays as "
         "history (great works, archaeology, a religion it founded).",
         "",
     ]
