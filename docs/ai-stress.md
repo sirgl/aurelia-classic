@@ -425,3 +425,24 @@ What `standard` does wrong, in plain words (the outcome FAILs first, then the be
   Owner: none (no net for allied action).
 - D3 medium/strong: peace comes after about 15 rounds (gates 12, 10). B7 strong: 13.7 unhappy rounds of
   30. A7 mild: the army stays 2.3 units below the control. P1 mild: 1.2 more pillaged tiles unrepaired.
+
+### The failed situations played to the end of the game
+
+`ai-stress suite --variant standard --situations a6,c2,p5 --instances 50` (to the end, `runs/exam-end` of the
+wave-2 clone): 36 instances of A6 and C2, 38 of P5 (the rest have no pair over the sea or no free tile).
+
+| situation | strength | `seat_cities` delta (gate) | `end_seat_win_weight` edited / control / delta (gate) | verdict |
+|---|---|---|---|---|
+| A6 | mild | +0.11 (>= 0.1) | 0.062 / 0.069 / -0.007 (>= 0) | FAIL (end win weight) |
+| A6 | medium | +0.14 (>= 0.2) | 0.069 / 0.069 / 0.000 | FAIL (cities) |
+| A6 | strong | +0.06 (>= 0.3) | 0.076 / 0.069 / +0.007 | FAIL (cities) |
+| C2 | mild | -0.06 (>= 0.2) | 0.049 / 0.049 / 0.000 | FAIL (cities) |
+| C2 | medium | 0.00 (>= 0.3) | 0.049 / 0.049 / 0.000 | FAIL (cities) |
+| C2 | strong | -0.03 (>= 0.4) | 0.049 / 0.049 / 0.000 | FAIL (cities) |
+| P5 | mild | -0.18 (>= -0.1) | 0.072 / 0.059 / +0.013 (>= -0.02) | FAIL (cities) |
+| P5 | medium | -0.32 (>= -0.2) | 0.099 / 0.059 / +0.039 (>= -0.03) | FAIL (cities) |
+| P5 | strong | -0.40 (>= -0.4) | 0.020 / 0.059 / -0.039 (>= -0.05) | pass |
+
+A disarmed nation over the sea is left alone to the end of the game: the real victories do not move (C2 not
+at all, A6 within one game in 36). The border grab costs cities in the window but not real victories, except
+at the strong level (citadels and war): -0.04, inside its gate.
