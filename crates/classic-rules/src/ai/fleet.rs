@@ -91,12 +91,7 @@ pub fn on_hand(obs: &AIObservation<'_>, rules: &CompiledRuleset) -> usize {
     alive + queued
 }
 
-/// Warships still to build.
-pub fn shortfall(obs: &AIObservation<'_>, state: &AiState, rules: &CompiledRuleset) -> usize {
-    wanted(obs, state).saturating_sub(on_hand(obs, rules))
-}
-
-/// `shortfall` under the turn's `net2` plan (the city planner's demand reads this one).
+/// Warships still to build, with the escorts of the turn's `net2` plan (`escorts_of`; as today without a plan).
 pub fn shortfall_for(obs: &AIObservation<'_>, brief: &TurnBrief, state: &AiState, rules: &CompiledRuleset) -> usize {
     wanted_with(obs, state, escorts_of(brief)).saturating_sub(on_hand(obs, rules))
 }

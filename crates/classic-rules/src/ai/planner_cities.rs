@@ -592,7 +592,7 @@ impl Empire {
             war_demand: crate::ai::operations::demand(obs, state, rules),
             war_cap: war_cap(obs, brief, tools, military),
             war_cities: cities.div_ceil(2),
-            fleet_demand: crate::ai::fleet::shortfall(obs, state, rules),
+            fleet_demand: crate::ai::fleet::shortfall_for(obs, brief, state, rules),
             striker_demand: if brief.air { crate::ai::air::shortfall(obs, state, rules, crate::ai::air::Wing::Striker) } else { 0 },
             fighter_demand: if brief.air { crate::ai::air::shortfall(obs, state, rules, crate::ai::air::Wing::Fighter) } else { 0 },
             carrier_demand: if brief.carriers { crate::ai::carrier::wanted(obs, brief, state, rules) } else { 0 },
