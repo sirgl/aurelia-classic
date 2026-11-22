@@ -142,23 +142,46 @@ fn tab_row(ui: &mut egui::Ui, r: Rect, state: &mut ScreenState, view: &CivicsVie
 // ---------------------------------------------------------------------------------------------
 // Text helpers
 
+/// The mark that ends a cut text (the font of the game has it).
+const ELLIPSIS: char = '\u{2026}';
+
 /// `value` in at most `rows` rows of `width`: lines break at spaces, and when the text does not
-/// fit the last line ends with "..." at a word boundary (a word wider than the line is cut). Returns the height.
+/// fit the last line ends with an ellipsis at a word boundary (a word wider than the line is cut).
+/// Returns the height.
 fn clipped(p: &egui::Painter, at: egui::Pos2, value: &str, size: f32, color: Color32, width: f32, rows: usize) -> f32 {
     let lines = wrap_lines(p, value, size, width.max(8.0), rows.max(1));
-    let font = FontId::proportional(size);
+    let scale = layer_scale(p);
     let mut y = at.y;
     for line in &lines {
-        let galley = p.layout_no_wrap(line.clone(), font.clone(), color);
-        let height = galley.size().y;
-        p.galley(pos2(at.x, y), galley, color);
+        let galley = layout(p, line, size, color);
+        let height = galley.size().y / scale;
+        let mut shape = egui::epaint::TextShape::new(pos2(at.x * scale, y * scale), galley, color);
+        if scale != 1.0 {
+            shape.transform(egui::emath::TSTransform::from_scaling(1.0 / scale));
+        }
+        p.add(shape);
         y += height;
     }
     y - at.y
 }
 
+/// How much the layer of `p` is scaled on its way to the screen (a phone shrinks the screen's
+/// canvas as one layer, `client::shell::screens`). egui scales the finished text mesh with it, so a
+/// glyph laid out at `size` is drawn from a bitmap of `size` pixels and shrunk: the dots of an
+/// ellipsis, one pixel wide, vanish.
+fn layer_scale(p: &egui::Painter) -> f32 {
+    p.ctx().layer_transform_to_global(p.layer_id()).map_or(1.0, |t| t.scaling).max(0.1)
+}
+
+/// The text laid out at the size it is drawn at on the screen. Its measures are in screen points of
+/// the layer's scale: divide them by `layer_scale` for the layer's own.
+fn layout(p: &egui::Painter, value: &str, size: f32, color: Color32) -> std::sync::Arc<egui::Galley> {
+    p.layout_no_wrap(value.to_owned(), FontId::proportional(size * layer_scale(p)), color)
+}
+
+/// The width `clipped` gives `value`: measured the way it is drawn.
 fn text_width(p: &egui::Painter, value: &str, size: f32) -> f32 {
-    p.layout_no_wrap(value.to_owned(), FontId::proportional(size), Color32::WHITE).size().x
+    layout(p, value, size, Color32::WHITE).size().x / layer_scale(p)
 }
 
 /// The lines of `value` for `clipped`.
@@ -178,43 +201,43 @@ fn wrap_lines(p: &egui::Painter, value: &str, size: f32, width: f32, rows: usize
         }
         if lines.is_empty() || !last_row {
             // A new row; a first word wider than the row is cut.
-            lines.push(word.to_owned());
-            if text_width(p, word, size) > width {
-                let cut = ellipsize(p, word, size, width);
-                lines.pop();
-                lines.push(cut);
-            }
+            lines.push(ellipsize(p, word, size, width));
             continue;
         }
         let line = lines.pop().unwrap_or_default();
-        lines.push(ellipsize(p, &format!("{line} ..."), size, width));
+        lines.push(with_ellipsis(p, &line, size, width));
         break;
     }
     lines
 }
 
-/// `value` cut to `width` with a closing "...": whole words dropped first, then letters.
+/// `value`, or when it is wider than `width`, `with_ellipsis`.
 fn ellipsize(p: &egui::Painter, value: &str, size: f32, width: f32) -> String {
-    let body = value.trim_end_matches('.').trim_end();
-    if text_width(p, value, size) <= width && !value.ends_with("...") {
+    if text_width(p, value, size) <= width {
         return value.to_owned();
     }
+    with_ellipsis(p, value, size, width)
+}
+
+/// `value` closed with an ellipsis and cut to `width`: whole words dropped first, then letters.
+fn with_ellipsis(p: &egui::Painter, value: &str, size: f32, width: f32) -> String {
+    let body = value.trim_end_matches(['.', ELLIPSIS]).trim_end();
     let mut words: Vec<&str> = body.split_whitespace().collect();
     while words.len() > 1 {
-        let shown = format!("{} ...", words.join(" "));
+        let shown = format!("{}{ELLIPSIS}", words.join(" "));
         if text_width(p, &shown, size) <= width {
             return shown;
         }
         words.pop();
     }
     let mut cut = words.first().copied().unwrap_or("").to_owned();
-    while !cut.is_empty() && text_width(p, &format!("{cut}..."), size) > width {
+    while !cut.is_empty() && text_width(p, &format!("{cut}{ELLIPSIS}"), size) > width {
         cut.pop();
     }
-    format!("{cut}...")
+    format!("{cut}{ELLIPSIS}")
 }
 
-/// The first clause of an effect text: what it does in one line ("-25% culture ...").
+/// The first clause of an effect text: what it does in one line ("-25% culture needed ...").
 pub(super) fn short_effect(value: &str) -> String {
     let cut = value.find(';').or_else(|| value.find(". ")).unwrap_or(value.len());
     value[..cut].trim().trim_end_matches('.').to_owned()

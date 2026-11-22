@@ -139,18 +139,52 @@ fn locks_say_why_with_the_numbers() {
 #[test]
 fn a_cut_line_ends_with_an_ellipsis_at_a_word_boundary() {
     let ctx = egui::Context::default();
-    let _ = ctx.run_ui(egui::RawInput::default(), |ui| {
+    let mut output = ctx.run_ui(egui::RawInput::default(), |ui| {
         let p = ui.painter();
         let text = "+50% Production in the capital when producing a Settler; When adopted: 1 free Settler in the capital";
         let lines = wrap_lines(p, text, 11.5, 200.0, 1);
         assert_eq!(lines.len(), 1);
-        assert!(lines[0].ends_with(" ..."), "{lines:?}");
-        assert!(text.starts_with(lines[0].trim_end_matches(" ...")), "words stay whole: {lines:?}");
+        assert!(lines[0].ends_with(ELLIPSIS), "{lines:?}");
+        assert!(text.starts_with(lines[0].trim_end_matches(ELLIPSIS)), "words stay whole: {lines:?}");
         assert!(text_width(p, &lines[0], 11.5) <= 200.0);
         let all = wrap_lines(p, "short text", 11.5, 200.0, 1);
         assert_eq!(all, ["short text"], "a text that fits is not cut");
         let two = wrap_lines(p, text, 11.5, 200.0, 2);
         assert_eq!(two.len(), 2);
-        assert!(two[1].ends_with("..."));
+        assert!(two[1].ends_with(ELLIPSIS));
     });
+    output.textures_delta.clear();
+}
+
+/// A phone draws the screen in a layer shrunk by about 0.85. The cut line and its ellipsis must fit
+/// the width the painter has there, and be laid out at the size it is drawn at: a glyph shrunk after
+/// its bitmap was made loses the dots of the ellipsis.
+#[test]
+fn a_cut_line_with_its_ellipsis_fits_the_width_at_the_touch_scale() {
+    const SCALE: f32 = 0.85;
+    let ctx = egui::Context::default();
+    let text = "+50% Production in the capital when producing a Settler; When adopted: 1 free Settler in the capital";
+    let (size, width) = (10.5, 300.0);
+    let mut output = ctx.run_ui(egui::RawInput::default(), |ui| {
+        let layer = ui.painter().layer_id();
+        ui.ctx().set_transform_layer(layer, egui::emath::TSTransform::new(vec2(12.0, 58.0), SCALE));
+        let lines = wrap_lines(ui.painter(), text, size, width, 1);
+        assert!(lines[0].ends_with(ELLIPSIS), "{lines:?}");
+        assert!(text_width(ui.painter(), &lines[0], size) <= width, "the cut line fits in the layer's points");
+        clipped(ui.painter(), pos2(10.0, 10.0), text, size, Color32::WHITE, width, 1);
+    });
+    output.textures_delta.clear();
+    let painted: Vec<_> = output
+        .shapes
+        .iter()
+        .filter_map(|s| match &s.shape {
+            egui::Shape::Text(t) if t.galley.text().ends_with(ELLIPSIS) => Some(t),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(painted.len(), 1, "the cut line is painted once");
+    let t = painted[0];
+    assert!(t.galley.size().x <= width * SCALE + 0.01, "{} wider than {}", t.galley.size().x, width * SCALE);
+    let laid_out = t.galley.job.sections[0].format.font_id.size;
+    assert!((laid_out - size * SCALE).abs() < 1e-3, "laid out at {laid_out}, drawn at {}", size * SCALE);
 }
