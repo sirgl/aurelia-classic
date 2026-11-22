@@ -16,6 +16,7 @@ pub(crate) mod air;
 pub(crate) mod city;
 pub(crate) mod experience;
 pub(crate) mod heal;
+pub(crate) mod palace;
 pub(crate) mod upgrade;
 pub(crate) mod validate;
 

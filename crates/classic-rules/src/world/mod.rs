@@ -2,6 +2,7 @@
 
 pub use kernel::world::*;
 pub mod barbarians;
+pub mod capital;
 pub mod city_states;
 pub mod congress;
 pub mod culture;

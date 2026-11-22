@@ -89,8 +89,11 @@ impl ModuleWorld<Classic> for ClassicWorld {
         self.tourism.archaeology_mut().digs.retain(|d| d.unit != unit);
     }
 
-    fn validate(&self, auth: &AuthWorld, _rules: &CompiledRuleset) -> Result<(), ValidationError> {
+    fn validate(&self, auth: &AuthWorld, rules: &CompiledRuleset) -> Result<(), ValidationError> {
         crate::systems::cargo::validate_cargo(auth)?;
+        if let Some(problem) = crate::world::capital::palace_problem(auth, rules) {
+            return Err(ValidationError::Module(problem));
+        }
         let players = auth.players().count();
         let sizes = [
             ("military", self.military.all().len()),

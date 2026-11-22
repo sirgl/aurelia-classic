@@ -15,6 +15,11 @@
 
 ### Rules
 
+- **One capital per nation.** A city you buy from a city-state, receive in a deal or liberate no longer brings its old palace,
+  so a nation can no longer end up with several capitals (the game took the first one, which could be a bought city overseas,
+  and the spaceship parts could not be installed). As in Unciv, a city that changes hands leaves its palace behind; when the
+  capital itself is lost, the palace goes to the largest remaining city that is not a puppet. Saves with several palaces
+  (or none) are repaired when they load.
 - **A destroyed nation leaves nothing behind.** When a nation or city-state loses its last city, every tie with it ends at
   once: wars, treaties, deals and gold per turn, offers, embassies, open borders, research agreements, its spies, its votes
   and seats in the World Congress, and the World Leader title. A city-state that was its ally picks its next ally at once.

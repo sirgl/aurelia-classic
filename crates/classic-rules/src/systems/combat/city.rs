@@ -228,6 +228,8 @@ impl<'a> WorldTransaction<'a> {
             .get(city)
             .ok_or(CommandError::UnknownCity)?
             .tile;
+        // Unciv `moveToCiv`: the palace stays behind, the old owner's next city takes it (below).
+        self.strip_palace(city, rules);
         match self.world.cities.set_owner(city, to) {
             CityWrite::Applied => {}
             CityWrite::TargetGone | CityWrite::QueueFull => return Err(CommandError::UnknownCity),
@@ -253,6 +255,10 @@ impl<'a> WorldTransaction<'a> {
                 .player_changes
                 .push(crate::transaction::journal::PlayerChange::EffectsChanged { player: from });
         }
+        // Both owners now: the old one without the city, the new one with it (its only city has
+        // the palace, Unciv `moveCapitalTo`). One palace per nation, whatever the path.
+        self.restore_palace(from, rules);
+        self.restore_palace(to, rules);
         Ok(())
     }
 
@@ -294,7 +300,10 @@ impl<'a> WorldTransaction<'a> {
                 continue;
             };
             use crate::rules::content::BuildingKind;
+            // `transfer_city` took the old owner's palace off; one here is the conqueror's,
+            // its only city's.
             if def.kind == BuildingKind::Palace {
+                kept.push(building);
                 continue;
             }
             let wonder = matches!(def.kind, BuildingKind::WorldWonder);
@@ -489,6 +498,7 @@ impl<'a> WorldTransaction<'a> {
             self.world.module.religion.holy_city_of(city).is_none(),
             "a holy city is never removed (can_be_destroyed)"
         );
+        let owner = self.world.cities.get(city).map(|c| c.owner);
         self.evict_spies(city);
         self.forget_thefts_in(city);
         self.clear_city_trade_routes(city, rules);
@@ -496,6 +506,10 @@ impl<'a> WorldTransaction<'a> {
         self.world.module.religion.forget_city(city);
         self.world.module.tourism.forget_city(city);
         crate::transaction::journal::remove_city(&mut *self.0.world, &mut self.0.journal, city);
+        // Unciv `City.destroyCity`: a razed capital hands the palace on.
+        if let Some(owner) = owner {
+            self.restore_palace(owner, rules);
+        }
     }
 
     /// End of the conqueror's turn: an undecided city becomes a puppet.

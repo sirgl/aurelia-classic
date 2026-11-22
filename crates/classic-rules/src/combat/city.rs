@@ -5,9 +5,9 @@ use crate::world::city::garrison;
 use crate::effects::{visit_owner_sources, ConditionContext};
 use crate::ids::{CityHandle, PlayerId};
 use crate::rules::compiled::EraDefinition;
-use crate::rules::content::BuildingKind;
 use crate::rules::effects::{CityCombatStat, CompiledEffect, EffectSet, Modifier, Selector};
 use crate::rules::CompiledRuleset;
+use crate::world::capital::holds_palace;
 use crate::world::city::{CityCore, CITY_BASE_HIT_POINTS};
 use crate::world::state::AuthWorld;
 
@@ -206,24 +206,19 @@ pub fn heal_per_turn(
     CITY_HEAL_PER_TURN.clamp(0, i64::from(u16::MAX)) as u16
 }
 
-/// The owner's capital: its city with a palace, else its original capital,
-/// else its first city.
+/// The owner's capital: its city with a palace (a nation holds one: `world::capital`), else its
+/// original capital, else its first city.
 pub fn capital_of(
     auth: &AuthWorld,
     rules: &CompiledRuleset,
     owner: PlayerId,
 ) -> Option<CityHandle> {
     let cities = auth.indexes().cities_of(owner);
-    let palace = cities.iter().copied().find(|c| {
-        auth.cities().get(*c).is_some_and(|core| {
-            core.buildings.iter().any(|b| {
-                rules
-                    .buildings
-                    .get(b.0 as usize)
-                    .is_some_and(|d| d.kind == BuildingKind::Palace)
-            })
-        })
-    });
+    let palace = cities.iter().copied().find(|c| auth.cities().get(*c).is_some_and(|core| holds_palace(rules, core)));
+    debug_assert!(
+        crate::world::capital::palace_cities(auth, rules, owner).len() <= 1,
+        "a nation holds one palace (world::capital)"
+    );
     if palace.is_some() {
         return palace;
     }

@@ -115,6 +115,12 @@ impl RulesModule for Classic {
         (3078422782052653983, CLASSIC_FINGERPRINT),
 ];
 
+    /// A save of a build that let a palace travel with a city holds several in one nation, or none
+    /// after a conquest (`world::capital::repair_palaces`).
+    fn repair_loaded(world: &mut AuthWorld, rules: &CompiledRuleset) {
+        crate::world::capital::repair_palaces(world, rules);
+    }
+
     fn execute(
         world: &mut AuthWorld,
         derived: &DerivedWorld,
