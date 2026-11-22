@@ -327,6 +327,105 @@ Then the seat's AI plays its turn as usual: the units the script spent stay spen
 cities, its other units) is the AI's. The script is data in the saved scene (`script`); what it counted goes
 to the row as `script_*`.
 
+## Defence against humans (the `h*` tricks)
+
+A human plays far better than our AI and uses tricks the AI does not see coming
+(`work/human-playbook-research.md`, 91 tricks; `work/human-playbook-triage.md`). Each trick here is a small
+explicit plan (a state machine, `stress/humans/`) that plays ONE seat the way a strong human would; the game's
+AI plays every other seat and the rest of the trickster's seat (its cities, its research, its other units).
+The nation judged is the AI the trick targets, against the same position played on without the trick.
+
+Code: `crates/qa/src/stress/humans/` (`Situation::Human(Trick)`, `Roles::Human(Cast)`, `Script::Human(Order)`).
+A scripted army is raised by the edit in the human's own land, nearest to its target (the units a human would
+have built for the trick), and played by the script from the first round through `GameState::execute`. At the
+end of its part of the turn the script holds every unit it plays (`debug_hold_unit`, harness only: a unit that
+did not move heals what a resting unit heals, its moves are spent), so the seat's AI never moves them. A human
+in a campaign refuses the peace offered to it (`army::refuse_peace`).
+
+| trick | research ids | what the human does | strengths (mild / medium / strong) | window | positions |
+|---|---|---|---|---|---|
+| HMO1 rush | MO1 | war at once; archers walk to two tiles of the capital and shoot, melee take it when it is at half its hit points, then the next city | 2 archers + 1 melee / 3 + 2 / 4 + 2 (the cheapest ranged unit's technology given when the rusher has none) | 30 | rounds 50-70 |
+| HMO3 sneak | MO3, D12 | the seat's borders open to the human (base); the army walks in at peace to two tiles of the seat's city nearest to it, declares war when every unit is there (or after 8 rounds) and strikes the same turn | 2 ranged + 2 melee / 3 + 4 / 5 + 5 | 25 | rounds 100-110 |
+| HMO5 squat | MO5, D14 | at war (base); units walk to the seat's luxury and strategic tiles, pillage the improvement and stand on the tile fortified while they live | 2 / 3 / 5 melee units | 20 | 100-110 |
+| HMT2 bait | MT2, MT3 | at war (base); a worker (MT3) or a weak unit (MT2) two tiles before the seat's city nearest to the human, a force three to four tiles out; what comes out is picked off, an empty or half-broken city is taken | worker + 3 units / weak unit + 4 / both baits + 6 | 20 | 100-110 |
+| HMO8 vulture | MO8, M4 | an army waits at home; the first city the seat founds after the start is the target (war declared on it), then it waits again | 3 / 5 / 7 units | 40 | rounds 50-70 |
+| HD1 swindle | D1, D3, D6, E2 | friends (base); a luxury the seat lacks (else any it can spare, else its gold a turn) for a lump sum of the seat's treasury, the price halving at each refusal; war the turn after the seat paid; peace asked from the war's tenth round, friendship asked again, the next sale | 30 % / 60 % / 90 % of the seat's treasury | 40 | 100-110 |
+| HD2 drain | D2 | friends, the human's army (3 ranged + 3 melee) at the seat's border and its war in round 3 (all base: both arms); before the war the human's gold a turn for a lump sum of the seat's gold | 30 % / 60 % / 90 % | 20 | 100-110 |
+| HD8 beg | D8 | at war, the human losing (two cities to the seat, three quarters of its army gone: base); white peace asked every round | one | 25 | 100-110 |
+| HMO11 turtle | MO11, D18 | the score leader disbands its military units beyond a cap at the start of each turn; every other nation is judged | one unit per city / one per two cities / none | 40 | 100-110 |
+| HV1 sniper | V1, E5 | every world wonder the seat builds is completed by the sniper (the score leader but the seat) a few rounds before the seat would finish it | 3 / 2 / 1 rounds before | 30 | 100-110 |
+| HW2 lobby | W2, W3, W4 | the second nation by score, with gold, buys the city-states before each congress session, proposes an embargo on the leader, votes against it | +500 / +1000 / +2000 gold | 40 | rounds 200-210 |
+| HCS poach | CS2-CS5, S3, CS1 | a rich rival buys away the city-states allied to the seat (gold, coups) | +500 / +1000 / +2000 gold | 40 | 100-110 |
+
+`army_dead` is the share of the human's army dead at the end of the window; `military_added_before_war` the
+seat's military units at the human's declaration minus at the start; `script_*` what the script counted (0 in
+the control).
+
+Not built here: MT1 chokepoint hold (the core of P6 kill-zone, wave 3), R1-R4 and S1-S2 (P11 pests, wave 3),
+D4 (wave 3), A1-A3 air and nukes (P10, wave 3); the tricks the triage marks "no" or "no new exam".
+
+### Gates of the human tricks (written before the first run)
+
+| situation | kind | metric | test | mild | medium | strong | owning small net |
+|---|---|---|---|---|---|---|---|
+| HMO1 | outcome | `seat_alive` | delta >= | -0.02 | -0.05 | -0.1 | danger net (on: the fight fixes), tactician, commander (off); scripted defence.rs |
+| HMO1 | outcome | `seat_cities` | delta >= | -0.2 | -0.4 | -0.6 | danger net (on: the fight fixes), tactician, commander (off); scripted defence.rs |
+| HMO1 | outcome | `seat_score_share` | delta >= | -0.01 | -0.02 | -0.03 | danger net (on: the fight fixes), tactician, commander (off); scripted defence.rs |
+| HMO1 | outcome | `end_seat_win_weight` | delta >= | -0.03 | -0.05 | -0.08 | danger net (on: the fight fixes), tactician, commander (off); scripted defence.rs |
+| HMO1 | behaviour | `capital_lost` | edited <= | 0.1 | 0.2 | 0.3 | danger net (on: the fight fixes), tactician, commander (off); scripted defence.rs |
+| HMO1 | behaviour | `army_dead` | edited >= | 0.5 | 0.5 | 0.5 | danger net (on: the fight fixes), tactician, commander (off); scripted defence.rs |
+| HMO3 | outcome | `seat_cities` | delta >= | -0.3 | -0.5 | -0.8 | strategist (posture: no trust term for an army inside the borders), danger net (on: the fight fixes); scripted defence.rs |
+| HMO3 | outcome | `seat_score_share` | delta >= | -0.01 | -0.02 | -0.03 | strategist (posture: no trust term for an army inside the borders), danger net (on: the fight fixes); scripted defence.rs |
+| HMO3 | outcome | `end_seat_win_weight` | delta >= | -0.03 | -0.05 | -0.08 | strategist (posture: no trust term for an army inside the borders), danger net (on: the fight fixes); scripted defence.rs |
+| HMO3 | behaviour | `military_added_before_war` | delta >= | 1 | 1 | 2 | strategist (posture: no trust term for an army inside the borders), danger net (on: the fight fixes); scripted defence.rs |
+| HMO3 | behaviour | `army_dead` | edited >= | 0.5 | 0.5 | 0.5 | strategist (posture: no trust term for an army inside the borders), danger net (on: the fight fixes); scripted defence.rs |
+| HMO5 | outcome | `seat_score_share` | delta >= | -0.005 | -0.01 | -0.02 | tactician, commander (off); none: scripted (planner_workers.rs repair, defence.rs) |
+| HMO5 | outcome | `seat_cities` | delta >= | -0.1 | -0.2 | -0.3 | tactician, commander (off); none: scripted (planner_workers.rs repair, defence.rs) |
+| HMO5 | outcome | `end_seat_win_weight` | delta >= | -0.02 | -0.03 | -0.05 | tactician, commander (off); none: scripted (planner_workers.rs repair, defence.rs) |
+| HMO5 | behaviour | `army_dead` | edited >= | 0.5 | 0.5 | 0.5 | tactician, commander (off); none: scripted (planner_workers.rs repair, defence.rs) |
+| HMO5 | behaviour | `script_squat_share` | edited <= | 0.3 | 0.3 | 0.3 | tactician, commander (off); none: scripted (planner_workers.rs repair, defence.rs) |
+| HMO5 | behaviour | `unhappy_rounds` | delta <= | 3 | 5 | 8 | tactician, commander (off); none: scripted (planner_workers.rs repair, defence.rs) |
+| HMT2 | outcome | `seat_cities` | delta >= | -0.1 | -0.2 | -0.3 | danger net (on: the fight fixes), tactician, commander (off); scripted defence.rs |
+| HMT2 | outcome | `seat_score_share` | delta >= | -0.005 | -0.01 | -0.02 | danger net (on: the fight fixes), tactician, commander (off); scripted defence.rs |
+| HMT2 | outcome | `end_seat_win_weight` | delta >= | -0.02 | -0.03 | -0.05 | danger net (on: the fight fixes), tactician, commander (off); scripted defence.rs |
+| HMT2 | behaviour | `script_lured` | edited <= | 1 | 1 | 1 | danger net (on: the fight fixes), tactician, commander (off); scripted defence.rs |
+| HMT2 | behaviour | `army_dead` | edited >= | 0.5 | 0.5 | 0.5 | danger net (on: the fight fixes), tactician, commander (off); scripted defence.rs |
+| HMO8 | outcome | `seat_cities` | delta >= | -0.2 | -0.3 | -0.4 | site net (settling beside an army; on in nets-x-site), danger net (on: the fight fixes); scripted defence.rs |
+| HMO8 | outcome | `seat_score_share` | delta >= | -0.01 | -0.015 | -0.02 | site net (settling beside an army; on in nets-x-site), danger net (on: the fight fixes); scripted defence.rs |
+| HMO8 | outcome | `end_seat_win_weight` | delta >= | -0.03 | -0.05 | -0.08 | site net (settling beside an army; on in nets-x-site), danger net (on: the fight fixes); scripted defence.rs |
+| HMO8 | behaviour | `new_city_lost` | edited <= | 0.2 | 0.3 | 0.4 | site net (settling beside an army; on in nets-x-site), danger net (on: the fight fixes); scripted defence.rs |
+| HMO8 | behaviour | `army_dead` | edited >= | 0.5 | 0.5 | 0.5 | site net (settling beside an army; on in nets-x-site), danger net (on: the fight fixes); scripted defence.rs |
+| HD1 | outcome | `seat_treasury` | delta >= | -50 | -100 | -150 | none: scripted (peace.rs Negotiation::value: no memory of a betrayal, diplomacy.rs) |
+| HD1 | outcome | `seat_score_share` | delta >= | -0.01 | -0.015 | -0.02 | none: scripted (peace.rs Negotiation::value: no memory of a betrayal, diplomacy.rs) |
+| HD1 | outcome | `end_seat_win_weight` | delta >= | -0.02 | -0.03 | -0.05 | none: scripted (peace.rs Negotiation::value: no memory of a betrayal, diplomacy.rs) |
+| HD1 | behaviour | `script_paid` | edited <= | 0.3 | 0.2 | 0.1 | none: scripted (peace.rs Negotiation::value: no memory of a betrayal, diplomacy.rs) |
+| HD1 | behaviour | `script_paid_again` | edited <= | 0.05 | 0.05 | 0.05 | none: scripted (peace.rs Negotiation::value: no memory of a betrayal, diplomacy.rs) |
+| HD2 | outcome | `seat_cities` | delta >= | -0.1 | -0.2 | -0.3 | none: scripted (peace.rs Negotiation::value: no memory of a betrayal, diplomacy.rs) |
+| HD2 | outcome | `seat_score_share` | delta >= | -0.005 | -0.01 | -0.015 | none: scripted (peace.rs Negotiation::value: no memory of a betrayal, diplomacy.rs) |
+| HD2 | outcome | `end_seat_win_weight` | delta >= | -0.02 | -0.03 | -0.05 | none: scripted (peace.rs Negotiation::value: no memory of a betrayal, diplomacy.rs) |
+| HD2 | behaviour | `script_paid` | edited <= | 0.2 | 0.2 | 0.2 | none: scripted (peace.rs Negotiation::value: no memory of a betrayal, diplomacy.rs) |
+| HD2 | behaviour | `purchases` | delta >= | -1 | -1.5 | -2 | none: scripted (peace.rs Negotiation::value: no memory of a betrayal, diplomacy.rs) |
+| HD8 | outcome | `seat_cities` | delta >= | -0.3 | -0.3 | -0.3 | none: scripted (peace.rs Negotiation::answer) |
+| HD8 | outcome | `seat_score_share` | delta >= | -0.01 | -0.01 | -0.01 | none: scripted (peace.rs Negotiation::answer) |
+| HD8 | outcome | `end_seat_win_weight` | delta >= | -0.03 | -0.03 | -0.03 | none: scripted (peace.rs Negotiation::answer) |
+| HD8 | behaviour | `script_white_peace` | edited <= | 0.3 | 0.3 | 0.3 | none: scripted (peace.rs Negotiation::answer) |
+| HMO11 | outcome | `seat_cities` | delta >= | 0.05 | 0.1 | 0.15 | strategist (posture: war on a weak rich nation) |
+| HMO11 | outcome | `end_seat_win_weight` | delta >= | 0 | 0 | 0 | strategist (posture: war on a weak rich nation) |
+| HMO11 | behaviour | `turtle_attacked` | edited >= | 0.5 | 0.6 | 0.7 | strategist (posture: war on a weak rich nation) |
+| HMO11 | behaviour | `turtle_cities_lost` | delta >= | 0.2 | 0.35 | 0.5 | strategist (posture: war on a weak rich nation) |
+| HV1 | outcome | `seat_score_share` | delta >= | -0.02 | -0.03 | -0.03 | none: scripted wonder_race.rs; strategist production head |
+| HV1 | outcome | `end_seat_win_weight` | delta >= | -0.03 | -0.03 | -0.03 | none: scripted wonder_race.rs; strategist production head |
+| HV1 | behaviour | `stock_burned` | delta <= | 0 | 0 | 0 | none: scripted wonder_race.rs; strategist production head |
+| HW2 | outcome | `seat_score_share` | delta >= | -0.01 | -0.02 | -0.03 | none: scripted (congress.rs, city_states.rs, victory_watch.rs); strategist has no diplomacy outputs |
+| HW2 | outcome | `end_seat_win_weight` | delta >= | -0.05 | -0.1 | -0.15 | none: scripted (congress.rs, city_states.rs, victory_watch.rs); strategist has no diplomacy outputs |
+| HW2 | behaviour | `seat_allies` | delta >= | -1 | -1.5 | -2 | none: scripted (congress.rs, city_states.rs, victory_watch.rs); strategist has no diplomacy outputs |
+| HW2 | behaviour | `embargo_on_seat` | edited <= | 0.2 | 0.3 | 0.4 | none: scripted (congress.rs, city_states.rs, victory_watch.rs); strategist has no diplomacy outputs |
+| HW2 | behaviour | `gifts_by_seat` | delta >= | 1 | 1 | 1 | none: scripted (congress.rs, city_states.rs, victory_watch.rs); strategist has no diplomacy outputs |
+| HCS | outcome | `seat_score_share` | delta >= | -0.005 | -0.01 | -0.015 | none: scripted (city_states.rs, espionage.rs); strategist has no diplomacy outputs |
+| HCS | outcome | `end_seat_win_weight` | delta >= | -0.03 | -0.05 | -0.08 | none: scripted (city_states.rs, espionage.rs); strategist has no diplomacy outputs |
+| HCS | behaviour | `seat_allies` | delta >= | -0.5 | -1 | -1.5 | none: scripted (city_states.rs, espionage.rs); strategist has no diplomacy outputs |
+| HCS | behaviour | `gifts_by_seat` | delta >= | 1 | 1 | 1 | none: scripted (city_states.rs, espionage.rs); strategist has no diplomacy outputs |
+
 ## Results
 
 See the end of this file (filled after the run).

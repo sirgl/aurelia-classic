@@ -91,6 +91,7 @@ pub fn measure(roles: &Roles, rules: &CompiledRuleset, game: &GameState, watch: 
             m.insert("war_rounds".into(), count(at_war.len()));
             m.insert("further_losses".into(), count(watch.captures.iter().filter(|c| c.from.0 == seat).count()));
         }
+        Roles::Human(cast) => super::humans::metrics::measure(&mut m, cast, rules, game, watch),
         Roles::Host { .. } => {
             let dead = watch.hosts.last().is_some_and(|(_, host, alive)| host.is_some() && !alive);
             m.insert("host_dead_at_end".into(), flag(dead));

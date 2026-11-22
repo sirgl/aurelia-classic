@@ -51,6 +51,8 @@ pub enum Script {
     /// P8 alliance-sweep: every round `seat` gifts `percent` of its treasury to the city-state it is
     /// nearest to winning as an ally (the most influence of those it is not the ally of).
     Sweep { seat: u8, percent: u32 },
+    /// A human trick (`humans::Order`).
+    Human(super::humans::Order),
 }
 
 impl Script {
@@ -58,6 +60,7 @@ impl Script {
     pub fn with_units(self, spawned: &[u64]) -> Script {
         match self {
             Script::Raid { seat, victim, .. } => Script::Raid { seat, victim, units: spawned.to_vec() },
+            Script::Human(order) => Script::Human(order.with_units(spawned)),
             other => other,
         }
     }
@@ -68,6 +71,7 @@ impl Script {
             Script::Raid { seat, victim, units } => Box::new(Raid { seat: PlayerId(*seat), victim: PlayerId(*victim), units: units.clone(), captured: 0, pillaged: 0 }),
             Script::SellThenWar { seat, victim, percent } => Box::new(SellThenWar { seat: PlayerId(*seat), victim: PlayerId(*victim), percent: *percent, stage: Stage::Offer, offers: 0 }),
             Script::Sweep { seat, percent } => Box::new(Sweep { seat: PlayerId(*seat), percent: *percent, gifted: 0 }),
+            Script::Human(order) => order.start(),
         }
     }
 }

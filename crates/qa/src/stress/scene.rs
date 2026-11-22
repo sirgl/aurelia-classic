@@ -52,6 +52,8 @@ pub enum Roles {
     Ally { seat: u8, ally: u8, enemy: u8 },
     /// `seat` is losing a war to `enemy`: cities and army gone.
     Losing { seat: u8, enemy: u8 },
+    /// A human trick: `human` plays it on `seat` (`humans::Cast`).
+    Human(super::humans::Cast),
 }
 
 impl Roles {
@@ -74,6 +76,7 @@ impl Roles {
             | Roles::Trick { seat, .. }
             | Roles::Ally { seat, .. }
             | Roles::Losing { seat, .. } => vec![PlayerId(seat)],
+            Roles::Human(cast) => cast.focus(game),
         }
     }
 }
@@ -100,6 +103,7 @@ impl Situation {
     pub fn levels(self) -> u8 {
         match self {
             Situation::D1 | Situation::C5 | Situation::P7 | Situation::D2 => 1,
+            Situation::Human(t) => t.levels(),
             _ => 3,
         }
     }
@@ -140,6 +144,7 @@ pub fn plan(situation: Situation, rules: &CompiledRuleset, position: &Position, 
             let base = vec![Change::Meet { a: a.0, b: enemy.0 }, Change::Meet { a: b.0, b: enemy.0 }, Change::Meet { a: a.0, b: b.0 }];
             (Roles::Common { a: a.0, b: b.0, enemy: enemy.0 }, base)
         }
+        Situation::Human(t) => return super::humans::plan(t, rules, position, instance),
         Situation::C5 => {
             let host = game.view().auth.module().congress().host().filter(|_| game.view().auth.module().congress().founded()).ok_or("the congress is not founded")?;
             (Roles::Host { host: host.0 }, Vec::new())
@@ -151,6 +156,9 @@ pub fn plan(situation: Situation, rules: &CompiledRuleset, position: &Position, 
 
 /// The edit of `situation` at `level` on the position.
 pub fn edit_of(situation: Situation, level: u8, rules: &CompiledRuleset, position: &Position, plan: &Plan) -> Result<Edit, String> {
+    if let Situation::Human(t) = situation {
+        return super::humans::edit_of(t, level, rules, position, plan);
+    }
     if situation.wave() == 2 {
         return super::tricks::edit_of(situation, level, rules, position, plan);
     }

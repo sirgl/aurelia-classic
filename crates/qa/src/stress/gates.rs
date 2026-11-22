@@ -200,13 +200,18 @@ const NET_PEACE: &str = "none: scripted peace.rs";
 
 /// The gates of one situation.
 pub fn of(situation: Situation) -> impl Iterator<Item = &'static Gate> {
-    GATES.iter().filter(move |g| g.situation == situation)
+    GATES.iter().chain(super::humans::gates::GATES).filter(move |g| g.situation == situation)
 }
 
 /// The gates as the document's table.
 pub fn markdown() -> String {
+    markdown_of(GATES)
+}
+
+/// A table of gates as the document holds it.
+pub fn markdown_of(gates: &[Gate]) -> String {
     let mut out = String::from("| situation | kind | metric | test | mild | medium | strong | owning small net |\n|---|---|---|---|---|---|---|---|\n");
-    for g in GATES {
+    for g in gates {
         let kind = if g.kind == Kind::Outcome { "outcome" } else { "behaviour" };
         let _ = writeln!(out, "| {} | {kind} | `{}` | {} | {} | {} | {} | {} |", g.situation.name().to_uppercase(), g.metric, g.test.symbol(), g.threshold[0], g.threshold[1], g.threshold[2], g.net);
     }
