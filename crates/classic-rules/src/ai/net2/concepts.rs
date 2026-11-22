@@ -93,6 +93,8 @@ impl SeatInputs {
             self.cs_contested,
             self.own_infamy,
             self.ties_at_risk,
+            self.space_race,
+            self.parts_short,
         ]
     }
 }
@@ -182,6 +184,7 @@ mod tests {
             "infamy_cost" | "late" => &['F', 'K', 'G'],
             "ease" => &['T'],
             "cs_gold_share" => &['F', 'K', 'G', 'Y'],
+            "part_hold" => &['K', 'G'],
             _ => &['K', 'S', 'R', 'Q'],
         }
     }

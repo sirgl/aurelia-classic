@@ -256,7 +256,7 @@ pub fn tilt(pass: &Pass) -> Tilt {
     out
 }
 
-/// The part a tilt term belongs to: the war order's posture terms (the order's value, no order) are the war's,
+/// The part a tilt term belongs to:the war order's posture terms (the order's value, no order) are the war's,
 /// the others the strategy's.
 fn tilt_part(term: &Term) -> Part {
     match term.src {
@@ -281,6 +281,8 @@ pub struct After {
     pub price_tilt: [Milli; pd::N],
     /// The peace neuron per rival at war (by `Pass::rivals`' order; 0 where not evaluated).
     pub peace: Vec<Milli>,
+    /// `weights::PART_HOLD`.
+    pub part_hold: Milli,
 }
 
 /// The levers of the turn (§4.4–§4.7) from the pass and the intent.
@@ -300,12 +302,13 @@ pub fn after_intent(pass: &Pass, intent: &Intent, inputs: &Inputs, round: u32) -
     let mut price_tilt = [0; pd::N];
     price_tilt[pd::MILITARY] = fire(&w::MILITARY, &Frame { s: &pass.seat, a: &pass.aggregates, y: &y, ..Frame::default() });
     let at_war = inputs.situation[fe::AT_WAR] > 0;
+    let part_hold = fire(&w::PART_HOLD, &Frame { k: &pass.carried, g: &inputs.seat.row(), ..Frame::default() });
     let plan = Net2Plan {
         parts: pass.parts,
         round,
         war: pass.core.war,
         peace_with,
-        rivals: pass.reads.clone(),
+        rivals: helped(&pass.reads, &pass.core.war),
         guard,
         cs_gold_share,
         embargo: embargo_of(&pass.reads),
@@ -315,8 +318,25 @@ pub fn after_intent(pass: &Pass, intent: &Intent, inputs: &Inputs, round: u32) -
         tall_share: intent.style[0],
         offence: Offence::default(),
         order_eases: super::orders::order_eases(&pass.core.war, &inputs.targets, &pass.eases, inputs.seat.war_gain),
+        space_hold: space_hold(&inputs.space, part_hold),
     };
-    After { plan, price_tilt, peace }
+    After { plan, price_tilt, peace, part_hold }
+}
+
+/// The reads with the help of the turn: the war order's rival gets none (`deny_help[r]` ∋ the order's target), a
+/// runaway none (`read_of`). Why: casebook E4 (A5 #11): the Prey order on the disarmed neighbour at r107, a friendship
+/// with it at r108 (`diplomacy::item_value_with` and `proposals_with` read `denies_help`, which named only the
+/// runaway), `prey` 1000 → 348 through the friend term, the order dropped at r117 and no war: the plan fought and
+/// befriended the same nation.
+fn helped(reads: &[RivalRead], war: &WarPlan) -> Vec<RivalRead> {
+    let target = war.order().map(|o| o.rival);
+    reads.iter().map(|r| if Some(r.rival) == target { RivalRead { help: Help::Deny, ..r.clone() } } else { r.clone() }).collect()
+}
+
+/// The copies held for the missing parts: each resource's need × the hold's level, rounded up (none at level 0).
+fn space_hold(space: &[super::plan::SpaceNeed], level: Milli) -> Vec<(crate::ids::ResourceId, i32)> {
+    let level = level.clamp(0, ONE);
+    space.iter().map(|x| (x.resource, ((i64::from(x.need) * level + ONE - 1) / ONE) as i32)).filter(|(_, n)| *n > 0).collect()
 }
 
 /// The peace neuron of every rival at war with us (0 for the others).

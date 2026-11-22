@@ -23,7 +23,7 @@ use crate::rules::content::Domain;
 use crate::rules::CompiledRuleset;
 use crate::world::player::PlayerKind;
 
-use super::plan::{CityInputs, Inputs, SeatInputs, TargetInputs, MAX_TARGETS};
+use super::plan::{CityInputs, Inputs, SeatInputs, SpaceNeed, TargetInputs, MAX_TARGETS};
 
 /// Standard rounds the rivals' sightings, the army estimate and the captures count (`pace_rounds`).
 pub const SIGHT_ROUNDS: u32 = 10;
@@ -270,6 +270,8 @@ impl InputMemory {
                 None => {
                     if let Some(c) = state.seen_cities().iter().find(|c| c.tile == tile && c.owner != obs.player) {
                         self.captured.push(Capture { tile, round: now, from: c.owner });
+                    } else if let Some(from) = first.then(|| resisting_from(obs, state, tile)).flatten() {
+                        self.captured.push(Capture { tile, round: now, from });
                     }
                 }
             }
@@ -573,7 +575,55 @@ pub fn read(obs: &AIObservation<'_>, brief: &TurnBrief, state: &AiState, rules: 
     let rival_rows = super::rival_inputs::read(obs, brief, state, rules, rivals, memory);
     let cities = cities(obs, brief, state, memory);
     let targets = targets(obs, brief, state, rules, memory);
-    Inputs { situation: *situation, seat, rivals: rival_rows, cities, pairs: Vec::new(), aims: Vec::new(), targets }
+    let space = space_needs(obs, rules);
+    let seat = SeatInputs { space_race: if space.is_empty() { 0 } else { 1000 }, parts_short: parts_short(&space), ..seat };
+    Inputs { situation: *situation, seat, rivals: rival_rows, cities, pairs: Vec::new(), aims: Vec::new(), targets, space }
+}
+
+/// The strategic resources the spaceship's missing parts need (G16 `space_race`, G17 `parts_short`, the hold's
+/// quantity), while the race is open to us: the science victory on, every prerequisite project of the parts complete
+/// or its technology known, and a part neither installed nor walking. Empty otherwise.
+fn space_needs(obs: &AIObservation<'_>, rules: &CompiledRuleset) -> Vec<SpaceNeed> {
+    if !obs.victories.enabled(crate::world::victory::VictoryKind::Science) {
+        return Vec::new();
+    }
+    let done = |p: crate::rules::content::ProjectId| obs.economy.projects.get(p.0 as usize).copied().unwrap_or(0);
+    let open = crate::ai::victory::prerequisite_projects(rules).into_iter().all(|p| done(p) > 0 || rules.module.projects.get(p.0 as usize).is_some_and(|d| d.required_tech.is_none_or(|t| obs.economy.techs.contains(&t))));
+    if !open {
+        return Vec::new();
+    }
+    let mut out: Vec<SpaceNeed> = Vec::new();
+    for (kind, project, needed) in crate::ai::victory::part_kinds(rules) {
+        let walking = obs.own_units.iter().filter(|u| u.kind == kind).count() as i64;
+        let missing = (i64::from(needed) - i64::from(done(project)) - walking).max(0) as i32;
+        let Some(def) = rules.units.get(kind.0 as usize) else { continue };
+        for (resource, n) in &def.required_resources {
+            let need = missing * i32::from(*n);
+            match out.iter_mut().find(|x| x.resource == *resource) {
+                Some(x) => x.need += need,
+                None => out.push(SpaceNeed { resource: *resource, need, free: obs.economy.resources.available(*resource) }),
+            }
+        }
+    }
+    out.retain(|x| x.need > 0);
+    out
+}
+
+/// A city of ours still in resistance when the memory starts (a saved game of another mind, an exam's scene: HD8's two
+/// captured cities read G4 even, so the war that took them read as one that had not paid, war-weary 500–1000 and the
+/// white peace taken, R4 trace) was taken in a current war: from the enemy at war with us whose known city is the
+/// nearest to it. None when no war runs or no enemy city is known.
+fn resisting_from(obs: &AIObservation<'_>, state: &AiState, tile: TileId) -> Option<PlayerId> {
+    let city = obs.own_cities.iter().find(|c| c.tile == tile).filter(|c| c.resistance > 0)?;
+    let dims = obs.view.dimensions();
+    let enemies: Vec<PlayerId> = obs.relations.iter().filter(|r| r.kind == PlayerKind::Major && r.at_war).map(|r| r.other).collect();
+    state.seen_cities().iter().filter(|c| enemies.contains(&c.owner)).filter_map(|c| Some((dims.distance(c.tile, city.tile)?, c.owner.0, c.owner))).min().map(|(_, _, p)| p)
+}
+
+/// G17: the copies the missing parts need beyond the free ones, 0…3.
+fn parts_short(space: &[SpaceNeed]) -> Milli {
+    let short: i64 = space.iter().map(|x| i64::from((x.need - x.free).max(0))).sum();
+    ramp(short, 0, 3)
 }
 
 /// The rules' era percent of the warmonger weights (`systems::diplomacy::WARMONGER_PERCENT`) at the average era of

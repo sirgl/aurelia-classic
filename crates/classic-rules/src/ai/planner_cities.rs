@@ -99,6 +99,9 @@ pub(crate) struct Empire {
     /// `TurnBrief::no_idle_cities`: a city the allocator leaves without an order takes
     /// the best process or the best order beyond the limits (`allocated_order`).
     no_idle: bool,
+    /// Copies of strategic resources `net2` holds for the missing spaceship parts (`Net2Plan::space_hold`): no other
+    /// unit takes them. Empty without `net2`'s economy part.
+    held: Vec<(crate::ids::ResourceId, i32)>,
     /// Space orders given this turn (Apollo, spaceship parts).
     space_planned: Vec<ProductionItem>,
     /// The cities' new queues of the space plan (`victory::space_plan`;
@@ -585,6 +588,7 @@ impl Empire {
             wonders_taken: wonders_taken(obs, rules),
             wants_explorer,
             no_idle: brief.no_idle_cities,
+            held: crate::ai::operations::with_net2(brief, crate::ai::net2::plan::Part::Economy, |p| p.space_hold.clone()).unwrap_or_default(),
             space_planned: Vec::new(),
             space_queues: if brief.space_finish { crate::ai::victory::space_plan(obs, rules) } else { Vec::new() },
             space_finish: brief.space_finish,
@@ -807,10 +811,13 @@ fn unit_available_in(
     let obsolete = def
         .obsolete_tech
         .is_some_and(|t| obs.economy.techs.contains(&t));
+    // A spaceship part takes the copies held for it; any other unit only what is left (`Empire::held`).
+    let part = def.spaceship_project.is_some();
+    let held = |r: &crate::ids::ResourceId| if part { 0 } else { empire.held.iter().filter(|(h, _)| h == r).map(|(_, n)| *n).sum() };
     let resources = def
         .required_resources
         .iter()
-        .all(|(r, n)| obs.economy.resources.available(*r) >= i32::from(*n));
+        .all(|(r, n)| obs.economy.resources.available(*r) - held(r) >= i32::from(*n));
     let replaced = has_own_replacement(rules, empire.nation, kind);
     let banned = empire.refused.contains(&ProductionItem::Unit(kind));
     // A unit of a policy (Landsknecht: Mercenary Army) is refused without it.

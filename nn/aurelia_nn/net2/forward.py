@@ -322,7 +322,10 @@ def levers(W, turn, seat, qs, core, aggs, ys, ar):
     guard = [fire(W.neurons["guard"], {"S": seat, "C": _city_row(W, c, rivals, qs)}, ar) for c in turn["cities"]]
     military = fire(W.neurons["military_tilt"], {"S": seat, "A": aggs, "Y": ys}, ar)
     cs = fire(W.neurons["cs_gold_share"], {"F": turn["f"], "K": turn["k"], "G": turn["g"], "Y": ys}, ar)
-    deny = [r["id"] for r, q in zip(rivals, qs) if q[W.q["runaway"]] >= W.gates["deny_help"]]
+    part_hold = fire(W.neurons["part_hold"], {"K": turn["k"], "G": turn["g"]}, ar)
+    # The war order's rival gets no help either (`levers::helped`, casebook E4).
+    target = order["rival"] if order is not None else None
+    deny = [r["id"] for r, q in zip(rivals, qs) if q[W.q["runaway"]] >= W.gates["deny_help"] or r["id"] == target]
     embargo, best = None, -1
     for r, q in zip(rivals, qs):
         if q[W.q["runaway"]] >= W.gates["embargo"] and q[W.q["runaway"]] > best:
@@ -331,7 +334,7 @@ def levers(W, turn, seat, qs, core, aggs, ys, ar):
     for r, q in zip(rivals, qs):
         if q[W.q["block"]] >= W.gates["block"] and q[W.q["block"]] > best:
             ballot, best = r["id"], q[W.q["block"]]
-    return {"peace": peace, "peace_with": peace_with, "deny_help": deny, "embargo": embargo, "ballot": ballot, "guard": guard, "military": military, "cs_gold_share": cs}
+    return {"peace": peace, "peace_with": peace_with, "deny_help": deny, "embargo": embargo, "ballot": ballot, "guard": guard, "military": military, "cs_gold_share": cs, "part_hold": part_hold}
 
 
 def forward(W: Weights, turn: dict, ar: Arith = FLOAT, teacher: dict | None = None) -> dict:
@@ -368,7 +371,7 @@ def deviation(a, b) -> float:
     return abs(float(a) - float(b))
 
 
-NEURONS = ("s", "ease", "q", "a", "tilt", "y", "peace", "guard", "military", "cs_gold_share")
+NEURONS = ("s", "ease", "q", "a", "tilt", "y", "peace", "guard", "military", "cs_gold_share", "part_hold")
 DECISIONS = ("core", "peace_with", "deny_help", "embargo", "ballot")
 
 

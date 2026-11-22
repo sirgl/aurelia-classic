@@ -108,8 +108,13 @@ pub mod g {
     pub const CS_CONTESTED: usize = 9;
     pub const OWN_INFAMY: usize = 10;
     pub const TIES_AT_RISK: usize = 11;
-    pub const N: usize = 12;
-    pub const NAMES: [&str; N] = ["capital_lost", "cities_lost", "war_rounds", "war_gain", "unhappy_trend", "embark", "enemy_air", "gold_stock", "cs_allies", "cs_contested", "own_infamy", "ties_at_risk"];
+    /// The space race is open to us: the parts' prerequisite projects are complete or their technologies known, and a
+    /// part of the ship is still missing (0/1000).
+    pub const SPACE_RACE: usize = 12;
+    /// The copies of strategic resources the missing parts need beyond the free ones, 0…3 → 0…1000.
+    pub const PARTS_SHORT: usize = 13;
+    pub const N: usize = 14;
+    pub const NAMES: [&str; N] = ["capital_lost", "cities_lost", "war_rounds", "war_gain", "unhappy_trend", "embark", "enemy_air", "gold_stock", "cs_allies", "cs_contested", "own_infamy", "ties_at_risk", "space_race", "parts_short"];
 }
 
 /// A rival's inputs (`plan::RivalInputs` in order).
@@ -309,8 +314,8 @@ pub const SEAT: [Neuron; s::N] = [
 /// is the rival's prey term.
 pub const EASE: Neuron = Neuron {
     name: "ease",
-    bias: -2300,
-    why: "a city is no target by default: it takes a small, near city with weak defences (the old size gate, at most 8 citizens, sits at size 500); −2000 → −2300 raises the bar of a soft city: at −2000 net2 declared 1.49× nets-x-site's wars (GAP.md, offsets 1810–1811)",
+    bias: -2200,
+    why: "a city is no target by default: it takes a small, near city with weak defences (the old size gate, at most 8 citizens, sits at size 500); −2000 → −2300 raised the bar of a soft city (at −2000 net2 declared 1.49× nets-x-site's wars, GAP.md); R4: at −2150 with the order's target denied help (`levers::helped`) the wars were 1.30× (151 / 116, offsets 1810–1811), at the gate, and A5's `nobody_attacked` 0.853; at −2250 0.873 (gate 0.861): −2200 between them",
     join: UNIT,
     terms: &[
         ts(T(t::SIZE), Shape::Not, 1000, "a small city: the learned capture chance falls 0.066 a citizen (`OPEN_CHANCE_WEIGHTS`), as much as a tile"),
@@ -357,7 +362,7 @@ pub const RIVAL: [Neuron; q::N] = [
             t(R(r::NEAR), 300, "only a neighbour can strike"),
             ts(R(r::SOLDIERS), Shape::Above(500), 800, "stronger than us"),
             t(R(r::PACT), -600, "a pact partner is bound"),
-            t(R(r::FRIEND), -300, "a friend is bound"),
+            t(R(r::FRIEND), 0, "read, no weight: a friendship binds nothing in these rules (no backstab memory, WAR-LEVER.md K3); at −300 a friend's army of 3+3 at our border read distrust 0 (tricks HD2 #1) and its 4–10 units two tiles from our city at peace menace 142–313 (HMO3 #1)"),
         ],
     },
     Neuron {
@@ -368,7 +373,7 @@ pub const RIVAL: [Neuron; q::N] = [
         terms: &[
             t(R(r::STACK), 1500, "a stack inside our borders at peace is the sneak attack (P3, MO3, B2)"),
             t(Q(q::DISTRUST), 400, "distrust raises it"),
-            t(R(r::FRIEND), -300, "a friend's stack less"),
+            t(R(r::FRIEND), 0, "read, no weight: a friend's stack inside our borders is the same sneak attack (HMO3 #1: 4–10 units two tiles from our city, menace 142–313 with −300); a friendship binds nothing in these rules"),
         ],
     },
     Neuron {
@@ -503,7 +508,7 @@ pub enum Table {
 /// the posture (prepare +2000, peace −1200) is removed: `net2` thinks with the threat 0.
 pub const TILT: &[(Table, usize, Term)] = &[
     (Table::Style, 1, t(A(a::ONE), -1200, "wide: −600 → −1800, the tall first (`weights::style::WIDE`) folded into the bias (F1, F2)")),
-    (Table::Style, 2, t(A(a::ONE), -400, "conquest: −900 → −1300, balances the prey term: conquest without prey is the 12.4 % schedule")),
+    (Table::Style, 2, t(A(a::ONE), -400, "conquest: −900 → −1300, balances the prey term: conquest without prey is the 12.4 % schedule. It is the cause of net2's fewer cities (R4: it moves the warlike leaders' lock to tall, and a tall seat is held to the rules' city model, `tall_real`: Rome, archipelago 1810002, 5 cities against 10 without it; founded 5.92 against nets-x-site's 6.34, 6.39 against 6.25 at 0), but at 0 the share fell 53.8 → 48.5 % on offsets 1810–1811 (nets-x-site's diplomatic victories 11 → 20, ours 21 → 14): kept until the tall seat's city cap is the net's")),
     (Table::Style, 2, t(A(a::MAX_PREY), 1500, "conquest is the play only next to a disarmed, reachable neighbour")),
     (Table::Aim, 3, t(S(s::CITY_STATE_ROOM), 800, "diplomacy: the winners are tall seats with gold and allies (F2)")),
     (Table::Posture, 0, t(S(s::WAR_WEARY), 1200, "peace: tiredness is the reason to end wars (D3, F3)")),
@@ -576,6 +581,22 @@ pub const CS_SHARE: Neuron = Neuron {
     ],
 };
 
+/// The copies of the strategic resources the missing spaceship parts need that no other unit may take (`Net2Plan::
+/// space_hold`: the level × the copies the missing parts need). Why (capital-fix FIX.md Part 2, Portugal, fractal
+/// 1783007 P3): 12 aluminium, 5 in installed parts and 6 in helicopter gunships, the last part could not be queued
+/// from r314 to r330 and the seat that knew every technology won by time.
+pub const PART_HOLD: Neuron = Neuron {
+    name: "part_hold",
+    bias: -500,
+    why: "no hold outside the space race: aluminium is the modern army's",
+    join: UNIT,
+    terms: &[
+        t(G(g::SPACE_RACE), 1500, "in the race every copy a missing part needs is the ship's: a unit can be built later, the last part cannot without its copy"),
+        t(G(g::PARTS_SHORT), 300, "the copies are short already: none of them goes to a unit"),
+        t(K(kc::DANGER), -600, "a city in danger may spend some of them on its defenders"),
+    ],
+};
+
 // ---- the offence addendum (work/new-net-offence-addendum-2026-11-22.md §3): declared, not yet built ----
 
 /// The offence is off: `net2` plays as the addendum's control `net2-defence` (every `Offence` field and
@@ -631,7 +652,7 @@ pub mod site {
 /// Every neuron of `net2`'s own tables.
 pub fn neurons() -> Vec<&'static Neuron> {
     let mut out: Vec<&'static Neuron> = SEAT.iter().chain(RIVAL.iter()).collect();
-    out.extend([&PEACE, &GUARD, &MILITARY, &CS_SHARE, &EASE]);
+    out.extend([&PEACE, &GUARD, &MILITARY, &CS_SHARE, &EASE, &PART_HOLD]);
     out
 }
 

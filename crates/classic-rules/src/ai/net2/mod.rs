@@ -67,6 +67,7 @@ pub fn think(obs: &AIObservation<'_>, brief: &TurnBrief, state: &mut AiState, ru
         let shares = levers::shares(&intent);
         trace::turn(&trace::Record { player: obs.player.0, round: obs.round, pace: obs.speed.pace_percent, inputs: &inputs, held: &own.core, logits, tempered: net.sharp, pass: &pass, tilt: &tilt, shares: &shares, after: &after });
     }
+    space_trace(obs.player.0, obs.round, &inputs, after.part_hold);
     let mut levers = after.plan;
     read_soldiers(&mut levers, &own.inputs);
     // The offence whose inputs the pass has (`offence`; the driver clears it for `net2-defence`).
@@ -76,6 +77,20 @@ pub fn think(obs: &AIObservation<'_>, brief: &TurnBrief, state: &mut AiState, ru
     let price_tilt = if parts.plays(Part::Economy) { after.price_tilt } else { [0; pd::N] };
     let strategy = strategy_net::plan_with_intent(seat, state, memory, &situation, intent, &price_tilt, Wishes::default());
     Plan2 { strategy, net2: levers }
+}
+
+/// `NET2_SPACE_TRACE=<file>`: one line a turn of the space race (the parts' needs, the free copies, the hold's level).
+/// It decides nothing.
+fn space_trace(player: u8, round: u32, inputs: &plan::Inputs, level: strategy_net::Milli) {
+    if inputs.space.is_empty() {
+        return;
+    }
+    let Some(path) = std::env::var_os("NET2_SPACE_TRACE") else { return };
+    let needs: Vec<String> = inputs.space.iter().map(|x| format!("[{},{},{}]", x.resource.0, x.need, x.free)).collect();
+    if let Ok(mut file) = std::fs::OpenOptions::new().create(true).append(true).open(path) {
+        use std::io::Write as _;
+        let _ = writeln!(file, "{{\"p\":{player},\"r\":{round},\"hold\":{level},\"needs\":[{}]}}", needs.join(","));
+    }
 }
 
 /// Part A's soldiers estimate of every rival read (§2.4 step 4), so that the war machine's `known_power`

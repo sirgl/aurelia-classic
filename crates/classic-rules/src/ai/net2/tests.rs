@@ -34,7 +34,7 @@ fn carried() -> [Milli; kc::N] {
 }
 
 fn inputs(seat: SeatInputs, rivals: Vec<RivalInputs>, cities: Vec<CityInputs>) -> Inputs {
-    Inputs { situation: situation(), seat, rivals, cities, pairs: vec![], aims: vec![], targets: vec![] }
+    Inputs { situation: situation(), seat, rivals, cities, pairs: vec![], aims: vec![], targets: vec![], space: vec![] }
 }
 
 fn pass_of(inputs: &Inputs, held: &CoreMemory, round: u32) -> Pass {
@@ -75,6 +75,35 @@ fn a5_the_disarmed_neighbour_is_prey() {
     assert_eq!(tilt.style, [0, -1200, 1100]);
 }
 
+/// Casebook E4 (A5 #11): the order's target gets no friendship, pact, agreement or open borders while the order lasts;
+/// another rival keeps its help.
+#[test]
+fn the_war_orders_target_gets_no_help() {
+    let inputs = inputs(seat(), vec![disarmed_neighbour(1), RivalInputs { soldiers: 500, ..rival(2) }], vec![]);
+    let p = pass(&inputs);
+    assert_eq!(p.core.war.order().map(|o| o.rival), Some(PlayerId(1)));
+    let plan = after(&inputs, &p).plan;
+    assert!(plan.denies_help(PlayerId(1)), "the order's target");
+    assert!(!plan.denies_help(PlayerId(2)), "a rival without an order");
+}
+
+/// The aluminium case (capital-fix FIX.md Part 2): in the open race the copies the missing parts need are held; outside
+/// it, none.
+#[test]
+fn the_space_race_holds_the_parts_copies() {
+    use crate::ids::ResourceId;
+    let need = super::plan::SpaceNeed { resource: ResourceId(7), need: 3, free: 2 };
+    let racing = Inputs { space: vec![need], ..inputs(SeatInputs { space_race: 1000, parts_short: 333, ..seat() }, vec![], vec![]) };
+    let p = pass(&racing);
+    let a = after(&racing, &p);
+    // part_hold = unit(−500 + 1500 + 300·0.333) = 1000: every copy the missing parts need.
+    assert_eq!(a.part_hold, 1000);
+    assert_eq!((a.plan.space_hold.clone(), a.plan.held(ResourceId(7)), a.plan.held(ResourceId(8))), (vec![(ResourceId(7), 3)], 3, 0));
+    let idle = inputs(seat(), vec![], vec![]);
+    let q = pass(&idle);
+    assert!(after(&idle, &q).plan.space_hold.is_empty());
+}
+
 #[test]
 fn an_average_neighbour_is_no_prey() {
     let inputs = inputs(seat(), vec![RivalInputs { soldiers: 500, open_cities: 0, ..disarmed_neighbour(1) }], vec![]);
@@ -110,14 +139,14 @@ fn level_neighbour(id: u8) -> RivalInputs {
 #[test]
 fn a_level_neighbour_with_a_soft_city_is_prey_and_the_order_aims_at_it() {
     // WAR-LEVER.md K1: 5 citizens (size 250), no garrison seen, 4 tiles (near 1000), walls 200 against our army.
-    // ease = unit(−2300 + 750 + 800 + 1000 + 480) = 730; a large guarded city: unit(−2300 + 0 + 320 + 600 + 300) = 0.
+    // ease = unit(−2200 + 750 + 800 + 1000 + 480) = 830; a large guarded city: unit(−2200 + 0 + 320 + 600 + 300) = 0.
     let mut inputs = inputs(seat(), vec![level_neighbour(1)], vec![]);
     inputs.targets = vec![target(1, 70, 1000, 600, 600, 500), target(1, 71, 250, 0, 1000, 200)];
     let p = pass(&inputs);
-    assert_eq!(p.eases, vec![0, 730]);
-    assert_eq!(p.rivals[0].inputs[super::weights::r::SOFT], 730);
-    // prey = unit(−1700 + 0 + 1280 + 120 + 876) = 576 → a Prey order aimed at the soft city.
-    assert_eq!(p.rivals[0].concepts[q::PREY], 576);
+    assert_eq!(p.eases, vec![0, 830]);
+    assert_eq!(p.rivals[0].inputs[super::weights::r::SOFT], 830);
+    // prey = unit(−1700 + 0 + 1280 + 120 + 996) = 696 → a Prey order aimed at the soft city.
+    assert_eq!(p.rivals[0].concepts[q::PREY], 696);
     let aim = p.core.war.order().and_then(|o| o.aim);
     assert_eq!(aim, Some(WarAim { city: TileId(71), why: AimWhy::Ease }));
 }
@@ -468,13 +497,15 @@ fn generated_line(rng: &mut Lcg) -> String {
         cs_contested: seat_row[9],
         own_infamy: seat_row[10],
         ties_at_risk: seat_row[11],
+        space_race: if seat_row[12] > 600 { 1000 } else { 0 },
+        parts_short: seat_row[13],
         ..SeatInputs::default()
     };
     let rivals: Vec<RivalInputs> = (0..1 + rng.below(7)).map(|i| generated_rival(rng, 1 + i as u8)).collect();
     let cities = (0..1 + rng.below(6)).map(|i| generated_city(rng, 100 + i, &rivals)).collect();
     let held = generated_held(rng, &rivals, round);
     let targets = (0..rng.below(6)).map(|i| generated_target(rng, 500 + i as u32, &rivals)).collect();
-    let inputs = Inputs { situation, seat, rivals, cities, pairs: vec![], aims: vec![], targets };
+    let inputs = Inputs { situation, seat, rivals, cities, pairs: vec![], aims: vec![], targets, space: vec![] };
     let spread = |rng: &mut Lcg| rng.below(6001) as Milli - 3000;
     let logits = Logits { concepts: k, style: [spread(rng), spread(rng), spread(rng)], aim: [spread(rng), spread(rng), spread(rng), spread(rng)], posture: [spread(rng), spread(rng), spread(rng), spread(rng)], style_margin: 1150 };
     let tempered = rng.below(2) == 0;
@@ -519,7 +550,7 @@ fn the_parity_fixture_is_the_integer_net() {
 #[test]
 fn the_weights_count() {
     let n = super::weights::count();
-    assert_eq!(n, 148, "net2's own hand weights (the 13 carried concepts and the carried logits are `strategy_net::weights`'s)");
+    assert_eq!(n, 152, "net2's own hand weights (the 13 carried concepts and the carried logits are `strategy_net::weights`'s)");
 }
 
 #[test]

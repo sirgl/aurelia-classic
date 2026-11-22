@@ -221,10 +221,11 @@ pub fn promotion_choices(obs: &AIObservation<'_>, rules: &CompiledRuleset) -> Ve
 
 /// Upgrades while the treasury stays above `reserve` gold and the
 /// strategic resources of this turn's upgrades last (each offer counts the
-/// empire's free copies alone).
-pub fn upgrade_orders(obs: &AIObservation<'_>, rules: &CompiledRuleset, reserve: u32) -> Vec<Command> {
+/// empire's free copies alone, less the copies `held` for the spaceship's
+/// parts: `Net2Plan::space_hold`).
+pub fn upgrade_orders(obs: &AIObservation<'_>, rules: &CompiledRuleset, reserve: u32, held: &[(crate::ids::ResourceId, i32)]) -> Vec<Command> {
     let mut gold = obs.economy.treasury;
-    let mut taken: Vec<(crate::ids::ResourceId, i32)> = Vec::new();
+    let mut taken: Vec<(crate::ids::ResourceId, i32)> = held.to_vec();
     let mut out = Vec::new();
     for unit in &obs.own_units {
         let Some((to, price)) = obs.view.upgrade_offer(unit.handle) else {
@@ -795,7 +796,8 @@ impl crate::ai::system::SystemAdvisor for MilitaryAdvisor {
             chosen
         };
         out.extend(proposals(10, promotions));
-        out.extend(proposals(5, upgrade_orders(obs, input.rules, UPGRADE_RESERVE)));
+        let held = crate::ai::operations::with_net2(input.brief, crate::ai::net2::plan::Part::Economy, |p| p.space_hold.clone()).unwrap_or_default();
+        out.extend(proposals(5, upgrade_orders(obs, input.rules, UPGRADE_RESERVE, &held)));
         out
     }
 }

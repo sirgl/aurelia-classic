@@ -63,6 +63,20 @@ pub struct SeatInputs {
     pub vote_reach: Milli,
     /// G15: own workers < cities / 2, early (0/1000).
     pub worker_need: Milli,
+    /// The space race is open to us and a part is missing (0/1000; `weights::g::SPACE_RACE`).
+    pub space_race: Milli,
+    /// The copies the missing parts need beyond the free ones, 0…3 → 0…1000 (`weights::g::PARTS_SHORT`).
+    pub parts_short: Milli,
+}
+
+/// One strategic resource the missing spaceship parts need (the hold's quantity, `Net2Plan::space_hold`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SpaceNeed {
+    pub resource: ResourceId,
+    /// Copies the parts not yet built or walking need.
+    pub need: i32,
+    /// Copies free now (`resources.available`).
+    pub free: i32,
 }
 
 /// The inputs of one met major rival (§2.3, R1–R24 and the two facts the war order needs).
@@ -264,6 +278,8 @@ pub struct Inputs {
     pub aims: Vec<AimInputs>,
     /// The known rival cities within reach and how easy each is to take, at most `MAX_TARGETS`.
     pub targets: Vec<TargetInputs>,
+    /// The strategic resources the missing spaceship parts need, while the race is open (empty else).
+    pub space: Vec<SpaceNeed>,
 }
 
 /// The inputs of the site head for one candidate tile (§3.4, S1–S9). Points are the planner's site points.
@@ -681,6 +697,10 @@ pub struct Net2Plan {
     /// (`net2/orders.rs`): what the order's war promises when no operation runs yet, read by the peace answer; when
     /// the aimed city has just been taken the next one prices the war that goes on (CHAIN.md D8, HD8 #1 r114).
     pub order_eases: Vec<(crate::ids::TileId, Milli)>,
+    /// Copies of a strategic resource held for the missing spaceship parts (`weights::PART_HOLD` × the copies they
+    /// need): no other unit is built, bought or upgraded into with them (the production planner, the upgrades, the
+    /// armory read `held`).
+    pub space_hold: Vec<(ResourceId, i32)>,
 }
 
 /// The trust of a rival without a reading (a city-state, a stranger): a stranger is not yet a liar.
@@ -705,6 +725,11 @@ impl Net2Plan {
             Some(read) => read.trust,
             None => TRUST_UNKNOWN,
         }
+    }
+
+    /// The copies of `resource` held for the spaceship's parts (0 without a hold).
+    pub fn held(&self, resource: ResourceId) -> i32 {
+        self.space_hold.iter().filter(|(r, _)| *r == resource).map(|(_, n)| *n).sum()
     }
 
     /// `deny_help[r]` (§4.6).

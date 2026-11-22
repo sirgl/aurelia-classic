@@ -195,7 +195,7 @@ fn output_json(rec: &Record<'_>) -> String {
         Ballot::Own => "null".to_string(),
     };
     format!(
-        "{{\"s\":{},\"ease\":{},\"q\":{},\"core\":{},\"a\":{},\"tilt\":{{\"style\":{},\"aim\":{},\"posture\":{}}},\"y\":{},\"peace\":{},\"peace_with\":{},\"deny_help\":{},\"embargo\":{embargo},\"ballot\":{ballot},\"guard\":{},\"military\":{},\"cs_gold_share\":{}}}",
+        "{{\"s\":{},\"ease\":{},\"q\":{},\"core\":{},\"a\":{},\"tilt\":{{\"style\":{},\"aim\":{},\"posture\":{}}},\"y\":{},\"peace\":{},\"peace_with\":{},\"deny_help\":{},\"embargo\":{embargo},\"ballot\":{ballot},\"guard\":{},\"military\":{},\"cs_gold_share\":{},\"part_hold\":{}}}",
         list(&rec.pass.seat),
         list(&rec.pass.eases),
         rows(&rec.pass.rivals, |x| list(&x.concepts)),
@@ -210,7 +210,8 @@ fn output_json(rec: &Record<'_>) -> String {
         list(&deny),
         list(&guards),
         rec.after.price_tilt[crate::ai::strategy_net::weights::pd::MILITARY],
-        plan.cs_gold_share
+        plan.cs_gold_share,
+        rec.after.part_hold
     )
 }
 
