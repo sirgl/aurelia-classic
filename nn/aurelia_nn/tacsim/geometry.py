@@ -107,6 +107,9 @@ class Geometry:
         self.l = len(loffs)
         lpos = {o: i for i, o in enumerate(loffs)}
         self.lnbr = mx.array([[lpos.get((dq + a, dr + b), -1) for a, b in DIRS] for dq, dr in loffs], dtype=mx.int32)
+        self.disc_to_local_list = [lpos.get(o, -1) for o in offs]
+        dpos = {o: i for i, o in enumerate(offs)}
+        self.local_to_disc = mx.array([dpos.get(o, -1) for o in loffs], dtype=mx.int32)
         self.ltile = mx.array([[idx(q + dq, r + dr) for dq, dr in loffs] for q, r in qr], dtype=mx.int32)
         self.inner = mx.array([INNER <= q < w - INNER and INNER <= r < w - INNER for q, r in qr])
         self.q = mx.array([q for q, _ in qr], dtype=mx.int32)

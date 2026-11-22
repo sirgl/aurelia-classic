@@ -59,7 +59,7 @@ def put1(arr, idx, val, where):
 
 
 class Sim:
-    def __init__(self, geo, m, cost_pool, cstatic, n_pieces, move_radius=None, has_near_imp=True):
+    def __init__(self, geo, m, cost_pool, cstatic, n_pieces, move_radius=None, has_near_imp=True, los=None):
         self.has_near_imp = has_near_imp
         self.geo = geo
         self.m = m
@@ -71,6 +71,16 @@ class Sim:
         self.iters = move_radius or geo.move_radius
         g = geo
         # Per scene: line-of-sight bits per (tile, disc offset) for the radius-4 disc (one uint64 per tile).
+        self.terr_rough = m["rough"]
+        self.cost_flat = cost_pool.reshape(-1)
+        ct, ca = cstatic["tile"], cstatic["alive"]
+        Bc, C = ct.shape
+        idx = mx.where(ca & (ct >= 0), (mx.arange(Bc) * self.T)[:, None] + ct, Bc * self.T)
+        self.city_plane = mx.full((Bc * self.T + 1,), -1, dtype=I32).at[idx.reshape(-1)].maximum(
+            mx.broadcast_to(mx.arange(C)[None, :], (Bc, C)).astype(I32).reshape(-1))[: Bc * self.T].reshape(Bc, self.T)
+        if los is not None:
+            self.los = los
+            return
         mid = g.disc_mid  # [T, O, K]
         lvl = m["sight_level"]
         eye = m["hills"].astype(I32)
@@ -134,22 +144,18 @@ class Sim:
         Dc = mx.broadcast_to(tiles[:, None, :], (B, C, tiles.shape[1]))
         dc = self.geo.distance(Sc, Dc)
         vis = vis | mx.any(cown[:, :, None] & (dc <= CITY_SIGHT) & self.los_bit(Sc, Dc), axis=1)
-        owned = s["owner"] == side[:, None]
-        nb = gn(owned.astype(I32), mx.broadcast_to(self.geo.nbr[None], (B, self.T, 6))) > 0
-        nb = nb & (self.geo.nbr[None] >= 0)
-        plot = owned | mx.any(nb, axis=2)
-        vis = vis | (gn(plot.astype(I32), tiles) > 0)
+        # Own territory shows itself and its neighbours: the target or one of its neighbours is ours.
+        tn = mx.take(self.geo.nbr, mx.maximum(tiles, 0), axis=0)  # [B, N, 6]
+        owned_t = gn(s["owner"], tiles) == side[:, None]
+        owned_n = (gn(s["owner"], tn) == side[:, None, None]) & (tn >= 0)
+        vis = vis | owned_t | mx.any(owned_n, axis=2)
         return vis & (tiles >= 0)
 
     # ------------------------------------------------------------------ the acting unit's options
 
     def city_on(self, s, tiles):
-        """City slot on each tile [B, N] (-1 none)."""
-        ct = self.cs["tile"]
-        hit = (ct[:, None, :] == tiles[:, :, None]) & self.cs["alive"][:, None, :] & (tiles[:, :, None] >= 0)
-        C = ct.shape[1]
-        ids = mx.arange(C)[None, None, :]
-        return mx.max(mx.where(hit, ids, -1), axis=2)
+        """City slot on each tile [B, N] (-1 none): cities do not move, a plane built once."""
+        return mx.where(tiles >= 0, gn(self.city_plane, tiles), -1)
 
     def controls_and_blocks(self, s, side):
         """Per window tile, for the mover's side: a visible enemy unit stands there (blocks the step),
@@ -160,8 +166,14 @@ class Sim:
         mil_side = mx.where(mil >= 0, gn(s["u_side"], mil), -1)
         civ_side = mx.where(civ >= 0, gn(s["u_side"], civ), -1)
         tiles = mx.broadcast_to(mx.arange(T)[None, :], (B, T)).astype(I32)
-        # Visibility of every tile that holds an enemy unit or city (only those matter).
-        vis = self.seen_by(s, side, tiles)
+        # Visibility only where it is read: the tiles of units and cities ([B, U + C] targets, not [B, T]).
+        ut = mx.where(s["u_alive"], s["u_tile"], -1)
+        ct = mx.where(self.cs["alive"], self.cs["tile"], -1)
+        at = mx.concatenate([ut, ct], axis=1)
+        seen = self.seen_by(s, side, at)
+        base = (mx.arange(B) * T)[:, None]
+        idx = mx.where(at >= 0, base + at, B * T).reshape(-1)
+        vis = mx.zeros((B * T + 1,), dtype=I32).at[idx].maximum(seen.astype(I32).reshape(-1))[: B * T].reshape(B, T) > 0
         enemy_unit = ((mil_side == enemy[:, None]) | (civ_side == enemy[:, None]))
         block = enemy_unit & vis
         city = self.city_on(s, tiles)
@@ -245,7 +257,7 @@ class Sim:
             path.append(v)
         path = mx.stack(path[::-1], axis=1)  # start ... goal (repeats at the start)
         ptile = gn(lt, path)
-        stop = gn(foreign.astype(I32), ptile) > 0
+        stop = gn(foreign.astype(I32), path) > 0
         first = mx.argmax(stop.astype(I32), axis=1)
         any_stop = mx.any(stop, axis=1)
         prev = mx.where(any_stop, g1(path, mx.maximum(first - 1, 0)), gl)
@@ -273,18 +285,24 @@ class Sim:
         # Moves.
         left, lt = self.reach(s, slot, block, ctrl)
         L = lt.shape[1]
-        foreign = ((mil_side >= 0) & (mil_side != side[:, None])) | ((civ_side >= 0) & (civ_side != side[:, None]))
-        own_same = mx.where(civilian[:, None], (civ >= 0) & (civ_side == side[:, None]), (mil >= 0) & (mil_side == side[:, None]))
-        free = ~foreign & ~own_same
-        ok_l = (left >= 0) & (mx.arange(L)[None, :] > 0) & (lt >= 0)
-        ok_l = ok_l & (gn(free.astype(I32), lt) > 0) & (gn(geo.inner.astype(I32)[None].__mul__(mx.ones((B, 1), dtype=I32)), lt) > 0)
-        ok_l = ok_l & alive[:, None]
+        ms_l = mx.where(lt >= 0, gn(mil_side, lt), -1)
+        cs_l = mx.where(lt >= 0, gn(civ_side, lt), -1)
+        foreign_l = ((ms_l >= 0) & (ms_l != side[:, None])) | ((cs_l >= 0) & (cs_l != side[:, None]))
+        own_same = mx.where(civilian[:, None], cs_l == side[:, None], ms_l == side[:, None])
+        ok_l = (left >= 0) & (mx.arange(L)[None, :] > 0) & (lt >= 0) & ~foreign_l & ~own_same
+        ok_l = ok_l & mx.where(lt >= 0, mx.take(geo.inner, mx.maximum(lt, 0)), False) & alive[:, None]
+        # Attacks (over the radius-4 disc of targets).
+        att_d, tgt_d = self.attack_mask(s, side, slot, alive, vis, mil, civ, mil_side, civ_side, city, city_owner)
+        return {"fort": fort, "setup": setup, "found": found, "move_l": ok_l, "attack_d": att_d, "tgt_d": tgt_d, "left": left, "lt": lt,
+                "edges": self._edges, "foreign_l": foreign_l}
+
+    def global_masks(self, mk):
+        """The move and attack masks over the window [B, T] (the parity check reads them)."""
+        B, T = self.B, self.T
         base = (mx.arange(B) * T)[:, None]
-        mv_mask = mx.zeros((B * T + 1,), dtype=I32).at[mx.where(ok_l, base + lt, B * T).reshape(-1)].add(1)[: B * T].reshape(B, T) > 0
-        # Attacks.
-        att = self.attack_mask(s, side, slot, alive, vis, mil, civ, mil_side, civ_side, city, city_owner)
-        return {"fort": fort, "setup": setup, "found": found, "move": mv_mask, "attack": att, "left": left, "lt": lt,
-                "edges": self._edges, "foreign": foreign}
+        def scatter(ok, tiles):
+            return mx.zeros((B * T + 1,), dtype=I32).at[mx.where(ok & (tiles >= 0), base + tiles, B * T).reshape(-1)].add(1)[: B * T].reshape(B, T) > 0
+        return scatter(mk["move_l"], mk["lt"]), scatter(mk["attack_d"], mk["tgt_d"])
 
     def attack_mask(self, s, side, slot, alive, vis, mil, civ, mil_side, civ_side, city, city_owner):
         B, T = self.B, self.T
@@ -329,8 +347,7 @@ class Sim:
         rr = rr & (g1(s["p_indirect_fire"], slot)[:, None] | los)
         rr = rr & mx.where(g1(s["p_ranged_only_in_domain"], slot)[:, None], water_t & (t_city < 0), True)
         ok = ready[:, None] & (tgt >= 0) & target_ok & (m_ok | rr)
-        base = (mx.arange(B) * T)[:, None]
-        return mx.zeros((B * T + 1,), dtype=I32).at[mx.where(ok, base + tgt, B * T).reshape(-1)].add(1)[: B * T].reshape(B, T) > 0
+        return ok, tgt
 
     def city_mask(self, s, side, cslot):
         """Targets of city `cslot`'s strike [B, T] (`plan_city_strike`)."""
@@ -582,7 +599,7 @@ class Sim:
         mv = mx.minimum(g1(s["u_mv"], slot), mmax)
         return self.set_unit(s, slot, change, mmax=mmax, mv=mv)
 
-    def advance(self, s, slot, to, where, mil):
+    def advance(self, s, slot, to, where, mil=None):
         """The attacker moves into the conquered tile, paying its own step (`advance`)."""
         frm = g1(s["u_tile"], slot)
         d = self.dir_between(frm, to)
@@ -591,8 +608,8 @@ class Sim:
         mv = g1(s["u_mv"], slot)
         cost = mx.where((code >= 0) & (code != 255), mx.minimum(code, mv), mv)
         # can_stop_at: no other military unit of ours there (a civilian may share).
-        here = gn(mil, to[:, None])[:, 0]
-        ok = where & ((here < 0) | (here == slot))
+        # After a won fight the tile holds no other military unit (its defender is gone): no check.
+        ok = where if mil is None else where & ((gn(mil, to[:, None])[:, 0] < 0) | (gn(mil, to[:, None])[:, 0] == slot))
         s = self.set_unit(s, slot, ok, tile=to, mv=mv - cost, st=mx.zeros_like(slot))
         return self.refresh_allowance(s, slot, frm, to, ok)
 
@@ -610,24 +627,6 @@ class Sim:
         spawn = spawn & (new < U)
         s = self.set_unit(s, new, spawn, alive=mx.ones(new.shape, dtype=mx.bool_), side=csid, tile=tile, hp=mx.full(new.shape, 100, dtype=I32),
                           mv=mx.zeros_like(new), mmax=moves, att=mx.zeros_like(new), st=mx.zeros_like(new), xp=mx.zeros_like(new), kind=kind)
-        for k in list(s.keys()):
-            if k.startswith("p_") and k not in ("p_ctx", "p_tctx", "p_ttype", "p_targ", "p_targ2", "p_tpct"):
-                arr = s[k]
-                if k == "p_civilian":
-                    val = mx.ones(new.shape, dtype=mx.bool_)
-                elif k in ("p_sight",):
-                    val = mx.full(new.shape, 2, dtype=arr.dtype)
-                elif k in ("p_embarked_sight",):
-                    val = mx.ones(new.shape, dtype=arr.dtype)
-                elif k == "p_moves_land":
-                    val = moves
-                elif k == "p_land":
-                    val = mx.ones(new.shape, dtype=mx.bool_)
-                elif k in ("p_capture_kind", "p_kind"):
-                    val = mx.full(new.shape, -1, dtype=arr.dtype) if k == "p_capture_kind" else kind
-                else:
-                    val = mx.zeros(new.shape, dtype=arr.dtype)
-                s[k] = put1(arr, new, val, spawn)
         s["n_slots"] = mx.where(spawn, new + 1, new)
         return s
 
@@ -651,7 +650,7 @@ class Sim:
         hit = lt == tgt[:, None]
         left_t = mx.max(mx.where(hit, left, -1), axis=1)
         mvv = mvv & (left_t >= 0)
-        end_tile, end_left = self.walk(s, slot, mk, tgt, mk["foreign"])
+        end_tile, end_left = self.walk(s, slot, mk, tgt, mk["foreign_l"])
         s = self.set_unit(s, slot, mvv, tile=end_tile, mv=mx.maximum(end_left, 0), st=mx.zeros_like(slot))
         s = self.refresh_allowance(s, slot, tile, end_tile, mvv)
         # Attack.
@@ -704,16 +703,12 @@ class Sim:
         s = self.heal_on_kill(s, d["slot"], melee_unit & a_killed & ~d_killed, d["heal_on_kill"])
         s = self.heal_on_kill(s, slot, melee_unit & d_killed & ~a_killed, a["heal_on_kill"])
         win = melee_unit & d_killed & ~a_killed
-        s = self.capture_civilians(s, slot, to, win, civ)
-        mil2, civ2 = self.occupancy(s)
-        s = self.advance(s, slot, to, win, mil2)
-        s = self.finish_attack(s, slot, win, mx.zeros_like(win))
         s = self.finish_attack(s, slot, melee_unit & ~d_killed & ~a_killed, mx.ones_like(win))
-        # --- melee on civilians: capture, advance
-        s = self.capture_civilians(s, slot, to, is_civ & ~ranged, civ)
-        mil3, _ = self.occupancy(s)
-        s = self.advance(s, slot, to, is_civ & ~ranged, mil3)
-        s = self.finish_attack(s, slot, is_civ & ~ranged, mx.zeros_like(win))
+        # A won melee and a melee on civilians: capture the civilians there, advance, the attack ends.
+        moves_in = win | (is_civ & ~ranged)
+        s = self.capture_civilians(s, slot, to, moves_in, civ)
+        s = self.advance(s, slot, to, moves_in)
+        s = self.finish_attack(s, slot, moves_in, mx.zeros_like(win))
         # --- melee on a city
         to_city = mx.minimum(exact.unit_damage(att_melee_city, c_str, a_dmg_taken, wm, r1).astype(I32), c_hp)
         to_att_c = exact.city_damage(c_str, att_melee_city, r2).astype(I32)
@@ -754,6 +749,8 @@ class Sim:
         """The city changes hands (the scene's end): building survival draws, the garrison dies, the owner
         changes, damage at most half, the attacker moves in."""
         draws = g1(self.cs["draws"], cslot)
+        # The capture gold's roll (`take_capture_gold`), then a survival roll per building that may fall.
+        s["rng"], _ = exact.draw(s["rng"], mx.full((self.B,), 100, dtype=mx.int64), where)
         for k in range(8):
             s["rng"], _ = exact.draw(s["rng"], mx.full((self.B,), 100, dtype=mx.int64), where & (draws > k))
         owner = g1(s["c_owner"], cslot)
@@ -762,11 +759,16 @@ class Sim:
         s["u_alive"] = s["u_alive"] & ~on
         s["u_tile"] = mx.where(on, -1, s["u_tile"])
         s["c_owner"] = put1(s["c_owner"], cslot, g1(s["u_side"], slot), where)
+        # A side left without a city is eliminated: its units go.
+        held = mx.take_along_axis(self.cs["side_cities"], mx.clip(owner, 0, 1)[:, None], axis=1)[:, 0]
+        gone = where & (held <= 1) & (owner >= 0)
+        out = s["u_alive"] & (s["u_side"] == owner[:, None]) & gone[:, None]
+        s["u_alive"] = s["u_alive"] & ~out
+        s["u_tile"] = mx.where(out, -1, s["u_tile"])
         maxhp = g1(self.cs["max_hp"], cslot)
         s["c_dmg"] = put1(s["c_dmg"], cslot, mx.minimum(g1(s["c_dmg"], cslot), maxhp * 50 // 100), where)
         s["c_strike"] = put1(s["c_strike"], cslot, mx.ones(cslot.shape, dtype=mx.bool_), where)
-        mil2, _ = self.occupancy(s)
-        s = self.advance(s, slot, tile, where, mil2)
+        s = self.advance(s, slot, tile, where)
         s = self.finish_attack(s, slot, where, mx.zeros_like(where))
         s["done"] = s["done"] | where
         return s
@@ -832,15 +834,22 @@ class Sim:
         s["u_tile"] = mx.where(extra, -1, s["u_tile"])
         return s
 
-    def step(self, s, a, mk=None):
-        """Apply one action per scene: a = {typ, side, slot, verb, tgt} ([B] each)."""
+    def step(self, s, a, mk=None, kinds=(A_UNIT, A_CITY, A_END, A_ROUND)):
+        """Apply one action per scene: a = {typ, side, slot, verb, tgt} ([B] each). `kinds`: the action
+        types that may occur in this call (a batch stepping in lockstep passes one: the other branches are
+        then not computed at all)."""
         s = dict(s)
         typ, side, slot, verb, tgt = a["typ"], a["side"], a["slot"], a["verb"], a["tgt"]
-        unit = (typ == A_UNIT) & ~s["done"]
-        if mk is None:
-            mk = self.masks(s, side, slot)
-        s = self.apply_unit(s, side, slot, verb, tgt, mk, unit & (verb != V_NONE))
-        s = self.city_strike(s, side, slot, tgt, (typ == A_CITY) & (verb == V_STRIKE) & ~s["done"])
-        s = self.end_turn(s, side, typ == A_END)
-        s = self.round_end(s, typ == A_ROUND)
+        if A_UNIT in kinds:
+            unit = (typ == A_UNIT) & ~s["done"]
+            if mk is None:
+                mk = self.masks(s, side, slot)
+            if "lt" in mk:  # a step with no unit action passes {} and skips the unit's masks
+                s = self.apply_unit(s, side, slot, verb, tgt, mk, unit & (verb != V_NONE))
+        if A_CITY in kinds:
+            s = self.city_strike(s, side, slot, tgt, (typ == A_CITY) & (verb == V_STRIKE) & ~s["done"])
+        if A_END in kinds:
+            s = self.end_turn(s, side, typ == A_END)
+        if A_ROUND in kinds:
+            s = self.round_end(s, typ == A_ROUND)
         return s

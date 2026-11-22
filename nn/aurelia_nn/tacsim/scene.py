@@ -195,11 +195,15 @@ class Batch:
                     rctx.append(p["contexts"])
                     ts = terms_all[bi][ui] + [(0, 0, 0, 0, 0)] * (K - len(terms_all[bi][ui]))
                 else:
+                    # A slot past the pieces holds only a captured civilian (the scene's capture kind):
+                    # its profile is set here once, so a capture writes the unit's state only.
+                    cap = next((q for q in profs if q["capture_kind"] is not None), None)
                     row_cost.append(0)
                     for k in P:
-                        rowP[k].append(False)
+                        rowP[k].append(cap is not None and k in ("civilian", "land"))
+                    civ = {"sight": 2, "embarked_sight": 1, "moves_land": cap["capture_moves"] or 0, "kind": cap["capture_kind"]} if cap else {}
                     for k in I:
-                        rowI[k].append(-1 if k in ("capture_kind", "kind") else 0)
+                        rowI[k].append(civ.get(k, -1 if k in ("capture_kind", "kind") else 0))
                     rctx.append([0] * N_CTX)
                     ts = [(0, 0, 0, 0, 0)] * K
                 for j, arr in enumerate(rt):
@@ -240,6 +244,7 @@ class Batch:
                 for k in cs:
                     cs[k][-1].append(vals[k])
         self.cstatic = {k: mx.array(v) if k == "alive" else mx.array(v, dtype=mx.int32) for k, v in cs.items()}
+        self.cstatic["side_cities"] = mx.array([d["scene"].get("city_counts", [9, 9]) for d in self.dumps], dtype=mx.int32)
 
     def state_from(self, rows_per_scene):
         """A state dict from Rust state records (one per scene): units, cities, rng, owners."""

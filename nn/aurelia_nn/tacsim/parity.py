@@ -113,7 +113,9 @@ def run(path, mode="free", limit=None, show=5, families=None, out=None):
                         bad = [i for i in range(T) if got[i] != want[i]][:6]
                         note(b, k, f"vis: side {side} tiles {bad} mlx {[got[i] for i in bad]}")
         if unit_steps:
-            fort, setup, found, mv, att = (mk[x].tolist() for x in ("fort", "setup", "found", "move", "attack"))
+            gmv, gat = sim.global_masks(mk)
+            fort, setup, found = (mk[x].tolist() for x in ("fort", "setup", "found"))
+            mv, att = gmv.tolist(), gat.tolist()
             for b in unit_steps:
                 if mode == "free" and diverged[b] is not None:
                     continue

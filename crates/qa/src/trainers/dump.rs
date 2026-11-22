@@ -445,8 +445,11 @@ fn scene_json(rules: &CompiledRuleset, game: &GameState, sc: &Scene, win: &Windo
         let _ = si;
         found_ok.push(bits);
     }
+    // Cities of each side on the whole map (a side with none left is eliminated: its units go).
+    let city_counts: Vec<usize> = sides.iter().map(|p| auth.indexes().cities_of(*p).len()).collect();
     json!({
         "found_ok": found_ok,
+        "city_counts": city_counts,
         "family": sc.fam.name(), "era": lab::era_names(rules).get(sc.era as usize), "era_index": sc.era, "instance": sc.instance, "attempt": sc.attempt,
         "window": {"q0": win.q0, "r0": win.r0, "w": win.w, "map_w": win.map_w, "map_h": win.map_h},
         "tiles": tiles, "profiles": profiles, "cities": city_list,
@@ -456,7 +459,7 @@ fn scene_json(rules: &CompiledRuleset, game: &GameState, sc: &Scene, win: &Windo
 }
 
 /// One dumped play of a scene.
-pub fn dump_one(rules: &CompiledRuleset, fam: Fam, era: u8, instance: usize, attempt: u32, rounds: u32, seed: u64) -> Result<Value, String> {
+pub fn dump_one(rules: &CompiledRuleset, fam: Fam, era: u8, instance: usize, attempt: u32, rounds: u32, seed: u64, aggressive: bool, record: bool) -> Result<Value, String> {
     let (mut game, sc) = families::build(rules, fam, era, instance, attempt)?;
     // The whole map known to both sides, as the trainers play it.
     let all: Vec<TileId> = (0..game.view().auth.map().tile_count() as u32).map(TileId).collect();
@@ -467,8 +470,16 @@ pub fn dump_one(rules: &CompiledRuleset, fam: Fam, era: u8, instance: usize, att
     let mut cities: Vec<TileId> = game.view().auth.cities().iter().map(|(_, c)| c.tile).filter(|t| win.index(*t).is_some()).collect();
     cities.sort_by_key(|t| t.0);
     let mut slots = Slots { ids: Vec::new() };
-    let scene = scene_json(rules, &game, &sc, &win, &cities, &mut slots);
-    let initial = state(rules, &game, &win, &mut slots, sides, &cities);
+    let scene = if record { scene_json(rules, &game, &sc, &win, &cities, &mut slots) } else {
+        for p in sc.mine.iter().chain(&sc.theirs) {
+            slots.slot_of(p.id);
+        }
+        Value::Null
+    };
+    let initial = if record { state(rules, &game, &win, &mut slots, sides, &cities) } else { Value::Null };
+    let play_started = std::time::Instant::now();
+    let mut actions = 0u64;
+    let mut rounds_played = 0u32;
     let d = Draw::new(lab::mix(seed ^ families::seed(fam, era, instance, attempt)));
     let mut steps: Vec<Value> = Vec::new();
     let piece_ids: Vec<EntityId> = sc.mine.iter().chain(&sc.theirs).map(|p| p.id).collect();
@@ -496,16 +507,19 @@ pub fn dump_one(rules: &CompiledRuleset, fam: Fam, era: u8, instance: usize, att
                     if c.owner != side {
                         break;
                     }
-                    let before_vis = state(rules, &game, &win, &mut slots, sides, &cities)["vis"].clone();
+                    let before_vis = if record { state(rules, &game, &win, &mut slots, sides, &cities)["vis"].clone() } else { Value::Null };
                     let opts = options(rules, &game, &win, side, h);
-                    let pick = (d.next() % (opts.len() as u64 + 1)) as usize;
+                    let pick = if aggressive { aggressive_pick(&game, &win, &opts, side, &d) } else { (d.next() % (opts.len() as u64 + 1)) as usize };
                     let listed: Vec<Value> = opts.iter().map(|(k, t, _)| json!([k, t])).collect();
                     let mut ok = true;
                     if pick < opts.len() {
                         ok = game.execute(rules, opts[pick].2.clone()).is_ok();
                     }
-                    let after = state(rules, &game, &win, &mut slots, sides, &cities);
-                    steps.push(json!({"round": round, "side": si, "unit": slot, "options": listed, "pick": pick, "ok": ok, "vis_before": before_vis, "after": after}));
+                    actions += 1;
+                    if record {
+                        let after = state(rules, &game, &win, &mut slots, sides, &cities);
+                        steps.push(json!({"round": round, "side": si, "unit": slot, "options": listed, "pick": pick, "ok": ok, "vis_before": before_vis, "after": after}));
+                    }
                     if pick >= opts.len() {
                         break;
                     }
@@ -526,19 +540,23 @@ pub fn dump_one(rules: &CompiledRuleset, fam: Fam, era: u8, instance: usize, att
                 if game.view().auth.indexes().city_on_tile(*t).and_then(|c| game.view().auth.cities().get(c)).is_none_or(|c| c.owner != side) {
                     continue;
                 }
-                let before_vis = state(rules, &game, &win, &mut slots, sides, &cities)["vis"].clone();
-                let pick = (d.next() % (opts.len() as u64 + 1)) as usize;
+                let before_vis = if record { state(rules, &game, &win, &mut slots, sides, &cities)["vis"].clone() } else { Value::Null };
+                let pick = if aggressive && !opts.is_empty() { (d.next() % opts.len() as u64) as usize } else { (d.next() % (opts.len() as u64 + 1)) as usize };
                 let listed: Vec<Value> = opts.iter().map(|(k, t, _)| json!([k, t])).collect();
                 let mut ok = true;
                 if pick < opts.len() {
                     ok = game.execute(rules, opts[pick].2.clone()).is_ok();
                 }
-                let after = state(rules, &game, &win, &mut slots, sides, &cities);
-                steps.push(json!({"round": round, "side": si, "city": ci, "options": listed, "pick": pick, "ok": ok, "vis_before": before_vis, "after": after}));
+                if record {
+                    let after = state(rules, &game, &win, &mut slots, sides, &cities);
+                    steps.push(json!({"round": round, "side": si, "city": ci, "options": listed, "pick": pick, "ok": ok, "vis_before": before_vis, "after": after}));
+                }
             }
             let ended = game.execute(rules, Command::EndTurn { player: side }).is_ok();
-            let after = state(rules, &game, &win, &mut slots, sides, &cities);
-            steps.push(json!({"round": round, "side": si, "end_turn": ended, "after": after}));
+            if record {
+                let after = state(rules, &game, &win, &mut slots, sides, &cities);
+                steps.push(json!({"round": round, "side": si, "end_turn": ended, "after": after}));
+            }
             if !ended {
                 stop = "end turn refused".into();
                 break 'play;
@@ -550,15 +568,42 @@ pub fn dump_one(rules: &CompiledRuleset, fam: Fam, era: u8, instance: usize, att
         for h in gone {
             game.debug_remove_unit(rules, h);
         }
-        let after = state(rules, &game, &win, &mut slots, sides, &cities);
-        steps.push(json!({"round": round, "round_end": removed, "after": after}));
+        if record {
+            let after = state(rules, &game, &win, &mut slots, sides, &cities);
+            steps.push(json!({"round": round, "round_end": removed, "after": after}));
+        }
+        rounds_played += 1;
         let alive = |s: PlayerId| game.view().auth.units().iter_handles().any(|(_, c)| c.owner == s && piece_ids.contains(&c.id));
         if !alive(sides[0]) || !alive(sides[1]) {
             stop = "a side has no unit".into();
             break;
         }
     }
-    Ok(json!({"scene": scene, "initial": initial, "steps": steps, "stop": stop, "seed": seed, "slots": slots.ids.len()}))
+    Ok(json!({"scene": scene, "initial": initial, "steps": steps, "stop": stop, "seed": seed, "slots": slots.ids.len(),
+        "play_s": play_started.elapsed().as_secs_f64(), "actions": actions, "rounds_played": rounds_played}))
+}
+
+/// The aggressive script: an attack when one is offered (9 in 10), else (8 in 10) the move that comes
+/// nearest to an enemy unit or city (ties by the draw), else the uniform draw.
+fn aggressive_pick(game: &GameState, win: &Window, opts: &[(String, i32, Command)], side: PlayerId, d: &Draw) -> usize {
+    let n = opts.len();
+    let roll = d.next() % 10;
+    let attacks: Vec<usize> = (0..n).filter(|i| opts[*i].0 == "A").collect();
+    if !attacks.is_empty() && roll < 9 {
+        return attacks[(d.next() % attacks.len() as u64) as usize];
+    }
+    let auth = game.view().auth;
+    let mut foes: Vec<TileId> = auth.units().iter_handles().filter(|(_, c)| c.owner != side).map(|(_, c)| c.tile).collect();
+    foes.extend(auth.cities().iter().filter(|(_, c)| c.owner != side).map(|(_, c)| c.tile));
+    let dims = auth.map().dimensions;
+    let near = |t: TileId| foes.iter().filter_map(|f| dims.distance(*f, t)).min().unwrap_or(99);
+    let moves: Vec<usize> = (0..n).filter(|i| opts[*i].0 == "M").collect();
+    if !moves.is_empty() && roll < 8 {
+        let best = moves.iter().map(|i| near(win.tile(opts[*i].1))).min().unwrap();
+        let tied: Vec<usize> = moves.into_iter().filter(|i| near(win.tile(opts[*i].1)) == best).collect();
+        return tied[(d.next() % tied.len() as u64) as usize];
+    }
+    (d.next() % (n as u64 + 1)) as usize
 }
 
 /// `ai-exam suite-dump --kept FILE --families duel,siege --per-cell 4 --rounds 10 --seed 1 --out FILE.jsonl --jobs 4`, or one
@@ -571,6 +616,8 @@ pub fn main(rules: &CompiledRuleset, args: &[String]) -> Result<(), String> {
     let mut seed = 1u64;
     let mut out = "dump.jsonl".to_owned();
     let mut jobs = 1usize;
+    let mut aggressive = false;
+    let mut record = true;
     let mut one: Option<(Fam, String, usize, u32)> = None;
     let (mut fam, mut era, mut inst, mut att) = (None, None, 0usize, 0u32);
     let mut it = args.iter();
@@ -584,6 +631,8 @@ pub fn main(rules: &CompiledRuleset, args: &[String]) -> Result<(), String> {
             "--seed" => seed = v()?.parse().map_err(|e| format!("{e}"))?,
             "--out" => out = v()?,
             "--jobs" => jobs = v()?.parse().map_err(|e| format!("{e}"))?,
+            "--policy" => aggressive = v()? == "aggressive",
+            "--no-record" => record = false,
             "--family" => fam = Some(Fam::parse(&v()?)?),
             "--era" => era = Some(v()?),
             "--instance" => inst = v()?.parse().map_err(|e| format!("{e}"))?,
@@ -616,16 +665,24 @@ pub fn main(rules: &CompiledRuleset, args: &[String]) -> Result<(), String> {
     }
     let file = std::sync::Mutex::new(std::fs::File::create(&out).map_err(|e| e.to_string())?);
     let started = std::time::Instant::now();
+    let totals = std::sync::Mutex::new((0f64, 0u64, 0u64));
     let ix: Vec<usize> = (0..cells.len()).collect();
     crate::export::parallel(&ix, jobs, |&i| {
         let (f, e, inst, a) = cells[i];
-        match dump_one(rules, f, e, inst, a, rounds, seed) {
+        match dump_one(rules, f, e, inst, a, rounds, seed, aggressive, record) {
             Ok(v) => {
-                let _ = writeln!(file.lock().unwrap(), "{v}");
+                let mut t = totals.lock().unwrap();
+                t.0 += v["play_s"].as_f64().unwrap_or(0.0);
+                t.1 += v["actions"].as_u64().unwrap_or(0);
+                t.2 += v["rounds_played"].as_u64().unwrap_or(0);
+                if record {
+                    let _ = writeln!(file.lock().unwrap(), "{v}");
+                }
             }
             Err(err) => eprintln!("{} {e} {inst}.{a}: {err}", f.name()),
         }
     });
-    eprintln!("{} scenes in {:.1} s", cells.len(), started.elapsed().as_secs_f64());
+    let t = totals.lock().unwrap();
+    eprintln!("{} scenes in {:.1} s; play {:.3} s on {jobs} threads (summed), {} unit actions, {} scene-rounds: {:.1} scene-rounds/s per thread", cells.len(), started.elapsed().as_secs_f64(), t.0, t.1, t.2, t.2 as f64 / t.0.max(1e-9));
     Ok(())
 }
