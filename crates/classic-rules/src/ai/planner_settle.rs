@@ -16,7 +16,9 @@
 //! city (`SITE_MIN_SCORE` by the score above, the same set): the site
 //! net's expected population 50 rounds after the founding, in score points
 //! by a linear map fitted on the training games (`site_net::planner_score`),
-//! plus the same distance terms (`SiteQuality`).
+//! held within one citizen of the land score (`bounded_net`), plus the same
+//! distance terms, the danger the site is in (`SiteContext::rival_risk`) and
+//! a dearer walk (`NET_TRAVEL_RISK`) (`SiteQuality`).
 
 use crate::ai::planner::{Decision, PlanTools, UnitView};
 use crate::ai::planner_map::{explore, Blockers, KnownMap, SearchLimit, Visit};
@@ -294,7 +296,9 @@ impl SiteContext<'_, '_> {
             if let NetRead::OwnLand = read {
                 features[crate::ai::site::FOREIGN_TILES] = 0;
             }
-            let score = crate::ai::site_net::planner_score(crate::ai::site_net::predict(&features)) + self.distance_score(tile);
+            let distance = self.distance_score(tile);
+            let net = crate::ai::site_net::planner_score(crate::ai::site_net::predict(&features));
+            let score = bounded_net(net, heuristic - distance) + distance + self.rival_risk(tile);
             return match read {
                 NetRead::Science(bonuses) => score + crate::ai::tall::site_bonus(self.view, self.rules, tile, bonuses),
                 NetRead::Fitted | NetRead::OwnLand => score,
@@ -307,6 +311,53 @@ impl SiteContext<'_, '_> {
             heuristic
         }
     }
+
+    /// The danger a site on the site net's path is in, in score points (0 or below): the net
+    /// does not read the distance to a rival city (its answer is flat from 3 to 10 tiles,
+    /// `ai-econ-shadow --probe`) nor the armies in sight, and `distance_terms` only takes 15
+    /// near a rival, so the net founded 35 % of its cities within 5 tiles of a rival (18 % for
+    /// the land score, which also pays for each rival tile in the radius).
+    #[cfg(feature = "experimental-ai")]
+    fn rival_risk(&self, tile: TileId) -> i32 {
+        let dims = self.view.dimensions();
+        let nearest_rival = self.foreign_cities.iter().filter_map(|t| dims.distance(*t, tile)).min();
+        let mut risk = 0;
+        // A city this close to a rival is the one its next war takes first.
+        if let Some(d) = nearest_rival.filter(|d| *d < RIVAL_SAFE_DISTANCE) {
+            risk -= (RIVAL_SAFE_DISTANCE - d) * RIVAL_PENALTY;
+        }
+        // A hostile army in sight a few tiles out reaches the settler or the new city in a turn
+        // or two (`legal` refuses only within `DANGER_RANGE`).
+        let armies = self.danger.iter().filter(|t| dims.distance(**t, tile).is_some_and(|d| d <= ARMY_RANGE)).count();
+        risk -= ARMY_PENALTY * armies as i32;
+        risk
+    }
+}
+
+/// Tiles from the nearest rival city a site on the net's path is free of `rival_risk`.
+pub const RIVAL_SAFE_DISTANCE: i32 = 7;
+/// Score points a tile closer than `RIVAL_SAFE_DISTANCE` costs: at 4 tiles 3 × 30 = 90, three
+/// turns of travel, about what the land score takes for 15 rival tiles in the radius.
+pub const RIVAL_PENALTY: i32 = 30;
+/// Hostile military units in sight within this many tiles of a site weigh on it.
+pub const ARMY_RANGE: i32 = 6;
+/// Score points each such unit costs: two turns of travel.
+pub const ARMY_PENALTY: i32 = 60;
+/// Score points each turn of a settler's walk costs on the site net's path on top of
+/// `TRAVEL_COST`: the net's sites lie farther out and 11.5 % of its settlers never founded a
+/// city (5.1 % on the land score); a turn on the road is a turn an unescorted settler can be
+/// caught.
+pub const NET_TRAVEL_RISK: i32 = 10;
+
+/// The site net's points held within one citizen at +50 rounds
+/// (`site_weights::SCORE_PER_CITIZEN`) of the land score (`land`, the site's `score_legal`
+/// without the distance terms): the map from citizens to points matches the land score's mean
+/// and spread on the training games, so an answer farther from the land score than that is the
+/// net reading outside its data, not a better site.
+#[cfg(feature = "experimental-ai")]
+fn bounded_net(net: i32, land: i32) -> i32 {
+    let band = crate::ai::site_weights::SCORE_PER_CITIZEN;
+    net.clamp(land - band, land + band)
 }
 
 /// The shadow tool's record (`ai::econ_shadow`): the site net's best site against the one the
@@ -503,7 +554,11 @@ impl SiteSearch<'_, '_, '_> {
             SiteQuality::Science(bonuses) => heuristic + crate::ai::tall::site_bonus(self.ctx.view, self.ctx.rules, tile, bonuses),
         } + self.ctx.supply_score(tile);
         let turns = crate::ai::planner_map::turns_for(points, self.moves_max) as i32;
-        let value = score - crate::ai::genome::get_i32(crate::ai::genome::Knob::SettleTravelCost) * turns;
+        let travel_risk = match self.quality {
+            SiteQuality::Net(..) => NET_TRAVEL_RISK,
+            SiteQuality::Heuristic | SiteQuality::Science(_) => 0,
+        };
+        let value = score - (crate::ai::genome::get_i32(crate::ai::genome::Knob::SettleTravelCost) + travel_risk) * turns;
         self.sites.push(Site { tile, score, value });
         Visit::Continue
     }

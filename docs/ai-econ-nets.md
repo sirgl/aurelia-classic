@@ -181,6 +181,80 @@ and within five of two cities of one major, where another player can still put a
   tiles of a rival (35 % against 18 %). The net wins in spite of it; the settlers' escort and travel
   (`planner_settle` escort wait, the travel cost a turn) are where to look next, not the net.
 
+### Phase 4: the guard on the net's sites (`econ-site`, after the review)
+
+The review accepted `econ-site` with one condition: a cause or a guard for its war-side cost (over 1600
+games 23 capitals lost against `standard`'s 8; on 1520–1521 rebel risings 13 against 3, turns below −20
+happiness 86 against 25). What the records say:
+
+- The capitals lost are the original capitals (`bench::play` counts a capture as a capital only for
+  `original_capital && original_owner == from`), not the forward cities. All cities lost are even
+  (1520–1521: 169 against 165); units lost are not (15810 against 12946, +22 %).
+- The cause in `planner_settle`: the net's answer was unbounded and added to `distance_terms`, which
+  take only 15 points near a rival; the net does not read the distance to a rival city (`--probe`: flat
+  from 3 to 10 tiles) and pays for rival tiles in the radius, where the land score takes 6 points for
+  each. So 35 % of its cities stood within 5 tiles of a rival (18 %), and 11.5 % of its settlers never
+  founded (5.1 %). A thinner core with more of its army at the border is the likely way to a lost
+  capital; the unhappiness is not split here into more war and bigger cities (a reading, not measured).
+
+The guard, on the net's path only (`SiteContext::net_score`, `SiteSearch::visit`; `standard` unchanged):
+
+| Term | Value | Why |
+|---|---|---|
+| `bounded_net` | the net's points held within one citizen (169 points) of the site's land score | the map from citizens to points matches the land score's mean and spread; farther from it the net reads outside its data |
+| `rival_risk`, rival city | −30 a tile closer than 7 to the nearest rival city (−90 at 4) | the net does not see the rival; a forward city is the one the next war takes first |
+| `rival_risk`, armies | −60 for each hostile military unit in sight within 6 tiles | `legal` refuses only within 3; an army at 4–6 reaches the settler or the city in a turn or two |
+| `NET_TRAVEL_RISK` | +10 a turn of travel (40 instead of 30) | the net's sites lie farther out; a turn on the road is a turn an unescorted settler can be caught |
+
+Gates (written before the run): fresh offsets 1530–1531, 400 pace games at Quick against `standard`,
+the pooled report.
+
+| Gate | Pass |
+|---|---|
+| Victory-weighted share | ≥ 52 % |
+| Real victories | the candidate's ≥ `standard`'s |
+| Capitals lost | ≤ 1.5 × `standard`'s |
+| Rebel risings | ≤ 2 × `standard`'s |
+| `standard` | `--solo standard --suite standard --speed quick` → `d2d736c1273a82bb` |
+
+Results (the build of `376c25c` with the guard; `standard` → `d2d736c1273a82bb`):
+
+`ai-econ-shadow --founded standard,econ-site --games 40` (the same 40 games as above):
+
+| Variant | Cities a seat at r198 | Own distance, mean | At 3 from an own city | Within 5 of a foreign city | Settlers | Never founded |
+|---|---:|---:|---:|---:|---:|---:|
+| `standard` | 5.71 | 3.27 | 80 % | 18 % | 1440 | 74 (5.1 %) |
+| `econ-site` before the guard | 5.35 | 3.98 | 45 % | 35 % | 1444 | 166 (11.5 %) |
+| `econ-site` with the guard | 5.77 | 3.45 | 66 % | 19 % | 1472 | 92 (6.3 %) |
+
+Pace, offsets 1530–1531, 400 games, pooled:
+
+| Gate | `econ-site` with the guard / `standard` | Pass |
+|---|---|---|
+| Victory-weighted share | **54.1 %** (CI 49.7–58.8; 57.2 and 51.2 by offset) | pass |
+| Real victories | 83 / 74 | pass |
+| Capitals lost | 2 / 1 (2 / 0 on 1530, 0 / 1 on 1531) | **fail** (limit 1.5) |
+| Rebel risings | 7 / 0, all on 1530 (turns below −20 happiness 52 / 4, 50 of them on 1530) | **fail** |
+
+Also: cities lost 160 / 148, units lost 13343 / 12799 (+4 %; +22 % before the guard on 1520–1521); points share 55.5 %.
+
+The guard removes the forward sites and the lost settlers (both back to `standard`'s level), and the
+capitals lost fall to one over `standard`'s on these games. The rebel risings stay. They sit in one
+block, the forward sites are gone, and r198 happiness is even (5.7 / 6.0 on 1530), so the guard does
+not explain them. Their cause is not found: the bench has no record of rebels for each game.
+
+Control: `econ-site` before the guard (the phase 3 build) on the same offsets 1530–1531, 400 games:
+victory-weighted 54.2 % (51.7 and 56.5 by offset), real victories 95 / 83, capitals lost 7 / 8, rebel
+risings 2 / 1, cities lost 138 / 170. On these games the unguarded net passes all four gates. The
+games change with the candidate, so `standard`'s own capitals lost go from 1 to 8 across the two runs.
+Counts this small (a few in 600 seats) are mostly noise at 400 games; the capital and rebel gates
+cannot separate the guard from the unguarded net. What the guard does change, without noise, is the
+mechanism the review named (the founding table above) and the units lost. It costs 12 real victories
+against the unguarded net on the same seeds (83 against 95), with the same victory-weighted share.
+
+Verdict by the gates written before the run: **fail** (capitals 2 against a limit of 1.5, rebels 7
+against 0).
+
 ### Commands
 
 ```sh
