@@ -534,7 +534,7 @@ pub const GUARD: Neuron = Neuron {
     join: UNIT,
     terms: &[
         t(C(c::STACK_MENACE), 1200, "the answer to a stack near the city"),
-        t(C(c::DANGER), 800, "the defence watch's danger"),
+        t(C(c::DANGER), 0, "read, no weight: the watch's saving already prices its own danger, and 800 multiplied it by 1.6 on 43 % of the cities in the first 70 rounds (4 % more army, 5 % less production at round 66, GAP.md); the guard adds what the watch does not see"),
         t(S(s::CAPITAL_FALL), 600, "after a fall the rest must hold"),
         t(C(c::DISTRUST_NEAR), 400, "a distrusted neighbour within 8 tiles"),
         t(C(c::YOUNG), 300, "new cities are the cheap targets (MO8)"),
