@@ -48,6 +48,16 @@
 //!   14 rounds. Context `sea` (the city over water) and `guarded` (a strong army of the enemy beside
 //!   the city): either call is fine: WIN = the city taken, or at least 75 % of our army alive when 14
 //!   rounds end. Never a bare attack rate.
+//! Added after the first run (the defence sides of tricks the first families played only one side of):
+//! - wounded: at most 1 of ours lost when 6 rounds end (2 of our 3-4 units start at 30-50 %; the enemy
+//!   is the hunter, which strikes the weakest it reaches).
+//! - harass: both raiders dead within 12 rounds with at most 1 of ours lost (2 slow melee, a mounted
+//!   and a ranged unit of ours against 2 horse archers of a scripted human, the keshik half the time, that shoot and
+//!   step back out of reach).
+//! - snipe: an enemy civilian (worker, Great General) captured or killed within 8 rounds (it walks to its
+//!   city with an escort).
+//! - surrounded: our strong unit alive when 4 rounds end, or 2 attackers killed (3-4 melee of a scripted
+//!   human close round it, then strike).
 
 use std::collections::BTreeMap;
 
@@ -83,10 +93,15 @@ pub enum Fam {
     Sink,
     Airstrike,
     Prey,
+    // Added after the first run (appended: the older families keep their seeds).
+    Wounded,
+    Harass,
+    Snipe,
+    Surrounded,
 }
 
 impl Fam {
-    pub const ALL: [Fam; 21] = [
+    pub const ALL: [Fam; 25] = [
         Fam::Duel,
         Fam::Focus,
         Fam::Hold,
@@ -108,6 +123,10 @@ impl Fam {
         Fam::Sink,
         Fam::Airstrike,
         Fam::Prey,
+        Fam::Wounded,
+        Fam::Harass,
+        Fam::Snipe,
+        Fam::Surrounded,
     ];
 
     pub fn name(self) -> &'static str {
@@ -133,6 +152,10 @@ impl Fam {
             Fam::Sink => "sink",
             Fam::Airstrike => "airstrike",
             Fam::Prey => "prey",
+            Fam::Wounded => "wounded",
+            Fam::Harass => "harass",
+            Fam::Snipe => "snipe",
+            Fam::Surrounded => "surrounded",
         }
     }
 
@@ -148,7 +171,10 @@ impl Fam {
             Fam::Hold | Fam::Raid | Fam::Counter | Fam::Retreat => 10,
             Fam::Choke | Fam::Kite | Fam::Convoy | Fam::Ram | Fam::Rush | Fam::Citadel | Fam::Prey => 14,
             Fam::Siege => 20,
-            Fam::Sink | Fam::Airstrike => 6,
+            Fam::Sink | Fam::Airstrike | Fam::Wounded => 6,
+            Fam::Harass => 12,
+            Fam::Snipe => 8,
+            Fam::Surrounded => 4,
         }
     }
 
@@ -174,6 +200,10 @@ impl Fam {
             Fam::Sink => &["ref-fight"],
             Fam::Airstrike => &["ref-air"],
             Fam::Prey => &["ref-siege", "ref-hold"],
+            Fam::Wounded => &["ref-flee-wounded", "ref-fight"],
+            Fam::Harass => &["ref-screen", "ref-fight"],
+            Fam::Snipe => &["ref-snipe"],
+            Fam::Surrounded => &["ref-break", "ref-flee"],
         }
     }
 
@@ -184,7 +214,7 @@ impl Fam {
             Fam::Duel => &[("MT4", 'U')],
             Fam::Focus => &[("MT7", 'U'), ("MT4", 'U')],
             Fam::Hold => &[("MT1", 'U'), ("MT15", 'U')],
-            Fam::Choke => &[("MT1", 'D'), ("MT14", 'D')],
+            Fam::Choke => &[("MT1", 'D')],
             Fam::Bait => &[("MT2", 'D'), ("MT3", 'D')],
             Fam::Kite => &[("MT7", 'U')],
             Fam::Guard => &[("MO7", 'D'), ("E1", 'D'), ("MT8", 'D'), ("CS4", 'D')],
@@ -194,7 +224,7 @@ impl Fam {
             Fam::Siege => &[("MO9", 'U'), ("MO10", 'U'), ("V2", 'U')],
             Fam::Ram => &[("MO1", 'U')],
             Fam::Rush => &[("MO1", 'D'), ("MO8", 'D'), ("MO12", 'D')],
-            Fam::Retreat => &[("MT2", 'U'), ("MO12", 'U')],
+            Fam::Retreat => &[],
             Fam::Flank => &[("MT4", 'U')],
             Fam::General => &[("MT12", 'U'), ("MT8", 'U')],
             Fam::Citadel => &[("MT10", 'D'), ("MO2", 'D'), ("MO4", 'D')],
@@ -202,6 +232,10 @@ impl Fam {
             Fam::Sink => &[("MT5", 'U'), ("MT6", 'U'), ("N1", 'U'), ("N2", 'U')],
             Fam::Airstrike => &[("A1", 'U'), ("A3", 'U')],
             Fam::Prey => &[("MO8", 'U'), ("MO1", 'U'), ("MO11", 'U')],
+            Fam::Wounded => &[("MT7", 'D')],
+            Fam::Harass => &[("MO12", 'D')],
+            Fam::Snipe => &[("MO7", 'U'), ("MT8", 'U'), ("E1", 'U'), ("M4", 'U'), ("CS4", 'U')],
+            Fam::Surrounded => &[("MT4", 'D')],
         }
     }
 
@@ -229,6 +263,10 @@ impl Fam {
             Fam::Sink => "sink embarked units",
             Fam::Airstrike => "strike a stack with bombers",
             Fam::Prey => "a weak fresh city in reach: take it when the context says so",
+            Fam::Wounded => "a human focus-fires our wounded units: save them",
+            Fam::Harass => "slow melee and a ranged unit against a human's hit-and-run horse (keshik)",
+            Fam::Snipe => "catch an escorted civilian (worker, Great General) of the enemy",
+            Fam::Surrounded => "a strong unit of ours about to be surrounded: break out or survive",
         }
     }
 
@@ -237,6 +275,8 @@ impl Fam {
         let land = k.has(Arm::Melee) && k.has(Arm::Ranged);
         match self {
             Fam::Kite => k.has(Arm::HitRun) && k.has(Arm::Melee),
+            Fam::Harass => (k.has(Arm::MountedRanged) || k.uniques.contains_key(&Arm::MountedRanged)) && k.has(Arm::Melee),
+            Fam::Snipe => (k.has(Arm::HitRun) || k.has(Arm::Mounted)) && k.has(Arm::Melee),
             Fam::Siege => land && (k.has(Arm::Siege)),
             Fam::Ram => land && (k.uniques.contains_key(&Arm::CityAssault) || k.has(Arm::CityAssault)),
             Fam::General => land && k.has(Arm::General),
@@ -624,6 +664,88 @@ pub fn build(rules: &CompiledRuleset, fam: Fam, era: u8, instance: usize, attemp
             p.clutter(p.d.range(2, 6) as usize, &[]);
             s.hunter = true;
         }
+        Fam::Wounded => {
+            let n = p.d.range(3, 4) as usize;
+            let arms = [Arm::Melee, Arm::Ranged, Arm::Mounted, Arm::Melee];
+            for (i, t) in p.spots(at(&p, -2, 0)?, 1, n)?.into_iter().enumerate() {
+                let k = p.kind(arms[i]).ok_or("no kind")?;
+                let role = if act::range_of(rules, k).is_some() { "ranged" } else { "melee" };
+                let piece = p.put(me, t, k, role);
+                if i < 2 {
+                    let hp = (u32::from(kernel::world::unit::UNIT_MAX_HP) * p.d.range(30, 50) as u32 / 100) as u16;
+                    p.game.debug_set_unit_hp(piece.h, hp);
+                }
+                s.mine.push(piece);
+            }
+            for (i, t) in p.spots(at(&p, 3, 0)?, 1, n)?.into_iter().enumerate() {
+                let k = p.kind([Arm::Melee, Arm::Mounted, Arm::Ranged, Arm::Mounted][i]).ok_or("no kind")?;
+                let piece = p.put(foe, t, k, "foe");
+                s.theirs.push(piece);
+            }
+            s.refuge = Some(at(&p, -9, 0)?);
+            p.clutter(p.d.range(2, 6) as usize, &[]);
+            s.hunter = true;
+        }
+        Fam::Harass => {
+            let before = lab::EraKinds::of(rules, lab.era);
+            let slow = before.by_arm.get(&Arm::Melee).and_then(|v| v.iter().copied().min_by_key(|k| (rules.units[k.0 as usize].movement, k.0))).ok_or("no melee")?;
+            for (i, t) in p.spots(at(&p, -2, 0)?, 1, 4)?.into_iter().enumerate() {
+                // Two slow melee, a ranged unit and a horse of our own (the answer to horse archers).
+                let (k, role) = match i {
+                    3 => (p.kind(Arm::Ranged).ok_or("no ranged")?, "ranged"),
+                    2 => (p.kind(Arm::Mounted).ok_or("no mounted")?, "mounted"),
+                    _ => (slow, "melee"),
+                };
+                let piece = p.put(me, t, k, role);
+                s.mine.push(piece);
+            }
+            // Horse archers: the keshik by rules id half the time (it moves after it shoots), else the
+            // era's mounted ranged unit, else one of the era's unique ones.
+            let keshik = p.unique(Arm::MountedRanged, Some("core:unit/keshik"), 50);
+            let common = lab.kinds.draw(Arm::MountedRanged, &p.d);
+            let uniq = lab.kinds.uniques.get(&Arm::MountedRanged).and_then(|v| p.d.pick(v));
+            for t in p.spots(at(&p, 4, 0)?, 1, 2)? {
+                let k = keshik.or(common).or(uniq).ok_or("no mounted ranged kind")?;
+                let piece = p.put(foe, t, k, "harasser");
+                s.theirs.push(piece);
+            }
+            p.clutter(p.d.range(3, 7) as usize, &[]);
+        }
+        Fam::Snipe => {
+            let home_t = at(&p, 6, 0)?;
+            p.city(foe, home_t, 3, false);
+            s.refuge = Some(home_t);
+            let civ = if p.d.chance(33) && lab.kinds.has(Arm::General) { p.kind(Arm::General).ok_or("no general")? } else { civil_kind(rules).ok_or("no worker")? };
+            let start = at(&p, 2, p.d.range(-2, 2))?;
+            let ward = p.put(foe, start, civ, "civilian");
+            s.theirs.push(ward);
+            if p.d.chance(60) {
+                let ek = p.kind(Arm::Melee).ok_or("no escort")?;
+                let t = p.spots(start, 1, 1)?[0];
+                let esc = p.put(foe, t, ek, "escort");
+                s.theirs.push(esc);
+            }
+            for t in p.spots(at(&p, -2, 0)?, 1, 2)? {
+                let k = p.kind(Arm::HitRun).ok_or("no fast kind")?;
+                let piece = p.put(me, t, k, "raider");
+                s.mine.push(piece);
+            }
+            s.aim_learner = Some(home_t);
+        }
+        Fam::Surrounded => {
+            let t0 = at(&p, 0, 0)?;
+            let strong = lab.kinds.by_arm.get(&Arm::Melee).and_then(|v| v.iter().copied().max_by_key(|k| (rules.units[k.0 as usize].strength, k.0))).ok_or("no melee")?;
+            let me_p = p.put(me, t0, strong, "melee");
+            s.mine.push(me_p);
+            s.refuge = Some(at(&p, -9, 0)?);
+            let n = p.d.range(3, 4) as usize;
+            for (i, t) in p.spots(at(&p, 3, 0)?, 2, n)?.into_iter().enumerate() {
+                let k = p.kind(if i % 2 == 0 { Arm::Melee } else { Arm::Mounted }).ok_or("no kind")?;
+                let piece = p.put(foe, t, k, "attacker");
+                s.theirs.push(piece);
+            }
+            s.hold = Some(t0);
+        }
         Fam::Guard | Fam::Convoy => {
             let home_t = at(&p, -6, 0)?;
             p.city(me, home_t, 3, false);
@@ -825,11 +947,21 @@ pub fn build(rules: &CompiledRuleset, fam: Fam, era: u8, instance: usize, attemp
             let anchor = TileId((y * p.w + x + p.d.range(5, 6)) as u32);
             let plan = [Arm::Ranged, Arm::Ranged, Arm::Ranged, Arm::Melee, Arm::Melee];
             let n = p.d.range(4, 5) as usize;
-            for (i, t) in p.spots(anchor, 2, n)?.into_iter().enumerate() {
+            let spots = p.spots(anchor, 2, n + 1)?;
+            for (i, t) in spots.iter().take(n).enumerate() {
                 let k = p.kind(plan[i]).ok_or("no kind")?;
                 let role = if act::range_of(rules, k).is_some() { "ranged" } else { "melee" };
-                let piece = p.put(foe, t, k, role);
+                let piece = p.put(foe, *t, k, role);
                 s.theirs.push(piece);
+            }
+            // The capital assault (MO1 D): a battering ram / siege tower where the era has one, else a
+            // siege unit where the era has one, half the time (an instance added to the rush, not a new one).
+            if p.d.chance(50) {
+                let extra = p.unique(Arm::CityAssault, None, 100).map(|k| (k, "ram")).or_else(|| lab.kinds.draw(Arm::Siege, &p.d).map(|k| (k, "ranged")));
+                if let Some((k, role)) = extra {
+                    let piece = p.put(foe, spots[n], k, role);
+                    s.theirs.push(piece);
+                }
             }
         }
         Fam::Retreat => {
@@ -1169,6 +1301,33 @@ pub fn reference_turn(rules: &CompiledRuleset, game: &mut GameState, scene: &mut
                 (Aim::Hold(c.tile), Nerve::Careful, false)
             }
             ("ref-careful", _) => (if ranged { Aim::Support } else { Aim::Close }, Nerve::Careful, false),
+            ("ref-flee-wounded", _) => {
+                if c.hp * 10 < kernel::world::unit::UNIT_MAX_HP * 6 {
+                    (Aim::Away(refuge), Nerve::Careful, false)
+                } else if ranged {
+                    (Aim::Support, Nerve::Even, false)
+                } else {
+                    let ward = sc.mine_alive(game).into_iter().filter(|(q, u)| q.id != p.id && u.hp * 10 < kernel::world::unit::UNIT_MAX_HP * 6).map(|(q, _)| q.h).next();
+                    (ward.map_or(Aim::Close, Aim::Guard), Nerve::Even, false)
+                }
+            }
+            ("ref-screen", _) => {
+                if ranged {
+                    (Aim::Support, Nerve::Even, false)
+                } else {
+                    let shooter = sc.mine.iter().find(|q| q.role == "ranged" && act::alive(game, q, me).is_some()).map(|q| q.h);
+                    if p.role == "mounted" {
+                        (Aim::Close, Nerve::Even, false)
+                    } else {
+                        (shooter.map_or(Aim::Hold(c.tile), Aim::Guard), Nerve::Even, false)
+                    }
+                }
+            }
+            ("ref-snipe", _) => {
+                civilian_hunt(rules, game, &sc, me, foe, &p);
+                continue;
+            }
+            ("ref-break", _) => (Aim::Away(refuge), Nerve::Even, false),
             // ref-fight and every other name: the competent fight.
             _ => {
                 if p.role == "general" {
@@ -1265,7 +1424,29 @@ pub fn enemy_turn(rules: &CompiledRuleset, game: &mut GameState, scene: &mut Sce
         }
         Fam::Guard | Fam::Convoy => {
             for p in &sc.theirs {
-                raider_turn(rules, game, &sc, p);
+                civilian_hunt(rules, game, &sc, me, foe, p);
+            }
+        }
+        Fam::Harass => {
+            for p in &sc.theirs {
+                act::unit_turn(game, rules, me, foe, p.h, &Aim::Kite, Nerve::Reckless, &ours, &friends);
+            }
+        }
+        Fam::Snipe => {
+            let refuge = sc.refuge.unwrap_or(sc.centre);
+            let ward = sc.theirs.iter().find(|q| q.role == "civilian" && act::alive(game, q, me).is_some()).map(|q| q.h);
+            for p in &sc.theirs {
+                let aim = if p.role == "civilian" { Aim::To(refuge) } else { ward.map_or(Aim::Close, Aim::Guard) };
+                act::unit_turn(game, rules, me, foe, p.h, &aim, Nerve::Careful, &ours, &friends);
+            }
+        }
+        Fam::Surrounded => {
+            let t0 = sc.mine_alive(game).first().map_or(sc.centre, |(_, c)| c.tile);
+            let around = sc.theirs_alive(game).iter().filter(|(_, u)| dist(game, u.tile, t0) == 1).count();
+            let go = around >= 3 || rel >= 2;
+            for p in &sc.theirs {
+                let aim = if go { Aim::Close } else { Aim::To(t0) };
+                act::unit_turn(game, rules, me, foe, p.h, &aim, if go { Nerve::Reckless } else { Nerve::Careful }, &ours, &friends);
             }
         }
         Fam::Counter => {
@@ -1286,7 +1467,7 @@ pub fn enemy_turn(rules: &CompiledRuleset, game: &mut GameState, scene: &mut Sce
             for p in &sc.theirs {
                 let Some(c) = act::alive(game, p, me) else { continue };
                 let ranged = act::range_of(rules, c.kind).is_some();
-                let aim = if ranged { Aim::Support } else if low { Aim::To(cap) } else { Aim::Close };
+                let aim = if ranged { Aim::Support } else if low || p.role == "ram" { Aim::To(cap) } else { Aim::Close };
                 act::unit_turn(game, rules, me, foe, p.h, &aim, Nerve::Even, &ours_city, &friends);
             }
         }
@@ -1294,12 +1475,12 @@ pub fn enemy_turn(rules: &CompiledRuleset, game: &mut GameState, scene: &mut Sce
     }
 }
 
-/// A scripted raider (guard, convoy): captures a civilian it can reach, strikes an escort only for a
+/// A civilian hunter (the guard and convoy raiders, the snipe reference): captures a civilian it can reach, strikes an escort only for a
 /// kill or a good exchange, else walks to the nearest civilian outside the strike of our cities.
-fn raider_turn(rules: &CompiledRuleset, game: &mut GameState, sc: &Scene, p: &Piece) {
-    let (me, foe) = (sc.enemy, sc.learner);
+fn civilian_hunt(rules: &CompiledRuleset, game: &mut GameState, sc: &Scene, me: PlayerId, foe: PlayerId, p: &Piece) {
     let Some(c) = act::alive(game, p, me) else { return };
-    let civs: Vec<(Piece, TileId)> = sc.mine_alive(game).into_iter().filter(|(q, _)| q.role == "civilian").map(|(q, u)| (q, u.tile)).collect();
+    let prey_of_foe = if foe == sc.learner { sc.mine_alive(game) } else { sc.theirs_alive(game) };
+    let civs: Vec<(Piece, TileId)> = prey_of_foe.into_iter().filter(|(q, _)| q.role == "civilian").map(|(q, u)| (q, u.tile)).collect();
     // Capture: a civilian alone on a tile reached this turn.
     for (q, t) in &civs {
         let guarded = game.view().auth.indexes().units_on(*t).iter().filter_map(|h| act::core_of(game, *h)).any(|u| u.owner == foe && !act::is_civilian(rules, u.kind));
@@ -1318,7 +1499,7 @@ fn raider_turn(rules: &CompiledRuleset, game: &mut GameState, sc: &Scene, p: &Pi
             }
         }
     }
-    let targets = targets_of(sc, false, false);
+    let targets = targets_of(sc, foe == sc.enemy, false);
     if let Some((_, t)) = act::best_blow(game, rules, me, p.h, &targets(game), Nerve::Careful) {
         if act::strike(game, rules, me, p.h, t) {
             act::stand(game, p.h);
@@ -1559,6 +1740,43 @@ pub fn judge(rules: &CompiledRuleset, game: &GameState, sc: &mut Scene, rel: u32
                 Some(true)
             } else if limit {
                 Some(false)
+            } else {
+                None
+            }
+        }
+        Fam::Wounded => {
+            if lost >= 2 {
+                Some(false)
+            } else if limit || combat_theirs == 0 {
+                Some(true)
+            } else {
+                None
+            }
+        }
+        Fam::Harass => {
+            if lost >= 2 || limit && combat_theirs > 0 {
+                Some(false)
+            } else if combat_theirs == 0 {
+                Some(true)
+            } else {
+                None
+            }
+        }
+        Fam::Snipe => {
+            let caught = sc.theirs.iter().filter(|q| q.role == "civilian").any(|q| act::alive(game, q, sc.enemy).is_none());
+            if caught {
+                Some(true)
+            } else if limit || mine.is_empty() {
+                Some(false)
+            } else {
+                None
+            }
+        }
+        Fam::Surrounded => {
+            if mine.is_empty() {
+                Some(false)
+            } else if limit || killed >= 2 {
+                Some(true)
             } else {
                 None
             }
