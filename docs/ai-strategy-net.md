@@ -232,6 +232,35 @@ the time of a turn) are in the lane's log.
 A save of the old `standard` loads into the new one: a memory without the retake's section (`0x5E`) loads as no memory
 (classic/docs/ai-retake.md "Versioning"): a city lost before the load is not retaken as lost.
 
+## Promoted: nets-x-site (the fifteenth promotion, 22 November)
+
+`standard` plays as the bench's `nets-x-site` (programme `work/small-nets-design-2026-11-22.md`): the play of `next-x`
+above with two changes.
+
+- **Tall first** (`strategist-x`, classic/docs/ai-strategist-defects.md §5): the strategist needs a strong reason for the
+  wide style (`weights::style`, the wide logit −1.2), so more seats play tall.
+- **The site net with its guard** (`econ-site`, classic/docs/ai-econ-nets.md "Phase 4"): the settlers value a site worth a
+  city by the site net (`ai::site_net`), held within one citizen of the land score (`planner_settle::bounded_net`), with a
+  cost for a site near a rival city or a hostile army (`rival_risk`) and a dearer walk (`NET_TRAVEL_RISK`).
+
+The promotion is a choice of the mind (`ClassicMind::new`): `Variant::Standard` builds the mind `Variant::NetsXSite` built
+(the strategist's parts of `strategist-x`, the economy nets of `econ-site`), under the name `standard`. The site net's
+table (`ai::site_weights`) was compiled only with `experimental-ai`; it is compiled in every build since, so the game
+built without the feature plays it (`ai_experimental_off`). The choice net's table stays bench only.
+
+`pre-nets-x` is the standard before it: the mind of `next-x`, bench only (`experimental-ai`). Every other variant plays as
+it was measured: `strategist-x`, `strategist-x-threat`, `econ-site` and its hand edits and `nets-x` on the mind of
+`next-x`, `next-x` itself (now the play of `pre-nets-x`), and the older lines as before; `nets-x-site` stays as an alias
+that plays as `standard`.
+
+Measured on the bench (pace, Quick, against the old `standard`): `nets-x-site` 63.3 % victory-weighted over 800 games
+(offsets 1500–1503; 238 real victories against 113, risings of rebels 4 against 15), 62.9 % on the replication
+(1512–1513), the AI's time of a turn 0.97×. The checks of the promotion (the new `standard` plays the games of the old
+`nets-x-site`, `pre-nets-x` those of the old `standard`, the other variants theirs, the time of a turn) are in
+`work/nets/nets-x/PROMOTE.md`.
+
+No save section is added: a save of the old `standard` loads into the new one.
+
 ## Not done
 
 - No training: the next step is fine-tuning by outcomes with a penalty for moving from the hand weights (the design page).

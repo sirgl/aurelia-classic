@@ -12,7 +12,8 @@
 //! site that became illegal; without any site it waits in a city and
 //! expansion pauses (no settlers piling up).
 //!
-//! `Variant::SiteNet` keeps all of this but the quality of a site worth a
+//! `Variant::SiteNet` (and the game's AI since the fifteenth promotion, as
+//! `nets-x-site`, through `econ-site`'s settlers) keeps all of this but the quality of a site worth a
 //! city (`SITE_MIN_SCORE` by the score above, the same set): the site
 //! net's expected population 50 rounds after the founding, in score points
 //! by a linear map fitted on the training games (`site_net::planner_score`),
@@ -263,26 +264,17 @@ impl SiteContext<'_, '_> {
     /// wherever this one is).
     /// `read` says how (`NetRead`).
     fn net_score(&self, tile: TileId, inputs: &SiteInputs<'_>, read: &NetRead<'_>, heuristic: i32) -> i32 {
-        #[cfg(feature = "experimental-ai")]
-        {
-            let _span = prof::span("classic/site_net");
-            let mut features = crate::ai::site::site_features_with(self.view, self.rules, self.player, tile, inputs, Some(heuristic));
-            if let NetRead::OwnLand = read {
-                features[crate::ai::site::FOREIGN_TILES] = 0;
-            }
-            let distance = self.distance_score(tile);
-            let net = crate::ai::site_net::planner_score(crate::ai::site_net::predict(&features));
-            let score = bounded_net(net, heuristic - distance) + distance + self.rival_risk(tile);
-            return match read {
-                NetRead::Science(bonuses) => score + crate::ai::tall::site_bonus(self.view, self.rules, tile, bonuses),
-                NetRead::Fitted | NetRead::OwnLand => score,
-            };
+        let _span = prof::span("classic/site_net");
+        let mut features = crate::ai::site::site_features_with(self.view, self.rules, self.player, tile, inputs, Some(heuristic));
+        if let NetRead::OwnLand = read {
+            features[crate::ai::site::FOREIGN_TILES] = 0;
         }
-        // Without the site net's table (`experimental-ai`) a site is worth its heuristic.
-        #[cfg(not(feature = "experimental-ai"))]
-        {
-            let _ = (tile, inputs, read);
-            heuristic
+        let distance = self.distance_score(tile);
+        let net = crate::ai::site_net::planner_score(crate::ai::site_net::predict(&features));
+        let score = bounded_net(net, heuristic - distance) + distance + self.rival_risk(tile);
+        match read {
+            NetRead::Science(bonuses) => score + crate::ai::tall::site_bonus(self.view, self.rules, tile, bonuses),
+            NetRead::Fitted | NetRead::OwnLand => score,
         }
     }
 
@@ -291,7 +283,6 @@ impl SiteContext<'_, '_> {
     /// `ai-econ-shadow --probe`) nor the armies in sight, and `distance_terms` only takes 15
     /// near a rival, so the net founded 35 % of its cities within 5 tiles of a rival (18 % for
     /// the land score, which also pays for each rival tile in the radius).
-    #[cfg(feature = "experimental-ai")]
     fn rival_risk(&self, tile: TileId) -> i32 {
         let dims = self.view.dimensions();
         let nearest_rival = self.foreign_cities.iter().filter_map(|t| dims.distance(*t, tile)).min();
@@ -328,7 +319,6 @@ pub const NET_TRAVEL_RISK: i32 = 10;
 /// without the distance terms): the map from citizens to points matches the land score's mean
 /// and spread on the training games, so an answer farther from the land score than that is the
 /// net reading outside its data, not a better site.
-#[cfg(feature = "experimental-ai")]
 fn bounded_net(net: i32, land: i32) -> i32 {
     let band = crate::ai::site_weights::SCORE_PER_CITIZEN;
     net.clamp(land - band, land + band)

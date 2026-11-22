@@ -103,6 +103,13 @@
 //! `experimental-ai`); `NextX` stays as an alias that plays as `Standard`. As in the thirteenth, the
 //! promotion is a choice of the mind, not of a variant's switches: every other variant plays as it
 //! was measured (`NextW`, `VoteGuard`, `NextWarRetake`, `LandlessPlan`, the books on `PreNext` …).
+//! In the fifteenth promotion (22 November) `Standard` took the play of `NetsXSite`: the mind of `NextX`
+//! with the strategist's tall first (`StrategistX`'s parts) and the settlers of `EconSite` (the site net
+//! with its guard), under the name `standard`, in every build (the site net's table is compiled in every
+//! build since). `PreNetsX` is the standard before it (the play of `NextX`; bench only, `experimental-ai`);
+//! `NetsXSite` stays as an alias that plays as `Standard`, and `NextX` plays as `PreNetsX`. Every other
+//! variant plays as it was measured (`StrategistX`, `EconSite` and its hand edits, `NetsX` on the mind of
+//! `NextX`).
 
 use crate::ai::grand_strategy::Stakes;
 use crate::ai::operations::WarGate;
@@ -166,6 +173,11 @@ pub enum Variant {
     /// retake of a lost city, on the switches of `WarOpen`), takes the alliances of a rival that would
     /// win the World Leader vote (`VoteGuard`), and gives a player with no city and no settler a goal
     /// through its strategist (`LandlessPlan`); `PreNextX` is the standard before it.
+    /// Since the fifteenth promotion (22 November) it plays as `NetsXSite`: on top of the play of `NextX`
+    /// its strategist needs a strong reason for the wide style (tall first, `StrategistX`'s parts,
+    /// classic/docs/ai-strategist-defects.md), and its settlers value a site by the site net held near the
+    /// land score, away from rivals and armies and with a dearer walk (`EconSite`'s settlers,
+    /// classic/docs/ai-econ-nets.md); `PreNetsX` is the standard before it.
     #[default]
     Standard,
     /// The game's AI before the eleventh promotion (2 November): `Standard` without the
@@ -843,9 +855,10 @@ pub enum Variant {
     PreNextX,
     /// `strategist-x` (lane A, 22 November, classic/docs/ai-strategist-defects.md): `next-x` whose
     /// strategist needs a strong reason for the wide style (`weights::style::WIDE`, tall first): its parts
-    /// are `strategist_parts`. A bench-only candidate, `experimental-ai` only; `Standard` does not change.
+    /// are `strategist_parts`. A bench-only candidate, `experimental-ai` only; it plays on the mind of
+    /// `next-x` (`PreNetsX` since the fifteenth promotion), as measured.
     StrategistX,
-    /// `Standard` (the play of the fourteenth promotion, `ClassicMind::new`) whose settlers value a site
+    /// `Standard` (the play of the fourteenth promotion, `PreNetsX` since the fifteenth, `ClassicMind::new`) whose settlers value a site
     /// worth a city by the site net (`site_net`, as `SiteNet` did on its older base); every other
     /// decision is `Standard`'s (classic/docs/ai-econ-nets.md; `experimental-ai` only).
     EconSite,
@@ -860,7 +873,9 @@ pub enum Variant {
     /// `StrategistX` under its own name (`experimental-ai` only).
     NetsX,
     /// `NetsX` whose settlers are `EconSite`'s (lane C: the site net as fitted, with its guard against
-    /// rivals and the walk); measured beside `NetsX` for information (`experimental-ai` only).
+    /// rivals and the walk); measured beside `NetsX` (`experimental-ai` only).
+    /// Promoted to `Standard` on 22 November (the fifteenth promotion): kept under its name as an alias
+    /// that plays as `Standard`.
     NetsXSite,
     /// `strategist-x-threat`: `next-x` whose strategist names the rival running away (`Plan::wishes.threat`,
     /// read by the posture, the war's stakes, the denunciation and the deals), without tall first. Bench
@@ -868,6 +883,12 @@ pub enum Variant {
     /// classic/docs/ai-strategist-defects.md), so it is not a part of `strategist-x`; kept for the
     /// commander's lane (no operation forms on the leader).
     StrategistXThreat,
+    /// The game's AI before the fifteenth promotion (22 November): the mind of `NextX` (the play of the
+    /// fourteenth promotion), without the strategist's tall first and the site net of `NetsXSite`
+    /// (`ClassicMind::new`). The control of the promotion. The variants built on the standard of the
+    /// fourteenth promotion (`StrategistX`, `StrategistXThreat`, `EconSite` and its hand edits, `NetsX`)
+    /// keep playing as they were measured. Kept for the bench (`experimental-ai` only).
+    PreNetsX,
 }
 
 /// The net's base: the expert the end-to-end net learns from and the mind it
@@ -888,7 +909,7 @@ const NUDGED_CANDIDATES: u32 = 40;
 
 impl Variant {
     /// The game's AI first.
-    pub const ALL: [Variant; 164] = [
+    pub const ALL: [Variant; 165] = [
         Variant::Standard,
         Variant::PreCamps,
         Variant::PreWorkers,
@@ -1053,6 +1074,7 @@ impl Variant {
         Variant::NetsX,
         Variant::NetsXSite,
         Variant::StrategistXThreat,
+        Variant::PreNetsX,
     ];
 
     /// The parts of the strategist's wishes the variant plays (`strategy_net::wishes::Parts`): a property
@@ -1219,6 +1241,7 @@ impl Variant {
             Variant::NetsX => "nets-x",
             Variant::NetsXSite => "nets-x-site",
             Variant::StrategistXThreat => "strategist-x-threat",
+            Variant::PreNetsX => "pre-nets-x",
             Variant::ArmyFit => "army-fit",
             Variant::Camps => "camps",
             Variant::ArmyCamps => "army-camps",
@@ -1254,12 +1277,14 @@ impl Variant {
     /// `NextWarRetake`), the vote guard, the landless players and the joint build's `NextX` are the
     /// bench's too. The play of `next-x` is the game's since the fourteenth promotion: `Standard`
     /// plays it in every build (none of its code is behind the feature); the names `next-x` and
-    /// `pre-next-x` (the standard before) are the bench's.
+    /// `pre-next-x` (the standard before) are the bench's. The play of `nets-x-site` is the game's since
+    /// the fifteenth promotion: `Standard` plays it in every build (the site net's table is compiled in
+    /// every build since); the names `nets-x-site` and `pre-nets-x` (the standard before) are the bench's.
     pub fn compiled(self) -> bool {
         cfg!(feature = "experimental-ai")
             || !matches!(
                 self,
-                Variant::Net | Variant::UnitNet | Variant::Hybrid | Variant::SiteNet | Variant::ChoiceNet | Variant::ChoiceNetProduction | Variant::ChoiceNetResearch | Variant::StandardScripted | Variant::PreCsGifts | Variant::Sharp | Variant::TallReal | Variant::Next | Variant::WonderCancel | Variant::WonderRace | Variant::NextW | Variant::NextRace | Variant::PreNext | Variant::WarPays | Variant::TacticianFit | Variant::WarMuster | Variant::SiegeCall | Variant::NextWar | Variant::Retake2 | Variant::NextWarRetake | Variant::VoteGuard | Variant::FieldCraft | Variant::RaidWar | Variant::Landless | Variant::LandlessPlan | Variant::NextX | Variant::PreNextX | Variant::StrategistX | Variant::StrategistXThreat | Variant::EconSite | Variant::EconSiteTall | Variant::EconSiteOwnLand | Variant::NetsX | Variant::NetsXSite
+                Variant::Net | Variant::UnitNet | Variant::Hybrid | Variant::SiteNet | Variant::ChoiceNet | Variant::ChoiceNetProduction | Variant::ChoiceNetResearch | Variant::StandardScripted | Variant::PreCsGifts | Variant::Sharp | Variant::TallReal | Variant::Next | Variant::WonderCancel | Variant::WonderRace | Variant::NextW | Variant::NextRace | Variant::PreNext | Variant::WarPays | Variant::TacticianFit | Variant::WarMuster | Variant::SiegeCall | Variant::NextWar | Variant::Retake2 | Variant::NextWarRetake | Variant::VoteGuard | Variant::FieldCraft | Variant::RaidWar | Variant::Landless | Variant::LandlessPlan | Variant::NextX | Variant::PreNextX | Variant::StrategistX | Variant::StrategistXThreat | Variant::EconSite | Variant::EconSiteTall | Variant::EconSiteOwnLand | Variant::NetsX | Variant::NetsXSite | Variant::PreNetsX
             )
     }
 

@@ -114,7 +114,6 @@ pub mod siege_tactics;
 pub mod siege_walls;
 pub mod site;
 pub mod site_net;
-#[cfg(feature = "experimental-ai")]
 mod site_weights;
 pub mod territory;
 pub mod tourism;

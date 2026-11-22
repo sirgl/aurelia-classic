@@ -367,3 +367,10 @@ Control on the same seeds (measured after the gate, it does not change it): the 
 it 628 against 397, risings 4 against 3. So offset 1555 is a harder draw for every tall-first build, and
 the edit loses no share (56.7 % against 55.8 %) while it halves the wars on the candidate (321 against 628).
 The gate R1 stays failed as written.
+
+## Promoted (22 November, the fifteenth promotion)
+
+Tall first (§5, `strategist-x`'s parts) is part of the game's `standard` since the fifteenth promotion: `standard` plays as the bench's `nets-x-site`
+(tall first of `strategist-x` with the guarded site net of `econ-site`; classic/docs/ai-strategy-net.md "Promoted:
+nets-x-site"). The results on this page were measured against the standard before it, the bench's `pre-nets-x` since
+(its hash `d2d736c1273a82bb`, as quoted here). The variants of this page keep playing on that standard, as measured.

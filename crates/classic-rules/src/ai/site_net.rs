@@ -24,7 +24,6 @@
 
 use super::net::{self, Net, ACT};
 use super::site::SITE_FEATURES;
-#[cfg(feature = "experimental-ai")]
 use super::site_weights;
 
 /// How the settlers read the site net (`TurnBrief::site_net`, `Variant::site_net`;
@@ -58,8 +57,8 @@ pub struct Reference {
 /// The city's expected population 50 rounds after its founding on the
 /// site of this row (`site::site_features`), in thousandths of a citizen.
 /// Not clamped: a poor site may come out slightly below 0.
-/// Compiled only with `experimental-ai`: the weights are `Variant::SiteNet`'s alone.
-#[cfg(feature = "experimental-ai")]
+/// Compiled in every build since the fifteenth promotion (22 November): the game's AI plays the net
+/// (`Variant::Standard`, as `NetsXSite`); before it only with `experimental-ai`.
 pub fn predict(features: &[i32; SITE_FEATURES]) -> i32 {
     infer(&site_weights::NET, features)
 }
@@ -77,14 +76,12 @@ pub fn infer(net: &Net<'_>, features: &[i32]) -> i32 {
 /// and mean of the planner's own land score), so the answer weighs against
 /// the travel and the distance terms of `planner_settle` as its own score
 /// did.
-#[cfg(feature = "experimental-ai")]
 pub fn planner_score(milli_citizens: i32) -> i32 {
     let points = i64::from(site_weights::SCORE_PER_CITIZEN) * i64::from(milli_citizens);
     site_weights::SCORE_AT_ZERO + (points + 500).div_euclid(1000) as i32
 }
 
 /// The f32 net's answers on a few test rows (`Reference`).
-#[cfg(feature = "experimental-ai")]
 pub fn references() -> &'static [Reference] {
     &site_weights::REFERENCE
 }

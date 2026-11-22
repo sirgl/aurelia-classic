@@ -255,6 +255,13 @@ against the unguarded net on the same seeds (83 against 95), with the same victo
 Verdict by the gates written before the run: **fail** (capitals 2 against a limit of 1.5, rebels 7
 against 0).
 
+### Promoted (22 November, the fifteenth promotion)
+
+The site net with its guard (`econ-site`, Phase 4) is part of the game's `standard` since the fifteenth promotion: `standard` plays as the bench's `nets-x-site`
+(tall first of `strategist-x` with the guarded site net of `econ-site`; classic/docs/ai-strategy-net.md "Promoted:
+nets-x-site"). The results on this page were measured against the standard before it, the bench's `pre-nets-x` since
+(its hash `d2d736c1273a82bb`, as quoted here). The variants of this page keep playing on that standard, as measured.
+
 ### Commands
 
 ```sh
