@@ -765,6 +765,7 @@ mod tests {
 
     #[test]
     fn all_generated_actions_have_alpha_and_bounded_cached_textures() {
+        if crate::ui::art_pack::skip("all_generated_actions_have_alpha_and_bounded_cached_textures") { return; }
         let mut decoder = action_art::Decoder::default();
         for action in ALL.into_iter().filter(|a| !WITHOUT_ART.contains(a)) {
             let image = decoder.decode(action).expect(action.id());

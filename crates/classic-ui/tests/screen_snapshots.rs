@@ -76,6 +76,7 @@ fn hud_over_the_map() {
 
 #[test]
 fn city_screen() {
+    if classic_ui::ui::art_pack::skip("city_screen") { return; }
     let mut stage = opened_match();
     let capital = stage.module.session.as_ref().and_then(|session| session.selected_city_tile()).expect("the capital is selected");
     stage.module.request(GameRequest::SelectCity(capital));
@@ -111,6 +112,7 @@ fn the_city_buttons_are_in_english_when_the_language_is_english() {
 
 #[test]
 fn research_screen() {
+    if classic_ui::ui::art_pack::skip("research_screen") { return; }
     let mut stage = opened_match();
     stage.open(Screen::Research.into());
     check(&mut stage, "classic-research");
@@ -136,6 +138,9 @@ fn menu_in(tag: &str, name: &str) {
 }
 
 fn city_in(tag: &str, name: &str) {
+    if classic_ui::ui::art_pack::skip(name) {
+        return;
+    }
     i18n::with_language(tag, || {
         let mut stage = opened_match();
         client::shell::theme::install_fonts(&stage.ctx, stage.module.theme(), tag);

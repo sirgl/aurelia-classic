@@ -617,6 +617,9 @@ fn religion_screen_founds_a_pantheon_with_the_faith_pool() {
 
 #[test]
 fn culture_screen_shows_a_writers_work_and_the_great_person_action() {
+    if crate::ui::art_pack::skip("culture_screen_shows_a_writers_work_and_the_great_person_action") {
+        return;
+    }
     let request = MatchRequest {
         nation: "core:nation/rome".into(),
         seed: 20260928,

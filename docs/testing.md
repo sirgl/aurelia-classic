@@ -8,8 +8,9 @@ On a shared machine keep `--build-jobs 4 --test-threads 4` (in nextest `-j` is `
 | What | Command | When |
 |---|---|---|
 | Changed only | `tools/test-changed.sh` | while working |
-| Fast | `cargo +1.98.1 nextest run --cargo-profile fasttest --build-jobs 4 --test-threads 4 --workspace` | before a commit |
-| Full | the same with `--profile full`, then `cargo +1.98.1 test --profile fasttest --workspace --doc`, and both again in `../platform` | release milestones, a moved pin |
+| **Fast tier** | `cargo +1.98.1 nextest run --cargo-profile fasttest --build-jobs 4 --test-threads 4 --workspace` | before a commit; ~25 s on 4 threads |
+| **Everything** (fast + slow tier + GPU) | the same with `--profile full`, then `cargo +1.98.1 test --profile fasttest --workspace --doc`, and both again in `../platform` | **before a merge into main; by a reviewer; after any change of the AI, the rules, the kernel, a net or a pinned hash**; a milestone |
+| The budget | `python3 tools/test-budget.py` | after adding a test that plays a game |
 
 Without nextest, `cargo +1.98.1 test --profile fasttest --workspace` runs the full set.
 
@@ -57,18 +58,52 @@ wall-clock `f64` after a JSON round trip; the qa crate now enables serde_json's 
 same class in `ai_grounds::economy_windows_replay_and_stop`). Benches and
 timings still use `--release`.
 
-## The fast and the full set
+## Two tiers
 
-`.config/nextest.toml` holds the sets; no test is changed or removed by them.
+`.config/nextest.toml` holds the tiers; no test is changed, ignored or removed by them.
 
-* `default` (fast) leaves out the GPU tests and the slow set: the 18 tests of 3 s and more in
-  release (long AI games over many seeds or 200-500 rounds, two scans of the art catalogue). They are
-  60% of the suite's test time.
-* `full` runs everything `cargo test --workspace` runs. `--run-ignored all` adds the `#[ignore]`d
-  measurements.
-* The `pins` group is in the fast set and `tools/test-changed.sh` always runs it, whatever changed.
-  Each pin takes under 3 s in release (12 s at `fasttest`), and between them any change of the rules, the AI, the kernel, the net's
-  encoding or the save format moves a hash:
+* **Fast tier = the `default` profile**, what a bare `cargo nextest run` runs: every test that takes
+  at most 0.5 s on 4 threads. About 1,880 of the 2,050 tests of classic, in **~22 s on 4 threads**
+  (58 CPU seconds); platform in ~7 s.
+* **Slow tier**: the 171 tests that took more than 0.5 s when measured: whole AI games, hash pins over
+  many rounds, ladders and scenes of the self-play, acceptance over seeds, scans of the art catalogue.
+  They are 80% of the CPU time. They run in `--profile full`, which is every test, the GPU tests
+  (four binaries of `classic-ui` that open the machine's GPU) included. Run it **before a merge into
+  main, as a reviewer, and after any change of the AI, the rules, the kernel, a net or a pinned hash**:
+  these are the changes the slow games exist to catch.
+* **How a test is marked slow:** by one filterset, the `default-filter` of `[profile.default]`, listing the
+  slow tests by test binary and name (a whole binary when every test in it is slow). A name convention
+  (`slow_`) was not used because it renames 171 tests across 40 files and a test's name then changes
+  with its speed; the filterset is one place, readable, and moving a test is a one-line edit. The rule:
+  a test that took more than 0.5 s in the junit file of `--profile measure-full` on 4 threads is slow.
+* **`measure` and `measure-full`** are `default` and `full` plus a junit file with the time of every test
+  (`target/nextest/<profile>/junit.xml`); `tools/test-budget.py` runs `measure` and reads it.
+
+### The guard
+
+In the fast tier a test that runs 2 s is reported SLOW and one that runs 6 s is terminated and fails
+(`TIMEOUT`): `slow-timeout` in `[profile.default]`; the 6 s kill leaves room for a loaded machine. The
+slowest fast test takes about 0.5 s. `python3 tools/test-budget.py` runs the fast tier with a junit file and
+**fails when any fast test took over 2 s**, and when the tier's floor at 4 threads (work divided by 4) is over
+30 s; so a slow test that sneaks in is caught by the budget check even when it is under the kill. The author
+then makes the test fast or adds it to the slow filterset in `.config/nextest.toml` (it runs in `full`). The
+pins keep their own limit of 30 s; `full` ends a test at 5 minutes, which is a hang.
+
+### The art pack
+
+The run-time art pack (`assets/visual/generated`) is not in git (README, "Running the game"). Nine tests need it:
+the art catalogue, the pedia's art keys, the action sheets, a great work's art, and the city and research
+snapshots (three languages). `classic_ui::ui::art_pack` is that group: a test of it starts with
+`if art_pack::skip(name) { return; }`, and on a clone without the pack it prints
+`art pack missing: see README` and passes; with the pack it runs in its tier as any test. The pack is
+missing only when its `.pack-version` file is absent: a pack that is there but incomplete fails the tests
+(`art_pack::tests`). Copy the pack from another clone (`cp -c -R`) to run them.
+
+### The pins
+
+The `pins` group is in the fast tier whatever its tests take, and `tools/test-changed.sh` always runs it.
+Between them any change of the rules, the AI, the kernel, the net's
+encoding or the save format moves a hash:
 
 | Pin | Catches |
 |---|---|

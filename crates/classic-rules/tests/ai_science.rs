@@ -78,7 +78,11 @@ fn refused_orders(variant: Variant, rounds: u32) -> usize {
 // that requirement, since the order filter was repaired. The marker was stale; the test runs.
 #[test]
 fn the_cities_order_only_what_the_rules_accept() {
-    let (standard, direct) = (refused_orders(Variant::Standard, 260), refused_orders(Variant::Direct, 260));
+    // The two games are independent: they run side by side.
+    let (standard, direct) = std::thread::scope(|scope| {
+        let direct = scope.spawn(|| refused_orders(Variant::Direct, 260));
+        (refused_orders(Variant::Standard, 260), direct.join().expect("the Direct game ran"))
+    });
     assert_eq!(standard, 0, "the game's AI orders only what the rules accept");
     assert!(direct > 0, "the control: Direct is refused (otherwise the case does not reach the refusals)");
 }

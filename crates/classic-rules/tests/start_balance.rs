@@ -115,57 +115,87 @@ fn the_same_seed_gives_the_same_map() {
     }
 }
 
-#[test]
-fn every_start_reaches_the_minimum_food_and_production() {
+/// One test per map script (the sweeps were 3 s each in a row; the scripts are independent, so they run side by side).
+fn every_start_reaches_the_minimum_food_and_production(script: MapScript) {
     let rules = rules();
     let policy = StartPolicy::CLASSIC;
     let mut checked = 0;
-    for script in [MapScript::Continents, MapScript::Fractal, MapScript::Pangaea] {
-        for size in [WorldSize::Duel, WorldSize::Small, WorldSize::Standard] {
-            for seed in 1..=25 {
-                let (g, _) = game(&rules, script, size, seed, StartBalance::ON);
-                for (p, start) in starts(&g, players(size).0).into_iter().enumerate() {
-                    let (food, production) = food_and_production(&g, &rules, p as u8, start);
-                    assert!(food >= policy.min_food, "{script:?} {size:?} seed {seed} player {p}: food {food}");
-                    assert!(production >= policy.min_production, "{script:?} {size:?} seed {seed} player {p}: production {production}");
-                    checked += 1;
-                }
+    for size in [WorldSize::Duel, WorldSize::Small, WorldSize::Standard] {
+        for seed in 1..=25 {
+            let (g, _) = game(&rules, script, size, seed, StartBalance::ON);
+            for (p, start) in starts(&g, players(size).0).into_iter().enumerate() {
+                let (food, production) = food_and_production(&g, &rules, p as u8, start);
+                assert!(food >= policy.min_food, "{script:?} {size:?} seed {seed} player {p}: food {food}");
+                assert!(production >= policy.min_production, "{script:?} {size:?} seed {seed} player {p}: production {production}");
+                checked += 1;
             }
         }
     }
-    assert!(checked > 600, "{checked} starts checked");
+    assert!(checked > 200, "{checked} starts checked");
 }
 
 #[test]
-fn every_start_has_horses_and_iron_within_three_tiles_and_not_under_it() {
+fn every_start_reaches_the_minimum_food_and_production_on_continents() {
+    every_start_reaches_the_minimum_food_and_production(MapScript::Continents);
+}
+
+#[test]
+fn every_start_reaches_the_minimum_food_and_production_on_fractal() {
+    every_start_reaches_the_minimum_food_and_production(MapScript::Fractal);
+}
+
+#[test]
+fn every_start_reaches_the_minimum_food_and_production_on_pangaea() {
+    every_start_reaches_the_minimum_food_and_production(MapScript::Pangaea);
+}
+
+fn every_start_has_horses_and_iron_within_three_tiles_and_not_under_it(script: MapScript) {
     let rules = rules();
     let kinds = promised(&rules, &StartPolicy::CLASSIC);
     let (mut starts_seen, mut missing) = (0, 0);
-    for script in [MapScript::Continents, MapScript::Fractal, MapScript::Pangaea, MapScript::SmallContinents] {
-        for size in [WorldSize::Duel, WorldSize::Small, WorldSize::Standard] {
-            for seed in 1..=20 {
-                let (g, report) = game(&rules, script, size, seed, StartBalance::ON);
-                let map = g.view().auth.map();
-                let dims = map.dimensions;
-                let mut lacking = 0;
-                for start in starts(&g, players(size).0) {
-                    for &kind in &kinds {
-                        let near = hex_disc(dims, start, 3)
-                            .filter(|t| *t != start)
-                            .any(|t| map.resource(t).flatten() == Some(ResourceId(kind as u16)));
-                        starts_seen += 1;
-                        if !near {
-                            lacking += 1;
-                        }
+    for size in [WorldSize::Duel, WorldSize::Small, WorldSize::Standard] {
+        for seed in 1..=20 {
+            let (g, report) = game(&rules, script, size, seed, StartBalance::ON);
+            let map = g.view().auth.map();
+            let dims = map.dimensions;
+            let mut lacking = 0;
+            for start in starts(&g, players(size).0) {
+                for &kind in &kinds {
+                    let near = hex_disc(dims, start, 3)
+                        .filter(|t| *t != start)
+                        .any(|t| map.resource(t).flatten() == Some(ResourceId(kind as u16)));
+                    starts_seen += 1;
+                    if !near {
+                        lacking += 1;
                     }
                 }
-                assert_eq!(lacking, report.strategic_missing as usize, "{script:?} {size:?} seed {seed}: the report counts the misses");
-                missing += lacking;
             }
+            assert_eq!(lacking, report.strategic_missing as usize, "{script:?} {size:?} seed {seed}: the report counts the misses");
+            missing += lacking;
         }
     }
     // A start with no free tile near it at all may miss one (the report says so); on these maps none does.
-    assert_eq!(missing, 0, "{missing} of {starts_seen} promised deposits missing");
+    assert_eq!(missing, 0, "{script:?}: {missing} of {starts_seen} promised deposits missing");
+}
+
+#[test]
+fn every_start_has_horses_and_iron_near_it_on_continents() {
+    every_start_has_horses_and_iron_within_three_tiles_and_not_under_it(MapScript::Continents);
+}
+
+#[test]
+fn every_start_has_horses_and_iron_near_it_on_fractal() {
+    every_start_has_horses_and_iron_within_three_tiles_and_not_under_it(MapScript::Fractal);
+}
+
+#[test]
+fn every_start_has_horses_and_iron_near_it_on_pangaea() {
+    every_start_has_horses_and_iron_within_three_tiles_and_not_under_it(MapScript::Pangaea);
+}
+
+#[test]
+fn every_start_has_horses_and_iron_near_it_on_small_continents() {
+    every_start_has_horses_and_iron_within_three_tiles_and_not_under_it(MapScript::SmallContinents);
 }
 
 #[test]

@@ -1195,28 +1195,47 @@ impl FlipWatch {
     }
 }
 
-/// Six AI nations on a small map (they meet and fight), several seeds:
-/// the cooldowns hold for wars that end by a deal as well as by `MakePeace`
-/// (`FlipWatch`).
-#[test]
-fn war_and_peace_do_not_flip_over_several_seeds() {
+/// Six AI nations on a small map (they meet and fight) for 300 rounds: the cooldowns hold for wars that
+/// end by a deal as well as by `MakePeace` (`FlipWatch`). One test per seed, so the seeds run in parallel
+/// (they were one loop of six games, 27 s in a row). Returns the watch for the checks of the seed.
+fn flip_watch_game(seed: u64) -> FlipWatch {
     let rules = compile_rules(core_rules()).unwrap();
-    let (mut by_deal, mut redeclared) = (0, 0);
-    for seed in [1_u64, 2, 4, 5, 8, 9] {
-        let config = ScenarioConfig { seed, players: 6, width: 40, height: 28, cities: 0, units: 0, water_ratio: 10 };
-        let mut game = generate_new_game(&rules, &config);
-        let mut driver = AiDriver::new(AiSettings::for_rules(&rules, rules.default_difficulty()), Vec::new());
-        driver.record_commands();
-        let mut flips = FlipWatch::new(6);
-        while game.view().auth.turn().round < 300 && game.winner().is_none() {
-            driver.run(&mut game, &rules, u32::MAX);
-            flips.observe(&game, driver.commands());
-        }
-        eprintln!("seed {seed:#x}: {}", flips.summary());
-        assert!(flips.violations.is_empty(), "seed {seed:#x}: {:#?}", flips.violations);
-        by_deal += flips.peace_by_deal.len();
-        redeclared += flips.redeclared.len();
+    let config = ScenarioConfig { seed, players: 6, width: 40, height: 28, cities: 0, units: 0, water_ratio: 10 };
+    let mut game = generate_new_game(&rules, &config);
+    let mut driver = AiDriver::new(AiSettings::for_rules(&rules, rules.default_difficulty()), Vec::new());
+    driver.record_commands();
+    let mut flips = FlipWatch::new(6);
+    while game.view().auth.turn().round < 300 && game.winner().is_none() {
+        driver.run(&mut game, &rules, u32::MAX);
+        flips.observe(&game, driver.commands());
     }
-    // The watch has something to watch: these seeds on this small map fight.
+    eprintln!("seed {seed:#x}: {}", flips.summary());
+    assert!(flips.violations.is_empty(), "seed {seed:#x}: {:#?}", flips.violations);
+    flips
+}
+
+macro_rules! flip_seeds {
+    ($($name:ident: $seed:expr),* $(,)?) => {$(
+        #[test]
+        fn $name() {
+            flip_watch_game($seed);
+        }
+    )*};
+}
+
+/// The watch has something to watch: this seed on this small map fights (five wars ended by a deal,
+/// five declared after a peace; the six seeds together had 11 and 13), so the check above is not vacuous.
+#[test]
+fn war_and_peace_do_not_flip_on_seed_4() {
+    let flips = flip_watch_game(4);
+    let (by_deal, redeclared) = (flips.peace_by_deal.len(), flips.redeclared.len());
     assert!(by_deal >= 1 && redeclared >= 1, "wars ended by a deal: {by_deal}, declared after a peace: {redeclared}");
+}
+
+flip_seeds! {
+    war_and_peace_do_not_flip_on_seed_1: 1,
+    war_and_peace_do_not_flip_on_seed_2: 2,
+    war_and_peace_do_not_flip_on_seed_5: 5,
+    war_and_peace_do_not_flip_on_seed_8: 8,
+    war_and_peace_do_not_flip_on_seed_9: 9,
 }

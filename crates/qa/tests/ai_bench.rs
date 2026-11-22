@@ -246,26 +246,38 @@ fn the_candidate_takes_alternate_seats() {
     assert!(weaker.sides[1].standings.last().unwrap().cities.mean > 1.0, "the standard AI expands");
 }
 
-/// A sequential run (`--sprt`) decides on the seed blocks in the
-/// schedule's order whatever the threads: `one-city` loses every block and
-/// is rejected at the minimum; equal versions take half of every block and
-/// play to the cap; against their own saved reports as the reference every
-/// difference is 0, and a game the reference lacks is an error.
+fn sequential_setup() -> (Suite, Sprt, Plan) {
+    (Suite::named("smoke").unwrap(), Sprt { s0: 0.45, s1: 0.55, alpha: 0.05, beta: 0.05 }, Plan { min_blocks: 2, max_blocks: 3 })
+}
+
+// A sequential run (`--sprt`) decides on the seed blocks in the
+// schedule's order whatever the threads: `one-city` loses every block and
+// is rejected at the minimum; equal versions take half of every block and
+// play to the cap; against their own saved reports as the reference every
+// difference is 0, and a game the reference lacks is an error.
+// The three parts are independent games: each is its own test, so they run side by side.
+
 #[test]
-fn a_sequential_run_decides_on_the_blocks_in_order() {
-    let suite = Suite::named("smoke").unwrap();
-    let sprt = Sprt { s0: 0.45, s1: 0.55, alpha: 0.05, beta: 0.05 };
-    let plan = Plan { min_blocks: 2, max_blocks: 3 };
+fn a_sequential_run_rejects_a_losing_version_on_any_number_of_threads() {
+    let (suite, sprt, plan) = sequential_setup();
     let labels = |games: &[aurelia_qa::bench::play::MatchResult]| -> Vec<(String, u64)> { games.iter().map(|g| (g.label.clone(), g.hash)).collect() };
     let weak = |jobs| play_sequential::<ClassicBench>(&suite, &pairing("one-city"), 0, sprt, plan, None, jobs).unwrap();
     let (one, three) = (weak(1), weak(3));
     assert_eq!((one.outcome.decision, one.outcome.blocks, one.outcome.games), (Decision::H0, 2, 4));
     assert_eq!(labels(&one.results), labels(&three.results), "the same games on any number of threads");
     assert_eq!(one.results[2].seed, 1001, "the second block is the next offset's seed");
+}
 
+#[test]
+fn a_sequential_run_of_equal_versions_plays_to_the_cap() {
+    let (suite, sprt, plan) = sequential_setup();
     let equal = play_sequential::<ClassicBench>(&suite, &pairing("standard"), 0, sprt, plan, None, 2).unwrap();
     assert_eq!((equal.outcome.decision, equal.outcome.blocks, equal.outcome.mean), (Decision::Undecided, 3, 0.5));
+}
 
+#[test]
+fn a_sequential_run_against_its_saved_reports_differs_by_nothing() {
+    let (suite, sprt, plan) = sequential_setup();
     let dir = std::env::temp_dir().join(format!("ai-bench-reference-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
     let paths: Vec<String> = (0..2)

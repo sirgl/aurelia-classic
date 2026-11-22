@@ -1,13 +1,12 @@
 # Test profiles for cargo-nextest (docs/testing.md).
 #
-#   fast:     cargo +1.98.1 nextest run --cargo-profile fasttest --build-jobs 4 --test-threads 4 --workspace
-#   full:     the same with `--profile full`
-#   changed:  tools/test-changed.sh
+#   fast tier (the default):  cargo +1.98.1 nextest run --cargo-profile fasttest --build-jobs 4 --test-threads 4 --workspace
+#   everything:               the same with `--profile full` (the slow tier and the GPU tests too)
+#   changed:                  tools/test-changed.sh
 #
-# `default` (fast) leaves out the slow AI games and the tests that open the GPU; `full` runs every test
-# that `cargo test --workspace` runs. Nothing here changes what a test checks; a test is never removed
-# from `full`. The `pins` group is the set of cheap pinned games that `tools/test-changed.sh` always
-# runs, whatever changed.
+# Two tiers (docs/testing.md, "Two tiers"): `default` is the fast tier, `full` is every test. Nothing here
+# changes what a test checks, and no test is removed or ignored. The `pins` group is the set of cheap
+# pinned games that `tools/test-changed.sh` always runs, whatever changed.
 
 [test-groups]
 # Cheap pins (each under 3 s in release, 12 s at the fasttest opt-level): any change of the rules,
@@ -15,39 +14,227 @@
 pins = { max-threads = "num-cpus" }
 
 [profile.default]
-# Left out of the fast run: the GPU tests (first line) and the slow set, the 18 tests of 3 s and more
-# in release (about 10 s and more at the fasttest opt-level; measured 1 November 2026, `--test-threads 4`):
-# long AI games over many seeds or 200-500 rounds, two art-catalogue scans. They are 60% of the
-# test time of the suite. The pins below still play an AI game (the smoke suite), a scripted core
-# game and a scripted classic game in the fast run.
+# THE FAST TIER: every test but the GPU tests and the SLOW set. Nothing is deleted or ignored: `--profile full`
+# runs all of it (docs/testing.md, "Two tiers"). The aim is the fast tier in 30 s on 4 threads.
+#
+# The slow set is decided by measurement, one rule: a test that took more than 0.5 s on 4 threads (junit of
+# `--profile measure-full`, 22 November 2026) is slow. It is listed here by test binary and name, in this one
+# place, and nowhere else: moving a test between the tiers is a one-line edit of this filter. A whole binary
+# is listed when all its tests are slow. The pins (group `pins` below) stay in the fast tier whatever they take.
+# The GPU tests (first line) open the machine's GPU: they are in `full` only.
 default-filter = """
-not (
-    (package(=classic-ui) & (binary(=render_scale) | binary(=render_headless) | binary(=new_match_frame) | binary(=hud_overlap)))
-  | (binary_id(=classic-rules::ai_acceptance) & test(=war_and_peace_do_not_flip_over_several_seeds))
-  | (binary_id(=classic-rules::ai_acceptance) & test(=six_ai_nations_play_300_classic_rounds))
-  | (binary_id(=aurelia-qa::ai_selfplay) & test(=given_space_techs_reach_the_science_victory))
-  | (binary_id(=classic-rules::ai_science) & test(=the_cities_order_only_what_the_rules_accept))
-  | (binary_id(=classic-rules::ai_track_b) & test(=ai_adopts_policies_and_founds_a_religion_in_a_classic_game))
-  | (binary_id(=classic-rules::ai_economy) & test(=the_ai_runs_trade_routes))
-  | (binary_id(=aurelia-qa::ai_grounds) & test(=battles_replay_and_export_aligned))
-  | (binary_id(=aurelia-qa::ai_export) & test(=religious_commands_split_into_slots_and_assemble_again))
-  | (binary_id(=aurelia-qa::ai_export) & test(=hindsight_labels_a_founders_moves_with_the_site_it_founds_on))
-  | (binary_id(=classic-rules) & test(=kernel_tests::astar::early_exit_for_unenterable_goals_changes_no_answer))
-  | (binary_id(=classic-rules::classic_ai_minors) & test(=ai_nations_city_states_and_barbarians_play_200_rounds))
-  | (binary_id(=classic-rules::ai_effects_checked) & test(=a_game_of_the_variant_repeats_few_walks))
-  | (binary_id(=aurelia-qa::ai_record) & test(=the_recording_changes_nothing_and_writes_every_kind_of_line))
-  | (binary_id(=aurelia-qa::ai_choice) & test(=recording_changes_no_game_and_exploration_is_seeded))
-  | (binary_id(=classic-rules::ai_sea_work) & test(=a_game_on_a_watery_map_has_work_boats_only_with_the_work))
-  | (binary_id(=classic-rules::net_e2e_speed) & test(=optimized_paths_equal_the_plain_path_on_random_weights))
-  | (binary_id(=classic-ui) & test(=ui::screens::nations::catalog::tests::complete_art_catalog_has_valid_unique_regions_and_keeps_augustus_distinct))
-  | (binary_id(=classic-ui) & test(=ui::hud::unit_actions::tests::all_generated_actions_have_alpha_and_bounded_cached_textures))
+not (package(=classic-ui) & (binary(=render_scale) | binary(=render_headless) | binary(=new_match_frame) | binary(=hud_overlap)))
+and not (
+  (binary_id(=aurelia-qa::ai_battle) & (test(=both_sides_attack)))
+  | (binary_id(=aurelia-qa::ai_bench) & (
+          test(=a_sequential_run_against_its_saved_reports_differs_by_nothing)
+        | test(=a_sequential_run_of_equal_versions_plays_to_the_cap)
+        | test(=a_sequential_run_rejects_a_losing_version_on_any_number_of_threads)
+        | test(=neutral_econ2_leaders_play_the_econ2_allocator)
+        | test(=neutral_leaders_play_the_allocator)
+        | test(=the_candidate_takes_alternate_seats)
+        | test(=the_standard_variant_plays_the_games_ai)
+    ))
+  | (binary_id(=aurelia-qa::ai_books) & (
+          test(=a_book_on_fog_march_walks_through_the_fog_to_its_target)
+        | test(=a_book_on_its_measured_base_plays_its_games)
+        | test(=the_rushes_declare_war_and_attack_by_a_bounded_round)
+    ))
+  | binary_id(=aurelia-qa::ai_choice)
+  | binary_id(=aurelia-qa::ai_danger)
+  | (binary_id(=aurelia-qa::ai_export) & (
+          test(=a_logged_game_is_the_plain_game_and_its_log_replays_round_by_round)
+        | test(=a_seat_filter_keeps_exactly_those_nations_turns)
+        | test(=hindsight_labels_a_founders_moves_with_the_site_it_founds_on)
+        | test(=religious_commands_split_into_slots_and_assemble_again)
+    ))
+  | (binary_id(=aurelia-qa::ai_grounds) & (
+          test(=a_scripted_learners_ground_exports_as_the_expert)
+        | test(=battles_replay_and_export_aligned)
+        | test(=economy_windows_replay_and_stop)
+        | test(=the_difficulty_knob_sets_the_scene)
+        | test(=the_siege_ladder_sets_the_scene)
+        | test(=the_skirmish_ladder_sets_the_scene)
+        | test(=the_start_stage_sets_the_scene)
+    ))
+  | (binary_id(=aurelia-qa::ai_ladder_solvable) & (
+          test(=a_solvable_scene_is_kept_as_drawn)
+        | test(=scene_37_is_drawn_again_at_attempt_6)
+        | test(=scene_48_is_drawn_again_at_attempt_1)
+    ))
+  | (binary_id(=aurelia-qa::ai_net) & (test(=a_match_with_net_seats_is_deterministic)))
+  | binary_id(=aurelia-qa::ai_record)
+  | binary_id(=aurelia-qa::ai_search)
+  | binary_id(=aurelia-qa::ai_search_export)
+  | (binary_id(=aurelia-qa::ai_selfplay) & (test(=given_space_techs_reach_the_science_victory) | test(=sampled_games_replay_and_export_aligned)))
+  | (binary_id(=aurelia-qa::ai_stress) & (test(=a_saved_scene_rebuilds_to_its_hash) | test(=an_instance_plays_the_same_twice)))
+  | (binary_id(=classic-rules) & (test(=kernel_tests::astar::early_exit_for_unenterable_goals_changes_no_answer)))
+  | (binary_id(=classic-rules::ai_acceptance) & (
+          test(=six_ai_nations_play_300_classic_rounds)
+        | test(=the_allocator_expands_builds_wonders_and_buys_tiles)
+        | test(=war_and_peace_do_not_flip_on_seed_1)
+        | test(=war_and_peace_do_not_flip_on_seed_2)
+        | test(=war_and_peace_do_not_flip_on_seed_4)
+        | test(=war_and_peace_do_not_flip_on_seed_5)
+        | test(=war_and_peace_do_not_flip_on_seed_8)
+        | test(=war_and_peace_do_not_flip_on_seed_9)
+    ))
+  | (binary_id(=classic-rules::ai_driver) & (test(=a_system_advisor_plugs_in_and_its_commands_run) | test(=saved_between_players_the_game_continues_identically_for_100_rounds)))
+  | (binary_id(=classic-rules::ai_economy) & (test(=ai_production_respects_strategic_resources) | test(=the_ai_runs_trade_routes)))
+  | (binary_id(=classic-rules::ai_effects_checked) & (test(=a_game_of_the_variant_repeats_few_walks)))
+  | binary_id(=classic-rules::ai_experimental_off)
+  | (binary_id(=classic-rules::ai_science) & (test(=the_cities_order_only_what_the_rules_accept)))
+  | (binary_id(=classic-rules::ai_sea_work) & (test(=a_game_on_a_watery_map_has_work_boats_only_with_the_work)))
+  | (binary_id(=classic-rules::ai_track_b) & (test(=ai_adopts_policies_and_founds_a_religion_in_a_classic_game)))
+  | (binary_id(=classic-rules::ai_unciv) & (test(=unciv_modules_inside_standard_change_only_their_family)))
+  | (binary_id(=classic-rules::barbarian_conversion) & (test(=germany_converts_barbarians_defeated_in_their_camp)))
+  | (binary_id(=classic-rules::baseline_hashes) & (test(=core_game_covers_buildings_and_research)))
+  | binary_id(=classic-rules::city_names_snapshot)
+  | (binary_id(=classic-rules::city_resistance) & (test(=a_city_in_resistance_gives_no_yield_of_the_ruleset_and_eats_nothing)))
+  | (binary_id(=classic-rules::city_states_classic) & (
+          test(=a_bought_out_city_ends_the_routes_into_it)
+        | test(=a_cultured_friend_adds_culture_to_the_pool)
+        | test(=a_delegate_is_worth_nothing_before_the_congress_and_something_after)
+        | test(=a_gifted_unit_joins_the_city_state)
+    ))
+  | binary_id(=classic-rules::classic_ai_minors)
+  | (binary_id(=classic-rules::classic_track_b_game) & (test(=classic_game_with_the_ai_driver_runs_200_rounds)))
+  | binary_id(=classic-rules::command_value)
+  | binary_id(=classic-rules::corrupt_saves)
+  | binary_id(=classic-rules::danger_net)
+  | (binary_id(=classic-rules::deal_terms) & (
+          test(=a_debtor_covered_by_what_it_receives_pays_whatever_the_order_of_the_players)
+        | test(=an_unpaid_gold_per_turn_breaks_the_deal_and_the_creditor_remembers)
+        | test(=gold_per_turn_cannot_exceed_the_income_with_the_deals_already_paid)
+        | test(=the_ai_does_not_give_a_strategic_resource_without_a_unit_yet_for_nothing)
+    ))
+  | (binary_id(=classic-rules::diplomacy_classic) & (
+          test(=a_traded_luxury_moves_its_happiness_to_the_receiver)
+        | test(=ai_exchanges_embassies_and_answers_offers)
+        | test(=an_embassy_reveals_the_hosts_capital_and_its_surroundings)
+        | test(=declaring_war_is_remembered_and_fades)
+    ))
+  | (binary_id(=classic-rules::disband_and_sale) & (
+          test(=a_building_sells_for_a_tenth_of_its_cost)
+        | test(=a_captured_city_does_not_take_the_national_wonder_out_of_the_queue)
+        | test(=a_city_awaiting_the_decision_or_a_puppet_does_not_count_for_every_city_until_annexed)
+        | test(=a_city_sells_one_building_a_turn)
+    ))
+  | binary_id(=classic-rules::effect_memo)
+  | (binary_id(=classic-rules::espionage_effects) & (test(=the_national_intelligence_agency_gives_an_agent_and_raises_every_spy) | test(=underground_sect_spies_press_the_founders_religion_where_they_are)))
+  | binary_id(=classic-rules::fuzz_culture)
+  | (binary_id(=classic-rules::fuzz_economy) & (test(=fuzz_economy_save_load_keeps_the_hash)))
+  | binary_id(=classic-rules::fuzz_inert)
+  | binary_id(=classic-rules::fuzz_naval)
+  | (binary_id(=classic-rules::fuzz_sim) & (test(=fuzz_deterministic_replay)))
+  | (binary_id(=classic-rules::game_speeds) & (
+          test(=a_save_keeps_the_speed_and_an_old_save_plays_at_standard)
+        | test(=quick_and_marathon_ai_games_run_100_rounds_without_refusals)
+        | test(=the_content_has_unciv_s_four_speeds_and_standard_is_neutral)
+    ))
+  | (binary_id(=classic-rules::gold) & (
+          test(=a_deficit_empties_the_treasury_and_costs_science)
+        | test(=a_national_wonder_costs_more_with_every_city)
+        | test(=a_unique_building_meets_the_requirement_of_the_building_it_replaces)
+    ))
+  | (binary_id(=classic-rules::happiness) & (
+          test(=a_luxury_counts_once_when_connected)
+        | test(=a_very_unhappy_empire_trains_no_settlers_and_works_worse)
+        | test(=chichen_itza_lengthens_golden_ages)
+        | test(=excess_happiness_fills_the_meter_and_starts_a_golden_age)
+    ))
+  | (binary_id(=classic-rules::net_e2e_model) & (
+          test(=the_layout_hash_is_fnv1a64)
+        | test(=the_turn_trace_equals_the_numpy_reference)
+        | test(=wide_layers_equal_the_numpy_reference)
+        | test(=zero_event_weights_play_the_net_without_events)
+    ))
+  | (binary_id(=classic-rules::net_e2e_speed) & (test(=incremental_tile_states_equal_a_full_recompute_in_a_real_game) | test(=optimized_paths_equal_the_plain_path_on_random_weights)))
+  | (binary_id(=classic-rules::resource_effects) & (
+          test(=a_bazaar_gives_one_more_copy_of_each_luxury_tile_of_its_city)
+        | test(=a_feitoria_gives_portugal_an_untradeable_copy_of_the_city_states_luxuries)
+        | test(=a_recycling_center_provides_two_aluminum)
+        | test(=arabia_doubles_oil_only)
+        | test(=russia_doubles_iron_and_the_third_alternative_adds_half_again)
+    ))
+  | (binary_id(=classic-rules::review_citadel_holes) & (
+          test(=city_state_loses_15_per_tile)
+        | test(=hole_barbarian_camp_in_the_radius_survives)
+        | test(=hole_build_citadel_on_a_tile_that_has_one)
+        | test(=hole_build_citadel_on_ice)
+    ))
+  | (binary_id(=classic-rules::site_search) & (test(=the_capped_count_and_the_tile_memo_change_no_answer)))
+  | (binary_id(=classic-rules::start_balance) & (
+          test(=every_start_has_horses_and_iron_near_it_on_continents)
+        | test(=every_start_has_horses_and_iron_near_it_on_fractal)
+        | test(=every_start_has_horses_and_iron_near_it_on_pangaea)
+        | test(=every_start_has_horses_and_iron_near_it_on_small_continents)
+        | test(=every_start_reaches_the_minimum_food_and_production_on_continents)
+        | test(=every_start_reaches_the_minimum_food_and_production_on_fractal)
+        | test(=every_start_reaches_the_minimum_food_and_production_on_pangaea)
+        | test(=the_starts_of_a_game_are_closer_in_value_than_before)
+    ))
+  | (binary_id(=classic-rules::tile_yields) & (
+          test(=bare_terrain_yields_are_the_classic_table)
+        | test(=city_centre_is_at_least_two_food_one_production)
+        | test(=farm_technology_yields_follow_fresh_water)
+        | test(=features_replace_or_add_to_the_terrain)
+    ))
+  | (binary_id(=classic-ui) & (test(=ui::hud::unit_actions::tests::all_generated_actions_have_alpha_and_bounded_cached_textures) | test(=ui::screens::nations::catalog::tests::complete_art_catalog_has_valid_unique_regions_and_keeps_augustus_distinct)))
+  | (binary_id(=classic-ui::driver_offload) & (
+          test(=a_bigger_game_on_the_worker_is_the_sliced_game_at_any_slice)
+        | test(=a_diverged_worker_is_an_error_not_a_silent_corruption)
+        | test(=a_loaded_game_continues_on_the_worker_as_it_would_sliced)
+        | test(=a_reset_during_a_job_cancels_it)
+        | test(=a_small_game_on_the_worker_is_the_sliced_game)
+    ))
+  | (binary_id(=classic-ui::driver_round) & (
+          test(=a_pointless_war_ends_in_peace_without_flipping)
+        | test(=a_renamed_city_shows_its_new_name_in_the_projection_at_once)
+        | test(=ai_keeps_a_war_while_the_enemy_was_seen_recently)
+        | test(=client_shows_the_world_through_the_chosen_observer)
+    ))
+  | (binary_id(=classic-ui::observer) & (test(=each_nation_sees_only_its_own_knowledge) | test(=one_nation_shown_alone_has_its_details_and_events)))
+  | (binary_id(=classic-ui::observer_cards) & (test(=a_tile_has_a_tooltip_only_as_far_as_the_nation_knows_it)))
+  | binary_id(=classic-ui::observer_knowledge)
+  | (binary_id(=classic-ui::platform_models) & (test(=classic_natural_wonders_stand_on_their_model_site_shape) | test(=content_keys_resolve_to_their_class_model_or_variant)))
+  | (binary_id(=classic-ui::release_version) & (test(=the_android_version_code_follows_the_version) | test(=the_change_log_has_a_section_for_the_version)))
+  | (binary_id(=classic-ui::render_projection) & (test(=a_land_unit_on_water_is_projected_as_embarked_and_only_when_seen) | test(=a_remembered_city_is_drawn_as_last_seen_by_both_paths)))
+  | (binary_id(=classic-ui::render_world_objects) & (
+          test(=a_generated_map_draws_fish_and_sea_oil_on_the_coast)
+        | test(=buildings_on_uneven_ground_stand_on_plinths)
+        | test(=cities_compose_their_tile_and_wonders_take_a_ring_tile)
+    ))
+  | (binary_id(=classic-ui::screen_snapshots) & (
+          test(=an_update_with_the_art_pack_and_a_plain_run_are_not_refused)
+        | test(=an_update_without_the_art_pack_is_refused)
+        | test(=city_screen)
+    ))
+  | (binary_id(=classic-ui::shortcuts) & (
+          test(=a_free_key_is_taken_at_once_and_esc_cancels)
+        | test(=a_remapped_key_does_what_the_player_chose)
+        | test(=an_old_settings_file_without_keys_keeps_the_defaults)
+    ))
+  | (binary_id(=classic-ui::top_bar_targets) & (
+          test(=a_button_value_says_what_a_click_opens)
+        | test(=a_click_on_each_value_opens_its_screen)
+        | test(=a_policy_that_can_be_adopted_lights_the_value_like_the_end_turn_gate)
+        | test(=culture_shows_the_cores_price_and_what_is_missing)
+    ))
+  | (binary_id(=aurelia-qa::ai_stress_humans) & (test(=a_trick_plays_the_same_twice) | test(=the_script_is_data_in_a_saved_scene)))
+  | (binary_id(=classic-rules::city_removal) & test(=nothing_names_a_razed_city_in_a_played_world))
+  | (binary_id(=classic-rules::elimination) & test(=nothing_names_a_dead_nation_in_a_played_world))
 )
 """
 fail-fast = false
 failure-output = "final"
 status-level = "fail"
 final-status-level = "slow"
-slow-timeout = { period = "30s" }
+# THE GUARD: a fast-tier test that runs 2 s is reported SLOW (tools/test-budget.py fails on it), one that runs
+# 6 s is terminated and fails (TIMEOUT), so a loaded machine does not fail a run by itself. The author moves the
+# test to the slow set above (add it to the filter) or makes it fast; see docs/testing.md, "Two tiers". The slowest fast test
+# takes about 0.5 s.
+slow-timeout = { period = "2s", terminate-after = 3 }
 
 [[profile.default.overrides]]
 filter = """
@@ -62,9 +249,40 @@ filter = """
   | (binary_id(=aurelia-qa::ai_export) & test(=the_layout_is_pinned))
 """
 test-group = "pins"
+slow-timeout = { period = "10s", terminate-after = 3 }
+
+# The longest tests start first: nextest starts tests in the order of the binaries, so a 10-second test
+# that happens to sit last would start when the others are done and set the end of the run. Priority
+# only orders the start; it changes nothing a test checks. Refresh the list from the junit file
+# (docs/testing.md, "The time budget") when a test above 3 s appears or one of these drops under 1 s.
+[[profile.default.overrides]]
+filter = """
+    (binary_id(=aurelia-qa::ai_selfplay) & test(=given_space_techs_reach_the_science_victory))
+  | (binary_id(=aurelia-qa::ai_ladder_solvable) & test(=scene_37_is_drawn_again_at_attempt_6))
+  | (binary_id(=classic-rules::ai_track_b) & test(=ai_adopts_policies_and_founds_a_religion_in_a_classic_game))
+  | (binary_id(=classic-rules::ai_economy) & test(=the_ai_runs_trade_routes))
+  | (binary_id(=classic-rules::ai_acceptance) & test(~war_and_peace_do_not_flip_on_seed))
+"""
+priority = 100
 
 [profile.full]
-# Everything `cargo test --workspace` runs: the slow games and the GPU tests too (they open the
-# machine's GPU). `--run-ignored all` adds the `#[ignore]`d measurements on top.
+# Everything `cargo test --workspace` runs: the GPU tests too (they open the machine's GPU). `--run-ignored all` adds the `#[ignore]`d measurements on top.
 default-filter = "all()"
-slow-timeout = { period = "120s" }
+# Generous: the slow tests take up to 30 s on a busy machine; 5 minutes is a hang.
+slow-timeout = { period = "60s", terminate-after = 5 }
+
+# Timing runs (docs/testing.md, "The time budget"): the same tests as `default` / `full`, plus a
+# JUnit file with the time of every test: target/nextest/<profile>/junit.xml.
+[profile.measure]
+inherits = "default"
+status-level = "all"
+final-status-level = "slow"
+[profile.measure.junit]
+path = "junit.xml"
+
+[profile.measure-full]
+inherits = "full"
+status-level = "all"
+final-status-level = "slow"
+[profile.measure-full.junit]
+path = "junit.xml"

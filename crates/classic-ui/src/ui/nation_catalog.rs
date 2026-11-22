@@ -98,6 +98,7 @@ mod tests {
     use super::*;
     #[test]
     fn complete_art_catalog_has_valid_unique_regions_and_keeps_augustus_distinct() {
+        if crate::ui::art_pack::skip("complete_art_catalog_has_valid_unique_regions_and_keeps_augustus_distinct") { return; }
         let cards = cards();
         assert_eq!(cards.len(), 43);
         assert_eq!(regions().len(), 129);
@@ -105,8 +106,10 @@ mod tests {
         assert_eq!(keys.len(), 43);
         assert_eq!(cards.iter().find(|c| c.key == "art:rome").unwrap().leader, "Augustus Caesar");
         let mut decoder = Decoder::default();
-        for card in &cards {
-            for asset in [Asset::Portrait, Asset::Emblem, Asset::Background] {
+        // One asset kind at a time: the decoder keeps two sheets, and the three kinds of a card live on three
+        // sheets, so going card by card decoded a sheet again for almost every region (129 decodes).
+        for asset in [Asset::Portrait, Asset::Emblem, Asset::Background] {
+            for card in &cards {
                 let pixels = decoder.decode(&card.key, asset).expect("every region decodes inside its real sheet");
                 assert!(pixels.size[0] > 0 && pixels.size[1] > 0);
                 assert!(decoder.sheets.len() <= 2);

@@ -17,6 +17,10 @@ const PLAYERS: u8 = 4;
 /// of this seed comes at round 160–200 (was by 160).
 const ROUNDS: u32 = 200;
 
+#[path = "common/parallel.rs"]
+mod parallel;
+use parallel::parallel;
+
 /// Seeds of the headless games. Few AI nations reach a Great
 /// Prophet in 160 rounds (2 games of 8 on this ruleset), so the religion
 /// is asserted over the set, not over one game: a single seed made the
@@ -26,10 +30,8 @@ const SEEDS: [u64; 9] = [0x7_B0B, 1, 2, 3, 4, 5, 6, 7, 8];
 #[test]
 fn ai_adopts_policies_and_founds_a_religion_in_a_classic_game() {
     let rules = compile_rules(core_rules()).unwrap();
-    let mut religions = 0;
-    for seed in SEEDS {
-        religions += one_game(&rules, seed);
-    }
+    // The nine games are independent: they run side by side (they were 8 s in a row).
+    let religions: usize = parallel(&SEEDS, |&seed| one_game(&rules, seed)).into_iter().sum();
     assert!(religions >= 1, "a religion is founded");
 }
 
