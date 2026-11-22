@@ -1,0 +1,439 @@
+//! The worked cases of the design (§4.8), each verdict computed by hand in its comment; the war order's
+//! timing (§3.3); the float twin's fixture (§3.2).
+
+use crate::ai::strategy_net::weights::{fe, kc};
+use crate::ai::strategy_net::{intent_from, Held, Intent, Logits, Milli, Net, Tilt};
+use crate::ids::{EntityId, PlayerId};
+
+use super::levers::{self, After, Pass};
+use super::plan::{CityInputs, CoreMemory, Embargo, Escorts, Generals, Help, Inputs, RivalInputs, SeatInputs, SpentWar, WarKind, WarOrder, WarPlan};
+use super::weights::{a, q};
+
+const ROUND: u32 = 100;
+const PACE: u32 = 100;
+
+fn rival(id: u8) -> RivalInputs {
+    RivalInputs::stranger(PlayerId(id))
+}
+
+fn seat() -> SeatInputs {
+    SeatInputs { war_gain: 500, ..SeatInputs::default() }
+}
+
+/// A seat at peace with nothing hostile in sight (force 1), its leader's `warlike` 300.
+fn situation() -> [Milli; fe::N] {
+    let mut f = [0; fe::N];
+    f[fe::FORCE] = 1000;
+    f
+}
+
+fn carried() -> [Milli; kc::N] {
+    let mut k = [0; kc::N];
+    k[kc::WARLIKE] = 300;
+    k
+}
+
+fn inputs(seat: SeatInputs, rivals: Vec<RivalInputs>, cities: Vec<CityInputs>) -> Inputs {
+    Inputs { situation: situation(), seat, rivals, cities }
+}
+
+fn pass_of(inputs: &Inputs, held: &CoreMemory, round: u32) -> Pass {
+    levers::before_intent(inputs, &carried(), held, round, PACE)
+}
+
+fn pass(inputs: &Inputs) -> Pass {
+    pass_of(inputs, &CoreMemory::default(), ROUND)
+}
+
+/// The intent of flat logits with the pass's tilt (no temperature), and the levers.
+fn after(inputs: &Inputs, pass: &Pass) -> After {
+    let logits = Logits { concepts: carried(), style: [0; 3], aim: [0; 4], posture: [0; 4], style_margin: 1150 };
+    let tilt = levers::tilt(pass);
+    let intent = intent_from(&logits, &inputs.situation, Held::default(), 3, 200, PACE, Net::default(), &tilt);
+    levers::after_intent(pass, &intent, inputs, ROUND)
+}
+
+/// A5 strong: R4 50, R6 800, R5 0, R2 1000, R1 800, `warlike` 300.
+fn disarmed_neighbour(id: u8) -> RivalInputs {
+    RivalInputs { soldiers: 50, open_cities: 800, seen_army: 0, land: 1000, near: 800, ..rival(id) }
+}
+
+#[test]
+fn a5_the_disarmed_neighbour_is_prey() {
+    let inputs = inputs(seat(), vec![disarmed_neighbour(1)], vec![]);
+    let p = pass(&inputs);
+    let c = &p.rivals[0].concepts;
+    // weak = unit(1000 − 2000·0.05 + 300·0.8) = unit(1140) = 1000; reach = 1000·0.8 = 800.
+    assert_eq!((c[q::WEAK], c[q::REACH]), (1000, 800));
+    // prey = unit(−1700 + 1600 + 1600·0.8 + 400·0.3) = unit(1300) = 1000 → a Prey order with the budget of 25.
+    assert_eq!(c[q::PREY], 1000);
+    let order = WarOrder { rival: PlayerId(1), kind: WarKind::Prey, since: ROUND, budget: 25, value: 1000 };
+    assert_eq!(p.core.war, WarPlan::Order(order));
+    // At peace with it: the posture prepares (+1800·1.0), conquest gains +1500 − 400.
+    let tilt = levers::tilt(&p);
+    assert_eq!((tilt.posture[2], tilt.posture[3]), (1800, 0));
+    assert_eq!(tilt.style, [0, -1200, 1100]);
+}
+
+#[test]
+fn an_average_neighbour_is_no_prey() {
+    let inputs = inputs(seat(), vec![RivalInputs { soldiers: 500, open_cities: 0, ..disarmed_neighbour(1) }], vec![]);
+    let p = pass(&inputs);
+    // weak = unit(1000 − 1000) = 0; prey = unit(−1700 + 1280 + 120) = 0 → no war.
+    assert_eq!((p.rivals[0].concepts[q::WEAK], p.rivals[0].concepts[q::PREY]), (0, 0));
+    assert_eq!(p.core.war, WarPlan::NoWar);
+    // No order and no war: the offensive postures are capped (−3000 each).
+    let tilt = levers::tilt(&p);
+    assert_eq!((tilt.posture[2], tilt.posture[3]), (-3000, -3000));
+}
+
+#[test]
+fn a_disarmed_friend_is_no_prey() {
+    let inputs = inputs(seat(), vec![RivalInputs { friend: 1000, ..disarmed_neighbour(1) }], vec![]);
+    let p = pass(&inputs);
+    // prey = unit(1300 − 1000) = 300 < 550 → no war.
+    assert_eq!(p.rivals[0].concepts[q::PREY], 300);
+    assert_eq!(p.core.war, WarPlan::NoWar);
+}
+
+#[test]
+fn a_disarmed_nation_over_the_ocean_is_no_prey() {
+    // The class the design's formula missed: no land and no sea route, reach 0.
+    let inputs = inputs(seat(), vec![RivalInputs { land: 0, sea: 0, ..disarmed_neighbour(1) }], vec![]);
+    let p = pass(&inputs);
+    // prey = unit(−1700 + 1600 + 0 + 120) = 20 → no war.
+    assert_eq!(p.rivals[0].concepts[q::PREY], 20);
+    assert_eq!(p.core.war, WarPlan::NoWar);
+}
+
+#[test]
+fn a_disarmed_neighbour_over_a_strait_is_an_overseas_prey() {
+    let inputs = inputs(seat(), vec![RivalInputs { land: 0, sea: 1000, near: 1000, ..disarmed_neighbour(1) }], vec![]);
+    let p = pass(&inputs);
+    // reach = 600·1.0 = 600; prey = unit(−1700 + 1600 + 960 + 120) = 980 → Overseas, budget 30, 2 escorts.
+    assert_eq!((p.rivals[0].concepts[q::REACH], p.rivals[0].concepts[q::PREY]), (600, 980));
+    assert_eq!(p.core.war.order().map(|o| (o.kind, o.budget)), Some((WarKind::Overseas, 30)));
+    assert_eq!(after(&inputs, &p).plan.escorts, Escorts::Ships(2));
+}
+
+/// A runaway (tree 1000, lead 1000: runaway 1000), reachable (land, near 800), a level army, our force even there.
+fn runaway(id: u8) -> RivalInputs {
+    RivalInputs { tree: 1000, lead: 1000, land: 1000, near: 800, soldiers: 500, local: 500, ..rival(id) }
+}
+
+#[test]
+fn a_runaway_with_a_level_army_gets_no_war_but_no_help_and_an_embargo() {
+    let inputs = inputs(seat(), vec![runaway(2)], vec![]);
+    let p = pass(&inputs);
+    let c = &p.rivals[0].concepts;
+    // runaway = unit(−1000 + 1200 + 1000) = 1000; spoiler = unit(−1400 + 1000 + 700·0.8 + 0 + 0) = 160 → no war.
+    assert_eq!((c[q::RUNAWAY], c[q::SPOILER]), (1000, 160));
+    assert_eq!(p.core.war, WarPlan::NoWar);
+    let plan = after(&inputs, &p).plan;
+    assert_eq!(plan.rivals[0].help, Help::Deny);
+    assert_eq!(plan.embargo, Embargo::On(PlayerId(2)));
+}
+
+#[test]
+fn a_runaway_we_can_beat_locally_gets_a_spoiler_war() {
+    let inputs = inputs(seat(), vec![RivalInputs { soldiers: 250, local: 800, ..runaway(2) }], vec![]);
+    let p = pass(&inputs);
+    // weak = unit(1000 − 500) = 500; spoiler = unit(160 + 600·0.5 + 1000·0.3) = 760 → Spoiler, budget 30.
+    assert_eq!(p.rivals[0].concepts[q::SPOILER], 760);
+    assert_eq!(p.core.war.order().map(|o| (o.kind, o.budget, o.value)), Some((WarKind::Spoiler, 30, 760)));
+}
+
+/// B4: the capital lost to an enemy we are at war with, our force even there, tired.
+fn b4() -> Inputs {
+    let tired = SeatInputs { capital_lost: 1000, war_rounds: 1000, unhappy_trend: 1000, ..seat() };
+    let taker = RivalInputs { holds_capital: 1000, local: 500, at_war: 1000, land: 1000, retake_case: 1000, ..rival(3) };
+    let other = RivalInputs { at_war: 1000, ..rival(4) };
+    let mut inputs = inputs(tired, vec![taker, other], vec![]);
+    inputs.situation[fe::AT_WAR] = 1000;
+    inputs
+}
+
+#[test]
+fn b4_a_lost_capital_is_retaken_even_tired() {
+    let inputs = b4();
+    let p = pass(&inputs);
+    // war_weary = unit(−400 + 1200 + 900 + 0 + 0 − 0) = 1000.
+    assert_eq!(p.seat[super::weights::s::WAR_WEARY], 1000);
+    // retake = unit(−900 + 1800 + 600·0.5 + 300 − 500) = 1000 → Retake order, budget 20.
+    assert_eq!(p.rivals[0].concepts[q::RETAKE], 1000);
+    assert_eq!(p.core.war.order().map(|o| (o.rival, o.kind, o.budget)), Some((PlayerId(3), WarKind::Retake, 20)));
+    // Peace: not with the taker (the order, the retake case); with the other enemy:
+    // unit(−300 + 1000 + 600·1.0) = 1000 ≥ 500.
+    let after = after(&inputs, &p);
+    assert_eq!(after.plan.peace_with, vec![PlayerId(4)]);
+    assert_eq!(after.peace, vec![0, 1000], "the taker's peace: unit(−300 + 1000 + 0 − 1500) = 0");
+    assert_eq!(after.plan.generals, Generals::AsToday);
+}
+
+#[test]
+fn a_war_fought_with_local_strength_alone_is_no_retake() {
+    // The class the design's formula missed: at war, strong locally, nothing of ours in its hands.
+    let inputs = inputs(seat(), vec![RivalInputs { local: 1000, at_war: 1000, land: 1000, ..rival(3) }], vec![]);
+    // retake = unit(−900 + 600 + 300) = 0.
+    assert_eq!(pass(&inputs).rivals[0].concepts[q::RETAKE], 0);
+}
+
+/// P3: a stack of 7 inside our borders at peace (R11 700) of a rival we distrust at 400.
+fn p3() -> Inputs {
+    // distrust = unit(−500 + 700·0.7 + 500·0.22 + 300·1.0) = 400.
+    let stacker = RivalInputs { stack: 700, warmonger: 220, near: 1000, ..rival(5) };
+    let near = CityInputs { city: EntityId(10), stack_owner: Some(PlayerId(5)), danger: 0, rivals_near: vec![], young: 0 };
+    let far = CityInputs { city: EntityId(11), stack_owner: None, danger: 0, rivals_near: vec![], young: 0 };
+    inputs(seat(), vec![stacker], vec![near, far])
+}
+
+#[test]
+fn p3_a_stack_at_the_border_is_defence() {
+    let inputs = p3();
+    let p = pass(&inputs);
+    let c = &p.rivals[0].concepts;
+    // menace = unit(−300 + 1500·0.7 + 400·0.4) = 910.
+    assert_eq!((c[q::DISTRUST], c[q::MENACE]), (400, 910));
+    assert_eq!(p.aggregates[a::MAX_MENACE], 910);
+    // The posture's defence: +1500·0.91 = 1365.
+    assert_eq!(levers::tilt(&p).posture[1], 1365);
+    let after = after(&inputs, &p);
+    // guard = unit(−200 + 1200·0.91) = 892 near the stack, 0 elsewhere; the military price +800·0.91 = 728.
+    assert_eq!(after.plan.guard.iter().map(|g| g.level).collect::<Vec<_>>(), vec![892, 0]);
+    assert_eq!(after.price_tilt[crate::ai::strategy_net::weights::pd::MILITARY], 728);
+    assert_eq!(after.plan.trust(PlayerId(5)), 600);
+    assert_eq!(after.plan.generals, Generals::Hold, "no order, no war: the generals stay home");
+}
+
+// ---- the war order's timing (§3.3, §4.4) ----
+
+fn held(value: Milli, since: u32) -> CoreMemory {
+    CoreMemory { war: WarPlan::Order(WarOrder { rival: PlayerId(1), kind: WarKind::Prey, since, budget: 25, value }), spent: vec![] }
+}
+
+/// A neighbour whose prey value is `prey`-ish: weak 1000, its reach set to land it at the value.
+fn prey_at(near: Milli) -> RivalInputs {
+    RivalInputs { at_war: 1000, ..RivalInputs { near, ..disarmed_neighbour(1) } }
+}
+
+#[test]
+fn an_order_is_kept_above_its_keep_and_dropped_below() {
+    // near 400: prey = unit(−1700 + 1600 + 640 + 120) = 660 ≥ 350, kept (it would not start below 550 either way).
+    let kept = pass_of(&inputs(seat(), vec![prey_at(400)], vec![]), &held(700, ROUND - 10), ROUND);
+    assert_eq!(kept.core.war.order().map(|o| (o.since, o.value)), Some((ROUND - 10, 660)));
+    // near 100: prey = unit(−1700 + 1600 + 160 + 120) = 180 < 350: dropped, no new order.
+    let dropped = pass_of(&inputs(seat(), vec![prey_at(100)], vec![]), &held(700, ROUND - 10), ROUND);
+    assert_eq!(dropped.core.war, WarPlan::NoWar);
+    assert!(dropped.core.spent.is_empty(), "inside the budget a lost reason is no spent war");
+}
+
+#[test]
+fn a_war_that_did_not_pay_ends_with_peace_and_is_not_restarted() {
+    let inputs = inputs(seat(), vec![prey_at(800)], vec![]);
+    let p = pass_of(&inputs, &held(1000, ROUND - 26), ROUND);
+    assert_eq!(p.core.war, WarPlan::NoWar, "the budget of 25 is spent, the gain even");
+    assert_eq!(p.core.spent, vec![SpentWar { rival: PlayerId(1), until: ROUND + 20 }]);
+    assert_eq!(after(&inputs, &p).plan.peace_with, vec![PlayerId(1)]);
+    let later = pass_of(&inputs, &p.core, ROUND + 5);
+    assert_eq!(later.core.war, WarPlan::NoWar, "no new order on it while spent");
+    let after_cooldown = pass_of(&inputs, &p.core, ROUND + 20);
+    assert!(after_cooldown.core.war.order().is_some(), "the cooldown over, the reason opens a new order");
+}
+
+#[test]
+fn a_war_that_pays_runs_past_its_budget() {
+    let inputs = inputs(seat(), vec![RivalInputs { captured_recent: 1000, ..prey_at(800) }], vec![]);
+    let p = pass_of(&inputs, &held(1000, ROUND - 40), ROUND);
+    assert_eq!(p.core.war.order().map(|o| o.since), Some(ROUND - 40));
+}
+
+#[test]
+fn one_order_at_a_time_held_against_a_better_target() {
+    let better = RivalInputs { near: 1000, ..disarmed_neighbour(2) };
+    let p = pass_of(&inputs(seat(), vec![prey_at(400), better], vec![]), &held(700, ROUND - 5), ROUND);
+    assert_eq!(p.core.war.order().map(|o| o.rival), Some(PlayerId(1)));
+}
+
+#[test]
+fn the_default_plan_is_todays_behaviour() {
+    let plan = super::plan::Net2Plan::default();
+    assert_eq!(plan.war, WarPlan::NoWar);
+    assert_eq!(plan.trust(PlayerId(1)), 1000);
+    assert!(!plan.denies_help(PlayerId(1)) && !plan.makes_peace_with(PlayerId(1)));
+    assert_eq!((plan.cs_gold_share, plan.guard_of(EntityId(1))), (0, 0));
+    assert_eq!((plan.embargo, plan.escorts, plan.generals), (Embargo::Nobody, Escorts::AsToday, Generals::AsToday));
+}
+
+// ---- the float twin's fixture ----
+
+/// A deterministic stream of numbers (an LCG) for the generated turns.
+struct Lcg(u64);
+
+impl Lcg {
+    fn next(&mut self) -> u64 {
+        self.0 = self.0.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        self.0 >> 33
+    }
+    fn below(&mut self, n: u64) -> u64 {
+        self.next() % n.max(1)
+    }
+    /// 0…1000: a third 0, a sixth 1000, the rest uniform.
+    fn milli(&mut self) -> Milli {
+        match self.below(6) {
+            0 | 1 => 0,
+            2 => 1000,
+            _ => self.below(1001) as Milli,
+        }
+    }
+    fn flag(&mut self) -> Milli {
+        if self.below(3) == 0 {
+            1000
+        } else {
+            0
+        }
+    }
+}
+
+fn generated_rival(rng: &mut Lcg, id: u8) -> RivalInputs {
+    let mut row = [0; super::weights::r::N];
+    for v in row.iter_mut() {
+        *v = rng.milli();
+    }
+    let flags = [super::weights::r::LAND, super::weights::r::SEA, super::weights::r::FRIEND, super::weights::r::PACT, super::weights::r::AT_WAR, super::weights::r::HOLDS_CAPITAL, super::weights::r::ALLY_HIT, super::weights::r::RETAKE_CASE, super::weights::r::CAPTURED_RECENT, super::weights::r::DENOUNCED_US];
+    for at in flags {
+        row[at] = rng.flag();
+    }
+    let r = |i: usize| row[i];
+    use super::weights::r as ri;
+    RivalInputs {
+        rival: PlayerId(id),
+        near: r(ri::NEAR),
+        land: r(ri::LAND),
+        sea: r(ri::SEA),
+        soldiers: r(ri::SOLDIERS),
+        seen_army: r(ri::SEEN_ARMY),
+        open_cities: r(ri::OPEN_CITIES),
+        tree: r(ri::TREE),
+        lead: r(ri::LEAD),
+        pace: r(ri::PACE),
+        culture: r(ri::CULTURE),
+        stack: r(ri::STACK),
+        warmonger: r(ri::WARMONGER),
+        betrayed: r(ri::BETRAYED),
+        denounced_us: r(ri::DENOUNCED_US),
+        friend: r(ri::FRIEND),
+        pact: r(ri::PACT),
+        at_war: r(ri::AT_WAR),
+        war_rounds: r(ri::WAR_ROUNDS),
+        holds_capital: r(ri::HOLDS_CAPITAL),
+        holds_cities: r(ri::HOLDS_CITIES),
+        grab: r(ri::GRAB),
+        ally_hit: r(ri::ALLY_HIT),
+        local: r(ri::LOCAL),
+        score: r(ri::SCORE),
+        retake_case: r(ri::RETAKE_CASE),
+        captured_recent: r(ri::CAPTURED_RECENT),
+    }
+}
+
+fn generated_city(rng: &mut Lcg, id: u64, rivals: &[RivalInputs]) -> CityInputs {
+    let pick = |rng: &mut Lcg| rivals[rng.below(rivals.len() as u64) as usize].rival;
+    let stack_owner = if rng.below(2) == 0 { Some(pick(rng)) } else { None };
+    let rivals_near = (0..rng.below(3)).map(|_| pick(rng)).collect();
+    CityInputs { city: EntityId(id), stack_owner, danger: rng.flag(), rivals_near, young: rng.flag() }
+}
+
+fn generated_held(rng: &mut Lcg, rivals: &[RivalInputs], round: u32) -> CoreMemory {
+    let war = if rng.below(2) == 0 {
+        WarPlan::NoWar
+    } else {
+        let rival = rivals[rng.below(rivals.len() as u64) as usize].rival;
+        let kind = WarKind::ALL[rng.below(6) as usize];
+        WarPlan::Order(WarOrder { rival, kind, since: round - rng.below(40) as u32, budget: kind.budget(), value: rng.milli() })
+    };
+    let spent = if rng.below(4) == 0 { vec![SpentWar { rival: rivals[0].rival, until: round + rng.below(20) as u32 - 5 }] } else { vec![] };
+    CoreMemory { war, spent }
+}
+
+/// One generated turn's line (the record of `trace::line`).
+fn generated_line(rng: &mut Lcg) -> String {
+    let round = 50 + rng.below(250) as u32;
+    let mut situation = [0; fe::N];
+    for v in situation.iter_mut() {
+        *v = rng.milli();
+    }
+    situation[fe::AT_WAR] = rng.flag();
+    let mut k = [0; kc::N];
+    for v in k.iter_mut() {
+        *v = rng.milli();
+    }
+    let seat_row: Vec<Milli> = (0..super::weights::g::N).map(|_| rng.milli()).collect();
+    let seat = SeatInputs {
+        capital_lost: if seat_row[0] > 700 { 1000 } else { 0 },
+        cities_lost: seat_row[1],
+        war_rounds: seat_row[2],
+        war_gain: seat_row[3],
+        unhappy_trend: seat_row[4],
+        embark: if seat_row[5] > 300 { 1000 } else { 0 },
+        enemy_air: seat_row[6],
+        gold_stock: seat_row[7],
+        cs_allies: seat_row[8],
+        cs_contested: seat_row[9],
+    };
+    let rivals: Vec<RivalInputs> = (0..1 + rng.below(7)).map(|i| generated_rival(rng, 1 + i as u8)).collect();
+    let cities = (0..1 + rng.below(6)).map(|i| generated_city(rng, 100 + i, &rivals)).collect();
+    let held = generated_held(rng, &rivals, round);
+    let inputs = Inputs { situation, seat, rivals, cities };
+    let spread = |rng: &mut Lcg| rng.below(6001) as Milli - 3000;
+    let logits = Logits { concepts: k, style: [spread(rng), spread(rng), spread(rng)], aim: [spread(rng), spread(rng), spread(rng), spread(rng)], posture: [spread(rng), spread(rng), spread(rng), spread(rng)], style_margin: 1150 };
+    let tempered = rng.below(2) == 0;
+    let pass = levers::before_intent(&inputs, &k, &held, round, PACE);
+    let tilt = levers::tilt(&pass);
+    let net = Net { sharp: tempered, ..Net::default() };
+    let intent: Intent = intent_from(&logits, &inputs.situation, Held::default(), 3, 200, PACE, net, &tilt);
+    let after = levers::after_intent(&pass, &intent, &inputs, round);
+    let shares = levers::shares(&intent);
+    let rec = super::trace::Record { player: 0, round, pace: PACE, inputs: &inputs, held: &held, logits: &logits, tempered, pass: &pass, tilt: &tilt, shares: &shares, after: &after };
+    super::trace::line(&rec)
+}
+
+fn fixture_dir() -> std::path::PathBuf {
+    std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../nn/aurelia_nn/net2/fixtures")
+}
+
+/// The fixture the float twin is checked against (`classic/nn/tests/test_net2_parity.py`): 200 generated
+/// turns and the weight tables, written by the integer net. `NET2_WRITE_FIXTURE=1` rewrites them; the
+/// test fails when the net and the committed fixture part.
+#[test]
+fn the_parity_fixture_is_the_integer_net() {
+    let mut rng = Lcg(0x6e65_7432);
+    let mut lines = String::new();
+    for _ in 0..200 {
+        lines.push_str(&generated_line(&mut rng));
+        lines.push('\n');
+    }
+    let weights = super::trace::export();
+    let dir = fixture_dir();
+    if std::env::var_os("NET2_WRITE_FIXTURE").is_some() {
+        std::fs::create_dir_all(&dir).expect("the fixture's directory can be made");
+        std::fs::write(dir.join("parity.jsonl"), &lines).expect("the fixture is written");
+        std::fs::write(dir.join("weights.json"), &weights).expect("the weights are written");
+    }
+    let committed = std::fs::read_to_string(dir.join("parity.jsonl")).unwrap_or_default();
+    let committed_weights = std::fs::read_to_string(dir.join("weights.json")).unwrap_or_default();
+    assert!(committed == lines, "the parity fixture is not the integer net's: rerun with NET2_WRITE_FIXTURE=1 and the twin's test");
+    assert!(committed_weights == weights, "the weights' export changed: rerun with NET2_WRITE_FIXTURE=1 and the twin's test");
+}
+
+#[test]
+fn the_weights_count() {
+    let n = super::weights::count();
+    assert_eq!(n, 126, "net2's own hand weights (the 13 carried concepts and the carried logits are `strategy_net::weights`'s)");
+}
+
+#[test]
+fn the_tilt_of_nothing_is_the_bias_terms_only() {
+    let inputs = inputs(seat(), vec![], vec![]);
+    let tilt = levers::tilt(&pass(&inputs));
+    assert_eq!(tilt, Tilt { style: [0, -1200, -400], aim: [0; 4], posture: [0, 0, -3000, -3000] });
+}

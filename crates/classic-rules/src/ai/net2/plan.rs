@@ -11,6 +11,12 @@
 //! Scale: thousandths (`Milli`, 1000 = 1.0), 0…1000 unless a field says otherwise. Every input is read
 //! from the seat's own observation and memory (fog), never from the world.
 //!
+//! Extension rule (the offensive outputs of the design's addendum will add war kinds, intent variants and
+//! levers): a reader asks through `Net2Plan`'s and `WarKind`'s methods (`war_on`, `passes_odds_at_war`,
+//! `trust`, …) or matches with a `_` arm, never exhaustively on a variant list, and a new lever is a new
+//! field with a `Default` that is today's behaviour. The enums are `#[non_exhaustive]` for the readers
+//! outside this crate (the bench).
+//!
 //! `Net2Plan::default()` is today's behaviour: no war order, no peace wish, every rival trusted, help
 //! denied to nobody, no guard, the city-state reserve as today, no embargo, the escorts and the
 //! generals as today. An executor that finds `brief.net2` None, or the default, plays as today.
@@ -195,6 +201,7 @@ pub struct SiteInputs {
 
 /// Why a war is fought (§4.4); each kind has its budget (§3.3).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
 pub enum WarKind {
     /// A weak, reachable neighbour: the cheap city.
     Prey,
@@ -264,6 +271,7 @@ impl WarOrder {
 
 /// The war the seat wants.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum WarPlan {
     /// No offensive war: the war machine picks no target of its own.
     #[default]
@@ -282,6 +290,7 @@ impl WarPlan {
 
 /// Whether a rival gets our help (§4.6).
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Help {
     #[default]
     Give,
@@ -291,6 +300,7 @@ pub enum Help {
 
 /// The rival the congress proposal and vote embargo (§4.6).
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Embargo {
     #[default]
     Nobody,
@@ -299,6 +309,7 @@ pub enum Embargo {
 
 /// The ships an operation sails with (§4.4).
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Escorts {
     /// `fleet.rs` as today.
     #[default]
@@ -309,6 +320,7 @@ pub enum Escorts {
 
 /// What the Great Generals do (§4.4).
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Generals {
     /// `great_people.rs` as today.
     #[default]
@@ -341,6 +353,8 @@ pub struct RivalRead {
     pub retake: Milli,
     pub duty: Milli,
     pub grabber: Milli,
+    /// AND(grabber, weak): the value of a `Border` war.
+    pub border: Milli,
     /// max of the war kinds (§4.4).
     pub war_value: Milli,
     /// The argmax kind (Overseas when not a retake and no land route).
