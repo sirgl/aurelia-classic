@@ -19,6 +19,7 @@ pub mod selfplay;
 pub mod site;
 pub mod spec;
 pub mod stress;
+pub mod trainers;
 
 pub use spec::{GameSpec, WorldSize};
 

@@ -68,6 +68,7 @@ and not (
   | binary_id(=aurelia-qa::ai_search_export)
   | (binary_id(=aurelia-qa::ai_selfplay) & (test(=given_space_techs_reach_the_science_victory) | test(=sampled_games_replay_and_export_aligned)))
   | (binary_id(=aurelia-qa::ai_stress) & (test(=a_saved_scene_rebuilds_to_its_hash) | test(=an_instance_plays_the_same_twice)))
+  | binary_id(=aurelia-qa::ai_trainers)
   | (binary_id(=classic-rules) & (test(=kernel_tests::astar::early_exit_for_unenterable_goals_changes_no_answer)))
   | (binary_id(=classic-rules::ai_acceptance) & (
           test(=six_ai_nations_play_300_classic_rounds)

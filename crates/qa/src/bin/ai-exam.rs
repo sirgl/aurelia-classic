@@ -83,6 +83,11 @@ fn opts() -> Result<Opts, String> {
 }
 
 fn real() -> Result<(), String> {
+    // The trainers (`aurelia_qa::trainers`, classic/docs/ai-trainers.md): `suite`, `suite-one`, `suite-show`, `suite-list`.
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    if let Some(cmd) = args.first().filter(|c| c.starts_with("suite")) {
+        return aurelia_qa::trainers::suite::main(cmd, &args[1..]);
+    }
     let o = opts()?;
     let rules = ClassicBench::rules();
     match o.cmd.as_str() {
