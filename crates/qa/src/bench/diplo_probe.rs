@@ -13,6 +13,13 @@
 //! | `parts_round` | the first round every prerequisite project of the parts was done |
 //! | `parts_lack` | at that round fewer free copies of a part's resource than one part needs |
 //! | `blocked` | rounds from then, while a part is missing, with fewer free copies than one part needs |
+//! | `unhappy`, `unhappy_first`, `happy_min` | rounds it started at or below the rebellion threshold (`happiness::uprising_possible`), the first, the least excess |
+//! | `cities_at`, `captured_at`, `wars_at` | at its first unhappy round: its cities, those of them founded by another nation, the nations at war with it |
+//! | `cities`, `captured` | the same at the end |
+//! | `war_rounds` | rounds at war with at least one nation |
+//! | `style_66`, `style` | the strategist's held style (0 tall, 1 wide, 2 conquest) at round 66 and at the end (none: no strategist) |
+//! | `denounced_by`, `denounced` | the nations that denounced it at some round, and that it denounced |
+//! | `victory` | its victory's kind when it won |
 
 use std::collections::BTreeMap;
 use std::io::Write;
@@ -56,6 +63,15 @@ struct Seat {
     parts_round: Option<u32>,
     parts_lack: bool,
     blocked: u32,
+    unhappy: u32,
+    unhappy_first: Option<u32>,
+    happy_min: Option<i32>,
+    at_unhappy: Option<(usize, usize, usize)>,
+    war_rounds: u32,
+    style_66: Option<usize>,
+    style: Option<usize>,
+    denounced_by: std::collections::BTreeSet<u8>,
+    denounced: std::collections::BTreeSet<u8>,
 }
 
 /// What the probe remembers from the last round: the quests and the influence of each seat.
@@ -85,7 +101,51 @@ fn city_states(game: &GameState<Classic>) -> Vec<PlayerId> {
     (0..players.count()).map(|p| PlayerId(p as u8)).filter(|p| players.is_city_state(*p)).collect()
 }
 
+/// The cities `major` holds and those of them another nation founded.
+fn holdings(game: &GameState<Classic>, major: PlayerId) -> (usize, usize) {
+    let auth = game.view().auth;
+    let held: Vec<_> = auth.cities().iter().filter(|(_, c)| c.owner == major).collect();
+    let captured = held.iter().filter(|(_, c)| c.original_owner != major && auth.players().is_major(c.original_owner)).count();
+    (held.len(), captured)
+}
+
 impl DiploProbe {
+    /// Happiness, wars and denunciations this round.
+    fn standing_round(&mut self, game: &GameState<Classic>) {
+        use classic_rules::derived::happiness::{excess_snapshot, uprising_possible};
+        let auth = game.view().auth;
+        let round = auth.turn().round;
+        let majors = majors(game);
+        let diplomacy = auth.diplomacy();
+        let relations = auth.module().relations();
+        for major in &majors {
+            if !auth.players().is_alive(*major) {
+                continue;
+            }
+            let excess = excess_snapshot(auth, *major);
+            let wars = majors.iter().filter(|o| *o != major && diplomacy.at_war(*major, **o)).count();
+            let holdings = holdings(game, *major);
+            let seat = self.seats.entry(major.0).or_default();
+            seat.happy_min = Some(seat.happy_min.map_or(excess, |m| m.min(excess)));
+            if uprising_possible(excess) {
+                seat.unhappy += 1;
+                if seat.unhappy_first.is_none() {
+                    seat.unhappy_first = Some(round);
+                    seat.at_unhappy = Some((holdings.0, holdings.1, wars));
+                }
+            }
+            seat.war_rounds += u32::from(wars > 0);
+            for other in &majors {
+                if other != major && relations.denounced(*other, *major, round) {
+                    seat.denounced_by.insert(other.0);
+                }
+                if other != major && relations.denounced(*major, *other, round) {
+                    seat.denounced.insert(other.0);
+                }
+            }
+        }
+    }
+
     /// Quests and tributes since the last round.
     fn city_state_round(&mut self, game: &GameState<Classic>) {
         let auth = game.view().auth;
@@ -173,9 +233,22 @@ impl MatchRecorder<ClassicBench> for DiploProbe {
     fn round_start(&mut self, game: &GameState<Classic>, rules: &CompiledRuleset<Classic>) {
         self.city_state_round(game);
         self.supply_round(game, rules);
+        self.standing_round(game);
     }
 
-    fn turn_start(&mut self, _game: &GameState<Classic>, _rules: &CompiledRuleset<Classic>, _player: PlayerId, _states: &AiStates) {}
+    fn turn_start(&mut self, game: &GameState<Classic>, _rules: &CompiledRuleset<Classic>, player: PlayerId, states: &AiStates) {
+        let round = game.view().auth.turn().round;
+        if !game.view().auth.players().is_major(player) {
+            return;
+        }
+        let Some(state) = states.get(player) else { return };
+        let style = classic_rules::ai::strategy_net::Memory::decode(&state.mind_memory).held.style;
+        let seat = self.seats.entry(player.0).or_default();
+        seat.style = style.or(seat.style);
+        if round == 66 {
+            seat.style_66 = style;
+        }
+    }
 
     fn finish(self: Box<Self>, game: &GameState<Classic>, rules: &CompiledRuleset<Classic>, minds: &[&classic_rules::ai::driver::ClassicMind]) {
         let Some(sink) = sink() else { return };
@@ -188,6 +261,8 @@ impl MatchRecorder<ClassicBench> for DiploProbe {
             let seat = self.seats.get(&major.0).cloned().unwrap_or_default();
             let allies = minors.iter().filter(|m| cs::is_ally(auth, **m, major)).count();
             let friends = minors.iter().filter(|m| cs::is_friends(auth, rules, **m, major)).count();
+            let (cities, captured) = holdings(game, major);
+            let victory = game.outcome().filter(|o| o.winner == major).map(|o| crate::spec::victory_name(o.kind));
             let cs_cities = auth.cities().iter().filter(|(_, c)| c.owner == major && auth.players().is_city_state(c.original_owner)).count();
             let line = serde_json::json!({
                 "game": self.name, "seed": self.seed, "player": major.0, "variant": variant,
@@ -196,6 +271,12 @@ impl MatchRecorder<ClassicBench> for DiploProbe {
                 "quests_given": seat.quests_given, "quests_done": seat.quests_done,
                 "allies": allies, "friends": friends, "allies_132": seat.allies_mid,
                 "parts_round": seat.parts_round, "parts_lack": seat.parts_lack, "blocked": seat.blocked,
+                "unhappy": seat.unhappy, "unhappy_first": seat.unhappy_first, "happy_min": seat.happy_min,
+                "cities_at": seat.at_unhappy.map(|a| a.0), "captured_at": seat.at_unhappy.map(|a| a.1), "wars_at": seat.at_unhappy.map(|a| a.2),
+                "cities": cities, "captured": captured, "war_rounds": seat.war_rounds,
+                "style_66": seat.style_66, "style": seat.style,
+                "denounced_by": seat.denounced_by.iter().collect::<Vec<_>>(), "denounced": seat.denounced.iter().collect::<Vec<_>>(),
+                "victory": victory,
             });
             lines.push(line.to_string());
         }
