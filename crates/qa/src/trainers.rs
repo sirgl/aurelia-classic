@@ -66,6 +66,8 @@ pub struct Scene {
     pub rounds: u32,
     /// The enemy's AI units are given the hunt of the nearest learner unit every round.
     pub hunt: bool,
+    /// The enemy's scene units are played by the scripted hunter (`families::enemy_turn`).
+    pub hunter: bool,
     /// War objectives set before the first round (the learner's aim, the enemy's).
     pub aim_learner: Option<TileId>,
     pub aim_enemy: Option<TileId>,

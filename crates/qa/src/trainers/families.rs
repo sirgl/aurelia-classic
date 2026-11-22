@@ -2,6 +2,10 @@
 //!
 //! WIN RULES (fixed before the first run; "lost" counts the learner's scene units that are dead or
 //! captured, "killed" the enemy's combat units dead; a round is a game round, 0 = the start):
+//! The enemy's units in duel, focus, hold, kite, retreat and general are a scripted HUNTER (they strike
+//! at even odds or better, else close on the nearest of ours; ranged keep at range behind a melee unit):
+//! the enemy's AI, given hunt tasks, wandered off the field in the pilot, and a scene nobody attacks in
+//! tests nothing. In hold the hunter commits to the assault (any blow the rules accept).
 //! - duel: every enemy unit dead and one of ours alive within 12 rounds (N of ours, 2-4, against N or,
 //!   from N = 3, N - 1).
 //! - focus: 3 enemy units killed within 4 rounds with at most 1 of ours lost (2 of the 4 foes start
@@ -409,6 +413,7 @@ fn blank(fam: Fam, lab: &Lab, instance: usize, attempt: u32) -> Scene {
         centre: lab.centre,
         rounds: fam.rounds(),
         hunt: false,
+        hunter: false,
         aim_learner: None,
         aim_enemy: None,
         context: None,
@@ -479,7 +484,7 @@ pub fn build(rules: &CompiledRuleset, fam: Fam, era: u8, instance: usize, attemp
                 let piece = p.put(foe, t, *k, "foe");
                 s.theirs.push(piece);
             }
-            s.hunt = true;
+            s.hunter = true;
         }
         Fam::Focus => {
             let a = at(&p, -2, 0)?;
@@ -506,7 +511,7 @@ pub fn build(rules: &CompiledRuleset, fam: Fam, era: u8, instance: usize, attemp
                 }
                 s.theirs.push(piece);
             }
-            s.hunt = true;
+            s.hunter = true;
         }
         Fam::Hold | Fam::Choke | Fam::Citadel => {
             // A wall of impassable land across the map at the centre's column, one pass on hills.
@@ -563,7 +568,7 @@ pub fn build(rules: &CompiledRuleset, fam: Fam, era: u8, instance: usize, attemp
             if fam == Fam::Hold {
                 s.mine = def_pieces;
                 s.theirs = att_pieces;
-                s.hunt = true;
+                s.hunter = true;
             } else {
                 s.mine = att_pieces;
                 s.theirs = def_pieces;
@@ -609,7 +614,7 @@ pub fn build(rules: &CompiledRuleset, fam: Fam, era: u8, instance: usize, attemp
             // Slow melee: the era's melee with the fewest moves.
             // Slow melee: the melee with the fewest moves of the era before (foot against horse).
             let before = lab::EraKinds::of(rules, lab.era.saturating_sub(1));
-            let slow = before.by_arm.get(&Arm::Melee).and_then(|v| v.iter().copied().min_by_key(|k| (rules.units[k.0 as usize].movement, k.0))).ok_or("no melee")?;
+            let slow = before.by_arm.get(&Arm::Melee).and_then(|v| v.iter().copied().min_by_key(|k| (rules.units[k.0 as usize].movement, rules.units[k.0 as usize].strength, k.0))).ok_or("no melee")?;
             let b = at(&p, p.d.range(2, 3), 0)?;
             let m = p.d.range(2, 3) as usize;
             for t in p.spots(b, 1, m)? {
@@ -617,7 +622,7 @@ pub fn build(rules: &CompiledRuleset, fam: Fam, era: u8, instance: usize, attemp
                 s.theirs.push(piece);
             }
             p.clutter(p.d.range(2, 6) as usize, &[]);
-            s.hunt = true;
+            s.hunter = true;
         }
         Fam::Guard | Fam::Convoy => {
             let home_t = at(&p, -6, 0)?;
@@ -844,7 +849,7 @@ pub fn build(rules: &CompiledRuleset, fam: Fam, era: u8, instance: usize, attemp
                 let piece = p.put(foe, t, k, "foe");
                 s.theirs.push(piece);
             }
-            s.hunt = true;
+            s.hunter = true;
         }
         Fam::Flank => {
             let t0 = at(&p, 1, 0)?;
@@ -1226,6 +1231,18 @@ pub fn enemy_turn(rules: &CompiledRuleset, game: &mut GameState, scene: &mut Sce
     let ours = targets_of(&sc, false, false);
     let ours_city = targets_of(&sc, false, true);
     let rel = game.view().auth.turn().round.saturating_sub(sc.start_round);
+    if sc.hunter {
+        // The scripted hunter: every enemy unit strikes at even odds or better, else closes on the
+        // nearest of ours (ranged units keep at their range behind a melee unit).
+        for p in &sc.theirs {
+            let Some(c) = act::alive(game, p, me) else { continue };
+            let ranged = act::range_of(rules, c.kind).is_some();
+            // The assault on the pass commits (a human attacker takes the poor odds of a fortified hill).
+            let nerve = if sc.fam == Fam::Hold { Nerve::Reckless } else { Nerve::Even };
+            act::unit_turn(game, rules, me, foe, p.h, if ranged { &Aim::Support } else { &Aim::Close }, nerve, &ours, &friends);
+        }
+        return;
+    }
     match sc.fam {
         Fam::Choke | Fam::Citadel => {
             for p in &sc.theirs {
