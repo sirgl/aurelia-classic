@@ -112,7 +112,7 @@ fn an_offer_expires_with_its_term() {
     game.execute(&rules, white_peace(P0, P1)).unwrap();
     let lapsed = rounds(&mut game, &rules, INBOX_ROUNDS + 1);
     assert_eq!(waiting(&game), 0);
-    assert_eq!(lapsed, [ClassicChange::OfferLapsed { from: P0, to: P1, peace: false, reason: OfferLapse::Expired }]);
+    assert_eq!(lapsed, [ClassicChange::OfferLapsed { from: P0, to: P1, peace: true, reason: OfferLapse::Expired }]);
 }
 
 /// A war began between the two: an offer that is not a peace is off.
@@ -149,7 +149,7 @@ fn terms_that_cannot_be_met_take_the_offer_off_the_list() {
     assert!(!at_war(&game, P0, P1));
     let lapsed = rounds(&mut game, &rules, 1);
     assert_eq!(waiting(&game), 0);
-    assert_eq!(lapsed, [ClassicChange::OfferLapsed { from: P1, to: P0, peace: false, reason: OfferLapse::NoLongerPossible }]);
+    assert_eq!(lapsed, [ClassicChange::OfferLapsed { from: P1, to: P0, peace: true, reason: OfferLapse::NoLongerPossible }]);
 }
 
 /// The proposer is gone: its offer is off with that reason.
@@ -166,7 +166,7 @@ fn a_nation_that_perishes_takes_its_offer_with_it() {
     let lapsed = rounds(&mut game, &rules, 1);
     assert!(!game.view().auth.players().is_alive(P2), "the last unit was its only holding");
     assert_eq!(waiting(&game), 0);
-    assert_eq!(lapsed, [ClassicChange::OfferLapsed { from: P2, to: P0, peace: false, reason: OfferLapse::NationGone }]);
+    assert_eq!(lapsed, [ClassicChange::OfferLapsed { from: P2, to: P0, peace: true, reason: OfferLapse::NationGone }]);
 }
 
 /// The AI answers at the start of its turn: its inbox keeps an offer one round, as before.
