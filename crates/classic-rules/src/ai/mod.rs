@@ -80,6 +80,7 @@ pub mod improvements;
 pub mod infamy;
 pub mod legal;
 pub mod net;
+pub mod net2;
 #[cfg(feature = "experimental-ai")]
 pub mod net_e2e;
 pub mod operations;

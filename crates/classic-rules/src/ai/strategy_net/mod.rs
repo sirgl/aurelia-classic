@@ -206,73 +206,137 @@ fn sharp_style(logits: Vec<Milli>, features: &[Milli; fe::N], concepts: &[Milli;
     out
 }
 
+/// Additions to the intent's logits before the temperature and the softmax: `net2`'s terms
+/// (`ai::net2`); `Tilt::NONE` for the strategist, whose intent it leaves bit for bit.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct Tilt {
+    pub style: [Milli; 3],
+    pub aim: [Milli; 4],
+    pub posture: [Milli; 4],
+}
+
+impl Tilt {
+    pub const NONE: Tilt = Tilt { style: [0; 3], aim: [0; 4], posture: [0; 4] };
+}
+
+/// The intent's logits before the temperature and the softmax, the concepts they read and the
+/// style's hysteresis margin (the lock's or the plain one).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Logits {
+    pub concepts: [Milli; kc::N],
+    pub style: [Milli; 3],
+    pub aim: [Milli; 4],
+    pub posture: [Milli; 4],
+    pub style_margin: Milli,
+}
+
 /// `intent_of` for a net (`Net`): `sharp`'s concepts, terms and temperatures when `sharp`.
 pub fn intent_net(features: &[Milli; fe::N], held: Held, cities: u32, rounds_left: u32, pace: u32, net: Net) -> Intent {
+    intent_tilted(features, held, cities, rounds_left, pace, net, &Tilt::NONE)
+}
+
+/// `intent_net` with `tilt` added to the logits (`net2`).
+pub fn intent_tilted(features: &[Milli; fe::N], held: Held, cities: u32, rounds_left: u32, pace: u32, net: Net, tilt: &Tilt) -> Intent {
+    intent_from(&logits_net(features, &held, net), features, held, cities, rounds_left, pace, net, tilt)
+}
+
+/// The style's logits: a locked style is the lock's situation with the turn's events; with its margin.
+fn style_logits(features: &[Milli; fe::N], concepts: &[Milli; kc::N], held: &Held, net: Net) -> ([Milli; 3], Milli) {
     let open = net.open;
-    let concepts = concepts_net(features, net);
     let extra_style = |table: &'static [(usize, weights::Term)]| (open && !net.pays_no_style()).then_some(table);
-    let extra_posture = |table: &'static [(usize, weights::Term)]| (open && !net.pays).then_some(table);
-    let temper = |logits: [Milli; 3], t: Milli| if net.sharp { sharp::tempered(&logits, t) } else { logits };
-    let temper4 = |logits: [Milli; 4], t: Milli| if net.sharp { sharp::tempered(&logits, t) } else { logits };
-    // A locked style is the lock's situation with the turn's events.
-    let (style, margin) = match &held.lock {
+    let (situation, lock_concepts, margin) = match &held.lock {
         Some(lock) => {
-            let mut at_lock = lock.situation;
-            for e in weights::STYLE_EVENTS {
-                at_lock[e] = features[e];
-            }
-            if open && !net.pays_no_style() {
-                for e in weights::open::STYLE_EVENTS {
-                    at_lock[e] = features[e];
-                }
-            }
-            if net.sharp {
-                for e in sharp::w::STYLE_EVENTS {
-                    at_lock[e] = features[e];
-                }
-            }
+            let at_lock = lock_situation(lock, features, net);
             // The window of any era is a posture's reason, not a style's: a locked style weighs
             // the opportunity itself (`weights::open::STYLE`), not the window it opens for a few
             // reviews (with the window the conquest style held 35 % of the traced reviews and its
             // prices cost the economy; tuning offsets 200–201).
             let lock_concepts = concepts_net(&at_lock, Net { open: false, sharp: net.sharp, pays: false, threat: 0, tall_first: false });
-            let mut style_logits = logits_of(&weights::STYLE, extra_style(weights::open::STYLE), &at_lock, &lock_concepts);
-            if net.sharp {
-                style_logits = sharp_style(style_logits, &at_lock, &lock_concepts);
-            }
-            if net.tall_first {
-                style_logits[1] += weights::style::WIDE.0;
-            }
-            let margin = if survival(features, &concepts) { weights::HYSTERESIS } else { weights::STYLE_LOCK };
-            (softmax(&temper(<[Milli; 3]>::try_from(style_logits).expect("three styles"), sharp::w::STYLE_TEMPERATURE)), margin)
+            let margin = if survival(features, concepts) { weights::HYSTERESIS } else { weights::STYLE_LOCK };
+            (at_lock, lock_concepts, margin)
         }
-        None => {
-            let mut style_logits = logits_of(&weights::STYLE, extra_style(weights::open::STYLE), features, &concepts);
-            if net.sharp {
-                style_logits = sharp_style(style_logits, features, &concepts);
-            }
-            if net.tall_first {
-                style_logits[1] += weights::style::WIDE.0;
-            }
-            (softmax(&temper(<[Milli; 3]>::try_from(style_logits).expect("three styles"), sharp::w::STYLE_TEMPERATURE)), weights::HYSTERESIS)
-        }
+        None => (*features, *concepts, weights::HYSTERESIS),
     };
+    let mut logits = logits_of(&weights::STYLE, extra_style(weights::open::STYLE), &situation, &lock_concepts);
+    if net.sharp {
+        logits = sharp_style(logits, &situation, &lock_concepts);
+    }
+    if net.tall_first {
+        logits[1] += weights::style::WIDE.0;
+    }
+    (<[Milli; 3]>::try_from(logits).expect("three styles"), margin)
+}
+
+/// The situation of a style's lock with the turn's events.
+fn lock_situation(lock: &StyleLock, features: &[Milli; fe::N], net: Net) -> [Milli; fe::N] {
+    let mut at_lock = lock.situation;
+    for e in weights::STYLE_EVENTS {
+        at_lock[e] = features[e];
+    }
+    if net.open && !net.pays_no_style() {
+        for e in weights::open::STYLE_EVENTS {
+            at_lock[e] = features[e];
+        }
+    }
+    if net.sharp {
+        for e in sharp::w::STYLE_EVENTS {
+            at_lock[e] = features[e];
+        }
+    }
+    at_lock
+}
+
+/// The intent's logits of a net (before the temperatures and the softmax).
+pub fn logits_net(features: &[Milli; fe::N], held: &Held, net: Net) -> Logits {
+    let open = net.open;
+    let concepts = concepts_net(features, net);
+    let extra_style = |table: &'static [(usize, weights::Term)]| (open && !net.pays_no_style()).then_some(table);
+    let extra_posture = |table: &'static [(usize, weights::Term)]| (open && !net.pays).then_some(table);
+    let (style, style_margin) = style_logits(features, &concepts, held, net);
     let mut aim_logits = logits_of(&weights::AIM, extra_style(weights::open::AIM), features, &concepts);
     if net.sharp {
         aim_logits = sharpened(aim_logits, sharp::w::AIM, features, &concepts);
     }
     // The model of the rivals (`weights::rival`, every weight 0 until trained).
     let aim_logits = sharpened(aim_logits, weights::rival::AIM, features, &concepts);
-    let aim = softmax(&temper4(<[Milli; 4]>::try_from(aim_logits).expect("four aims"), sharp::w::AIM_TEMPERATURE));
     let mut posture_logits = sharpened(logits_of(&weights::POSTURE, extra_posture(weights::open::POSTURE), features, &concepts), weights::rival::POSTURE, features, &concepts);
     for (at, w, _) in weights::threat::POSTURE {
         posture_logits[*at] += w * net.threat / ONE;
     }
-    let posture = softmax(&temper4(<[Milli; 4]>::try_from(posture_logits).expect("four postures"), sharp::w::POSTURE_TEMPERATURE));
-    let style_pick = hold(&style, held.style, margin);
+    let aim = <[Milli; 4]>::try_from(aim_logits).expect("four aims");
+    let posture = <[Milli; 4]>::try_from(posture_logits).expect("four postures");
+    Logits { concepts, style, aim, posture, style_margin }
+}
+
+/// `logits` plus `tilt`, element by element.
+fn tilted<const N: usize>(logits: &[Milli; N], tilt: &[Milli; N]) -> [Milli; N] {
+    let mut out = *logits;
+    for (o, t) in out.iter_mut().zip(tilt) {
+        *o += t;
+    }
+    out
+}
+
+/// The intent of logits: the softmaxes (with `sharp`'s temperatures), the held picks, the cities
+/// wanted and the horizon.
+#[allow(clippy::too_many_arguments)]
+pub fn intent_from(logits: &Logits, features: &[Milli; fe::N], held: Held, cities: u32, rounds_left: u32, pace: u32, net: Net, tilt: &Tilt) -> Intent {
+    let temper = |logits: [Milli; 3], t: Milli| if net.sharp { sharp::tempered(&logits, t) } else { logits };
+    let temper4 = |logits: [Milli; 4], t: Milli| if net.sharp { sharp::tempered(&logits, t) } else { logits };
+    let concepts = logits.concepts;
+    let style = softmax(&temper(tilted(&logits.style, &tilt.style), sharp::w::STYLE_TEMPERATURE));
+    let aim = softmax(&temper4(tilted(&logits.aim, &tilt.aim), sharp::w::AIM_TEMPERATURE));
+    let posture = softmax(&temper4(tilted(&logits.posture, &tilt.posture), sharp::w::POSTURE_TEMPERATURE));
+    let style_pick = hold(&style, held.style, logits.style_margin);
     let aim_pick = hold(&aim, held.aim, weights::HYSTERESIS);
     let posture_pick = hold(&posture, held.posture, weights::HYSTERESIS);
-    // More cities: each style's rows weighed by its share.
+    let more_cities = more_cities_of(&style, &concepts, features, cities);
+    let horizon = horizon_of(&style, &aim, &posture, &concepts, features, rounds_left, pace, net);
+    Intent { concepts, style, aim, posture, style_pick, aim_pick, posture_pick, more_cities, horizon, locked: held.lock.is_some(), sharp: net.sharp, tall_real: false, science_first: false }
+}
+
+/// More cities: each style's rows weighed by its share.
+fn more_cities_of(style: &[Milli; 3], concepts: &[Milli; kc::N], features: &[Milli; fe::N], cities: u32) -> u32 {
     let room = features[fe::ROOM] * 6; // free sites, thousandths
     let mut more: Milli = 0;
     for (s, (per_site, base, _)) in weights::CITY_ROWS.iter().enumerate() {
@@ -286,7 +350,12 @@ pub fn intent_net(features: &[Milli; fe::N], held: Held, cities: u32, rounds_lef
     if concepts[kc::HAPPINESS_CRISIS] < ONE / 2 {
         more_cities = more_cities.max(u64::from(floor));
     }
-    // The horizon.
+    more_cities as u32
+}
+
+/// The horizon H in rounds of the game's speed.
+#[allow(clippy::too_many_arguments)]
+fn horizon_of(style: &[Milli; 3], aim: &[Milli; 4], posture: &[Milli; 4], concepts: &[Milli; kc::N], features: &[Milli; fe::N], rounds_left: u32, pace: u32, net: Net) -> u32 {
     let share = |name: &str| -> Milli {
         match name {
             "style_tall" => style[0],
@@ -307,8 +376,7 @@ pub fn intent_net(features: &[Milli; fe::N], held: Held, cities: u32, rounds_lef
         }
     }
     let h = (h / ONE).clamp(weights::HORIZON_MIN, weights::HORIZON_MAX);
-    let horizon = (h * i64::from(pace.max(1)) / 100).clamp(1, i64::from(rounds_left.max(1))) as u32;
-    Intent { concepts, style, aim, posture, style_pick, aim_pick, posture_pick, more_cities: more_cities as u32, horizon, locked: held.lock.is_some(), sharp: net.sharp, tall_real: false, science_first: false }
+    (h * i64::from(pace.max(1)) / 100).clamp(1, i64::from(rounds_left.max(1))) as u32
 }
 
 /// The 13 rows of the price layer: the 11 shares and the 2 gates.
@@ -325,10 +393,18 @@ pub fn rows(intent: &Intent) -> [Milli; 13] {
 /// Layer 2: the price multipliers of an intent (food 1000: the cell sets
 /// it).
 pub fn price_mult(intent: &Intent) -> [Milli; pd::N] {
+    price_mult_tilted(intent, &[0; pd::N])
+}
+
+/// `price_mult` with `tilt` added to each multiplier before the bounds (`net2`'s price terms).
+pub fn price_mult_tilted(intent: &Intent, tilt: &[Milli; pd::N]) -> [Milli; pd::N] {
     let rows = if intent.sharp { sharp::rows(intent) } else { rows(intent) };
     let mut mult = [ONE; pd::N];
     for (row, price, w, _) in weights::PRICE_ROWS {
         mult[*price] += rows[*row] * w / ONE * weights::PRICE_GAIN / ONE;
+    }
+    for (m, t) in mult.iter_mut().zip(tilt) {
+        *m += t;
     }
     for m in mult.iter_mut() {
         *m = (*m).clamp(weights::PRICE_MIN, weights::PRICE_MAX);
@@ -471,6 +547,9 @@ pub struct Memory {
     /// The samples of the rivals' screens (`ai::rival_model::Book`): written before `sharp`'s
     /// section (after the retake's) behind its marker (`RIVAL_SECTION`), only when there is one.
     pub rival_book: crate::ai::rival_model::Book,
+    /// `net2`'s own (`ai::net2::plan::Memory2`): a section after the rivals' book and before `sharp`'s
+    /// (`NET2_SECTION`), only when there is one, so the other variants' memory keeps its bytes.
+    pub net2: Option<crate::ai::net2::plan::Memory2>,
 }
 
 /// A review of the goals and of the cell's prices.
@@ -497,6 +576,9 @@ const NEXT_SECTION: u8 = 0x5D;
 const RETAKE_SECTION: u8 = 0x5E;
 /// The marker of the rivals' book (`Memory::rival_book`), after the retake's and before `sharp`'s section (0x5E was its marker on its own branch, which the retake line took first).
 const RIVAL_SECTION: u8 = 0x5F;
+/// The marker of `net2`'s section (a length of two bytes, then its body, `ai::net2::memory`), after the
+/// rivals' book and before `sharp`'s; the memory's encode is its only writer.
+const NET2_SECTION: u8 = 0x60;
 
 /// The bytes of a section of `marker`: the marker and its numbers, eight bytes each (`next`'s:
 /// the rivals and the science victory's fit too, −1 for none).
@@ -620,6 +702,12 @@ impl Memory {
             w.0.push(RIVAL_SECTION);
             self.rival_book.encode(&mut w.0);
         }
+        if let Some(m) = &self.net2 {
+            let body = m.encode();
+            w.0.push(NET2_SECTION);
+            w.0.extend_from_slice(&(body.len() as u16).to_le_bytes());
+            w.0.extend_from_slice(&body);
+        }
         if let Some(m) = &self.sharp {
             let next = m.rivals.is_some() || m.fits.is_some();
             w.0.push(if next { NEXT_SECTION } else { SHARP_SECTION });
@@ -733,6 +821,16 @@ impl Memory {
                 None => r.0 = &[],
             }
         }
+        // `net2`'s section: its marker, a length and its body; one that does not read is none.
+        let net2 = if r.0.first() == Some(&NET2_SECTION) {
+            r.u8()?;
+            let len = usize::from(u16::from_le_bytes(r.take::<2>()?));
+            let (body, rest) = r.0.split_at_checked(len)?;
+            r.0 = rest;
+            crate::ai::net2::plan::Memory2::decode(body)
+        } else {
+            None
+        };
         // `sharp`'s section: its marker and numbers, the memory's last bytes (`section_len`).
         let sharp = match r.0.first().copied() {
             Some(marker) if section_len(marker) == Some(r.0.len()) => {
@@ -743,7 +841,7 @@ impl Memory {
             }
             _ => None,
         };
-        Some(Memory { held, survey, review, target, sharp, retake, rival_book })
+        Some(Memory { held, survey, review, target, sharp, retake, rival_book, net2 })
     }
 }
 
@@ -773,70 +871,137 @@ pub fn branch_complete(rules: &CompiledRuleset, policies: &[PolicyId], branch: P
         .all(|(i, _)| policies.contains(&PolicyId(i as u16)))
 }
 
+/// What a turn of the net reads: the observation, the brief, the rules and the allocator's prices.
+#[derive(Clone, Copy)]
+pub struct Seat<'a, 'o> {
+    pub obs: &'a AIObservation<'o>,
+    pub brief: &'a crate::ai::planner::TurnBrief,
+    pub rules: &'a CompiledRuleset,
+    pub prices: &'a Prices,
+}
+
+impl Seat<'_, '_> {
+    fn cities(&self) -> u32 {
+        self.obs.own_cities.len() as u32
+    }
+
+    fn pace(&self) -> u32 {
+        self.obs.speed.pace_percent.max(1)
+    }
+
+    /// `rounds` Standard rounds at the game's pace (at least 1).
+    fn paced(&self, rounds: u32) -> u32 {
+        (rounds * self.pace() / 100).max(1)
+    }
+}
+
+/// The situation of a turn (layer 0), the model of the rivals it read and whether the land was surveyed.
+#[derive(Debug, Clone)]
+pub struct Situation {
+    pub features: [Milli; fe::N],
+    pub rivals: crate::ai::rival_model::Rivals,
+    pub survey_due: bool,
+}
+
 /// The net's turn for a nation: the situation, the intent (held by the
 /// memory's hysteresis), the prices, and every few rounds the goals; the
 /// memory is written back. `prices` are the allocator's of the turn.
 /// `stakes`: the leader's in a war (`grand_strategy::Stakes`), read by `war-open` alone.
 pub fn think(obs: &AIObservation<'_>, brief: &crate::ai::planner::TurnBrief, state: &mut AiState, rules: &CompiledRuleset, prices: &Prices, stakes: &crate::ai::grand_strategy::Stakes) -> Plan {
+    let seat = Seat { obs, brief, rules, prices };
     let mut memory = Memory::decode(&state.mind_memory);
-    let round = obs.round;
-    let cities = obs.own_cities.len() as u32;
-    let pace = obs.speed.pace_percent.max(1);
-    let paced = |rounds: u32| (rounds * pace / 100).max(1);
-    let survey_due = memory.survey.as_ref().is_none_or(|s| round >= s.round + paced(weights::goal::SURVEY_ROUNDS) || s.cities != cities);
-    if survey_due {
-        let mut survey = features::survey(obs, rules, state);
-        if brief.sharp {
-            sharp::survey(obs, state, &mut survey);
-        }
-        memory.survey = Some(survey);
-    }
+    let situation = situation(seat, state, stakes, &mut memory);
+    // `strategist-x`: the rival running away (`threat`), a term of the posture; tall first.
+    let parts = brief.strategist;
+    let threat = if parts.threat { threat::assess(&situation.rivals) } else { None };
+    let net = Net { open: brief.war_open, sharp: brief.sharp, pays: brief.war_pays, threat: threat.map_or(0, |t| t.level), tall_first: parts.tall_first };
+    let intent = intent_step(seat, &mut memory, &situation, net, &Tilt::NONE);
+    plan_with_intent(seat, state, memory, &situation, intent, &[0; pd::N], wishes::Wishes { threat })
+}
+
+/// Layer 0 of a turn: the land survey when due, the features, the model of the rivals (its book
+/// sampled when due), all kept in `memory`.
+pub fn situation(seat: Seat<'_, '_>, state: &AiState, stakes: &crate::ai::grand_strategy::Stakes, memory: &mut Memory) -> Situation {
+    let Seat { obs, brief, rules, prices } = seat;
+    let survey_due = survey_step(seat, state, memory);
     let survey = memory.survey.expect("surveyed above");
-    let mut situation = features::situation(obs, brief, rules, &survey);
+    let mut features = features::situation(obs, brief, rules, &survey);
     if brief.war_open {
         // `war-open`: what the war machine sees (`features::open`).
-        features::open(obs, brief, state, rules, prices, stakes, &mut situation);
+        features::open(obs, brief, state, rules, prices, stakes, &mut features);
     }
     if brief.sharp {
         // `sharp`: the features on scales that keep moving and its new inputs (`sharp::features`).
-        sharp::features(obs, brief, rules, state, &mut memory.sharp, survey_due, &mut situation);
+        sharp::features(obs, brief, rules, state, &mut memory.sharp, survey_due, &mut features);
     }
     // The model of the rivals from the public screens (`ai::rival_model`): inputs of every variant's
     // net, read with weight 0 (`weights::rival`); the book samples the screens for the trends.
     let rivals = crate::ai::rival_model::estimate(obs, rules, &memory.rival_book);
-    features::rivals(&rivals, &mut situation);
-    if memory.rival_book.due(round, pace) {
-        memory.rival_book.record(obs.player, &rivals, pace);
+    features::rivals(&rivals, &mut features);
+    if memory.rival_book.due(obs.round, seat.pace()) {
+        memory.rival_book.record(obs.player, &rivals, seat.pace());
     }
-    let rounds_left = prices.rounds_left;
-    // `strategist-x`: the rival running away (`threat`), a term of the posture; tall first.
-    let parts = brief.strategist;
-    let threat = if parts.threat { threat::assess(&rivals) } else { None };
-    let net = Net { open: brief.war_open, sharp: brief.sharp, pays: brief.war_pays, threat: threat.map_or(0, |t| t.level), tall_first: parts.tall_first };
-    let mut intent = intent_net(&situation, memory.held, cities, rounds_left, pace, net);
-    // The style is locked when the first branch may be opened after the
-    // first survey of the surroundings, at the latest `LOCK_MAX_ROUNDS`.
-    let mut lock = memory.held.lock;
-    if lock.is_none() {
-        let opened = obs.culture.branches.iter().any(|b| branches::is_normal(rules, *b));
-        let may_open = obs.culture.unlockable.iter().any(|b| branches::is_normal(rules, *b));
-        if round >= paced(weights::LOCK_MAX_ROUNDS) || round >= paced(weights::LOCK_MIN_ROUNDS) && (opened || may_open) {
-            lock = Some(StyleLock { round, situation });
-            intent.locked = true;
-            trace::lock(obs.player.0, round, &intent);
+    Situation { features, rivals, survey_due }
+}
+
+/// The land survey, every `SURVEY_ROUNDS` paced rounds or when the city count changes: whether it ran.
+fn survey_step(seat: Seat<'_, '_>, state: &AiState, memory: &mut Memory) -> bool {
+    let round = seat.obs.round;
+    let cities = seat.cities();
+    let due = memory.survey.as_ref().is_none_or(|s| round >= s.round + seat.paced(weights::goal::SURVEY_ROUNDS) || s.cities != cities);
+    if due {
+        let mut survey = features::survey(seat.obs, seat.rules, state);
+        if seat.brief.sharp {
+            sharp::survey(seat.obs, state, &mut survey);
         }
+        memory.survey = Some(survey);
     }
+    due
+}
+
+/// Layer 1 of a turn: the intent of the situation with `tilt` on its logits, the style's lock, the
+/// tall play; the picks are held in `memory`.
+pub fn intent_step(seat: Seat<'_, '_>, memory: &mut Memory, situation: &Situation, net: Net, tilt: &Tilt) -> Intent {
+    let obs = seat.obs;
+    let round = obs.round;
+    let mut intent = intent_tilted(&situation.features, memory.held, seat.cities(), seat.prices.rounds_left, seat.pace(), net, tilt);
+    let lock = lock_step(seat, memory.held.lock, &situation.features, &mut intent);
     if let Some(from) = memory.held.style.filter(|s| *s != intent.style_pick) {
         trace::style_change(obs.player.0, round, from, &intent);
     }
-    // `tall-real`: a tall seat where the science victory fits the game aims at it
-    // (`ai::tall_real`); its city count is the rules' size model's.
-    // `next`: whether the science victory fits the seat's game, judged once at the lock
-    // (`tall_real::science_fits`) and kept in `sharp`'s memory.
+    tall_real_step(seat, memory, lock.is_some(), &mut intent);
+    memory.held = Held { style: Some(intent.style_pick), aim: Some(intent.aim_pick), posture: Some(intent.posture_pick), lock };
+    intent
+}
+
+/// The style is locked when the first branch may be opened after the
+/// first survey of the surroundings, at the latest `LOCK_MAX_ROUNDS`.
+fn lock_step(seat: Seat<'_, '_>, held: Option<StyleLock>, situation: &[Milli; fe::N], intent: &mut Intent) -> Option<StyleLock> {
+    if held.is_some() {
+        return held;
+    }
+    let (obs, rules) = (seat.obs, seat.rules);
+    let round = obs.round;
+    let opened = obs.culture.branches.iter().any(|b| branches::is_normal(rules, *b));
+    let may_open = obs.culture.unlockable.iter().any(|b| branches::is_normal(rules, *b));
+    if round >= seat.paced(weights::LOCK_MAX_ROUNDS) || round >= seat.paced(weights::LOCK_MIN_ROUNDS) && (opened || may_open) {
+        intent.locked = true;
+        trace::lock(obs.player.0, round, intent);
+        return Some(StyleLock { round, situation: *situation });
+    }
+    None
+}
+
+/// `tall-real`: a tall seat where the science victory fits the game aims at it
+/// (`ai::tall_real`); its city count is the rules' size model's.
+/// `next`: whether the science victory fits the seat's game, judged once at the lock
+/// (`tall_real::science_fits`) and kept in `sharp`'s memory.
+fn tall_real_step(seat: Seat<'_, '_>, memory: &mut Memory, locked: bool, intent: &mut Intent) {
+    let Seat { obs, brief, rules, prices } = seat;
     let next_fit = brief.next;
     let fits = if next_fit {
         let held = memory.sharp.and_then(|m| m.fits);
-        let fits = held.or_else(|| lock.is_some().then(|| crate::ai::tall_real::science_fits(obs, rules, prices.rounds_left)));
+        let fits = held.or_else(|| locked.then(|| crate::ai::tall_real::science_fits(obs, rules, prices.rounds_left)));
         if let Some(m) = memory.sharp.as_mut() {
             m.fits = fits;
         }
@@ -851,51 +1016,75 @@ pub fn think(obs: &AIObservation<'_>, brief: &crate::ai::planner::TurnBrief, sta
         intent.science_first = !brief.next;
         intent.aim_pick = weights::AIM_SCIENCE;
         let target = crate::ai::tall_real::city_target(obs, rules, prices.rounds_left, next_fit);
-        intent.more_cities = target.saturating_sub(cities);
+        intent.more_cities = target.saturating_sub(seat.cities());
     }
-    memory.held = Held { style: Some(intent.style_pick), aim: Some(intent.aim_pick), posture: Some(intent.posture_pick), lock };
-    let mut mult = price_mult(&intent);
-    let at_war = situation[fe::AT_WAR] > 0;
-    let lost = memory.review.as_ref().is_some_and(|r| r.goals.iter().any(|g| !goal_alive(obs, rules, g)));
-    let review_due = memory.review.as_ref().is_none_or(|r| round >= r.round + paced(weights::goal::REVIEW_ROUNDS) || r.cities != cities || r.at_war != at_war) || lost;
-    let base = Base::of(prices);
-    if review_due && !obs.own_cities.is_empty() {
-        let model = model::Model::of_observation(obs, rules);
-        let review = goals::review(&model, rules, &intent, &mut mult, &base, round, at_war);
-        memory.review = Some(review);
-    }
+}
+
+/// Layer 2 and the goals of a turn: the prices of the intent with `price_tilt` added, the goals'
+/// review when due, the research target, the city target; the memory is written back to `state`.
+pub fn plan_with_intent(seat: Seat<'_, '_>, state: &mut AiState, mut memory: Memory, situation: &Situation, intent: Intent, price_tilt: &[Milli; pd::N], wishes: wishes::Wishes) -> Plan {
+    let obs = seat.obs;
+    let round = obs.round;
+    let mut mult = price_mult_tilted(&intent, price_tilt);
+    let review_due = review_step(seat, &mut memory, &intent, &mut mult, situation.features[fe::AT_WAR] > 0);
     let review = memory.review.clone().unwrap_or_default();
     if review.food > 0 {
         mult[pd::FOOD] = review.food;
     }
-    // The research target: the held one while its goal stays, else the
-    // first goal's; another goal's replaces it when its rate leads by 15 %.
-    let goal_end = |g: &Goal| g.path.last().copied();
-    let held = memory.target.and_then(|t| review.goals.iter().find(|g| goal_end(g) == Some(t)).filter(|_| !obs.economy.techs.contains(&t)));
-    let best = review.goals.iter().filter(|g| goal_end(g).is_some()).max_by_key(|g| g.rate);
-    let target = match (held, best) {
-        (Some(h), Some(b)) if b.rate * ONE > h.rate * weights::head::KEEP_MARGIN => goal_end(b),
-        (Some(h), _) => goal_end(h),
-        (None, Some(b)) => goal_end(b),
-        (None, None) => None,
-    };
+    let target = research_target(obs, memory.target, &review);
     memory.target = target;
     state.mind_memory = memory.encode();
-    // The rules' city model is the ceiling (`brief.tall_cities`: the count with
-    // the most science per research cost); wide and conquest play may pass it.
-    let mut city_target = cities + intent.more_cities;
-    if let Some(model) = brief.tall_cities.filter(|_| !intent.tall_real) {
-        let allowance = (intent.style[1] * weights::CITY_CEILING_WIDE + intent.style[2] * weights::CITY_CEILING_CONQUEST) / ONE / ONE;
-        city_target = city_target.min(model + allowance as u32).max(cities);
-    }
-    let wishes = wishes::Wishes { threat };
-    let plan = Plan { round, features: situation, intent, mult, goals: review.goals.clone(), target, city_target, growth: review.growth.clone(), war_open: brief.war_open, wishes };
-    trace::turn(obs.player.0, &plan, review_due, rules);
+    let city_target = city_target_of(seat, &intent);
+    let plan = Plan { round, features: situation.features, intent, mult, goals: review.goals.clone(), target, city_target, growth: review.growth.clone(), war_open: seat.brief.war_open, wishes };
+    trace::turn(obs.player.0, &plan, review_due, seat.rules);
     if review_due {
-        trace::rivals(obs.player.0, &rivals);
+        trace::rivals(obs.player.0, &situation.rivals);
     }
     if review_due {
         trace::diplo(obs, state, &plan.intent);
     }
     plan
+}
+
+/// The goals' review, every `REVIEW_ROUNDS` paced rounds, on a change of the city count or of the
+/// war, or when a goal is lost: whether it was due.
+fn review_step(seat: Seat<'_, '_>, memory: &mut Memory, intent: &Intent, mult: &mut [Milli; pd::N], at_war: bool) -> bool {
+    let (obs, rules) = (seat.obs, seat.rules);
+    let round = obs.round;
+    let cities = seat.cities();
+    let lost = memory.review.as_ref().is_some_and(|r| r.goals.iter().any(|g| !goal_alive(obs, rules, g)));
+    let review_due = memory.review.as_ref().is_none_or(|r| round >= r.round + seat.paced(weights::goal::REVIEW_ROUNDS) || r.cities != cities || r.at_war != at_war) || lost;
+    let base = Base::of(seat.prices);
+    if review_due && !obs.own_cities.is_empty() {
+        let model = model::Model::of_observation(obs, rules);
+        let review = goals::review(&model, rules, intent, mult, &base, round, at_war);
+        memory.review = Some(review);
+    }
+    review_due
+}
+
+/// The research target: the held one while its goal stays, else the
+/// first goal's; another goal's replaces it when its rate leads by 15 %.
+fn research_target(obs: &AIObservation<'_>, held_target: Option<TechId>, review: &Review) -> Option<TechId> {
+    let goal_end = |g: &Goal| g.path.last().copied();
+    let held = held_target.and_then(|t| review.goals.iter().find(|g| goal_end(g) == Some(t)).filter(|_| !obs.economy.techs.contains(&t)));
+    let best = review.goals.iter().filter(|g| goal_end(g).is_some()).max_by_key(|g| g.rate);
+    match (held, best) {
+        (Some(h), Some(b)) if b.rate * ONE > h.rate * weights::head::KEEP_MARGIN => goal_end(b),
+        (Some(h), _) => goal_end(h),
+        (None, Some(b)) => goal_end(b),
+        (None, None) => None,
+    }
+}
+
+/// The rules' city model is the ceiling (`brief.tall_cities`: the count with
+/// the most science per research cost); wide and conquest play may pass it.
+fn city_target_of(seat: Seat<'_, '_>, intent: &Intent) -> u32 {
+    let cities = seat.cities();
+    let mut city_target = cities + intent.more_cities;
+    if let Some(model) = seat.brief.tall_cities.filter(|_| !intent.tall_real) {
+        let allowance = (intent.style[1] * weights::CITY_CEILING_WIDE + intent.style[2] * weights::CITY_CEILING_CONQUEST) / ONE / ONE;
+        city_target = city_target.min(model + allowance as u32).max(cities);
+    }
+    city_target
 }
