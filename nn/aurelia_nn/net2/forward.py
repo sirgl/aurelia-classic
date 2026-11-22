@@ -37,6 +37,7 @@ TEMPERATURES = (600, 600, 1000)
 KIND_ORDER = ("prey", "retake", "spoiler", "duty", "border")
 BUDGETS = {"prey": 25, "retake": 20, "spoiler": 30, "duty": 15, "border": 15, "overseas": 30}
 SPENT_ROUNDS = 20
+PREPARE_ROUNDS = 30
 
 
 class Arith:
@@ -146,6 +147,23 @@ def seat_concepts(W, turn, ar):
     return [fire(W.neurons[name], frame, ar) for name in W.seat]
 
 
+def eases(W, turn, ar):
+    """The ease of every target (`weights::EASE`)."""
+    return [fire(W.neurons["ease"], {"T": target["t"]}, ar) for target in turn.get("targets", [])]
+
+
+def with_soft(W, turn, ease):
+    """The turn with each rival's `soft` (R27) set to the largest ease of its targets (`levers::soft_of`)."""
+    soft = W.r["soft"]
+    rivals = []
+    for rival in turn["rivals"]:
+        best = max([e for t, e in zip(turn.get("targets", []), ease) if t["rival"] == rival["id"]], default=0)
+        r = list(rival["r"])
+        r[soft] = best
+        rivals.append(dict(rival, r=r))
+    return dict(turn, rivals=rivals)
+
+
 def rival_concepts(W, turn, seat, ar, recorded=None):
     """Each rival's concepts in order; a concept reads the earlier ones (the recorded ones with `recorded`)."""
     out = []
@@ -174,29 +192,58 @@ def paced(rounds, pace):
     return max(1, rounds * max(pace, 1) // 100)
 
 
-def _judge(W, order, rivals, qs, war_gain, rnd):
+def _judge(W, order, rivals, qs, war_gain, rnd, pace):
     found = [(r, q) for r, q in zip(rivals, qs) if r["id"] == order["rival"]]
     if not found:
         return "dropped", None
     r, q = found[0][0]["r"], found[0][1]
     value = q[W.q["war_value"]]
-    in_budget = rnd <= order["since"] + order["budget"]
+    at_war = r[W.r["at_war"]] > 0
+    war_since = order.get("war_since")
+    if war_since is None and at_war:
+        war_since = rnd
+    elif war_since is not None and not at_war:
+        return "dropped", None
+    if war_since is None:
+        in_budget = rnd <= order["since"] + paced(PREPARE_ROUNDS, pace)
+    else:
+        in_budget = rnd <= war_since + order["budget"]
     retaking = r[W.r["retake_case"]] > 0
     pays = r[W.r["captured_recent"]] > 0 or retaking
+    kept = dict(order, value=value, war_since=war_since)
     if value >= W.gates["war_keep"] and (in_budget or pays):
-        return "keep", dict(order, value=value)
+        return "keep", kept
+    if in_budget and r[W.r["operating"]] > 0:
+        return "keep", kept
     if not in_budget and war_gain <= ONE // 2 and not retaking:
         return "spent", None
     return "dropped", None
 
 
-def war_plan(W, turn, qs):
-    """The war order and the spent ones after the turn (`levers::war_plan`)."""
+def aimed(order, turn, ease):
+    """The order's aim: its rival's easiest target, the first on a tie; none for a retake (`levers::aimed`)."""
+    if order is None:
+        return None
+    best = None
+    if order["kind"] != "retake":
+        for target, e in zip(turn.get("targets", []), ease):
+            if target["rival"] == order["rival"] and (best is None or e > best[1]):
+                best = (target["city"], e)
+    return dict(order, aim=best[0] if best else None)
+
+
+def war_plan(W, turn, qs, ease):
+    """The war order and the spent ones after the turn (`levers::war_plan`, `levers::aimed`)."""
+    core = _war_plan(W, turn, qs)
+    return {"war": aimed(core["war"], turn, ease), "spent": core["spent"]}
+
+
+def _war_plan(W, turn, qs):
     rnd, pace, held = turn["round"], turn["pace"], turn["held"]
     spent = [s for s in held["spent"] if s[1] > rnd]
     order = held["war"]
     if order is not None:
-        verdict, kept = _judge(W, order, turn["rivals"], qs, turn["g"][W.names["g"].index("war_gain")], rnd)
+        verdict, kept = _judge(W, order, turn["rivals"], qs, turn["g"][W.names["g"].index("war_gain")], rnd, pace)
         if verdict == "keep":
             return {"war": kept, "spent": spent}
         if verdict == "spent":
@@ -211,7 +258,8 @@ def war_plan(W, turn, qs):
     if best is None:
         return {"war": None, "spent": spent}
     kind = best[2]
-    order = {"rival": best[0]["id"], "kind": kind, "since": rnd, "budget": paced(BUDGETS[kind], pace), "value": best[1]}
+    war_since = rnd if best[0]["r"][W.r["at_war"]] > 0 else None
+    order = {"rival": best[0]["id"], "kind": kind, "since": rnd, "budget": paced(BUDGETS[kind], pace), "war_since": war_since, "value": best[1]}
     return {"war": order, "spent": spent}
 
 
@@ -285,18 +333,20 @@ def levers(W, turn, seat, qs, core, aggs, ys, ar):
 def forward(W: Weights, turn: dict, ar: Arith = FLOAT, teacher: dict | None = None) -> dict:
     """One turn's neurons (the keys of a trace line's `out`)."""
     t = teacher or {}
+    ease = eases(W, turn, ar)
+    turn = with_soft(W, turn, t.get("ease", ease))
     seat = seat_concepts(W, turn, ar)
     s_in = t.get("s", seat)
     qs = rival_concepts(W, turn, s_in, ar, recorded=t.get("q"))
     q_in = t.get("q", qs)
-    core = war_plan(W, turn, q_in)
+    core = war_plan(W, turn, q_in, t.get("ease", ease))
     core_in = t.get("core", core)
     aggs = aggregates(W, turn, q_in, core_in)
     a_in = t.get("a", aggs)
     tilts = tilt(W, s_in, a_in, ar)
     ys = shares(turn, t.get("tilt", tilts), ar)
     y_in = t.get("y", ys)
-    out = {"s": seat, "q": qs, "core": core, "a": aggs, "tilt": tilts, "y": ys}
+    out = {"s": seat, "ease": ease, "q": qs, "core": core, "a": aggs, "tilt": tilts, "y": ys}
     out.update(levers(W, turn, s_in, q_in, core_in, a_in, y_in, ar))
     return out
 
@@ -314,7 +364,7 @@ def deviation(a, b) -> float:
     return abs(float(a) - float(b))
 
 
-NEURONS = ("s", "q", "a", "tilt", "y", "peace", "guard", "military", "cs_gold_share")
+NEURONS = ("s", "ease", "q", "a", "tilt", "y", "peace", "guard", "military", "cs_gold_share")
 DECISIONS = ("core", "peace_with", "deny_help", "embargo")
 
 

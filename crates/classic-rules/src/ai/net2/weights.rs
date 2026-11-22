@@ -15,6 +15,7 @@
 //! | `A` | the aggregates over the rivals and the war order (`a`) | `levers` |
 //! | `Y` | the intent's shares: 3 styles, 4 aims, 4 postures (`y`) | `strategy_net::intent_from` |
 //! | `C` | one city's guard inputs (`c`) | `levers` |
+//! | `T` | one known rival city's target inputs T1–T4 (`t`) | part A |
 //!
 //! Deviations from the design's formulas, each a defect of the class "a war kind opens without the
 //! thing it is about": `prey` and `duty` need the reach (the design's would order a war on a disarmed
@@ -37,6 +38,7 @@ pub enum Src {
     A(usize),
     Y(usize),
     C(usize),
+    T(usize),
 }
 
 /// How a term reads its source `x` (0…1000).
@@ -104,8 +106,10 @@ pub mod g {
     pub const GOLD_STOCK: usize = 7;
     pub const CS_ALLIES: usize = 8;
     pub const CS_CONTESTED: usize = 9;
-    pub const N: usize = 10;
-    pub const NAMES: [&str; N] = ["capital_lost", "cities_lost", "war_rounds", "war_gain", "unhappy_trend", "embark", "enemy_air", "gold_stock", "cs_allies", "cs_contested"];
+    pub const OWN_INFAMY: usize = 10;
+    pub const TIES_AT_RISK: usize = 11;
+    pub const N: usize = 12;
+    pub const NAMES: [&str; N] = ["capital_lost", "cities_lost", "war_rounds", "war_gain", "unhappy_trend", "embark", "enemy_air", "gold_stock", "cs_allies", "cs_contested", "own_infamy", "ties_at_risk"];
 }
 
 /// A rival's inputs (`plan::RivalInputs` in order).
@@ -136,10 +140,14 @@ pub mod r {
     pub const SCORE: usize = 23;
     pub const RETAKE_CASE: usize = 24;
     pub const CAPTURED_RECENT: usize = 25;
-    pub const N: usize = 26;
+    /// The largest `ease` of its targets (`EASE`): the core's aggregate of the T rows, before the rival concepts.
+    pub const SOFT: usize = 26;
+    /// An operation of ours against it forms or marches (0/1000).
+    pub const OPERATING: usize = 27;
+    pub const N: usize = 28;
     pub const NAMES: [&str; N] = [
         "near", "land", "sea", "soldiers", "seen_army", "open_cities", "tree", "lead", "pace", "culture", "stack", "warmonger", "betrayed", "denounced_us", "friend", "pact", "at_war",
-        "war_rounds", "holds_capital", "holds_cities", "grab", "ally_hit", "local", "score", "retake_case", "captured_recent",
+        "war_rounds", "holds_capital", "holds_cities", "grab", "ally_hit", "local", "score", "retake_case", "captured_recent", "soft", "operating",
     ];
 }
 
@@ -149,7 +157,9 @@ pub mod s {
     pub const CAPITAL_FALL: usize = 1;
     pub const CITY_STATE_ROOM: usize = 2;
     pub const AIR_NEED: usize = 3;
-    pub const N: usize = 4;
+    pub const INFAMY_COST: usize = 4;
+    pub const LATE: usize = 5;
+    pub const N: usize = 6;
 }
 
 /// A rival's concepts (`RIVAL` in order; a concept reads only earlier ones).
@@ -208,7 +218,17 @@ pub mod c {
     pub const N: usize = 4;
 }
 
-use Src::{A, C, F, G, K, Q, R, S, Y};
+/// One known rival city's target inputs (`plan::TargetInputs` in order).
+pub mod t {
+    pub const SIZE: usize = 0;
+    pub const GARRISON: usize = 1;
+    pub const NEAR: usize = 2;
+    pub const WALLS: usize = 3;
+    pub const N: usize = 4;
+    pub const NAMES: [&str; N] = ["size", "garrison", "near", "walls"];
+}
+
+use Src::{A, C, F, G, K, Q, R, S, T, Y};
 
 // ---- §4.1 seat concepts ----
 
@@ -259,7 +279,41 @@ pub const SEAT: [Neuron; s::N] = [
             t(F(fe::AT_WAR), 400, "at war the bombers come to us"),
         ],
     },
+    Neuron {
+        name: "infamy_cost",
+        bias: -100,
+        why: "the offence addendum §3.1: a seat that never declared pays nothing",
+        join: UNIT,
+        terms: &[
+            t(G(g::OWN_INFAMY), 1000, "1000 = every scripted AI that met us denounces us already (250 points, `ai/diplomacy.rs`); 400 = it distrusts us and refuses friendship, pacts and agreements"),
+            t(G(g::TIES_AT_RISK), 600, "the friendships, agreements and pacts the next declaration blocks for about 30 rounds"),
+        ],
+    },
+    Neuron {
+        name: "late",
+        bias: -1800,
+        why: "a city taken before the last two fifths of the game pays its worth long enough",
+        join: UNIT,
+        terms: &[t(F(fe::PROGRESS), 3000, "0 at 60 % of the game, 1000 at 93 %: the war case prices a city by the rounds left (`city_worth`); nets-x-site opened 63 of its 68 wars before round 200 of 330 (WAR-LEVER.md §4)")],
+    },
 ];
+
+// ---- the target: how easy one known rival city is to take (WAR-LEVER.md §2) ----
+
+/// The ease of one target (the T rows): the war order aims at its rival's easiest city, and `soft` (the largest)
+/// is the rival's prey term.
+pub const EASE: Neuron = Neuron {
+    name: "ease",
+    bias: -2000,
+    why: "a city is no target by default: it takes a small, near city with weak defences (the old size gate, at most 8 citizens, sits at size 500)",
+    join: UNIT,
+    terms: &[
+        ts(T(t::SIZE), Shape::Not, 1000, "a small city: the learned capture chance falls 0.066 a citizen (`OPEN_CHANCE_WEIGHTS`), as much as a tile"),
+        ts(T(t::GARRISON), Shape::Not, 800, "no defenders seen: the army meets only the walls"),
+        t(T(t::NEAR), 1000, "a near city: the chance falls 0.067 a tile, as much as a citizen"),
+        ts(T(t::WALLS), Shape::Not, 600, "the city's own strength against our army: the siege's other half"),
+    ],
+};
 
 // ---- §4.2 rival concepts ----
 
@@ -332,13 +386,17 @@ pub const RIVAL: [Neuron; q::N] = [
         terms: &[
             t(Q(q::WEAK), 1600, "the disarmed neighbour is the cheap city (A5, MO11, MO13)"),
             t(Q(q::REACH), 1600, "AND: a city we can reach (a disarmed nation over the ocean is no prey)"),
+            t(R(r::SOFT), 1200, "a soft city within reach is the prey even when the nation's army is level (WAR-LEVER.md K1: the cities the old war machine took profitably)"),
             t(K(kc::WARLIKE), 400, "a warlike leader"),
             t(R(r::GRAB), 300, "a grabber pays twice"),
-            t(R(r::FRIEND), -1000, "never a friend"),
+            t(R(r::FRIEND), -600, "a friend's yields end with the war, but the rules add no backstab memory: a price, not a veto (WAR-LEVER.md K3)"),
             t(R(r::PACT), -1200, "never a pact partner"),
             t(K(kc::HAPPINESS_CRISIS), -700, "not in a crisis: conquered cities deepen it"),
             t(K(kc::DANGER), -500, "not under threat elsewhere"),
             t(S(s::WAR_WEARY), -600, "not when tired"),
+            t(S(s::INFAMY_COST), -900, "the declaration's cost in ties (offence addendum §3.2)"),
+            ts(S(s::INFAMY_COST), Shape::Times(R(r::AT_WAR)), 900, "at war with it the declaration is paid"),
+            t(S(s::LATE), -1500, "a conquest late in the game does not pay (the war case's worth runs over the rounds left)"),
         ],
     },
     Neuron {
@@ -352,6 +410,8 @@ pub const RIVAL: [Neuron; q::N] = [
             t(Q(q::WEAK), 600, "beatable"),
             t(R(r::AT_WAR), 400, "already at war with it: continue"),
             ts(R(r::LOCAL), Shape::Centered(500), 1000, "our force where the war would be, against its"),
+            t(S(s::INFAMY_COST), -900, "the declaration's cost in ties (offence addendum §3.2)"),
+            ts(S(s::INFAMY_COST), Shape::Times(R(r::AT_WAR)), 900, "at war with it the declaration is paid"),
         ],
     },
     Neuron {
@@ -508,9 +568,9 @@ const fn declared(name: &'static str, why: &'static str) -> Neuron {
     Neuron { name, bias: 0, why, join: UNIT, terms: &[] }
 }
 
-/// The offence's seat concepts (addendum §3.1): no terms yet, each fires 0; not in `neurons()`.
-pub const OFFENCE_SEAT: [Neuron; 3] = [
-    declared("infamy_cost", "unit(−100 + 1000·G11 + 600·G12): the declaration's cost in ties, read by every offensive war value"),
+/// The offence's seat concepts (addendum §3.1) not built yet: no terms, each fires 0; not in `neurons()` (`infamy_cost`
+/// is built: `SEAT`).
+pub const OFFENCE_SEAT: [Neuron; 2] = [
     declared("isolation", "unit(1000 − 1200·max reach − 600·max menace − 400·max(runaway·reach)): the minimal army is safe"),
     declared("sweep", "unit(−600 + 1200·G14 + 600·Y(aim_diplomacy) + 400·G8): the city-state sweep before a session"),
 ];
@@ -536,6 +596,8 @@ pub mod gate {
     pub const ESCORT_SHIPS: (u32, &str) = (2, "the landing needs ships that shell the coast (`fleet.rs` 1-10)");
     /// Standard rounds after a war order spent its budget without paying before another order on that rival.
     pub const SPENT_ROUNDS: (u32, &str) = (20, "the war that did not pay ends, and is not restarted at once");
+    /// Standard rounds a war order may wait for its army at peace before it is spent.
+    pub const PREPARE_ROUNDS: (u32, &str) = (30, "the war machine's `FORM_LIMIT`: an army that has not marched by then does not");
 }
 
 /// The site head (§3.4): site = clamp(S1, S2 − BOUND, S2 + BOUND) + S3 − GAP·S4·(1 + S5/1000) − ARMY·S6 − TRAVEL·S7 + FILL·S8·S9/10⁶.
@@ -550,7 +612,7 @@ pub mod site {
 /// Every neuron of `net2`'s own tables.
 pub fn neurons() -> Vec<&'static Neuron> {
     let mut out: Vec<&'static Neuron> = SEAT.iter().chain(RIVAL.iter()).collect();
-    out.extend([&PEACE, &GUARD, &MILITARY, &CS_SHARE]);
+    out.extend([&PEACE, &GUARD, &MILITARY, &CS_SHARE, &EASE]);
     out
 }
 
@@ -560,5 +622,5 @@ pub fn count() -> usize {
     for neuron in neurons() {
         n += neuron.terms.len() + usize::from(matches!(neuron.join, Join::Sum(_)));
     }
-    n + TILT.len() + 7 + 5
+    n + TILT.len() + 8 + 5
 }

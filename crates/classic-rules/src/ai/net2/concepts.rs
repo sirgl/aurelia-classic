@@ -5,7 +5,7 @@ use crate::ai::strategy_net::layers::{unit, ONE};
 use crate::ai::strategy_net::weights::Act;
 use crate::ai::strategy_net::Milli;
 
-use super::plan::{RivalInputs, SeatInputs};
+use super::plan::{RivalInputs, SeatInputs, TargetInputs};
 use super::weights::{self as w, q, r, s, Join, Neuron, Shape, Src, Term};
 
 /// The layers one neuron reads; a layer not yet computed is an empty slice (reading it is a defect of
@@ -21,6 +21,7 @@ pub struct Frame<'a> {
     pub a: &'a [Milli],
     pub y: &'a [Milli],
     pub c: &'a [Milli],
+    pub t: &'a [Milli],
 }
 
 impl Frame<'_> {
@@ -35,6 +36,7 @@ impl Frame<'_> {
             Src::A(i) => self.a[i],
             Src::Y(i) => self.y[i],
             Src::C(i) => self.c[i],
+            Src::T(i) => self.t[i],
         }
     }
 
@@ -78,13 +80,26 @@ pub fn fire(neuron: &Neuron, frame: &Frame<'_>) -> Milli {
 impl SeatInputs {
     /// The inputs in `weights::g`'s order.
     pub fn row(&self) -> [Milli; w::g::N] {
-        [self.capital_lost, self.cities_lost, self.war_rounds, self.war_gain, self.unhappy_trend, self.embark, self.enemy_air, self.gold_stock, self.cs_allies, self.cs_contested]
+        [
+            self.capital_lost,
+            self.cities_lost,
+            self.war_rounds,
+            self.war_gain,
+            self.unhappy_trend,
+            self.embark,
+            self.enemy_air,
+            self.gold_stock,
+            self.cs_allies,
+            self.cs_contested,
+            self.own_infamy,
+            self.ties_at_risk,
+        ]
     }
 }
 
 impl RivalInputs {
-    /// The inputs in `weights::r`'s order.
-    pub fn row(&self) -> [Milli; r::N] {
+    /// The inputs in `weights::r`'s order; `soft` is the core's aggregate of the targets (`levers::soft_of`).
+    pub fn row(&self, soft: Milli) -> [Milli; r::N] {
         [
             self.near,
             self.land,
@@ -112,8 +127,22 @@ impl RivalInputs {
             self.score,
             self.retake_case,
             self.captured_recent,
+            soft,
+            self.operating,
         ]
     }
+}
+
+impl TargetInputs {
+    /// The inputs in `weights::t`'s order.
+    pub fn row(&self) -> [Milli; w::t::N] {
+        [self.size, self.garrison, self.near, self.walls]
+    }
+}
+
+/// One target's ease (`weights::EASE`).
+pub fn ease(target: &TargetInputs) -> Milli {
+    fire(&w::EASE, &Frame { t: &target.row(), ..Frame::default() })
 }
 
 /// The new seat concepts (§4.1) of the features, the carried concepts and the seat inputs.
@@ -148,6 +177,8 @@ mod tests {
             "peace" => &['S', 'R', 'Q'],
             "guard" => &['S', 'C'],
             "military_tilt" => &['S', 'A', 'Y'],
+            "infamy_cost" | "late" => &['F', 'K', 'G'],
+            "ease" => &['T'],
             "cs_gold_share" => &['F', 'K', 'G', 'Y'],
             _ => &['K', 'S', 'R', 'Q'],
         }
@@ -164,6 +195,7 @@ mod tests {
             Src::A(i) => ('A', i, w::a::N),
             Src::Y(i) => ('Y', i, w::y::N),
             Src::C(i) => ('C', i, w::c::N),
+            Src::T(i) => ('T', i, w::t::N),
         }
     }
 

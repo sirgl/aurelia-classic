@@ -9,7 +9,7 @@ use crate::ai::strategy_net::weights::Act;
 use crate::ai::strategy_net::{Logits, Milli, Tilt};
 
 use super::levers::{After, Pass};
-use super::plan::{CityInputs, CoreMemory, Embargo, Help, Inputs, WarPlan};
+use super::plan::{CityInputs, CoreMemory, Embargo, Help, Inputs, TargetInputs, WarPlan};
 use super::weights::{self as w, Join, Neuron, Shape, Src, Table, Term};
 
 /// The JSON of every table of `net2`: the neurons, the tilt, the gates, the site head.
@@ -29,10 +29,11 @@ pub fn export() -> String {
     let gates: Vec<String> = gates.iter().map(|(k, v)| format!("\"{k}\": {v}")).collect();
     let _ = writeln!(out, "  \"gates\": {{{}}},", gates.join(", "));
     let names = format!(
-        "{{\"g\": [{}], \"r\": [{}], \"a\": [{}], \"at_war_feature\": {}}}",
+        "{{\"g\": [{}], \"r\": [{}], \"a\": [{}], \"t\": [{}], \"at_war_feature\": {}}}",
         quoted(&w::g::NAMES),
         quoted(&w::r::NAMES),
         quoted(&w::a::NAMES),
+        quoted(&w::t::NAMES),
         crate::ai::strategy_net::weights::fe::AT_WAR
     );
     let _ = writeln!(out, "  \"names\": {names},");
@@ -80,6 +81,7 @@ fn src_json(src: Src) -> String {
         Src::A(i) => ("A", i),
         Src::Y(i) => ("Y", i),
         Src::C(i) => ("C", i),
+        Src::T(i) => ("T", i),
     };
     format!("[\"{layer}\", {i}]")
 }
@@ -126,9 +128,23 @@ fn rows<T, F: Fn(&T) -> String>(items: &[T], each: F) -> String {
 
 fn war_json(war: &WarPlan) -> String {
     match war.order() {
-        Some(o) => format!("{{\"rival\":{},\"kind\":\"{}\",\"since\":{},\"budget\":{},\"value\":{}}}", o.rival.0, o.kind.name(), o.since, o.budget, o.value),
+        Some(o) => {
+            let aim = match o.aim {
+                Some(aim) => aim.city.0.to_string(),
+                None => "null".to_string(),
+            };
+            let war_since = match o.war_since() {
+                Some(since) => since.to_string(),
+                None => "null".to_string(),
+            };
+            format!("{{\"rival\":{},\"kind\":\"{}\",\"since\":{},\"budget\":{},\"war_since\":{war_since},\"value\":{},\"aim\":{aim}}}", o.rival.0, o.kind.name(), o.since, o.budget, o.value)
+        }
         None => "null".to_string(),
     }
+}
+
+fn target_json(target: &TargetInputs) -> String {
+    format!("{{\"rival\":{},\"city\":{},\"t\":{}}}", target.rival.0, target.city.0, list(&target.row()))
 }
 
 fn core_json(core: &CoreMemory) -> String {
@@ -148,7 +164,7 @@ fn input_json(rec: &Record<'_>) -> String {
     let inputs = rec.inputs;
     let l = rec.logits;
     format!(
-        "{{\"round\":{},\"pace\":{},\"held\":{},\"f\":{},\"k\":{},\"g\":{},\"rivals\":{},\"cities\":{},\"logits\":{{\"style\":{},\"aim\":{},\"posture\":{}}},\"tempered\":{}}}",
+        "{{\"round\":{},\"pace\":{},\"held\":{},\"f\":{},\"k\":{},\"g\":{},\"rivals\":{},\"cities\":{},\"targets\":{},\"logits\":{{\"style\":{},\"aim\":{},\"posture\":{}}},\"tempered\":{}}}",
         rec.round,
         rec.pace,
         core_json(rec.held),
@@ -157,6 +173,7 @@ fn input_json(rec: &Record<'_>) -> String {
         list(&inputs.seat.row()),
         rows(&rec.pass.rivals, |x| format!("{{\"id\":{},\"r\":{}}}", x.rival.0, list(&x.inputs))),
         rows(&inputs.cities, city_json),
+        rows(&inputs.targets, target_json),
         list(&l.style),
         list(&l.aim),
         list(&l.posture),
@@ -174,8 +191,9 @@ fn output_json(rec: &Record<'_>) -> String {
         Embargo::Nobody => "null".to_string(),
     };
     format!(
-        "{{\"s\":{},\"q\":{},\"core\":{},\"a\":{},\"tilt\":{{\"style\":{},\"aim\":{},\"posture\":{}}},\"y\":{},\"peace\":{},\"peace_with\":{},\"deny_help\":{},\"embargo\":{embargo},\"guard\":{},\"military\":{},\"cs_gold_share\":{}}}",
+        "{{\"s\":{},\"ease\":{},\"q\":{},\"core\":{},\"a\":{},\"tilt\":{{\"style\":{},\"aim\":{},\"posture\":{}}},\"y\":{},\"peace\":{},\"peace_with\":{},\"deny_help\":{},\"embargo\":{embargo},\"guard\":{},\"military\":{},\"cs_gold_share\":{}}}",
         list(&rec.pass.seat),
+        list(&rec.pass.eases),
         rows(&rec.pass.rivals, |x| list(&x.concepts)),
         core_json(&rec.pass.core),
         list(&rec.pass.aggregates),

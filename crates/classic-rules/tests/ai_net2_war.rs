@@ -96,12 +96,12 @@ fn first_turn(game: &mut GameState, rules: &CompiledRuleset, variant: Variant, o
 }
 
 
-use classic_rules::ai::net2::plan::{Net2Plan, WarKind, WarOrder, WarPlan, Opening};
+use classic_rules::ai::net2::plan::{Net2Plan, Opening, OrderPhase, WarKind, WarOrder, WarPlan};
 use classic_rules::ai::operations::{set_net2_for_test, Routes};
 use classic_rules::ai::retake::order_margin;
 
 fn order(kind: WarKind) -> Net2Plan {
-    let war = WarOrder { rival: ENEMY, kind, since: 0, budget: kind.budget(), value: 800, aim: None, opening: Opening::Plain, raid: false };
+    let war = WarOrder { rival: ENEMY, kind, since: 0, budget: kind.budget(), phase: OrderPhase::Preparing, value: 800, aim: None, opening: Opening::Plain, raid: false };
     Net2Plan { war: WarPlan::Order(war), ..Net2Plan::default() }
 }
 

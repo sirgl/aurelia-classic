@@ -6,10 +6,10 @@
 use crate::ids::{PlayerId, TileId};
 
 use super::inputs::InputMemory;
-use super::plan::{AimWhy, CoreMemory, Memory2, Opening, SpentWar, WarAim, WarKind, WarOrder, WarPlan};
+use super::plan::{AimWhy, CoreMemory, Memory2, Opening, OrderPhase, SpentWar, WarAim, WarKind, WarOrder, WarPlan};
 
 /// The body's format version (its first byte).
-const VERSION: u8 = 2;
+const VERSION: u8 = 3;
 
 impl Memory2 {
     pub fn encode(&self) -> Vec<u8> {
@@ -60,6 +60,13 @@ fn encode_war(war: &WarPlan, out: &mut Vec<u8>) {
             out.push(kind_code(o.kind));
             out.extend_from_slice(&o.since.to_le_bytes());
             out.extend_from_slice(&o.budget.to_le_bytes());
+            match o.phase {
+                OrderPhase::Preparing => out.push(0),
+                OrderPhase::Fighting { since } => {
+                    out.push(1);
+                    out.extend_from_slice(&since.to_le_bytes());
+                }
+            }
             out.extend_from_slice(&o.value.to_le_bytes());
             encode_aim(o.aim, out);
             encode_opening(o.opening, out);
@@ -68,7 +75,7 @@ fn encode_war(war: &WarPlan, out: &mut Vec<u8>) {
     }
 }
 
-const AIMS: [AimWhy; 6] = [AimWhy::Capital, AimWhy::Young, AimWhy::Resource, AimWhy::Holy, AimWhy::Worth, AimWhy::Parts];
+const AIMS: [AimWhy; 7] = [AimWhy::Capital, AimWhy::Young, AimWhy::Resource, AimWhy::Holy, AimWhy::Worth, AimWhy::Parts, AimWhy::Ease];
 
 fn encode_aim(aim: Option<WarAim>, out: &mut Vec<u8>) {
     match aim {
@@ -120,11 +127,16 @@ fn decode_war(r: &mut Bytes<'_>) -> Option<WarPlan> {
             let kind = *WarKind::ALL.get(usize::from(r.u8()?))?;
             let since = r.u32()?;
             let budget = r.u32()?;
+            let phase = match r.u8()? {
+                0 => OrderPhase::Preparing,
+                1 => OrderPhase::Fighting { since: r.u32()? },
+                _ => return None,
+            };
             let value = r.i64()?;
             let aim = decode_aim(r)?;
             let opening = decode_opening(r)?;
             let raid = r.u8()? == 1;
-            Some(WarPlan::Order(WarOrder { rival, kind, since, budget, value, aim, opening, raid }))
+            Some(WarPlan::Order(WarOrder { rival, kind, since, budget, phase, value, aim, opening, raid }))
         }
         _ => None,
     }
@@ -160,10 +172,11 @@ mod tests {
     #[test]
     fn the_memory_reads_back() {
         let aim = Some(WarAim { city: TileId(77), why: AimWhy::Young });
-        let order = WarOrder { rival: PlayerId(3), kind: WarKind::Overseas, since: 120, budget: 20, value: 640, aim, opening: Opening::Staged { since: 120, until: 130 }, raid: true };
+        let order = WarOrder { rival: PlayerId(3), kind: WarKind::Overseas, since: 120, budget: 20, phase: OrderPhase::Fighting { since: 125 }, value: 640, aim, opening: Opening::Staged { since: 120, until: 130 }, raid: true };
         let spent = vec![SpentWar { rival: PlayerId(2), until: 140 }];
         let hires = vec![SpentWar { rival: PlayerId(4), until: 150 }];
-        let memory = Memory2 { core: CoreMemory { war: WarPlan::Order(order), spent, hires }, inputs: InputMemory::default() };
+        let inputs = InputMemory { infamy: 175, ..InputMemory::default() };
+        let memory = Memory2 { core: CoreMemory { war: WarPlan::Order(order), spent, hires }, inputs };
         assert_eq!(Memory2::decode(&memory.encode()), Some(memory));
         assert_eq!(Memory2::decode(&Memory2::default().encode()), Some(Memory2::default()));
         assert_eq!(Memory2::decode(&[9, 0]), None, "another version is no memory");

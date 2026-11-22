@@ -8,7 +8,7 @@ use crate::ai::strategy_net::{Intent, Milli, Tilt};
 use crate::ids::PlayerId;
 
 use super::concepts::{self, fire, Frame};
-use super::plan::{CityGuard, CityInputs, CoreMemory, Embargo, Escorts, Generals, Help, Inputs, Net2Plan, Offence, Opening, RivalRead, Soldiers, SpentWar, WarKind, WarOrder, WarPlan};
+use super::plan::{AimWhy, OrderPhase, CityGuard, CityInputs, CoreMemory, Embargo, Escorts, Generals, Help, Inputs, Net2Plan, Offence, Opening, RivalRead, Soldiers, SpentWar, TargetInputs, WarAim, WarKind, WarOrder, WarPlan};
 use super::weights::{self as w, a, gate, q, r, s, y, Table};
 
 /// One rival's layer: its inputs and its concepts.
@@ -29,23 +29,55 @@ pub struct Pass {
     /// The war order and the spent ones after this turn.
     pub core: CoreMemory,
     pub aggregates: [Milli; a::N],
+    /// The ease of every target (`Inputs::targets`' order).
+    pub eases: Vec<Milli>,
 }
 
 /// The pass before the intent: the seat's and the rivals' concepts, the war order (from `held`), the aggregates.
 pub fn before_intent(inputs: &Inputs, carried: &[Milli; kc::N], held: &CoreMemory, round: u32, pace: u32) -> Pass {
     let seat_row = inputs.seat.row();
     let seat = concepts::seat(&inputs.situation, carried, &seat_row);
+    let eases: Vec<Milli> = inputs.targets.iter().map(concepts::ease).collect();
     let mut rivals = Vec::with_capacity(inputs.rivals.len());
     let mut reads = Vec::with_capacity(inputs.rivals.len());
     for rival in &inputs.rivals {
-        let row = rival.row();
+        let row = rival.row(soft_of(rival.rival, &inputs.targets, &eases));
         let concepts = concepts::rival(carried, &seat, &row);
         reads.push(read_of(rival.rival, &row, &concepts));
         rivals.push(RivalPass { rival: rival.rival, inputs: row, concepts });
     }
-    let core = war_plan(held, &reads, &rivals, inputs.seat.war_gain, round, pace);
+    let mut core = war_plan(held, &reads, &rivals, inputs.seat.war_gain, round, pace);
+    core.war = aimed(core.war, &inputs.targets, &eases);
     let aggregates = aggregates_of(&reads, &rivals, &core.war, inputs.situation[fe::AT_WAR]);
-    Pass { carried: *carried, seat, rivals, reads, core, aggregates }
+    Pass { carried: *carried, seat, rivals, reads, core, aggregates, eases }
+}
+
+/// `soft_r` (R27): the largest ease of `rival`'s targets, 0 without one.
+pub fn soft_of(rival: PlayerId, targets: &[TargetInputs], eases: &[Milli]) -> Milli {
+    let mut best = 0;
+    for (target, ease) in targets.iter().zip(eases) {
+        if target.rival == rival {
+            best = best.max(*ease);
+        }
+    }
+    best
+}
+
+/// The order aims at its rival's easiest target (the first on a tie: the nearest), every turn; a retake keeps
+/// its lost cities first (`operations::targets_for`) and aims at none.
+fn aimed(war: WarPlan, targets: &[TargetInputs], eases: &[Milli]) -> WarPlan {
+    let WarPlan::Order(order) = war else { return war };
+    if order.kind == WarKind::Retake {
+        return WarPlan::Order(WarOrder { aim: None, ..order });
+    }
+    let mut best: Option<(&TargetInputs, Milli)> = None;
+    for (target, ease) in targets.iter().zip(eases) {
+        if target.rival == order.rival && best.is_none_or(|(_, e)| *ease > e) {
+            best = Some((target, *ease));
+        }
+    }
+    let aim = best.map(|(target, _)| WarAim { city: target.city, why: AimWhy::Ease });
+    WarPlan::Order(WarOrder { aim, ..order })
 }
 
 /// A rival's read: its concepts by name, the war kind, the trust and the help.
@@ -105,24 +137,45 @@ fn war_plan(held: &CoreMemory, reads: &[RivalRead], rivals: &[RivalPass], war_ga
     let mut spent: Vec<SpentWar> = held.spent.iter().filter(|s| s.until > round).copied().collect();
     let hires: Vec<SpentWar> = held.hires.iter().filter(|s| s.until > round).copied().collect();
     if let WarPlan::Order(order) = held.war {
-        match judge(&order, reads, rivals, war_gain, round) {
+        match judge(&order, reads, rivals, war_gain, round, pace) {
             Verdict::Keep(kept) => return CoreMemory { war: WarPlan::Order(kept), spent, hires },
             Verdict::Spent => spent.push(SpentWar { rival: order.rival, until: round + paced(gate::SPENT_ROUNDS.0, pace) }),
             Verdict::Dropped => {}
         }
     }
-    CoreMemory { war: start(reads, &spent, round, pace), spent, hires }
+    CoreMemory { war: start(reads, rivals, &spent, round, pace), spent, hires }
 }
 
-fn judge(order: &WarOrder, reads: &[RivalRead], rivals: &[RivalPass], war_gain: Milli, round: u32) -> Verdict {
+/// The order's phase this turn: a war with its rival begun since the last turn starts the budget's clock.
+fn phase_now(order: &WarOrder, at_war: bool, round: u32) -> Option<OrderPhase> {
+    match (order.phase, at_war) {
+        (OrderPhase::Preparing, false) => Some(OrderPhase::Preparing),
+        (OrderPhase::Preparing, true) => Some(OrderPhase::Fighting { since: round }),
+        (OrderPhase::Fighting { since }, true) => Some(OrderPhase::Fighting { since }),
+        // The war it fought has ended: the order with it.
+        (OrderPhase::Fighting { .. }, false) => None,
+    }
+}
+
+fn judge(order: &WarOrder, reads: &[RivalRead], rivals: &[RivalPass], war_gain: Milli, round: u32, pace: u32) -> Verdict {
     let (Some(read), Some(rival)) = (reads.iter().find(|x| x.rival == order.rival), rivals.iter().find(|x| x.rival == order.rival)) else {
         return Verdict::Dropped;
     };
-    let in_budget = round <= order.since + order.budget;
+    let Some(phase) = phase_now(order, rival.inputs[r::AT_WAR] > 0, round) else { return Verdict::Dropped };
+    let in_budget = match phase {
+        OrderPhase::Preparing => round <= order.since + paced(gate::PREPARE_ROUNDS.0, pace),
+        OrderPhase::Fighting { since } => round <= since + order.budget,
+    };
     let retaking = rival.inputs[r::RETAKE_CASE] > 0;
     let pays = rival.inputs[r::CAPTURED_RECENT] > 0 || retaking;
+    let kept = WarOrder { value: read.war_value, phase, ..*order };
     if read.war_value >= gate::WAR_KEEP.0 && (in_budget || pays) {
-        return Verdict::Keep(WarOrder { value: read.war_value, ..*order });
+        return Verdict::Keep(kept);
+    }
+    // Its army forms or marches: a reason that dips (the local force moves with the army) does not disband it
+    // inside the budget (WAR-LEVER.md: 18 of 36 operations ended so, `unordered`).
+    if in_budget && rival.inputs[r::OPERATING] > 0 {
+        return Verdict::Keep(kept);
     }
     if !in_budget && war_gain <= ONE / 2 && !retaking {
         return Verdict::Spent;
@@ -131,8 +184,8 @@ fn judge(order: &WarOrder, reads: &[RivalRead], rivals: &[RivalPass], war_gain: 
 }
 
 /// A new order on the rival with the largest war value at least the start (the lower id on a tie),
-/// none on a rival whose last order was spent.
-fn start(reads: &[RivalRead], spent: &[SpentWar], round: u32, pace: u32) -> WarPlan {
+/// none on a rival whose last order was spent; at war with it already, its war's clock starts now.
+fn start(reads: &[RivalRead], rivals: &[RivalPass], spent: &[SpentWar], round: u32, pace: u32) -> WarPlan {
     let mut best: Option<&RivalRead> = None;
     for read in reads {
         if read.war_value < gate::WAR_START.0 || spent.iter().any(|s| s.rival == read.rival) {
@@ -143,7 +196,11 @@ fn start(reads: &[RivalRead], spent: &[SpentWar], round: u32, pace: u32) -> WarP
         }
     }
     match best {
-        Some(read) => WarPlan::Order(WarOrder { rival: read.rival, kind: read.war_kind, since: round, budget: paced(read.war_kind.budget(), pace), value: read.war_value, aim: None, opening: Opening::Plain, raid: false }),
+        Some(read) => {
+            let at_war = rivals.iter().any(|x| x.rival == read.rival && x.inputs[r::AT_WAR] > 0);
+            let phase = if at_war { OrderPhase::Fighting { since: round } } else { OrderPhase::Preparing };
+            WarPlan::Order(WarOrder { rival: read.rival, kind: read.war_kind, since: round, budget: paced(read.war_kind.budget(), pace), phase, value: read.war_value, aim: None, opening: Opening::Plain, raid: false })
+        }
         None => WarPlan::NoWar,
     }
 }

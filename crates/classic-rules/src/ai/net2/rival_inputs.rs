@@ -137,6 +137,7 @@ pub fn read(obs: &AIObservation<'_>, brief: &TurnBrief, state: &AiState, rules: 
         }
         row.retake_case = if brief.retaking_from(r) { 1000 } else { 0 };
         row.captured_recent = if memory.captured.iter().any(|c| c.from == r && now.saturating_sub(c.round) <= sight) { 1000 } else { 0 };
+        row.operating = if state.operations().iter().any(|o| o.enemy == r) { 1000 } else { 0 };
         out.push(row);
     }
     out

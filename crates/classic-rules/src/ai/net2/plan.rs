@@ -135,6 +135,8 @@ pub struct RivalInputs {
     pub era_ahead: Milli,
     /// R31: city-states allied to it / 3.
     pub cs_held: Milli,
+    /// An operation of ours against it forms or marches (0/1000): an order is not dropped under its army.
+    pub operating: Milli,
 }
 
 impl RivalInputs {
@@ -175,6 +177,7 @@ impl RivalInputs {
             entry: 0,
             era_ahead: 0,
             cs_held: 0,
+            operating: 0,
         }
     }
 }
@@ -222,6 +225,26 @@ pub struct AimInputs {
     pub ring: Milli,
 }
 
+/// The inputs of one known city of a met major within `DECISIVE_RANGE` of ours (T1–T4, 0…1000): how easy
+/// it is to take, read by `weights::EASE` (WAR-LEVER.md §2). The war order aims at its rival's easiest one.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TargetInputs {
+    pub rival: PlayerId,
+    pub city: TileId,
+    /// T1: its citizens, 2…14 → 0…1000.
+    pub size: Milli,
+    /// T2: the military power seen on it or within `DEFENCE_RADIUS` over that and our military power (0: none seen).
+    pub garrison: Milli,
+    /// T3: our nearest city to it, R1's ramp: 1000 at ≤ 5 tiles, 0 at ≥ 15.
+    pub near: Milli,
+    /// T4: its estimated strength (`operations::estimate_target`: the base, the citizens, the technology and the
+    /// walls the rules give by the technologies we know) over that and our military power.
+    pub walls: Milli,
+}
+
+/// The most targets read per turn (the nearest first).
+pub const MAX_TARGETS: usize = 40;
+
 /// Everything `net2` reads in a turn.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Inputs {
@@ -235,6 +258,8 @@ pub struct Inputs {
     pub pairs: Vec<PairInputs>,
     /// The seen rival cities a war may aim at, at most 40.
     pub aims: Vec<AimInputs>,
+    /// The known rival cities within reach and how easy each is to take, at most `MAX_TARGETS`.
+    pub targets: Vec<TargetInputs>,
 }
 
 /// The inputs of the site head for one candidate tile (§3.4, S1–S9). Points are the planner's site points.
@@ -329,6 +354,8 @@ pub enum AimWhy {
     Holy,
     Worth,
     Parts,
+    /// The rival's city that is easiest to take (`weights::EASE`: small, bare, near, weak walls).
+    Ease,
 }
 
 /// The city a war order aims at.
@@ -348,6 +375,17 @@ pub enum Opening {
     Staged { since: u32, until: u32 },
 }
 
+/// Where a war order stands: its budget is the war's, from the declaration (§3.3: a war that has not paid by
+/// its budget ends), and the army it waits for has the war machine's forming time (WAR-LEVER.md §2).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum OrderPhase {
+    /// At peace with its rival: the army forms, at most `weights::gate::PREPARE_ROUNDS` paced rounds from `since`.
+    #[default]
+    Preparing,
+    /// At war with its rival since this round.
+    Fighting { since: u32 },
+}
+
 /// A war order: one at a time (§4.4).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct WarOrder {
@@ -355,8 +393,9 @@ pub struct WarOrder {
     pub kind: WarKind,
     /// The round the order started.
     pub since: u32,
-    /// Its budget in paced rounds (`WarKind::budget` × pace).
+    /// The war's budget in paced rounds (`WarKind::budget` × pace), from the declaration (`OrderPhase::Fighting`).
     pub budget: u32,
+    pub phase: OrderPhase,
     /// Its war value this turn (≥ 350 while kept).
     pub value: Milli,
     /// The named city (None: any city of the rival, as the war machine picks today).
@@ -367,9 +406,12 @@ pub struct WarOrder {
 }
 
 impl WarOrder {
-    /// The rounds left of the budget at `round`.
-    pub fn rounds_left(&self, round: u32) -> u32 {
-        (self.since + self.budget).saturating_sub(round)
+    /// The round its war began (None: it prepares).
+    pub fn war_since(&self) -> Option<u32> {
+        match self.phase {
+            OrderPhase::Preparing => None,
+            OrderPhase::Fighting { since } => Some(since),
+        }
     }
 }
 

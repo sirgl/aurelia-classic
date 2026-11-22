@@ -24,7 +24,7 @@ use crate::rules::content::Domain;
 use crate::rules::CompiledRuleset;
 use crate::world::player::PlayerKind;
 
-use super::plan::{CityInputs, Inputs, SeatInputs};
+use super::plan::{CityInputs, Inputs, SeatInputs, TargetInputs, MAX_TARGETS};
 
 /// Standard rounds the rivals' sightings, the army estimate and the captures count (`pace_rounds`).
 pub const SIGHT_ROUNDS: u32 = 10;
@@ -157,6 +157,10 @@ pub struct InputMemory {
     pub surveys: Vec<Survey>,
     /// Written by the turn's read: the soldiers estimate of each met rival, for the executors.
     pub soldiers: Vec<SoldierRead>,
+    /// G11: our own estimate of the warmonger memory an average met major holds of us, points (the rules,
+    /// `systems::diplomacy`: + `WARMONGER_ATTACKED_WEIGHT` × the era percent a declaration, + the conquest offset a
+    /// city taken, `WARMONGER_DECAY` a round). The rules show a nation only its own memory of others.
+    pub infamy: u32,
 }
 
 /// The version of the memory's bytes (its first byte); a body of another version does not read.
@@ -219,16 +223,27 @@ impl InputMemory {
         }
         let first = !self.started;
         let sight = obs.speed.pace_rounds(SIGHT_ROUNDS);
+        if !first {
+            let decay = crate::systems::diplomacy::WARMONGER_DECAY.unsigned_abs().saturating_mul(now.saturating_sub(self.round));
+            self.infamy = self.infamy.saturating_sub(decay);
+        }
+        let known_before = self.foreign.clone();
         self.observe_cities(obs, state, first);
         self.observe_foreign(obs, state, rules, first);
         self.observe_lost();
+        let percent = warmonger_percent(brief, rules);
+        for capture in self.captured.iter().filter(|c| c.round == now && !first) {
+            self.infamy = self.infamy.saturating_add(conquest_offset(&known_before, obs.own_cities.len(), capture.from) * percent / 100);
+        }
         // The happiness samples: kept for a window and a half.
         if self.happy.last().is_none_or(|(r, _)| *r < now) {
             self.happy.push((now, brief.happiness));
         }
         self.happy.retain(|(r, _)| now.saturating_sub(*r) <= sight + sight / 2);
         self.observe_sights(obs, brief, rules, sight);
-        self.observe_ties(obs, state);
+        let declared = self.observe_ties(obs, state);
+        let weight = crate::systems::diplomacy::WARMONGER_ATTACKED_WEIGHT.unsigned_abs();
+        self.infamy = self.infamy.saturating_add(declared * weight * percent / 100);
         let kept = obs.speed.pace_rounds(LOST_KEPT_ROUNDS);
         self.lost.retain(|l| now.saturating_sub(l.round) <= kept);
         self.captured.retain(|c| now.saturating_sub(c.round) <= kept);
@@ -336,8 +351,11 @@ impl InputMemory {
         self.sights.sort_by_key(|s| s.player);
     }
 
-    fn observe_ties(&mut self, obs: &AIObservation<'_>, state: &AiState) {
+    /// The ties of every met major, and the wars we declared since the last turn (a war that began while an
+    /// operation, a raid or an objective of ours stood against it).
+    fn observe_ties(&mut self, obs: &AIObservation<'_>, state: &AiState) -> u32 {
         let now = obs.round;
+        let mut declared = 0;
         let tie_window = obs.speed.pace_rounds(WAR_RAMP_ROUNDS);
         let raided = crate::ai::raid::enemies(state);
         for relation in obs.relations.iter().filter(|r| r.kind == PlayerKind::Major) {
@@ -355,6 +373,9 @@ impl InputMemory {
             if relation.at_war && !ties.at_war && !ties.planned && ties.tie_round.is_some_and(|t| now.saturating_sub(t) <= tie_window) {
                 ties.betrayals = ties.betrayals.saturating_add(1).min(8);
             }
+            if relation.at_war && !ties.at_war && ties.planned {
+                declared += 1;
+            }
             ties.at_war = relation.at_war;
             if relation.friends || relation.defensive_pact || relation.research_agreement || relation.we_grant_entry || relation.they_grant_entry {
                 ties.tie_round = Some(now);
@@ -365,6 +386,7 @@ impl InputMemory {
                 || state.relation(owner).and_then(|m| m.objective).is_some();
         }
         self.ties.sort_by_key(|t| t.player);
+        declared
     }
 
     /// Appends the bytes of the memory to `out`: a version, then the body prefixed by its length, so
@@ -432,6 +454,8 @@ impl InputMemory {
             put32(w, s.target.0);
             put8(w, u8::from(s.land) | u8::from(s.sea) << 1);
         }
+        // Fields added after version 1 go last: a body without them reads them as 0.
+        put32(w, self.infamy);
         // The soldiers are an output of the read, not memory; a restart reads them afresh.
         out.push(MEMORY_VERSION);
         out.extend_from_slice(&(body.len() as u32).to_le_bytes());
@@ -490,6 +514,9 @@ impl InputMemory {
             let (player, round, our_cities, target, flags) = (PlayerId(r.u8()?), r.u32()?, r.u16()?, TileId(r.u32()?), r.u8()?);
             m.surveys.push(Survey { player, round, our_cities, target, land: flags & 1 != 0, sea: flags & 2 != 0 });
         }
+        if r.at < body.len() {
+            m.infamy = r.u32()?;
+        }
         Some((m, 1 + 4 + len))
     }
 }
@@ -546,7 +573,79 @@ pub fn read(obs: &AIObservation<'_>, brief: &TurnBrief, state: &AiState, rules: 
     let seat = seat(obs, brief, rules, memory);
     let rival_rows = super::rival_inputs::read(obs, brief, state, rules, rivals, memory);
     let cities = cities(obs, brief, state, memory);
-    Inputs { situation: *situation, seat, rivals: rival_rows, cities, pairs: Vec::new(), aims: Vec::new() }
+    let targets = targets(obs, brief, state, rules, memory);
+    Inputs { situation: *situation, seat, rivals: rival_rows, cities, pairs: Vec::new(), aims: Vec::new(), targets }
+}
+
+/// The rules' era percent of the warmonger weights (`systems::diplomacy::WARMONGER_PERCENT`) at the average era of
+/// the nations we know: ours and the met ones' (the rules average every living nation's).
+fn warmonger_percent(brief: &TurnBrief, rules: &CompiledRuleset) -> u32 {
+    let own = crate::ai::strategy_net::features::era_of(rules, &brief.techs);
+    let eras: Vec<usize> = std::iter::once(own).chain(brief.met_eras.iter().map(|(_, e)| usize::from(*e))).collect();
+    let era = eras.iter().sum::<usize>() / eras.len().max(1);
+    let table = crate::systems::diplomacy::WARMONGER_PERCENT;
+    table[era.min(table.len() - 1)].unsigned_abs()
+}
+
+/// The rules' warmonger offset of one city taken from `victim` (`warmonger_for_conquest`: the world's expected
+/// cities over the world's cities × the victim's), with the cities we knew before the capture.
+fn conquest_offset(known: &[SeenCity], own_cities: usize, victim: PlayerId) -> u32 {
+    let expected = crate::systems::diplomacy::EXPECTED_CITY_COUNT.unsigned_abs();
+    let world = (known.len() + own_cities).max(1) as u32;
+    let victims = known.iter().filter(|c| c.owner == victim).count().max(1) as u32;
+    1000 * expected / (world * victims)
+}
+
+/// The garrison of a target out of sight: unknown, as likely there as not.
+const GARRISON_UNKNOWN: Milli = 500;
+
+/// T1–T4 (`TargetInputs`): every city of a met major the state remembers within `DECISIVE_RANGE` of our nearest
+/// city, the nearest first (the tile on a tie), at most `MAX_TARGETS`.
+fn targets(obs: &AIObservation<'_>, brief: &TurnBrief, state: &AiState, rules: &CompiledRuleset, memory: &InputMemory) -> Vec<TargetInputs> {
+    let ours = i64::from(brief.military_power);
+    let majors: Vec<PlayerId> = obs.relations.iter().filter(|r| r.kind == PlayerKind::Major).map(|r| r.other).collect();
+    let mut found: Vec<(i32, TargetInputs)> = Vec::new();
+    for city in state.seen_cities().iter().filter(|c| majors.contains(&c.owner)) {
+        let Some(from) = brief.nearest_city(brief.dims, city.tile) else { continue };
+        let Some(distance) = brief.dims.distance(from.tile, city.tile) else { continue };
+        if distance > crate::ai::operations::DECISIVE_RANGE {
+            continue;
+        }
+        let in_sight = obs.visible_foreign_cities.iter().any(|v| v.tile == city.tile);
+        let garrison = if in_sight {
+            let near = |tile: TileId| brief.dims.distance(tile, city.tile).is_some_and(|d| d <= crate::ai::operations::DEFENCE_RADIUS);
+            let guard: i64 = brief.sightings.iter().filter(|s| s.owner == city.owner && s.military && near(s.tile)).map(|s| i64::from(s.power)).sum();
+            share_of(guard, ours, 0)
+        } else {
+            match memory.foreign_at(city.tile).and_then(|c| c.open) {
+                Some(true) => 0,
+                _ => GARRISON_UNKNOWN,
+            }
+        };
+        let estimate = crate::ai::operations::estimate_target(brief, rules, city);
+        let strength = (estimate.strength * i64::from(estimate.hp) / 10_000).max(0);
+        let target = TargetInputs {
+            rival: city.owner,
+            city: city.tile,
+            size: ramp(i64::from(city.population) - 2, 0, 12),
+            garrison,
+            near: ramp(15 - i64::from(distance), 0, 10),
+            walls: share_of(strength, ours, 1000),
+        };
+        found.push((distance, target));
+    }
+    found.sort_by_key(|(d, t)| (*d, t.city));
+    found.into_iter().take(MAX_TARGETS).map(|(_, t)| t).collect()
+}
+
+/// `part` over `part + rest`, thousandths; `none` when both are 0.
+fn share_of(part: i64, rest: i64, none: Milli) -> Milli {
+    let (part, rest) = (part.max(0), rest.max(0));
+    if part + rest == 0 {
+        none
+    } else {
+        part * 1000 / (part + rest)
+    }
 }
 
 /// G1–G10 (§2.2).
@@ -580,7 +679,13 @@ fn seat(obs: &AIObservation<'_>, brief: &TurnBrief, rules: &CompiledRuleset, mem
     let gold_stock = ramp(i64::from(obs.economy.treasury), 0, 3 * i64::from(crate::ai::city_states::MEDIUM_GIFT));
     let cs_allies = ramp(obs.city_states.iter().filter(|c| c.ally == Some(me)).count() as i64, 0, 4);
     let cs_contested = ramp(contested_city_states(obs), 0, 4);
-    SeatInputs { capital_lost, cities_lost, war_rounds, war_gain, unhappy_trend, embark, enemy_air, gold_stock, cs_allies, cs_contested, ..SeatInputs::default() }
+    // G11: our infamy over the scripted AIs' denunciation line (`ai::diplomacy::DENOUNCE_WARMONGER`).
+    let own_infamy = ramp(i64::from(memory.infamy), 0, i64::from(crate::ai::diplomacy::DENOUNCE_WARMONGER));
+    // G12: the ties a declaration puts at risk: friendships, research agreements and pacts with majors.
+    let majors = obs.relations.iter().filter(|r| r.kind == PlayerKind::Major);
+    let ties: i64 = majors.map(|r| i64::from(r.friends) + i64::from(r.research_agreement) + i64::from(r.defensive_pact)).sum();
+    let ties_at_risk = ramp(ties, 0, 4);
+    SeatInputs { capital_lost, cities_lost, war_rounds, war_gain, unhappy_trend, embark, enemy_air, gold_stock, cs_allies, cs_contested, own_infamy, ties_at_risk, ..SeatInputs::default() }
 }
 
 /// G4 (§2.2): in each current war, the cities captured from the enemy since it began minus the cities
