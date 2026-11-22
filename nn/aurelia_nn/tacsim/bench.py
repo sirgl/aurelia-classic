@@ -40,10 +40,11 @@ def replicate(path, batch_size, limit=None, families=None, seed=1):
     dumps = load_lines(path, limit=limit, families=families)
     tb = Batch(dumps)
     mr = max(1, max(p["moves_land"] for d in dumps for p in d["scene"]["profiles"]) // 60)
-    geo = Geometry(tb.w, radius=sight_radius(dumps), move_radius=max(mr, 4))
+    geo = Geometry(tb.w, radius=sight_radius(dumps), move_radius=max(mr, 4), h=tb.h)
     has_near = any(t["cond"][0] == "other" for d in dumps for p in d["scene"]["profiles"] for t in p["terms"])
     has_air = any(p["domain"] == "Air" or p.get("air_intercept_range", 0) > 0 for d in dumps for p in d["scene"]["profiles"])
-    kw = dict(move_radius=mr, has_near_imp=has_near, dest_pool=tb.dest_pool, withdraw_pool=tb.withdraw_pool, has_air=has_air)
+    kw = dict(move_radius=mr, has_near_imp=has_near, dest_pool=tb.dest_pool, withdraw_pool=tb.withdraw_pool, has_air=has_air,
+              features=tb.features())
     tsim = Sim(geo, tb.m, tb.cost_pool, tb.cstatic, tb.n_pieces, extra=tb.extra(), **kw)
     assert all(o >= 0 for o in geo.disc_to_local_list)
     idx = mx.arange(batch_size) % tb.b

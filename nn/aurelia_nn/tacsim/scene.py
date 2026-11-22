@@ -154,7 +154,8 @@ class Batch:
         B = len(dumps)
         sc0 = dumps[0]["scene"]
         self.w = sc0["window"]["w"]
-        T = self.w * self.w
+        self.h = sc0["window"].get("h", self.w)
+        T = self.w * self.h
         self.b, self.t = B, T
         self.u = u or max(max(d["slots"], len(d["scene"]["profiles"])) for d in dumps) + 2
         self.c = c or max(1, max(len(d["scene"]["cities"]) for d in dumps))
@@ -423,7 +424,12 @@ class Batch:
                     if q >= 0:
                         anyof[bi][j][q] = True
                 has_any[bi][j] = len(pr["requires_any"]) > 0
-        self.z.update({"req": mx.array(req), "anyof": mx.array(anyof), "has_any": mx.array(has_any), "insta": mx.array(insta)})
+        # Prerequisites as index lists (-1 padding): a few per promotion, not an NP x NP matrix.
+        def lists(mat):
+            rows = [[[q for q in range(NP) if mat[bi][j][q]] for j in range(NP)] for bi in range(B)]
+            w = max(1, max((len(r) for sc in rows for r in sc), default=1))
+            return mx.array([[r + [-1] * (w - len(r)) for r in sc] for sc in rows], dtype=mx.int32)
+        self.z.update({"req": lists(req), "anyof": lists(anyof), "has_any": mx.array(has_any), "insta": mx.array(insta)})
         self.n_pieces = mx.array([len(d["scene"]["profiles"]) for d in self.dumps], dtype=mx.int32)
         # Cities.
         cs = {k: [] for k in ["alive", "tile", "max_hp", "str0", "pop0", "gsp", "rsp", "draws", "orig"]}
@@ -443,6 +449,16 @@ class Batch:
         self.cstatic = {k: mx.array(v) if k == "alive" else mx.array(v, dtype=mx.int32) for k, v in cs.items()}
         self.cstatic["side_cities"] = mx.array([d["scene"].get("city_counts", [9, 9]) for d in self.dumps], dtype=mx.int32)
         self.unsupported = {k: v for k, v in self.unsupported.items() if v}
+
+    def features(self):
+        """Which rules a batch can meet (static): the simulator leaves the others out of its graph."""
+        p, z = self.p, self.z
+        return {"promo": bool(mx.any(z["fit"]).item()),
+                "withdraw": bool(mx.any(p["withdraw"] > 0).item()),
+                "capture_defeated": bool(mx.any(p["capture_defeated"]).item()),
+                "spawn": bool(mx.any(p["civ_spawn"] >= 0).item()) or bool(mx.any(p["capture_spawn"] >= 0).item()),
+                "citadel": bool(mx.any(self.m["citadel_dmg"] > 0).item()),
+                "mountains": bool(mx.any(p["cross_mountains"]).item())}
 
     def extra(self):
         """The static tables besides the tiles and the cities (promotions `z_*`, spawn profiles `sp_*`)."""

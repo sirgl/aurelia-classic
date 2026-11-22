@@ -74,6 +74,8 @@ pub struct Window {
     pub q0: i32,
     pub r0: i32,
     pub w: i32,
+    /// Rows (the window is `w` x `h`; the whole map with `--whole-map`).
+    pub h: i32,
     pub map_w: i32,
     pub map_h: i32,
 }
@@ -85,13 +87,19 @@ impl Window {
         let (cq, cr) = (centre.0 as i32 % mw, centre.0 as i32 / mw);
         let q0 = (cq - WINDOW / 2).clamp(0, (mw - WINDOW).max(0));
         let r0 = (cr - WINDOW / 2).clamp(0, (mh - WINDOW).max(0));
-        Window { q0, r0, w: WINDOW, map_w: mw, map_h: mh }
+        Window { q0, r0, w: WINDOW.min(mw), h: WINDOW.min(mh), map_w: mw, map_h: mh }
+    }
+    /// The whole map as the window.
+    fn whole(game: &GameState) -> Window {
+        let dims = game.view().auth.map().dimensions;
+        let (mw, mh) = (dims.width as i32, dims.height as i32);
+        Window { q0: 0, r0: 0, w: mw, h: mh, map_w: mw, map_h: mh }
     }
     /// Window index of a map tile (None outside).
     pub fn index(&self, t: TileId) -> Option<i32> {
         let (q, r) = (t.0 as i32 % self.map_w, t.0 as i32 / self.map_w);
         let (x, y) = (q - self.q0, r - self.r0);
-        (x >= 0 && y >= 0 && x < self.w && y < self.w).then_some(y * self.w + x)
+        (x >= 0 && y >= 0 && x < self.w && y < self.h).then_some(y * self.w + x)
     }
     pub fn tile(&self, i: i32) -> TileId {
         let (x, y) = (i % self.w, i / self.w);
@@ -101,11 +109,11 @@ impl Window {
     fn inner(&self, t: TileId) -> bool {
         self.index(t).is_some_and(|i| {
             let (x, y) = (i % self.w, i / self.w);
-            x >= INNER && y >= INNER && x < self.w - INNER && y < self.w - INNER
+            x >= INNER && y >= INNER && x < self.w - INNER && y < self.h - INNER
         })
     }
     fn tiles(&self) -> impl Iterator<Item = TileId> + '_ {
-        (0..self.w * self.w).map(|i| self.tile(i))
+        (0..self.w * self.h).map(|i| self.tile(i))
     }
 }
 
@@ -238,7 +246,7 @@ fn profile_of(rules: &CompiledRuleset, game: &GameState, win: &Window, h: UnitHa
     if tables {
         // The step-cost table: per window tile and direction, the cost code of the unit's own price of
         // the step (points; 255 all moves; -1 no step; -2 outside the window).
-        let mut cost: Vec<i32> = Vec::with_capacity((win.w * win.w * 6) as usize);
+        let mut cost: Vec<i32> = Vec::with_capacity((win.w * win.h * 6) as usize);
         for t in win.tiles() {
             for d in 0..6 {
                 let code = match neighbour(win, t, d) {
@@ -528,7 +536,7 @@ fn state(rules: &CompiledRuleset, game: &GameState, win: &Window, slots: &mut Sl
     let bits: Vec<String> = sides
         .iter()
         .map(|p| {
-            let mut s = String::with_capacity((win.w * win.w) as usize);
+            let mut s = String::with_capacity((win.w * win.h) as usize);
             for t in win.tiles() {
                 let i = p.0 as usize * vis.tiles + t.0 as usize;
                 s.push(if vis.counts.get(i).is_some_and(|c| *c > 0) { '1' } else { '0' });
@@ -755,7 +763,7 @@ fn scene_json(rules: &CompiledRuleset, game: &GameState, sc: &Scene, win: &Windo
         "found_ok": found_ok,
         "city_counts": city_counts,
         "family": sc.fam.name(), "era": lab::era_names(rules).get(sc.era as usize), "era_index": sc.era, "instance": sc.instance, "attempt": sc.attempt,
-        "window": {"q0": win.q0, "r0": win.r0, "w": win.w, "map_w": win.map_w, "map_h": win.map_h},
+        "window": {"q0": win.q0, "r0": win.r0, "w": win.w, "h": win.h, "map_w": win.map_w, "map_h": win.map_h},
         "tiles": tiles, "profiles": profiles, "cities": city_list, "promotions": promotions, "spawn": spawn,
         "n_mine": sc.mine.len(), "n_theirs": sc.theirs.len(),
         "move_denominator": kernel::world::unit::MOVE_DENOMINATOR,
@@ -763,14 +771,27 @@ fn scene_json(rules: &CompiledRuleset, game: &GameState, sc: &Scene, win: &Windo
 }
 
 /// One dumped play of a scene.
-pub fn dump_one(rules: &CompiledRuleset, fam: Fam, era: u8, instance: usize, attempt: u32, rounds: u32, seed: u64, aggressive: bool, record: bool, plant: &[String]) -> Result<Value, String> {
+/// How a dump is taken: the play's script, the variants, the window.
+#[derive(Debug, Clone, Default)]
+pub struct DumpOptions {
+    pub aggressive: bool,
+    pub record: bool,
+    pub plant: Vec<String>,
+    /// The whole map as the window (not 24 x 24 around the arena).
+    pub whole_map: bool,
+    /// Multi-turn path costs to this many goals per piece at the start (`find_path_cost`).
+    pub paths: usize,
+}
+
+pub fn dump_one(rules: &CompiledRuleset, fam: Fam, era: u8, instance: usize, attempt: u32, rounds: u32, seed: u64, o: &DumpOptions) -> Result<Value, String> {
+    let (aggressive, record, plant) = (o.aggressive, o.record, &o.plant[..]);
     let (mut game, mut sc) = families::build(rules, fam, era, instance, attempt)?;
     let planted = plant_extras(rules, &mut game, &mut sc, plant);
     // The whole map known to both sides, as the trainers play it.
     let all: Vec<TileId> = (0..game.view().auth.map().tile_count() as u32).map(TileId).collect();
     game.debug_reveal(sc.learner, &all);
     game.debug_reveal(sc.enemy, &all);
-    let win = Window::around(&game, sc.centre);
+    let win = if o.whole_map { Window::whole(&game) } else { Window::around(&game, sc.centre) };
     let sides = [sc.learner, sc.enemy];
     let mut cities: Vec<TileId> = game.view().auth.cities().iter().map(|(_, c)| c.tile).filter(|t| win.index(*t).is_some()).collect();
     cities.sort_by_key(|t| t.0);
@@ -783,6 +804,7 @@ pub fn dump_one(rules: &CompiledRuleset, fam: Fam, era: u8, instance: usize, att
         Value::Null
     };
     let initial = if record { state(rules, &game, &win, &mut slots, sides, &cities) } else { Value::Null };
+    let paths = if record && o.paths > 0 { path_costs(rules, &game, &win, &pieces, o.paths) } else { Value::Null };
     let play_started = std::time::Instant::now();
     let mut actions = 0u64;
     let mut rounds_played = 0u32;
@@ -885,8 +907,36 @@ pub fn dump_one(rules: &CompiledRuleset, fam: Fam, era: u8, instance: usize, att
             break;
         }
     }
-    Ok(json!({"scene": scene, "initial": initial, "steps": steps, "stop": stop, "seed": seed, "slots": slots.ids.len(), "planted": planted,
+    Ok(json!({"scene": scene, "initial": initial, "steps": steps, "stop": stop, "seed": seed, "slots": slots.ids.len(), "planted": planted, "paths": paths,
         "play_s": play_started.elapsed().as_secs_f64(), "actions": actions, "rounds_played": rounds_played}))
+}
+
+/// The multi-turn path cost of each piece to `n` goals spread over the window (every k-th tile, a
+/// per-piece offset): `[goal, turns, moves_left]` of `find_path_cost` (turns before the last step,
+/// points left after it), `[goal, -1, -1]` when no path. The MLX wavefront must give the same.
+fn path_costs(rules: &CompiledRuleset, game: &GameState, win: &Window, pieces: &[UnitHandle], n: usize) -> Value {
+    let tiles = (win.w * win.h) as usize;
+    let stride = (tiles / n.max(1)).max(1);
+    let mut scratch = classic_rules::navigation::PathScratch::default();
+    let out: Vec<Value> = pieces
+        .iter()
+        .enumerate()
+        .map(|(i, h)| {
+            let goals: Vec<Value> = (0..n)
+                .map(|k| ((k * stride + i * 7) % tiles) as i32)
+                .map(|g| {
+                    let goal = win.tile(g);
+                    let req = classic_rules::navigation::PathRequest::for_unit(game.view().auth, rules, *h, goal);
+                    match req.and_then(|r| classic_rules::navigation::find_path_cost(game.view(), rules, &r, &mut scratch)) {
+                        Some(c) => json!([g, c.turns, c.moves_left]),
+                        None => json!([g, -1, -1]),
+                    }
+                })
+                .collect();
+            Value::Array(goals)
+        })
+        .collect();
+    Value::Array(out)
 }
 
 /// Parity variants of a scene (`--plant`), to exercise rules the families rarely reach; measurement
@@ -979,6 +1029,8 @@ pub fn main(rules: &CompiledRuleset, args: &[String]) -> Result<(), String> {
     let mut aggressive = false;
     let mut record = true;
     let mut plant: Vec<String> = Vec::new();
+    let mut whole_map = false;
+    let mut paths = 0usize;
     let mut one: Option<(Fam, String, usize, u32)> = None;
     let (mut fam, mut era, mut inst, mut att) = (None, None, 0usize, 0u32);
     let mut it = args.iter();
@@ -995,6 +1047,8 @@ pub fn main(rules: &CompiledRuleset, args: &[String]) -> Result<(), String> {
             "--policy" => aggressive = v()? == "aggressive",
             "--no-record" => record = false,
             "--plant" => plant = v()?.split(',').map(str::to_owned).collect(),
+            "--whole-map" => whole_map = true,
+            "--paths" => paths = v()?.parse().map_err(|e| format!("{e}"))?,
             "--family" => fam = Some(Fam::parse(&v()?)?),
             "--era" => era = Some(v()?),
             "--instance" => inst = v()?.parse().map_err(|e| format!("{e}"))?,
@@ -1031,7 +1085,8 @@ pub fn main(rules: &CompiledRuleset, args: &[String]) -> Result<(), String> {
     let ix: Vec<usize> = (0..cells.len()).collect();
     crate::export::parallel(&ix, jobs, |&i| {
         let (f, e, inst, a) = cells[i];
-        match dump_one(rules, f, e, inst, a, rounds, seed, aggressive, record, &plant) {
+        let o = DumpOptions { aggressive, record, plant: plant.clone(), whole_map, paths };
+        match dump_one(rules, f, e, inst, a, rounds, seed, &o) {
             Ok(v) => {
                 let mut t = totals.lock().unwrap();
                 t.0 += v["play_s"].as_f64().unwrap_or(0.0);

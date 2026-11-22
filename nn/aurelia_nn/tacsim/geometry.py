@@ -3,7 +3,6 @@
 
 Tables (MLX int32 arrays):
 - `nbr[T, 6]`: the neighbour in each direction (-1 off the window);
-- `dist[T, T]`: hex distance;
 - `disc`: the offsets of the radius-`R` disc in the kernel's `hex_disc` order, their distance, the
   tiles strictly between the centre and each offset on the hex line (the kernel's `hex_line_all`:
   cube lerp, nudge (1, 1, -2), `round_cube`; translation invariant, so one table of offsets),
@@ -64,9 +63,10 @@ def line_between(dq, dr):
 
 
 class Geometry:
-    def __init__(self, w, radius=4, move_radius=5, att_radius=4):
-        self.w = w
-        self.t = w * w
+    def __init__(self, w, radius=4, move_radius=5, att_radius=4, h=None):
+        h = h or w
+        self.w, self.h = w, h
+        self.t = w * h
         self.radius = radius
         self.move_radius = move_radius
         T = self.t
@@ -74,12 +74,10 @@ class Geometry:
         self.qr = qr
 
         def idx(q, r):
-            return r * w + q if 0 <= q < w and 0 <= r < w else -1
+            return r * w + q if 0 <= q < w and 0 <= r < h else -1
 
         self.nbr_list = [[idx(q + dq, r + dr) for dq, dr in DIRS] for q, r in qr]
         self.nbr = mx.array(self.nbr_list, dtype=mx.int32)
-        self.dist_list = [[hex_distance(q2 - q1, r2 - r1) for (q2, r2) in qr] for (q1, r1) in qr]
-        self.dist = mx.array(self.dist_list, dtype=mx.int32)
         offs = disc_offsets(radius)
         self.offs = offs
         self.o = len(offs)
@@ -121,7 +119,7 @@ class Geometry:
         dpos = {o: i for i, o in enumerate(self.att_offs)}
         self.local_to_disc = mx.array([dpos.get(o, -1) for o in loffs], dtype=mx.int32)
         self.ltile = mx.array([[idx(q + dq, r + dr) for dq, dr in loffs] for q, r in qr], dtype=mx.int32)
-        self.inner = mx.array([INNER <= q < w - INNER and INNER <= r < w - INNER for q, r in qr])
+        self.inner = mx.array([INNER <= q < w - INNER and INNER <= r < h - INNER for q, r in qr])
         self.q = mx.array([q for q, _ in qr], dtype=mx.int32)
         self.r = mx.array([r for _, r in qr], dtype=mx.int32)
 

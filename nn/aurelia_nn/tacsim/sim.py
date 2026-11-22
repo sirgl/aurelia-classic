@@ -71,8 +71,10 @@ def grow(arr, slot):
 
 
 def g2(arr, slot, j):
-    """arr[b, slot[b], j[b], ...] for arr [B, U, N, ...]."""
-    return grow(grow(arr, slot), j)
+    """arr[b, slot[b], j[b], ...] for arr [B, U, N, ...] (one gather over the flattened U x N axis)."""
+    B, U, N = arr.shape[:3]
+    flat = arr.reshape((B, U * N) + arr.shape[3:])
+    return grow(flat, mx.maximum(slot, 0) * N + mx.maximum(j, 0))
 
 
 def first_index(mask, axis=-1):
@@ -102,8 +104,11 @@ def put1(arr, idx, val, where):
 
 class Sim:
     def __init__(self, geo, m, cost_pool, cstatic, n_pieces, move_radius=None, has_near_imp=True, los=None, extra=None,
-                 dest_pool=None, withdraw_pool=None, has_air=False):
+                 dest_pool=None, withdraw_pool=None, has_air=False, features=None):
         self.has_near_imp = has_near_imp
+        # The rules the batch can meet (`Batch.features`); the others stay out of the compiled graph.
+        self.f = {"promo": True, "withdraw": True, "capture_defeated": True, "spawn": True, "citadel": True, "mountains": True}
+        self.f.update(features or {})
         self.has_air = has_air
         self.geo = geo
         self.m = m
@@ -115,6 +120,7 @@ class Sim:
         self.dest_pool = dest_pool
         self.withdraw_pool = withdraw_pool
         self.iters = move_radius or geo.move_radius
+        self._pack()
         g = geo
         self.terr_rough = m["rough"]
         self.cost_flat = cost_pool.reshape(-1)
@@ -145,6 +151,35 @@ class Sim:
             words.append(mx.stack(ws, axis=2))
             mx.eval(words[-1])
         self.los = mx.concatenate(words, axis=1).reshape(B, T * W)
+
+    # Profile fields a promotion changes (ints added, bools or-ed) and that a spawn writes.
+    D_INT = list(DELTA_INT.values()) + STAT_NAMES
+
+    def _pack(self):
+        """The promotion changes and the spawn profiles packed into a few tables, so that taking a
+        promotion or creating a unit is one gather (not one per field)."""
+        z = self.z
+        if "z_d_ctx" in z:
+            self.pz_int = mx.concatenate([z["z_d_ctx"]] + [z["z_d_" + k][..., None] for k in self.D_INT], axis=-1)  # [B, U, NP, 23 + NI]
+            self.pz_bool = mx.stack([z["z_f_" + k] for k in FLAG_DELTA], axis=-1)  # [B, U, NP, NF]
+        sp = sorted(k for k in z if k.startswith("sp_") and k not in ("sp_prom", "sp_level"))
+        self.sp_keys = {"int": [], "bool": [], "vec": []}
+        ints, bools, vecs = [], [], []
+        for k in sp:
+            v = z[k]
+            if v.ndim == 2:
+                (bools if v.dtype == mx.bool_ else ints).append(v)
+                self.sp_keys["bool" if v.dtype == mx.bool_ else "int"].append(k[3:])
+            else:
+                vecs.append(v)
+                self.sp_keys["vec"].append(k[3:])
+        if ints:
+            self.sp_int = mx.stack(ints, axis=-1)  # [B, NS, n]
+            self.sp_bool = mx.stack(bools, axis=-1) if bools else None
+            self.sp_vec = [z["sp_" + k] for k in self.sp_keys["vec"]]
+            mx.eval(self.sp_int, *(x for x in [self.sp_bool] if x is not None))
+        if "z_d_ctx" in z:
+            mx.eval(self.pz_int, self.pz_bool)
 
     # ------------------------------------------------------------------ occupancy and sight
 
@@ -360,6 +395,77 @@ class Sim:
         final_left = g1(left, prev)
         return final_tile, final_left
 
+    def path_costs(self, s, side, slot, iters=None, check_every=8):
+        """The multi-turn move cost of unit `slot` of `side` to every tile of the map (kernel `astar`'s
+        turn-aware scalar, all goals at once: a Bellman-Ford wavefront over [B, T, 6] until no tile
+        improves): g [B, T] (2^30 unreached), the scale, and the decoded `PathCost` (turns before the
+        last step, points left after it). Units and zones of control come from the mover's view, as
+        for a move order. The strategy's "how fast troops arrive" reads this."""
+        geo = self.geo
+        B, T = self.B, self.T
+        INF = 1 << 30
+        block, ctrl, *_ = self.controls_and_blocks(s, side)
+        ctrl = mx.where(g1(s["p_sea"], slot)[:, None], self._ctrl_sea, ctrl)
+        tile = g1(s["u_tile"], slot)
+        nbr = geo.nbr  # [T, 6]: p = the neighbour in direction d; the step p -> t goes (d + 3) % 6
+        dprime = (mx.arange(6) + 3) % 6
+        cid = g1(s["p_cost_id"], slot)
+        pidx = mx.maximum(nbr, 0)[None] * 6 + dprime[None, None, :]  # [1, T, 6]
+        code = mx.take(self.cost_flat, cid[:, None, None] * (T * 6) + pidx)
+        code = mx.where((nbr >= 0)[None], code, -2)
+        n1 = mx.take(nbr.reshape(-1), mx.maximum(nbr, 0) * 6 + ((dprime + 5) % 6)[None, :])
+        n2 = mx.take(nbr.reshape(-1), mx.maximum(nbr, 0) * 6 + ((dprime + 1) % 6)[None, :])
+        ci = ctrl.astype(I32)
+        slowed = ((n1 >= 0)[None] & (gn(ci, mx.broadcast_to(n1[None], (B, T, 6))) > 0)) | \
+                 ((n2 >= 0)[None] & (gn(ci, mx.broadcast_to(n2[None], (B, T, 6))) > 0))
+        slowed = slowed & ~g1(s["p_ignore_zoc"], slot)[:, None, None]
+        edge_ok = (code >= 0) & ~block[:, :, None]
+        all_moves = (code == 255) | slowed
+        # The budget (`MoveBudget::of_unit`) and the allowance per tile (`Allowance::full_on`).
+        embarks = g1(s["p_embarks"], slot)
+        water = self.m["water"]
+        here_water = gn(water.astype(I32), tile[:, None])[:, 0] > 0
+        mmax = g1(s["u_mmax"], slot)
+        land_a = mx.where(embarks & here_water, g1(s["p_moves_land"], slot), mmax)
+        emb_a = mx.where(embarks, mx.where(here_water, mmax, g1(s["p_moves_embarked"], slot)), mmax)
+        scale = mx.maximum(land_a, emb_a)
+        full = mx.where(embarks[:, None] & water, emb_a[:, None], land_a[:, None])  # [B, T]
+        full_from = gn(full, mx.broadcast_to(mx.maximum(nbr, 0)[None], (B, T, 6)))
+        left0 = mx.minimum(g1(s["u_mv"], slot), g1(full, tile))
+        start = scale - left0
+        tiles = mx.arange(T)[None, :]
+        g = mx.where(tiles == tile[:, None], start[:, None], INF)
+        g = mx.where((land_a > 0)[:, None] & (tile >= 0)[:, None], g, INF)
+        sc = scale[:, None, None]
+        nb = mx.broadcast_to(mx.maximum(nbr, 0)[None], (B, T, 6))
+
+        def relax(g):
+            gp = gn(g, nb)  # [B, T, 6] the scalar at each predecessor
+            turn = gp // sc
+            used = gp % sc
+            fresh = (used == 0) & (gp > 0)
+            left = mx.where(fresh, full_from, sc - used)
+            step = mx.where(all_moves, left, mx.minimum(code, left))
+            after = mx.minimum(left - step, full[:, :, None])
+            ng = turn * sc + sc - after
+            ng = mx.where(edge_ok & (gp < INF) & (nbr >= 0)[None], ng, INF)
+            return mx.minimum(g, mx.min(ng, axis=2))
+
+        relax_c = mx.compile(relax)
+        n = iters or T
+        done = 0
+        while done < n:
+            prev = g
+            for _ in range(check_every):
+                g = relax_c(g)
+            done += check_every
+            if iters is None and bool(mx.all(g == prev).item()):
+                break
+        reached = g < INF
+        turns = mx.where(g <= scale[:, None], 0, (g - 1) // mx.maximum(scale[:, None], 1))
+        moves_left = mx.where(g <= scale[:, None], scale[:, None] - g, (turns + 1) * scale[:, None] - g)
+        return g, scale, mx.where(reached, turns, -1), mx.where(reached, moves_left, -1)
+
     def promo_mask(self, s, slot, alive):
         """[B, NP]: the promotions the unit may take now (`validate_promote`: enough experience for its
         level, `available_promotions`: choosable for its kind, not held, prerequisites held)."""
@@ -368,8 +474,9 @@ class Sim:
         need = mx.maximum((10 * level * (level + 1) // 2) * (100 + pct) // 100, 1)
         held = grow(s["u_prom"], slot)  # [B, NP]
         fit = grow(self.z["z_fit"], slot)
-        req_ok = ~mx.any(self.z["z_req"] & ~held[:, None, :], axis=2)
-        any_ok = ~self.z["z_has_any"] | mx.any(self.z["z_anyof"] & held[:, None, :], axis=2)
+        req, anyof = self.z["z_req"], self.z["z_anyof"]  # [B, NP, R] prerequisite lists (-1 none)
+        req_ok = mx.all((req < 0) | gn(held, req), axis=2)
+        any_ok = ~self.z["z_has_any"] | mx.any((anyof >= 0) & gn(held, anyof), axis=2)
         ready = alive & (g1(s["u_xp"], slot) >= need)
         return ready[:, None] & fit & ~held & req_ok & any_ok
 
@@ -390,7 +497,7 @@ class Sim:
         setup = alive & g1(s["p_must_set_up"], slot) & (st != 3) & (mv > 0) & ~water_here
         fo = mx.take_along_axis(self.m["found_ok"].reshape(B, 2 * T), (side * T + mx.maximum(tile, 0))[:, None], axis=1)[:, 0]
         found = alive & g1(s["p_founder"], slot) & fo
-        promo = self.promo_mask(s, slot, alive)
+        promo = self.promo_mask(s, slot, alive) if self.f["promo"] else mx.zeros((B, s["u_prom"].shape[2]), dtype=mx.bool_)
         # Moves.
         ctrl = mx.where(g1(s["p_sea"], slot)[:, None], self._ctrl_sea, ctrl)
         left, lt = self.reach(s, slot, block, ctrl)
@@ -774,12 +881,15 @@ class Sim:
             known = where & (profile_from >= 0)
             s["u_prom"] = put1(s["u_prom"], new, grow(self.z["sp_prom"], profile_from), known)
             s = self.set_unit(s, new, known, level=g1(self.z["sp_level"], profile_from))
-            for k, tab in self.z.items():
-                if not k.startswith("sp_") or k in ("sp_prom", "sp_level"):
-                    continue
-                name = "p_" + k[3:]
-                row = grow(tab, profile_from)
-                s[name] = put1(s[name], new, row.astype(s[name].dtype), where & (profile_from >= 0))
+            ri = grow(self.sp_int, profile_from)  # [B, n]: one gather per table
+            for i, k in enumerate(self.sp_keys["int"]):
+                s["p_" + k] = put1(s["p_" + k], new, ri[:, i], known)
+            if self.sp_bool is not None:
+                rb = grow(self.sp_bool, profile_from)
+                for i, k in enumerate(self.sp_keys["bool"]):
+                    s["p_" + k] = put1(s["p_" + k], new, rb[:, i], known)
+            for k, tab in zip(self.sp_keys["vec"], self.sp_vec):
+                s["p_" + k] = put1(s["p_" + k], new, grow(tab, profile_from).astype(s["p_" + k].dtype), known)
         s["n_slots"] = mx.where(where, new + 1, new)
         return s, new
 
@@ -794,6 +904,9 @@ class Sim:
         spawn = hit & (kind >= 0) & ~g1(s["p_no_capture"], captor)
         # What the civilian becomes, as the captor's (the dump's spawn table; else the converter's
         # captured-civilian slot profile).
+        if not self.f["spawn"]:
+            s, _ = self.new_unit(s, csid, tile, spawn, mx.full(victim.shape, 100, dtype=I32), moves, kind)
+            return s
         sp = g1(s["p_civ_spawn"], victim)
         known = sp >= 0
         water = gn(self.m["water"].astype(I32), tile[:, None])[:, 0] > 0
@@ -841,7 +954,8 @@ class Sim:
         s = self.set_unit(s, slot, fnd, alive=mx.zeros(slot.shape, dtype=mx.bool_), tile=mx.full(slot.shape, -1, dtype=I32))
         s["done"] = s["done"] | fnd
         # Promote.
-        s = self.promote(s, slot, tgt, take & (verb == V_PROMOTE))
+        if self.f["promo"]:
+            s = self.promote(s, slot, tgt, take & (verb == V_PROMOTE))
         # Move.
         mvv = take & (verb == V_MOVE)
         lt, left = mk["lt"], mk["left"]
@@ -867,13 +981,15 @@ class Sim:
         held = grow(s["u_prom"], slot)
         held = held | ((mx.arange(held.shape[1])[None, :] == p[:, None]) & keep[:, None])
         s["u_prom"] = put1(s["u_prom"], slot, held, keep)
-        s["p_ctx"] = put1(s["p_ctx"], slot, grow(s["p_ctx"], slot) + g2(self.z["z_d_ctx"], slot, p), keep)
-        for k in list(DELTA_INT.values()) + STAT_NAMES:
+        di = g2(self.pz_int, slot, p)  # [B, 23 + NI]: one gather for every change
+        db = g2(self.pz_bool, slot, p)
+        s["p_ctx"] = put1(s["p_ctx"], slot, grow(s["p_ctx"], slot) + di[:, :N_CTX], keep)
+        for i, k in enumerate(self.D_INT):
             name = "p_" + k
-            s[name] = put1(s[name], slot, g1(s[name], slot) + g2(self.z["z_d_" + k], slot, p), keep)
-        for k in FLAG_DELTA:
+            s[name] = put1(s[name], slot, g1(s[name], slot) + di[:, N_CTX + i], keep)
+        for i, k in enumerate(FLAG_DELTA):
             name = "p_" + k
-            s[name] = put1(s[name], slot, g1(s[name], slot) | g2(self.z["z_f_" + k], slot, p), keep)
+            s[name] = put1(s[name], slot, g1(s[name], slot) | db[:, i], keep)
         cm = g2(self.z["z_cmov"], slot, p)
         mset = g1(s["u_mset"], slot)
         nset = mx.where(cm >= 0, mset | mx.left_shift(mx.ones_like(cm), mx.maximum(cm, 0)), mset)
@@ -915,11 +1031,14 @@ class Sim:
         melee_city = is_city & ~ranged
         ranged_any = take & ranged
         # Withdrawal before melee (`try_withdraw`): a free tile away from the attacker, then the roll.
-        wtile = self.withdraw_tile(s, d, a["tile"])
-        can_wd = melee_unit & (d["withdraw"] > 0) & (wtile >= 0)
-        rng, wroll = exact.draw(s["rng"], mx.full((B,), 100, dtype=mx.int64), can_wd)
-        withdrew = can_wd & (wroll < d["withdraw"].astype(mx.int64))
-        melee_unit = melee_unit & ~withdrew
+        if self.f["withdraw"]:
+            wtile = self.withdraw_tile(s, d, a["tile"])
+            can_wd = melee_unit & (d["withdraw"] > 0) & (wtile >= 0)
+            rng, wroll = exact.draw(s["rng"], mx.full((B,), 100, dtype=mx.int64), can_wd)
+            withdrew = can_wd & (wroll < d["withdraw"].astype(mx.int64))
+            melee_unit = melee_unit & ~withdrew
+        else:
+            rng, withdrew, wtile = s["rng"], mx.zeros_like(take), d["tile"]
         # Interception of an air strike (`intercept`): evasion roll, interception roll, damage roll.
         icpt, g_slot, rng = self.intercept(s, a, d, to, air, is_unit | is_civ, rng)
         # Rolls: melee (unit or city) draws two, ranged one, melee on civilians none.
@@ -929,8 +1048,9 @@ class Sim:
         s["rng"] = rng
         wm = a["wounded_mod"]
         # --- the defender withdrew: it steps back, the attacker takes the tile
-        s = self.set_unit(s, d["slot"], withdrew, tile=wtile, st=mx.zeros_like(slot))
-        s = self.refresh_allowance(s, d["slot"], d["tile"], wtile, withdrew)
+        if self.f["withdraw"]:
+            s = self.set_unit(s, d["slot"], withdrew, tile=wtile, st=mx.zeros_like(slot))
+            s = self.refresh_allowance(s, d["slot"], d["tile"], wtile, withdrew)
         # --- melee unit vs unit
         to_def = exact.unit_damage(att_melee_unit, def_melee, a_dmg_taken, wm, r1).astype(I32)
         to_att = exact.unit_damage(def_melee, att_melee_unit, 100 - d["hp"], d["wounded_mod"], r2).astype(I32)
@@ -947,7 +1067,8 @@ class Sim:
         win = melee_unit & d_killed & ~a_killed
         # CaptureDefeatedEnemy (`try_capture_defeated`): the roll, then the defeated kind joins the
         # attacker with half HP next to it.
-        s = self.capture_defeated(s, a, d, win & a["capture_defeated"])
+        if self.f["capture_defeated"]:
+            s = self.capture_defeated(s, a, d, win & a["capture_defeated"])
         s = self.finish_attack(s, slot, melee_unit & ~d_killed & ~a_killed, mx.ones_like(win))
         # A won melee, a withdrawal and a melee on civilians: capture the civilians there, advance, the
         # attack ends.
@@ -1136,20 +1257,22 @@ class Sim:
         medic = mx.max(mx.where(same & (dd == 1), s["p_heal_adjacent"][:, None, :], 0), axis=2)
         dose = mx.where(no, 0, rate + medic)
         s["u_hp"] = mx.where(mine, mx.clip(s["u_hp"] + dose, 1, 100), s["u_hp"])
-        # Citadels (`citadel_damage`): the strongest intact citadel of the enemy next to the unit.
-        nb = mx.take(self.geo.nbr, mx.maximum(tiles, 0), axis=0)  # [B, U, 6]
-        cit = mx.where(nb >= 0, gn(self.m["citadel_dmg"], nb), 0)
-        host = mx.where(nb >= 0, gn(s["owner"], nb), -1)
-        hurt = mx.max(mx.where((cit > 0) & (host == (1 - s["u_side"])[:, :, None]), cit, 0), axis=2)
-        hit = mine & (hurt > 0)
-        dead = hit & (hurt >= s["u_hp"])
-        s["u_hp"] = mx.where(hit & ~dead, s["u_hp"] - hurt, s["u_hp"])
-        s["u_alive"] = s["u_alive"] & ~dead
-        s["u_tile"] = mx.where(dead, -1, s["u_tile"])
-        # Mountains (`mountain_damage`): a unit that crosses them loses 50 HP standing on one, never dying.
-        on_m = mine & ~dead & s["p_cross_mountains"] & (gn(self.m["mountain"].astype(I32), tiles) > 0)
-        s["u_hp"] = mx.where(on_m, s["u_hp"] - mx.minimum(MOUNTAIN_DAMAGE, s["u_hp"] - 1), s["u_hp"])
-        mine = mine & ~dead
+        if self.f["citadel"]:
+            # Citadels (`citadel_damage`): the strongest intact citadel of the enemy next to the unit.
+            nb = mx.take(self.geo.nbr, mx.maximum(tiles, 0), axis=0)  # [B, U, 6]
+            cit = mx.where(nb >= 0, gn(self.m["citadel_dmg"], nb), 0)
+            host = mx.where(nb >= 0, gn(s["owner"], nb), -1)
+            hurt = mx.max(mx.where((cit > 0) & (host == (1 - s["u_side"])[:, :, None]), cit, 0), axis=2)
+            hit = mine & (hurt > 0)
+            dead = hit & (hurt >= s["u_hp"])
+            s["u_hp"] = mx.where(hit & ~dead, s["u_hp"] - hurt, s["u_hp"])
+            s["u_alive"] = s["u_alive"] & ~dead
+            s["u_tile"] = mx.where(dead, -1, s["u_tile"])
+            mine = mine & ~dead
+        if self.f["mountains"]:
+            # Mountains (`mountain_damage`): a unit that crosses them loses 50 HP standing on one, never dying.
+            on_m = mine & s["p_cross_mountains"] & (gn(self.m["mountain"].astype(I32), tiles) > 0)
+            s["u_hp"] = mx.where(on_m, s["u_hp"] - mx.minimum(MOUNTAIN_DAMAGE, s["u_hp"] - 1), s["u_hp"])
         mmax = mx.where(s["p_embarks"] & water & s["p_land"], s["p_moves_embarked"], s["p_moves_land"])
         s["u_att"] = mx.where(mine, 0, s["u_att"])
         s["u_icpt"] = mx.where(mine, 0, s["u_icpt"])

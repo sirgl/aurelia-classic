@@ -57,11 +57,12 @@ def sight_radius(dumps):
 def build(dumps, move_radius=None):
     batch = Batch(dumps)
     mr = move_radius or max(1, max(p["moves_land"] for d in dumps for p in d["scene"]["profiles"]) // 60)
-    geo = Geometry(batch.w, radius=sight_radius(dumps), move_radius=mr)
+    geo = Geometry(batch.w, radius=sight_radius(dumps), move_radius=mr, h=batch.h)
     has_near = any(t["cond"][0] == "other" for d in dumps for p in d["scene"]["profiles"] for t in p["terms"])
     has_air = any(p["domain"] == "Air" or p.get("air_intercept_range", 0) > 0 for d in dumps for p in d["scene"]["profiles"])
     sim = Sim(geo, batch.m, batch.cost_pool, batch.cstatic, batch.n_pieces, move_radius=mr, has_near_imp=has_near, extra=batch.extra(),
-              dest_pool=batch.dest_pool, withdraw_pool=batch.withdraw_pool, has_air=has_air)
+              dest_pool=batch.dest_pool, withdraw_pool=batch.withdraw_pool, has_air=has_air,
+              features=batch.features())
     return batch, geo, sim
 
 
@@ -84,6 +85,34 @@ def rust_masks(st, T):
     return fort, setup, found, move, att, promo
 
 
+def check_paths(dumps, batch, sim, s):
+    """The multi-turn path costs at the scene's start (`Sim.path_costs`) against Rust's `find_path_cost`
+    to the dumped goals: (goals checked, goals equal, first mismatches)."""
+    if not any(d.get("paths") for d in dumps):
+        return 0, 0, []
+    B = batch.b
+    n_pieces = max(len(d["scene"]["profiles"]) for d in dumps)
+    checked = ok = 0
+    bad = []
+    for i in range(n_pieces):
+        slot = mx.full((B,), i, dtype=mx.int32)
+        side = mx.take_along_axis(s["u_side"], slot[:, None], axis=1)[:, 0]
+        _, _, turns, left = sim.path_costs(s, mx.maximum(side, 0), slot)
+        turns, left = turns.tolist(), left.tolist()
+        for b, d in enumerate(dumps):
+            ps = d.get("paths") or []
+            if i >= len(ps):
+                continue
+            for goal, t, m in ps[i]:
+                checked += 1
+                if (turns[b][goal], left[b][goal]) == (t, m):
+                    ok += 1
+                elif len(bad) < 8:
+                    bad.append({"family": d["scene"]["family"], "era": d["scene"]["era"], "instance": d["scene"]["instance"], "piece": i,
+                                "goal": goal, "rust": [t, m], "mlx": [turns[b][goal], left[b][goal]]})
+    return checked, ok, bad
+
+
 def run(path, mode="free", limit=None, show=5, families=None, out=None):
     t0 = time.time()
     dumps = load_lines(path, limit=limit, families=families)
@@ -92,6 +121,9 @@ def run(path, mode="free", limit=None, show=5, families=None, out=None):
     s = batch.initial_state()
     mx.eval(s)
     t_load = time.time() - t0
+    tp = time.time()
+    paths = check_paths(dumps, batch, sim, s)
+    t_paths = time.time() - tp
     n_steps = max(len(d["steps"]) for d in dumps)
     diverged = [None] * B
     stats = collections.defaultdict(lambda: collections.Counter())
@@ -227,6 +259,7 @@ def run(path, mode="free", limit=None, show=5, families=None, out=None):
             s = keep
     t_run = time.time() - t1
     report = summarize(dumps, stats, diverged, examples, batch, t_load, t_run, mode)
+    report["paths"] = {"checked": paths[0], "ok": paths[1], "examples": paths[2], "seconds": round(t_paths, 2)}
     report["unmodelled_taken"] = int(mx.sum(s["n_unmodelled"]).item()) if "n_unmodelled" in s else 0
     report["odd_promotions"] = sorted({k for v in batch.odd_promos.values() for k in v})
     if out:
@@ -284,6 +317,8 @@ def main(argv=None):
     for r in rep["rows"]:
         print(f"  {r['family']:8} {r['era']:12} scenes {r['scenes_ok']}/{r['scenes']} steps {r['steps_ok']}/{r['steps']} masks {r['masks_ok']}/{r['masks']} {r['bad'] or ''}")
     print("causes:", rep["causes"])
+    if rep["paths"]["checked"]:
+        print(f"multi-turn path costs: {rep['paths']['ok']}/{rep['paths']['checked']} goals equal ({rep['paths']['seconds']} s)", rep["paths"]["examples"][:4])
     print("unmodelled promotions taken:", rep["unmodelled_taken"], "odd promotion changes in the tables:", rep["odd_promotions"])
     for e in rep["examples"]:
         print("  ex:", e)
