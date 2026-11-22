@@ -156,22 +156,19 @@ class Runner:
             a = {"typ": mx.where(slot >= 0, A_UNIT, A_PAD), "side": side, "slot": slot, "verb": verb, "tgt": tgt}
             return sim.step(s, a, mk, kinds=(A_UNIT,))
 
-        def units_step(s, side, ks, sel, key):
-            """Several units in one launch (wave / group): decided on the launch's start state, applied in
-            order; an action no longer legal when its turn comes becomes nothing."""
-            slots = [kth_unit(s, side, k, sel) for k in ks]
-            keys = mx.random.split(key, len(slots))
-            decided = []
-            for j, slot in enumerate(slots):
-                mk = sim.masks(s, side, slot)
-                decided.append(decide(sim, s, slot, mk, policy, net, keys[j]))
-            for slot, (verb, tgt) in zip(slots, decided):
-                mk = sim.masks(s, side, slot)
-                legal = mx.where(verb == V_MOVE, mx.any(mk["move_l"] & (mk["lt"] == tgt[:, None]), axis=1),
-                                 mx.where(verb == V_ATTACK, mx.any(mk["attack_d"] & (mk["tgt_d"] == tgt[:, None]), axis=1), True))
-                a = {"typ": mx.where(slot >= 0, A_UNIT, A_PAD), "side": side, "slot": slot, "verb": mx.where(legal, verb, V_NONE), "tgt": tgt}
-                s = sim.step(s, a, mk, kinds=(A_UNIT,))
-            return s
+        def decide_fn(s, side, k, sel, key):
+            slot = kth_unit(s, side, k, sel)
+            mk = sim.masks(s, side, slot)
+            verb, tgt = decide(sim, s, slot, mk, policy, net, key)
+            return slot, verb, tgt
+
+        def apply_fn(s, side, slot, verb, tgt):
+            """Apply a decision taken on an earlier state: an action no longer legal becomes nothing."""
+            mk = sim.masks(s, side, slot)
+            legal = mx.where(verb == V_MOVE, mx.any(mk["move_l"] & (mk["lt"] == tgt[:, None]), axis=1),
+                             mx.where(verb == V_ATTACK, mx.any(mk["attack_d"] & (mk["tgt_d"] == tgt[:, None]), axis=1), True))
+            a = {"typ": mx.where(slot >= 0, A_UNIT, A_PAD), "side": side, "slot": slot, "verb": mx.where(legal, verb, V_NONE), "tgt": tgt}
+            return sim.step(s, a, mk, kinds=(A_UNIT,))
 
         def city_step(s, side, c, key):
             cslot = mx.full((B,), c, dtype=I32)
@@ -193,14 +190,17 @@ class Runner:
         self.city_step = c(city_step)
         self.end_step = c(end_step)
         self.round_step = c(round_step)
-        self.units_raw = units_step
-        self._groups = {}
+        self.decide_fn = c(decide_fn)
+        self.apply_fn = c(apply_fn)
 
-    def group_fn(self, n):
-        if n not in self._groups:
-            f = lambda s, side, ks, sel, key: self.units_raw(s, side, ks, sel, key)
-            self._groups[n] = mx.compile(f) if self.compile_ else f
-        return self._groups[n]
+    def group(self, s, side, n, sel, key):
+        """n units decided on the same state (one net forward each, no sync between), then applied in
+        order; the host syncs once after."""
+        keys = mx.random.split(key, n)
+        decided = [self.decide_fn(s, side, mx.array(k, dtype=I32), sel, keys[k]) for k in range(n)]
+        for slot, verb, tgt in decided:
+            s = self.apply_fn(s, side, slot, verb, tgt)
+        return s
 
 
 def play(runner, s, rounds, mode="seq", seed=0):
@@ -229,9 +229,16 @@ def play(runner, s, rounds, mode="seq", seed=0):
                     mx.eval(s)
             elif mode == "group":
                 key, sub = mx.random.split(key)
-                s = runner.group_fn(K)(s, side, [mx.array(k, dtype=I32) for k in range(K)], every, sub)
+                s = runner.group(s, side, K, every, sub)
                 launches += 1
                 unit_launches += 1
+                mx.eval(s)
+            elif mode == "seq_async":
+                for k in range(K):
+                    key, sub = mx.random.split(key)
+                    s = runner.unit_step(s, side, mx.array(k, dtype=I32), every, sub)
+                unit_launches += K
+                launches += 1
                 mx.eval(s)
             elif mode == "wave":
                 contact = in_contact(sim, s, side)
@@ -241,7 +248,7 @@ def play(runner, s, rounds, mode="seq", seed=0):
                 if n_far:
                     # One compiled shape per side (K), the ranks past a scene's far units are empty slots.
                     key, sub = mx.random.split(key)
-                    s = runner.group_fn(K)(s, side, [mx.array(k, dtype=I32) for k in range(K)], far, sub)
+                    s = runner.group(s, side, K, far, sub)
                     launches += 1
                     unit_launches += 1
                     mx.eval(s)
