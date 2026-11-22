@@ -228,7 +228,7 @@ impl Fam {
             Fam::Flank => &[("MT4", 'U')],
             Fam::General => &[("MT12", 'U'), ("MT8", 'U')],
             Fam::Citadel => &[("MT10", 'D'), ("MO2", 'D'), ("MO4", 'D')],
-            Fam::Bombard => &[("N3", 'U'), ("N4", 'U')],
+            Fam::Bombard => &[("N3", 'U')],
             Fam::Sink => &[("MT5", 'U'), ("MT6", 'U'), ("N1", 'U'), ("N2", 'U')],
             Fam::Airstrike => &[("A1", 'U'), ("A3", 'U')],
             Fam::Prey => &[("MO8", 'U'), ("MO1", 'U'), ("MO11", 'U')],

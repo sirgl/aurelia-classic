@@ -1,0 +1,267 @@
+# The trainers: a library of combat scenes (eras × unit types × tasks, and the 91 tricks)
+
+`ai-exam suite` (`crates/qa/src/trainers.rs`, `trainers/`): short combat scenes, each a function of its index, that an
+AI variant (or a script) plays on the learner's seat. Purpose: bring the AI's combat to a reasonable level before the
+dreams, and measure every kind of fighting against a reference that plays the task well. A measurement only: it
+changes no rule and no AI (`ai-tournament --solo standard --suite standard --speed quick` = `380c45a20e751d31`,
+`--solo pre-nets-x` = `3743c16568ce4435`, unchanged).
+
+## Commands
+
+| what | command | time |
+|---|---|---|
+| everything (proof, controls, players) | `ai-exam suite --out DIR --instances 100 --players standard,unciv --jobs 8` | 190 s on 8 threads (25 families, 177 family × era cells, 17,700 instances) |
+| one family, every era | `ai-exam suite --out DIR --families duel --instances 100 --players standard --jobs 4` | 17 s |
+| another build on the same scenes | `ai-exam suite --out DIR2 --kept DIR/kept.jsonl --players tac2 --jobs 8` | 44 s for all (no proof) |
+| one scene, a trace a round | `ai-exam suite-one --family hold --era medieval --instance 3 --attempt 0 --player standard` | < 0.1 s |
+| what a scene is | `ai-exam suite-show --family hold --era medieval --instance 3` | |
+| families, eras, solvers, tricks | `ai-exam suite-list`; the era's lab and kinds: `ai-exam suite-lab --era medieval` | |
+
+`DIR/rows.jsonl` holds every play (`info.stage`: `solver`, `passive`, `random`, `player`), `DIR/kept.jsonl` the
+attempt kept per instance (or `attempt: null`: unsolved). A run resumes: what DIR holds is not played again. The
+tables and Roman's page: `/Users/roman.ivanov/civ/work/nets/trainers/tools/summary.py` and `page.py`.
+
+## The scene
+
+- **The lab of an era** (`lab.rs`): a generated two-nation game (Small, Pangaea, no city-states, no barbarians, Quick),
+  repainted to flat open land, every unit removed, a home city for each nation in a far corner (west: the learner,
+  east: the enemy; the enemy's is its capital), the two nations at war, every technology of the era and the eras
+  before known to both, 300 gold each. Ground kinds come from the rules' data (open land: the land terrain with no
+  defence and the most food; hills: the rules' high ground; impassable land; shallow water; the cover feature with a
+  defence bonus).
+- **Kinds by era and arm**: melee, mounted, ranged, mounted ranged (archers with 4+ moves), hit-and-run (moves after
+  attacking, 4+ moves), siege, city assault (attacks only cities), naval melee and ranged, fighter, bomber, Great
+  General; from each kind's role, domain, movement and free promotions. An era's kinds of an arm are the common kinds
+  the era brings; an arm it adds nothing to keeps the latest earlier kind it does not make obsolete. Unique kinds are
+  used only where a trick names them (the keshik `core:unit/keshik`, the battering ram and siege tower as the era's
+  unique city-assault unit, a unique ranged ship 20 % of bombard draws), with a fallback by arm.
+- **A family claims an era** when the kinds it needs exist there (`Fam::claims`): kite needs a hit-and-run kind (not
+  ancient), siege a siege kind, ram a city-assault kind (ancient: battering ram, classical: siege tower), bombard an era
+  that brings its own ranged ship, sink a ship and the embarking technology, airstrike a bomber.
+- **An instance** is drawn from `families::seed(family, era, instance, attempt)` alone: positions, compositions,
+  clutter (hills and cover), sizes. The same index builds the same scene in every build (checked for the tac2 build).
+- **The closed arena**: a unit of either seat that is not one of the scene's pieces (a home city trains or buys one) is
+  taken off at every round end. **The map is known to both sides** (in the pilot an unexplored map sent the AI's units
+  off to scout).
+- **Who plays**: the learner's seat is an AI variant, or a script on top of `standard` (which plays the rest of the
+  seat). The enemy's seat is `standard`; in the defence scenes its scene units are a scripted human (`enemy_turn`); in
+  duel, focus, hold, kite, retreat, general, wounded the enemy's units are a scripted HUNTER (strike at even odds or
+  better, else close on the nearest of ours; ranged units keep at range behind a melee unit; in hold the assault
+  commits): the enemy's AI with hunt tasks wandered off the field in the pilot. The learner's AI gets the war objective
+  of the target city in the city scenes, and no operation in the field scenes (as the exam's T1).
+
+## The proof that an instance is winnable, and the controls
+
+Fixed before the final run. Attempt 0, 1, ... of an instance (12 at most) is drawn until one is **kept**: it builds,
+one of the family's solvers (scripted references, `Fam::solvers`, every one of them plays every attempt it is tried on)
+wins it, and the **passive** control (every unit fortifies, or does nothing) does not. An instance with no kept
+attempt is **unsolved** and leaves the suite (counted per cell). On the kept attempt the **random** control (each unit
+does one thing drawn among standing, fortifying, a reachable move and an accepted strike) and the players play.
+Exception by design: the opportunity contexts where either call is right (`prey`, contexts `sea` and `guarded`) are not
+filtered by the passive control (holding back wins them).
+
+**Reasonable level** (per family and era, on the kept attempts only, set before the final run after the pilots): a
+player is at the reasonable level when it wins at least 70 % of what the best solver wins there and loses at most
+1.3 × the best solver's units (+ 0.25). Win rates carry a Wilson 95 % interval on the page (N = the kept attempts, up
+to 100).
+
+Guards (`tests/ai_trainers.rs`, slow tier, `.config/nextest.toml`): a scene is a function of its index (the same index
+builds and plays the same, another attempt is another scene); the win rules decide what they say; every family builds
+in every era it claims; a sample of every family stays solvable (2 of instances 0-3 in its middle era kept).
+
+## The families
+
+Win rules are fixed in the header of `trainers/families.rs` (quoted here). "Lost" counts our scene units dead or
+captured, "killed" the enemy's combat units dead.
+
+| family | task | eras | rounds | WIN | solvers | tricks (side) |
+|---|---|---|---|---|---|---|
+| `duel` | skirmish N vs M on open ground with clutter | ancient, classical, medieval, renaissance, industrial, modern, atomic, information | 12 | every enemy unit dead and one of ours alive within 12 rounds (N of ours, 2-4, against N or, from N = 3, N - 1). | ref-fight, ref-hold, ref-careful | MT4 U |
+| `focus` | kill the wounded first: 3 of 4 foes in 4 rounds | ancient, classical, medieval, renaissance, industrial, modern, atomic, information | 4 | 3 enemy units killed within 4 rounds with at most 1 of ours lost (2 of the 4 foes start wounded to 25-70 %). | ref-focus, ref-fight | MT7 U, MT4 U |
+| `hold` | hold a mountain pass on hills against 1.5 times the force | ancient, classical, medieval, renaissance, industrial, modern, atomic, information | 10 | (a wall of mountains across the map, a pass three tiles wide on hills) no enemy unit has stood on the pass's middle tile or west of the wall at a round end, and one of ours is alive when 10 rounds end (or every attacker is dead first); the attackers are melee and mounted, one and a half times the defenders (at least 3). | ref-hold, ref-hold-even | MT1 U, MT15 U |
+| `choke` | break a human holding a pass (melee on hills, ranged behind) | ancient, classical, medieval, renaissance, industrial, modern, atomic, information | 14 | every holder dead within 14 rounds with at least half of ours alive (the holders are a scripted human: they hold the pass on hills, fortify and shoot, never advance). | ref-choke, ref-fight | MT1 D |
+| `bait` | a civilian bait in front of our post, an ambush behind it | ancient, classical, medieval, renaissance, industrial, modern, atomic, information | 12 | 2 ambushers killed with at most 1 of ours lost within 12 rounds (a scripted human leaves a civilian 2 tiles in front of our post, an ambush behind it; from round 4 the ambush comes on). | ref-post, ref-fight | MT2 D, MT3 D |
+| `kite` | hit-and-run units (keshik, horseman, cavalry, tanks) against slow melee, no loss | classical, medieval, renaissance, industrial, modern, atomic, information | 14 | every enemy unit dead within 14 rounds with none of ours lost (2 hit-and-run units of the era against 2-3 slow melee of the era before). | ref-kite, ref-kite-careful | MT7 U |
+| `guard` | keep civilians (worker, Great General) from raiders | ancient, classical, medieval, renaissance, industrial, modern, atomic, information | 12 | every civilian of ours alive and ours when 12 rounds end (or every raider dead); the raiders are a scripted human that hunts civilians. | ref-guard, ref-guard-strike | MO7 D, E1 D, MT8 D, CS4 D |
+| `convoy` | walk a settler past a raider and found a city | ancient, classical, medieval, renaissance, industrial, modern, atomic, information | 14 | a city of ours founded within 14 rounds by the settler (its start is too close to our city to found on); a scripted raider hunts it. | ref-convoy | M2 D, M4 D, MO7 D |
+| `raid` | pillage 3 improvements around an enemy city | ancient, classical, medieval, renaissance, industrial, modern, atomic, information | 10 | 3 enemy improvements pillaged within 10 rounds with at most 1 of ours lost. | ref-pillage | MO6 U, MO5 U |
+| `counter` | stop raiders pillaging our land | ancient, classical, medieval, renaissance, industrial, modern, atomic, information | 10 | fewer than 2 of our improvements pillaged when 10 rounds end (or every raider dead); the raiders are a scripted human that pillages. | ref-hunt, ref-fight | MO6 D, MO5 D, D3 D |
+| `siege` | take a walled city with siege units | classical, medieval, renaissance, industrial, modern, atomic, information | 20 | the city (walls, and castle from the medieval era on, by the rules' buildings) taken within 20 rounds. Measures: rounds to take, units and production lost (quick vs cheap). | ref-siege, ref-press | MO9 U, MO10 U, V2 U |
+| `ram` | take the capital with a battering ram or siege tower and a capturer | ancient, classical | 14 | the enemy capital taken within 14 rounds by an army with a city-assault unit (battering ram / siege tower by rules id; fallback the era's siege unit) and a capturer. | ref-siege, ref-press | MO1 U |
+| `rush` | hold the capital against an early rush | ancient, classical, medieval, renaissance, industrial, modern, atomic, information | 14 | our capital still ours when 14 rounds end (or every rusher dead); a scripted human rushes it (ranged shoot from 2 tiles, melee takes it). | ref-defend, ref-fight | MO1 D, MO8 D, MO12 D |
+| `retreat` | save the army from a force twice its size | ancient, classical, medieval, renaissance, industrial, modern, atomic, information | 10 | at least 75 % of our army alive when 10 rounds end against a force twice its size. | ref-flee |  |
+| `flank` | surround and kill a strong defender in 3 rounds | ancient, classical, medieval, renaissance, industrial, modern, atomic, information | 3 | the strong defender killed within 3 rounds with at most 1 of ours lost. | ref-flank, ref-press | MT4 U |
+| `general` | fight with a Great General's aura and keep him alive | ancient, classical, medieval, renaissance, industrial, modern, atomic, information | 12 | every enemy unit dead within 12 rounds and our Great General alive. | ref-fight, ref-careful | MT12 U, MT8 U |
+| `citadel` | break a holder on a citadel (damage to every adjacent unit) | ancient, classical, medieval, renaissance, industrial, modern, atomic, information | 14 | every holder dead within 14 rounds with at least half of ours alive; the holder stands on a citadel (the rules' improvement that damages adjacent enemies). | ref-choke, ref-fight | MT10 D, MO2 D, MO4 D |
+| `bombard` | bombard and take a coastal city with ships | ancient, medieval, renaissance, modern, information | 12 | (3 ranged ships and a melee ship against a city of 2-4 without walls) the coastal city taken, or at 10 % of its hit points or less at a round end, within 12 rounds, by ships. | ref-bombard | N3 U, N4 U |
+| `sink` | sink embarked units | classical, medieval, renaissance, industrial, modern, atomic, information | 6 | every embarked enemy unit dead within 6 rounds. | ref-fight | MT5 U, MT6 U, N1 U, N2 U |
+| `airstrike` | strike a stack with bombers | modern, atomic, information | 6 | 2 enemy units killed within 6 rounds (bombers based in our city, a melee spotter in front: an air strike needs its target in sight). | ref-air | A1 U, A3 U |
+| `prey` | a weak fresh city in reach: take it when the context says so | ancient, classical, medieval, renaissance, industrial, modern, atomic, information | 14 |  | ref-siege, ref-hold | MO8 U, MO1 U, MO11 U |
+| `wounded` | a human focus-fires our wounded units: save them | ancient, classical, medieval, renaissance, industrial, modern, atomic, information | 6 | at most 1 of ours lost when 6 rounds end (2 of our 3-4 units start at 30-50 %; the enemy is the hunter, which strikes the weakest it reaches). | ref-flee-wounded, ref-fight | MT7 D |
+| `harass` | slow melee and a ranged unit against a human's hit-and-run horse (keshik) | ancient, classical, medieval | 12 | both raiders dead within 12 rounds with at most 1 of ours lost (2 slow melee, a mounted and a ranged unit of ours against 2 horse archers of a scripted human, the keshik half the time, that shoot and step back out of reach). | ref-screen, ref-fight | MO12 D |
+| `snipe` | catch an escorted civilian (worker, Great General) of the enemy | classical, medieval, renaissance, industrial, modern, atomic, information | 8 | an enemy civilian (worker, Great General) captured or killed within 8 rounds (it walks to its city with an escort). | ref-snipe | MO7 U, MT8 U, E1 U, M4 U, CS4 U |
+| `surrounded` | a strong unit of ours about to be surrounded: break out or survive | ancient, classical, medieval, renaissance, industrial, modern, atomic, information | 4 | our strong unit alive when 4 rounds end, or 2 attackers killed (3-4 melee of a scripted human close round it, then strike). | ref-break, ref-flee | MT4 D |
+
+The references (`families::reference_turn`, built on `act::unit_turn`): **ref-fight** (ranged keep at range behind a
+melee unit and strike the best blow by the rules' previews: a kill first, then the most wounded, the units that capture
+before the others; melee strike at even odds or better, move to strike when a blow lands from a reachable tile, else
+close in), **ref-careful** (the same at 2:1 odds), **ref-hold** (hold the best defensive tile, fortify), **ref-focus**,
+**ref-choke** (ranged soften the pass, melee wait two tiles off until a holder is below 60 % or the pass is empty),
+**ref-post** (never leave the post for the bait), **ref-kite** (shoot from the edge of range and step out of every
+foe's reach), **ref-guard** (the civilian walks to its city, the escort stands on its tile), **ref-convoy**,
+**ref-pillage** (the nearest unpillaged improvement outside the city's strike), **ref-hunt**, **ref-siege** (siege and
+ranged on the city and the units by it, melee wait 3 tiles off until the city is at half), **ref-press** (everything
+at the city at any odds), **ref-defend**, **ref-flee**, **ref-flank** (surround, then strike at any odds),
+**ref-bombard**, **ref-air** (bombers strike the weakest in range; a melee spotter stands in front, an air strike
+needs its target in sight), **ref-flee-wounded**, **ref-screen** (melee guard the ranged unit, our horse runs the
+horse archers down), **ref-snipe**, **ref-break**.
+
+## The 91 tricks
+
+`Fam::tricks` maps each family to the tricks it stands for, with the side: U (the learner may use it), D (a scripted
+human uses it against the learner). Combat tricks with a scene on both sides: 12; on one side: 21; no scene: 58 (the
+non-combat ones stay in ai-stress, the rest are not applicable to the rules or not built, with the reason).
+
+| trick | what | U: scenes | D: scenes | why no scene |
+|---|---|---|---|---|
+| MT1 | Hold a chokepoint (hill, fort, citadel, ZOC pinch) with a few melee units and ra | hold | choke |  |
+| MT2 | Poke an AI city or unit with a cheap bait so the AI sends its army into your pre | – | bait | U not built: a lure scene (the AI baits a human) |
+| MT3 | Worker (or other civilian) as bait: move a worker next to the AI's fortified uni | – | bait | U not applicable (triage: the rule is in the lure) |
+| MT4 | Kill the AI melee units first; the AI wave then stops. | duel, focus, flank | surrounded |  |
+| MT5 | Shoot units that the AI embarks in the middle of a battle or on coastal routes;  | sink | – | D not built: the AI embarked under a human fleet (next step) |
+| MT6 | Ranged fire across lakes or water at units that cannot reply. | sink | – | D not built (as MT5) |
+| MT7 | Focus-fire wounded or retreating units; wound a unit and leave it alive so the A | focus, kite | wounded |  |
+| MT8 | Snipe unescorted Great Generals and other lone high-value units. | general, snipe | guard |  |
+| MT9 | Peacekeeper blockade: under open borders, park workers or weak units around a ci | – | – | needs open borders at peace: ai-stress P3 (sneak-stack) |
+| MT10 | Fort/citadel damage zone: put a citadel two tiles from an AI city; every unit ne | – | citadel | U not built: the AI building a citadel with its general |
+| MT11 | Use civilians as spotters for siege units. | – | – | not applicable: joke source, no mechanism (triage) |
+| MT12 | Great General stacking plus instant heal by finishing a city with near-promotion | general | – | D: a human general stack against the AI (next step) |
+| MT13 | Deny healing: stand next to a wounded AI unit so it cannot heal in place. | – | – | not applicable: an Unciv-code fact (triage) |
+| MT14 | Over-commit trigger: with 5 or more units near an AI target city the AI drops it | – | – | not applicable: an Unciv-code fact (triage) |
+| MT15 | Strong high-damage defenders deter AI melee: the AI will not attack a city if th | hold | – | D: as MT1 D (choke) |
+| MO1 | Early capital rush: 2-4 archers and a couple of warriors, march to the AI capita | ram, prey | rush |  |
+| MO2 | Forward settle next to the AI border, buy tiles, drop a Great General citadel on | – | citadel | U not built (citadel by the AI) |
+| MO3 | Sneak attack: move an army in under open borders, surround a city, then declare  | – | – | non-combat: stays in ai-stress (whole-game positions) |
+| MO4 | Take land by citadel after peace; the AI treats it as weak or no casus belli. | – | citadel | U deliberately not built (rules gap, CHAIN.md) |
+| MO5 | Cut an AI luxury or strategic resource with a fort or citadel after a turn of wo | raid | counter |  |
+| MO6 | Pillage raids with fast units. | raid | counter |  |
+| MO7 | Steal or snipe unescorted settlers and workers; hover on a hill near a contested | snipe | guard, convoy |  |
+| MO8 | Wait and take: let the AI settle and grow new cities, then conquer them quickly. | prey | rush |  |
+| MO9 | Take good cities from the AI instead of founding your own (Deity advice). | siege | – | D: as rush (the AI holds its city) |
+| MO10 | Attack before the AI modernises: outdated garrisons fall to upgraded units; or w | siege | – | D: as rush with a later-era rusher (next step) |
+| MO11 | Turtle with a minimal army; the AI does not attack a weak target. | prey | – | D: whole-game (ai-stress A5) |
+| MO12 | Pre-built offensive army and a lopsided army composition that the AI cannot coun | – | rush, harass |  |
+| MO13 | Punish Piety-opening AIs: many AIs choose Piety (and Honor) early and neglect th | – | – | non-combat: stays in ai-stress (whole-game positions) |
+| D1 | Sell a luxury for a lump sum, then declare war and keep the gold. **On list (var | – | – | non-combat: stays in ai-stress (whole-game positions) (diplomacy, deals) |
+| D2 | Gold-per-turn deal then a war that breaks it; or drain the AI treasury with GPT/ | – | – | non-combat: stays in ai-stress (whole-game positions) (diplomacy, deals) |
+| D3 | Pillage-and-repair the sold resource, or sell a resource just before barbarians  | – | counter |  |
+| D4 | Bribe AI A to declare war on civ B, then declare war on A (two-front war at no c | – | – | non-combat: stays in ai-stress (whole-game positions) (diplomacy, deals) |
+| D5 | Pay an AI to attack a one-city civ, then take the cities and liberate the one yo | – | – | non-combat: stays in ai-stress (whole-game positions) (diplomacy, deals) |
+| D6 | Short war / peace cycles to re-sell resources sooner than waiting out the 30-tur | – | – | non-combat: stays in ai-stress (whole-game positions) (diplomacy, deals) |
+| D7 | Peace shopping: peace with one AI of a team brings peace with all; the AI does n | – | – | not applicable: no teams in the rules |
+| D8 | White-peace fishing: remove the cities the AI "demands" from the screen; the AI  | – | – | non-combat: stays in ai-stress (whole-game positions) (diplomacy, deals) |
+| D9 | Wear down the AI army so it proposes peace; refuse the first offers so it offers | – | – | non-combat: stays in ai-stress (whole-game positions) (diplomacy, deals) |
+| D10 | Attack right after a peace treaty expires. | – | – | non-combat: stays in ai-stress (whole-game positions) (diplomacy, deals) |
+| D11 | Tech blocking with cheap research agreements; sign research agreements with many | – | – | non-combat: stays in ai-stress (whole-game positions) (diplomacy, deals) |
+| D12 | Sell open borders for gold, or buy them cheap from a friendly AI (Unciv sells at | – | – | non-combat: stays in ai-stress (whole-game positions) (diplomacy, deals) |
+| D13 | Declare war once to "meet" an AI and unlock bribes against it. | – | – | not applicable: war needs contact |
+| D14 | Deny a strategic resource (iron) before war so the AI cannot rebuild swordsmen. | – | – | non-combat: stays in ai-stress (whole-game positions) (diplomacy, deals) |
+| D15 | Keep the AI busy: war against others lowers its appetite for a new war (Unciv -2 | – | – | not applicable: Unciv MotivationToAttack |
+| D16 | Break an Unciv demand once, then repeat it freely for 100 turns. | – | – | not applicable: Unciv popup flag |
+| D17 | Unciv AI war timing is predictable: it needs at least as many units as cities, p | – | – | not applicable: Unciv deterministic rolls |
+| D18 | Deterrence: keep military strength high vs. AIs so fewer declare war at once. | – | – | non-combat: stays in ai-stress (whole-game positions) (diplomacy, deals) |
+| E1 | Steal workers from city-states ("worker shops") or other civs instead of buildin | snipe | guard |  |
+| E2 | Luxury arbitrage: buy luxury tiles early and resell the resources repeatedly; Un | – | – | non-combat: stays in ai-stress (whole-game positions) |
+| E3 | Cheap late tech from the AI: Unciv prices tech by square root of cost. | – | – | not applicable: no tech item in deals |
+| E4 | Early National College and Academies as a human science lead the AI does not mat | – | – | non-combat: stays in ai-stress (whole-game positions) |
+| E5 | Build wonders the AI cannot (Circus Maximum in a secondary city, Pyramids for wo | – | – | non-combat: stays in ai-stress (whole-game positions) |
+| R1 | Convert AI cities with prophets or missionaries; an early prophet into a freshly | – | – | non-combat: stays in ai-stress (whole-game positions) |
+| R2 | Capture the holy city, then purge the rest with missionary and inquisitor. | – | – | non-combat: stays in ai-stress (whole-game positions) |
+| R3 | Re-convert city-states the AI flipped, with a prophet. | – | – | non-combat: stays in ai-stress (whole-game positions) |
+| R4 | Convert AI cities away so the AI loses the shared-religion tourism bonus on you. | – | – | non-combat: stays in ai-stress (whole-game positions) |
+| C1 | Block the AI's tourism: steal its dig sites, withhold open borders and trade rou | – | – | non-combat: stays in ai-stress (whole-game positions) |
+| C2 | Conquer a neighbour to erase its accumulated culture for a cultural win. | – | – | non-combat: stays in ai-stress (whole-game positions) |
+| C3 | Kill the culture leader early, before it becomes influential. | – | – | non-combat: stays in ai-stress (whole-game positions) |
+| S1 | Park a spy early in an AI capital and steal repeatedly. | – | – | non-combat: stays in ai-stress (whole-game positions) |
+| S2 | Let AI spies in and kill them (Double Agents) to level your own spies; AI spies  | – | – | non-combat: stays in ai-stress (whole-game positions) |
+| S3 | Coup a city-state held by an AI ally; spend gold to shrink the influence gap fir | – | – | non-combat: stays in ai-stress (whole-game positions) |
+| S4 | Use spies as diplomats to swing World Congress votes. | – | – | not applicable: diplomats carry no votes |
+| CS1 | Pledge to protect plus consulates: near-permanent friendship for little effort;  | – | – | non-combat: stays in ai-stress (whole-game positions) |
+| CS2 | Feed advanced units to a city-state ally the AI attacks. | – | – | non-combat: stays in ai-stress (whole-game positions) |
+| CS3 | Bribe the AI team to war on city-states (spreads city-state hatred toward the AI | – | – | non-combat: stays in ai-stress (whole-game positions) |
+| CS4 | Steal a city-state worker by parking next to the tile it wants to improve; repea | snipe | guard |  |
+| CS5 | War-peace cycles with city-states, shooting in between; recapture city-state wor | – | – | non-combat: stays in ai-stress (whole-game positions) |
+| CS6 | Early influence lead snowballs; final alliance sweep wins a diplomatic or cultur | – | – | non-combat: stays in ai-stress (whole-game positions) |
+| CS7 | Finish AI units to complete city-state missions for a free alliance. | – | – | non-combat: stays in ai-stress (whole-game positions) |
+| CS8 | Unciv: AI pledges to every city-state, bullies only at Peace and only those it v | – | – | not applicable: Unciv AI fact |
+| W1 | Sell your "core" delegates to an AI on its proposal, then vote the rest against  | – | – | not applicable: no delegate item in deals |
+| W2 | Buy city-state loyalty right before a vote; embargo the leader, ban its luxuries | – | – | non-combat: stays in ai-stress (whole-game positions) |
+| W3 | Take the host seat and push your own agenda: world religion, ideology, ban resol | – | – | non-combat: stays in ai-stress (whole-game positions) |
+| W4 | In the World Leader vote the AIs split their votes for themselves, so a human ge | – | – | non-combat: stays in ai-stress (whole-game positions) |
+| N1 | Sink embarked units with ships. | sink | – | D not built (as MT5) |
+| N2 | Keep ships at sea and let AI armies "jump in the water"; they lose full stacks i | sink | – | D only by design (not a trick to use) |
+| N3 | Bombard AI cities with destroyers; subs ignored by destroyers. | bombard | – | D not built: a human fleet bombards an AI city |
+| N4 | Block AI harbours with cheap units, put ranged units in the path of its fleet. | – | – | not built: harbour block (next step: a coastal city and a blockading ship) |
+| N5 | Sink destroyers with land artillery before the navy can act. | – | – | not built: artillery against ships (next step) |
+| A1 | AI builds almost no air units unless a unique unit; fighters and bombers face li | airstrike | – | D not built: human bombers against the AI (next step) |
+| A2 | Nuke or destroy the final spaceship part as it nears the capital; AI does not ai | – | – | non-combat: stays in ai-stress (whole-game positions) |
+| A3 | Use nukes against the AI as a routine tool. | airstrike | – | not built: nukes (a deterrence scene needs the nuclear AI and a city to lose; next step) |
+| V1 | Snipe a wonder 1-2 turns before the AI completes it. | – | – | non-combat: stays in ai-stress (whole-game positions) |
+| V2 | Take the AI city that holds the wonder instead of racing. | siege | – | D: as rush |
+| V3 | Stop an AI space race by destroying parts en route, or by taking all production  | – | – | non-combat: stays in ai-stress (whole-game positions) |
+| V4 | Win diplomatic or cultural before the AI launches (AI launch timing is the main  | – | – | not applicable: Civ IV timing advice |
+| M1 | Settle the gaps between AI cities (filler cities, tile buying). | – | – | non-combat: stays in ai-stress (whole-game positions) |
+| M2 | Ninja-settle: body-block AI settlers near your border; keep a unit on a hill for | – | convoy | U not applicable (triage) |
+| M3 | Delay accepting embassies and friendship so the AI cannot forward-settle into yo | – | – | not applicable: no embassy-to-settling link |
+| M4 | Intercept AI settlers heading to distant poor spots, or kill border cities the A | snipe | convoy |  |
+| M5 | Stop city-spamming AIs early to cap their expansion. | – | – | non-combat: stays in ai-stress (whole-game positions) |
+
+## First measurement (22 November 2026, `runs/final`, 100 instances a cell)
+
+Means over the family's cells with 10 or more kept instances; win rates on the kept attempts; tac2 is the build of
+`work/tac` 48dc5cf (its own `standard` as the enemy; that build's `standard` on the learner's seat equals the main
+build's in every cell).
+
+| family | cells | kept / drawn | passive % | random % | best solver % | standard % | tac2 % | unciv % |
+|---|---|---|---|---|---|---|---|---|
+| `duel` | 8 | 800/800 | 0 | 0 | 90 | 9 | 9 | 52 |
+| `focus` | 8 | 800/800 | 0 | 0 | 100 | 6 | 6 | 91 |
+| `hold` | 8 | 589/800 | 0 | 1 | 83 | 0 | 0 | 33 |
+| `choke` | 7 | 612/700 | 0 | 0 | 84 | 0 | 0 | 78 |
+| `bait` | 8 | 768/800 | 0 | 7 | 96 | 0 | 0 | 84 |
+| `kite` | 7 | 660/700 | 0 | 0 | 100 | 0 | 0 | 46 |
+| `guard` | 8 | 800/800 | 0 | 0 | 100 | 31 | 34 | 15 |
+| `convoy` | 8 | 791/800 | 0 | 16 | 100 | 76 | 77 | 86 |
+| `raid` | 8 | 800/800 | 0 | 0 | 100 | 0 | 0 | 0 |
+| `counter` | 8 | 655/800 | 0 | 0 | 92 | 0 | 0 | 34 |
+| `siege` | 7 | 643/700 | 0 | 0 | 87 | 42 | 22 | 54 |
+| `ram` | 2 | 200/200 | 0 | 0 | 100 | 30 | 16 | 54 |
+| `rush` | 8 | 714/800 | 0 | 20 | 97 | 72 | 60 | 11 |
+| `retreat` | 8 | 641/800 | 0 | 1 | 100 | 20 | 28 | 1 |
+| `flank` | 8 | 749/800 | 0 | 0 | 95 | 0 | 0 | 57 |
+| `general` | 8 | 800/800 | 0 | 0 | 94 | 0 | 0 | 62 |
+| `citadel` | 8 | 714/800 | 0 | 0 | 88 | 0 | 0 | 24 |
+| `bombard` | 3 | 292/300 | 0 | 0 | 100 | 0 | 0 | 0 |
+| `sink` | 7 | 700/700 | 0 | 2 | 100 | 40 | 40 | 98 |
+| `airstrike` | 3 | 140/300 | 0 | 0 | 100 | 14 | 14 | 45 |
+| `wounded` | 8 | 800/800 | 0 | 26 | 100 | 87 | 87 | 20 |
+| `harass` | 2 | 200/200 | 0 | 0 | 100 | 0 | 0 | 48 |
+| `snipe` | 7 | 700/700 | 0 | 0 | 100 | 0 | 2 | 60 |
+| `surrounded` | 8 | 800/800 | 0 | 15 | 98 | 61 | 61 | 0 |
+| `prey-either` | 8 | 730/730 | 100 | 95 | 100 | 43 | 93 | 8 |
+| `prey-land` | 4 | 60/60 | 0 | 0 | 100 | 68 | 59 | 0 |
+
+Cells with no solver for most instances (generator or solver to improve, the instances are out of the suite): choke
+modern 14/100 and atomic 0/100, bombard modern and information 0/100 (the era's ships do not scratch its cities),
+retreat information 12/100, airstrike atomic 25/100, harass medieval 1/100 (no script catches keshiks with foot and
+one horse).
+
+Roman's page: `/Users/roman.ivanov/civ/work/trainers-2026-11-23.html`.
+
+## Limits
+
+- Scripts are simple and competent, not optimal: the best solver's win rate is a floor of what is winnable. A
+  search solver (`search.rs`) on these scenes is the next step for the cells where the references are weak.
+- The scenes are short and closed (no reinforcements, no economy): they test tactics, not the operations that put
+  units in the field. In the field scenes the learner's AI has no operation.
+- Not built: nukes, the AI's own citadels, harbour blocks, a human fleet or bombers against the AI, the AI's lure.
