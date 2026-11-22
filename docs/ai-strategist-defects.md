@@ -334,11 +334,11 @@ nations from its first unhappy round (285), 35 rounds below −20, least excess 
 denunciation joins the wars on it.
 
 Where the happiness goes (the probe's breakdown, `strategist-x-threat` on 60 games of offset 1551,
-`happiness::player_happiness` at the first unhappy round and 15 rounds before): 1551003 p2 again (the
+`happiness::player_happiness` at the first unhappy round and 10–20 rounds before): 1551003 p2 again (the
 threat alone is the same game) falls from −3 at round 270 to −41 at round 285 with the luxuries unchanged
 (24, 6 kinds), no occupied city and the buildings +3: the unhappiness of its citizens rose 113 → 144 and
 public opinion (a foreign ideology's pressure) added 11. 1551005 (odd) p5, tall: +3 at round 210 to −28 at
-226, citizens' unhappiness 53 → 76, cities 10 → 13, opinion +9, luxuries unchanged. So the collapse is not
+226, citizens' unhappiness 53 → 76, the cities' count unhappiness 10 → 13, opinion +9, luxuries unchanged. So the collapse is not
 captured cities and not lost luxuries: it is a late empire at war that grows and meets the ideologies'
 pressure without the happiness to match. Which planner lets the citizens outgrow the happiness at war is
 not traced tonight; the cause in the candidate is the threat's wars, and tall first does not show it.
