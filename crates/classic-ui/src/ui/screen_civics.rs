@@ -171,8 +171,83 @@ fn text_width(p: &egui::Painter, value: &str, size: f32) -> f32 {
     layout(p, value, size, Color32::WHITE).size().x
 }
 
-/// The lines of `value` for `clipped`.
+/// The lines of `value` for `clipped`, measured once while the text stays on the screen: a cut
+/// line costs one layout per word it tries, and the screen shows dozens of cut effects
+/// (`LinesMemo`).
 fn wrap_lines(p: &egui::Painter, value: &str, size: f32, width: f32, rows: usize) -> Vec<String> {
+    let key = LinesKey::new(p, value, size, width, rows);
+    let ctx = p.ctx();
+    let pass = ctx.cumulative_pass_nr();
+    let memo_id = egui::Id::new("civics-lines-memo");
+    let known = ctx.data_mut(|data| data.get_temp_mut_or_default::<LinesMemo>(memo_id).get(pass, &key));
+    if let Some(lines) = known {
+        return lines;
+    }
+    let lines = measure_lines(p, value, size, width, rows);
+    ctx.data_mut(|data| data.get_temp_mut_or_default::<LinesMemo>(memo_id).put(pass, key, lines.clone()));
+    lines
+}
+
+/// What the lines of a text depend on: the text, its size, the width and rows it has, and the
+/// points per pixel the fonts measure at.
+#[derive(Clone, PartialEq, Eq, Hash)]
+struct LinesKey {
+    value: String,
+    size: u32,
+    width: u32,
+    rows: usize,
+    pixels_per_point: u32,
+}
+
+impl LinesKey {
+    fn new(p: &egui::Painter, value: &str, size: f32, width: f32, rows: usize) -> Self {
+        let pixels_per_point = p.ctx().pixels_per_point().to_bits();
+        Self { value: value.to_owned(), size: size.to_bits(), width: width.to_bits(), rows, pixels_per_point }
+    }
+}
+
+/// The lines of the texts drawn in this pass and the one before: a text that leaves the screen
+/// for a whole pass is measured again, so the memo holds two passes of texts at most.
+#[derive(Clone, Default)]
+struct LinesMemo {
+    pass: u64,
+    current: std::collections::HashMap<LinesKey, Vec<String>>,
+    previous: std::collections::HashMap<LinesKey, Vec<String>>,
+}
+
+impl LinesMemo {
+    /// A new pass: the texts of the pass before stay one more pass, older ones go.
+    fn turn(&mut self, pass: u64) {
+        if pass == self.pass {
+            return;
+        }
+        if pass == self.pass + 1 {
+            self.previous = std::mem::take(&mut self.current);
+        } else {
+            self.previous.clear();
+            self.current.clear();
+        }
+        self.pass = pass;
+    }
+
+    fn get(&mut self, pass: u64, key: &LinesKey) -> Option<Vec<String>> {
+        self.turn(pass);
+        if let Some(lines) = self.current.get(key) {
+            return Some(lines.clone());
+        }
+        let lines = self.previous.remove(key)?;
+        self.current.insert(key.clone(), lines.clone());
+        Some(lines)
+    }
+
+    fn put(&mut self, pass: u64, key: LinesKey, lines: Vec<String>) {
+        self.turn(pass);
+        self.current.insert(key, lines);
+    }
+}
+
+/// The lines of `value` in at most `rows` rows of `width`, measured word by word.
+fn measure_lines(p: &egui::Painter, value: &str, size: f32, width: f32, rows: usize) -> Vec<String> {
     let mut lines: Vec<String> = Vec::new();
     let mut words = value.split_whitespace();
     while let Some(word) = words.next() {

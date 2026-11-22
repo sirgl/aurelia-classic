@@ -335,3 +335,31 @@ fn the_list_says_the_next_price_is_higher_when_the_core_says_so() {
     let output = settled(&ctx, &mut state, &view, SIZES[0]);
     assert!(!words(&output).contains("raises the next price"), "no note when the price stays");
 }
+
+/// The cut lines are measured once while the text stays on the screen and are the lines a fresh
+/// measure gives; a text not drawn for a whole pass leaves the memo.
+#[test]
+fn the_lines_of_a_text_are_measured_once_while_it_is_shown() {
+    let ctx = egui::Context::default();
+    let text = "+50% Production in the capital when producing a Settler; When adopted: 1 free Settler in the capital";
+    let memo = |ctx: &egui::Context| ctx.data_mut(|d| d.get_temp::<LinesMemo>(egui::Id::new("civics-lines-memo")));
+    let mut pass = |draw: bool| {
+        let mut output = ctx.run_ui(egui::RawInput::default(), |ui| {
+            if draw {
+                let p = ui.painter();
+                assert_eq!(wrap_lines(p, text, 11.5, 200.0, 2), measure_lines(p, text, 11.5, 200.0, 2));
+            }
+        });
+        output.textures_delta.clear();
+    };
+    pass(true);
+    pass(true);
+    let held = memo(&ctx).expect("the memo is kept");
+    assert_eq!(held.current.len() + held.previous.len(), 1, "one text, one entry");
+    pass(false);
+    pass(false);
+    pass(true);
+    let held = memo(&ctx).expect("the memo is kept");
+    assert!(held.previous.is_empty(), "the text left the memo while it was not drawn, then came back alone");
+    assert_eq!(held.current.len(), 1);
+}
