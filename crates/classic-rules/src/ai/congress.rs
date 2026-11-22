@@ -6,7 +6,7 @@
 //! the AI contributed a full share (reward tier 2). Reads
 //! `AIObservation::congress` (the Congress screen).
 
-use crate::ai::net2::plan::{Embargo, Net2Plan};
+use crate::ai::net2::plan::{Ballot, Embargo, Net2Plan};
 use crate::ai::planner_value::{league_project_value, Weights};
 use crate::command::Command;
 use crate::ids::{CityHandle, PlayerId};
@@ -143,38 +143,33 @@ fn stance(obs: &AIObservation<'_>, proposal: &Proposal, net2: Option<&Net2Plan>)
     }
 }
 
-/// A candidate's delegates short of the threshold at or below which the World Leader vote is pooled against it: a
-/// rival one delegate short can still be carried over by one friend's ballot.
-pub const THREAT_SLACK: i32 = 1;
-
-/// The ballot of the World Leader vote under a `net2` plan (A3: the plain AI votes for itself, so a leader at the
-/// threshold wins against six seats that split on themselves, though a tie or a higher candidate blocks the win,
-/// `systems::congress::leader_vote`). From the delegates every nation shows on the Congress screen:
+/// The ballot of the World Leader vote under a `net2` plan. Whether to block a rival is the net's decision
+/// (`Net2Plan::ballot`, `weights::RIVAL` `block`: a rival whose own delegates reach the votes needed); this executes it
+/// from the delegates every nation shows on the Congress screen:
 /// - we hold the threshold ourselves: vote for ourselves;
-/// - a rival is within `THREAT_SLACK` of it: all delegates to the coalition candidate `c*`, the strongest candidate
-///   but that rival (ties to the lowest id; we may be `c*`). Every seat reads the same public table, so seats converge
-///   without talking, and `c*` ties or beats the threat. Never so that our ballot elects `c*`: when `c*` and our
-///   delegates together would reach the threshold and pass the threat, we vote for ourselves (`pool_elects`);
-/// - else for ourselves, as today.
-pub fn leader_choice(obs: &AIObservation<'_>, info: &crate::knowledge::observation::CongressInfo) -> PlayerId {
+/// - `Ballot::Block(threat)`: all delegates to the coalition candidate `c*`, the strongest candidate but the threat (ties
+///   to the lowest id; we may be `c*`), so that a tie or a higher candidate stops it. Never so that our ballot elects
+///   `c*`: when `c*` and our delegates together would reach the threshold and pass the threat, we vote for ourselves
+///   (`pool_elects`);
+/// - `Ballot::Own`: for ourselves, as today.
+pub fn leader_choice(obs: &AIObservation<'_>, info: &crate::knowledge::observation::CongressInfo, ballot: Ballot) -> PlayerId {
     let me = obs.player;
     let needed = i32::from(info.needed);
     let delegates = |p: PlayerId| info.delegates.iter().find(|(q, _)| *q == p).map_or(0, |(_, n)| i32::from(*n));
     if needed == 0 || delegates(me) >= needed {
         return me;
     }
+    let Ballot::Block(threat) = ballot else {
+        return me;
+    };
     let mut table: Vec<(PlayerId, i32)> = info.delegates.iter().map(|(p, n)| (*p, i32::from(*n))).collect();
     if !table.iter().any(|(p, _)| *p == me) {
         table.push((me, 0));
     }
     // The strongest first; the lowest id on a tie.
     table.sort_by_key(|(p, n)| (std::cmp::Reverse(*n), p.0));
-    let Some(&(threat, n)) = table.iter().find(|(p, n)| *p != me && n + THREAT_SLACK >= needed) else {
-        return me;
-    };
-    debug_assert!(n + THREAT_SLACK >= needed);
     let coalition = table.iter().find(|(p, _)| *p != threat).map_or(me, |(p, _)| *p);
-    if coalition != me && pool_elects(delegates(coalition) + delegates(me), n, needed) {
+    if coalition != me && pool_elects(delegates(coalition) + delegates(me), delegates(threat), needed) {
         return me;
     }
     coalition
@@ -236,8 +231,8 @@ pub fn vote_orders_with(obs: &AIObservation<'_>, guard: bool, net2: Option<&Net2
         let choice = if proposal.kind.elects() {
             if proposal.kind == ResolutionKind::DiplomaticVictory {
                 crate::ai::strategy_net::trace::leader_vote(obs, delegates, info.delegates_left, info.needed, info.proposals.len());
-                if net2.is_some() {
-                    out.push(Command::CastVotes { player: obs.player, proposal: i as u8, choice: u32::from(leader_choice(obs, info).0), delegates });
+                if let Some(plan) = net2 {
+                    out.push(Command::CastVotes { player: obs.player, proposal: i as u8, choice: u32::from(leader_choice(obs, info, plan.ballot).0), delegates });
                     continue;
                 }
             }

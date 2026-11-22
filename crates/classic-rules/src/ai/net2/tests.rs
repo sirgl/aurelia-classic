@@ -6,7 +6,7 @@ use crate::ai::strategy_net::{intent_from, Held, Intent, Logits, Milli, Net, Til
 use crate::ids::{EntityId, PlayerId, TileId};
 
 use super::levers::{self, After, Pass};
-use super::plan::{AimWhy, OrderPhase, CityInputs, Parts, CoreMemory, Embargo, Escorts, Generals, Help, Inputs, Opening, RivalInputs, SeatInputs, SpentWar, TargetInputs, WarAim, WarKind, WarOrder, WarPlan};
+use super::plan::{AimWhy, Ballot, OrderPhase, CityInputs, Parts, CoreMemory, Embargo, Escorts, Generals, Help, Inputs, Opening, RivalInputs, SeatInputs, SpentWar, TargetInputs, WarAim, WarKind, WarOrder, WarPlan};
 use super::weights::{a, q};
 
 const ROUND: u32 = 100;
@@ -110,14 +110,14 @@ fn level_neighbour(id: u8) -> RivalInputs {
 #[test]
 fn a_level_neighbour_with_a_soft_city_is_prey_and_the_order_aims_at_it() {
     // WAR-LEVER.md K1: 5 citizens (size 250), no garrison seen, 4 tiles (near 1000), walls 200 against our army.
-    // ease = unit(−2000 + 750 + 800 + 1000 + 480) = 1000; a large guarded city: unit(−2000 + 0 + 320 + 600 + 300) = 0.
+    // ease = unit(−2300 + 750 + 800 + 1000 + 480) = 730; a large guarded city: unit(−2300 + 0 + 320 + 600 + 300) = 0.
     let mut inputs = inputs(seat(), vec![level_neighbour(1)], vec![]);
     inputs.targets = vec![target(1, 70, 1000, 600, 600, 500), target(1, 71, 250, 0, 1000, 200)];
     let p = pass(&inputs);
-    assert_eq!(p.eases, vec![0, 1000]);
-    assert_eq!(p.rivals[0].inputs[super::weights::r::SOFT], 1000);
-    // prey = unit(−1700 + 0 + 1280 + 120 + 1200) = 900 → a Prey order aimed at the soft city.
-    assert_eq!(p.rivals[0].concepts[q::PREY], 900);
+    assert_eq!(p.eases, vec![0, 730]);
+    assert_eq!(p.rivals[0].inputs[super::weights::r::SOFT], 730);
+    // prey = unit(−1700 + 0 + 1280 + 120 + 876) = 576 → a Prey order aimed at the soft city.
+    assert_eq!(p.rivals[0].concepts[q::PREY], 576);
     let aim = p.core.war.order().and_then(|o| o.aim);
     assert_eq!(aim, Some(WarAim { city: TileId(71), why: AimWhy::Ease }));
 }
@@ -127,7 +127,7 @@ fn a_level_neighbour_with_only_large_guarded_cities_is_no_prey() {
     let mut inputs = inputs(seat(), vec![level_neighbour(1)], vec![]);
     inputs.targets = vec![target(1, 70, 1000, 600, 600, 500), target(1, 72, 600, 400, 600, 400)];
     let p = pass(&inputs);
-    // ease of the second = unit(−2000 + 400 + 480 + 600 + 360) = 0 → soft 0; prey = unit(−1700 + 1280 + 120) = 0.
+    // ease of the second = unit(−2300 + 400 + 480 + 600 + 360) = 0 → soft 0; prey = unit(−1700 + 1280 + 120) = 0.
     assert_eq!(p.rivals[0].concepts[q::PREY], 0);
     assert_eq!(p.core.war, WarPlan::NoWar);
 }
@@ -183,6 +183,19 @@ fn a_runaway_with_a_level_army_gets_no_war_but_no_help_and_an_embargo() {
     let plan = after(&inputs, &p).plan;
     assert_eq!(plan.rivals[0].help, Help::Deny);
     assert_eq!(plan.embargo, Embargo::On(PlayerId(2)));
+}
+
+/// The World Leader ballot (GAP.md): a rival whose own delegates reach the votes is blocked; one short is not (every
+/// seat votes for itself, so it wins nothing, and a block would only elect the candidate we pooled on).
+#[test]
+fn the_ballot_blocks_only_a_rival_with_the_votes_of_its_own() {
+    let blocked = |alone: Milli| {
+        let inputs = inputs(seat(), vec![rival(2), RivalInputs { alone, ..rival(3) }], vec![]);
+        let p = pass(&inputs);
+        (p.rivals[1].concepts[q::BLOCK], after(&inputs, &p).plan.ballot)
+    };
+    assert_eq!(blocked(1000), (1000, Ballot::Block(PlayerId(3))));
+    assert_eq!(blocked(0), (0, Ballot::Own));
 }
 
 #[test]
@@ -362,7 +375,7 @@ fn generated_rival(rng: &mut Lcg, id: u8) -> RivalInputs {
     for v in row.iter_mut() {
         *v = rng.milli();
     }
-    let flags = [super::weights::r::LAND, super::weights::r::SEA, super::weights::r::FRIEND, super::weights::r::PACT, super::weights::r::AT_WAR, super::weights::r::HOLDS_CAPITAL, super::weights::r::ALLY_HIT, super::weights::r::RETAKE_CASE, super::weights::r::CAPTURED_RECENT, super::weights::r::DENOUNCED_US];
+    let flags = [super::weights::r::LAND, super::weights::r::SEA, super::weights::r::FRIEND, super::weights::r::PACT, super::weights::r::AT_WAR, super::weights::r::HOLDS_CAPITAL, super::weights::r::ALLY_HIT, super::weights::r::RETAKE_CASE, super::weights::r::CAPTURED_RECENT, super::weights::r::DENOUNCED_US, super::weights::r::ALONE];
     for at in flags {
         row[at] = rng.flag();
     }
@@ -397,6 +410,7 @@ fn generated_rival(rng: &mut Lcg, id: u8) -> RivalInputs {
         retake_case: r(ri::RETAKE_CASE),
         captured_recent: r(ri::CAPTURED_RECENT),
         operating: if r(ri::OPERATING) > 500 { 1000 } else { 0 },
+        alone: r(ri::ALONE),
         ..RivalInputs::stranger(PlayerId(id))
     }
 }
@@ -504,7 +518,7 @@ fn the_parity_fixture_is_the_integer_net() {
 #[test]
 fn the_weights_count() {
     let n = super::weights::count();
-    assert_eq!(n, 143, "net2's own hand weights (the 13 carried concepts and the carried logits are `strategy_net::weights`'s)");
+    assert_eq!(n, 146, "net2's own hand weights (the 13 carried concepts and the carried logits are `strategy_net::weights`'s)");
 }
 
 #[test]

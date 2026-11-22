@@ -8,7 +8,7 @@ use classic_content::core::core_rules;
 use classic_rules::ai::congress::{leader_choice, proposal_orders_with, vote_orders_with};
 use classic_rules::ai::city_states::{ceiling_for, gift_orders_shared, reserve_for};
 use classic_rules::ai::diplomacy::DiplomacyAdvisor;
-use classic_rules::ai::net2::plan::{Embargo, Help, Net2Plan, RivalRead, WarKind, TRUST_MIN};
+use classic_rules::ai::net2::plan::{Ballot, Embargo, Help, Net2Plan, RivalRead, WarKind, TRUST_MIN};
 use classic_rules::ai::peace::Negotiation;
 use classic_rules::ai::planner::TurnBrief;
 use classic_rules::ai::planner_value::Weights;
@@ -72,7 +72,7 @@ fn scene() -> (GameState, CompiledRuleset) {
 
 /// A reading of rival `p` with the given trust and help; the rest neutral.
 fn read(p: PlayerId, trust: i64, help: Help) -> RivalRead {
-    RivalRead { rival: p, weak: 0, reach: 0, menace: 0, distrust: 1000 - trust, prey: 0, runaway: 0, spoiler: 0, retake: 0, duty: 0, grabber: 0, border: 0, brake: 0, war_value: 0, war_kind: WarKind::Prey, trust, help, soldiers: Default::default() }
+    RivalRead { rival: p, weak: 0, reach: 0, menace: 0, distrust: 1000 - trust, prey: 0, runaway: 0, spoiler: 0, retake: 0, duty: 0, grabber: 0, block: 0, border: 0, brake: 0, war_value: 0, war_kind: WarKind::Prey, trust, help, soldiers: Default::default() }
 }
 
 fn plan(rivals: Vec<RivalRead>) -> Net2Plan {
@@ -317,27 +317,28 @@ fn congress_obs<'g>(game: &'g GameState, rules: &'g CompiledRuleset, delegates: 
 }
 
 /// A3: the human (P1) holds 36 % and the AIs 12 % each: the AIs pool on one candidate and the leader does not win.
-/// The seat votes for the strongest candidate but the threat; we hold the threshold ourselves: for us.
+/// The net blocks P1 (`Ballot::Block`); the seat votes for the strongest candidate but the threat; we hold the
+/// threshold ourselves: for us; no block: for us.
 #[test]
-fn the_leader_vote_is_pooled_against_the_rival_at_the_threshold() {
+fn the_leader_vote_is_pooled_against_the_rival_the_net_blocks() {
     let (game, rules) = league();
-    let who = |table: &[(PlayerId, u16)], needed| {
+    let who = |table: &[(PlayerId, u16)], needed, ballot| {
         let obs = congress_obs(&game, &rules, table, needed);
-        leader_choice(&obs, obs.congress.as_ref().unwrap())
+        leader_choice(&obs, obs.congress.as_ref().unwrap(), ballot)
     };
+    let block = Ballot::Block(P1);
     // P1 at the threshold, P2 ahead of us: the pool goes to P2 (a tie or better blocks P1).
-    assert_eq!(who(&[(P0, 4), (P1, 9), (P2, 5)], 9), P2);
+    assert_eq!(who(&[(P0, 4), (P1, 9), (P2, 5)], 9, block), P2);
     // We are the strongest but the threat: the seat votes for itself, which is the coalition's candidate.
-    assert_eq!(who(&[(P0, 6), (P1, 9), (P2, 3)], 9), P0);
+    assert_eq!(who(&[(P0, 6), (P1, 9), (P2, 3)], 9, block), P0);
     // Ties between candidates go to the lowest id.
-    assert_eq!(who(&[(P0, 4), (P1, 9), (P2, 4)], 9), P0);
-    // One delegate short of the threshold is a threat; two short is not.
-    assert_eq!(who(&[(P0, 2), (P1, 8), (P2, 5)], 9), P2);
-    assert_eq!(who(&[(P0, 2), (P1, 7), (P2, 5)], 9), P0, "nobody near: for ourselves, as today");
+    assert_eq!(who(&[(P0, 4), (P1, 9), (P2, 4)], 9, block), P0);
+    // No block: for ourselves, as today, whatever the table holds.
+    assert_eq!(who(&[(P0, 4), (P1, 9), (P2, 5)], 9, Ballot::Own), P0, "the net blocks nobody: for ourselves");
     // We hold the threshold: for ourselves, whatever the rival holds.
-    assert_eq!(who(&[(P0, 9), (P1, 9), (P2, 0)], 9), P0);
+    assert_eq!(who(&[(P0, 9), (P1, 9), (P2, 0)], 9, block), P0);
     // The pool would elect P2 (6 + 4 = 10, past the threshold and the threat's 9): for ourselves.
-    assert_eq!(who(&[(P0, 4), (P1, 9), (P2, 6)], 9), P0, "our ballot must not make the coalition candidate the World Leader");
+    assert_eq!(who(&[(P0, 4), (P1, 9), (P2, 6)], 9, block), P0, "our ballot must not make the coalition candidate the World Leader");
 }
 
 /// The ballot as commands: with the plan, the whole seat goes on the coalition candidate; without it, on ourselves.
@@ -351,8 +352,10 @@ fn the_ballot_of_the_leader_vote() {
     c.proposals = vec![Proposal { kind: ResolutionKind::DiplomaticVictory, choice: 0, proposer: None, repeal: false }];
     let cast = |net2: Option<&Net2Plan>| vote_orders_with(&obs, false, net2);
     assert_eq!(format!("{:?}", cast(None)), format!("{:?}", vec![Command::CastVotes { player: P0, proposal: 0, choice: u32::from(P0.0), delegates: 4 }]));
-    let p = plan(vec![]);
+    let p = Net2Plan { ballot: Ballot::Block(P1), ..plan(vec![]) };
     assert_eq!(format!("{:?}", cast(Some(&p))), format!("{:?}", vec![Command::CastVotes { player: P0, proposal: 0, choice: u32::from(P2.0), delegates: 4 }]));
+    let own = plan(vec![]);
+    assert_eq!(format!("{:?}", cast(Some(&own))), format!("{:?}", vec![Command::CastVotes { player: P0, proposal: 0, choice: u32::from(P0.0), delegates: 4 }]), "no block: for ourselves");
 }
 
 /// Resolutions are voted by what they name: no on an embargo on us and on a luxury we hold; yes on the embargo the

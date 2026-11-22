@@ -327,7 +327,11 @@ def levers(W, turn, seat, qs, core, aggs, ys, ar):
     for r, q in zip(rivals, qs):
         if q[W.q["runaway"]] >= W.gates["embargo"] and q[W.q["runaway"]] > best:
             embargo, best = r["id"], q[W.q["runaway"]]
-    return {"peace": peace, "peace_with": peace_with, "deny_help": deny, "embargo": embargo, "guard": guard, "military": military, "cs_gold_share": cs}
+    ballot, best = None, -1
+    for r, q in zip(rivals, qs):
+        if q[W.q["block"]] >= W.gates["block"] and q[W.q["block"]] > best:
+            ballot, best = r["id"], q[W.q["block"]]
+    return {"peace": peace, "peace_with": peace_with, "deny_help": deny, "embargo": embargo, "ballot": ballot, "guard": guard, "military": military, "cs_gold_share": cs}
 
 
 def forward(W: Weights, turn: dict, ar: Arith = FLOAT, teacher: dict | None = None) -> dict:
@@ -365,7 +369,7 @@ def deviation(a, b) -> float:
 
 
 NEURONS = ("s", "ease", "q", "a", "tilt", "y", "peace", "guard", "military", "cs_gold_share")
-DECISIONS = ("core", "peace_with", "deny_help", "embargo")
+DECISIONS = ("core", "peace_with", "deny_help", "embargo", "ballot")
 
 
 def parity(W: Weights, lines, ar: Arith = FLOAT, teacher: bool = True) -> dict:

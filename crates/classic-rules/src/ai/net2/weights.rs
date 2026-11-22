@@ -144,10 +144,12 @@ pub mod r {
     pub const SOFT: usize = 26;
     /// An operation of ours against it forms or marches (0/1000).
     pub const OPERATING: usize = 27;
-    pub const N: usize = 28;
+    /// Its delegates reach the World Leader's votes by themselves (0/1000).
+    pub const ALONE: usize = 28;
+    pub const N: usize = 29;
     pub const NAMES: [&str; N] = [
         "near", "land", "sea", "soldiers", "seen_army", "open_cities", "tree", "lead", "pace", "culture", "stack", "warmonger", "betrayed", "denounced_us", "friend", "pact", "at_war",
-        "war_rounds", "holds_capital", "holds_cities", "grab", "ally_hit", "local", "score", "retake_case", "captured_recent", "soft", "operating",
+        "war_rounds", "holds_capital", "holds_cities", "grab", "ally_hit", "local", "score", "retake_case", "captured_recent", "soft", "operating", "alone",
     ];
 }
 
@@ -176,7 +178,8 @@ pub mod q {
     pub const GRABBER: usize = 9;
     pub const BORDER: usize = 10;
     pub const WAR_VALUE: usize = 11;
-    pub const N: usize = 12;
+    pub const BLOCK: usize = 12;
+    pub const N: usize = 13;
     /// The war kinds' values in `plan::WarKind`'s order of the argmax (Prey, Retake, Spoiler, Duty, Border).
     pub const KINDS: [usize; 5] = [PREY, RETAKE, SPOILER, DUTY, BORDER];
 }
@@ -304,8 +307,8 @@ pub const SEAT: [Neuron; s::N] = [
 /// is the rival's prey term.
 pub const EASE: Neuron = Neuron {
     name: "ease",
-    bias: -2000,
-    why: "a city is no target by default: it takes a small, near city with weak defences (the old size gate, at most 8 citizens, sits at size 500)",
+    bias: -2300,
+    why: "a city is no target by default: it takes a small, near city with weak defences (the old size gate, at most 8 citizens, sits at size 500); −2000 → −2300 raises the bar of a soft city: at −2000 net2 declared 1.49× nets-x-site's wars (GAP.md, offsets 1810–1811)",
     join: UNIT,
     terms: &[
         ts(T(t::SIZE), Shape::Not, 1000, "a small city: the learned capture chance falls 0.066 a citizen (`OPEN_CHANCE_WEIGHTS`), as much as a tile"),
@@ -469,6 +472,17 @@ pub const RIVAL: [Neuron; q::N] = [
             t(Q(q::BORDER), 1000, "border"),
         ],
     },
+    Neuron {
+        name: "block",
+        bias: -500,
+        why: "no block by default: a block gives our delegates, and the leaders' bonus of a failed vote (`LEADERS_BONUS_ON_FAIL`), to another nation",
+        join: UNIT,
+        terms: &[t(
+            R(r::ALONE),
+            1500,
+            "a rival with the votes of its own wins unless a tie or a higher candidate stops it; one short wins nothing, since every seat votes for itself, and the block then only elects the candidate we pooled on (GAP.md: 4 of 200 games)",
+        )],
+    },
 ];
 
 // ---- §4.3 the intent's tilt ----
@@ -592,6 +606,7 @@ pub mod gate {
     pub const PEACE: (Milli, &str) = (500, "the peace wish wins over the war's inertia");
     pub const DENY_HELP: (Milli, &str) = (500, "a rival more likely than not to run away gets no help (lane A T4/T1: science wins 0.311 → 0.256, no war cost)");
     pub const EMBARGO: (Milli, &str) = (600, "the embargo, the cheap brake, only on a clear runaway (W2, VP #8)");
+    pub const BLOCK: (Milli, &str) = (500, "the ballot goes against a rival only when it would win the vote");
     /// Ships escorting an `Overseas` order (`fleet::FLEET_SIZE`).
     pub const ESCORT_SHIPS: (u32, &str) = (2, "the landing needs ships that shell the coast (`fleet.rs` 1-10)");
     /// Standard rounds after a war order spent its budget without paying before another order on that rival.
@@ -622,5 +637,5 @@ pub fn count() -> usize {
     for neuron in neurons() {
         n += neuron.terms.len() + usize::from(matches!(neuron.join, Join::Sum(_)));
     }
-    n + TILT.len() + 8 + 5
+    n + TILT.len() + 9 + 5
 }

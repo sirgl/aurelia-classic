@@ -137,6 +137,9 @@ pub struct RivalInputs {
     pub cs_held: Milli,
     /// An operation of ours against it forms or marches (0/1000): an order is not dropped under its army.
     pub operating: Milli,
+    /// R32 (GAP.md): the league elects a World Leader and its delegates on the Congress screen reach the votes
+    /// needed by themselves (0/1000): it wins the vote unless a tie or a higher candidate stops it.
+    pub alone: Milli,
 }
 
 impl RivalInputs {
@@ -178,6 +181,7 @@ impl RivalInputs {
             era_ahead: 0,
             cs_held: 0,
             operating: 0,
+            alone: 0,
         }
     }
 }
@@ -453,6 +457,17 @@ pub enum Embargo {
     On(PlayerId),
 }
 
+/// The seat's ballot in the World Leader vote (GAP.md: the congress part).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum Ballot {
+    /// For ourselves.
+    #[default]
+    Own,
+    /// Against this rival: the delegates go to the strongest other candidate, so that a tie or a higher one stops it.
+    Block(PlayerId),
+}
+
 /// The ships an operation sails with (§4.4).
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 #[non_exhaustive]
@@ -539,6 +554,8 @@ pub struct RivalRead {
     pub retake: Milli,
     pub duty: Milli,
     pub grabber: Milli,
+    /// Its World Leader vote is to be blocked (`weights::RIVAL` `block`).
+    pub block: Milli,
     /// AND(grabber, weak): the value of a `Border` war.
     pub border: Milli,
     /// A runaway we cannot beat ourselves (offence addendum §3.2; 0 until the offence is built).
@@ -653,6 +670,8 @@ pub struct Net2Plan {
     /// The share of the gold for city-states, 0…1000 (0: today's reserve and ceiling).
     pub cs_gold_share: Milli,
     pub embargo: Embargo,
+    /// The World Leader ballot.
+    pub ballot: Ballot,
     pub escorts: Escorts,
     pub generals: Generals,
     /// The style share of tall (the site head's S9).

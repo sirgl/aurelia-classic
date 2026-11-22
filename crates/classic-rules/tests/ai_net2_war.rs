@@ -216,5 +216,5 @@ fn known_power_counts_the_soldiers_estimate_when_it_is_sure() {
 
 fn empty_read(rival: PlayerId) -> classic_rules::ai::net2::plan::RivalRead {
     use classic_rules::ai::net2::plan::{Help, RivalRead};
-    RivalRead { rival, weak: 0, reach: 0, menace: 0, distrust: 0, prey: 0, runaway: 0, spoiler: 0, retake: 0, duty: 0, grabber: 0, border: 0, brake: 0, war_value: 0, war_kind: WarKind::Prey, trust: 1000, help: Help::Give, soldiers: Default::default() }
+    RivalRead { rival, weak: 0, reach: 0, menace: 0, distrust: 0, prey: 0, runaway: 0, spoiler: 0, retake: 0, duty: 0, grabber: 0, block: 0, border: 0, brake: 0, war_value: 0, war_kind: WarKind::Prey, trust: 1000, help: Help::Give, soldiers: Default::default() }
 }

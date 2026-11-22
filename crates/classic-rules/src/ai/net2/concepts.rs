@@ -129,6 +129,7 @@ impl RivalInputs {
             self.captured_recent,
             soft,
             self.operating,
+            self.alone,
         ]
     }
 }

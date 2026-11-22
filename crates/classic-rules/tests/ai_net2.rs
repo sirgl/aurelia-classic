@@ -292,7 +292,7 @@ fn the_site_head_is_the_guarded_net_when_the_plan_is_silent() {
 /// A rival read with the menace at its top and every other concept 0.
 fn menaced_read(rival: PlayerId) -> classic_rules::ai::net2::plan::RivalRead {
     use classic_rules::ai::net2::plan::{Help, RivalRead, WarKind};
-    RivalRead { rival, weak: 0, reach: 0, menace: 1000, distrust: 0, prey: 0, runaway: 0, spoiler: 0, retake: 0, duty: 0, grabber: 0, border: 0, brake: 0, war_value: 0, war_kind: WarKind::Prey, trust: 1000, help: Help::Give, soldiers: Default::default() }
+    RivalRead { rival, weak: 0, reach: 0, menace: 1000, distrust: 0, prey: 0, runaway: 0, spoiler: 0, retake: 0, duty: 0, grabber: 0, block: 0, border: 0, brake: 0, war_value: 0, war_kind: WarKind::Prey, trust: 1000, help: Help::Give, soldiers: Default::default() }
 }
 
 /// Plays 30 rounds of `net2` for the float twin's parity on real turns: run it with `NET2_TRACE=<file>`

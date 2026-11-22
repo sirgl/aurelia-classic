@@ -9,7 +9,7 @@ use crate::ai::strategy_net::weights::Act;
 use crate::ai::strategy_net::{Logits, Milli, Tilt};
 
 use super::levers::{After, Pass};
-use super::plan::{CityInputs, CoreMemory, Embargo, Help, Inputs, TargetInputs, WarPlan};
+use super::plan::{Ballot, CityInputs, CoreMemory, Embargo, Help, Inputs, TargetInputs, WarPlan};
 use super::weights::{self as w, Join, Neuron, Shape, Src, Table, Term};
 
 /// The JSON of every table of `net2`: the neurons, the tilt, the gates, the site head.
@@ -25,7 +25,7 @@ pub fn export() -> String {
     let _ = writeln!(out, "  \"rival\": [{}],", names(&w::RIVAL));
     let tilt: Vec<String> = w::TILT.iter().map(|(table, at, term)| format!("{{\"table\": \"{}\", \"at\": {at}, \"term\": {}}}", table_name(*table), term_json(term))).collect();
     let _ = writeln!(out, "  \"tilt\": [\n    {}\n  ],", tilt.join(",\n    "));
-    let gates = [("war_start", w::gate::WAR_START.0), ("war_keep", w::gate::WAR_KEEP.0), ("peace", w::gate::PEACE.0), ("deny_help", w::gate::DENY_HELP.0), ("embargo", w::gate::EMBARGO.0)];
+    let gates = [("war_start", w::gate::WAR_START.0), ("war_keep", w::gate::WAR_KEEP.0), ("peace", w::gate::PEACE.0), ("deny_help", w::gate::DENY_HELP.0), ("embargo", w::gate::EMBARGO.0), ("block", w::gate::BLOCK.0)];
     let gates: Vec<String> = gates.iter().map(|(k, v)| format!("\"{k}\": {v}")).collect();
     let _ = writeln!(out, "  \"gates\": {{{}}},", gates.join(", "));
     let names = format!(
@@ -190,8 +190,12 @@ fn output_json(rec: &Record<'_>) -> String {
         Embargo::On(p) => p.0.to_string(),
         Embargo::Nobody => "null".to_string(),
     };
+    let ballot = match plan.ballot {
+        Ballot::Block(p) => p.0.to_string(),
+        Ballot::Own => "null".to_string(),
+    };
     format!(
-        "{{\"s\":{},\"ease\":{},\"q\":{},\"core\":{},\"a\":{},\"tilt\":{{\"style\":{},\"aim\":{},\"posture\":{}}},\"y\":{},\"peace\":{},\"peace_with\":{},\"deny_help\":{},\"embargo\":{embargo},\"guard\":{},\"military\":{},\"cs_gold_share\":{}}}",
+        "{{\"s\":{},\"ease\":{},\"q\":{},\"core\":{},\"a\":{},\"tilt\":{{\"style\":{},\"aim\":{},\"posture\":{}}},\"y\":{},\"peace\":{},\"peace_with\":{},\"deny_help\":{},\"embargo\":{embargo},\"ballot\":{ballot},\"guard\":{},\"military\":{},\"cs_gold_share\":{}}}",
         list(&rec.pass.seat),
         list(&rec.pass.eases),
         rows(&rec.pass.rivals, |x| list(&x.concepts)),

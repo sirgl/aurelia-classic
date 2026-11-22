@@ -8,7 +8,7 @@ use crate::ai::strategy_net::{Intent, Milli, Tilt};
 use crate::ids::PlayerId;
 
 use super::concepts::{self, fire, Frame};
-use super::plan::{AimWhy, OrderPhase, CityGuard, Part, Parts, CityInputs, CoreMemory, Embargo, Escorts, Generals, Help, Inputs, Net2Plan, Offence, Opening, RivalRead, Soldiers, SpentWar, TargetInputs, WarAim, WarKind, WarOrder, WarPlan};
+use super::plan::{AimWhy, Ballot, OrderPhase, CityGuard, Part, Parts, CityInputs, CoreMemory, Embargo, Escorts, Generals, Help, Inputs, Net2Plan, Offence, Opening, RivalRead, Soldiers, SpentWar, TargetInputs, WarAim, WarKind, WarOrder, WarPlan};
 use super::weights::{self as w, a, gate, q, r, s, y, Src, Table, Term};
 
 /// One rival's layer: its inputs and its concepts.
@@ -99,6 +99,7 @@ fn read_of(rival: PlayerId, inputs: &[Milli; r::N], c: &[Milli; q::N]) -> RivalR
         retake: c[q::RETAKE],
         duty: c[q::DUTY],
         grabber: c[q::GRABBER],
+        block: c[q::BLOCK],
         border: c[q::BORDER],
         brake: 0,
         war_value: c[q::WAR_VALUE],
@@ -308,6 +309,7 @@ pub fn after_intent(pass: &Pass, intent: &Intent, inputs: &Inputs, round: u32) -
         guard,
         cs_gold_share,
         embargo: embargo_of(&pass.reads),
+        ballot: ballot_of(&pass.reads),
         escorts: escorts_of(&pass.core.war),
         generals: if pass.core.war.order().is_none() && !at_war { Generals::Hold } else { Generals::AsToday },
         tall_share: intent.style[0],
@@ -358,6 +360,20 @@ fn embargo_of(reads: &[RivalRead]) -> Embargo {
     match best {
         Some(read) => Embargo::On(read.rival),
         None => Embargo::Nobody,
+    }
+}
+
+/// The ballot against the rival with the largest block at least the gate (the lower id on a tie), else for ourselves.
+fn ballot_of(reads: &[RivalRead]) -> Ballot {
+    let mut best: Option<&RivalRead> = None;
+    for read in reads {
+        if read.block >= gate::BLOCK.0 && best.is_none_or(|b| read.block > b.block) {
+            best = Some(read);
+        }
+    }
+    match best {
+        Some(read) => Ballot::Block(read.rival),
+        None => Ballot::Own,
     }
 }
 

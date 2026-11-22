@@ -138,9 +138,21 @@ pub fn read(obs: &AIObservation<'_>, brief: &TurnBrief, state: &AiState, rules: 
         row.retake_case = if brief.retaking_from(r) { 1000 } else { 0 };
         row.captured_recent = if memory.captured.iter().any(|c| c.from == r && now.saturating_sub(c.round) <= sight) { 1000 } else { 0 };
         row.operating = if state.operations().iter().any(|o| o.enemy == r) { 1000 } else { 0 };
+        row.alone = alone(obs, r);
         out.push(row);
     }
     out
+}
+
+/// R32: the league elects a World Leader and `rival`'s delegates on the Congress screen reach the votes needed.
+fn alone(obs: &AIObservation<'_>, rival: PlayerId) -> Milli {
+    let Some(info) = obs.congress.as_ref().filter(|c| c.united_nations && c.needed > 0) else { return 0 };
+    let delegates = info.delegates.iter().find(|(p, _)| *p == rival).map_or(0, |(_, n)| *n);
+    if delegates >= info.needed {
+        1000
+    } else {
+        0
+    }
 }
 
 /// R7, R8, R9 of one rival (`strategy_net::threat::of` reads the same three).
