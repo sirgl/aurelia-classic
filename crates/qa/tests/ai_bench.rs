@@ -246,16 +246,16 @@ fn the_candidate_takes_alternate_seats() {
     assert!(weaker.sides[1].standings.last().unwrap().cities.mean > 1.0, "the standard AI expands");
 }
 
-/// A sequential run (`--sprt`) decides on the seed blocks in the
-/// schedule's order whatever the threads: `one-city` loses every block and
-/// is rejected at the minimum; equal versions take half of every block and
-/// play to the cap; against their own saved reports as the reference every
-/// difference is 0, and a game the reference lacks is an error.
 fn sequential_setup() -> (Suite, Sprt, Plan) {
     (Suite::named("smoke").unwrap(), Sprt { s0: 0.45, s1: 0.55, alpha: 0.05, beta: 0.05 }, Plan { min_blocks: 2, max_blocks: 3 })
 }
 
-// The three parts of the run are independent games: each is its own test, so they run side by side.
+// A sequential run (`--sprt`) decides on the seed blocks in the
+// schedule's order whatever the threads: `one-city` loses every block and
+// is rejected at the minimum; equal versions take half of every block and
+// play to the cap; against their own saved reports as the reference every
+// difference is 0, and a game the reference lacks is an error.
+// The three parts are independent games: each is its own test, so they run side by side.
 
 #[test]
 fn a_sequential_run_rejects_a_losing_version_on_any_number_of_threads() {

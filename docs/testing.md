@@ -81,12 +81,13 @@ timings still use `--release`.
 
 ### The guard
 
-In the fast tier a test that runs 2 s is terminated and fails (`TIMEOUT`): `slow-timeout` in
-`[profile.default]`. The author then either makes the test fast or adds it to the slow filterset in
-`.config/nextest.toml` (and it runs in `full`). The slowest fast test takes about 0.5 s, so 2 s is
-four times the headroom of a loaded machine. The pins keep their own limit of 30 s. The `full` profile
-ends a test at 5 minutes, which is a hang. `python3 tools/test-budget.py` reports the fast tier's wall
-time at 4 threads, its CPU seconds and the slowest tests, and fails when the tier does not fit 30 s.
+In the fast tier a test that runs 2 s is reported SLOW and one that runs 6 s is terminated and fails
+(`TIMEOUT`): `slow-timeout` in `[profile.default]`; the 6 s kill leaves room for a loaded machine. The
+slowest fast test takes about 0.5 s. `python3 tools/test-budget.py` runs the fast tier with a junit file and
+**fails when any fast test took over 2 s**, and when the tier's floor at 4 threads (work divided by 4) is over
+30 s; so a slow test that sneaks in is caught by the budget check even when it is under the kill. The author
+then makes the test fast or adds it to the slow filterset in `.config/nextest.toml` (it runs in `full`). The
+pins keep their own limit of 30 s; `full` ends a test at 5 minutes, which is a hang.
 
 ### The art pack
 

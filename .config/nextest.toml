@@ -230,10 +230,11 @@ fail-fast = false
 failure-output = "final"
 status-level = "fail"
 final-status-level = "slow"
-# THE GUARD: a fast-tier test that runs 2 s is terminated and fails (TIMEOUT). The author moves it to the slow
-# set above (add it to the filter) or makes it fast; see docs/testing.md, "Two tiers". The slowest fast test
+# THE GUARD: a fast-tier test that runs 2 s is reported SLOW (tools/test-budget.py fails on it), one that runs
+# 6 s is terminated and fails (TIMEOUT), so a loaded machine does not fail a run by itself. The author moves the
+# test to the slow set above (add it to the filter) or makes it fast; see docs/testing.md, "Two tiers". The slowest fast test
 # takes about 0.5 s.
-slow-timeout = { period = "2s", terminate-after = 1 }
+slow-timeout = { period = "2s", terminate-after = 3 }
 
 [[profile.default.overrides]]
 filter = """

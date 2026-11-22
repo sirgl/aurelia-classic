@@ -17,14 +17,14 @@ const PLAYERS: u8 = 4;
 /// of this seed comes at round 160–200 (was by 160).
 const ROUNDS: u32 = 200;
 
-/// Seeds of the headless games. Few AI nations reach a Great
-/// Prophet in 160 rounds (2 games of 8 on this ruleset), so the religion
-/// is asserted over the set, not over one game: a single seed made the
-/// assertion hang on the butterfly effects of any rule change.
 #[path = "common/parallel.rs"]
 mod parallel;
 use parallel::parallel;
 
+/// Seeds of the headless games. Few AI nations reach a Great
+/// Prophet in 160 rounds (2 games of 8 on this ruleset), so the religion
+/// is asserted over the set, not over one game: a single seed made the
+/// assertion hang on the butterfly effects of any rule change.
 const SEEDS: [u64; 9] = [0x7_B0B, 1, 2, 3, 4, 5, 6, 7, 8];
 
 #[test]
