@@ -152,7 +152,7 @@ impl Situation {
 
     /// Every situation: the catalogue's (`ALL`) and the human tricks.
     pub fn all() -> Vec<Situation> {
-        Self::ALL.into_iter().chain(humans::Trick::ALL.into_iter().map(Situation::Human)).collect()
+        Self::ALL.into_iter().chain(humans::Trick::every().into_iter().map(Situation::Human)).collect()
     }
 
     pub fn parse(text: &str) -> Result<Self, String> {

@@ -16,6 +16,7 @@ pub mod deals;
 pub mod gates;
 pub mod lobby;
 pub mod metrics;
+pub mod offence;
 pub mod sniper;
 pub mod squat;
 pub mod turtle;
@@ -57,6 +58,29 @@ pub enum Trick {
     Lobby,
     /// CS2-CS5, S3, CS1: the city-states allied to the seat bought away with gold and coups.
     Poach,
+    // The offence: the AI seat judged is the one that could play the trick (`offence`); the
+    // situation hands it the opportunity, its own AI decides.
+    /// MO1: an archer army at home next to an early rival's capital, at peace.
+    OffRush,
+    /// MO3: the rival's borders open to the seat, the seat's army at home next to them.
+    OffSneak,
+    /// MO6, MO7: at war, the seat's fast units in the rival's countryside, beside its workers.
+    OffRaid,
+    /// MO2, MO4: the seat's great generals on its border next to a rival's city.
+    OffCitadel,
+    /// MO8: at war, the rival's new city founded three to four tiles from the seat's city.
+    OffVulture,
+    /// W2: the seat, second by score, rich before the congress sessions.
+    OffLobby,
+    /// CS6: the seat rich, a rival holding city-state allies.
+    OffPoach,
+}
+
+/// Who the trick is judged on: the AI it targets (defence) or the AI that could play it (offence).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Side {
+    Defence,
+    Offence,
 }
 
 impl Trick {
@@ -75,6 +99,21 @@ impl Trick {
         Trick::Poach,
     ];
 
+    /// The offence tricks.
+    pub const OFFENCE: [Trick; 7] = [Trick::OffRush, Trick::OffSneak, Trick::OffRaid, Trick::OffCitadel, Trick::OffVulture, Trick::OffLobby, Trick::OffPoach];
+
+    /// Every trick, defence then offence.
+    pub fn every() -> Vec<Trick> {
+        Self::ALL.into_iter().chain(Self::OFFENCE).collect()
+    }
+
+    pub fn side(self) -> Side {
+        match self {
+            Trick::OffRush | Trick::OffSneak | Trick::OffRaid | Trick::OffCitadel | Trick::OffVulture | Trick::OffLobby | Trick::OffPoach => Side::Offence,
+            _ => Side::Defence,
+        }
+    }
+
     /// The situation's name (`h` and the research id; "h" keeps them apart from the catalogue's).
     pub fn name(self) -> &'static str {
         match self {
@@ -90,6 +129,13 @@ impl Trick {
             Trick::Sniper => "hv1",
             Trick::Lobby => "hw2",
             Trick::Poach => "hcs",
+            Trick::OffRush => "omo1",
+            Trick::OffSneak => "omo3",
+            Trick::OffRaid => "omo7",
+            Trick::OffCitadel => "omo2",
+            Trick::OffVulture => "omo8",
+            Trick::OffLobby => "ow2",
+            Trick::OffPoach => "ocs",
         }
     }
 
@@ -116,6 +162,13 @@ impl Trick {
             Trick::Sniper => 30,
             Trick::Lobby => 40,
             Trick::Poach => 40,
+            Trick::OffRush => 30,
+            Trick::OffSneak => 25,
+            Trick::OffRaid => 20,
+            Trick::OffCitadel => 25,
+            Trick::OffVulture => 25,
+            Trick::OffLobby => 40,
+            Trick::OffPoach => 40,
         }
     }
 
@@ -123,7 +176,7 @@ impl Trick {
     /// that reaches round 70 serves, e.g. `runs/positions-early`), the rest at the run's round.
     pub fn start(self, index: usize, round: u32, jitter: u32) -> u32 {
         match self {
-            Trick::Rush | Trick::Vulture => position::round_of(index, 50, 20),
+            Trick::Rush | Trick::Vulture | Trick::OffRush => position::round_of(index, 50, 20),
             _ => position::round_of(index, round, jitter),
         }
     }
@@ -202,6 +255,7 @@ pub fn plan(trick: Trick, rules: &CompiledRuleset, position: &Position, instance
         Trick::Turtle => turtle::plan(rules, position, instance),
         Trick::Sniper => sniper::plan(rules, position, instance),
         Trick::Lobby | Trick::Poach => lobby::plan(trick, rules, position, instance),
+        _ => offence::plan(trick, rules, position, instance),
     }
 }
 
@@ -219,6 +273,7 @@ pub fn edit_of(trick: Trick, level: u8, rules: &CompiledRuleset, position: &Posi
         Trick::Turtle => turtle::edit_of(cast, level, rules, position),
         Trick::Sniper => sniper::edit_of(cast, level, rules, position),
         Trick::Lobby | Trick::Poach => lobby::edit_of(cast, level, rules, position),
+        _ => offence::edit_of(cast, level, rules, position),
     }
 }
 

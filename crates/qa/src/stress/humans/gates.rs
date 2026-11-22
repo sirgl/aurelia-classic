@@ -14,7 +14,7 @@ const fn gate(trick: Trick, kind: Kind, metric: &'static str, test: Test, thresh
 
 use Kind::{Behaviour as B, Outcome as O};
 use Test::{DeltaAtLeast as DGE, DeltaAtMost as DLE, EditedAtLeast as EGE, EditedAtMost as ELE};
-use Trick::{Bait, Beg, Drain, Lobby, Poach, Rush, Sneak, Sniper, Squat, Swindle, Turtle, Vulture};
+use Trick::{Bait, Beg, Drain, Lobby, OffCitadel, OffLobby, OffPoach, OffRaid, OffRush, OffSneak, OffVulture, Poach, Rush, Sneak, Sniper, Squat, Swindle, Turtle, Vulture};
 
 const NET_FIGHT: &str = "danger net (on: the fight fixes), tactician, commander (off); scripted defence.rs";
 const NET_SNEAK: &str = "strategist (posture: no trust term for an army inside the borders), danger net (on: the fight fixes); scripted defence.rs";
@@ -87,7 +87,54 @@ pub const GATES: &[Gate] = &[
     gate(Poach, B, "gifts_by_seat", DGE, [1.0, 1.0, 1.0], NET_ALLIES),
 ];
 
+const OFF_WAR: &str = "strategist (posture, war stakes: no opportunity term), commander (off); scripted operations.rs";
+const OFF_RAID: &str = "tactician, commander (off); none: scripted (field_craft.rs not in standard, operations.rs)";
+const OFF_CITADEL: &str = "none: scripted great_people.rs (a general waits without a site)";
+const OFF_GOLD: &str = "none: scripted (city_states.rs gift_orders, congress.rs); strategist has no diplomacy outputs";
+
+/// The offence gates (written before the offence's first run, 22 Nov 2026): the AI seat that could
+/// play the trick, against the control without the opportunity. The behaviour gates read whether it
+/// took the opportunity, the outcome gates whether it gained.
+pub const OFFENCE: &[Gate] = &[
+    gate(OffRush, O, "seat_cities", DGE, [0.1, 0.2, 0.3], OFF_WAR),
+    gate(OffRush, O, "seat_score_share", DGE, [0.0, 0.005, 0.01], OFF_WAR),
+    gate(OffRush, O, "end_seat_win_weight", DGE, [0.0, 0.0, 0.0], OFF_WAR),
+    gate(OffRush, B, "war_on_rival", DGE, [0.3, 0.4, 0.5], OFF_WAR),
+    gate(OffRush, B, "rival_capital_taken", EGE, [0.1, 0.2, 0.3], OFF_WAR),
+    gate(OffSneak, O, "seat_cities", DGE, [0.1, 0.2, 0.3], OFF_WAR),
+    gate(OffSneak, O, "seat_score_share", DGE, [0.0, 0.005, 0.01], OFF_WAR),
+    gate(OffSneak, O, "end_seat_win_weight", DGE, [0.0, 0.0, 0.0], OFF_WAR),
+    gate(OffSneak, B, "war_on_rival", DGE, [0.2, 0.3, 0.4], OFF_WAR),
+    gate(OffSneak, B, "rival_cities_taken", DGE, [0.1, 0.2, 0.3], OFF_WAR),
+    gate(OffRaid, O, "seat_score_share", DGE, [0.002, 0.004, 0.006], OFF_RAID),
+    gate(OffRaid, O, "end_seat_win_weight", DGE, [0.0, 0.0, 0.0], OFF_RAID),
+    gate(OffRaid, B, "rival_civilians_end", DLE, [-0.5, -1.0, -1.5], OFF_RAID),
+    gate(OffRaid, B, "rival_pillaged_end", DGE, [1.0, 2.0, 3.0], OFF_RAID),
+    gate(OffCitadel, O, "seat_score_share", DGE, [0.002, 0.003, 0.005], OFF_CITADEL),
+    gate(OffCitadel, O, "end_seat_win_weight", DGE, [0.0, 0.0, 0.0], OFF_CITADEL),
+    gate(OffCitadel, B, "seat_citadels", DGE, [0.5, 1.0, 1.0], OFF_CITADEL),
+    gate(OffCitadel, B, "rival_cities_taken", DGE, [0.0, 0.0, 0.2], OFF_CITADEL),
+    gate(OffVulture, O, "seat_cities", DGE, [0.2, 0.4, 0.5], OFF_WAR),
+    gate(OffVulture, O, "seat_score_share", DGE, [0.0, 0.005, 0.01], OFF_WAR),
+    gate(OffVulture, O, "end_seat_win_weight", DGE, [0.0, 0.0, 0.0], OFF_WAR),
+    gate(OffVulture, B, "rival_cities_taken", DGE, [0.3, 0.5, 0.6], OFF_WAR),
+    gate(OffLobby, O, "seat_score_share", DGE, [0.0, 0.002, 0.004], OFF_GOLD),
+    gate(OffLobby, O, "end_seat_win_weight", DGE, [0.0, 0.0, 0.0], OFF_GOLD),
+    gate(OffLobby, B, "gifts_by_seat", DGE, [1.0, 2.0, 3.0], OFF_GOLD),
+    gate(OffLobby, B, "seat_allies", DGE, [0.5, 1.0, 1.5], OFF_GOLD),
+    gate(OffLobby, B, "embargo_proposals_by_seat", DGE, [0.2, 0.3, 0.4], OFF_GOLD),
+    gate(OffPoach, O, "seat_score_share", DGE, [0.0, 0.002, 0.004], OFF_GOLD),
+    gate(OffPoach, O, "end_seat_win_weight", DGE, [0.0, 0.0, 0.0], OFF_GOLD),
+    gate(OffPoach, B, "gifts_by_seat", DGE, [1.0, 2.0, 3.0], OFF_GOLD),
+    gate(OffPoach, B, "seat_allies", DGE, [0.5, 1.0, 1.5], OFF_GOLD),
+];
+
 /// The gates as the document's table.
 pub fn markdown() -> String {
     crate::stress::gates::markdown_of(GATES)
+}
+
+/// The offence gates as the document's table.
+pub fn offence_markdown() -> String {
+    crate::stress::gates::markdown_of(OFFENCE)
 }

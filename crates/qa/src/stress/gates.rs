@@ -200,7 +200,7 @@ const NET_PEACE: &str = "none: scripted peace.rs";
 
 /// The gates of one situation.
 pub fn of(situation: Situation) -> impl Iterator<Item = &'static Gate> {
-    GATES.iter().chain(super::humans::gates::GATES).filter(move |g| g.situation == situation)
+    GATES.iter().chain(super::humans::gates::GATES).chain(super::humans::gates::OFFENCE).filter(move |g| g.situation == situation)
 }
 
 /// The gates as the document's table.

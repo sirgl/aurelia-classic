@@ -42,14 +42,43 @@ pub fn measure(m: &mut Measures, cast: Cast, rules: &CompiledRuleset, game: &Gam
         }
         _ => {}
     }
+    if cast.trick.side() == super::Side::Offence {
+        offence(m, rules, game, watch, cast);
+    }
+}
+
+/// The offence: did the seat take what the situation handed it (`human` is the rival here).
+fn offence(m: &mut Measures, rules: &CompiledRuleset, game: &GameState, watch: &Watch, cast: Cast) {
+    let flag = |b: bool| f64::from(u8::from(b));
+    let (seat, rival) = (cast.seat, cast.human);
+    m.insert("war_on_rival".into(), flag(watch.declared.iter().any(|e| e.by.0 == seat && e.on.0 == rival)));
+    m.insert("rival_cities_taken".into(), watch.captures.iter().filter(|c| c.from.0 == rival && c.to.0 == seat).count() as f64);
+    m.insert("rival_capital_taken".into(), flag(watch.captures.iter().any(|c| c.from.0 == rival && c.to.0 == seat && is_original_capital(game, c.city, rival))));
+    let last = watch.of(rival).last().copied();
+    m.insert("rival_civilians_end".into(), last.map_or(0.0, |s| f64::from(s.civilians)));
+    m.insert("rival_pillaged_end".into(), last.map_or(0.0, |s| f64::from(s.pillaged)));
+    m.insert("seat_citadels".into(), citadels(rules, game, seat) as f64);
+    let embargo = watch.proposals.iter().filter(|p| p.by.0 == seat && p.kind == ResolutionKind::PlayerEmbargo).count();
+    m.insert("embargo_proposals_by_seat".into(), embargo as f64);
+}
+
+fn is_original_capital(game: &GameState, city: u64, owner: u8) -> bool {
+    let auth = game.view().auth;
+    auth.cities().handle_of(kernel::ids::EntityId(city)).and_then(|h| auth.cities().get(h)).is_some_and(|c| c.original_capital && c.original_owner.0 == owner)
+}
+
+/// The tiles of `seat`'s land that hold a citadel.
+fn citadels(rules: &CompiledRuleset, game: &GameState, seat: u8) -> usize {
+    let map = game.view().auth.map();
+    (0..map.tile_count() as u32)
+        .map(classic_rules::ids::TileId)
+        .filter(|t| map.owner(*t).flatten() == Some(PlayerId(seat)))
+        .filter(|t| map.improvement(*t).flatten().and_then(|i| rules.improvements.get(i.0 as usize)).is_some_and(|d| d.culture_bomb_radius > 0))
+        .count()
 }
 
 fn capital_lost(game: &GameState, watch: &Watch, seat: u8) -> bool {
-    let auth = game.view().auth;
-    watch.captures.iter().filter(|c| c.from.0 == seat).any(|c| {
-        let city = auth.cities().handle_of(kernel::ids::EntityId(c.city)).and_then(|h| auth.cities().get(h));
-        city.is_some_and(|city| city.original_capital && city.original_owner.0 == seat)
-    })
+    watch.captures.iter().any(|c| c.from.0 == seat && is_original_capital(game, c.city, seat))
 }
 
 /// The city-states allied to `seat` now.

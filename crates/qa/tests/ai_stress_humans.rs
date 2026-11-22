@@ -157,3 +157,21 @@ fn the_swindler_offers_its_ware() {
     let played = play::play_arm(rules(), edited, position().variant, 2, false).expect("plays");
     assert!(played.script.contains_key("script_offers"), "the swindle counts its offers: {:?}", played.script);
 }
+
+#[test]
+fn every_offence_builds_without_a_script_or_says_why() {
+    let doc = std::fs::read_to_string(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../docs/ai-stress.md")).expect("the document");
+    assert!(doc.contains(&humans::gates::offence_markdown()), "docs/ai-stress.md holds the offence gates");
+    let (rules, p) = (rules(), position());
+    for trick in Trick::OFFENCE {
+        assert_eq!(trick.side(), humans::Side::Offence);
+        let situation = Situation::Human(trick);
+        let Ok(plan) = scene::plan(situation, rules, &p, 0) else { continue };
+        for level in 0..situation.levels() {
+            if let Ok(edit) = scene::edit_of(situation, level, rules, &p, &plan) {
+                assert!(edit.script.is_none(), "{} level {level}: the seat's own AI plays the opportunity", trick.name());
+                scene::arms(rules, &p, &plan, &edit).unwrap_or_else(|e| panic!("{} level {level}: {e}", trick.name()));
+            }
+        }
+    }
+}

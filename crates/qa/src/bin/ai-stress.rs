@@ -109,7 +109,7 @@ fn real() -> Result<(), String> {
         "suite" => suite(&o, &rules),
         "random" => random(&o, &rules),
         "gates" => {
-            print!("{}\n{}", gates::markdown(), stress::humans::gates::markdown());
+            print!("{}\n{}\n{}", gates::markdown(), stress::humans::gates::markdown(), stress::humans::gates::offence_markdown());
             Ok(())
         }
         other => Err(format!("unknown command {other}")),

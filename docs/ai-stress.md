@@ -426,6 +426,64 @@ D4 (wave 3), A1-A3 air and nukes (P10, wave 3); the tricks the triage marks "no"
 | HCS | behaviour | `seat_allies` | delta >= | -0.5 | -1 | -1.5 | none: scripted (city_states.rs, espionage.rs); strategist has no diplomacy outputs |
 | HCS | behaviour | `gifts_by_seat` | delta >= | 1 | 1 | 1 | none: scripted (city_states.rs, espionage.rs); strategist has no diplomacy outputs |
 
+### The offence: can the AI play the tricks itself (`o*`)
+
+The same tricks turned round (`stress/humans/offence.rs`, `Trick::OFFENCE`): the AI seat judged is the one
+that COULD play the trick. The edit hands it the opportunity a strong human makes for himself; its own AI
+plays every seat (no script). The behaviour gates read whether it took the opportunity, the outcome gates
+whether it gained against the control without it. `Cast.human` is the rival here.
+
+| trick | research ids | the opportunity (edited arm only) | strengths (mild / medium / strong) | window | positions |
+|---|---|---|---|---|---|
+| OMO1 rush | MO1 | an archer army of the seat at home nearest to the nearest rival's capital, at peace | 2 ranged + 1 melee / 3 + 2 / 4 + 2 | 30 | rounds 50-70 |
+| OMO3 sneak | MO3 | the rival's borders open to the seat (base); the seat's army at home nearest to the rival's city | 2 + 2 / 3 + 4 / 5 + 5 | 25 | 100-110 |
+| OMO7 raid | MO6, MO7 | at war (base); the seat's fast units in the rival's countryside, 2-3 tiles from its cities | 2 / 3 / 5 | 20 | 100-110 |
+| OMO2 citadel | MO2, MO4 | great generals of the seat on its land nearest to the rival's city | 1 / 2 / 2 and the seat's war | 25 | 100-110 |
+| OMO8 vulture | MO8 | at war (base); the rival's new city 3-4 tiles from the seat's city | the city / + 1 ranged 1 melee / + 2 and 2 | 25 | 100-110 |
+| OW2 lobby | W2 | the seat, second by score, gets gold (the congress founded) | +500 / +1000 / +2000 | 40 | rounds 200 |
+| OCS poach | CS6 | the seat (the most score but the rival with the most city-state allies) gets gold | +500 / +1000 / +2000 | 40 | 100-110 |
+
+`war_on_rival`: the seat declared war on the rival; `rival_cities_taken`, `rival_capital_taken`: taken by the
+seat; `rival_civilians_end`, `rival_pillaged_end`: the rival's civilians and pillaged tiles at the end;
+`seat_citadels`: citadels in the seat's land; `embargo_proposals_by_seat`. HMO11 (the turtle) is already an
+offence exam: the others are judged on what they take from a defenceless leader.
+
+#### Offence gates (written before the first run)
+
+| situation | kind | metric | test | mild | medium | strong | owning small net |
+|---|---|---|---|---|---|---|---|
+| OMO1 | outcome | `seat_cities` | delta >= | 0.1 | 0.2 | 0.3 | strategist (posture, war stakes: no opportunity term), commander (off); scripted operations.rs |
+| OMO1 | outcome | `seat_score_share` | delta >= | 0 | 0.005 | 0.01 | strategist (posture, war stakes: no opportunity term), commander (off); scripted operations.rs |
+| OMO1 | outcome | `end_seat_win_weight` | delta >= | 0 | 0 | 0 | strategist (posture, war stakes: no opportunity term), commander (off); scripted operations.rs |
+| OMO1 | behaviour | `war_on_rival` | delta >= | 0.3 | 0.4 | 0.5 | strategist (posture, war stakes: no opportunity term), commander (off); scripted operations.rs |
+| OMO1 | behaviour | `rival_capital_taken` | edited >= | 0.1 | 0.2 | 0.3 | strategist (posture, war stakes: no opportunity term), commander (off); scripted operations.rs |
+| OMO3 | outcome | `seat_cities` | delta >= | 0.1 | 0.2 | 0.3 | strategist (posture, war stakes: no opportunity term), commander (off); scripted operations.rs |
+| OMO3 | outcome | `seat_score_share` | delta >= | 0 | 0.005 | 0.01 | strategist (posture, war stakes: no opportunity term), commander (off); scripted operations.rs |
+| OMO3 | outcome | `end_seat_win_weight` | delta >= | 0 | 0 | 0 | strategist (posture, war stakes: no opportunity term), commander (off); scripted operations.rs |
+| OMO3 | behaviour | `war_on_rival` | delta >= | 0.2 | 0.3 | 0.4 | strategist (posture, war stakes: no opportunity term), commander (off); scripted operations.rs |
+| OMO3 | behaviour | `rival_cities_taken` | delta >= | 0.1 | 0.2 | 0.3 | strategist (posture, war stakes: no opportunity term), commander (off); scripted operations.rs |
+| OMO7 | outcome | `seat_score_share` | delta >= | 0.002 | 0.004 | 0.006 | tactician, commander (off); none: scripted (field_craft.rs not in standard, operations.rs) |
+| OMO7 | outcome | `end_seat_win_weight` | delta >= | 0 | 0 | 0 | tactician, commander (off); none: scripted (field_craft.rs not in standard, operations.rs) |
+| OMO7 | behaviour | `rival_civilians_end` | delta <= | -0.5 | -1 | -1.5 | tactician, commander (off); none: scripted (field_craft.rs not in standard, operations.rs) |
+| OMO7 | behaviour | `rival_pillaged_end` | delta >= | 1 | 2 | 3 | tactician, commander (off); none: scripted (field_craft.rs not in standard, operations.rs) |
+| OMO2 | outcome | `seat_score_share` | delta >= | 0.002 | 0.003 | 0.005 | none: scripted great_people.rs (a general waits without a site) |
+| OMO2 | outcome | `end_seat_win_weight` | delta >= | 0 | 0 | 0 | none: scripted great_people.rs (a general waits without a site) |
+| OMO2 | behaviour | `seat_citadels` | delta >= | 0.5 | 1 | 1 | none: scripted great_people.rs (a general waits without a site) |
+| OMO2 | behaviour | `rival_cities_taken` | delta >= | 0 | 0 | 0.2 | none: scripted great_people.rs (a general waits without a site) |
+| OMO8 | outcome | `seat_cities` | delta >= | 0.2 | 0.4 | 0.5 | strategist (posture, war stakes: no opportunity term), commander (off); scripted operations.rs |
+| OMO8 | outcome | `seat_score_share` | delta >= | 0 | 0.005 | 0.01 | strategist (posture, war stakes: no opportunity term), commander (off); scripted operations.rs |
+| OMO8 | outcome | `end_seat_win_weight` | delta >= | 0 | 0 | 0 | strategist (posture, war stakes: no opportunity term), commander (off); scripted operations.rs |
+| OMO8 | behaviour | `rival_cities_taken` | delta >= | 0.3 | 0.5 | 0.6 | strategist (posture, war stakes: no opportunity term), commander (off); scripted operations.rs |
+| OW2 | outcome | `seat_score_share` | delta >= | 0 | 0.002 | 0.004 | none: scripted (city_states.rs gift_orders, congress.rs); strategist has no diplomacy outputs |
+| OW2 | outcome | `end_seat_win_weight` | delta >= | 0 | 0 | 0 | none: scripted (city_states.rs gift_orders, congress.rs); strategist has no diplomacy outputs |
+| OW2 | behaviour | `gifts_by_seat` | delta >= | 1 | 2 | 3 | none: scripted (city_states.rs gift_orders, congress.rs); strategist has no diplomacy outputs |
+| OW2 | behaviour | `seat_allies` | delta >= | 0.5 | 1 | 1.5 | none: scripted (city_states.rs gift_orders, congress.rs); strategist has no diplomacy outputs |
+| OW2 | behaviour | `embargo_proposals_by_seat` | delta >= | 0.2 | 0.3 | 0.4 | none: scripted (city_states.rs gift_orders, congress.rs); strategist has no diplomacy outputs |
+| OCS | outcome | `seat_score_share` | delta >= | 0 | 0.002 | 0.004 | none: scripted (city_states.rs gift_orders, congress.rs); strategist has no diplomacy outputs |
+| OCS | outcome | `end_seat_win_weight` | delta >= | 0 | 0 | 0 | none: scripted (city_states.rs gift_orders, congress.rs); strategist has no diplomacy outputs |
+| OCS | behaviour | `gifts_by_seat` | delta >= | 1 | 2 | 3 | none: scripted (city_states.rs gift_orders, congress.rs); strategist has no diplomacy outputs |
+| OCS | behaviour | `seat_allies` | delta >= | 0.5 | 1 | 1.5 | none: scripted (city_states.rs gift_orders, congress.rs); strategist has no diplomacy outputs |
+
 ## Results
 
 See the end of this file (filled after the run).

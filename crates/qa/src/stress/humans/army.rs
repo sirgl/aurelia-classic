@@ -119,7 +119,7 @@ pub fn walk(game: &mut GameState, rules: &CompiledRuleset, unit: UnitHandle, to:
 }
 
 /// A free tile a unit of `owner` may stand on: land, no unit, no city.
-fn free(game: &GameState, rules: &CompiledRuleset, tile: TileId) -> bool {
+pub fn free_tile(game: &GameState, rules: &CompiledRuleset, tile: TileId) -> bool {
     let auth = game.view().auth;
     auth.indexes().units_on(tile).is_empty() && auth.indexes().city_on_tile(tile).is_none() && battle::standable(rules, game, tile)
 }
@@ -130,7 +130,7 @@ pub fn posts(game: &GameState, rules: &CompiledRuleset, centre: TileId, ring: i3
     let map = game.view().auth.map();
     let mut tiles: Vec<(i32, u8, u32)> = (0..map.tile_count() as u32)
         .map(TileId)
-        .filter(|t| distance(game, centre, *t) == ring && free(game, rules, *t) && map.land_area(*t) == map.land_area(centre))
+        .filter(|t| distance(game, centre, *t) == ring && free_tile(game, rules, *t) && map.land_area(*t) == map.land_area(centre))
         .map(|t| (distance(game, from, t), u8::from(!kernel::navigation::terrain::is_hills(map, t)), t.0))
         .collect();
     tiles.sort_unstable();
@@ -380,7 +380,7 @@ pub fn home_tiles(game: &GameState, rules: &CompiledRuleset, player: PlayerId, t
     let cities: Vec<TileId> = auth.indexes().cities_of(player).iter().filter_map(|h| auth.cities().get(*h)).map(|c| c.tile).collect();
     let mut tiles: Vec<(i32, u32)> = (0..map.tile_count() as u32)
         .map(TileId)
-        .filter(|t| map.land_area(*t) == map.land_area(toward) && free(game, rules, *t))
+        .filter(|t| map.land_area(*t) == map.land_area(toward) && free_tile(game, rules, *t))
         .filter(|t| {
             let owner = map.owner(*t).flatten();
             owner == Some(player) || (owner.is_none() && cities.iter().any(|c| distance(game, *c, *t) <= 2))
