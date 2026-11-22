@@ -150,6 +150,7 @@ and not (
         | test(=zero_event_weights_play_the_net_without_events)
     ))
   | (binary_id(=classic-rules::net_e2e_speed) & (test(=incremental_tile_states_equal_a_full_recompute_in_a_real_game) | test(=optimized_paths_equal_the_plain_path_on_random_weights)))
+  | (binary_id(=classic-rules::one_palace) & (test(=whole_games_keep_one_palace_per_nation_every_round)))
   | (binary_id(=classic-rules::resource_effects) & (
           test(=a_bazaar_gives_one_more_copy_of_each_luxury_tile_of_its_city)
         | test(=a_feitoria_gives_portugal_an_untradeable_copy_of_the_city_states_luxuries)
