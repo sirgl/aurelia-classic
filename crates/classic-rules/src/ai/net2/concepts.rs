@@ -130,6 +130,7 @@ impl RivalInputs {
             soft,
             self.operating,
             self.alone,
+            self.cs_held,
         ]
     }
 }

@@ -42,7 +42,7 @@ mod tests {
     #[test]
     fn army_travel_and_gaps() {
         assert_eq!(score(&site()) - score(&SiteInputs { army: 2, travel: 3, ..site() }), 120 + 120);
-        assert_eq!(score(&SiteInputs { fill: 1000, tall: 1000, ..site() }) - score(&site()), 25, "a tall seat closes its gaps");
+        assert_eq!(score(&SiteInputs { fill: 1000, tall: 1000, ..site() }), score(&site()), "a gap weighs nothing: it stays ours (GAP.md)");
         assert_eq!(score(&SiteInputs { fill: 1000, tall: 0, ..site() }), score(&site()), "a wide seat does not");
     }
 }

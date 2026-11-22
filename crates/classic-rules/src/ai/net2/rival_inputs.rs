@@ -139,6 +139,8 @@ pub fn read(obs: &AIObservation<'_>, brief: &TurnBrief, state: &AiState, rules: 
         row.captured_recent = if memory.captured.iter().any(|c| c.from == r && now.saturating_sub(c.round) <= sight) { 1000 } else { 0 };
         row.operating = if state.operations().iter().any(|o| o.enemy == r) { 1000 } else { 0 };
         row.alone = alone(obs, r);
+        // R31: the city-states allied to it, which join a war declared on it (`minor_allies_join_war`).
+        row.cs_held = ramp(obs.city_states.iter().filter(|c| c.ally == Some(r)).count() as i64, 0, 3);
         out.push(row);
     }
     out

@@ -333,6 +333,56 @@ impl SiteContext<'_, '_> {
     }
 }
 
+/// Scratch trace of `net2`'s site head (`NET2_SITE_TRACE=<file>`, net2/GAP.md): per settler decision the site the
+/// head ranks first and the one it ranks first without its two own terms (the rival's menace on the gap penalty, S5,
+/// and the gap a tall seat fills, S8·S9), which is the guarded `net_score` of `nets-x-site`. It decides nothing.
+mod site_trace {
+    use super::*;
+    use std::cell::RefCell;
+    use std::io::Write as _;
+
+    type Candidate = (TileId, i64, i64, crate::ai::strategy_net::Milli, i64, crate::ai::strategy_net::Milli);
+
+    thread_local! {
+        static SEEN: RefCell<Vec<Candidate>> = const { RefCell::new(Vec::new()) };
+    }
+
+    fn on() -> bool {
+        std::env::var_os("NET2_SITE_TRACE").is_some()
+    }
+
+    pub(super) fn begin() {
+        if on() {
+            SEEN.with(|s| s.borrow_mut().clear());
+        }
+    }
+
+    pub(super) fn candidate(tile: TileId, head: &crate::ai::net2::plan::SiteInputs) {
+        if !on() {
+            return;
+        }
+        let plain = crate::ai::net2::plan::SiteInputs { rival_menace: 0, fill: 0, ..*head };
+        let entry = (tile, crate::ai::net2::site_head::score(head), crate::ai::net2::site_head::score(&plain), head.rival_menace, head.rival_gap, head.fill * head.tall / 1000);
+        SEEN.with(|s| s.borrow_mut().push(entry));
+    }
+
+    pub(super) fn decided(brief: &crate::ai::planner::TurnBrief, cities: usize, chosen: Option<TileId>) {
+        let Some(path) = std::env::var_os("NET2_SITE_TRACE") else { return };
+        let seen = SEEN.with(|s| std::mem::take(&mut *s.borrow_mut()));
+        let head = seen.iter().find(|c| Some(c.0) == chosen).copied();
+        let plain = seen.iter().max_by_key(|c| (c.2, std::cmp::Reverse(c.0 .0))).copied();
+        let (Some(head), Some(plain)) = (head, plain) else { return };
+        let apart = brief.dims.distance(head.0, plain.0).unwrap_or(-1);
+        let line = format!(
+            "{{\"r\":{},\"p\":{},\"cities\":{cities},\"same\":{},\"apart\":{apart},\"head\":[{},{},{},{},{},{}],\"plain\":[{},{},{},{},{},{}]}}\n",
+            brief.round, brief.player.0, head.0 == plain.0, head.0 .0, head.1, head.2, head.3, head.4, head.5, plain.0 .0, plain.1, plain.2, plain.3, plain.4, plain.5
+        );
+        if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open(path) {
+            let _ = f.write_all(line.as_bytes());
+        }
+    }
+}
+
 /// Tiles within which two own cities make a site a gap to fill (`SiteContext::head_inputs`, S8).
 pub const FILL_REACH: i32 = 5;
 /// Tiles from every city a gap site keeps at least (S8).
@@ -569,6 +619,7 @@ impl SiteSearch<'_, '_, '_> {
             let mut head = self.ctx.head_inputs(tile, inputs, read, heuristic, 0);
             let score = crate::ai::net2::site_head::score(&head);
             head.travel = i64::from(turns);
+            site_trace::candidate(tile, &head);
             (score as i32, crate::ai::net2::site_head::score(&head) as i32)
         } else {
             let score = match self.quality {
@@ -734,7 +785,9 @@ fn choose_site(
                 SiteNetPlay::OwnLand => SiteQuality::Net(inputs, NetRead::OwnLand),
             },
         };
+        site_trace::begin();
         let sites = best_sites_by(ctx, unit.tile, unit.moves_max, tools, limit, &quality);
+        site_trace::decided(brief, ctx.own_cities.len(), sites.first().map(|s| s.tile));
         if brief.site_net != SiteNetPlay::Off && crate::ai::econ_shadow::enabled() {
             shadow_site(ctx, view, tools, limit, &sites);
         }

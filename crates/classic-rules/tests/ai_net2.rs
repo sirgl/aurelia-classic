@@ -215,14 +215,15 @@ fn only_the_net2_variants_think_with_net2() {
 }
 
 /// The site head with a plan that says nothing (no menace, a wide seat) values every site as the guarded
-/// `net_score` does, travel included; a tall seat adds the gap bonus (S8) and nothing else.
+/// `net_score` does, travel included; a tall seat too, since the gap a tall seat fills (S8) weighs nothing
+/// (`weights::site::FILL`, GAP.md).
 #[test]
 fn the_site_head_is_the_guarded_net_when_the_plan_is_silent() {
     let rules = rules();
     let settings = AiSettings::for_rules(&rules, rules.default_difficulty());
     let silent = Net2Plan::default();
     let tall = Net2Plan { tall_share: 1000, ..Net2Plan::default() };
-    let (mut compared, mut bonus_seen, mut menaced) = (0, 0, 0);
+    let (mut compared, mut menaced) = (0, 0);
     let mut game = scenario(&rules);
     let mut driver = ClassicDriver::new(settings.clone(), Vec::new());
     while game.view().auth.turn().round < 70 {
@@ -263,15 +264,9 @@ fn the_site_head_is_the_guarded_net_when_the_plan_is_silent() {
             let head = search(&SiteQuality::Head(inputs, HeadRead { plan: &silent, rivals: &others }));
             assert_eq!(head, guarded, "round {round} player {p}: a silent plan is the guarded net");
             compared += guarded.len();
-            // A tall seat: the same sites, each worth the same or the gap bonus more (+25 at most).
-            let wide = search(&SiteQuality::Head(inputs, HeadRead { plan: &tall, rivals: &others }));
-            assert_eq!(wide.len(), head.len());
-            for site in &wide {
-                let base = head.iter().find(|s| s.tile == site.tile).expect("the same sites");
-                let gain = site.score - base.score;
-                assert!(gain == 0 || gain == 25, "round {round} player {p} tile {:?}: the tall seat's gain is the gap bonus, not {gain}", site.tile);
-                bonus_seen += usize::from(gain == 25);
-            }
+            // A tall seat: the same sites and values.
+            let tall_sites = search(&SiteQuality::Head(inputs, HeadRead { plan: &tall, rivals: &others }));
+            assert_eq!(tall_sites, head, "round {round} player {p}: a gap weighs nothing for a tall seat either");
             // A menacing neighbour doubles the penalty of a site next to it: never a better site, and a worse
             // one where a rival city is within the gap.
             let menace = Net2Plan { rivals: others.iter().map(|(_, owner)| *owner).collect::<std::collections::BTreeSet<_>>().into_iter().map(|rival| menaced_read(rival)).collect(), ..Net2Plan::default() };
@@ -284,8 +279,7 @@ fn the_site_head_is_the_guarded_net_when_the_plan_is_silent() {
         }
     }
     assert!(compared > 100, "{compared} sites compared");
-    // The cases the test is about happen: gaps to fill and sites next to a rival.
-    assert!(bonus_seen > 0, "no gap site seen");
+    // The case the test is about happens: sites next to a rival.
     assert!(menaced > 0, "no site next to a rival seen");
 }
 

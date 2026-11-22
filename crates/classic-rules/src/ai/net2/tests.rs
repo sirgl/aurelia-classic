@@ -411,6 +411,7 @@ fn generated_rival(rng: &mut Lcg, id: u8) -> RivalInputs {
         captured_recent: r(ri::CAPTURED_RECENT),
         operating: if r(ri::OPERATING) > 500 { 1000 } else { 0 },
         alone: r(ri::ALONE),
+        cs_held: r(ri::CS_HELD),
         ..RivalInputs::stranger(PlayerId(id))
     }
 }
@@ -518,7 +519,7 @@ fn the_parity_fixture_is_the_integer_net() {
 #[test]
 fn the_weights_count() {
     let n = super::weights::count();
-    assert_eq!(n, 146, "net2's own hand weights (the 13 carried concepts and the carried logits are `strategy_net::weights`'s)");
+    assert_eq!(n, 148, "net2's own hand weights (the 13 carried concepts and the carried logits are `strategy_net::weights`'s)");
 }
 
 #[test]

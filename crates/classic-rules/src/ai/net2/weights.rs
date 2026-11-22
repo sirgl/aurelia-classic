@@ -146,10 +146,12 @@ pub mod r {
     pub const OPERATING: usize = 27;
     /// Its delegates reach the World Leader's votes by themselves (0/1000).
     pub const ALONE: usize = 28;
-    pub const N: usize = 29;
+    /// The city-states allied to it, / 3 (R31).
+    pub const CS_HELD: usize = 29;
+    pub const N: usize = 30;
     pub const NAMES: [&str; N] = [
         "near", "land", "sea", "soldiers", "seen_army", "open_cities", "tree", "lead", "pace", "culture", "stack", "warmonger", "betrayed", "denounced_us", "friend", "pact", "at_war",
-        "war_rounds", "holds_capital", "holds_cities", "grab", "ally_hit", "local", "score", "retake_case", "captured_recent", "soft", "operating", "alone",
+        "war_rounds", "holds_capital", "holds_cities", "grab", "ally_hit", "local", "score", "retake_case", "captured_recent", "soft", "operating", "alone", "cs_held",
     ];
 }
 
@@ -400,6 +402,7 @@ pub const RIVAL: [Neuron; q::N] = [
             t(S(s::INFAMY_COST), -900, "the declaration's cost in ties (offence addendum §3.2)"),
             ts(S(s::INFAMY_COST), Shape::Times(R(r::AT_WAR)), 900, "at war with it the declaration is paid"),
             t(S(s::LATE), -1500, "a conquest late in the game does not pay (the war case's worth runs over the rounds left)"),
+            t(R(r::CS_HELD), -600, "its allied city-states join a war declared on it (`minor_allies_join_war`): three allies make it a war on four (casebook, offset 1783: a spoiler war pulled in 3 nations and 5 city-states)"),
         ],
     },
     Neuron {
@@ -415,6 +418,7 @@ pub const RIVAL: [Neuron; q::N] = [
             ts(R(r::LOCAL), Shape::Centered(500), 1000, "our force where the war would be, against its"),
             t(S(s::INFAMY_COST), -900, "the declaration's cost in ties (offence addendum §3.2)"),
             ts(S(s::INFAMY_COST), Shape::Times(R(r::AT_WAR)), 900, "at war with it the declaration is paid"),
+            t(R(r::CS_HELD), -600, "its allied city-states join a war declared on it (`minor_allies_join_war`), and a runaway holds many"),
         ],
     },
     Neuron {
@@ -621,7 +625,7 @@ pub mod site {
     pub const GAP: (i64, &str) = (30, "`RIVAL_PENALTY`: the forward city is the one the next war takes first; up to twice next to a menacing rival");
     pub const ARMY: (i64, &str) = (60, "`ARMY_PENALTY`: an army 4–6 tiles off reaches the settler in a turn or two");
     pub const TRAVEL: (i64, &str) = (40, "`TRAVEL_COST` 30 + `NET_TRAVEL_RISK` 10");
-    pub const FILL: (i64, &str) = (25, "small: a tall seat closes its own gaps (M1) before walking far");
+    pub const FILL: (i64, &str) = (0, "read, no weight: a gap inside our land stays ours, the outward site is the one a rival takes; at 25 the term chose a gap over a better outward site in 242 of 5633 settler decisions, mostly at 2-5 cities, and without the head net2 took +4.1, +4.2 and +2.1 points (GAP.md)");
 }
 
 /// Every neuron of `net2`'s own tables.
