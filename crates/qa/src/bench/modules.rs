@@ -434,6 +434,10 @@ impl BenchRules for ClassicBench {
     }
 
     fn recorder(name: &str, seed: u64) -> Option<Box<dyn MatchRecorder<Self>>> {
+        // The parity source of the MLX economy (`bench::econ_dump`, `AURELIA_ECON_DUMP`).
+        if let Some(dump) = crate::bench::econ_dump::EconDump::new(name, seed) {
+            return Some(Box::new(dump));
+        }
         // The probe of lane A's defects (`bench::diplo_probe`, `AURELIA_DIPLO_PROBE`).
         if let Some(probe) = crate::bench::diplo_probe::DiploProbe::new(name, seed) {
             return Some(Box::new(probe));

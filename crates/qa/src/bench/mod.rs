@@ -2,6 +2,7 @@
 //! the standings and the report with its seed-block bootstrap.
 
 pub mod diplo_probe;
+pub mod econ_dump;
 pub mod landless;
 pub mod modules;
 pub mod pace;
