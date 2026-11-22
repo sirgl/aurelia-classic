@@ -18,6 +18,7 @@
 - **A destroyed nation leaves nothing behind.** When a nation or city-state loses its last city, every tie with it ends at
   once: wars, treaties, deals and gold per turn, offers, embassies, open borders, research agreements, its spies, its votes
   and seats in the World Congress, and the World Leader title. A city-state that was its ally picks its next ally at once.
+- A holy city can no longer be razed, as in Unciv.
 - **World Congress:** when the host is destroyed, the league passes to the living nation with the most delegates; a
   destroyed nation can no longer win a vote.
 - **Nations remember wrongs.** Taking a neighbour's land with a citadel costs its opinion of you (10 per tile). Declaring
