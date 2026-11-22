@@ -276,6 +276,14 @@ fn melee_turn(game: &mut GameState, rules: &CompiledRuleset, s: Soldier, enemy: 
 pub fn siege(game: &mut GameState, rules: &CompiledRuleset, owner: PlayerId, enemy: PlayerId, ids: &[u64], city: TileId, budget: &mut usize) -> Tally {
     let mut tally = Tally::default();
     let army = soldiers(game, rules, owner, ids);
+    if !gathered(game, &army, city) {
+        tally.add(pick_off(game, rules, owner, enemy, ids, budget));
+        for s in &army {
+            take_post(game, rules, s.handle, city, GATHER_RING, budget);
+        }
+        hold_all(game, rules, owner, ids);
+        return tally;
+    }
     for s in army.iter().filter(|s| s.range.is_some()) {
         ranged_turn(game, rules, *s, enemy, city, budget, &mut tally);
     }
@@ -284,6 +292,16 @@ pub fn siege(game: &mut GameState, rules: &CompiledRuleset, owner: PlayerId, ene
     }
     hold_all(game, rules, owner, ids);
     tally
+}
+
+/// The army gathers just beyond the city's strike before it closes in (a human does not walk in
+/// one unit at a time).
+const GATHER_RING: i32 = classic_rules::combat::city::CITY_ATTACK_RANGE + 1;
+
+/// Two thirds of the army stand within one tile of the gathering ring, or closer.
+fn gathered(game: &GameState, army: &[Soldier], city: TileId) -> bool {
+    let near = army.iter().filter(|s| distance(game, s.tile, city) <= GATHER_RING + 1).count();
+    near * 3 >= army.len() * 2
 }
 
 /// Every unit of `ids` that stands next to a weaker enemy unit outside a city strikes it (ranged
