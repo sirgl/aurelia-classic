@@ -1731,6 +1731,32 @@ pub fn running_case(brief: &TurnBrief, state: &AiState, rules: &CompiledRuleset,
     Some(case)
 }
 
+/// `running_case` of an assault with no operation (work/nets/tricks/CHAIN.md D8, tac/runs/C1.md): the units with
+/// `UnitTask::Assault` on a seen city of `enemy` (the planners' assault group; the exam's C1 army) priced as the
+/// operation they are, the group its own army and need (nothing missing), the walk of its farthest member and the
+/// siege. The best such city; None without an assault on the enemy. Without it the peace layer priced a war with no
+/// operation at 0 and took the first white peace the enemy offered (C1: 55 of 56 `tac2` losses).
+pub fn assault_case(brief: &TurnBrief, state: &AiState, rules: &CompiledRuleset, prices: &Prices, stakes: &Stakes, enemy: PlayerId) -> Option<WarCase> {
+    let arsenal = Arsenal::of(brief, rules);
+    let mut best: Option<WarCase> = None;
+    for city in state.seen_cities().iter().filter(|c| c.owner == enemy) {
+        let task = Some(UnitTask::Assault { target: city.tile });
+        let group: Vec<&UnitBrief> = brief.units.iter().filter(|u| state.task_of(u.id).map(|t| t.task) == task).collect();
+        if group.is_empty() {
+            continue;
+        }
+        let army = composition_of(rules, group.iter().map(|u| u.kind));
+        let distance = group.iter().filter_map(|u| brief.dims.distance(u.tile, city.tile)).max().unwrap_or(0).max(0) as u32;
+        let rounds = (distance * 2).div_ceil(3) + 1 + SIEGE_ROUNDS_ESTIMATE;
+        let chance = model_chance(brief, state, rules, &arsenal, city, &estimate_target(brief, rules, city), army, Some(brief.round));
+        let case = war_case(prices, stakes, rules, &arsenal, city, army, Composition::default(), rounds, crate::ai::strikes::on_hand_best(&brief.armory), chance, brief.war.siege, rival_percent(brief, city.owner));
+        if best.is_none_or(|b| case.value(stakes) > b.value(stakes)) {
+            best = Some(case);
+        }
+    }
+    best
+}
+
 /// The score a captured city of `population` brings by the rules (`SiegeFixes::priced`):
 /// the rules' capture leaves it fewer citizens (`captured_population`); the AI keeps a city of
 /// `ANNEX_POPULATION` and more annexed, the rest as puppets (`combat::conquest_decisions`); a

@@ -127,20 +127,50 @@ fn d1_d2_a_flow_paid_for_now_counts_only_the_rounds_the_rules_guarantee() {
 // ---- D8: the war order prices going on (net2::orders) ----
 
 fn white_peace_answer(net2: Option<Net2Plan>, seen: bool) -> bool {
+    let on = net2.is_some();
+    white_peace(net2, seen, on, false)
+}
+
+/// P1 offers P0 a white peace 11 rounds into P0's war. `switch`: `TurnBrief::war_at_peace`; `assault`: four of P0's
+/// swordsmen next to P1's city with the task `Assault` on it and no operation (the exam's C1).
+fn white_peace(net2: Option<Net2Plan>, seen: bool, switch: bool, assault: bool) -> bool {
     let (mut game, rules) = scene();
+    let city = tile(&game, 35, 3);
+    let sword = classic_rules::ids::UnitKindId(rules.units.iter().position(|u| u.key == "core:unit/swordsman").unwrap() as u16);
+    if assault {
+        for (q, r) in [(34, 3), (34, 4), (35, 4), (36, 2)] {
+            game.debug_spawn_unit(&rules, P0, tile(&game, q, r), sword);
+        }
+    }
     game.execute(&rules, Command::DeclareWar { player: P0, enemy: P1 }).unwrap();
     for _ in 0..classic_rules::MIN_WAR_ROUNDS_BEFORE_PEACE + 1 {
         end_round(&mut game, &rules);
     }
     to_p0(&mut game, &rules);
-    let (obs, brief) = brief_of(&game, &rules, net2);
+    let (obs, mut brief) = brief_of(&game, &rules, net2);
+    brief.war_at_peace = switch;
     let mut state = AiState::new(P0, obs.round);
     if seen {
-        state.see_city(SeenCity { tile: tile(&game, 35, 3), owner: P1, population: 3, last_seen_round: obs.round });
+        state.see_city(SeenCity { tile: city, owner: P1, population: 3, last_seen_round: obs.round });
+    }
+    if assault {
+        for unit in brief.units.iter().filter(|u| brief.dims.distance(u.tile, city).is_some_and(|d| d <= 2)) {
+            state.set_task(unit.id, classic_rules::ai::UnitTask::Assault { target: city }, obs.round);
+        }
     }
     let input = AdvisorInput { observation: &obs, brief: &brief, state: &state, rules: &rules };
     let offer = DealOffer { id: 1, from: P1, to: P0, items: vec![(P1, DealItem::Peace)], expires: obs.round };
     Negotiation::new(&input).answer(&offer).0
+}
+
+/// C1 (tac/runs/C1.md): an assault on the enemy's city with no operation. Today going on is worth 0 and the white
+/// peace passes; with the switch (`Variant::values_war_at_peace`: `peace-fix`, `tac2`, every `net2` variant) the group
+/// is priced as the operation it is and the white peace is refused. No plan of `net2` is needed.
+#[test]
+fn c1_an_assault_without_an_operation_prices_the_war() {
+    assert!(white_peace(None, true, false, true), "today: the white peace passes");
+    assert!(!white_peace(None, true, true, true), "with the switch: refused");
+    assert!(white_peace(None, true, true, false), "the switch with no assault: nothing to price, passes");
 }
 
 fn ordered(game_tile: TileId, eases: Vec<(TileId, i64)>) -> Net2Plan {

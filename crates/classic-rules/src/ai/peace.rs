@@ -81,12 +81,17 @@ impl WarProspect {
         let mut attack = running_case(brief, state, rules, prices, stakes, enemy)
             .or_else(|| view.and_then(|v| crate::ai::raid::running_case(brief, state, rules, prices, v, enemy)))
             .unwrap_or_default();
-        // `net2`: the order decides the war, the case only ranks (`operations::order_decides`): a war with an order on
-        // the enemy is worth at least what the order promises (`ordered_case`), with no operation running or with one
-        // whose case is below it (its army's cost, a low chance). CHAIN.md D8; THE ONE place a war's going on is priced.
-        if let Some(ordered) = ordered_case(brief, state, prices, stakes, enemy).filter(|_| crate::ai::net2::orders::PRICES_PEACE) {
-            if ordered.value(stakes) > attack.value(stakes) {
-                attack = ordered;
+        // THE ONE place a war's going on is priced (CHAIN.md D8, tac/runs/C1.md). With `TurnBrief::war_at_peace`
+        // (`Variant::values_war_at_peace`): an assault with no operation is the operation it is (`assault_case`), and a
+        // `net2` war order is worth at least what it promises (`ordered_case`: the order decides the war, the case only
+        // ranks, `operations::order_decides`), with no operation running or with one whose case is below it.
+        if brief.war_at_peace {
+            let assault = crate::ai::operations::assault_case(brief, state, rules, prices, stakes, enemy);
+            let ordered = ordered_case(brief, state, prices, stakes, enemy).filter(|_| crate::ai::net2::orders::PRICES_PEACE);
+            for case in [assault, ordered].into_iter().flatten() {
+                if case.value(stakes) > attack.value(stakes) {
+                    attack = case;
+                }
             }
         }
         Self {
