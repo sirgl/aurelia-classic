@@ -144,6 +144,18 @@ impl Watch {
                         self.strikes.push(Event { round, by, on: owner });
                     }
                 }
+                Command::RangedAttack { target, .. } => {
+                    let auth = game.view().auth;
+                    let owner = auth
+                        .indexes()
+                        .city_on_tile(*target)
+                        .and_then(|c| auth.cities().get(c))
+                        .map(|c| c.owner)
+                        .or_else(|| auth.indexes().units_on(*target).first().and_then(|u| auth.units().get(*u)).map(|u| u.core.owner));
+                    if let Some(owner) = owner {
+                        self.strikes.push(Event { round, by, on: owner });
+                    }
+                }
                 Command::AttackUnit { defender, .. } => {
                     if let Some(owner) = game.view().auth.units().get(*defender).map(|u| u.core.owner) {
                         self.strikes.push(Event { round, by, on: owner });

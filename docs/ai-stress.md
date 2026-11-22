@@ -153,4 +153,153 @@ plant citadels, bait unit, pillage). The harness already has the other parts: th
 
 ## Results
 
-See the end of this file (filled after the run).
+
+Run on 22 November 2026: 100 positions of the pace suite (Small, six nations, Quick, standard AI, rounds 100-110;
+C5 at rounds 150-160 from a second set), every arm played out to the end of the game (an arm costs about 5 CPU
+seconds, so all 100 instances carry the end metrics). Gates unchanged. Raw rows: `runs/wave1`, `runs/b1b`, `runs/d1b`,
+`runs/c5`, `runs/random` (under `work/nets/stress/`). A situation is built on 81 positions (A5, B1, B4: the others have no
+two nations on one landmass), 57 (D1), 100 (A1, B9), 61 (C5: the congress is founded on 61).
+
+## Measurement fixes after the first run (gates not changed)
+
+- D1 `both_struck` counted melee attacks only: ranged attacks were missing, so it read 0.000. Fixed; rerun in `runs/d1b`.
+- B1 `counter_by_3` counted an invader hurt by anyone, a city's strike included: it read 1.000 at every level. It now
+  counts only strikes of the seat's own units (melee, ranged) on the enemy within three rounds; the old value is kept as
+  `invader_hurt_by_3`. Rerun in `runs/b1b`.
+
+Before and after:
+
+| situation | level | kind | metric | n | edited | control | delta (se) | gate | result |
+|---|---|---|---|---|---|---|---|---|---|
+| D1 | 0 | behaviour | `both_struck` | 57 | 0.000 | 0.000 | +0.000 (0.000) | edited >= 0.5 | FAIL |
+| B1 | 0 | behaviour | `counter_by_3` | 81 | 1.000 | 0.000 | +1.000 (0.000) | edited >= 0.8 | pass |
+| B1 | 1 | behaviour | `counter_by_3` | 81 | 1.000 | 0.000 | +1.000 (0.000) | edited >= 0.8 | pass |
+| B1 | 2 | behaviour | `counter_by_3` | 81 | 1.000 | 0.000 | +1.000 (0.000) | edited >= 0.8 | pass |
+
+After the fix:
+
+| situation | level | kind | metric | n | edited | control | delta (se) | gate | result |
+|---|---|---|---|---|---|---|---|---|---|
+| D1 | 0 | outcome | `seat_cities` | 57 | 3.789 | 4.053 | -0.263 (0.069) | delta >= 0.3 | FAIL |
+| D1 | 0 | behaviour | `both_struck` | 57 | 0.088 | 0.000 | +0.088 (0.038) | edited >= 0.5 | FAIL |
+| D1 | 0 | behaviour | `separate_peace` | 57 | 0.000 | 0.000 | +0.000 (0.000) | edited <= 0.3 | pass |
+| D1 | 0 | outcome | `end_seat_win_weight` | 57 | 0.083 | 0.123 | -0.039 (0.028) | delta >= 0 | FAIL |
+| D1 | 0 | outcome | `end_seat_score_share` | 57 | 0.330 | 0.337 | -0.007 (0.005) | delta >= 0 | FAIL |
+| B1 | 0 | behaviour | `counter_by_3` | 81 | 0.716 | 0.198 | +0.519 (0.061) | edited >= 0.8 | FAIL |
+| B1 | 1 | behaviour | `counter_by_3` | 81 | 0.790 | 0.198 | +0.593 (0.058) | edited >= 0.8 | FAIL |
+| B1 | 2 | behaviour | `counter_by_3` | 81 | 0.914 | 0.198 | +0.716 (0.050) | edited >= 0.8 | pass |
+
+## Result table (A5, A1, B4, B9 from `runs/wave1`; B1, D1 reruns; C5)
+
+| situation | level | kind | metric | n | edited | control | delta (se) | gate | result |
+|---|---|---|---|---|---|---|---|---|---|
+| A5 | 0 | outcome | `seat_cities` | 81 | 4.407 | 4.309 | +0.099 (0.076) | delta >= 0.2 | FAIL |
+| A5 | 0 | behaviour | `weak_captured` | 81 | 0.148 | 0.099 | +0.049 (0.030) | delta >= 0.15 | FAIL |
+| A5 | 0 | behaviour | `nobody_attacked` | 81 | 0.852 | 0.889 | -0.037 (0.033) | edited <= 0.6 | FAIL |
+| A5 | 0 | outcome | `end_seat_win_weight` | 81 | 0.068 | 0.040 | +0.028 (0.018) | delta >= 0 | pass |
+| A5 | 0 | outcome | `end_seat_score_share` | 81 | 0.164 | 0.155 | +0.009 (0.004) | delta >= 0 | pass |
+| A5 | 1 | outcome | `seat_cities` | 81 | 4.358 | 4.309 | +0.049 (0.066) | delta >= 0.35 | FAIL |
+| A5 | 1 | behaviour | `weak_captured` | 81 | 0.062 | 0.099 | -0.037 (0.027) | delta >= 0.25 | FAIL |
+| A5 | 1 | behaviour | `nobody_attacked` | 81 | 0.914 | 0.889 | +0.025 (0.030) | edited <= 0.5 | FAIL |
+| A5 | 1 | outcome | `end_seat_win_weight` | 81 | 0.071 | 0.040 | +0.031 (0.017) | delta >= 0 | pass |
+| A5 | 1 | outcome | `end_seat_score_share` | 81 | 0.167 | 0.155 | +0.012 (0.004) | delta >= 0.005 | pass |
+| A5 | 2 | outcome | `seat_cities` | 81 | 4.370 | 4.309 | +0.062 (0.075) | delta >= 0.5 | FAIL |
+| A5 | 2 | behaviour | `weak_captured` | 81 | 0.086 | 0.099 | -0.012 (0.028) | delta >= 0.3 | FAIL |
+| A5 | 2 | behaviour | `nobody_attacked` | 81 | 0.877 | 0.889 | -0.012 (0.033) | edited <= 0.4 | FAIL |
+| A5 | 2 | outcome | `end_seat_win_weight` | 81 | 0.065 | 0.040 | +0.025 (0.018) | delta >= 0 | pass |
+| A5 | 2 | outcome | `end_seat_score_share` | 81 | 0.167 | 0.155 | +0.012 (0.003) | delta >= 0.01 | pass |
+| A1 | 0 | outcome | `seat_score_share` | 100 | 0.762 | 0.773 | -0.011 (0.001) | delta >= -0.01 | FAIL |
+| A1 | 0 | outcome | `leader_won` | 100 | 0.000 | 0.000 | +0.000 (0.000) | edited <= 0.05 | pass |
+| A1 | 0 | behaviour | `wars_on_leader` | 100 | 0.030 | 0.030 | +0.000 (0.000) | delta >= 0.25 | FAIL |
+| A1 | 0 | behaviour | `denouncements_of_leader` | 100 | 0.170 | 0.180 | -0.010 (0.039) | delta >= 0.5 | FAIL |
+| A1 | 0 | behaviour | `research_pacts_others` | 100 | 1.120 | 1.100 | +0.020 (0.072) | delta >= 0.25 | FAIL |
+| A1 | 0 | behaviour | `tech_gap` | 100 | 5.178 | 3.708 | +1.470 (0.125) | delta <= 2 | pass |
+| A1 | 0 | outcome | `end_seat_win_weight` | 100 | 0.180 | 0.107 | +0.072 (0.028) | delta >= -0.05 | pass |
+| A1 | 0 | outcome | `end_seat_score_share` | 100 | 0.759 | 0.767 | -0.009 (0.003) | delta >= -0.02 | pass |
+| A1 | 1 | outcome | `seat_score_share` | 100 | 0.751 | 0.773 | -0.022 (0.002) | delta >= -0.02 | FAIL |
+| A1 | 1 | outcome | `leader_won` | 100 | 0.000 | 0.000 | +0.000 (0.000) | edited <= 0.1 | pass |
+| A1 | 1 | behaviour | `wars_on_leader` | 100 | 0.030 | 0.030 | +0.000 (0.000) | delta >= 0.5 | FAIL |
+| A1 | 1 | behaviour | `denouncements_of_leader` | 100 | 0.140 | 0.180 | -0.040 (0.055) | delta >= 1 | FAIL |
+| A1 | 1 | behaviour | `research_pacts_others` | 100 | 1.110 | 1.100 | +0.010 (0.059) | delta >= 0.5 | FAIL |
+| A1 | 1 | behaviour | `tech_gap` | 100 | 6.786 | 3.708 | +3.078 (0.138) | delta <= 4 | pass |
+| A1 | 1 | outcome | `end_seat_win_weight` | 100 | 0.175 | 0.107 | +0.068 (0.030) | delta >= -0.1 | pass |
+| A1 | 1 | outcome | `end_seat_score_share` | 100 | 0.751 | 0.767 | -0.016 (0.003) | delta >= -0.04 | pass |
+| A1 | 2 | outcome | `seat_score_share` | 100 | 0.740 | 0.773 | -0.033 (0.002) | delta >= -0.04 | pass |
+| A1 | 2 | outcome | `leader_won` | 100 | 0.000 | 0.000 | +0.000 (0.000) | edited <= 0.2 | pass |
+| A1 | 2 | behaviour | `wars_on_leader` | 100 | 0.010 | 0.030 | -0.020 (0.014) | delta >= 0.5 | FAIL |
+| A1 | 2 | behaviour | `denouncements_of_leader` | 100 | 0.120 | 0.180 | -0.060 (0.045) | delta >= 1 | FAIL |
+| A1 | 2 | behaviour | `research_pacts_others` | 100 | 1.090 | 1.100 | -0.010 (0.070) | delta >= 0.5 | FAIL |
+| A1 | 2 | behaviour | `tech_gap` | 100 | 8.760 | 3.708 | +5.052 (0.145) | delta <= 8 | pass |
+| A1 | 2 | outcome | `end_seat_win_weight` | 100 | 0.125 | 0.107 | +0.018 (0.025) | delta >= -0.15 | pass |
+| A1 | 2 | outcome | `end_seat_score_share` | 100 | 0.741 | 0.767 | -0.026 (0.003) | delta >= -0.06 | pass |
+| B4 | 0 | outcome | `seat_cities` | 81 | 3.210 | 4.012 | -0.802 (0.097) | delta >= -0.7 | FAIL |
+| B4 | 0 | outcome | `seat_score_share` | 81 | 0.112 | 0.160 | -0.048 (0.004) | delta >= -0.04 | FAIL |
+| B4 | 0 | behaviour | `capital_retaken` | 81 | 0.210 | 0.000 | +0.210 (0.046) | edited >= 0.3 | FAIL |
+| B4 | 0 | behaviour | `further_losses` | 81 | 0.099 | 0.000 | +0.099 (0.045) | delta <= 0.5 | pass |
+| B4 | 0 | outcome | `end_seat_win_weight` | 81 | 0.003 | 0.062 | -0.059 (0.022) | delta >= -0.03 | FAIL |
+| B4 | 0 | outcome | `end_seat_score_share` | 81 | 0.099 | 0.152 | -0.053 (0.005) | delta >= -0.03 | FAIL |
+| B4 | 1 | outcome | `seat_cities` | 81 | 2.469 | 4.012 | -1.543 (0.129) | delta >= -1.4 | FAIL |
+| B4 | 1 | outcome | `seat_score_share` | 81 | 0.085 | 0.160 | -0.074 (0.004) | delta >= -0.07 | FAIL |
+| B4 | 1 | behaviour | `capital_retaken` | 81 | 0.148 | 0.000 | +0.148 (0.040) | edited >= 0.3 | FAIL |
+| B4 | 1 | behaviour | `further_losses` | 81 | 0.086 | 0.000 | +0.086 (0.036) | delta <= 0.8 | pass |
+| B4 | 1 | outcome | `end_seat_win_weight` | 81 | 0.000 | 0.062 | -0.062 (0.022) | delta >= -0.05 | FAIL |
+| B4 | 1 | outcome | `end_seat_score_share` | 81 | 0.073 | 0.152 | -0.079 (0.005) | delta >= -0.05 | FAIL |
+| B4 | 2 | outcome | `seat_cities` | 81 | 1.272 | 4.012 | -2.741 (0.135) | delta >= -2.1 | FAIL |
+| B4 | 2 | outcome | `seat_score_share` | 81 | 0.056 | 0.160 | -0.104 (0.004) | delta >= -0.1 | FAIL |
+| B4 | 2 | behaviour | `capital_retaken` | 81 | 0.049 | 0.000 | +0.049 (0.024) | edited >= 0.3 | FAIL |
+| B4 | 2 | behaviour | `further_losses` | 81 | 0.049 | 0.000 | +0.049 (0.030) | delta <= 1 | pass |
+| B4 | 2 | outcome | `end_seat_win_weight` | 81 | 0.000 | 0.062 | -0.062 (0.022) | delta >= -0.08 | pass |
+| B4 | 2 | outcome | `end_seat_score_share` | 81 | 0.039 | 0.152 | -0.113 (0.005) | delta >= -0.07 | FAIL |
+| B9 | 0 | outcome | `rival_wins_science` | 100 | 0.330 | 0.060 | +0.270 (0.045) | edited <= 0.5 | pass |
+| B9 | 0 | behaviour | `rival_cities_lost` | 100 | 0.000 | 0.000 | +0.000 (0.000) | delta >= 0.5 | FAIL |
+| B9 | 0 | outcome | `end_seat_win_weight` | 100 | 0.033 | 0.062 | -0.030 (0.022) | delta >= -0.05 | pass |
+| B9 | 0 | outcome | `end_seat_score_share` | 100 | 0.738 | 0.753 | -0.015 (0.002) | delta >= -0.02 | pass |
+| B9 | 1 | outcome | `rival_wins_science` | 100 | 0.360 | 0.060 | +0.300 (0.046) | edited <= 0.4 | pass |
+| B9 | 1 | behaviour | `rival_cities_lost` | 100 | 0.000 | 0.000 | +0.000 (0.000) | delta >= 0.5 | FAIL |
+| B9 | 1 | outcome | `end_seat_win_weight` | 100 | 0.033 | 0.062 | -0.030 (0.017) | delta >= -0.1 | pass |
+| B9 | 1 | outcome | `end_seat_score_share` | 100 | 0.736 | 0.753 | -0.017 (0.002) | delta >= -0.04 | pass |
+| B9 | 2 | outcome | `rival_wins_science` | 100 | 0.390 | 0.060 | +0.330 (0.047) | edited <= 0.3 | FAIL |
+| B9 | 2 | behaviour | `rival_cities_lost` | 100 | 0.000 | 0.000 | +0.000 (0.000) | delta >= 0.5 | FAIL |
+| B9 | 2 | outcome | `end_seat_win_weight` | 100 | 0.043 | 0.062 | -0.020 (0.020) | delta >= -0.15 | pass |
+| B9 | 2 | outcome | `end_seat_score_share` | 100 | 0.733 | 0.753 | -0.020 (0.002) | delta >= -0.06 | pass |
+| B1 | 0 | outcome | `seat_cities` | 81 | 3.704 | 3.753 | -0.049 (0.039) | delta >= -0.3 | pass |
+| B1 | 0 | outcome | `seat_score_share` | 81 | 0.158 | 0.162 | -0.004 (0.001) | delta >= -0.01 | pass |
+| B1 | 0 | behaviour | `counter_by_3` | 81 | 0.716 | 0.198 | +0.519 (0.061) | edited >= 0.8 | FAIL |
+| B1 | 0 | behaviour | `purchases` | 81 | 1.901 | 2.123 | -0.222 (0.197) | delta >= 0.5 | FAIL |
+| B1 | 0 | outcome | `end_seat_win_weight` | 81 | 0.037 | 0.056 | -0.019 (0.014) | delta >= -0.03 | pass |
+| B1 | 0 | outcome | `end_seat_score_share` | 81 | 0.150 | 0.150 | +0.000 (0.003) | delta >= -0.01 | pass |
+| B1 | 1 | outcome | `seat_cities` | 81 | 3.691 | 3.753 | -0.062 (0.041) | delta >= -0.5 | pass |
+| B1 | 1 | outcome | `seat_score_share` | 81 | 0.156 | 0.162 | -0.007 (0.001) | delta >= -0.02 | pass |
+| B1 | 1 | behaviour | `counter_by_3` | 81 | 0.790 | 0.198 | +0.593 (0.058) | edited >= 0.8 | FAIL |
+| B1 | 1 | behaviour | `purchases` | 81 | 2.148 | 2.123 | +0.025 (0.213) | delta >= 1 | FAIL |
+| B1 | 1 | outcome | `end_seat_win_weight` | 81 | 0.052 | 0.056 | -0.003 (0.018) | delta >= -0.05 | pass |
+| B1 | 1 | outcome | `end_seat_score_share` | 81 | 0.144 | 0.150 | -0.006 (0.003) | delta >= -0.02 | pass |
+| B1 | 2 | outcome | `seat_cities` | 81 | 3.704 | 3.753 | -0.049 (0.039) | delta >= -0.8 | pass |
+| B1 | 2 | outcome | `seat_score_share` | 81 | 0.156 | 0.162 | -0.007 (0.001) | delta >= -0.03 | pass |
+| B1 | 2 | behaviour | `counter_by_3` | 81 | 0.914 | 0.198 | +0.716 (0.050) | edited >= 0.8 | pass |
+| B1 | 2 | behaviour | `purchases` | 81 | 1.951 | 2.123 | -0.173 (0.207) | delta >= 1 | FAIL |
+| B1 | 2 | outcome | `end_seat_win_weight` | 81 | 0.034 | 0.056 | -0.022 (0.019) | delta >= -0.08 | pass |
+| B1 | 2 | outcome | `end_seat_score_share` | 81 | 0.150 | 0.150 | -0.000 (0.003) | delta >= -0.03 | pass |
+| D1 | 0 | outcome | `seat_cities` | 57 | 3.789 | 4.053 | -0.263 (0.069) | delta >= 0.3 | FAIL |
+| D1 | 0 | behaviour | `both_struck` | 57 | 0.088 | 0.000 | +0.088 (0.038) | edited >= 0.5 | FAIL |
+| D1 | 0 | behaviour | `separate_peace` | 57 | 0.000 | 0.000 | +0.000 (0.000) | edited <= 0.3 | pass |
+| D1 | 0 | outcome | `end_seat_win_weight` | 57 | 0.083 | 0.123 | -0.039 (0.028) | delta >= 0 | FAIL |
+| D1 | 0 | outcome | `end_seat_score_share` | 57 | 0.330 | 0.337 | -0.007 (0.005) | delta >= 0 | FAIL |
+| C5 | 0 | behaviour | `host_dead_at_end` | 61 | 0.164 | 0.000 | +0.164 (0.048) | edited <= 0 | FAIL |
+
+## Random mode (200 samples, seed 1, `ai-stress random`), the 10 worst by damage to the seat
+
+Damage = control minus edited of the seat's end score share plus a quarter of the victory weight.
+
+| rank | damage | sample | position | recipe |
+|---|---|---|---|---|
+| 1 | +0.520 | 180 | 18-pace-small-continents-small r109 | seat 0 / Seize { taker: PlayerId(3), cities: 2 } + Invade { enemy: PlayerId(3), units: 11 } |
+| 2 | +0.426 | 192 | 2-pace-fractal-small r104 | seat 3 / Seize { taker: PlayerId(2), cities: 1 } + Seize { taker: PlayerId(4), cities: 1 } |
+| 3 | +0.357 | 113 | 20-pace-small-continents-small r106 | seat 3 / Seize { taker: PlayerId(0), cities: 1 } + Seize { taker: PlayerId(1), cities: 2 } |
+| 4 | +0.310 | 70 | 6-pace-continents-small r109 | seat 5 / Seize { taker: PlayerId(0), cities: 3 } + Disarm { nation: PlayerId(3), percent: 59 } |
+| 5 | +0.263 | 91 | 20-pace-fractal-small r104 | seat 4 / Seize { taker: PlayerId(5), cities: 2 } + Boost { nation: PlayerId(3), percent: 66 } |
+| 6 | +0.226 | 188 | 1-pace-continents-small r103 | seat 5 / Seize { taker: PlayerId(1), cities: 1 } |
+| 7 | +0.222 | 115 | 10-pace-archipelago-small r102 | seat 2 / Seize { taker: PlayerId(0), cities: 1 } |
+| 8 | +0.214 | 14 | 13-pace-continents-small r107 | seat 1 / War { enemy: PlayerId(0) } + Seize { taker: PlayerId(4), cities: 2 } |
+| 9 | +0.196 | 176 | 6-pace-fractal-small r101 | seat 1 / Seize { taker: PlayerId(4), cities: 1 } |
+| 10 | +0.192 | 78 | 12-pace-continents-small r100 | seat 5 / Seize { taker: PlayerId(2), cities: 1 } |
