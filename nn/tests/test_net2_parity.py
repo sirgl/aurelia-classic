@@ -21,7 +21,10 @@ def test_every_float_neuron_within_two_thousandths():
     lines = _lines()
     assert len(lines) == 200
     worst = parity(Weights.load(), lines, FLOAT, teacher=True)
-    assert all(worst[k] <= 2 for k in NEURONS if k != "y"), worst
+    assert all(worst[k] <= 2 for k in NEURONS if k not in ("y", "city_cap")), worst
+    # `city_cap` counts thousandths of a city with two products at weight 6000 (`Shape::Times`): the integer net's
+    # rounding of each product, times 6, plus the sum's: up to 13 thousandths of a city, not a defect of the twin.
+    assert worst["city_cap"] <= 13, worst
     # The shares come from the carried integer softmax (`strategy_net::layers::softmax`), which gives
     # the largest share the rounding rest: up to 3 thousandths for four choices, not a defect of the twin.
     assert worst["y"] <= 3, worst

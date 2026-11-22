@@ -48,6 +48,7 @@ impl Frame<'_> {
             Shape::Not => ONE - x,
             Shape::Above(c) => (x - c).max(0),
             Shape::Centered(c) => x - c,
+            Shape::Below(c) => (c - x).max(0),
             Shape::Times(other) => x * self.value(other) / ONE,
         }
     }
@@ -95,6 +96,7 @@ impl SeatInputs {
             self.ties_at_risk,
             self.space_race,
             self.parts_short,
+            self.size_model,
         ]
     }
 }
@@ -185,6 +187,8 @@ mod tests {
             "ease" => &['T'],
             "cs_gold_share" => &['F', 'K', 'G', 'Y'],
             "part_hold" => &['K', 'G'],
+            "city_cap" => &['F', 'K', 'G', 'A', 'Y'],
+            "space_research" => &['F', 'Y'],
             _ => &['K', 'S', 'R', 'Q'],
         }
     }

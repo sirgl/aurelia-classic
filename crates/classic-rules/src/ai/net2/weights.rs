@@ -51,6 +51,8 @@ pub enum Shape {
     Above(Milli),
     /// x − c (signed).
     Centered(Milli),
+    /// max(0, c − x).
+    Below(Milli),
     /// x · y / 1000.
     Times(Src),
 }
@@ -113,8 +115,10 @@ pub mod g {
     pub const SPACE_RACE: usize = 12;
     /// The copies of strategic resources the missing parts need beyond the free ones, 0…3 → 0…1000.
     pub const PARTS_SHORT: usize = 13;
-    pub const N: usize = 14;
-    pub const NAMES: [&str; N] = ["capital_lost", "cities_lost", "war_rounds", "war_gain", "unhappy_trend", "embark", "enemy_air", "gold_stock", "cs_allies", "cs_contested", "own_infamy", "ties_at_risk", "space_race", "parts_short"];
+    /// The new cities the rules' size model pays for a real tall seat, 250 a city (set after the intent; `CITY_CAP` only).
+    pub const SIZE_MODEL: usize = 14;
+    pub const N: usize = 15;
+    pub const NAMES: [&str; N] = ["capital_lost", "cities_lost", "war_rounds", "war_gain", "unhappy_trend", "embark", "enemy_air", "gold_stock", "cs_allies", "cs_contested", "own_infamy", "ties_at_risk", "space_race", "parts_short", "size_model"];
 }
 
 /// A rival's inputs (`plan::RivalInputs` in order).
@@ -212,6 +216,9 @@ pub mod a {
 /// The intent's shares (`Y`): the styles, the aims, the postures.
 pub mod y {
     pub const STYLE_TALL: usize = 0;
+    pub const STYLE_WIDE: usize = 1;
+    pub const STYLE_CONQUEST: usize = 2;
+    pub const AIM_SCIENCE: usize = 3;
     pub const AIM_DIPLOMACY: usize = 6;
     pub const POSTURE_PREPARE: usize = 9;
     pub const N: usize = 11;
@@ -314,8 +321,8 @@ pub const SEAT: [Neuron; s::N] = [
 /// is the rival's prey term.
 pub const EASE: Neuron = Neuron {
     name: "ease",
-    bias: -2150,
-    why: "a city is no target by default: it takes a small, near city with weak defences (the old size gate, at most 8 citizens, sits at size 500); −2000 → −2300 raised the bar of a soft city (at −2000 net2 declared 1.49× nets-x-site's wars, GAP.md); R4: at −2150 with the order's target denied help (`levers::helped`) the wars were 1.30× (151 / 116, offsets 1810–1811), at the gate, and A5's `nobody_attacked` 0.856; at −2200 0.864 and at −2250 0.873 (gate 0.861) with the wars 1.26× and 1.21×: the wars follow the denied help, not the bar, so −2150, the brief's value",
+    bias: -2200,
+    why: "a city is no target by default: it takes a small, near city with weak defences (the old size gate, at most 8 citizens, sits at size 500); −2000 → −2300 raised the bar of a soft city (at −2000 net2 declared 1.49× nets-x-site's wars, GAP.md); R4: at −2150 the wars were 1.30× on the tuning offsets and 1.32× on the acceptance's (gate 1.3), A5's `nobody_attacked` 0.856, at −2200 0.864 with the wars 1.26×; the whole games do not separate −2150 from −2200, so R5 takes −2200 back: the wars' gate, not the A5 rate, binds",
     join: UNIT,
     terms: &[
         ts(T(t::SIZE), Shape::Not, 1000, "a small city: the learned capture chance falls 0.066 a citizen (`OPEN_CHANCE_WEIGHTS`), as much as a tile"),
@@ -597,6 +604,50 @@ pub const PART_HOLD: Neuron = Neuron {
     ],
 };
 
+/// The research on the spaceship's way (`Net2Plan::space_research`). Why (R5 traces, two late science victories):
+/// Ottomans, continents 1810002 (won r~306), and England, pangaea 1810001 (won r~330), both researched after robotics
+/// four technologies outside the ship's closure (nuclear fusion, globalization, the internet, lasers: 34 100 of the
+/// rules' beakers, 17–20 rounds) before mobile tactics and particle physics, the engine's: the review names no
+/// spaceship goal (`goal 0` from robotics on) and every one of them scored the floor (`own 5`), so the lowest id won.
+/// 75 of the 81 technologies are on the ship's way: the lever changes the order of the last few only.
+pub const SPACE_RESEARCH: Neuron = Neuron {
+    name: "space_research",
+    bias: -1000,
+    why: "no seat turns its research to the ship by default: globalization's delegates and the internet's tourism are other roads",
+    join: UNIT,
+    terms: &[
+        t(Y(y::AIM_SCIENCE), 2000, "the science aim: the ship is the victory it plays for (0.75 alone opens it; England 1810001 held 0.95 at robotics)"),
+        t(F(fe::SPACE_OWN), 1000, "the way to the ship already gone (its technologies' beakers known, its parts built; 0.6 at robotics): with aim 0.4 it opens at 0.7, a diplomatic seat (aim 0.2) never"),
+    ],
+};
+
+/// The new cities a real tall seat founds (`Intent::more_cities` of a `tall_real` seat, thousandths of a city, rounded
+/// half up; the executors `tall_real::adjust` and `Prices::city_cap` only read the target). The rules' size model
+/// (`tall_real::SizeModel::more`) is one input among the land, the leader's tilt, the rivals and the mood. R4's case:
+/// a warlike leader held to tall by the conquest bias kept 2 cities from r55 to r130 (Rome, archipelago 1810002; 5 at
+/// the end against 10 under conquest, score 863 against 1014). Tuning rounds on offsets 1810–1811 (R4 there: 53.5 %):
+/// without the model (the sites, a floor of four, the count, the happiness below zero) 9.0 cities a seat against
+/// nets-x-site's 6.3, 35.9 %, science victories 23 / 59, risings 25 / 0; the model with the conquest and wide shares at
+/// 6000 a site 7.6 cities, 45.2 %; the model alone 5.8 cities, 49.7 %, real victories 95 / 97; this form 5.9 cities,
+/// 52.0 %, real 113 / 103, science 77 / 70. The model's happiness floor (6 points left after the city) is what keeps a
+/// tall empire growing: it stays, and the net adds only the founding of a warlike seat's conquest share.
+pub const CITY_CAP: Neuron = Neuron {
+    name: "city_cap",
+    bias: 0,
+    why: "the model's count unless a reason moves it",
+    join: LINEAR,
+    terms: &[
+        t(G(g::SIZE_MODEL), 4000, "the rules' size model: the new cities whose beakers pay the research and policy cost they add, the empire content after them, a city a city (R5 first form without it: 9.0 cities, science victories 23 / 59)"),
+        ts(Y(y::STYLE_CONQUEST), Shape::Times(F(fe::ROOM)), 3000, "the leader's tilt: a warlike leader moved to tall by the conquest bias founds half its conquest share of the free sites (6 → 1000) on top (Rome 1810002, r55: 0.40 of 4 sites, 0.8 more); a pure tall seat (0.05) stays at the model; at 6000 with the wide share's 6000 (R5 tuning) 7.6 cities, 45.2 %"),
+        ts(Y(y::STYLE_WIDE), Shape::Times(F(fe::ROOM)), 0, "read, no weight: the wide share is not the tilt's (the bias moved conquest, not wide); at 6000 it founded on most tall seats (R5 tuning: 7.6 cities, 45.2 %)"),
+        ts(F(fe::CITIES), Shape::Above(375), -4000, "the count now: beyond three cities (8 → 1000) half a city less a city held: the tilt's founding is a city or two, not the wide play"),
+        ts(F(fe::HAPPY), Shape::Below(500), -8000, "the happiness headroom: an unhappy empire founds none, a city less per 2.5 points below zero (a city and its citizen cost about 3.4)"),
+        t(K(kc::HAPPINESS_CRISIS), -6000, "in a crisis the rules cut growth: no city (`CITY_CRISIS`)"),
+        t(A(a::MAX_MENACE), -2000, "rivals' pressure: a stack at our border takes the settler and the young city first (MO8)"),
+        ts(F(fe::PROGRESS), Shape::Above(600), -5000, "late a new city has no rounds to grow its citizens: the model's horizon refused every city in 1326 of 3178 turns of r198–263 (R4 traces); the tilt's founding stops too (−1.6 cities at 93 % of the game)"),
+    ],
+};
+
 // ---- the offence addendum (work/new-net-offence-addendum-2026-11-22.md §3): declared, not yet built ----
 
 /// The offence is off: `net2` plays as the addendum's control `net2-defence` (every `Offence` field and
@@ -632,6 +683,7 @@ pub mod gate {
     pub const DENY_HELP: (Milli, &str) = (500, "a rival more likely than not to run away gets no help (lane A T4/T1: science wins 0.311 → 0.256, no war cost)");
     pub const EMBARGO: (Milli, &str) = (600, "the embargo, the cheap brake, only on a clear runaway (W2, VP #8)");
     pub const BLOCK: (Milli, &str) = (500, "the ballot goes against a rival only when it would win the vote");
+    pub const SPACE_RESEARCH: (Milli, &str) = (500, "the research keeps to the ship's way when the science aim and the way gone say so more likely than not");
     /// Ships escorting an `Overseas` order (`fleet::FLEET_SIZE`).
     pub const ESCORT_SHIPS: (u32, &str) = (2, "the landing needs ships that shell the coast (`fleet.rs` 1-10)");
     /// Standard rounds after a war order spent its budget without paying before another order on that rival.
@@ -652,7 +704,7 @@ pub mod site {
 /// Every neuron of `net2`'s own tables.
 pub fn neurons() -> Vec<&'static Neuron> {
     let mut out: Vec<&'static Neuron> = SEAT.iter().chain(RIVAL.iter()).collect();
-    out.extend([&PEACE, &GUARD, &MILITARY, &CS_SHARE, &EASE, &PART_HOLD]);
+    out.extend([&PEACE, &GUARD, &MILITARY, &CS_SHARE, &EASE, &PART_HOLD, &CITY_CAP, &SPACE_RESEARCH]);
     out
 }
 
@@ -662,5 +714,5 @@ pub fn count() -> usize {
     for neuron in neurons() {
         n += neuron.terms.len() + usize::from(matches!(neuron.join, Join::Sum(_)));
     }
-    n + TILT.len() + 9 + 5
+    n + TILT.len() + 10 + 5
 }

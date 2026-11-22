@@ -52,7 +52,7 @@ pub fn think(obs: &AIObservation<'_>, brief: &TurnBrief, state: &mut AiState, ru
     let mut memory = Memory::decode(&state.mind_memory);
     let situation = strategy_net::situation(seat, state, stakes, &mut memory);
     let mut own = memory.net2.take().unwrap_or_default();
-    let inputs = {
+    let mut inputs = {
         let _span = prof::span("net2/inputs");
         inputs::read(obs, brief, state, rules, &situation.features, &situation.rivals, &mut own.inputs)
     };
@@ -61,8 +61,10 @@ pub fn think(obs: &AIObservation<'_>, brief: &TurnBrief, state: &mut AiState, ru
     let pass = levers::before_intent(&inputs, &carried, &own.core, obs.round, obs.speed.pace_percent, parts);
     let tilt = levers::tilt(&pass);
     let logits = std::env::var_os("NET2_TRACE").map(|_| strategy_net::logits_net(&situation.features, &memory.held, net));
-    let intent = strategy_net::intent_step(seat, &mut memory, &situation, net, &tilt);
+    let mut intent = strategy_net::intent_step(seat, &mut memory, &situation, net, &tilt);
+    inputs.seat.size_model = size_model(parts, &intent);
     let after = levers::after_intent(&pass, &intent, &inputs, obs.round);
+    cap_cities(obs, parts, &mut intent, after.city_cap);
     if let Some(logits) = &logits {
         let shares = levers::shares(&intent);
         trace::turn(&trace::Record { player: obs.player.0, round: obs.round, pace: obs.speed.pace_percent, inputs: &inputs, held: &own.core, logits, tempered: net.sharp, pass: &pass, tilt: &tilt, shares: &shares, after: &after });
@@ -77,6 +79,29 @@ pub fn think(obs: &AIObservation<'_>, brief: &TurnBrief, state: &mut AiState, ru
     let price_tilt = if parts.plays(Part::Economy) { after.price_tilt } else { [0; pd::N] };
     let strategy = strategy_net::plan_with_intent(seat, state, memory, &situation, intent, &price_tilt, Wishes::default());
     Plan2 { strategy, net2: levers }
+}
+
+/// G15 `size_model`: the new cities the rules' size model pays (`tall_real_step` wrote them into the intent), 250 a
+/// city up to 4; 0 for a seat that does not play the real tall style or without the strategy part.
+fn size_model(parts: Parts, intent: &strategy_net::Intent) -> strategy_net::Milli {
+    if !intent.tall_real || !parts.plays(Part::Strategy) {
+        return 0;
+    }
+    strategy_net::Milli::from(intent.more_cities.min(4)) * 250
+}
+
+/// A real tall seat's new cities are the net's (`weights::CITY_CAP`), not the rules' size model's (`tall_real_step`
+/// wrote the model's); the executors (`tall_real::adjust`, `Prices::city_cap`) read the plan's target made of them.
+/// Without the strategy part the seat keeps the model, as `nets-x-site` plays.
+fn cap_cities(obs: &AIObservation<'_>, parts: Parts, intent: &mut strategy_net::Intent, city_cap: strategy_net::Milli) {
+    if !intent.tall_real || !parts.plays(Part::Strategy) {
+        return;
+    }
+    let more = levers::cities_of(city_cap);
+    if strategy_net::trace::enabled() {
+        strategy_net::trace::push(format!("r{} p{} CAP cities {} model more {} net {} → more {}", obs.round, obs.player.0, obs.own_cities.len(), intent.more_cities, city_cap, more));
+    }
+    intent.more_cities = more;
 }
 
 /// `NET2_SPACE_TRACE=<file>`: one line a turn of the space race (the parts' needs, the free copies, the hold's level).

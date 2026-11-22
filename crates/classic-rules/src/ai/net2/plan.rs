@@ -67,6 +67,9 @@ pub struct SeatInputs {
     pub space_race: Milli,
     /// The copies the missing parts need beyond the free ones, 0…3 → 0…1000 (`weights::g::PARTS_SHORT`).
     pub parts_short: Milli,
+    /// The new cities the rules' size model pays for a real tall seat (`tall_real::SizeModel::more`), 250 a city (4 → 1000;
+    /// `weights::g::SIZE_MODEL`); 0 for another seat. Set after the intent (`net2::cap_cities`), read by `CITY_CAP` only.
+    pub size_model: Milli,
 }
 
 /// One strategic resource the missing spaceship parts need (the hold's quantity, `Net2Plan::space_hold`).
@@ -701,6 +704,10 @@ pub struct Net2Plan {
     /// need): no other unit is built, bought or upgraded into with them (the production planner, the upgrades, the
     /// armory read `held`).
     pub space_hold: Vec<(ResourceId, i32)>,
+    /// The research stays on the spaceship's technologies and their prerequisites while one of them is available
+    /// (`weights::SPACE_RESEARCH` at least `gate::SPACE_RESEARCH`; the research head, `strategy_net::heads::research`,
+    /// reads it).
+    pub space_research: bool,
 }
 
 /// The trust of a rival without a reading (a city-state, a stranger): a stranger is not yet a liar.

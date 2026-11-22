@@ -104,6 +104,62 @@ fn the_space_race_holds_the_parts_copies() {
     assert!(after(&idle, &q).plan.space_hold.is_empty());
 }
 
+/// The city cap of a real tall seat (`weights::CITY_CAP`) on Rome, archipelago 1810002, round 55 (R4 trace): 2 cities,
+/// 4 free sites (room 666), excess happiness +8 (900), the conquest share 0.40 and wide 0.07 under the conquest bias;
+/// the size model 0 more (its floor of 6 after the city). The tilt founds on; a pure tall seat keeps the model's count.
+#[test]
+fn the_tall_cap_is_the_model_and_the_tilt() {
+    use super::concepts::{fire, Frame};
+    use super::weights::{g, CITY_CAP};
+    let mut f = [0; fe::N];
+    (f[fe::ROOM], f[fe::CITIES], f[fe::HAPPY], f[fe::PROGRESS]) = (666, 250, 900, 166);
+    let k = [0; kc::N];
+    let aggs = [0; a::N];
+    let rome = [530, 70, 400];
+    let cap = |f: &[Milli; fe::N], model: Milli, aggs: &[Milli; a::N], style: [Milli; 3]| {
+        let mut gs = [0; g::N];
+        gs[g::SIZE_MODEL] = model;
+        let mut y = [0; super::weights::y::N];
+        y[0..3].copy_from_slice(&style);
+        fire(&CITY_CAP, &Frame { f, k: &k, g: &gs, a: aggs, y: &y, ..Frame::default() })
+    };
+    // 3000·0.40·0.666 = 3·266 (the product rounded down); the wide share reads no weight.
+    assert_eq!(cap(&f, 0, &aggs, rome), 798);
+    assert_eq!(levers::cities_of(798), 1, "one more: the target 3");
+    // A pure tall seat: the model's 2 and 3·33 → 2.
+    assert_eq!(levers::cities_of(cap(&f, 500, &aggs, [900, 50, 50])), 2);
+    // Unhappy (−4: 300) and a menacing stack at the border: 798 − 8000·0.2 − 2000·0.8 < 0 → none.
+    let mut sad = f;
+    sad[fe::HAPPY] = 300;
+    let mut menaced = aggs;
+    menaced[a::MAX_MENACE] = 800;
+    assert_eq!(levers::cities_of(cap(&sad, 0, &menaced, rome)), 0);
+    // Late, with 6 cities and one free site: 198 − 4000·0.375 − 5000·0.3 < 0 → none.
+    let mut late = f;
+    (late[fe::ROOM], late[fe::CITIES], late[fe::PROGRESS]) = (166, 750, 900);
+    assert_eq!(levers::cities_of(cap(&late, 0, &aggs, rome)), 0);
+    assert_eq!(levers::cities_of(499), 0, "half a city rounds up, less does not");
+    assert_eq!(levers::cities_of(500), 1);
+}
+
+/// The research on the ship's way (`weights::SPACE_RESEARCH`): England, pangaea 1810001, at robotics (aim science 0.95,
+/// the way 0.6) keeps to it; a diplomatic seat (aim 0.2) at the same point does not.
+#[test]
+fn the_science_seat_researches_the_ships_way() {
+    use super::concepts::{fire, Frame};
+    use super::weights::SPACE_RESEARCH;
+    let mut f = [0; fe::N];
+    f[fe::SPACE_OWN] = 600;
+    let level = |aim: Milli| {
+        let mut y = [0; super::weights::y::N];
+        y[super::weights::y::AIM_SCIENCE] = aim;
+        fire(&SPACE_RESEARCH, &Frame { f: &f, y: &y, ..Frame::default() })
+    };
+    assert_eq!(level(950), 1000, "unit(−1000 + 1900 + 600)");
+    assert_eq!(level(200), 0, "unit(−1000 + 400 + 600)");
+    assert!(level(450) >= super::weights::gate::SPACE_RESEARCH.0, "−1000 + 900 + 600 = 500");
+}
+
 #[test]
 fn an_average_neighbour_is_no_prey() {
     let inputs = inputs(seat(), vec![RivalInputs { soldiers: 500, open_cities: 0, ..disarmed_neighbour(1) }], vec![]);
@@ -139,14 +195,14 @@ fn level_neighbour(id: u8) -> RivalInputs {
 #[test]
 fn a_level_neighbour_with_a_soft_city_is_prey_and_the_order_aims_at_it() {
     // WAR-LEVER.md K1: 5 citizens (size 250), no garrison seen, 4 tiles (near 1000), walls 200 against our army.
-    // ease = unit(−2150 + 750 + 800 + 1000 + 480) = 880; a large guarded city: unit(−2150 + 0 + 320 + 600 + 300) = 0.
+    // ease = unit(−2200 + 750 + 800 + 1000 + 480) = 830; a large guarded city: unit(−2200 + 0 + 320 + 600 + 300) = 0.
     let mut inputs = inputs(seat(), vec![level_neighbour(1)], vec![]);
     inputs.targets = vec![target(1, 70, 1000, 600, 600, 500), target(1, 71, 250, 0, 1000, 200)];
     let p = pass(&inputs);
-    assert_eq!(p.eases, vec![0, 880]);
-    assert_eq!(p.rivals[0].inputs[super::weights::r::SOFT], 880);
-    // prey = unit(−1700 + 0 + 1280 + 120 + 1056) = 756 → a Prey order aimed at the soft city.
-    assert_eq!(p.rivals[0].concepts[q::PREY], 756);
+    assert_eq!(p.eases, vec![0, 830]);
+    assert_eq!(p.rivals[0].inputs[super::weights::r::SOFT], 830);
+    // prey = unit(−1700 + 0 + 1280 + 120 + 996) = 696 → a Prey order aimed at the soft city.
+    assert_eq!(p.rivals[0].concepts[q::PREY], 696);
     let aim = p.core.war.order().and_then(|o| o.aim);
     assert_eq!(aim, Some(WarAim { city: TileId(71), why: AimWhy::Ease }));
 }
@@ -499,6 +555,7 @@ fn generated_line(rng: &mut Lcg) -> String {
         ties_at_risk: seat_row[11],
         space_race: if seat_row[12] > 600 { 1000 } else { 0 },
         parts_short: seat_row[13],
+        size_model: seat_row[14],
         ..SeatInputs::default()
     };
     let rivals: Vec<RivalInputs> = (0..1 + rng.below(7)).map(|i| generated_rival(rng, 1 + i as u8)).collect();
@@ -550,7 +607,7 @@ fn the_parity_fixture_is_the_integer_net() {
 #[test]
 fn the_weights_count() {
     let n = super::weights::count();
-    assert_eq!(n, 152, "net2's own hand weights (the 13 carried concepts and the carried logits are `strategy_net::weights`'s)");
+    assert_eq!(n, 165, "net2's own hand weights (the 13 carried concepts and the carried logits are `strategy_net::weights`'s)");
 }
 
 #[test]

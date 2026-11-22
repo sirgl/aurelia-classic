@@ -283,6 +283,10 @@ pub struct After {
     pub peace: Vec<Milli>,
     /// `weights::PART_HOLD`.
     pub part_hold: Milli,
+    /// `weights::CITY_CAP`: the new cities a real tall seat founds, thousandths of a city (`cities_of`).
+    pub city_cap: Milli,
+    /// `weights::SPACE_RESEARCH`.
+    pub space_research: Milli,
 }
 
 /// The levers of the turn (§4.4–§4.7) from the pass and the intent.
@@ -303,6 +307,8 @@ pub fn after_intent(pass: &Pass, intent: &Intent, inputs: &Inputs, round: u32) -
     price_tilt[pd::MILITARY] = fire(&w::MILITARY, &Frame { s: &pass.seat, a: &pass.aggregates, y: &y, ..Frame::default() });
     let at_war = inputs.situation[fe::AT_WAR] > 0;
     let part_hold = fire(&w::PART_HOLD, &Frame { k: &pass.carried, g: &inputs.seat.row(), ..Frame::default() });
+    let city_cap = fire(&w::CITY_CAP, &Frame { f: &inputs.situation, k: &pass.carried, g: &inputs.seat.row(), a: &pass.aggregates, y: &y, ..Frame::default() });
+    let space_research = fire(&w::SPACE_RESEARCH, &Frame { f: &inputs.situation, y: &y, ..Frame::default() });
     let plan = Net2Plan {
         parts: pass.parts,
         round,
@@ -319,8 +325,14 @@ pub fn after_intent(pass: &Pass, intent: &Intent, inputs: &Inputs, round: u32) -
         offence: Offence::default(),
         order_eases: super::orders::order_eases(&pass.core.war, &inputs.targets, &pass.eases, inputs.seat.war_gain),
         space_hold: space_hold(&inputs.space, part_hold),
+        space_research: pass.parts.plays(Part::Strategy) && space_research >= gate::SPACE_RESEARCH.0,
     };
-    After { plan, price_tilt, peace, part_hold }
+    After { plan, price_tilt, peace, part_hold, city_cap, space_research }
+}
+
+/// The new cities of `weights::CITY_CAP`'s answer: rounded half up, none below half a city.
+pub fn cities_of(city_cap: Milli) -> u32 {
+    ((city_cap.max(0) + ONE / 2) / ONE) as u32
 }
 
 /// The reads with the help of the turn: the war order's rival gets none (`deny_help[r]` ∋ the order's target), a

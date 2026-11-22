@@ -16,6 +16,8 @@
 //!   larger share of the empire's than the cost it adds to the research left. The target is a
 //!   count of cities, not "the cities now and a few more": it binds (`adjust` refuses a settler's
 //!   founding beyond it; the allocator orders no settler past it through `Prices::city_cap`).
+//!   A seat of `net2` with its strategy part takes the count from its net (`net2::weights::CITY_CAP`,
+//!   `net2::cap_cities`); the model is then only traced, and these executors read the net's target.
 //!   Captured cities stay puppets (the game's `Conquest::PuppetAll`): a puppet raises no cost
 //!   (`derived::culture::effective_cities`), so it counts beside the target.
 //! - **Its aim is the science victory** and its policies, buildings and spaceship follow it: the
