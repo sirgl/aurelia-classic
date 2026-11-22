@@ -281,3 +281,60 @@ against `standard` (`--repeat 2`), never run before:
 | R2 | risings of rebels, candidate | ≤ 2 × `standard`'s in the same games |
 | R3 | capitals lost, candidate | ≤ 1.5 × `standard`'s in the same games |
 | R4 | `--solo standard --suite standard --speed quick` hash | `d2d736c1273a82bb` |
+
+**Finding 1, the case.** The rule is latent in the measured games: a domination stake exists for a seat on
+the domination path or for the last capital left, and no seat of the 800 replication games ends with the
+domination goal. An instrumented build (printing every non-threat stake that reached `candidate`) printed
+none in 40 `--solo strategist-x --suite standard` games and none in 30 pace games of offset 1550. So the
+fix does not explain the wars or the capitals lost; it closes the rule for a domination seat. Pinned by
+`grand_strategy::tests::only_the_runaway_rivals_cities_are_runaway`.
+
+### Ablations, offset 1550 (400 pace games Quick each, build `b3bf402` + probe)
+
+| | tall first alone (A-style) | | the threat alone (A-threat) | |
+|---|---:|---:|---:|---:|
+| | `strategist-x` | `standard` | `strategist-x` | `standard` |
+| victory-weighted share (95 % CI) | **61.1 % (55.8–66.3)** | | 49.7 % (46.6–52.8) | |
+| real victories | **121** | 64 | 67 | 66 |
+| diplomatic / science / time | 52 / 69 / 99 | 29 / 35 / 115 | 37 / 29 / 129 | 40 / 26 / 138 |
+| wars declared / wars on it | 238 / 208 | 251 / 281 | 528 / **627** | 457 / 358 |
+| cities captured / capitals lost | 97 / 2 | 125 / 4 | 237 / 3 | 160 / 1 |
+| seats eliminated | 1 | 2 | 0 | 0 |
+| turns below −20 happiness / risings (rebels) | 9 / 1 (1) | 5 / 0 | **228 / 40 (79)** | 45 / 7 (11) |
+
+**What explains the gain: tall first, both kinds.** Tall first alone gives the whole gain of the replicated
+candidate (61.1 % against 60.0–60.6 %), science +34 and diplomatic +23. The threat alone gives nothing
+(49.7 %, real 67 against 66) and every cost.
+
+Why tall first gives the diplomatic victories too (the probe's seats, A-style): in `standard`'s own seats a
+seat that holds the tall style wins a real victory 13 times as often as a wide one (0.106 a seat against
+0.008: tall 558 seats, 25 diplomatic + 34 science; wide 597 seats, 4 + 1), and allies twice the city-states
+at the end (1.70 against 0.81). The diplomatic winners are tall (25 of 29 for `standard`, 45 of 52 for the
+candidate) with 6 allies and 7 friends: a tall seat of 3–6 cities has the gold for the city-states that a
+wide one spends on settlers and upkeep. Tall first moves 512 seats from wide to tall (tall 921, wide 85,
+conquest 194 of 1200 against 558 / 597 / 45), and each of them now plays the style that wins both races.
+Case 1550001 (continents, even): p2 `strategist-x`, tall, 3 cities, 6 allies, wins by diplomacy; the three
+`standard` seats are wide with 9–14 cities and 0–3 allies. Case 1550002 (odd): p5 `strategist-x`, tall,
+3 cities, 6 allies, 7 friends, wins by diplomacy. The denunciations of the leader do not move the votes:
+the threat alone has 37 diplomatic victories against 40.
+
+A side effect of the same weight: the wide logit's −1.2 also moves seats to conquest (194 against 45),
+which win little (0.031 a seat). Not changed tonight (it is the next tuning question, not a defect).
+
+**What causes the rebels and the wars on the candidate: the threat.** With the threat alone 917 of 1200
+candidate seats denounce a leader at some round; those seats were at war 16.9 rounds a game against 6.5
+for the candidate's seats that denounce nobody, and 17 of the 18 unhappy candidate seats are among them.
+The unhappy seats fall late (first round 223–317 of ~330), at war with 1.2 nations on average when it
+starts (8 of 18 at war), with no captured city (captured 0 at the first unhappy round), and most are
+denounced by every other nation. Cases: 1551003 (pangaea, even) p2, conquest, 11 cities, at war with all 5
+nations from its first unhappy round (285), 35 rounds below −20, least excess −42, denounced by all 5;
+1551017 (pangaea, odd) p1, tall, 9 cities, 67 rounds at war, 30 rounds unhappy from 261, denounced by all
+5. Tall first alone has 1 unhappy candidate seat in 1200. The threat's posture term (prepare +2.0, peace
+−1.2) opens wars in general, not on the leader (no operation forms on it, the stop rule above), and its
+denunciation joins the wars on it.
+
+**Hand edit (step 4): `strategist-x` plays tall first alone.** Why: the threat adds no victory (alone 49.7 %;
+with tall first 59.9–60.6 % against 61.1 % without it) and it is the part that costs the wars on the
+candidate, the capitals lost and the rebels. The threat stays as the bench-only variant
+`strategist-x-threat` for the commander's lane (its next step: why no operation forms on the leader).
+Measured by the gate R1–R4 above on offset 1555.
