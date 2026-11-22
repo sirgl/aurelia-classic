@@ -89,7 +89,8 @@ fn every_effect_is_on_screen_without_a_click() {
     assert!(shown("+25% worker speed"), "the effect of an adoptable policy");
     assert!(shown("+1 production in every city"), "the effect of an adopted policy");
     assert!(shown("-25% culture needed for border growth"), "a branch row says what its opener does");
-    assert!(shown("+15% growth in every city"), "and its finisher");
+    let words: Vec<String> = output.shapes.iter().filter_map(|s| match &s.shape { egui::Shape::Text(t) => Some(t.galley.text().to_owned()), _ => None }).collect();
+    assert!(words.join(" ").contains("+15% growth in every city"), "and its finisher (the line may wrap)");
 }
 
 #[test]
@@ -133,4 +134,23 @@ fn locks_say_why_with_the_numbers() {
     assert_eq!(policy_reason(meritocracy, &view.branches[1], &view).as_deref(), Some("Needs Citizenship first"));
     let ideology = &view.branches[3];
     assert_eq!(branch_state_line(ideology, &view), Lock::Ideology(classic_rules::derived::culture::IdeologyBlock::TooEarly).reason());
+}
+
+#[test]
+fn a_cut_line_ends_with_an_ellipsis_at_a_word_boundary() {
+    let ctx = egui::Context::default();
+    let _ = ctx.run_ui(egui::RawInput::default(), |ui| {
+        let p = ui.painter();
+        let text = "+50% Production in the capital when producing a Settler; When adopted: 1 free Settler in the capital";
+        let lines = wrap_lines(p, text, 11.5, 200.0, 1);
+        assert_eq!(lines.len(), 1);
+        assert!(lines[0].ends_with(" ..."), "{lines:?}");
+        assert!(text.starts_with(lines[0].trim_end_matches(" ...")), "words stay whole: {lines:?}");
+        assert!(text_width(p, &lines[0], 11.5) <= 200.0);
+        let all = wrap_lines(p, "short text", 11.5, 200.0, 1);
+        assert_eq!(all, ["short text"], "a text that fits is not cut");
+        let two = wrap_lines(p, text, 11.5, 200.0, 2);
+        assert_eq!(two.len(), 2);
+        assert!(two[1].ends_with("..."));
+    });
 }

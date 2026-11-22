@@ -10,7 +10,6 @@ use crate::ui::model::{
     BranchCard, BranchState, CivicsView, Cost, GameRequest, Offer, OfferKind, PolicyCard,
     PolicyState,
 };
-use egui::text::{LayoutJob, TextFormat, TextWrapping};
 use i18n::{t, tf};
 
 /// A canvas at least this wide shows the branches, the tree and the offers side by side.
@@ -143,14 +142,76 @@ fn tab_row(ui: &mut egui::Ui, r: Rect, state: &mut ScreenState, view: &CivicsVie
 // ---------------------------------------------------------------------------------------------
 // Text helpers
 
-/// `value` in at most `rows` rows of `width`, the cut end shown as an ellipsis. Returns the height.
+/// `value` in at most `rows` rows of `width`: lines break at spaces, and when the text does not
+/// fit the last line ends with "..." at a word boundary (a word wider than the line is cut). Returns the height.
 fn clipped(p: &egui::Painter, at: egui::Pos2, value: &str, size: f32, color: Color32, width: f32, rows: usize) -> f32 {
-    let mut job = LayoutJob::single_section(value.to_owned(), TextFormat::simple(FontId::proportional(size), color));
-    job.wrap = TextWrapping { max_width: width.max(8.0), max_rows: rows.max(1), break_anywhere: false, overflow_character: Some('…') };
-    let galley = p.layout_job(job);
-    let height = galley.size().y;
-    p.galley(at, galley, color);
-    height
+    let lines = wrap_lines(p, value, size, width.max(8.0), rows.max(1));
+    let font = FontId::proportional(size);
+    let mut y = at.y;
+    for line in &lines {
+        let galley = p.layout_no_wrap(line.clone(), font.clone(), color);
+        let height = galley.size().y;
+        p.galley(pos2(at.x, y), galley, color);
+        y += height;
+    }
+    y - at.y
+}
+
+fn text_width(p: &egui::Painter, value: &str, size: f32) -> f32 {
+    p.layout_no_wrap(value.to_owned(), FontId::proportional(size), Color32::WHITE).size().x
+}
+
+/// The lines of `value` for `clipped`.
+fn wrap_lines(p: &egui::Painter, value: &str, size: f32, width: f32, rows: usize) -> Vec<String> {
+    let mut lines: Vec<String> = Vec::new();
+    let mut words = value.split_whitespace();
+    while let Some(word) = words.next() {
+        let last_row = lines.len() == rows;
+        let current = lines.last().cloned().unwrap_or_default();
+        let joined = if current.is_empty() { word.to_owned() } else { format!("{current} {word}") };
+        if text_width(p, &joined, size) <= width {
+            match lines.last_mut() {
+                Some(line) => *line = joined,
+                None => lines.push(joined),
+            }
+            continue;
+        }
+        if lines.is_empty() || !last_row {
+            // A new row; a first word wider than the row is cut.
+            lines.push(word.to_owned());
+            if text_width(p, word, size) > width {
+                let cut = ellipsize(p, word, size, width);
+                lines.pop();
+                lines.push(cut);
+            }
+            continue;
+        }
+        let line = lines.pop().unwrap_or_default();
+        lines.push(ellipsize(p, &format!("{line} ..."), size, width));
+        break;
+    }
+    lines
+}
+
+/// `value` cut to `width` with a closing "...": whole words dropped first, then letters.
+fn ellipsize(p: &egui::Painter, value: &str, size: f32, width: f32) -> String {
+    let body = value.trim_end_matches('.').trim_end();
+    if text_width(p, value, size) <= width && !value.ends_with("...") {
+        return value.to_owned();
+    }
+    let mut words: Vec<&str> = body.split_whitespace().collect();
+    while words.len() > 1 {
+        let shown = format!("{} ...", words.join(" "));
+        if text_width(p, &shown, size) <= width {
+            return shown;
+        }
+        words.pop();
+    }
+    let mut cut = words.first().copied().unwrap_or("").to_owned();
+    while !cut.is_empty() && text_width(p, &format!("{cut}..."), size) > width {
+        cut.pop();
+    }
+    format!("{cut}...")
 }
 
 /// The first clause of an effect text: what it does in one line ("-25% culture ...").
@@ -274,6 +335,8 @@ fn branch_row(ui: &mut egui::Ui, row: Rect, state: &mut ScreenState, view: &Civi
     let name_color = if matches!(branch.state, BranchState::Locked(_)) { MUTED } else { CREAM };
     text(ui.painter(), pos2(left, row.top() + 3.0), &branch.name, 14.0, name_color);
     let (tag, tag_color) = branch_tag(branch, view);
+    let name_w = text_width(ui.painter(), &branch.name, 14.0);
+    let tag = ellipsize(ui.painter(), &tag, 10.5, (row.right() - 8.0 - row.left() - 46.0 - name_w - 8.0).max(40.0));
     let tag_galley = ui.painter().layout_no_wrap(tag, FontId::proportional(10.5), tag_color);
     let tag_x = row.right() - 8.0 - tag_galley.size().x;
     ui.painter().galley(pos2(tag_x, row.top() + 5.0), tag_galley, tag_color);
@@ -299,7 +362,7 @@ fn branch_tag(branch: &BranchCard, view: &CivicsView) -> (String, Color32) {
         BranchState::Available(_) => (t!("classic.ui.screen-civics.tag-free").to_owned(), CULTURE),
         BranchState::Locked(lock) if lock.is_era() => (branch.era.clone().unwrap_or_default(), MUTED),
         BranchState::Locked(lock) if lock.is_culture() => (tf!("classic.ui.screen-civics.tag-price", n = view.next_cost), MUTED),
-        BranchState::Locked(_) => (t!("classic.ui.screen-civics.locked-caps").to_owned(), MUTED),
+        BranchState::Locked(lock) => (lock.reason().to_owned(), MUTED),
     }
 }
 
@@ -642,8 +705,10 @@ fn offers_panel(ui: &mut egui::Ui, r: Rect, state: &mut ScreenState, view: &Civi
     } else {
         offer_cards(ui, area, state, view, columns, focused);
     }
-    let hint = ui.painter().layout_no_wrap(t!("classic.ui.screen-civics.keys-hint").to_owned(), FontId::proportional(10.0), MUTED);
-    ui.painter().galley(pos2(r.left() + 16.0, r.bottom() - hint_h), hint, MUTED);
+    if !client::shell::theme::touch_wanted() {
+        let hint = ui.painter().layout_no_wrap(t!("classic.ui.screen-civics.keys-hint").to_owned(), FontId::proportional(10.0), MUTED);
+        ui.painter().galley(pos2(r.left() + 16.0, r.bottom() - hint_h), hint, MUTED);
+    }
 }
 
 /// The empty list: why, and how far the next policy is.
@@ -697,7 +762,7 @@ fn offer_card(ui: &mut egui::Ui, card: Rect, state: &mut ScreenState, offer: &Of
     clipped(ui.painter(), pos2(left, card.top() + 8.0), &offer.name, 14.0, CREAM, button_rect.left() - 6.0 - left, 1);
     text(ui.painter(), pos2(left, card.top() + 27.0), offer_role(offer), 10.0, GOLD);
     let top = badge.bottom() + 6.0;
-    let rows = (((card.bottom() - top - 4.0) / 14.0).floor() as usize).clamp(1, 4);
+    let rows = (((card.bottom() - top - 12.0) / 14.0).floor() as usize).clamp(1, 4);
     clipped(ui.painter(), pos2(card.left() + 10.0, top), &offer.text, 11.5, Color32::from_rgb(214, 220, 206), card.width() - 20.0, rows);
     if button(ui, button_rect, &cost_label(Verb::of(offer.kind), offer.cost), true, true) {
         take(state, offer.kind.request());
