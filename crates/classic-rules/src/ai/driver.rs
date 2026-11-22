@@ -991,6 +991,12 @@ impl ClassicMind {
                 let plan = if self.net2 {
                     let crate::ai::net2::plan::Plan2 { strategy, net2 } = crate::ai::net2::think(observation, &brief, state, rules, &prices, &stakes);
                     brief.net2 = Some(net2);
+                    // The defence watch was made before `net2` thought: its dangers take the plan's guard
+                    // levels now, before the city planner and `defence::arm` read them.
+                    if let Some(mut watch) = brief.defence.take() {
+                        watch.apply_net2(&brief, &observation.own_cities);
+                        brief.defence = Some(watch);
+                    }
                     strategy
                 } else {
                     crate::ai::strategy_net::think(observation, &brief, state, rules, &prices, &stakes)
