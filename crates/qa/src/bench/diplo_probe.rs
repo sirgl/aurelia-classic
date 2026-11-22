@@ -26,6 +26,7 @@ use std::io::Write;
 use std::sync::{Mutex, OnceLock};
 
 use classic_rules::world::city_states as cs;
+use classic_rules::ClassicGame;
 use classic_rules::world::city_states::Quest;
 use classic_rules::world::player::ClassicPlayers;
 use kernel::ai::state::AiStates;
