@@ -20,6 +20,8 @@ pub struct SavedEspionage {
     pub steal_rights: Vec<u8>,
     pub renaissance_granted: bool,
     pub era_granted: Vec<u8>,
+    /// The thefts found out: (round, victim, thief + 1 or 0, city ordinal + 1).
+    pub thefts: Vec<(u32, u8, u8, u32)>,
 }
 
 /// World Congress: founded, host, special session, United Nations, timer,

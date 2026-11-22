@@ -180,6 +180,9 @@ pub struct AIObservation<'a> {
     pub spies: Vec<SpyInfo>,
     /// Victims we hold steal rights on, with what may be stolen.
     pub steal: Vec<(PlayerId, Vec<TechId>)>,
+    /// The thefts from us we found out, oldest first: when, by whom (when identified) and from
+    /// which city (`world::espionage::MAX_THEFTS_KEPT` at most).
+    pub thefts_against_us: Vec<crate::world::espionage::Theft>,
     /// The victories of the game and its last round (the setup screen).
     pub victories: crate::world::victory::VictoryOptions,
     /// The game's speed (the setup screen): the AI's horizons and gates in
@@ -477,6 +480,7 @@ impl<'a> AIObservation<'a> {
             public,
             spies: spies_of(auth, player),
             steal: steal_rights(auth, rules, player),
+            thefts_against_us: auth.module().espionage().thefts_against(player).copied().collect(),
             victories: auth.module().victory().options(),
             speed: auth.settings().speed_values(),
         };

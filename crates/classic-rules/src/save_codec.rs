@@ -34,8 +34,13 @@ use crate::persistence::SaveGameV1;
 /// play at Standard); 24: the rebellion countdowns of the barbarian section
 /// (`REVOLTS_SINCE`; older saves have none running); 25: the cities that
 /// sold a building this turn, in the player's economy record
-/// (`SALES_SINCE`; older saves have sold none).
-pub const CODEC_VERSION: u32 = 25;
+/// (`SALES_SINCE`; older saves have sold none); 26: the thefts a victim found
+/// out, in the espionage section (`THEFTS_SINCE`; older saves remember none).
+pub const CODEC_VERSION: u32 = 26;
+
+/// The codec version whose espionage section gained the thefts found out;
+/// older saves read none.
+const THEFTS_SINCE: u32 = 26;
 
 /// The codec version whose player economy record gained the cities that
 /// sold a building this turn; older saves read none.
@@ -171,6 +176,7 @@ impl Field for crate::persistence::schema::SavedEspionage {
         self.steal_rights.put(out);
         self.renaissance_granted.put(out);
         self.era_granted.put(out);
+        self.thefts.put(out);
     }
     fn take(r: &mut Reader<'_>) -> Result<Self, CodecError> {
         Ok(Self {
@@ -178,6 +184,7 @@ impl Field for crate::persistence::schema::SavedEspionage {
             steal_rights: Field::take(r)?,
             renaissance_granted: Field::take(r)?,
             era_granted: Field::take(r)?,
+            thefts: r.since(THEFTS_SINCE)?,
         })
     }
 }

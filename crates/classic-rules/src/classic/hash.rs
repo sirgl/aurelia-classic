@@ -144,6 +144,9 @@ fn espionage(world: &ClassicWorld, auth: &AuthWorld, mix: &mut dyn FnMut(u64)) {
         for r in e.steal_rights.iter().chain(&e.era_granted) {
             mix(u64::from(*r));
         }
+        for (round, victim, thief, city) in &e.thefts {
+            mix(u64::from(*round) << 32 ^ u64::from(*victim) << 24 ^ u64::from(*thief) << 16 ^ u64::from(*city));
+        }
     }
 }
 
