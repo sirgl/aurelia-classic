@@ -13,6 +13,7 @@ use classic_rules::{ClassicGame, Command, CompiledRuleset, GameState};
 use kernel::ai::plan::{role_of, AiRole};
 use kernel::ai::trace::{DecisionTrace, Outcome};
 use kernel::ids::EntityId;
+use kernel::rules::content::Domain;
 
 use crate::bench::modules::majors;
 
@@ -56,6 +57,10 @@ pub struct Sample {
     pub happiness: i32,
     /// Tiles of its land whose improvement is pillaged.
     pub pillaged: u32,
+    /// Aircraft (air domain units, missiles included).
+    pub air: u32,
+    /// Land units standing on water (embarked).
+    pub at_sea: u32,
 }
 
 /// A city's head order and stock after a round.
@@ -78,6 +83,10 @@ pub struct Watch {
     seen_round: u32,
     /// The unit kinds that are not combat units (`AiRole`): what a sample counts as civilians.
     civilian_kinds: Vec<u16>,
+    /// The unit kinds of the air domain.
+    air_kinds: Vec<u16>,
+    /// The unit kinds of the land domain.
+    land_kinds: Vec<u16>,
     owners: BTreeMap<u64, PlayerId>,
     pact_until: BTreeMap<(u8, u8), u32>,
     pub captures: Vec<Capture>,
@@ -106,6 +115,18 @@ pub struct Watch {
     pub heads: BTreeMap<u64, Vec<Head>>,
     /// The pairs of majors at war after each round (the lower id first).
     pub wars: Vec<(u32, Vec<(u8, u8)>)>,
+    /// The military units of each major alive after the last round read (id -> owner).
+    military: BTreeMap<u64, PlayerId>,
+    /// Military units each major lost (gone between two rounds: killed, captured, disbanded).
+    pub losses: BTreeMap<u8, u32>,
+    /// Orders of aircraft (strikes, sweeps, interceptions) by player, applied.
+    pub air_orders: Vec<(u32, PlayerId)>,
+    /// Interception orders by player, applied.
+    pub interceptions: Vec<(u32, PlayerId)>,
+    /// Faith answers by player, applied: removing heresy, a faith purchase, a spread.
+    pub faith_orders: Vec<(u32, PlayerId)>,
+    /// Spies a player sent to one of its own cities (counter-intelligence), applied.
+    pub spies_home: Vec<(u32, PlayerId)>,
 }
 
 impl Watch {
@@ -115,7 +136,10 @@ impl Watch {
         let start = auth.turn().round;
         let mut watch = Watch { seen_round: start.saturating_sub(1), ..Watch::default() };
         watch.civilian_kinds = (0..rules.units.len() as u16).filter(|k| role_of(rules, classic_rules::ids::UnitKindId(*k)) != AiRole::Military && role_of(rules, classic_rules::ids::UnitKindId(*k)) != AiRole::Naval).collect();
+        watch.air_kinds = (0..rules.units.len() as u16).filter(|k| rules.units[usize::from(*k)].domain == Domain::Air).collect();
+        watch.land_kinds = (0..rules.units.len() as u16).filter(|k| rules.units[usize::from(*k)].domain == Domain::Land).collect();
         watch.owners = auth.cities().iter().map(|(_, c)| (c.id.0, c.owner)).collect();
+        watch.military = military_of(game, &watch.civilian_kinds);
         for pair in pairs(game) {
             watch.pact_until.insert((pair.0 .0, pair.1 .0), auth.module().relations().research_agreement_until(pair.0, pair.1));
         }
@@ -138,6 +162,7 @@ impl Watch {
         self.read_tracked(game, round);
         self.read_host(game, round);
         self.read_samples(game, round);
+        self.read_losses(game);
         if self.victory.is_none() {
             self.victory = game.outcome().map(|o| (o.round, o.winner, o.kind));
         }
@@ -177,14 +202,28 @@ impl Watch {
                 Command::MakePeace { enemy, .. } => self.peaces.push(Event { round, by, on: *enemy }),
                 Command::HurryProduction { .. } | Command::PurchaseTile { .. } => self.purchases.push((round, by)),
                 Command::GiftGold { .. } => self.gifts.push((round, by)),
+                Command::Intercept { .. } => {
+                    self.interceptions.push((round, by));
+                    self.air_orders.push((round, by));
+                }
+                Command::AirSweep { .. } | Command::Nuke { .. } => self.air_orders.push((round, by)),
+                Command::RemoveHeresy { .. } | Command::PurchaseWithFaith { .. } | Command::SpreadReligion { .. } => self.faith_orders.push((round, by)),
+                Command::MoveSpy { player, city: Some(city), .. } => {
+                    if game.view().auth.cities().get(*city).is_some_and(|c| c.owner == *player) {
+                        self.spies_home.push((round, by));
+                    }
+                }
                 Command::ProposeResolution { kind, choice, .. } => self.proposals.push(Proposal { round, by, kind: *kind, choice: *choice }),
                 Command::AttackCity { city, .. } => {
                     if let Some(owner) = game.view().auth.cities().get(*city).map(|c| c.owner) {
                         self.strikes.push(Event { round, by, on: owner });
                     }
                 }
-                Command::RangedAttack { target, .. } => {
+                Command::RangedAttack { unit, target, .. } => {
                     let auth = game.view().auth;
+                    if auth.units().get(*unit).is_some_and(|u| self.air_kinds.contains(&u.core.kind.0)) {
+                        self.air_orders.push((round, by));
+                    }
                     let owner = auth
                         .indexes()
                         .city_on_tile(*target)
@@ -245,23 +284,36 @@ impl Watch {
             }
         }
         for player in majors(game) {
-            let (mut military, mut civilians) = (0, 0);
+            let (mut military, mut civilians, mut air, mut at_sea) = (0, 0, 0, 0);
             for unit in auth.indexes().units_of(player).iter().filter_map(|h| auth.units().get(*h)) {
                 if self.civilian_kinds.contains(&unit.core.kind.0) {
                     civilians += 1;
                 } else {
                     military += 1;
                 }
+                air += u32::from(self.air_kinds.contains(&unit.core.kind.0));
+                at_sea += u32::from(self.land_kinds.contains(&unit.core.kind.0) && map.is_water(unit.core.tile));
             }
             let happiness = classic_rules::derived::happiness::excess_snapshot(auth, player);
             let treasury = auth.players().treasury_of(player);
-            self.samples.push(Sample { round, player, military, civilians, treasury, happiness, pillaged: pillaged.get(&player.0).copied().unwrap_or(0) });
+            self.samples.push(Sample { round, player, military, civilians, treasury, happiness, pillaged: pillaged.get(&player.0).copied().unwrap_or(0), air, at_sea });
         }
         for (_, city) in auth.cities().iter() {
             self.heads.entry(city.id.0).or_default().push(Head { round, item: city.queue.first().copied(), stock: city.production });
         }
         let at_war = pairs(game).into_iter().filter(|(a, b)| auth.diplomacy().at_war(*a, *b)).map(|(a, b)| (a.0, b.0)).collect();
         self.wars.push((round, at_war));
+    }
+
+    /// The military units gone since the last round, counted against their owners.
+    fn read_losses(&mut self, game: &GameState) {
+        let now = military_of(game, &self.civilian_kinds);
+        for (id, owner) in &self.military {
+            if !now.contains_key(id) {
+                *self.losses.entry(owner.0).or_default() += 1;
+            }
+        }
+        self.military = now;
     }
 
     /// The samples of one nation, in round order.
@@ -295,6 +347,20 @@ impl Watch {
     pub fn followed(&self) -> usize {
         self.tracked.len()
     }
+}
+
+/// The military units of the majors (any kind that is not a civilian), by id.
+fn military_of(game: &GameState, civilian_kinds: &[u16]) -> BTreeMap<u64, PlayerId> {
+    let auth = game.view().auth;
+    let mut out = BTreeMap::new();
+    for player in majors(game) {
+        for unit in auth.indexes().units_of(player).iter().filter_map(|h| auth.units().get(*h)) {
+            if !civilian_kinds.contains(&unit.core.kind.0) {
+                out.insert(unit.core.id.0, player);
+            }
+        }
+    }
+    out
 }
 
 /// Every pair of living major nations, the lower id first.

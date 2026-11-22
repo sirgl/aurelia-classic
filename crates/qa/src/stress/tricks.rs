@@ -17,31 +17,31 @@ use super::Situation;
 use crate::battle::{self, Arm as Kind};
 use crate::bench::modules::majors;
 
-fn distance(game: &GameState, a: TileId, b: TileId) -> i32 {
+pub(super) fn distance(game: &GameState, a: TileId, b: TileId) -> i32 {
     game.view().auth.map().dimensions.distance(a, b).unwrap_or(i32::MAX)
 }
 
-fn at_war(game: &GameState, a: PlayerId, b: PlayerId) -> bool {
+pub(super) fn at_war(game: &GameState, a: PlayerId, b: PlayerId) -> bool {
     game.view().auth.diplomacy().at_war(a, b)
 }
 
-fn meet(a: PlayerId, b: PlayerId) -> Change {
+pub(super) fn meet(a: PlayerId, b: PlayerId) -> Change {
     Change::Meet { a: a.0, b: b.0 }
 }
 
-fn war(by: PlayerId, on: PlayerId) -> Change {
+pub(super) fn war(by: PlayerId, on: PlayerId) -> Change {
     Change::War { a: by.0, b: on.0 }
 }
 
 /// The nearest pair on one landmass, the seat and the other by `flip`.
-fn seat_and_rival(game: &GameState, flip: bool, info: &mut BTreeMap<String, String>) -> Result<(PlayerId, PlayerId), String> {
+pub(super) fn seat_and_rival(game: &GameState, flip: bool, info: &mut BTreeMap<String, String>) -> Result<(PlayerId, PlayerId), String> {
     let (a, b, d) = nearest_pair(game).ok_or("no two nations share a landmass")?;
     info.insert("pair_distance".to_owned(), d.to_string());
     Ok(if flip { (b, a) } else { (a, b) })
 }
 
 /// The nearest pair at peace on one landmass (`B2`, `B5`, `P3` need a war that starts now).
-fn seat_and_rival_at_peace(game: &GameState, flip: bool, info: &mut BTreeMap<String, String>) -> Result<(PlayerId, PlayerId), String> {
+pub(super) fn seat_and_rival_at_peace(game: &GameState, flip: bool, info: &mut BTreeMap<String, String>) -> Result<(PlayerId, PlayerId), String> {
     let (a, b) = seat_and_rival(game, flip, info)?;
     if at_war(game, a, b) {
         return Err("the nearest pair is at war already".to_owned());
@@ -50,7 +50,7 @@ fn seat_and_rival_at_peace(game: &GameState, flip: bool, info: &mut BTreeMap<Str
 }
 
 /// The two nations whose cities are nearest of the pairs that share no landmass (`A6`, `C2`).
-fn pair_over_sea(game: &GameState) -> Option<(PlayerId, PlayerId, i32)> {
+pub(super) fn pair_over_sea(game: &GameState) -> Option<(PlayerId, PlayerId, i32)> {
     let all = majors(game);
     let mut best: Option<(i32, PlayerId, PlayerId)> = None;
     for a in &all {
@@ -69,7 +69,7 @@ fn pair_over_sea(game: &GameState) -> Option<(PlayerId, PlayerId, i32)> {
 }
 
 /// The nation of the instance: the majors in id order, one picked by the instance's draw.
-fn picked(game: &GameState, instance: usize) -> Result<PlayerId, String> {
+pub(super) fn picked(game: &GameState, instance: usize) -> Result<PlayerId, String> {
     let all = majors(game);
     if all.is_empty() {
         return Err("no nations".to_owned());
@@ -78,7 +78,7 @@ fn picked(game: &GameState, instance: usize) -> Result<PlayerId, String> {
 }
 
 /// The living nation with the most of `key` (ties: the lower id).
-fn top_by(game: &GameState, key: impl Fn(PlayerId) -> i64) -> PlayerId {
+pub(super) fn top_by(game: &GameState, key: impl Fn(PlayerId) -> i64) -> PlayerId {
     majors(game).into_iter().max_by_key(|p| (key(*p), std::cmp::Reverse(p.0))).unwrap_or(PlayerId(0))
 }
 
@@ -228,13 +228,13 @@ pub(super) fn edit_of(situation: Situation, level: u8, rules: &CompiledRuleset, 
 // Builders
 
 /// `percent` of the military units of `player` removed (by the draw of each unit's id).
-fn disarm(game: &GameState, rules: &CompiledRuleset, player: PlayerId, percent: u64, salt: u64) -> Change {
+pub(super) fn disarm(game: &GameState, rules: &CompiledRuleset, player: PlayerId, percent: u64, salt: u64) -> Change {
     let ids = edit::military_units(game, rules, player).into_iter().filter(|id| percent >= 100 || mix(*id ^ salt) % 100 < percent).collect();
     Change::RemoveUnits { ids }
 }
 
 /// Free tiles a unit can stand on, drawn by `salt`, that `keep` accepts.
-fn free_tiles(game: &GameState, rules: &CompiledRuleset, salt: u64, keep: impl Fn(TileId) -> bool) -> Vec<TileId> {
+pub(super) fn free_tiles(game: &GameState, rules: &CompiledRuleset, salt: u64, keep: impl Fn(TileId) -> bool) -> Vec<TileId> {
     let auth = game.view().auth;
     let mut tiles: Vec<(u64, TileId)> = (0..auth.map().tile_count() as u32)
         .map(TileId)
@@ -246,7 +246,7 @@ fn free_tiles(game: &GameState, rules: &CompiledRuleset, salt: u64, keep: impl F
 }
 
 /// The enemy's melee, ranged, melee, mounted, ... on `tiles`.
-fn army_on(game: &GameState, rules: &CompiledRuleset, enemy: PlayerId, tiles: &[TileId], n: usize) -> Result<Vec<Change>, String> {
+pub(super) fn army_on(game: &GameState, rules: &CompiledRuleset, enemy: PlayerId, tiles: &[TileId], n: usize) -> Result<Vec<Change>, String> {
     let kinds = edit::kinds_of(game, rules, enemy);
     let melee = *kinds.get(&Kind::Melee).ok_or("the enemy has no melee unit")?;
     let pick = |arm: Kind| kinds.get(&arm).copied().or_else(|| battle::fallback(arm).and_then(|f| kinds.get(&f).copied())).unwrap_or(melee);
@@ -259,7 +259,7 @@ fn army_on(game: &GameState, rules: &CompiledRuleset, enemy: PlayerId, tiles: &[
 
 /// `n` enemy units just outside `seat`'s land, 2 to 4 tiles from its cities on their landmass (an
 /// army at the border).
-fn at_border(game: &GameState, rules: &CompiledRuleset, seat: PlayerId, enemy: PlayerId, n: usize, salt: u64) -> Result<Vec<Change>, String> {
+pub(super) fn at_border(game: &GameState, rules: &CompiledRuleset, seat: PlayerId, enemy: PlayerId, n: usize, salt: u64) -> Result<Vec<Change>, String> {
     let map = game.view().auth.map();
     let cities = city_tiles(game, seat);
     let tiles = free_tiles(game, rules, salt, |t| {
@@ -269,7 +269,7 @@ fn at_border(game: &GameState, rules: &CompiledRuleset, seat: PlayerId, enemy: P
 }
 
 /// `n` enemy units 1 to 3 tiles from `seat`'s capital (an early rush).
-fn near_capital(game: &GameState, rules: &CompiledRuleset, seat: PlayerId, enemy: PlayerId, n: usize, salt: u64) -> Result<Vec<Change>, String> {
+pub(super) fn near_capital(game: &GameState, rules: &CompiledRuleset, seat: PlayerId, enemy: PlayerId, n: usize, salt: u64) -> Result<Vec<Change>, String> {
     let auth = game.view().auth;
     let capital = classic_rules::combat::city::capital_of(auth, rules, seat).and_then(|c| auth.cities().get(c)).map(|c| c.tile).ok_or("the seat has no capital")?;
     let map = auth.map();
@@ -279,7 +279,7 @@ fn near_capital(game: &GameState, rules: &CompiledRuleset, seat: PlayerId, enemy
 
 /// `n` fast units of the raider (its mounted kind, else melee) in the seat's countryside, 2 to 3
 /// tiles from its cities.
-fn raiders(game: &GameState, rules: &CompiledRuleset, seat: PlayerId, raider: PlayerId, n: usize, salt: u64) -> Result<Vec<Change>, String> {
+pub(super) fn raiders(game: &GameState, rules: &CompiledRuleset, seat: PlayerId, raider: PlayerId, n: usize, salt: u64) -> Result<Vec<Change>, String> {
     let kinds = edit::kinds_of(game, rules, raider);
     let kind = kinds.get(&Kind::Mounted).or_else(|| kinds.get(&Kind::Melee)).copied().ok_or("the raider has no land unit")?;
     let map = game.view().auth.map();
@@ -293,7 +293,7 @@ fn raiders(game: &GameState, rules: &CompiledRuleset, seat: PlayerId, raider: Pl
 
 /// Copies of `percent` of the leader's land military units (each copy of a unit's kind) on free
 /// tiles of its land 1 to 3 tiles from its cities; as many as the tiles allow.
-fn army_copies(game: &GameState, rules: &CompiledRuleset, leader: PlayerId, percent: usize, salt: u64) -> Vec<Change> {
+pub(super) fn army_copies(game: &GameState, rules: &CompiledRuleset, leader: PlayerId, percent: usize, salt: u64) -> Vec<Change> {
     let auth = game.view().auth;
     let kinds: Vec<u16> = edit::military_units(game, rules, leader)
         .into_iter()
@@ -309,7 +309,7 @@ fn army_copies(game: &GameState, rules: &CompiledRuleset, leader: PlayerId, perc
 }
 
 /// The tiles of `player`'s land that hold a resource of `class`, by resource.
-fn resource_tiles(game: &GameState, rules: &CompiledRuleset, player: PlayerId, class: ResourceClass) -> BTreeMap<u16, Vec<u32>> {
+pub(super) fn resource_tiles(game: &GameState, rules: &CompiledRuleset, player: PlayerId, class: ResourceClass) -> BTreeMap<u16, Vec<u32>> {
     let map = game.view().auth.map();
     let mut by: BTreeMap<u16, Vec<u32>> = BTreeMap::new();
     for t in (0..map.tile_count() as u32).map(TileId) {
@@ -326,14 +326,14 @@ fn resource_tiles(game: &GameState, rules: &CompiledRuleset, player: PlayerId, c
 }
 
 /// The resources of `class` in `player`'s land gone: the `kinds` kinds it holds most of.
-fn deplete(game: &GameState, rules: &CompiledRuleset, player: PlayerId, class: ResourceClass, kinds: usize) -> Change {
+pub(super) fn deplete(game: &GameState, rules: &CompiledRuleset, player: PlayerId, class: ResourceClass, kinds: usize) -> Change {
     let mut by: Vec<(usize, u16, Vec<u32>)> = resource_tiles(game, rules, player, class).into_iter().map(|(r, t)| (t.len(), r, t)).collect();
     by.sort_by_key(|(n, r, _)| (std::cmp::Reverse(*n), *r));
     Change::Deplete { tiles: by.into_iter().take(kinds).flat_map(|(_, _, t)| t).collect() }
 }
 
 /// The cities of `seat` nearest to `enemy`, the capital last, taken by `enemy`.
-fn losing_cities(game: &GameState, rules: &CompiledRuleset, seat: PlayerId, enemy: PlayerId, count: usize) -> Result<Vec<Change>, String> {
+pub(super) fn losing_cities(game: &GameState, rules: &CompiledRuleset, seat: PlayerId, enemy: PlayerId, count: usize) -> Result<Vec<Change>, String> {
     let auth = game.view().auth;
     let capital = classic_rules::combat::city::capital_of(auth, rules, seat).and_then(|c| auth.cities().get(c)).map(|c| c.id.0);
     let mut cities: Vec<(bool, i32, u64)> = auth
@@ -352,7 +352,7 @@ fn losing_cities(game: &GameState, rules: &CompiledRuleset, seat: PlayerId, enem
 
 /// `P7`: the city of any nation whose head order is a world wonder nobody holds, with the most
 /// production stocked in it; the sniper is the nation with the most score but the seat.
-fn snipe_plan(game: &GameState, rules: &CompiledRuleset, info: &mut BTreeMap<String, String>) -> Result<(Roles, Vec<Change>), String> {
+pub(super) fn snipe_plan(game: &GameState, rules: &CompiledRuleset, info: &mut BTreeMap<String, String>) -> Result<(Roles, Vec<Change>), String> {
     let auth = game.view().auth;
     let built: Vec<BuildingKindId> = auth.cities().iter().flat_map(|(_, c)| c.buildings.iter().copied()).filter(|b| rules.buildings[b.0 as usize].wonder).collect();
     let all = majors(game);
@@ -375,7 +375,7 @@ fn snipe_plan(game: &GameState, rules: &CompiledRuleset, info: &mut BTreeMap<Str
 
 /// `P5`: the tile of the forward city: free land no nation owns, 3 to 4 tiles from the seat's
 /// city nearest to the grabber, on its landmass, nearest to the grabber's cities.
-fn forward_tile(game: &GameState, rules: &CompiledRuleset, seat: PlayerId, grabber: PlayerId, round: u32) -> Result<TileId, String> {
+pub(super) fn forward_tile(game: &GameState, rules: &CompiledRuleset, seat: PlayerId, grabber: PlayerId, round: u32) -> Result<TileId, String> {
     let map = game.view().auth.map();
     let grabber_cities = city_tiles(game, grabber);
     let front = city_tiles(game, seat).into_iter().min_by_key(|c| (nearest_on_land(game, grabber, *c).unwrap_or(i32::MAX), c.0)).ok_or("the seat has no city")?;
@@ -394,7 +394,7 @@ fn forward_tile(game: &GameState, rules: &CompiledRuleset, seat: PlayerId, grabb
 
 /// `P5` at `level`: the forward city; with one and two citadels on the seat's tiles next to it
 /// (nearest to the seat's city first); the strongest level adds the grabber's war.
-fn grab(game: &GameState, rules: &CompiledRuleset, seat: PlayerId, grabber: PlayerId, tile: TileId, level: usize) -> Vec<Change> {
+pub(super) fn grab(game: &GameState, rules: &CompiledRuleset, seat: PlayerId, grabber: PlayerId, tile: TileId, level: usize) -> Vec<Change> {
     let mut changes = vec![Change::Found { player: grabber.0, tile: tile.0 }];
     let citadel = rules.improvements.iter().position(|d| d.culture_bomb_radius > 0);
     let map = game.view().auth.map();
