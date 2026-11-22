@@ -57,3 +57,7 @@ classic.ui.hud-game.city-state-close = 閉じる (Esc)
 
 classic.ui.hud-game.rebels-ahead = 幸福度が{ $threshold }を下回ると領内で反乱軍が蜂起します：あと不満{ NUMBER($left) }
 classic.ui.hud-game.rebels-now = 幸福度が{ $threshold }未満：数ターンごとに領内で反乱軍が蜂起します
+classic.ui.hud-game.rivals-more = ほか { $n }
+classic.ui.hud-game.city-states-row = 都市国家：{ $met } と接触
+classic.ui.hud-game.city-states-row-war = 都市国家：{ $met } と接触、{ $war } と戦争中
+classic.ui.hud-game.city-states-row-hint = 都市国家の画面を開く

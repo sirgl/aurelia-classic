@@ -79,6 +79,7 @@ impl Session {
             borders_open,
             peace: self.peace_availability(player),
             peace_by_offer: self.peace_by_offer(player),
+            city_state: !self.peace_by_offer(player),
             peace_ask: self.peace_ask(player),
             open_borders: self.open_borders_availability(me, player),
         }

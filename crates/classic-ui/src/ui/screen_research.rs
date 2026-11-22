@@ -15,7 +15,8 @@ fn progress(status: &TechStatus) -> Progress {
         TechStatus::Known => Progress::Done,
         TechStatus::Researching => Progress::Queued(1),
         TechStatus::Queued(n) => Progress::Queued(*n as u32 + 1),
-        TechStatus::Available | TechStatus::Locked(_) => Progress::Open,
+        TechStatus::Available => Progress::Open,
+        TechStatus::Locked(_) => Progress::Locked,
     }
 }
 
@@ -27,6 +28,9 @@ fn status_line(view: &ResearchView, tech: &TechCard) -> CardLine {
         t!("classic.ui.screen-research.discovered").into()
     } else if progress == Progress::Queued(1) {
         tf!("classic.ui.screen-research.science-progress", stored = view.stored, cost = tech.cost)
+    } else if let (Progress::Locked, TechStatus::Locked(needs)) = (progress, &tech.status) {
+        // What it waits for in place of its cost: the same words as the tooltip.
+        needs.clone()
     } else {
         tf!("classic.ui.screen-research.science-cost", cost = tech.cost)
     };
@@ -139,6 +143,24 @@ mod tests {
     }
     fn cell(tech: &TechCard) -> Cell {
         Cell { column: tech.column, row: tech.row }
+    }
+
+    /// A technology that is known, one that can be started and one that waits for another are
+    /// three looks, and the locked one says what it waits for in place of its cost.
+    #[test]
+    fn available_and_locked_technologies_are_drawn_apart_and_the_locked_one_names_what_it_needs() {
+        assert_eq!(progress(&TechStatus::Known), Progress::Done);
+        assert_eq!(progress(&TechStatus::Available), Progress::Open);
+        assert_eq!(progress(&TechStatus::Locked("Requires Pottery".into())), Progress::Locked);
+        let view = session().research_view();
+        let locked = view.techs.iter().find(|t| matches!(t.status, TechStatus::Locked(_))).expect("a locked technology at the start");
+        let TechStatus::Locked(needs) = &locked.status else { unreachable!() };
+        let nodes = graph(&view).nodes;
+        let index = view.techs.iter().position(|t| t.name == locked.name).unwrap();
+        assert_eq!(nodes[index].progress, Progress::Locked);
+        assert_eq!(nodes[index].card.lines[1].text, *needs, "the line names what it needs");
+        let open = view.techs.iter().position(|t| t.status == TechStatus::Available).expect("an available technology");
+        assert_eq!(nodes[open].progress, Progress::Open);
     }
 
     #[test]

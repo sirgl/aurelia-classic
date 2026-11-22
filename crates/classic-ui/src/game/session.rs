@@ -44,6 +44,9 @@ pub struct Session {
     /// the core has no such state; it only removes the unit from "needs orders".
     pub(super) skipped: Vec<UnitHandle>,
     pub(super) sleeping: Vec<UnitHandle>,
+    /// The round in which the player last opened the Congress, the diplomacy and the espionage
+    /// screen (`Looked`): what the end of the turn asks about them is answered by looking.
+    pub(super) looked: [Option<u32>; 3],
     pub(super) notices: Vec<Notice>,
     pub(super) message: Option<String>,
     pub(super) path_cache: Option<super::path::PathCache>,
@@ -131,6 +134,7 @@ impl Session {
             city_strike: None,
             skipped: Vec::new(),
             sleeping: Vec::new(),
+            looked: [None; 3],
             notices: Vec::new(),
             message: None,
             path_cache: None,

@@ -198,6 +198,8 @@ pub struct Rival {
     /// The nation refused the player's peace and said what it asks.
     pub peace_ask: Option<PeaceAsk>,
     pub open_borders: Availability,
+    /// A city-state, not a nation: the map's panel sums these up in one row.
+    pub city_state: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

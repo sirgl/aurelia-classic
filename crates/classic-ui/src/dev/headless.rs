@@ -28,7 +28,7 @@
 //! chosen, but nothing is queued: the end-turn button asks for the production), AURELIA_GAME_PARADE (set: one unit of every
 //! kind around the start), AURELIA_GAME_ZOOM (camera zoom), AURELIA_VISUAL_SIZE (WxH),
 //! AURELIA_VISUAL_HOVER_PIXEL (x,y: physical pointer for tooltip and route preview),
-//! AURELIA_GAME_SHORTCUTS (set: the keyboard shortcuts overlay is open), AURELIA_GAME_REPORT (set: the "Report a bug" dialog is open), AURELIA_GAME_SAVES (list | delete | name: the "Load game" list, with the first confirmation of the selected save asked (delete), or the "Save game" naming dialog; AURELIA_GAME_SAVES_SELECT=<row>; the saves are those of AURELIA_SAVE_DIR), AURELIA_GAME_UI_SCALE (0.75..1.5), AURELIA_GAME_SETTINGS_TAB (audio | graphics | game | controls),
+//! AURELIA_GAME_SHORTCUTS (set: the keyboard shortcuts overlay is open), AURELIA_GAME_STATUS (a shell error text: the toast; AURELIA_GAME_STATUS_SINK=menu: the main menu's line, as before), AURELIA_GAME_REPORT (set: the "Report a bug" dialog is open), AURELIA_GAME_SAVES (list | delete | name: the "Load game" list, with the first confirmation of the selected save asked (delete), or the "Save game" naming dialog; AURELIA_GAME_SAVES_SELECT=<row>; the saves are those of AURELIA_SAVE_DIR), AURELIA_GAME_UI_SCALE (0.75..1.5), AURELIA_GAME_SETTINGS_TAB (audio | graphics | game | controls),
 //! AURELIA_GAME_SHOWCASE=world (the world art showcase: one capture per view, saved as
 //! <path stem>-<view>.png) with AURELIA_GAME_ERAS (eras of players 0..=3, default 7,1,3,5).
 //! `--bench-world` measures frame time and world-object rebuilds on a dense late-game map.
@@ -1062,6 +1062,14 @@ fn show_screen(app: &mut GameApp, capital: Option<u32>) {
     if let Ok(tab) = std::env::var("AURELIA_GAME_SETTINGS_TAB") { app.screens.capture_settings_tab(&app.ctx, &tab); }
     app.screens.capture_navigation(std::env::var("AURELIA_GAME_NAVIGATION").as_deref() == Ok("1"));
     app.screens.shortcuts.open = std::env::var_os("AURELIA_GAME_SHORTCUTS").is_some();
+    // A shell error as play raises it (AURELIA_GAME_STATUS=<text>): the toast over the screen; with
+    // AURELIA_GAME_STATUS_SINK=menu the old sink, the main menu's line, for the picture of "before".
+    if let Ok(text) = std::env::var("AURELIA_GAME_STATUS") {
+        match std::env::var("AURELIA_GAME_STATUS_SINK").as_deref() {
+            Ok("menu") => app.screens.menu_status = Some(text),
+            _ => app.screens.error(text),
+        }
+    }
     // AURELIA_GAME_REPORT (set: the "Report a bug" dialog is open; `saved`: its file is made too).
     if let Ok(report) = std::env::var("AURELIA_GAME_REPORT") {
         app.apply(client::shell::module::ShellAction::ReportBug);
