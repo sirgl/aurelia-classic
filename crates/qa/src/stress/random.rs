@@ -69,7 +69,7 @@ pub fn sample(rules: &CompiledRuleset, position: &Position, seed: u64) -> Result
                 changes.extend(scene::invaders(game, rules, seat, enemy, units, seed)?);
             }
             Primitive::Boost { nation, percent } => {
-                gift.get_or_insert(Gift { player: nation.0, percent });
+                gift.get_or_insert(Gift { player: nation.0, percent, yield_kind: super::edit::Yield::Science });
             }
             Primitive::Seize { taker, cities } => {
                 let capital = classic_rules::combat::city::capital_of(game.view().auth, rules, seat).and_then(|c| game.view().auth.cities().get(c)).map(|c| c.id.0).ok_or("the seat has no capital")?;
@@ -84,5 +84,5 @@ pub fn sample(rules: &CompiledRuleset, position: &Position, seed: u64) -> Result
         }
     }
     let plan = Plan { roles: Roles::Seat { seat: seat.0 }, base: Vec::new(), info: Default::default() };
-    Ok((plan, Edit { changes, gift }, format!("seat {} / {}", seat.0, text.join(" + "))))
+    Ok((plan, Edit { changes, gift, script: None }, format!("seat {} / {}", seat.0, text.join(" + "))))
 }

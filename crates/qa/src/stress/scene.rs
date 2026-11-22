@@ -8,8 +8,9 @@ use classic_rules::ids::{PlayerId, TileId};
 use classic_rules::{ClassicGame, CompiledRuleset, GameState};
 use serde::{Deserialize, Serialize};
 
-use super::edit::{self, Change, Gift};
+use super::edit::{self, Change, Gift, Yield};
 use super::play::Arm;
+use super::seat::Script;
 use super::position::{mix, Position};
 use super::Situation;
 use crate::battle::{self, Arm as Kind};
@@ -34,6 +35,23 @@ pub enum Roles {
     Host { host: u8 },
     /// A random edit (`random`): only the outcome of `seat` is judged.
     Seat { seat: u8 },
+    /// `enemy`'s army stands at `seat`'s border or inside it at peace; its war starts `war_after`
+    /// rounds into the window (0: at once).
+    Sneak { seat: u8, enemy: u8, war_after: u32 },
+    /// `seat` is weakened (its army, its resources, its treasury); its own outcome is judged.
+    Weak { seat: u8 },
+    /// The world wonder `building` that `seat`'s city `city` builds is completed by `sniper`.
+    Snipe { seat: u8, sniper: u8, city: u64, building: u16 },
+    /// `grabber` settles at `seat`'s border on `tile` and raises citadels next to it.
+    Grab { seat: u8, grabber: u8, tile: u32 },
+    /// `raider`'s units hunt `seat`'s civilians and improvements (a script).
+    Raid { seat: u8, raider: u8 },
+    /// `trickster`, a friend, sells to `seat`, then declares war (a script).
+    Trick { seat: u8, trickster: u8 },
+    /// `seat` and `ally` hold a defensive pact; `enemy` declares war on `seat`.
+    Ally { seat: u8, ally: u8, enemy: u8 },
+    /// `seat` is losing a war to `enemy`: cities and army gone.
+    Losing { seat: u8, enemy: u8 },
 }
 
 impl Roles {
@@ -47,7 +65,15 @@ impl Roles {
             Roles::Lost { victim, .. } => vec![PlayerId(victim)],
             Roles::Common { a, b, .. } => vec![PlayerId(a), PlayerId(b)],
             Roles::Host { host } => others(host),
-            Roles::Seat { seat } => vec![PlayerId(seat)],
+            Roles::Seat { seat }
+            | Roles::Sneak { seat, .. }
+            | Roles::Weak { seat }
+            | Roles::Snipe { seat, .. }
+            | Roles::Grab { seat, .. }
+            | Roles::Raid { seat, .. }
+            | Roles::Trick { seat, .. }
+            | Roles::Ally { seat, .. }
+            | Roles::Losing { seat, .. } => vec![PlayerId(seat)],
         }
     }
 }
@@ -65,13 +91,15 @@ pub struct Plan {
 pub struct Edit {
     pub changes: Vec<Change>,
     pub gift: Option<Gift>,
+    /// The scripted adversary of the edited arm.
+    pub script: Option<Script>,
 }
 
 impl Situation {
     /// The strengths of the edit: 0 mild, 1 medium, 2 strong; a situation with no strength has one.
     pub fn levels(self) -> u8 {
         match self {
-            Situation::D1 | Situation::C5 => 1,
+            Situation::D1 | Situation::C5 | Situation::P7 | Situation::D2 => 1,
             _ => 3,
         }
     }
@@ -116,12 +144,16 @@ pub fn plan(situation: Situation, rules: &CompiledRuleset, position: &Position, 
             let host = game.view().auth.module().congress().host().filter(|_| game.view().auth.module().congress().founded()).ok_or("the congress is not founded")?;
             (Roles::Host { host: host.0 }, Vec::new())
         }
+        wave2 => return super::tricks::plan(wave2, rules, position, instance),
     };
     Ok(Plan { roles, base, info })
 }
 
 /// The edit of `situation` at `level` on the position.
-pub fn edit_of(level: u8, rules: &CompiledRuleset, position: &Position, plan: &Plan) -> Result<Edit, String> {
+pub fn edit_of(situation: Situation, level: u8, rules: &CompiledRuleset, position: &Position, plan: &Plan) -> Result<Edit, String> {
+    if situation.wave() == 2 {
+        return super::tricks::edit_of(situation, level, rules, position, plan);
+    }
     let game = &position.game;
     let salt = mix(position.round as u64 ^ u64::from(level) << 8);
     let l = usize::from(level.min(2));
@@ -132,14 +164,14 @@ pub fn edit_of(level: u8, rules: &CompiledRuleset, position: &Position, plan: &P
             vec![Change::RemoveUnits { ids }]
         }
         Roles::Invasion { seat, enemy } => invaders(game, rules, PlayerId(seat), PlayerId(enemy), [4, 7, 10][l], salt)?,
-        Roles::Runaway { leader } => return Ok(Edit { changes: Vec::new(), gift: Some(Gift { player: leader, percent: [25, 50, 100][l] }) }),
+        Roles::Runaway { leader } => return Ok(Edit { changes: Vec::new(), gift: Some(Gift { player: leader, percent: [25, 50, 100][l], yield_kind: Yield::Science }), script: None }),
         Roles::Lost { victim, taker, capital } => lost_cities(game, PlayerId(victim), PlayerId(taker), capital, 1 + l),
         Roles::Race { leader } => spaceship(rules, PlayerId(leader), [3, 2, 1][l]),
         Roles::Common { a, b, enemy } => vec![Change::War { a: a, b: enemy }, Change::War { a: b, b: enemy }],
         Roles::Host { host } => remove_nation(game, PlayerId(host))?,
-        Roles::Seat { .. } => return Err("a random scene has its edit made by `random::sample`".to_owned()),
+        other => return Err(format!("{} has no wave-1 edit for {other:?}", situation.name())),
     };
-    Ok(Edit { changes, gift: None })
+    Ok(Edit { changes, gift: None, script: None })
 }
 
 /// The two arms: the control (the base) and the edited (the base and the edit); the ids of the units
@@ -149,7 +181,10 @@ pub fn arms(rules: &CompiledRuleset, position: &Position, plan: &Plan, edit: &Ed
     edit::apply_all(&mut control, rules, &plan.base)?;
     let mut edited = control.clone();
     let spawned = edit::apply_all(&mut edited, rules, &edit.changes)?;
-    Ok((Arm { game: control, gift: None, tracked: Vec::new() }, Arm { game: edited, gift: edit.gift, tracked: spawned }))
+    let control = Arm { game: control, gift: None, tracked: Vec::new(), later: edit::later(&plan.base), script: None };
+    let script = edit.script.clone().map(|s| s.with_units(&spawned));
+    let edited = Arm { game: edited, gift: edit.gift, tracked: spawned, later: [edit::later(&plan.base), edit::later(&edit.changes)].concat(), script };
+    Ok((control, edited))
 }
 
 // ---------------------------------------------------------------------------
@@ -160,7 +195,7 @@ pub(super) fn city_tiles(game: &GameState, p: PlayerId) -> Vec<TileId> {
     auth.indexes().cities_of(p).iter().filter_map(|h| auth.cities().get(*h)).map(|c| c.tile).collect()
 }
 
-fn distance(game: &GameState, a: TileId, b: TileId) -> i32 {
+pub(super) fn distance(game: &GameState, a: TileId, b: TileId) -> i32 {
     game.view().auth.map().dimensions.distance(a, b).unwrap_or(i32::MAX)
 }
 
