@@ -168,7 +168,7 @@ fn soldier_reads(obs: &AIObservation<'_>, model: &Rivals, met: &[&crate::knowled
         .map(|r| SoldiersEvidence {
             player: r.other,
             lower: memory.seen_units(r.other, obs.round, window),
-            cities: memory.foreign.iter().filter(|c| c.owner == r.other).count() as u32,
+            score: obs.public.score_of(r.other).unwrap_or(0),
         })
         .collect();
     let guesses = crate::ai::rival_model::soldiers(row, model.living, &evidence);

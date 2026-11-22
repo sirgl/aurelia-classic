@@ -87,7 +87,7 @@ fn demo(value: i64, best: i64, average: i64, worst: i64) -> Demographic {
 #[test]
 fn a_disarmed_rival_of_an_average_score_reads_as_disarmed() {
     let d = demo(12, 14, 74 / 6, 1);
-    let ev = |player: u8, lower: i64| SoldiersEvidence { player: PlayerId(player), lower, cities: 2 };
+    let ev = |player: u8, lower: i64| SoldiersEvidence { player: PlayerId(player), lower, score: 100 };
     let evidence = [ev(1, 0), ev(2, 3), ev(3, 3), ev(4, 3), ev(5, 3)];
     let g = soldiers(&d, 6, &evidence);
     assert_eq!(g[0], Guess::exact(1), "the worst is exact when the others are excluded by sight: {g:?}");
@@ -100,18 +100,18 @@ fn a_disarmed_rival_of_an_average_score_reads_as_disarmed() {
     assert!(g[1..].iter().all(|x| x.lo >= 3 && x.hi <= 14), "{g:?}");
 }
 
-/// Without the exclusion (two rivals might be the worst), the sum is shared by cities, not score, and
+/// Without the exclusion (two rivals might be the worst), the sum above the floors is shared by score, and
 /// every value stays in [max(worst, seen), best].
 #[test]
-fn the_rest_of_the_sum_is_shared_by_cities() {
+fn the_rest_of_the_sum_is_shared_by_score() {
     let d = demo(10, 30, 20, 2);
     let evidence = [
-        SoldiersEvidence { player: PlayerId(1), lower: 0, cities: 1 },
-        SoldiersEvidence { player: PlayerId(2), lower: 0, cities: 5 },
-        SoldiersEvidence { player: PlayerId(3), lower: 0, cities: 1 },
+        SoldiersEvidence { player: PlayerId(1), lower: 0, score: 100 },
+        SoldiersEvidence { player: PlayerId(2), lower: 0, score: 500 },
+        SoldiersEvidence { player: PlayerId(3), lower: 0, score: 100 },
     ];
     let g = soldiers(&d, 4, &evidence);
-    assert!(g[1].value > g[0].value, "the nation with five cities has more: {g:?}");
+    assert!(g[1].value > g[0].value, "the nation with the larger score has more: {g:?}");
     assert_eq!(g[0].value, g[2].value);
     assert!(g.iter().all(|x| x.lo >= 2 && x.hi <= 30 && x.value >= x.lo && x.value <= x.hi), "{g:?}");
     // A nation not met: the worst may be its; nothing is assigned.
@@ -122,7 +122,7 @@ fn the_rest_of_the_sum_is_shared_by_cities() {
 /// A duel: exact, as the row.
 #[test]
 fn two_nations_are_exact() {
-    let g = soldiers(&demo(5, 9, 7, 5), 2, &[SoldiersEvidence { player: PlayerId(1), lower: 0, cities: 1 }]);
+    let g = soldiers(&demo(5, 9, 7, 5), 2, &[SoldiersEvidence { player: PlayerId(1), lower: 0, score: 100 }]);
     assert_eq!(g, vec![Guess::exact(9)]);
 }
 
@@ -514,4 +514,76 @@ fn narrowed_cuts_what_a_smaller_sensor_collects() {
     assert_eq!(cut.radius, 2);
     assert_eq!(wide.narrowed(9).foreign_units, wide.foreign_units, "a wider radius gives the observation itself");
     assert_eq!(wide.narrowed(9).radius, 6);
+}
+
+// ---- the estimator against the truth on played games (run with `--ignored --nocapture`) ----
+
+/// Plays six-nation games of the game's AI and, at every fifth round, compares for every seat and every
+/// met rival its soldiers by the old estimate (score-shared, `rival_model::estimate`) and by the fixed one
+/// (`net2`'s memory of sightings, `inputs::read`) with the truth (the rival's own demographics value).
+/// Prints the mean absolute error of both, over every reading and over the readings where the rival has
+/// at most half of the seat's soldiers (the disarmed neighbour).
+#[test]
+#[ignore]
+fn the_soldiers_estimate_against_the_truth_on_played_games() {
+    use classic_rules::ai::{AiDriver, AiSettings};
+    use classic_rules::derived::standing::demographics;
+    use classic_rules::scenario::{generate_new_game, ScenarioConfig};
+    let rules = rules();
+    let seeds: Vec<u64> = std::env::var("NET2_SEEDS").ok().map(|v| v.split(',').filter_map(|s| s.parse().ok()).collect()).unwrap_or_else(|| vec![11, 12, 13]);
+    let rounds: u32 = std::env::var("NET2_ROUNDS").ok().and_then(|v| v.parse().ok()).unwrap_or(150);
+    let soldiers_at = Measure::ALL.iter().position(|m| *m == Measure::Soldiers).unwrap();
+    // (readings, old error, new error, doubt) overall and for the disarmed.
+    let (mut all, mut weak) = ((0i64, 0i64, 0i64), (0i64, 0i64, 0i64));
+    let mut exact = 0;
+    let mut exact_wrong = 0;
+    let (mut in_range, mut sums) = (0, 0);
+    for seed in seeds {
+        let mut game = generate_new_game(&rules, &ScenarioConfig { seed, players: 6, width: 60, height: 40, cities: 0, units: 0, water_ratio: 15 });
+        let mut driver = AiDriver::new(AiSettings::for_rules(&rules, rules.default_difficulty()), Vec::new());
+        let mut seats: Vec<(PlayerId, AiState, InputMemory)> = (0..6).map(|p| (PlayerId(p), AiState::new(PlayerId(p), 1), InputMemory::default())).collect();
+        let mut last = 0;
+        while game.view().auth.turn().round < rounds {
+            let report = driver.run(&mut game, &rules, 200);
+            assert!(!report.waiting);
+            let round = game.view().auth.turn().round;
+            if !report.round_done || round == last {
+                continue;
+            }
+            last = round;
+            for (seat, state, memory) in seats.iter_mut() {
+                if !game.view().auth.players().is_alive(*seat) || game.view().auth.indexes().cities_of(*seat).is_empty() {
+                    continue;
+                }
+                let obs = game.ai_observation(&rules, *seat);
+                let brief = planner::observe(&obs, state, &rules);
+                let model = estimate(&obs, &rules, &Book::default());
+                let _ = inputs::read(&obs, &brief, state, &rules, &neutral(&[]), &model, memory);
+                if round % 5 != 0 {
+                    continue;
+                }
+                let own = model.own[soldiers_at];
+                for r in &model.rivals {
+                    let view = game.view();
+                    let truth = demographics(view.auth, &rules, view.derived, r.player).iter().find(|d| d.measure == Measure::Soldiers).map_or(0, |d| d.value);
+                    let old = r.rows[soldiers_at].value;
+                    let Some(new) = memory.soldiers_of(r.player) else { continue };
+                    let (e_old, e_new) = ((old - truth).abs(), (new.value - truth).abs());
+                    all = (all.0 + 1, all.1 + e_old, all.2 + e_new);
+                    if truth * 2 <= own {
+                        weak = (weak.0 + 1, weak.1 + e_old, weak.2 + e_new);
+                    }
+                    if new.lo == new.hi {
+                        exact += 1;
+                        exact_wrong += i32::from(new.value != truth);
+                    }
+                    sums += 1;
+                    in_range += i32::from(truth >= new.lo && truth <= new.hi);
+                }
+            }
+        }
+    }
+    let mean = |s: i64, n: i64| if n == 0 { 0.0 } else { s as f64 / n as f64 };
+    eprintln!("soldiers: {} readings, mean abs error old {:.2} new {:.2}; exact values given {} ({} wrong); truth inside the range {}/{}", all.0, mean(all.1, all.0), mean(all.2, all.0), exact, exact_wrong, in_range, sums);
+    eprintln!("soldiers of the disarmed (truth at most half of ours): {} readings, old {:.2} new {:.2}", weak.0, mean(weak.1, weak.0), mean(weak.2, weak.0));
 }

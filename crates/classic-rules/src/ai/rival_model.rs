@@ -275,9 +275,8 @@ pub struct SoldiersEvidence {
     pub player: PlayerId,
     /// A lower bound: the most of its military units seen at one time in the last 10 paced rounds.
     pub lower: i64,
-    /// Its cities seen (an army scales with the cities it guards: `operations::known_power`'s own
-    /// assumption).
-    pub cities: u32,
+    /// Its score on the public list: the weight of its share of what the sight leaves open.
+    pub score: i64,
 }
 
 /// The guess of every met rival's soldiers (the demographics row `Measure::Soldiers`), in the order of
@@ -287,9 +286,15 @@ pub struct SoldiersEvidence {
 /// 1. the demographics' `worst` is the exact value of one living nation. When it is below the seat's
 ///    own, every nation is met, and exactly one met rival has a lower bound within it (the others are
 ///    excluded by sight: they were seen with more units), that rival has `worst`, exactly;
-/// 2. the rest of the sum (`average × living − own − assigned`) is shared by the cities seen, not by
-///    score, with a nation not met counting the mean of the others; each value is clamped to
-///    `[max(worst, its lower bound), best]`.
+/// 2. otherwise one of the rivals whose lower bound is within `worst` (or a nation not met) is the worst:
+///    each is `worst` with the chance 1/k, k the candidates and the nations not met;
+/// 3. the sum (`average × living − own − assigned`) is shared: each nation holds at least `max(worst,
+///    its lower bound)`, and the slack above those floors is shared by score (a nation not met counts
+///    the mean); each value is clamped to `[max(worst, its lower bound), best]`.
+///
+/// The design (§2.4) shared by cities seen; measured on played games (the soldiers test of
+/// `tests/ai_net2_inputs.rs`), the cities seen gave a larger error than the score (mean absolute error
+/// 3.36 against 2.75 soldiers), and the score on the slack above the floors with step 2 the smallest.
 pub fn soldiers(d: &Demographic, living: u32, evidence: &[SoldiersEvidence]) -> Vec<Guess> {
     let n = i64::from(living);
     let others = n - 1;
@@ -315,7 +320,7 @@ pub fn soldiers(d: &Demographic, living: u32, evidence: &[SoldiersEvidence]) -> 
     }
     // The nations of the share: the open rivals and the nations not met.
     let unmet = (others - met).max(0);
-    let weight = |i: usize| i64::from(evidence[i].cities.max(1));
+    let weight = |i: usize| evidence[i].score.max(1);
     let open_weight: i64 = open.iter().map(|i| weight(*i)).sum();
     let mean_weight = if open.is_empty() { 1 } else { (open_weight / open.len() as i64).max(1) };
     let total_weight = open_weight + unmet * mean_weight;
@@ -330,8 +335,19 @@ pub fn soldiers(d: &Demographic, living: u32, evidence: &[SoldiersEvidence]) -> 
     for &i in &open {
         let lo = floor(i).max(rest_lo - (slots - 1) * d.best).min(d.best);
         let hi = d.best.min(rest_hi - (floors - floor(i))).max(lo);
-        let share = if total_weight > 0 { mid * weight(i) / total_weight } else { mid / slots.max(1) };
-        out[i] = Guess { value: share.clamp(lo, hi), lo, hi };
+        // Every nation holds at least its floor (the worst, or what was seen); the slack the sum leaves
+        // above the floors is shared by weight.
+        let slack = (mid - floors).max(0);
+        let share = floor(i) + if total_weight > 0 { slack * weight(i) / total_weight } else { slack / slots.max(1) };
+        // One of the candidates holds the worst: each is the worst with the chance 1/k (k: the candidates and
+        // the nations not met), else the shared value.
+        let value = if d.worst < own && assigned.is_none() && candidates.contains(&i) {
+            let k = candidates.len() as i64 + unmet;
+            (d.worst + (k - 1) * share) / k.max(1)
+        } else {
+            share
+        };
+        out[i] = Guess { value: value.clamp(lo, hi), lo, hi };
     }
     out
 }
