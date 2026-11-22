@@ -793,6 +793,11 @@ impl<'a> WorldTransaction<'a> {
         }
     }
 
+    /// The city is razed: no record of a theft names it (`remove_city`).
+    pub(crate) fn forget_thefts_in(&mut self, city: CityHandle) {
+        self.world.module.espionage.thefts.retain(|theft| theft.city != city);
+    }
+
     /// War sends the diplomats of both sides home.
     pub(crate) fn evacuate_diplomats(&mut self, a: PlayerId, b: PlayerId) {
         let owners: Vec<(PlayerId, PlayerId)> = vec![(a, b), (b, a)];

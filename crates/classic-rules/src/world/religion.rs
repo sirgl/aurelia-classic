@@ -238,6 +238,13 @@ impl ReligionState {
         self.religions.push(religion);
     }
 
+    /// The city is razed: its slot holds no pressure any more (the slot is never reused).
+    pub(crate) fn forget_city(&mut self, city: CityHandle) {
+        if let Some(slot) = self.cities.get_mut(city.index as usize) {
+            *slot = CityFaith::default();
+        }
+    }
+
     pub(crate) fn city_mut(&mut self, city: CityHandle) -> &mut CityFaith {
         let index = city.index as usize;
         if self.cities.len() <= index {

@@ -4,24 +4,18 @@
 
 use crate::ids::{CityHandle, PlayerId, ResourceId};
 use crate::persistence::decode::DecodeError;
+use crate::persistence::encode::CityOrdinals;
 use crate::persistence::schema::SavedRelations;
 use crate::rules::CompiledRuleset;
 use crate::world::relations::{DealItem, DealOffer, Grievance, GrievanceKind, OngoingTrade, RelationsState, TradeFlow};
 
-/// (tag, value, extra) of a deal item.
-fn encode_item(item: DealItem, city_ordinals: &[u32]) -> (u8, u32, u16) {
-    match item {
+/// (tag, value, extra) of a deal item; None for a city that was removed.
+fn encode_item(item: DealItem, city_ordinals: &CityOrdinals) -> Option<(u8, u32, u16)> {
+    let coded = match item {
         DealItem::Gold(g) => (0, g, 0),
         DealItem::GoldPerTurn(g) => (1, g, 0),
         DealItem::Resource { resource, amount } => (2, u32::from(resource.0), amount),
-        DealItem::City(c) => (
-            3,
-            city_ordinals
-                .get(c.index as usize)
-                .copied()
-                .unwrap_or(u32::MAX),
-            0,
-        ),
+        DealItem::City(c) => (3, city_ordinals.of(c)?, 0),
         DealItem::Embassy => (4, 0, 0),
         DealItem::OpenBorders => (5, 0, 0),
         DealItem::DefensivePact => (6, 0, 0),
@@ -30,7 +24,8 @@ fn encode_item(item: DealItem, city_ordinals: &[u32]) -> (u8, u32, u16) {
         DealItem::Peace => (9, 0, 0),
         DealItem::ThirdPartyWar(p) => (10, u32::from(p.0), 0),
         DealItem::ThirdPartyPeace(p) => (11, u32::from(p.0), 0),
-    }
+    };
+    Some(coded)
 }
 
 fn decode_item(
@@ -60,7 +55,7 @@ fn decode_item(
     })
 }
 
-pub(crate) fn encode_relations(r: &RelationsState, city_ordinals: &[u32]) -> SavedRelations {
+pub(crate) fn encode_relations(r: &RelationsState, city_ordinals: &CityOrdinals) -> SavedRelations {
     SavedRelations {
         peace_until: r.peace_until.clone(),
         war_since: r.war_since.clone(),
@@ -87,13 +82,14 @@ pub(crate) fn encode_relations(r: &RelationsState, city_ordinals: &[u32]) -> Sav
         offers: r
             .offers
             .iter()
-            .map(|o| {
+            // The removal of a city withdraws the offers naming it (`remove_city`).
+            .filter_map(|o| {
                 let items = o
                     .items
                     .iter()
-                    .map(|(giver, item)| (giver.0, encode_item(*item, city_ordinals)))
-                    .collect();
-                (o.id, o.from.0, o.to.0, o.expires, items)
+                    .map(|(giver, item)| Some((giver.0, encode_item(*item, city_ordinals)?)))
+                    .collect::<Option<Vec<_>>>()?;
+                Some((o.id, o.from.0, o.to.0, o.expires, items))
             })
             .collect(),
         next_offer: r.next_offer,

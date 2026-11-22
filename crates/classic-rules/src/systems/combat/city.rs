@@ -471,22 +471,21 @@ impl<'a> WorldTransaction<'a> {
         self.remove_city(city, rules);
     }
 
-    /// Raze a city completely: its tiles become unowned, its units go,
-    /// the city leaves the store.
+    /// Raze a city completely. Every record of the rules that names it goes first (one cleaner
+    /// per owner of the state: spies and the thefts, trade routes, offers, the city's slots of faith
+    /// and great works), then the kernel removes it (tiles, indexes, timed effects, the store).
+    /// The guard: `world::references::references_to_city` must be empty after (tests/city_removal.rs).
     pub(crate) fn remove_city(&mut self, city: CityHandle, rules: &CompiledRuleset) {
-        self.evict_spies(city);
-        self.clear_city_trade_routes(city, rules);
-        let Some(core) = self.world.cities.get(city) else {
+        if self.world.cities.get(city).is_none() {
             return;
-        };
-        let (owner, tile) = (core.owner, core.tile);
-        crate::transaction::journal::release_city_tiles(&mut *self.0.world, &mut self.0.journal, city);
-        self.world.indexes.unindex_city_owner(owner, city);
-        self.world.indexes.unindex_city_tile(tile);
-        self.world.cities.remove(city);
-        self.journal
-            .city_changes
-            .push(CityChange::Removed { city, owner, tile });
+        }
+        self.evict_spies(city);
+        self.forget_thefts_in(city);
+        self.clear_city_trade_routes(city, rules);
+        self.withdraw_offers_of_city(city);
+        self.world.module.religion.forget_city(city);
+        self.world.module.tourism.forget_city(city);
+        crate::transaction::journal::remove_city(&mut *self.0.world, &mut self.0.journal, city);
     }
 
     /// End of the conqueror's turn: an undecided city becomes a puppet.

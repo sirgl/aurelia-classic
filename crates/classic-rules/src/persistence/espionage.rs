@@ -5,14 +5,11 @@
 use crate::ids::CityHandle;
 use crate::persistence::decode::DecodeError;
 use crate::persistence::schema::{SavedEspionage, SavedSpy};
+use crate::persistence::encode::CityOrdinals;
 use crate::world::espionage::{EspionageState, Spy, SpyState, Theft};
 
-fn encode_spy(spy: &Spy, city_ordinals: &[u32]) -> SavedSpy {
-    let city = spy
-        .city
-        .and_then(|c| city_ordinals.get(c.index as usize))
-        .map(|o| o + 1)
-        .unwrap_or(0);
+fn encode_spy(spy: &Spy, city_ordinals: &CityOrdinals) -> SavedSpy {
+    let city = spy.city.and_then(|c| city_ordinals.of(c)).map_or(0, |o| o + 1);
     (
         (spy.name, spy.rank, spy.state.tag(), city),
         (spy.amount as u64, spy.rate as u64, spy.goal as u64),
@@ -20,7 +17,7 @@ fn encode_spy(spy: &Spy, city_ordinals: &[u32]) -> SavedSpy {
     )
 }
 
-pub(crate) fn encode_espionage(state: &EspionageState, city_ordinals: &[u32]) -> SavedEspionage {
+pub(crate) fn encode_espionage(state: &EspionageState, city_ordinals: &CityOrdinals) -> SavedEspionage {
     SavedEspionage {
         spies: state
             .all_spies()
@@ -33,9 +30,9 @@ pub(crate) fn encode_espionage(state: &EspionageState, city_ordinals: &[u32]) ->
         thefts: state
             .all_thefts()
             .iter()
-            .map(|t| {
-                let city = city_ordinals.get(t.city.index as usize).map(|o| o + 1).unwrap_or(0);
-                (t.round, t.victim.0, t.thief.map(|p| p.0 + 1).unwrap_or(0), city)
+            .filter_map(|t| {
+                let city = city_ordinals.of(t.city)? + 1;
+                Some((t.round, t.victim.0, t.thief.map(|p| p.0 + 1).unwrap_or(0), city))
             })
             .collect(),
     }

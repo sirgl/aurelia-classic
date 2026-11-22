@@ -334,6 +334,13 @@ impl TourismState {
         GreatWorkId(self.works.len() as u32 - 1)
     }
 
+    /// The city is razed: the works in its slots are lost with it (the slot is never reused).
+    pub(crate) fn forget_city(&mut self, city: CityHandle) {
+        if let Some(slot) = self.cities.get_mut(city.index as usize) {
+            *slot = CityWorks::default();
+        }
+    }
+
     pub(crate) fn city_mut(&mut self, city: CityHandle) -> &mut CityWorks {
         let index = city.index as usize;
         if self.cities.len() <= index {

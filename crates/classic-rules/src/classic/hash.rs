@@ -47,7 +47,7 @@ fn relations(world: &ClassicWorld, auth: &AuthWorld, mix: &mut dyn FnMut(u64)) {
     // game without treaties hashes as before M4).
     let relations = world.relations();
     if !relations.is_pristine() {
-        let city_ordinals = crate::persistence::encode::city_ordinals(auth);
+        let city_ordinals = crate::persistence::encode::CityOrdinals::new(auth);
         let saved = crate::persistence::relations::encode_relations(relations, &city_ordinals);
         mix(0x7265_6c61);
         let matrices = [
@@ -133,7 +133,7 @@ fn barbarians(world: &ClassicWorld, mix: &mut dyn FnMut(u64)) {
 fn espionage(world: &ClassicWorld, auth: &AuthWorld, mix: &mut dyn FnMut(u64)) {
     // Espionage: mixed once a spy exists.
     if !world.espionage().is_pristine() {
-        let ordinals = crate::persistence::encode::city_ordinals(auth);
+        let ordinals = crate::persistence::encode::CityOrdinals::new(auth);
         let e = crate::persistence::espionage::encode_espionage(world.espionage(), &ordinals);
         mix(0x7370_7973 ^ u64::from(e.renaissance_granted));
         for ((name, rank, state, city), (amount, rate, goal), (diplomat, dead)) in

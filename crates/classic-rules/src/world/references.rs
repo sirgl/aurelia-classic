@@ -14,7 +14,7 @@
 //! per-player parts of culture, religion, tourism (influence included), military, victory
 //! projects, congress rewards and project contributions, espionage eras.
 
-use crate::ids::PlayerId;
+use crate::ids::{CityHandle, PlayerId};
 use crate::world::congress::ResolutionKind;
 use crate::world::state::AuthWorld;
 
@@ -123,5 +123,60 @@ fn positional(auth: &AuthWorld, player: PlayerId) -> Vec<String> {
         "espionage.steal_rights",
         others.iter().any(|o| espionage.steal_rights(player, *o) != 0 || espionage.steal_rights(*o, player) != 0),
     );
+    found
+}
+
+/// Every place of the world state that still names `city`, by name (empty: none): the guard of
+/// the city's removal (`remove_city`; tests/city_removal.rs asks for an empty list after a raze).
+///
+/// - **Typed**: every `CityHandle` the module's state holds, found in its `Debug` text (a new
+///   field is searched without being listed here), and the kernel's tiles, indexes and timed
+///   effects.
+/// - **Positional**: the module's tables by city slot (faith, great works) must be empty for it.
+pub fn references_to_city(auth: &AuthWorld, city: CityHandle) -> Vec<String> {
+    let world = auth.module();
+    let parts = [
+        ("trade", format!("{:?}", world.trade)),
+        ("military", format!("{:?}", world.military)),
+        ("barbarians", format!("{:?}", world.barbarians)),
+        ("city_states", format!("{:?}", world.city_states)),
+        ("victory", format!("{:?}", world.victory)),
+        ("congress", format!("{:?}", world.congress)),
+        ("espionage", format!("{:?}", world.espionage)),
+        ("culture", format!("{:?}", world.culture)),
+        ("religion", format!("{:?}", world.religion.religions())),
+        ("tourism", format!("{:?}", world.tourism.works())),
+        ("relations", format!("{:?}", world.relations)),
+    ];
+    let name = format!("{city:?}");
+    let mut found = Vec::new();
+    for (part, text) in parts {
+        if text.contains(&name) {
+            found.push(format!("{part}: {}", excerpt(&text, &name)));
+        }
+    }
+    if auth.cities().get(city).is_some() {
+        found.push("the city store".to_string());
+    }
+    let tiles = auth.map().tile_count();
+    let tile_ids = || (0..tiles).map(|i| crate::ids::TileId(i as u32));
+    if tile_ids().any(|t| auth.map().owning_city(t) == Some(city)) {
+        found.push("kernel map: owning city".to_string());
+    }
+    if tile_ids().any(|t| auth.indexes().city_on_tile(t) == Some(city)) {
+        found.push("kernel indexes: city on tile".to_string());
+    }
+    if auth.indexes().cities_by_player.values().any(|cities| cities.contains(&city)) {
+        found.push("kernel indexes: cities by player".to_string());
+    }
+    if auth.active_effects().iter().any(|e| e.target == crate::world::effects::EffectTarget::City(city)) {
+        found.push("kernel timed effects".to_string());
+    }
+    if *world.religion.city(city) != crate::world::religion::CityFaith::default() {
+        found.push("religion: the city's faith slot".to_string());
+    }
+    if !world.tourism.city(city).works.is_empty() {
+        found.push("tourism: the city's great works".to_string());
+    }
     found
 }

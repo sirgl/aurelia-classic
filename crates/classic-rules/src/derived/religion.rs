@@ -550,8 +550,9 @@ pub fn found_status(
         .indexes()
         .city_on_tile(tile)
         .ok_or(FaithBlock::NotInOwnCity)?;
-    let owner = auth.cities().get(city).map(|c| c.owner);
-    if owner != Some(player) || auth.module().religion().holy_city_of(city).is_some() {
+    // A burning city is not a city of one's own to found in: a holy city is never razed.
+    let own = auth.cities().get(city).is_some_and(|c| c.owner == player && c.status != crate::world::city::CityStatus::Razing);
+    if !own || auth.module().religion().holy_city_of(city).is_some() {
         return Err(FaithBlock::NotInOwnCity);
     }
     let faith = auth.module().religion().player(player);

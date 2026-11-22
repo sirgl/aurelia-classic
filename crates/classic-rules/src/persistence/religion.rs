@@ -96,7 +96,7 @@ const KINDS: [GreatPersonKind; 9] = [
 
 pub(crate) fn encode_faith(auth: &AuthWorld) -> SavedFaith {
     let state = auth.module().religion();
-    let ordinals = crate::persistence::encode::city_ordinals(auth);
+    let ordinals = crate::persistence::encode::CityOrdinals::new(auth);
     let players = (0..auth.players().count())
         .map(|i| encode_player(state.player(PlayerId(i as u8))))
         .collect();
@@ -106,7 +106,9 @@ pub(crate) fn encode_faith(auth: &AuthWorld) -> SavedFaith {
         .map(|r| SavedReligion {
             religion: r.religion.0,
             founder: r.founder.0,
-            holy_city: ordinals[r.holy_city.index as usize],
+            // A holy city is never removed (it cannot be razed: `validate_decide_city`); a removed
+            // one would be refused at load, never read as another city.
+            holy_city: ordinals.of(r.holy_city).unwrap_or(u32::MAX),
             beliefs: r.beliefs.iter().map(|b| b.0).collect(),
             enhanced: r.enhanced,
         })

@@ -30,15 +30,15 @@ fn yields_of(y: RouteYields) -> [u32; 4] {
 }
 
 pub fn encode_routes(auth: &AuthWorld) -> Vec<SavedTradeRoute> {
-    let order: Vec<CityHandle> = auth.cities().iter().map(|(h, _)| h).collect();
-    let ordinal = |c: CityHandle| order.iter().position(|h| *h == c).unwrap_or(usize::MAX) as u32;
+    let ordinals = crate::persistence::encode::CityOrdinals::new(auth);
     auth.module().trade()
         .routes()
         .iter()
-        .map(|r| SavedTradeRoute {
+        // The removal of a city ends its routes (`clear_city_trade_routes`): none names a removed one.
+        .filter_map(|r| Some(SavedTradeRoute {
             owner: r.owner.0,
-            origin: ordinal(r.origin),
-            destination: ordinal(r.destination),
+            origin: ordinals.of(r.origin)?,
+            destination: ordinals.of(r.destination)?,
             domain: u8::from(r.domain == TradeDomain::Sea),
             kind: r.kind.code(),
             unit_kind: r.unit_kind.0,
@@ -48,7 +48,7 @@ pub fn encode_routes(auth: &AuthWorld) -> Vec<SavedTradeRoute> {
             circuits_done: r.circuits_done,
             circuits_total: r.circuits_total,
             yields: [yields_of(r.origin_yields), yields_of(r.destination_yields)].concat(),
-        })
+        }))
         .collect()
 }
 

@@ -13,7 +13,7 @@ pub(crate) mod turn;
 pub(crate) mod validate;
 
 use crate::command::CommandError;
-use crate::ids::{PlayerId, TileId};
+use crate::ids::{CityHandle, PlayerId, TileId};
 use crate::rules::CompiledRuleset;
 use crate::classic::ClassicChange;
 use crate::transaction::journal::PlayerChange;
@@ -183,6 +183,26 @@ impl<'a> WorldTransaction<'a> {
                 });
                 self.relations_changed(offer.from);
             }
+        }
+    }
+
+    /// The city is razed: the offers that give it are withdrawn, and their proposers told as of an
+    /// offer that can no longer be met (`ClassicChange::OfferLapsed`, `remove_city`).
+    pub(crate) fn withdraw_offers_of_city(&mut self, city: CityHandle) {
+        let gives = |offer: &crate::world::relations::DealOffer| offer.items.iter().any(|(_, item)| *item == DealItem::City(city));
+        let offers = &mut self.world.module.relations.offers;
+        let (withdrawn, kept): (Vec<_>, Vec<_>) = offers.drain(..).partition(gives);
+        *offers = kept;
+        for offer in withdrawn {
+            let peace = offer.items.iter().any(|(_, item)| *item == DealItem::Peace);
+            self.journal.module_changes.push(ClassicChange::OfferLapsed {
+                from: offer.from,
+                to: offer.to,
+                peace,
+                reason: OfferLapse::NoLongerPossible,
+            });
+            self.relations_changed(offer.from);
+            self.relations_changed(offer.to);
         }
     }
 
