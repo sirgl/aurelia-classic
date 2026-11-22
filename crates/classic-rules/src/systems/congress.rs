@@ -513,7 +513,14 @@ impl<'a> WorldTransaction<'a> {
             return;
         }
         if congress.leader_vote_due && congress.united_nations {
+            let dropped: Vec<Proposal> = congress.proposals.iter().filter(|p| p.proposer.is_some()).copied().collect();
             congress.proposals.retain(|p| p.proposer.is_none());
+            for proposal in dropped {
+                if let Some(proposer) = proposal.proposer {
+                    self.journal.module_changes.push(crate::classic::ClassicChange::ProposalDropped { proposer, kind: proposal.kind });
+                }
+            }
+            let congress = &mut self.world.module.congress;
             congress.proposals.push(Proposal {
                 kind: ResolutionKind::DiplomaticVictory,
                 choice: 0,

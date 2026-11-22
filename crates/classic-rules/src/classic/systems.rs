@@ -6,7 +6,7 @@ use kernel::systems::{CityGrowth, KernelEvent, ModuleSystems};
 
 use crate::classic::effects::ClassicTrigger;
 use crate::classic::turn::{CityStepInput, EndTurnInput};
-use crate::classic::{Classic, ClassicCityStep, ClassicStep};
+use crate::classic::{Classic, ClassicChange, ClassicCityStep, ClassicStep};
 use crate::effects::city::CityModifiers;
 use crate::ids::{CityHandle, PlayerId, ProductionItem, TileId, UnitHandle};
 use crate::rules::effects::{CostTarget, Trigger};
@@ -75,6 +75,7 @@ impl ModuleSystems<Classic> for ClassicSystems {
             KernelEvent::UnitPurchased { unit, kind, .. } => tx.bought_unit_waits(unit, kind, rules),
             KernelEvent::BuildingCompleted { city, building } => {
                 tx.place_free_great_work(city, building, rules);
+                tx.announce_wonder(city, building, rules);
                 tx.fire(rules, TriggerEvent::BuildingBuilt { city, building });
                 tx.capital_science_boost(city, building, rules);
                 tx.espionage_after_building(city, building, rules);
@@ -367,4 +368,15 @@ fn unit_problem(
         return violation("needs its policy");
     }
     Ok(())
+}
+
+impl WorldTransaction<'_> {
+    /// A completed world wonder is announced to every nation (`ClassicChange::WonderBuilt`).
+    fn announce_wonder(&mut self, city: crate::ids::CityHandle, building: crate::ids::BuildingKindId, rules: &CompiledRuleset) {
+        let is_wonder = rules.buildings.get(building.0 as usize).is_some_and(|b| b.kind == crate::rules::content::BuildingKind::WorldWonder);
+        let Some(player) = self.world.cities.get(city).map(|c| c.owner) else { return };
+        if is_wonder {
+            self.journal.module_changes.push(ClassicChange::WonderBuilt { player, city, building });
+        }
+    }
 }

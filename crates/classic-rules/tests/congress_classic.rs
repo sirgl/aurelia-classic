@@ -392,3 +392,66 @@ fn the_ai_without_delegates_or_session_casts_nothing() {
     assert!(!game.view().auth.module().congress().in_session());
     assert!(vote_orders(&game.ai_observation(&rules, P0)).is_empty(), "no session");
 }
+
+/// One whole round; the module changes of it.
+fn round_changes(game: &mut GameState, rules: &CompiledRuleset) -> Vec<classic_rules::classic::ClassicChange> {
+    let round = game.view().auth.turn().round;
+    let mut changes = Vec::new();
+    while game.view().auth.turn().round == round {
+        let active = game.view().auth.active_player();
+        let result = game.execute(rules, Command::EndTurn { player: active }).unwrap();
+        changes.extend(result.changes().module_changes.iter().copied());
+    }
+    changes
+}
+
+/// A nation's proposal leaves the list in two ways only: the session it waited for opens and
+/// decides it, or the World Leader vote replaces the agenda and it is dropped, told with
+/// `ClassicChange::ProposalDropped`. Over 250 rounds of a United Nations (18 proposals) it never
+/// vanishes unannounced, and the session order (timer, finish, open) survives a save and a load in
+/// the middle of a session. (The drop itself did not occur in this game: the 14 November
+/// hypothesis "the timer adds a vote into an open session" is not reproducible, as the audit said.)
+#[test]
+fn a_proposal_never_vanishes_unannounced_and_a_save_in_a_session_plays_on_alike() {
+    use classic_rules::classic::ClassicChange;
+    let (mut game, rules) = world();
+    for i in 0..rules.technologies.len() {
+        game.debug_learn(&rules, P0, TechId(i as u16));
+        game.debug_learn(&rules, P1, TechId(i as u16));
+    }
+    end_round(&mut game, &rules);
+    assert!(game.view().auth.module().congress().united_nations());
+    let own = |g: &GameState| g.view().auth.module().congress().proposals().iter().filter(|p| p.proposer.is_some()).count();
+    let (mut proposed, mut saved_in_session) = (0, false);
+    for _ in 0..250 {
+        for player in [P0, P1] {
+            until_active(&mut game, &rules, player);
+            let congress = game.view().auth.module().congress();
+            if congress.in_session() || !congress.proposers().contains(&player) {
+                continue;
+            }
+            let kind = ResolutionKind::StandingArmyTax;
+            if game.execute(&rules, Command::ProposeResolution { player, kind, choice: 0, repeal: false }).is_ok() {
+                proposed += 1;
+            }
+        }
+        let (waiting, was_open) = (own(&game), game.view().auth.module().congress().in_session());
+        if was_open && !saved_in_session {
+            saved_in_session = true;
+            let save = classic_rules::persistence::encode::encode(&game, &rules);
+            let mut loaded = classic_rules::persistence::decode::decode(&save, &rules).unwrap();
+            assert_eq!(authoritative_hash(&loaded), authoritative_hash(&game));
+            round_changes(&mut loaded, &rules);
+            round_changes(&mut game, &rules);
+            assert_eq!(authoritative_hash(&loaded), authoritative_hash(&game), "the save plays the round alike");
+            continue;
+        }
+        let changes = round_changes(&mut game, &rules);
+        let told = changes.iter().any(|c| matches!(c, ClassicChange::ProposalDropped { .. }));
+        if waiting > 0 && !was_open && own(&game) == 0 && !game.view().auth.module().congress().in_session() {
+            assert!(told, "{waiting} proposals vanished without a word");
+        }
+    }
+    assert!(proposed >= 5, "nations proposed: {proposed}");
+    assert!(saved_in_session, "a session was open at some point");
+}
