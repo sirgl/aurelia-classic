@@ -2,7 +2,8 @@
 //! scene holds the list, and `apply` makes one on a world. The harness setters do the work; nothing
 //! here goes through the AI or changes a rule.
 
-use classic_rules::ids::{PlayerId, TechId, TileId, UnitKindId};
+use classic_rules::ids::{BuildingKindId, ImprovementId, PlayerId, TechId, TileId, UnitKindId};
+use classic_rules::world::relations::DealItem;
 use classic_rules::rules::content::ProjectId;
 use classic_rules::{ClassicGame, CompiledRuleset, GameState};
 use kernel::ai::plan::{role_of, AiRole};
@@ -30,16 +31,57 @@ pub enum Change {
     Discover { player: u8, techs: Vec<u16> },
     /// `times` completions of a project for `player` (Apollo, spaceship parts).
     Project { player: u8, project: u16, times: u16 },
+    /// `then` made `after` rounds into the window, at the start of that round (a stack placed at
+    /// peace, the war declared later). The play loop makes it (`play::play_arm`); at the start it is
+    /// nothing.
+    Later { after: u32, then: Box<Change> },
+    /// Gold into a treasury (`gold` > 0), or out of it down to an empty one (`gold` < 0).
+    Treasury { player: u8, gold: i32 },
+    /// An improvement of `player` on `tile`; an improvement with a culture bomb (the citadel) is
+    /// raised as a great general raises it, the tiles around it taken.
+    Improve { player: u8, tile: u32, improvement: u16 },
+    /// The world wonder `building` completed in `player`'s capital: the race for it is over for
+    /// everyone else.
+    Wonder { player: u8, building: u16 },
+    /// A city of `player` founded on `tile` (a forward settle).
+    Found { player: u8, tile: u32 },
+    /// An accord between the two as an accepted deal makes it.
+    Accord { giver: u8, receiver: u8, accord: Accord },
+    /// The resources of the tiles gone (a lost strategic or luxury resource).
+    Deplete { tiles: Vec<u32> },
 }
 
-/// A science gift: every round the edited arm adds `percent` of the beakers `player` earns to its
-/// pool (science x1.25 is 25). The one thing the rules have no per-seat setting for (the difficulty
-/// is one for all seats, bench/modules.rs); it lives in the exam's play loop only (`play::play_arm`),
-/// never in a normal game.
+/// The deal items a scene makes (`Change::Accord`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Accord {
+    Friendship,
+    DefensivePact,
+    /// The giver opens its borders to the receiver.
+    OpenBorders,
+}
+
+/// What a per-round gift adds to (`Gift`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Yield {
+    #[default]
+    Science,
+    Culture,
+    Gold,
+}
+
+/// A yield gift: every round the edited arm adds `percent` of the science (culture, gold) `player`
+/// earns to its pool (science x1.25 is 25). The one thing the rules have no per-seat setting for (the
+/// difficulty is one for all seats, bench/modules.rs); it lives in the exam's play loop only
+/// (`play::play_arm`), never in a normal game.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Gift {
     pub player: u8,
     pub percent: u32,
+    /// Science when a saved scene of wave 1 holds no yield.
+    #[serde(default)]
+    pub yield_kind: Yield,
 }
 
 /// Makes `change`; an error names what the world does not hold.
@@ -79,8 +121,70 @@ pub fn apply(game: &mut GameState, rules: &CompiledRuleset, change: &Change) -> 
                 game.debug_add_project(PlayerId(*player), ProjectId(*project));
             }
         }
+        Change::Later { .. } => {}
+        Change::Treasury { player, gold } => {
+            if *gold >= 0 {
+                game.debug_earn(PlayerId(*player), gold.unsigned_abs());
+            } else {
+                game.debug_spend(PlayerId(*player), gold.unsigned_abs());
+            }
+        }
+        Change::Improve { player, tile, improvement } => improve(game, rules, PlayerId(*player), TileId(*tile), ImprovementId(*improvement))?,
+        Change::Wonder { player, building } => wonder(game, rules, PlayerId(*player), BuildingKindId(*building))?,
+        Change::Found { player, tile } => {
+            if game.view().auth.indexes().city_on_tile(TileId(*tile)).is_some() {
+                return Err(format!("a city stands on {tile}"));
+            }
+            game.debug_found_city(rules, PlayerId(*player), TileId(*tile));
+        }
+        Change::Accord { giver, receiver, accord } => {
+            let item = match accord {
+                Accord::Friendship => DealItem::Friendship,
+                Accord::DefensivePact => DealItem::DefensivePact,
+                Accord::OpenBorders => DealItem::OpenBorders,
+            };
+            game.debug_deal_item(rules, PlayerId(*giver), PlayerId(*receiver), item)?;
+        }
+        Change::Deplete { tiles } => {
+            for tile in tiles {
+                game.debug_clear_resource(rules, TileId(*tile));
+            }
+        }
     }
     Ok(None)
+}
+
+/// The changes `Later` holds, with the round of the window each is made in (1 = the first).
+pub fn later(changes: &[Change]) -> Vec<(u32, Change)> {
+    let mut out = Vec::new();
+    for change in changes {
+        if let Change::Later { after, then } = change {
+            out.push((*after, (**then).clone()));
+        }
+    }
+    out
+}
+
+fn improve(game: &mut GameState, rules: &CompiledRuleset, player: PlayerId, tile: TileId, improvement: ImprovementId) -> Result<(), String> {
+    let def = rules.improvements.get(improvement.0 as usize).ok_or_else(|| format!("no improvement {}", improvement.0))?;
+    if def.culture_bomb_radius > 0 {
+        if !game.debug_raise_citadel(rules, player, tile) {
+            return Err("the rules hold no citadel".to_owned());
+        }
+        return Ok(());
+    }
+    game.debug_set_improvement_batch(rules, &[(tile, improvement)]);
+    Ok(())
+}
+
+fn wonder(game: &mut GameState, rules: &CompiledRuleset, player: PlayerId, building: BuildingKindId) -> Result<(), String> {
+    let capital = classic_rules::combat::city::capital_of(game.view().auth, rules, player).ok_or("the wonder's builder has no capital")?;
+    game.debug_complete_building(rules, capital, building);
+    let built = game.view().auth.cities().get(capital).is_some_and(|c| c.buildings.contains(&building));
+    if !built {
+        return Err(format!("the rules refuse the wonder {} in the capital of {}", building.0, player.0));
+    }
+    Ok(())
 }
 
 /// Makes every change in order; the ids of the units spawned.

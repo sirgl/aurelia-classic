@@ -16,6 +16,11 @@
 //!   the gates as the document's table.
 //! `ai-stress report --out DIR`
 //!   the result table against the gates (Markdown).
+//! `ai-stress suite --variant NAME --positions DIR --out DIR [--situations all] [--instances 100] [--jobs 2] [--no-end]`
+//!   the whole exam on the AI variant NAME (every seat played on by it) and on `standard`, the
+//!   reference: DIR/NAME/ and DIR/standard/ as `run` writes them (a rerun plays only what is missing),
+//!   and DIR/suite-NAME.md, the table "situation x strength: pass/fail, outcome delta, behaviour".
+//!   `--variant` also works for `run` and `one`.
 //!
 //! A measurement: it changes no rule and no AI.
 
@@ -25,6 +30,7 @@ use std::sync::Mutex;
 
 use aurelia_qa::bench::modules::{BenchRules, ClassicBench};
 use aurelia_qa::stress::{self, gates, position, Row, Saved, Situation};
+use classic_rules::ai::variant::Variant;
 
 fn main() {
     if let Err(e) = real() {
@@ -33,6 +39,7 @@ fn main() {
     }
 }
 
+#[derive(Clone)]
 struct Opts {
     cmd: String,
     positions: PathBuf,
@@ -49,12 +56,14 @@ struct Opts {
     to_end: bool,
     samples: usize,
     seed: u64,
+    /// The AI that plays on (the log's own when none).
+    variant: Option<String>,
 }
 
 fn opts() -> Result<Opts, String> {
     let mut args = std::env::args().skip(1);
     let cmd = args.next().ok_or("run | one | rebuild | report")?;
-    let mut o = Opts { cmd, positions: PathBuf::from("positions"), out: PathBuf::from("stress"), scene: None, situations: vec![Situation::A5, Situation::B1], instances: 100, instance: 0, round: 100, jitter: 10, jobs: 2, level: None, to_end: true, samples: 200, seed: 1 };
+    let mut o = Opts { cmd, positions: PathBuf::from("positions"), out: PathBuf::from("stress"), scene: None, situations: vec![Situation::A5, Situation::B1], instances: 100, instance: 0, round: 100, jitter: 10, jobs: 2, level: None, to_end: true, samples: 200, seed: 1, variant: None };
     while let Some(a) = args.next() {
         let mut value = || args.next().ok_or(format!("{a} needs a value"));
         let number = |v: String| v.parse::<usize>().map_err(|e| format!("{a}: {e}"));
@@ -62,7 +71,11 @@ fn opts() -> Result<Opts, String> {
             "--positions" => o.positions = PathBuf::from(value()?),
             "--out" => o.out = PathBuf::from(value()?),
             "--scene" => o.scene = Some(PathBuf::from(value()?)),
-            "--situations" => o.situations = value()?.split(',').map(Situation::parse).collect::<Result<_, _>>()?,
+            "--situations" => {
+                let list = value()?;
+                o.situations = if list == "all" { Situation::ALL.to_vec() } else { list.split(',').map(Situation::parse).collect::<Result<_, _>>()? };
+            }
+            "--variant" => o.variant = Some(value()?),
             "--situation" => o.situations = vec![Situation::parse(&value()?)?],
             "--instances" => o.instances = number(value()?)?,
             "--instance" => o.instance = number(value()?)?,
@@ -93,6 +106,7 @@ fn real() -> Result<(), String> {
             Ok(())
         }
         "report" => report(&o),
+        "suite" => suite(&o, &rules),
         "random" => random(&o, &rules),
         "gates" => {
             print!("{}", gates::markdown());
@@ -107,8 +121,16 @@ fn read_rows(out: &std::path::Path) -> Vec<Row> {
     text.lines().filter_map(|l| serde_json::from_str(l).ok()).collect()
 }
 
+fn variant_of(o: &Opts) -> Result<Option<Variant>, String> {
+    match &o.variant {
+        Some(name) => Variant::from_name(name).map(Some).ok_or_else(|| format!("no AI variant {name}")),
+        None => Ok(None),
+    }
+}
+
 fn run(o: &Opts, rules: &classic_rules::CompiledRuleset) -> Result<(), String> {
     std::fs::create_dir_all(&o.out).map_err(|e| e.to_string())?;
+    let variant = variant_of(o)?;
     let logs = position::logs(&o.positions)?;
     let done: std::collections::BTreeSet<(String, usize)> = read_rows(&o.out).into_iter().map(|r| (r.situation, r.instance)).collect();
     let open = |name: &str| std::fs::OpenOptions::new().create(true).append(true).open(o.out.join(name)).map_err(|e| e.to_string());
@@ -124,7 +146,7 @@ fn run(o: &Opts, rules: &classic_rules::CompiledRuleset) -> Result<(), String> {
             return;
         }
         let log = std::fs::canonicalize(&logs[i]).unwrap_or_else(|_| logs[i].clone());
-        let result = position::load(rules, &log, position::round_of(i, o.round, o.jitter)).map(|p| stress::run_instance(rules, &p, i, &todo, Some(&scenes), o.to_end));
+        let result: Result<stress::Done, String> = Ok(stress::run_log(rules, &log, i, &todo, (o.round, o.jitter), variant, Some(&scenes), o.to_end));
         let note = |situation: &str, error: &str| {
             let line = serde_json::json!({"situation": situation, "instance": i, "error": error});
             let _ = writeln!(unbuilt.lock().expect("one writer at a time"), "{line}");
@@ -152,8 +174,7 @@ fn one(o: &Opts, rules: &classic_rules::CompiledRuleset) -> Result<(), String> {
     std::env::set_var("STRESS_TRACE", "1");
     let logs = position::logs(&o.positions)?;
     let log = logs.get(o.instance).ok_or("no such instance")?;
-    let p = position::load(rules, log, position::round_of(o.instance, o.round, o.jitter))?;
-    let done = stress::run_instance(rules, &p, o.instance, &o.situations, None, o.to_end);
+    let done = stress::run_log(rules, log, o.instance, &o.situations, (o.round, o.jitter), variant_of(o)?, None, o.to_end);
     for row in done.rows.iter().filter(|r| o.level.is_none_or(|l| r.level == l)) {
         println!("{}", serde_json::to_string_pretty(row).map_err(|e| e.to_string())?);
     }
@@ -167,6 +188,29 @@ fn report(o: &Opts) -> Result<(), String> {
     let rows = read_rows(&o.out);
     let results = gates::judge(&rows);
     println!("{} rows\n\n{}", rows.len(), gates::results_markdown(&results));
+    Ok(())
+}
+
+/// The whole exam on a variant and on `standard`, and the table of the two.
+fn suite(o: &Opts, rules: &classic_rules::CompiledRuleset) -> Result<(), String> {
+    let name = o.variant.clone().ok_or("--variant NAME")?;
+    variant_of(o)?;
+    let situations = if o.situations == [Situation::A5, Situation::B1] { Situation::ALL.to_vec() } else { o.situations.clone() };
+    let mut arms = vec![name.clone()];
+    if name != "standard" {
+        arms.push("standard".to_owned());
+    }
+    for arm in &arms {
+        let each = Opts { cmd: "run".to_owned(), out: o.out.join(arm), variant: Some(arm.clone()), situations: situations.clone(), positions: o.positions.clone(), scene: None, ..o.clone() };
+        println!("suite: {arm}");
+        run(&each, rules)?;
+    }
+    let candidate = read_rows(&o.out.join(&name));
+    let reference = if name == "standard" { None } else { Some(read_rows(&o.out.join("standard"))) };
+    let table = stress::suite::table(&name, &candidate, reference.as_deref());
+    let path = o.out.join(format!("suite-{name}.md"));
+    std::fs::write(&path, &table).map_err(|e| e.to_string())?;
+    println!("{table}\n{}", path.display());
     Ok(())
 }
 

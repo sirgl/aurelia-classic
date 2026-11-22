@@ -18,13 +18,17 @@ pub mod play;
 pub mod position;
 pub mod random;
 pub mod scene;
+pub mod seat;
+pub mod suite;
+pub mod tricks;
 pub mod watch;
 
 use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 
-/// The situations built (the catalogue's names, work/ai-scenarios.html).
+/// The situations built (the catalogue's names, work/ai-scenarios.html; `P*` are the adversary
+/// groups of work/human-playbook-triage.md).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum Situation {
     /// A weak neighbour: its army and its city defenders gone.
@@ -41,10 +45,75 @@ pub enum Situation {
     D1,
     /// The world congress: the host dies.
     C5,
+    /// Sneak stack: an army inside the borders at peace (open borders), the war four rounds later.
+    P3,
+    /// Early rush: an enemy army next to the capital in rounds 30-50.
+    P2,
+    /// Wonder snipe: the wonder a city builds is completed by another nation.
+    P7,
+    /// Border grab: a forward city at the border, citadels next to it.
+    P5,
+    /// Raid-hunt: scripted raiders capture civilians and pillage.
+    P1,
+    /// Deal cycle: a friend sells open borders for gold, then declares war (scripted).
+    P4,
+    /// Alliance sweep: the leader, rich, gifts gold to the city-states every round (scripted).
+    P8,
+    /// Military x2: one rival's army doubled.
+    A2,
+    /// Culture x2: one rival's culture doubled.
+    A3,
+    /// Gold x3: one rival's gold multiplied.
+    A4,
+    /// A weak neighbour over the sea.
+    A6,
+    /// We become weak: our army halved.
+    A7,
+    /// Surprise war: an army at the border at peace, war at once.
+    B2,
+    /// A friend's betrayal: a friend's army at the border, war at once.
+    B5,
+    /// A strategic resource lost.
+    B6,
+    /// Bankrupt and unhappy: the treasury empty, the luxuries gone.
+    B7,
+    /// An amphibious target: a weak enemy at war reachable only by sea.
+    C2,
+    /// A defensive pact: the ally's partner is attacked.
+    D2,
+    /// A losing war: cities and army lost to the enemy.
+    D3,
 }
 
 impl Situation {
-    pub const ALL: [Situation; 7] = [Situation::A5, Situation::B1, Situation::A1, Situation::B4, Situation::B9, Situation::D1, Situation::C5];
+    pub const ALL: [Situation; 26] = [
+        Situation::A5,
+        Situation::B1,
+        Situation::A1,
+        Situation::B4,
+        Situation::B9,
+        Situation::D1,
+        Situation::C5,
+        Situation::P3,
+        Situation::P2,
+        Situation::P7,
+        Situation::P5,
+        Situation::P1,
+        Situation::P4,
+        Situation::P8,
+        Situation::A2,
+        Situation::A3,
+        Situation::A4,
+        Situation::A6,
+        Situation::A7,
+        Situation::B2,
+        Situation::B5,
+        Situation::B6,
+        Situation::B7,
+        Situation::C2,
+        Situation::D2,
+        Situation::D3,
+    ];
 
     pub fn name(self) -> &'static str {
         match self {
@@ -55,11 +124,48 @@ impl Situation {
             Situation::B9 => "b9",
             Situation::D1 => "d1",
             Situation::C5 => "c5",
+            Situation::P3 => "p3",
+            Situation::P2 => "p2",
+            Situation::P7 => "p7",
+            Situation::P5 => "p5",
+            Situation::P1 => "p1",
+            Situation::P4 => "p4",
+            Situation::P8 => "p8",
+            Situation::A2 => "a2",
+            Situation::A3 => "a3",
+            Situation::A4 => "a4",
+            Situation::A6 => "a6",
+            Situation::A7 => "a7",
+            Situation::B2 => "b2",
+            Situation::B5 => "b5",
+            Situation::B6 => "b6",
+            Situation::B7 => "b7",
+            Situation::C2 => "c2",
+            Situation::D2 => "d2",
+            Situation::D3 => "d3",
         }
     }
 
     pub fn parse(text: &str) -> Result<Self, String> {
-        Self::ALL.into_iter().find(|s| s.name() == text.to_ascii_lowercase()).ok_or_else(|| format!("no situation {text} (a5 b1 a1 b4 b9 d1 c5)"))
+        let names: Vec<&str> = Self::ALL.iter().map(|s| s.name()).collect();
+        Self::ALL.into_iter().find(|s| s.name() == text.to_ascii_lowercase()).ok_or_else(|| format!("no situation {text} ({})", names.join(" ")))
+    }
+
+    /// 1: built in wave 1 (`scene`), 2: in wave 2 (`tricks`).
+    pub fn wave(self) -> u8 {
+        match self {
+            Situation::A5 | Situation::B1 | Situation::A1 | Situation::B4 | Situation::B9 | Situation::D1 | Situation::C5 => 1,
+            _ => 2,
+        }
+    }
+
+    /// The round an instance starts at, from the run's base round and jitter: the early rush starts
+    /// at rounds 30 to 50 whatever the run asks.
+    pub fn start(self, index: usize, round: u32, jitter: u32) -> u32 {
+        match self {
+            Situation::P2 => position::round_of(index, 30, 20),
+            _ => position::round_of(index, round, jitter),
+        }
     }
 
     /// The rounds both arms are played on.
@@ -72,6 +178,25 @@ impl Situation {
             Situation::B9 => 40,
             Situation::D1 => 30,
             Situation::C5 => 40,
+            Situation::P3 => 20,
+            Situation::P2 => 25,
+            Situation::P7 => 15,
+            Situation::P5 => 30,
+            Situation::P1 => 20,
+            Situation::P4 => 20,
+            Situation::P8 => 40,
+            Situation::A2 => 40,
+            Situation::A3 => 60,
+            Situation::A4 => 40,
+            Situation::A6 => 50,
+            Situation::A7 => 30,
+            Situation::B2 => 15,
+            Situation::B5 => 15,
+            Situation::B6 => 30,
+            Situation::B7 => 30,
+            Situation::C2 => 40,
+            Situation::D2 => 25,
+            Situation::D3 => 30,
         }
     }
 }
@@ -104,6 +229,9 @@ pub struct Saved {
     pub base: Vec<edit::Change>,
     pub edit: Vec<edit::Change>,
     pub gift: Option<edit::Gift>,
+    /// The scripted adversary of the edited arm (none in wave 1).
+    #[serde(default)]
+    pub script: Option<seat::Script>,
     /// The world hash of the edited arm at its start (16 hex digits): a rebuild must match it.
     pub world: String,
 }
@@ -126,11 +254,37 @@ pub fn run_instance(rules: &classic_rules::CompiledRuleset, position: &position:
     done
 }
 
+/// Plays `situations` on the log of instance `index`: the log replayed to each situation's start
+/// round (`Situation::start`, one replay per round), played on by `variant` on every seat (the log's
+/// own when none).
+#[allow(clippy::too_many_arguments)]
+pub fn run_log(rules: &classic_rules::CompiledRuleset, log: &std::path::Path, index: usize, situations: &[Situation], (round, jitter): (u32, u32), variant: Option<classic_rules::ai::variant::Variant>, save: Option<&std::path::Path>, to_end: bool) -> Done {
+    let mut by_round: BTreeMap<u32, Vec<Situation>> = BTreeMap::new();
+    for s in situations {
+        by_round.entry(s.start(index, round, jitter)).or_default().push(*s);
+    }
+    let mut done = Done { rows: Vec::new(), unbuilt: Vec::new() };
+    for (start, todo) in by_round {
+        match position::load(rules, log, start) {
+            Ok(mut p) => {
+                if let Some(v) = variant {
+                    p.variant = v;
+                }
+                let d = run_instance(rules, &p, index, &todo, save, to_end);
+                done.rows.extend(d.rows);
+                done.unbuilt.extend(d.unbuilt);
+            }
+            Err(e) => done.unbuilt.extend(todo.iter().map(|s| (s.name().to_owned(), e.clone()))),
+        }
+    }
+    done
+}
+
 fn run_situation(rules: &classic_rules::CompiledRuleset, position: &position::Position, instance: usize, situation: Situation, save: Option<&std::path::Path>, to_end: bool, rows: &mut Vec<Row>) -> Result<(), String> {
     let plan = scene::plan(situation, rules, position, instance)?;
     let window = situation.window();
     let start = position.round;
-    let edits: Vec<scene::Edit> = (0..situation.levels()).map(|l| scene::edit_of(l, rules, position, &plan)).collect::<Result<_, _>>()?;
+    let edits: Vec<scene::Edit> = (0..situation.levels()).map(|l| scene::edit_of(situation, l, rules, position, &plan)).collect::<Result<_, _>>()?;
     let (control_arm, _) = scene::arms(rules, position, &plan, &edits[0])?;
     let control = measure_arm(rules, &plan, play::play_arm(rules, control_arm, position.variant, window, to_end)?, start, window);
     for (level, edit) in edits.iter().enumerate() {
@@ -147,6 +301,7 @@ fn run_situation(rules: &classic_rules::CompiledRuleset, position: &position::Po
                 base: plan.base.clone(),
                 edit: edit.changes.clone(),
                 gift: edit.gift,
+                script: edit.script.clone(),
                 world: format!("{world:016x}"),
             };
             save_scene(dir, &saved)?;
@@ -162,6 +317,7 @@ fn run_situation(rules: &classic_rules::CompiledRuleset, position: &position::Po
 /// The measures of a played arm: after the window, and at the end of the game when it was played out.
 fn measure_arm(rules: &classic_rules::CompiledRuleset, plan: &scene::Plan, played: play::Played, start: u32, window: u32) -> metrics::Measures {
     let mut m = metrics::measure(&plan.roles, rules, &played.window, &played.watch, start, window);
+    m.extend(played.script.clone());
     if let Some(end) = &played.end {
         m.extend(metrics::end_outcome(&plan.roles, rules, end));
     }

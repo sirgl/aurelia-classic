@@ -8,7 +8,9 @@ use classic_rules::classic::Classic;
 use classic_rules::ids::PlayerId;
 use classic_rules::world::congress::ResolutionKind;
 use classic_rules::world::victory::VictoryKind;
-use classic_rules::{ClassicGame, Command, GameState};
+use classic_rules::ids::ProductionItem;
+use classic_rules::{ClassicGame, Command, CompiledRuleset, GameState};
+use kernel::ai::plan::{role_of, AiRole};
 use kernel::ai::trace::{DecisionTrace, Outcome};
 use kernel::ids::EntityId;
 
@@ -40,6 +42,30 @@ pub struct Proposal {
     pub choice: u32,
 }
 
+/// A nation after a round.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Sample {
+    pub round: u32,
+    pub player: PlayerId,
+    /// Military units (any domain).
+    pub military: u32,
+    /// Workers, settlers and other civilians.
+    pub civilians: u32,
+    pub treasury: u32,
+    /// The excess happiness of the nation's last turn (below 0: unhappy).
+    pub happiness: i32,
+    /// Tiles of its land whose improvement is pillaged.
+    pub pillaged: u32,
+}
+
+/// A city's head order and stock after a round.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Head {
+    pub round: u32,
+    pub item: Option<ProductionItem>,
+    pub stock: u32,
+}
+
 /// Units put in by the edit that the watch follows (B1's invaders).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Tracked {
@@ -50,6 +76,8 @@ pub struct Tracked {
 #[derive(Debug, Clone, Default)]
 pub struct Watch {
     seen_round: u32,
+    /// The unit kinds that are not combat units (`AiRole`): what a sample counts as civilians.
+    civilian_kinds: Vec<u16>,
     owners: BTreeMap<u64, PlayerId>,
     pact_until: BTreeMap<(u8, u8), u32>,
     pub captures: Vec<Capture>,
@@ -70,14 +98,23 @@ pub struct Watch {
     pub tracked_dead: u32,
     /// The congress host after each round.
     pub hosts: Vec<(u32, Option<PlayerId>, bool)>,
+    /// Every major nation after each round.
+    pub samples: Vec<Sample>,
+    /// Gold gifts to city-states (round, giver).
+    pub gifts: Vec<(u32, PlayerId)>,
+    /// The head order of every city after each round, by city id.
+    pub heads: BTreeMap<u64, Vec<Head>>,
+    /// The pairs of majors at war after each round (the lower id first).
+    pub wars: Vec<(u32, Vec<(u8, u8)>)>,
 }
 
 impl Watch {
     /// A watch of a game at the start of round `start`; it follows the units `tracked`.
-    pub fn new(game: &GameState, tracked: &[u64]) -> Self {
+    pub fn new(game: &GameState, rules: &CompiledRuleset, tracked: &[u64]) -> Self {
         let auth = game.view().auth;
         let start = auth.turn().round;
         let mut watch = Watch { seen_round: start.saturating_sub(1), ..Watch::default() };
+        watch.civilian_kinds = (0..rules.units.len() as u16).filter(|k| role_of(rules, classic_rules::ids::UnitKindId(*k)) != AiRole::Military && role_of(rules, classic_rules::ids::UnitKindId(*k)) != AiRole::Naval).collect();
         watch.owners = auth.cities().iter().map(|(_, c)| (c.id.0, c.owner)).collect();
         for pair in pairs(game) {
             watch.pact_until.insert((pair.0 .0, pair.1 .0), auth.module().relations().research_agreement_until(pair.0, pair.1));
@@ -100,6 +137,7 @@ impl Watch {
         self.read_trace(game, trace);
         self.read_tracked(game, round);
         self.read_host(game, round);
+        self.read_samples(game, round);
         if self.victory.is_none() {
             self.victory = game.outcome().map(|o| (o.round, o.winner, o.kind));
         }
@@ -138,6 +176,7 @@ impl Watch {
                 Command::Denounce { target, .. } => self.denounced.push(Event { round, by, on: *target }),
                 Command::MakePeace { enemy, .. } => self.peaces.push(Event { round, by, on: *enemy }),
                 Command::HurryProduction { .. } | Command::PurchaseTile { .. } => self.purchases.push((round, by)),
+                Command::GiftGold { .. } => self.gifts.push((round, by)),
                 Command::ProposeResolution { kind, choice, .. } => self.proposals.push(Proposal { round, by, kind: *kind, choice: *choice }),
                 Command::AttackCity { city, .. } => {
                     if let Some(owner) = game.view().auth.cities().get(*city).map(|c| c.owner) {
@@ -180,6 +219,48 @@ impl Watch {
             let alive = host.is_some_and(|h| auth.players().is_alive(h));
             self.hosts.push((round, host, alive));
         }
+    }
+
+    fn read_samples(&mut self, game: &GameState, round: u32) {
+        let auth = game.view().auth;
+        let map = auth.map();
+        let mut pillaged: BTreeMap<u8, u32> = BTreeMap::new();
+        for t in (0..map.tile_count() as u32).map(classic_rules::ids::TileId) {
+            if map.pillaged(t) {
+                if let Some(owner) = map.owner(t).flatten() {
+                    *pillaged.entry(owner.0).or_default() += 1;
+                }
+            }
+        }
+        for player in majors(game) {
+            let (mut military, mut civilians) = (0, 0);
+            for unit in auth.indexes().units_of(player).iter().filter_map(|h| auth.units().get(*h)) {
+                if self.civilian_kinds.contains(&unit.core.kind.0) {
+                    civilians += 1;
+                } else {
+                    military += 1;
+                }
+            }
+            let happiness = classic_rules::derived::happiness::excess_snapshot(auth, player);
+            let treasury = auth.players().treasury_of(player);
+            self.samples.push(Sample { round, player, military, civilians, treasury, happiness, pillaged: pillaged.get(&player.0).copied().unwrap_or(0) });
+        }
+        for (_, city) in auth.cities().iter() {
+            self.heads.entry(city.id.0).or_default().push(Head { round, item: city.queue.first().copied(), stock: city.production });
+        }
+        let at_war = pairs(game).into_iter().filter(|(a, b)| auth.diplomacy().at_war(*a, *b)).map(|(a, b)| (a.0, b.0)).collect();
+        self.wars.push((round, at_war));
+    }
+
+    /// The samples of one nation, in round order.
+    pub fn of(&self, player: u8) -> impl Iterator<Item = &Sample> {
+        self.samples.iter().filter(move |s| s.player.0 == player)
+    }
+
+    /// Rounds after which the two were at war.
+    pub fn war_rounds(&self, a: u8, b: u8) -> Vec<u32> {
+        let pair = (a.min(b), a.max(b));
+        self.wars.iter().filter(|(_, w)| w.contains(&pair)).map(|(r, _)| *r).collect()
     }
 
     /// One line about the round just read (`STRESS_TRACE`).
