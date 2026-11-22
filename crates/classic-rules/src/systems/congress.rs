@@ -436,6 +436,7 @@ impl<'a> WorldTransaction<'a> {
         }
         self.world.module.congress.last_round = Some(round);
         self.check_projects(rules);
+        self.replace_dead_members(rules);
         if self.world.module.congress.session_round.is_some_and(|r| r < round) {
             self.finish_session(rules);
         }
@@ -540,7 +541,8 @@ impl<'a> WorldTransaction<'a> {
     /// alternates with them).
     fn finish_session(&mut self, rules: &CompiledRuleset) {
         let proposals = std::mem::take(&mut self.world.module.congress.proposals);
-        let votes = std::mem::take(&mut self.world.module.congress.votes);
+        let votes = self.votes_for_living_candidates(&proposals);
+        self.world.module.congress.votes.clear();
         let host = self.world.module.congress.host;
         let mut leader_vote = false;
         for (i, proposal) in proposals.iter().enumerate() {
@@ -554,6 +556,40 @@ impl<'a> WorldTransaction<'a> {
         congress.turns_until_session = interval;
         congress.leader_vote_due = congress.united_nations && !leader_vote;
         self.assign_proposers(rules);
+    }
+
+    /// The votes of the session without those for a nation that died after the vote was cast: in
+    /// an election (a new host, the World Leader) a dead candidate must not win or break a tie.
+    fn votes_for_living_candidates(&self, proposals: &[Proposal]) -> Vec<Vote> {
+        let mut kept = Vec::new();
+        for vote in &self.world.module.congress.votes {
+            let elects = proposals.get(vote.proposal as usize).is_some_and(|p| p.kind.elects());
+            if elects && !self.world.players.is_alive(PlayerId(vote.choice as u8)) {
+                continue;
+            }
+            kept.push(*vote);
+        }
+        kept
+    }
+
+    /// A host or a proposer who was eliminated leaves the league's roles at the next round
+    /// (own design, like the league itself; Unciv has no host). The host passes to the living
+    /// nation with the most delegates (the lowest id on a tie), the proposers are chosen anew:
+    /// a dead nation holds no proposal slot and breaks no tie.
+    fn replace_dead_members(&mut self, rules: &CompiledRuleset) {
+        let congress = &self.world.module.congress;
+        let players = &self.world.players;
+        let host_died = congress.host.is_some_and(|h| !players.is_alive(h));
+        let proposer_died = congress.proposers.iter().any(|p| !players.is_alive(*p));
+        if host_died {
+            let successor = crate::systems::city_states::majors(self.world)
+                .into_iter()
+                .max_by_key(|p| (delegates(self.world, rules, *p), std::cmp::Reverse(p.0)));
+            self.world.module.congress.host = successor;
+        }
+        if host_died || proposer_died {
+            self.assign_proposers(rules);
+        }
     }
 
     fn resolve(
