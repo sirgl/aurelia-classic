@@ -275,3 +275,17 @@ mod tests {
         assert_eq!(CITY_TECH_STRENGTH[100], 11830);
     }
 }
+
+/// Whether `city` may be destroyed, by razing or by a nuke (Unciv `City.canBeDestroyed`): never an
+/// original capital or a holy city, nor a capital unless it was just captured (`just_captured`:
+/// the decision on a captured city, a nuke). The one rule every removal of a city asks
+/// (`remove_city` asserts it).
+pub fn can_be_destroyed(auth: &AuthWorld, rules: &CompiledRuleset, city: CityHandle, just_captured: bool) -> bool {
+    let Some(core) = auth.cities().get(city) else {
+        return false;
+    };
+    if core.original_capital || auth.module().religion().holy_city_of(city).is_some() {
+        return false;
+    }
+    just_captured || !crate::world::city::is_capital(rules, core)
+}

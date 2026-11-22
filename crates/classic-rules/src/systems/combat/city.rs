@@ -468,7 +468,11 @@ impl<'a> WorldTransaction<'a> {
                 .push(CityChange::PopulationChanged { city });
             return;
         }
-        self.remove_city(city, rules);
+        // Unciv `City.destroyCity` asks `canBeDestroyed()`: a city that became a holy city or its
+        // owner's capital while it burned keeps its last citizens and burns on.
+        if crate::combat::city::can_be_destroyed(self.world, rules, city, false) {
+            self.remove_city(city, rules);
+        }
     }
 
     /// Raze a city completely. Every record of the rules that names it goes first (one cleaner
@@ -479,6 +483,12 @@ impl<'a> WorldTransaction<'a> {
         if self.world.cities.get(city).is_none() {
             return;
         }
+        // Every path that destroys a city asks `can_be_destroyed` first (razing, the decision, a
+        // nuke): a holy city is never removed, so no religion names a removed city.
+        debug_assert!(
+            self.world.module.religion.holy_city_of(city).is_none(),
+            "a holy city is never removed (can_be_destroyed)"
+        );
         self.evict_spies(city);
         self.forget_thefts_in(city);
         self.clear_city_trade_routes(city, rules);

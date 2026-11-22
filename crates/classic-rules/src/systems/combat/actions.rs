@@ -401,9 +401,11 @@ impl<'a> WorldTransaction<'a> {
         let Some(core) = self.world.cities.get(city) else {
             return;
         };
-        let capital = core.original_capital;
         let pop = core.population;
-        if !capital && (level > 2 || (level == 2 && pop < NUKE_LEVEL2_ELIM_POPULATION_THRESHOLD)) {
+        // Unciv Nuke.doNukeExplosionDamageToCity: `canBeDestroyed(true)`; an original capital or a
+        // holy city survives with the damage and the losses below.
+        let destroyed = level > 2 || (level == 2 && pop < NUKE_LEVEL2_ELIM_POPULATION_THRESHOLD);
+        if destroyed && crate::combat::city::can_be_destroyed(self.world, rules, city, true) {
             self.remove_city(city, rules);
             return;
         }

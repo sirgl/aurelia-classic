@@ -1,7 +1,11 @@
-//! A razed city leaves no record behind (`remove_city`): nothing in the world state names it after
-//! (`world::references::references_to_city`), and a save made after the raze loads and plays on
+//! A destroyed city leaves no record behind (`remove_city`): nothing in the world state names it
+//! after (`world::references::references_to_city`), and a save made after it loads and plays on
 //! alike. The class: state that holds a `CityHandle` and outlives the city; a save could not be
-//! loaded when a theft record named a razed city.
+//! loaded when a theft record named a razed city, or a religion a nuked holy city.
+//!
+//! The paths that destroy a city, each asking `combat::city::can_be_destroyed` (Unciv
+//! `City.canBeDestroyed`): the decision to raze a captured city (`validate_decide_city`), a razing
+//! city that burns down (`burn_city`), a nuke (`nuke_city`). A holy city survives each.
 
 use classic_content::core::core_rules;
 use classic_rules::ai::driver::ClassicMind;
@@ -118,26 +122,108 @@ fn a_holy_city_cannot_be_razed() {
     game.debug_found_city(&rules, P1, tile(&game, 24, 15));
     game.debug_meet_all();
     until_active(&mut game, &rules, P0);
-    let at = game.view().auth.cities().get(holy).unwrap().tile;
-    let prophet = game.debug_spawn_unit(&rules, P0, at, unit_kind(&rules, "core:unit/great-prophet"));
-    game.execute(
-        &rules,
-        Command::FoundReligion {
-            unit: prophet,
-            religion: ReligionId(0),
-            founder: belief(&rules, "core:belief/founder/tithe"),
-            follower: belief(&rules, "core:belief/follower/pagodas"),
-            pantheon: Some(belief(&rules, "core:belief/pantheon/ancestor-worship")),
-            bonus: None,
-        },
-    )
-    .unwrap();
+    found_religion(&mut game, &rules, P0, holy);
     until_active(&mut game, &rules, P1);
     game.debug_capture_city(&rules, holy, P1);
     let raze = game.execute(&rules, Command::DecideCity { player: P1, city: holy, decision: CityDecision::Raze });
     assert!(raze.is_err(), "{raze:?}");
     game.execute(&rules, Command::DecideCity { player: P1, city: holy, decision: CityDecision::Puppet }).unwrap();
     assert_eq!(game.view().auth.module().religion().religions()[0].holy_city, holy);
+}
+
+/// P0 founds a religion in its second city (`holy`), and P1, at war with it, has a nuclear missile
+/// in its own city three tiles away.
+fn holy_city_under_a_missile() -> (GameState, CompiledRuleset, CityHandle, classic_rules::ids::UnitHandle) {
+    let rules = compile_rules(core_rules()).unwrap();
+    let mut game = GameState::new(&rules, GameConfig { players: 2, width: 30, height: 20, rng_seed: 7 });
+    game.debug_found_city(&rules, P0, tile(&game, 3, 3));
+    let holy = game.debug_found_city(&rules, P0, tile(&game, 9, 3));
+    game.debug_found_city(&rules, P1, tile(&game, 12, 3));
+    game.debug_meet_all();
+    until_active(&mut game, &rules, P0);
+    found_religion(&mut game, &rules, P0, holy);
+    game.debug_set_population(&rules, holy, 1);
+    until_active(&mut game, &rules, P1);
+    game.execute(&rules, Command::DeclareWar { player: P1, enemy: P0 }).unwrap();
+    let missile = game.debug_spawn_unit(&rules, P1, tile(&game, 12, 3), unit_kind(&rules, "core:unit/nuclear-missile"));
+    let at = game.view().auth.cities().get(holy).unwrap().tile;
+    game.debug_reveal(P1, &[at]);
+    (game, rules, holy, missile)
+}
+
+/// The reviewer's scene: a nuke that destroys a city of one citizen leaves a holy city standing
+/// (Unciv `Nuke.doNukeExplosionDamageToCity`: `canBeDestroyed(true)`), and the save loads.
+#[test]
+fn a_nuke_leaves_a_holy_city_standing_and_the_save_loads() {
+    let (mut game, rules, holy, missile) = holy_city_under_a_missile();
+    let at = game.view().auth.cities().get(holy).unwrap().tile;
+    game.execute(&rules, Command::Nuke { unit: missile, target: at }).unwrap();
+    assert!(game.view().auth.cities().get(holy).is_some(), "the holy city stands");
+    assert_eq!(game.view().auth.module().religion().religions()[0].holy_city, holy);
+    round_trip(&game, &rules, 3);
+}
+
+/// The same nuke destroys a city that is not holy: nothing names it after, and the save loads.
+#[test]
+fn a_nuke_destroys_a_small_city_and_leaves_no_record() {
+    let rules = compile_rules(core_rules()).unwrap();
+    let mut game = GameState::new(&rules, GameConfig { players: 2, width: 30, height: 20, rng_seed: 7 });
+    game.debug_found_city(&rules, P0, tile(&game, 3, 3));
+    let small = game.debug_found_city(&rules, P0, tile(&game, 9, 3));
+    game.debug_found_city(&rules, P1, tile(&game, 12, 3));
+    game.debug_meet_all();
+    game.debug_set_population(&rules, small, 1);
+    until_active(&mut game, &rules, P1);
+    game.execute(&rules, Command::DeclareWar { player: P1, enemy: P0 }).unwrap();
+    let missile = game.debug_spawn_unit(&rules, P1, tile(&game, 12, 3), unit_kind(&rules, "core:unit/nuclear-missile"));
+    let at = game.view().auth.cities().get(small).unwrap().tile;
+    game.debug_reveal(P1, &[at]);
+    game.execute(&rules, Command::Nuke { unit: missile, target: at }).unwrap();
+    assert!(game.view().auth.cities().get(small).is_none(), "the city is destroyed");
+    assert_eq!(references_to_city(game.view().auth, small), Vec::<String>::new());
+    round_trip(&game, &rules, 3);
+}
+
+/// A burning city that becomes a holy city is not destroyed (Unciv `City.destroyCity` asks
+/// `canBeDestroyed()`): it keeps its last citizen and burns on; the save loads.
+#[test]
+fn a_burning_city_that_becomes_holy_keeps_its_last_citizen() {
+    let rules = compile_rules(core_rules()).unwrap();
+    let mut game = GameState::new(&rules, GameConfig { players: 2, width: 30, height: 20, rng_seed: 7 });
+    game.debug_found_city(&rules, P0, tile(&game, 3, 3));
+    game.debug_found_city(&rules, P1, tile(&game, 24, 15));
+    let second = game.debug_found_city(&rules, P1, tile(&game, 24, 8));
+    game.debug_meet_all();
+    game.debug_set_population(&rules, second, 3);
+    until_active(&mut game, &rules, P0);
+    game.debug_capture_city(&rules, second, P0);
+    game.execute(&rules, Command::DecideCity { player: P0, city: second, decision: CityDecision::Raze }).unwrap();
+    found_religion(&mut game, &rules, P0, second);
+    for _ in 0..8 {
+        end_round(&mut game, &rules);
+    }
+    let core = game.view().auth.cities().get(second).expect("the holy city stands");
+    assert!(core.population >= 1, "{}", core.population);
+    assert_eq!(game.view().auth.module().religion().religions()[0].holy_city, second);
+    round_trip(&game, &rules, 3);
+}
+
+/// `player` founds Buddhism in its city `city` with a Great Prophet.
+fn found_religion(game: &mut GameState, rules: &CompiledRuleset, player: PlayerId, city: CityHandle) {
+    let at = game.view().auth.cities().get(city).unwrap().tile;
+    let prophet = game.debug_spawn_unit(rules, player, at, unit_kind(rules, "core:unit/great-prophet"));
+    game.execute(
+        rules,
+        Command::FoundReligion {
+            unit: prophet,
+            religion: ReligionId(0),
+            founder: belief(rules, "core:belief/founder/tithe"),
+            follower: belief(rules, "core:belief/follower/pagodas"),
+            pantheon: Some(belief(rules, "core:belief/pantheon/ancestor-worship")),
+            bonus: None,
+        },
+    )
+    .unwrap();
 }
 
 fn unit_kind(rules: &CompiledRuleset, key: &str) -> UnitKindId {
