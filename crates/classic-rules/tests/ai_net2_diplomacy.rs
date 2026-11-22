@@ -336,6 +336,8 @@ fn the_leader_vote_is_pooled_against_the_rival_at_the_threshold() {
     assert_eq!(who(&[(P0, 2), (P1, 7), (P2, 5)], 9), P0, "nobody near: for ourselves, as today");
     // We hold the threshold: for ourselves, whatever the rival holds.
     assert_eq!(who(&[(P0, 9), (P1, 9), (P2, 0)], 9), P0);
+    // The pool would elect P2 (6 + 4 = 10, past the threshold and the threat's 9): for ourselves.
+    assert_eq!(who(&[(P0, 4), (P1, 9), (P2, 6)], 9), P0, "our ballot must not make the coalition candidate the World Leader");
 }
 
 /// The ballot as commands: with the plan, the whole seat goes on the coalition candidate; without it, on ourselves.

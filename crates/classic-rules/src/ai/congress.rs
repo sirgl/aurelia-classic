@@ -153,7 +153,8 @@ pub const THREAT_SLACK: i32 = 1;
 /// - we hold the threshold ourselves: vote for ourselves;
 /// - a rival is within `THREAT_SLACK` of it: all delegates to the coalition candidate `c*`, the strongest candidate
 ///   but that rival (ties to the lowest id; we may be `c*`). Every seat reads the same public table, so seats converge
-///   without talking, and `c*` ties or beats the threat;
+///   without talking, and `c*` ties or beats the threat. Never so that our ballot elects `c*`: when `c*` and our
+///   delegates together would reach the threshold and pass the threat, we vote for ourselves (`pool_elects`);
 /// - else for ourselves, as today.
 pub fn leader_choice(obs: &AIObservation<'_>, info: &crate::knowledge::observation::CongressInfo) -> PlayerId {
     let me = obs.player;
@@ -172,7 +173,19 @@ pub fn leader_choice(obs: &AIObservation<'_>, info: &crate::knowledge::observati
         return me;
     };
     debug_assert!(n + THREAT_SLACK >= needed);
-    table.iter().find(|(p, _)| *p != threat).map_or(me, |(p, _)| *p)
+    let coalition = table.iter().find(|(p, _)| *p != threat).map_or(me, |(p, _)| *p);
+    if coalition != me && pool_elects(delegates(coalition) + delegates(me), n, needed) {
+        return me;
+    }
+    coalition
+}
+
+/// Our delegates on the coalition candidate would elect it: together they reach the threshold and pass the threat's
+/// `threat` delegates (a tie at the threshold elects nobody, `systems::congress::leader_vote`). In a field where the
+/// other seats vote for themselves, the pool gave the coalition candidate the World Leader: tuning offset 1690, the
+/// `nets-x-site` seats won 42 diplomatic victories against net2 with the pool and 19 without net2's congress.
+fn pool_elects(pooled: i32, threat: i32, needed: i32) -> bool {
+    pooled >= needed && pooled > threat
 }
 
 /// All delegates on the open session: elections for itself, yes/no by
