@@ -139,14 +139,14 @@ fn level_neighbour(id: u8) -> RivalInputs {
 #[test]
 fn a_level_neighbour_with_a_soft_city_is_prey_and_the_order_aims_at_it() {
     // WAR-LEVER.md K1: 5 citizens (size 250), no garrison seen, 4 tiles (near 1000), walls 200 against our army.
-    // ease = unit(−2200 + 750 + 800 + 1000 + 480) = 830; a large guarded city: unit(−2200 + 0 + 320 + 600 + 300) = 0.
+    // ease = unit(−2150 + 750 + 800 + 1000 + 480) = 880; a large guarded city: unit(−2150 + 0 + 320 + 600 + 300) = 0.
     let mut inputs = inputs(seat(), vec![level_neighbour(1)], vec![]);
     inputs.targets = vec![target(1, 70, 1000, 600, 600, 500), target(1, 71, 250, 0, 1000, 200)];
     let p = pass(&inputs);
-    assert_eq!(p.eases, vec![0, 830]);
-    assert_eq!(p.rivals[0].inputs[super::weights::r::SOFT], 830);
-    // prey = unit(−1700 + 0 + 1280 + 120 + 996) = 696 → a Prey order aimed at the soft city.
-    assert_eq!(p.rivals[0].concepts[q::PREY], 696);
+    assert_eq!(p.eases, vec![0, 880]);
+    assert_eq!(p.rivals[0].inputs[super::weights::r::SOFT], 880);
+    // prey = unit(−1700 + 0 + 1280 + 120 + 1056) = 756 → a Prey order aimed at the soft city.
+    assert_eq!(p.rivals[0].concepts[q::PREY], 756);
     let aim = p.core.war.order().and_then(|o| o.aim);
     assert_eq!(aim, Some(WarAim { city: TileId(71), why: AimWhy::Ease }));
 }

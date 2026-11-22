@@ -314,8 +314,8 @@ pub const SEAT: [Neuron; s::N] = [
 /// is the rival's prey term.
 pub const EASE: Neuron = Neuron {
     name: "ease",
-    bias: -2200,
-    why: "a city is no target by default: it takes a small, near city with weak defences (the old size gate, at most 8 citizens, sits at size 500); −2000 → −2300 raised the bar of a soft city (at −2000 net2 declared 1.49× nets-x-site's wars, GAP.md); R4: at −2150 with the order's target denied help (`levers::helped`) the wars were 1.30× (151 / 116, offsets 1810–1811), at the gate, and A5's `nobody_attacked` 0.853; at −2250 0.873 (gate 0.861): −2200 between them",
+    bias: -2150,
+    why: "a city is no target by default: it takes a small, near city with weak defences (the old size gate, at most 8 citizens, sits at size 500); −2000 → −2300 raised the bar of a soft city (at −2000 net2 declared 1.49× nets-x-site's wars, GAP.md); R4: at −2150 with the order's target denied help (`levers::helped`) the wars were 1.30× (151 / 116, offsets 1810–1811), at the gate, and A5's `nobody_attacked` 0.856; at −2200 0.864 and at −2250 0.873 (gate 0.861) with the wars 1.26× and 1.21×: the wars follow the denied help, not the bar, so −2150, the brief's value",
     join: UNIT,
     terms: &[
         ts(T(t::SIZE), Shape::Not, 1000, "a small city: the learned capture chance falls 0.066 a citizen (`OPEN_CHANCE_WEIGHTS`), as much as a tile"),
