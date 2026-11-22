@@ -20,6 +20,7 @@
 //! | `style_66`, `style` | the strategist's held style (0 tall, 1 wide, 2 conquest) at round 66 and at the end (none: no strategist) |
 //! | `denounced_by`, `denounced` | the nations that denounced it at some round, and that it denounced |
 //! | `victory` | its victory's kind when it won |
+//! | `mood_at`, `mood_before` | its happiness by source (`happiness::player_happiness`) at its first unhappy round and 10–20 rounds before |
 
 use std::collections::BTreeMap;
 use std::io::Write;
@@ -73,6 +74,23 @@ struct Seat {
     style: Option<usize>,
     denounced_by: std::collections::BTreeSet<u8>,
     denounced: std::collections::BTreeSet<u8>,
+    mood_recent: Option<serde_json::Value>,
+    mood_older: Option<serde_json::Value>,
+    mood_at: Option<serde_json::Value>,
+    mood_before: Option<serde_json::Value>,
+}
+
+/// A seat's happiness by source, and the luxury trades it takes part in.
+fn mood(game: &GameState<Classic>, rules: &CompiledRuleset<Classic>, major: PlayerId) -> serde_json::Value {
+    let auth = game.view().auth;
+    let h = classic_rules::derived::happiness::player_happiness(auth, rules, major);
+    let round = auth.turn().round;
+    let trades = auth.module().relations().trades().iter().filter(|t| t.until > round && matches!(t.flow, classic_rules::world::relations::TradeFlow::Resource { .. }) && (t.from == major || t.to == major)).count();
+    serde_json::json!({
+        "round": round, "excess": h.happiness() - h.unhappiness_total, "luxuries": h.luxuries, "kinds": h.luxury_kinds, "local": h.local,
+        "buildings": h.buildings, "league": h.league, "opinion": h.from_opinion, "from_cities": h.from_cities,
+        "from_population": h.from_population, "from_occupied": h.from_occupied, "trades": trades,
+    })
 }
 
 /// What the probe remembers from the last round: the quests and the influence of each seat.
@@ -112,7 +130,7 @@ fn holdings(game: &GameState<Classic>, major: PlayerId) -> (usize, usize) {
 
 impl DiploProbe {
     /// Happiness, wars and denunciations this round.
-    fn standing_round(&mut self, game: &GameState<Classic>) {
+    fn standing_round(&mut self, game: &GameState<Classic>, rules: &CompiledRuleset<Classic>) {
         use classic_rules::derived::happiness::{excess_snapshot, uprising_possible};
         let auth = game.view().auth;
         let round = auth.turn().round;
@@ -127,12 +145,18 @@ impl DiploProbe {
             let wars = majors.iter().filter(|o| *o != major && diplomacy.at_war(*major, **o)).count();
             let holdings = holdings(game, *major);
             let seat = self.seats.entry(major.0).or_default();
+            if round % 10 == 0 {
+                seat.mood_older = seat.mood_recent.take();
+                seat.mood_recent = Some(mood(game, rules, *major));
+            }
             seat.happy_min = Some(seat.happy_min.map_or(excess, |m| m.min(excess)));
             if uprising_possible(excess) {
                 seat.unhappy += 1;
                 if seat.unhappy_first.is_none() {
                     seat.unhappy_first = Some(round);
                     seat.at_unhappy = Some((holdings.0, holdings.1, wars));
+                    seat.mood_at = Some(mood(game, rules, *major));
+                    seat.mood_before = seat.mood_older.clone();
                 }
             }
             seat.war_rounds += u32::from(wars > 0);
@@ -234,7 +258,7 @@ impl MatchRecorder<ClassicBench> for DiploProbe {
     fn round_start(&mut self, game: &GameState<Classic>, rules: &CompiledRuleset<Classic>) {
         self.city_state_round(game);
         self.supply_round(game, rules);
-        self.standing_round(game);
+        self.standing_round(game, rules);
     }
 
     fn turn_start(&mut self, game: &GameState<Classic>, _rules: &CompiledRuleset<Classic>, player: PlayerId, states: &AiStates) {
@@ -277,7 +301,7 @@ impl MatchRecorder<ClassicBench> for DiploProbe {
                 "cities": cities, "captured": captured, "war_rounds": seat.war_rounds,
                 "style_66": seat.style_66, "style": seat.style,
                 "denounced_by": seat.denounced_by.iter().collect::<Vec<_>>(), "denounced": seat.denounced.iter().collect::<Vec<_>>(),
-                "victory": victory,
+                "victory": victory, "mood_at": seat.mood_at, "mood_before": seat.mood_before,
             });
             lines.push(line.to_string());
         }
