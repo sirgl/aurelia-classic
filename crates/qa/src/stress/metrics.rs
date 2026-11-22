@@ -34,11 +34,15 @@ pub fn measure(roles: &Roles, rules: &CompiledRuleset, game: &GameState, watch: 
             let declared = watch.declared.iter().any(|e| e.on.0 == weak);
             m.insert("nobody_attacked".into(), flag(!declared && lost.is_empty()));
         }
-        Roles::Invasion { seat, .. } => {
+        Roles::Invasion { seat, enemy } => {
             m.insert("capital_lost".into(), flag(capital_lost(game, watch, seat)));
             m.insert("cities_lost".into(), count(watch.captures.iter().filter(|c| c.from.0 == seat).count()));
             m.insert("first_counter".into(), first(&mut watch.first_hurt.into_iter()));
-            m.insert("counter_by_3".into(), flag(watch.first_hurt.is_some_and(|r| r.saturating_sub(start) <= 3)));
+            // Before the fix of 22 Nov `counter_by_3` was this (an invader hurt by anyone, a city's strike
+            // included); it is kept as `invader_hurt_by_3`. `counter_by_3` is a strike of a unit of the seat
+            // on the enemy (melee or ranged; a city's strike is not one) within three rounds.
+            m.insert("invader_hurt_by_3".into(), flag(watch.first_hurt.is_some_and(|r| r.saturating_sub(start) <= 3)));
+            m.insert("counter_by_3".into(), flag(watch.strikes.iter().any(|e| e.by.0 == seat && e.on.0 == enemy && e.round.saturating_sub(start) <= 3)));
             m.insert("invaders_dead".into(), f64::from(watch.tracked_dead));
             m.insert("purchases".into(), count(watch.purchases.iter().filter(|(_, p)| p.0 == seat).count()));
         }
