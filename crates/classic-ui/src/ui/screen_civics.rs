@@ -150,38 +150,25 @@ const ELLIPSIS: char = '\u{2026}';
 /// Returns the height.
 fn clipped(p: &egui::Painter, at: egui::Pos2, value: &str, size: f32, color: Color32, width: f32, rows: usize) -> f32 {
     let lines = wrap_lines(p, value, size, width.max(8.0), rows.max(1));
-    let scale = layer_scale(p);
     let mut y = at.y;
     for line in &lines {
         let galley = layout(p, line, size, color);
-        let height = galley.size().y / scale;
-        let mut shape = egui::epaint::TextShape::new(pos2(at.x * scale, y * scale), galley, color);
-        if scale != 1.0 {
-            shape.transform(egui::emath::TSTransform::from_scaling(1.0 / scale));
-        }
-        p.add(shape);
+        let height = galley.size().y;
+        p.galley(pos2(at.x, y), galley, color);
         y += height;
     }
     y - at.y
 }
 
-/// How much the layer of `p` is scaled on its way to the screen (a phone shrinks the screen's
-/// canvas as one layer, `client::shell::screens`). egui scales the finished text mesh with it, so a
-/// glyph laid out at `size` is drawn from a bitmap of `size` pixels and shrunk: the dots of an
-/// ellipsis, one pixel wide, vanish.
-fn layer_scale(p: &egui::Painter) -> f32 {
-    p.ctx().layer_transform_to_global(p.layer_id()).map_or(1.0, |t| t.scaling).max(0.1)
-}
-
-/// The text laid out at the size it is drawn at on the screen. Its measures are in screen points of
-/// the layer's scale: divide them by `layer_scale` for the layer's own.
+/// The text laid out in design units. In a phone's scaled layer the shell lays every text out
+/// again at the size it is drawn at (`client::shell::crisp`), so the screen never asks for the scale.
 fn layout(p: &egui::Painter, value: &str, size: f32, color: Color32) -> std::sync::Arc<egui::Galley> {
-    p.layout_no_wrap(value.to_owned(), FontId::proportional(size * layer_scale(p)), color)
+    p.layout_no_wrap(value.to_owned(), FontId::proportional(size), color)
 }
 
-/// The width `clipped` gives `value`: measured the way it is drawn.
+/// The width `clipped` gives `value`.
 fn text_width(p: &egui::Painter, value: &str, size: f32) -> f32 {
-    layout(p, value, size, Color32::WHITE).size().x / layer_scale(p)
+    layout(p, value, size, Color32::WHITE).size().x
 }
 
 /// The lines of `value` for `clipped`.
@@ -795,7 +782,7 @@ fn reading_strip(ui: &mut egui::Ui, area: Rect, bottom: f32, title: &str, body: 
 /// The height `clipped` gives `value`.
 fn clipped_height(p: &egui::Painter, value: &str, size: f32, width: f32, rows: usize) -> f32 {
     let lines = wrap_lines(p, value, size, width.max(8.0), rows.max(1));
-    lines.iter().map(|line| layout(p, line, size, Color32::WHITE).size().y / layer_scale(p)).sum()
+    lines.iter().map(|line| layout(p, line, size, Color32::WHITE).size().y).sum()
 }
 
 /// The empty list: why, and how far the next policy is.

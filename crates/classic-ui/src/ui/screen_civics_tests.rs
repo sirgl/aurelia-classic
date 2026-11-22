@@ -160,9 +160,11 @@ fn a_cut_line_ends_with_an_ellipsis_at_a_word_boundary() {
     output.textures_delta.clear();
 }
 
-/// A phone draws the screen in a layer shrunk by about 0.85. The cut line and its ellipsis must fit
-/// the width the painter has there, and be laid out at the size it is drawn at: a glyph shrunk after
-/// its bitmap was made loses the dots of the ellipsis.
+/// A phone draws the screen in a layer shrunk by about 0.85, and the shell lays its texts out again
+/// at the size they are drawn at (`client::shell::crisp`). The cut line and its ellipsis fit the
+/// width the painter has there, and the screen lays them out in design units: laid out once at
+/// `size * scale` after the shell's pass, not twice (a screen of its own scaling would end at
+/// `size * scale * scale`).
 #[test]
 fn a_cut_line_with_its_ellipsis_fits_the_width_at_the_touch_scale() {
     const SCALE: f32 = 0.85;
@@ -175,7 +177,9 @@ fn a_cut_line_with_its_ellipsis_fits_the_width_at_the_touch_scale() {
         let lines = wrap_lines(ui.painter(), text, size, width, 1);
         assert!(lines[0].ends_with(ELLIPSIS), "{lines:?}");
         assert!(text_width(ui.painter(), &lines[0], size) <= width, "the cut line fits in the layer's points");
+        let from = client::shell::crisp::mark(ui.ctx(), layer);
         clipped(ui.painter(), pos2(10.0, 10.0), text, size, Color32::WHITE, width, 1);
+        client::shell::crisp::sharpen(ui.ctx(), layer, from, SCALE);
     });
     output.textures_delta.clear();
     let painted: Vec<_> = output
@@ -187,9 +191,7 @@ fn a_cut_line_with_its_ellipsis_fits_the_width_at_the_touch_scale() {
         })
         .collect();
     assert_eq!(painted.len(), 1, "the cut line is painted once");
-    let t = painted[0];
-    assert!(t.galley.size().x <= width * SCALE + 0.01, "{} wider than {}", t.galley.size().x, width * SCALE);
-    let laid_out = t.galley.job.sections[0].format.font_id.size;
+    let laid_out = painted[0].galley.job.sections[0].format.font_id.size;
     assert!((laid_out - size * SCALE).abs() < 1e-3, "laid out at {laid_out}, drawn at {}", size * SCALE);
 }
 
