@@ -36,6 +36,7 @@
 //! it, saved as <path stem>-NN.png (AURELIA_GAME_SEQUENCE_FRAMES, default 14;
 //! AURELIA_GAME_SEQUENCE=embark|disembark: a warrior steps from the shore onto the water, or back;
 //! AURELIA_GAME_SEQUENCE_STEP seconds per frame, default 0.08).
+//! AURELIA_BENCH_FRAMES=n (with `--screenshot`): n more frames of the captured state, timed (`time_frames`).
 //! `--bench-animation` measures frames while units walk (AURELIA_BENCH_MAP, AURELIA_BENCH_UNITS).
 //! `--bench-ui` measures the UI slice of a frame (models, egui, tessellation; no GPU) on the
 //! heaviest screens of an empire of AURELIA_BENCH_CITIES cities (default 100).
@@ -395,8 +396,29 @@ pub fn screenshot(path: &str) {
     for _ in 0..frames {
         run.frame();
     }
+    let timed = env_number("AURELIA_BENCH_FRAMES", 0) as usize;
+    if timed > 0 {
+        time_frames(&mut run, timed);
+    }
     println!("turn {}  hash {:x}", turn(&run.app), hash(&run.app));
     save_capture(&run.core, &run.texture, run.size.0, run.size.1, path);
+}
+
+/// AURELIA_BENCH_FRAMES=n with `--screenshot`: n more frames of the captured state, timed: the
+/// whole frame (CPU and the wait for the GPU) and its UI part (egui with the screens and the
+/// shell's passes over them, `FrameStages::ui_ms`). Ten frames first are not counted.
+fn time_frames(run: &mut Offscreen, count: usize) {
+    for _ in 0..10 {
+        run.frame();
+    }
+    let mut whole = Vec::with_capacity(count);
+    let mut ui = Vec::with_capacity(count);
+    for _ in 0..count {
+        whole.push(run.frame());
+        ui.push(run.app.stages.ui_ms);
+    }
+    report("frame", &whole, 0);
+    report("frame UI", &ui, 0);
 }
 
 /// AURELIA_GAME_DEPOSITS: strategic resources next to the capital (harness, like
