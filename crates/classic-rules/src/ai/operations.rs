@@ -1770,9 +1770,10 @@ fn candidate(
     horizon: Horizon,
     gate: WarGate<'_>,
 ) -> Option<Candidate> {
-    // `strategist-x`: a city carrying the race of the rival running away is weighed by its case, not
-    // turned away by the odds (`Stakes::with_threat`).
-    let staked = brief.strategist_x && matches!(gate, WarGate::Value(_, stakes) if stakes.capital(city.tile).is_some_and(|s| s.value > 0));
+    // `strategist-x`: a city of the rival running away (`Stakes::runaway`, its race's share set by
+    // `Stakes::with_plan`) is weighed by its case, not turned away by the odds. A stake of the domination
+    // path alone is not: it stays behind the odds gate and `OBJECTIVE_RANGE`, as in `standard`.
+    let staked = matches!(gate, WarGate::Value(_, stakes) if stakes.runaway(city.tile));
     if brief.war_pays && !odds_are_good(city, horizon) && !staked {
         return None;
     }

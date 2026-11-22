@@ -958,14 +958,15 @@ impl ClassicMind {
                 if plan.intent.tall_real {
                     brief.building_order = crate::ai::tall::BuildingOrder::Science;
                 }
-                // `strategist-x`: the war's stakes carry the race of the rival running away
-                // (`Stakes::with_threat`); the city-states it marks as prey are the war machine's too.
+                // `strategist-x`: the city-states it marks as prey are the war machine's too.
                 if brief.strategist_x {
-                    stakes = stakes.with_threat(observation, state, plan.wishes.threat);
                     let prey: Vec<_> = observation.relations.iter().filter(|r| plan.wishes.stance(r.other).is_some_and(|s| s.prey >= crate::ai::strategy_net::weights::stance::ACTS.0) && !brief.relations.iter().any(|b| b.other == r.other)).copied().collect();
                     brief.relations.extend(prey);
                 }
                 brief.strategy = Some(std::sync::Arc::new(plan));
+                // `strategist-x`: the war's stakes carry the race of the rival running away, by the one rule of
+                // `Stakes::of` (`Stakes::with_plan`; the stakes of `lead` were made before the plan).
+                stakes = stakes.with_plan(observation, &brief, state);
             }
         }
         let units = brief.units.iter().map(|u| (u.id, u.handle, u.kind)).collect();

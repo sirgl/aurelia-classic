@@ -485,6 +485,11 @@ pub struct CapitalStake {
     /// What the capture adds to the chance of the victory, as a share of
     /// the prize (hundredths of score points).
     pub value: Centi,
+    /// `strategist-x`: a city of the rival the strategist names running away (`Stakes::with_plan`); its
+    /// share of that rival's race is in `value`. Only such a city is weighed by its case past the odds
+    /// gate and reached from the decisive range (`operations::candidate`): a stake of the domination path
+    /// alone is not.
+    pub runaway: bool,
 }
 
 impl Stakes {
@@ -495,6 +500,11 @@ impl Stakes {
 
     pub fn capital(&self, tile: TileId) -> Option<&CapitalStake> {
         self.capitals.iter().find(|c| c.tile == tile)
+    }
+
+    /// `strategist-x`: the city on `tile` is the rival's running away (`CapitalStake::runaway`).
+    pub fn runaway(&self, tile: TileId) -> bool {
+        self.capital(tile).is_some_and(|c| c.runaway)
     }
 
     /// A war's expected gain as the leader weighs it: a gain counts by its
@@ -513,9 +523,7 @@ impl Stakes {
     /// game), every one on the domination path; known ones as targets,
     /// the others as what finding them is worth.
     pub fn of(obs: &AIObservation<'_>, brief: &TurnBrief, state: &AiState, personality: &Personality) -> Self {
-        let threat = brief.strategy.as_ref().and_then(|plan| plan.wishes.threat);
-        let stakes = Self::of_leanings(obs, brief, state, personality);
-        stakes.with_threat(obs, state, threat)
+        Self::of_leanings(obs, brief, state, personality).with_plan(obs, brief, state)
     }
 
     /// `of` without the strategist's threat.
@@ -563,24 +571,41 @@ impl Stakes {
         stake * FAR_CAPITAL_CHANCE / 1000
     }
 
-    /// `strategist-x`: the race of the rival the strategist names running away (`Plan::wishes`,
-    /// `strategy_net::threat`). Each seen city of it carries a stake: the prize of a victory × the
-    /// threat × the city's citizens over the citizens of the rival's seen cities (a capture takes its
-    /// share of the rival's race), added to a capital's stake on the same tile. None: unchanged.
-    pub fn with_threat(mut self, obs: &AIObservation<'_>, state: &AiState, threat: Option<crate::ai::strategy_net::wishes::Threat>) -> Self {
-        let Some(threat) = threat else { return self };
-        let cities: Vec<_> = state.seen_cities().iter().filter(|c| c.owner == threat.rival).collect();
-        let citizens: i64 = cities.iter().map(|c| i64::from(c.population.max(1))).sum();
+    /// `strategist-x`: the race of the rival the strategist names running away (`Plan::wishes.threat` of
+    /// `brief.strategy`, `strategy_net::threat`). The one way the threat enters the stakes: `Stakes::of` and
+    /// the driver's turn stakes (after the plan, `ClassicMind`) both come through here. Each seen city of
+    /// the rival carries a stake: the prize of a victory × the threat × the city's citizens over the
+    /// citizens of the rival's seen cities (a capture takes its share of the rival's race), added to a
+    /// capital's stake on the same tile, and marked `runaway`. No threat, or stakes that carry it already:
+    /// unchanged.
+    pub fn with_plan(self, obs: &AIObservation<'_>, brief: &TurnBrief, state: &AiState) -> Self {
+        let Some(threat) = brief.strategy.as_ref().and_then(|plan| plan.wishes.threat) else { return self };
+        if self.capitals.iter().any(|c| c.runaway) {
+            return self;
+        }
+        let cities: Vec<(TileId, u32)> = state.seen_cities().iter().filter(|c| c.owner == threat.rival).map(|c| (c.tile, c.population)).collect();
+        if cities.is_empty() {
+            return self;
+        }
+        let prize = prize(&obs.view.race(), obs) * threat.level / 1000;
+        self.with_race(&cities, prize)
+    }
+
+    /// The race `prize` shared by the citizens of `cities` (tile, citizens; a city counts one at least),
+    /// each share added to the stake of its tile and marked `runaway`.
+    fn with_race(mut self, cities: &[(TileId, u32)], prize: Centi) -> Self {
+        let citizens: i64 = cities.iter().map(|(_, p)| i64::from((*p).max(1))).sum();
         if citizens == 0 {
             return self;
         }
-        let race = obs.view.race();
-        let prize = prize(&race, obs) * threat.level / 1000;
-        for city in cities {
-            let value = prize * i64::from(city.population.max(1)) / citizens;
-            match self.capitals.iter_mut().find(|c| c.tile == city.tile) {
-                Some(stake) => stake.value += value,
-                None => self.capitals.push(CapitalStake { tile: city.tile, decisive: false, value }),
+        for (tile, population) in cities {
+            let value = prize * i64::from((*population).max(1)) / citizens;
+            match self.capitals.iter_mut().find(|c| c.tile == *tile) {
+                Some(stake) => {
+                    stake.value += value;
+                    stake.runaway = true;
+                }
+                None => self.capitals.push(CapitalStake { tile: *tile, decisive: false, value, runaway: true }),
             }
         }
         self
@@ -588,7 +613,7 @@ impl Stakes {
 
     fn add(&mut self, capital: &CapitalStanding, decisive: bool, value: Centi) {
         match capital.tile {
-            Some(tile) => self.capitals.push(CapitalStake { tile, decisive, value }),
+            Some(tile) => self.capitals.push(CapitalStake { tile, decisive, value, runaway: false }),
             None => self.unfound.push(UnfoundCapital { founder: capital.founder, holder: capital.holder, value }),
         }
     }
@@ -642,6 +667,25 @@ mod tests {
         assert!(halfway > 333 && halfway < at_end(150));
     }
 
+    /// Finding 1 of the review of `strategist-x` (22 Nov): a capital stake of the domination path is not a
+    /// city of the rival running away. Only the race's stakes (`with_race`) are `runaway`, and a capital
+    /// of that rival keeps its domination value with the race's share added.
+    #[test]
+    fn only_the_runaway_rivals_cities_are_runaway() {
+        let standing = |founder: u8, tile: u32| CapitalStanding { founder: PlayerId(founder), holder: PlayerId(founder), tile: Some(TileId(tile)) };
+        let mut stakes = Stakes::neutral();
+        stakes.add(&standing(1, 7), false, 4_000);
+        stakes.add(&standing(2, 9), false, 3_000);
+        assert!(!stakes.runaway(TileId(7)) && !stakes.runaway(TileId(9)), "domination stakes are not the threat's: {stakes:?}");
+        // The runaway rival 2 holds its capital (tile 9, 6 citizens) and a city (tile 11, 2 citizens).
+        let stakes = stakes.with_race(&[(TileId(9), 6), (TileId(11), 2)], 8_000);
+        assert!(!stakes.runaway(TileId(7)), "rival 1's capital stays a domination stake");
+        assert_eq!(stakes.capital(TileId(7)).map(|c| c.value), Some(4_000));
+        assert_eq!(stakes.capital(TileId(9)), Some(&CapitalStake { tile: TileId(9), decisive: false, value: 3_000 + 6_000, runaway: true }));
+        assert_eq!(stakes.capital(TileId(11)), Some(&CapitalStake { tile: TileId(11), decisive: false, value: 2_000, runaway: true }));
+        assert!(!stakes.runaway(TileId(13)), "no stake");
+    }
+
     /// A known capital is a target, an unknown one is worth finding: its
     /// stake at the chance of an operation on a far capital, and only when
     /// its founder holds it (an embassy reveals the holder's palace).
@@ -652,7 +696,7 @@ mod tests {
         stakes.add(&standing(1, 1, Some(TileId(7))), true, 4_000);
         stakes.add(&standing(2, 2, None), false, 10_000);
         stakes.add(&standing(3, 2, None), false, 6_000);
-        assert_eq!(stakes.capitals, vec![CapitalStake { tile: TileId(7), decisive: true, value: 4_000 }]);
+        assert_eq!(stakes.capitals, vec![CapitalStake { tile: TileId(7), decisive: true, value: 4_000, runaway: false }]);
         assert_eq!(stakes.unfound.len(), 2);
         assert_eq!(stakes.finding(PlayerId(2)), 10_000 * FAR_CAPITAL_CHANCE / 1000);
         assert_eq!(stakes.finding(PlayerId(1)), 0, "known already");
