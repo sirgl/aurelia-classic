@@ -9,6 +9,8 @@
 //!   plays one instance with a line a round on stderr (`STRESS_TRACE`), prints the row.
 //! `ai-stress rebuild --scene DIR/scenes/a5-003-L2.json`
 //!   builds a saved edited start again and checks its world hash.
+//! `ai-stress table --variant NAME --out DIR`
+//!   the suite's table from the rows DIR/NAME/ and DIR/standard/ hold, with no play.
 //! `ai-stress random --positions DIR --out DIR --samples 200 [--seed 1] [--jobs 2]`
 //!   random combinations of the primitives at random strengths on the positions, each played edited
 //!   against control; DIR/random.jsonl and DIR/ranking.md, ranked by the damage to the seat's outcome.
@@ -107,6 +109,7 @@ fn real() -> Result<(), String> {
         }
         "report" => report(&o),
         "suite" => suite(&o, &rules),
+        "table" => table(&o),
         "random" => random(&o, &rules),
         "gates" => {
             print!("{}", gates::markdown());
@@ -205,6 +208,19 @@ fn suite(o: &Opts, rules: &classic_rules::CompiledRuleset) -> Result<(), String>
         println!("suite: {arm}");
         run(&each, rules)?;
     }
+    let candidate = read_rows(&o.out.join(&name));
+    let reference = if name == "standard" { None } else { Some(read_rows(&o.out.join("standard"))) };
+    let table = stress::suite::table(&name, &candidate, reference.as_deref());
+    let path = o.out.join(format!("suite-{name}.md"));
+    std::fs::write(&path, &table).map_err(|e| e.to_string())?;
+    println!("{table}\n{}", path.display());
+    Ok(())
+}
+
+/// The suite's table from the rows a suite (or runs into `OUT/NAME/`, `OUT/standard/`) wrote, with
+/// no play: a suite played over several sets of positions is tabled once.
+fn table(o: &Opts) -> Result<(), String> {
+    let name = o.variant.clone().ok_or("--variant NAME")?;
     let candidate = read_rows(&o.out.join(&name));
     let reference = if name == "standard" { None } else { Some(read_rows(&o.out.join("standard"))) };
     let table = stress::suite::table(&name, &candidate, reference.as_deref());

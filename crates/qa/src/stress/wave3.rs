@@ -1,6 +1,6 @@
 //! The situations of wave 3: the adversary groups the waves before skipped (P6 kill-zone, P9
 //! sea-hunter, P10 air-nuke, P11 and P12 pests), the air battle (C1), one vote from a diplomatic
-//! victory (B10), the rest of the playbook (P4L, P4B, P1E, P7C) and the worst combinations of the
+//! victory (B10), the rest of the playbook (P4L, P4B, P4W, P1E, P3D, P7C) and the worst combinations of the
 //! random mode (R1-R5). Each is a plan (roles and base, both arms) and an edit of one strength,
 //! made of the `edit::Change` primitives, plus a scripted adversary (`seat::Script`) where the
 //! trick is a plan of play.
@@ -81,6 +81,31 @@ pub(super) fn plan(situation: Situation, rules: &CompiledRuleset, position: &Pos
             (Roles::Raid { seat: seat.0, raider: raider.0 }, vec![meet(seat, raider), war(raider, seat)])
         }
         Situation::P7C => wonder_city_plan(game, rules, &mut info)?,
+        Situation::P3D => {
+            let (seat, enemy) = seat_and_rival(game, flip, &mut info)?;
+            let mut base = vec![meet(seat, enemy)];
+            if !at_war(game, seat, enemy) {
+                base.push(war(enemy, seat));
+            }
+            base.push(Change::Accord { giver: enemy.0, receiver: seat.0, accord: Accord::Peace });
+            // The war comes the round the treaty the base made ends.
+            let mut world = game.clone();
+            edit::apply_all(&mut world, rules, &base)?;
+            let until = world.view().auth.module().relations().peace_treaty_until(seat, enemy);
+            let war_after = until.saturating_sub(position.round) + 1;
+            info.insert("treaty_until".to_owned(), until.to_string());
+            (Roles::Sneak { seat: seat.0, enemy: enemy.0, war_after }, base)
+        }
+        Situation::P4W => {
+            let (seat, enemy) = seat_and_rival(game, flip, &mut info)?;
+            let mut base = vec![meet(seat, enemy)];
+            if !at_war(game, seat, enemy) {
+                base.push(war(seat, enemy));
+            }
+            // The seat is winning: half the enemy's army is gone in both arms.
+            base.push(super::tricks::disarm(game, rules, enemy, 50, 0));
+            (Roles::Trick { seat: seat.0, trickster: enemy.0 }, base)
+        }
         Situation::R1 | Situation::R2 | Situation::R3 | Situation::R4 | Situation::R5 => promoted_plan(game, rules, flip, &mut info)?,
         other => return Err(format!("{} is not a situation of wave 3", other.name())),
     };
@@ -129,6 +154,12 @@ pub(super) fn edit_of(situation: Situation, level: u8, rules: &CompiledRuleset, 
             let changes = super::tricks::raiders(game, rules, PlayerId(seat), PlayerId(raider), [1, 2, 3][l], salt)?;
             scripted(changes, Script::Raid { seat: raider, victim: seat, units: Vec::new() })
         }
+        (Situation::P3D, Roles::Sneak { seat, enemy, war_after }) => {
+            let mut changes = super::tricks::at_border(game, rules, PlayerId(seat), PlayerId(enemy), [4, 7, 10][l], salt)?;
+            changes.push(Change::Later { after: war_after, then: Box::new(war(PlayerId(enemy), PlayerId(seat))) });
+            Ok(Edit { changes, gift: None, script: None })
+        }
+        (Situation::P4W, Roles::Trick { seat, trickster }) => scripted(Vec::new(), Script::PeaceFishing { seat: trickster, victim: seat, every: [3, 2, 1][l] }),
         (Situation::P7C, Roles::Lost { taker, capital, .. }) => Ok(Edit { changes: vec![Change::CaptureCity { city: capital, conqueror: taker }], gift: None, script: None }),
         (Situation::R1 | Situation::R2 | Situation::R3 | Situation::R4 | Situation::R5, _) => promoted_edit(situation, l, rules, position, plan, salt),
         (s, roles) => Err(format!("{} has no edit for {roles:?}", s.name())),

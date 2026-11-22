@@ -77,6 +77,7 @@ pub fn measure(roles: &Roles, rules: &CompiledRuleset, game: &GameState, watch: 
         }
         Roles::Trick { seat, trickster } => {
             m.insert("at_war_with_trickster".into(), flag(!watch.war_rounds(seat, trickster).is_empty()));
+            m.insert("cities_taken".into(), count(watch.captures.iter().filter(|c| c.to.0 == seat && c.from.0 == trickster).count()));
             m.insert("cities_lost".into(), count(watch.captures.iter().filter(|c| c.from.0 == seat).count()));
         }
         Roles::Ally { seat, ally, enemy } => {

@@ -83,6 +83,8 @@ finding (a human is much stronger than our AI):
 | P4B bribed war | 300 gold | 600 | 1000 |
 | P1E early raid | 1 raider | 2 | 3 |
 | P7C wonder city lost | one level | | |
+| P3D attack after the treaty | 4 units at the border | 7 | 10 |
+| P4W white-peace fishing | an offer every 3 rounds | 2 | every round |
 
 ## The situations built
 
@@ -188,6 +190,12 @@ United Nations, religions and spies belong to the later eras).
   (`treasury`) and the `BribeThenWar` script offers it for the victim's war on the third, then declares
   war on the victim. Window 25.
 - P1E early raid (MO7): P1 at rounds 30-50. Window 25.
+- P3D attack after the treaty (D10): the nearest pair made peace in the base (a war, then `peace` with its
+  treaty); the enemy's army 2-4 tiles from the seat's cities and its war the round the treaty ends.
+  Window 30.
+- P4W white-peace fishing (D8): the seat at war with its nearest rival, half the rival's army gone (base:
+  the seat is winning); the `PeaceFishing` script offers white peace every 3, 2, 1 rounds.
+  `script_peace_made` reads the end of the war after the first offer (whoever made it). Window 25.
 - P7C wonder city lost (V2): the city with the most world wonders goes to the nearest nation on its
   landmass in a war (`capital_retaken` reads that city). Window 30.
 
@@ -435,6 +443,16 @@ passes when its outcome gates pass at every level. `ai-stress gates` prints this
 | P7C | outcome | `seat_cities` | delta >= | -0.9 | -0.9 | -0.9 | commander, scripted retake |
 | P7C | outcome | `end_seat_win_weight` | delta >= | -0.05 | -0.05 | -0.05 | commander, scripted retake |
 | P7C | behaviour | `capital_retaken` | edited >= | 0.3 | 0.3 | 0.3 | commander, scripted retake |
+| P3D | outcome | `seat_cities` | delta >= | -0.3 | -0.5 | -0.8 | danger net (on in standard: the fight fixes read it), tactician, commander (off); scripted defence.rs |
+| P3D | outcome | `seat_score_share` | delta >= | -0.01 | -0.02 | -0.03 | danger net (on in standard: the fight fixes read it), tactician, commander (off); scripted defence.rs |
+| P3D | outcome | `end_seat_win_weight` | delta >= | -0.03 | -0.05 | -0.08 | danger net (on in standard: the fight fixes read it), tactician, commander (off); scripted defence.rs |
+| P3D | behaviour | `counter_by_3` | edited >= | 0.8 | 0.8 | 0.8 | danger net (on in standard: the fight fixes read it), tactician, commander (off); scripted defence.rs |
+| P3D | behaviour | `military_added_before_war` | delta >= | 1 | 1 | 2 | danger net (on in standard: the fight fixes read it), tactician, commander (off); scripted defence.rs |
+| P4W | outcome | `seat_cities` | delta >= | -0.1 | -0.15 | -0.2 | none: scripted (peace.rs Negotiation::value, diplomacy.rs) |
+| P4W | outcome | `seat_score_share` | delta >= | -0.005 | -0.0075 | -0.01 | none: scripted (peace.rs Negotiation::value, diplomacy.rs) |
+| P4W | outcome | `end_seat_win_weight` | delta >= | -0.02 | -0.03 | -0.05 | none: scripted (peace.rs Negotiation::value, diplomacy.rs) |
+| P4W | behaviour | `script_peace_made` | edited <= | 0.3 | 0.4 | 0.5 | none: scripted (peace.rs Negotiation::value, diplomacy.rs) |
+| P4W | behaviour | `cities_taken` | delta >= | -0.1 | -0.15 | -0.2 | none: scripted (peace.rs Negotiation::value, diplomacy.rs) |
 | R1 | outcome | `play_on_share` | delta >= | -0.01 | -0.02 | -0.03 | commander, scripted retake; strategist (economy) |
 | R1 | outcome | `end_seat_win_weight` | delta >= | -0.05 | -0.1 | -0.15 | commander, scripted retake; strategist (economy) |
 | R1 | behaviour | `seat_recaptures` | edited >= | 0.2 | 0.3 | 0.3 | commander, scripted retake; strategist (economy) |

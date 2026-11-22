@@ -107,6 +107,10 @@ pub enum Situation {
     P1E,
     /// The city that holds our world wonders is captured.
     P7C,
+    /// Attack right after the peace treaty ends: the enemy's army waits at the border (trick D10).
+    P3D,
+    /// White-peace fishing: the enemy we are beating offers white peace every few rounds (scripted).
+    P4W,
     /// The worst combinations of the random mode, named (`wave3::promoted`).
     R1,
     R2,
@@ -116,7 +120,7 @@ pub enum Situation {
 }
 
 impl Situation {
-    pub const ALL: [Situation; 42] = [
+    pub const ALL: [Situation; 44] = [
         Situation::A5,
         Situation::B1,
         Situation::A1,
@@ -154,6 +158,8 @@ impl Situation {
         Situation::P4B,
         Situation::P1E,
         Situation::P7C,
+        Situation::P3D,
+        Situation::P4W,
         Situation::R1,
         Situation::R2,
         Situation::R3,
@@ -200,6 +206,8 @@ impl Situation {
             Situation::P4B => "p4b",
             Situation::P1E => "p1e",
             Situation::P7C => "p7c",
+            Situation::P3D => "p3d",
+            Situation::P4W => "p4w",
             Situation::R1 => "r1",
             Situation::R2 => "r2",
             Situation::R3 => "r3",
@@ -228,6 +236,8 @@ impl Situation {
             | Situation::P4B
             | Situation::P1E
             | Situation::P7C
+            | Situation::P3D
+            | Situation::P4W
             | Situation::R1
             | Situation::R2
             | Situation::R3
@@ -286,6 +296,8 @@ impl Situation {
             Situation::P4B => 25,
             Situation::P1E => 25,
             Situation::P7C => 30,
+            Situation::P3D => 30,
+            Situation::P4W => 25,
             Situation::R1 | Situation::R2 | Situation::R3 | Situation::R4 | Situation::R5 => 40,
         }
     }

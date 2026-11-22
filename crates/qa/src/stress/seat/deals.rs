@@ -1,7 +1,8 @@
 //! The deal tricks of wave 3 beyond P4 (group P4 of work/human-playbook-triage.md): a friend sells a
 //! luxury for a lump sum and declares war (P4L, trick D1); a friend pays the victim to declare war on
-//! a third nation and then declares war on the victim (P4B, trick D4). Both are one state machine:
-//! offer the bait, wait for the victim to take it, betray.
+//! a third nation and then declares war on the victim (P4B, trick D4): one state machine, offer the
+//! bait, wait for the victim to take it, betray. A loser offers white peace every few rounds (P4W,
+//! trick D8).
 
 use std::collections::BTreeMap;
 
@@ -132,5 +133,50 @@ impl Seat for Betrayal {
             ("script_betrayed".to_owned(), f64::from(u8::from(betrayed))),
             ("script_gold_moved".to_owned(), f64::from(self.gold_taken)),
         ])
+    }
+}
+
+// ---------------------------------------------------------------------------
+// P4W white-peace fishing
+
+pub(super) struct PeaceFishing {
+    seat: PlayerId,
+    victim: PlayerId,
+    every: u32,
+    turns: u32,
+    offers: u32,
+    peace: bool,
+}
+
+impl PeaceFishing {
+    pub(super) fn new(seat: PlayerId, victim: PlayerId, every: u32) -> Self {
+        PeaceFishing { seat, victim, every: every.max(1), turns: 0, offers: 0, peace: false }
+    }
+}
+
+impl Seat for PeaceFishing {
+    fn player(&self) -> PlayerId {
+        self.seat
+    }
+
+    fn play(&mut self, game: &mut GameState, rules: &CompiledRuleset) {
+        if self.peace {
+            return;
+        }
+        if self.offers > 0 && !game.view().auth.diplomacy().at_war(self.seat, self.victim) {
+            self.peace = true;
+            return;
+        }
+        self.turns += 1;
+        if self.turns % self.every != 0 {
+            return;
+        }
+        self.offers += 1;
+        let items = vec![(self.seat, DealItem::Peace)];
+        let _ = game.execute(rules, Command::ProposeDeal { from: self.seat, to: self.victim, items });
+    }
+
+    fn counts(&self) -> BTreeMap<String, f64> {
+        BTreeMap::from([("script_offers".to_owned(), f64::from(self.offers)), ("script_peace_made".to_owned(), f64::from(u8::from(self.peace)))])
     }
 }

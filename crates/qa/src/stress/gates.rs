@@ -58,7 +58,7 @@ const fn gate(situation: Situation, kind: Kind, metric: &'static str, test: Test
 }
 
 use Kind::{Behaviour as B, Outcome as O};
-use Situation::{A1, A2, A3, A4, A5, A6, A7, B1, B10, B2, B4, B5, B6, B7, B9, C1, C2, C5, D1, D2, D3, P1, P10, P11, P12, P1E, P2, P3, P4, P4B, P4L, P5, P6, P7, P7C, P8, P9, R1, R2, R3, R4, R5};
+use Situation::{A1, A2, A3, A4, A5, A6, A7, B1, B10, B2, B4, B5, B6, B7, B9, C1, C2, C5, D1, D2, D3, P1, P10, P11, P12, P1E, P2, P3, P4, P4B, P4L, P5, P6, P3D, P4W, P7, P7C, P8, P9, R1, R2, R3, R4, R5};
 use Test::{DeltaAtLeast as DGE, DeltaAtMost as DLE, EditedAtLeast as EGE, EditedAtMost as ELE};
 
 pub const GATES: &[Gate] = &[
@@ -237,7 +237,17 @@ pub const GATES: &[Gate] = &[
     gate(P7C, O, "seat_score_share", DGE, [-0.04, -0.04, -0.04], "commander, scripted retake"),
     gate(P7C, O, "seat_cities", DGE, [-0.9, -0.9, -0.9], "commander, scripted retake"),
     gate(P7C, O, "end_seat_win_weight", DGE, [-0.05, -0.05, -0.05], "commander, scripted retake"),
-    gate(P7C, B, "capital_retaken", EGE, [0.3, 0.3, 0.3], "commander, scripted retake"),    // R1-R5, promoted from the random mode on nets-x-site (written before their first run).
+    gate(P7C, B, "capital_retaken", EGE, [0.3, 0.3, 0.3], "commander, scripted retake"),    gate(P3D, O, "seat_cities", DGE, [-0.3, -0.5, -0.8], NET_DEFENCE),
+    gate(P3D, O, "seat_score_share", DGE, [-0.01, -0.02, -0.03], NET_DEFENCE),
+    gate(P3D, O, "end_seat_win_weight", DGE, [-0.03, -0.05, -0.08], NET_DEFENCE),
+    gate(P3D, B, "counter_by_3", EGE, [0.8, 0.8, 0.8], NET_DEFENCE),
+    gate(P3D, B, "military_added_before_war", DGE, [1.0, 1.0, 2.0], NET_DEFENCE),
+    gate(P4W, O, "seat_cities", DGE, [-0.1, -0.15, -0.2], NET_DEALS),
+    gate(P4W, O, "seat_score_share", DGE, [-0.005, -0.0075, -0.01], NET_DEALS),
+    gate(P4W, O, "end_seat_win_weight", DGE, [-0.02, -0.03, -0.05], NET_DEALS),
+    gate(P4W, B, "script_peace_made", ELE, [0.3, 0.4, 0.5], NET_DEALS),
+    gate(P4W, B, "cities_taken", DGE, [-0.1, -0.15, -0.2], NET_DEALS),
+    // R1-R5, promoted from the random mode on nets-x-site (written before their first run).
     gate(R1, O, "play_on_share", DGE, [-0.01, -0.02, -0.03], NET_R_LOSS),
     gate(R1, O, "end_seat_win_weight", DGE, [-0.05, -0.1, -0.15], NET_R_LOSS),
     gate(R1, B, "seat_recaptures", EGE, [0.2, 0.3, 0.3], NET_R_LOSS),

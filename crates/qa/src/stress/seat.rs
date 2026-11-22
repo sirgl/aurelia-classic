@@ -118,6 +118,9 @@ pub enum Script {
     /// P4B: `seat` pays `victim` (a friend) `gold` to declare war on `third`, then declares war on
     /// `victim` once it is at war with `third`.
     BribeThenWar { seat: u8, victim: u8, third: u8, gold: u32 },
+    /// P4W white-peace fishing (trick D8): `seat`, losing its war on `victim`, offers white peace
+    /// every `every` rounds until the victim takes it.
+    PeaceFishing { seat: u8, victim: u8, every: u32 },
 }
 
 impl Script {
@@ -149,6 +152,7 @@ impl Script {
             Script::Spies { seat, victim } => Box::new(pests::Spies::new(p(seat), p(victim))),
             Script::LuxuryThenWar { seat, victim, percent } => Box::new(deals::Betrayal::new(p(seat), p(victim), deals::Bait::Luxury { percent: *percent })),
             Script::BribeThenWar { seat, victim, third, gold } => Box::new(deals::Betrayal::new(p(seat), p(victim), deals::Bait::Bribe { third: p(third), gold: *gold })),
+            Script::PeaceFishing { seat, victim, every } => Box::new(deals::PeaceFishing::new(p(seat), p(victim), *every)),
         }
     }
 }
