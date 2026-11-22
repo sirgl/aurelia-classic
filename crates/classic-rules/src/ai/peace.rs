@@ -156,17 +156,24 @@ impl<'i, 'o, 'a> Negotiation<'i, 'o, 'a> {
         prospect
     }
 
-    /// What a `net2` war order on `enemy` promises while no operation's case prices the war (`net2::orders`, CHAIN.md
-    /// D8): the aimed city's capture (`operations::captured_gain` of its last seen size, as a puppet below
-    /// `ANNEX_POPULATION`) at the aim's ease, with no army cost (the order's army is the war machine's to form). None
-    /// without an order on it, an aim, or a sighting of the city.
+    /// What a `net2` war order on `enemy` promises (`net2::orders`, CHAIN.md D8): the capture of the order rival's
+    /// easiest city it still holds (`Net2Plan::order_eases`, the aim first) — `operations::captured_gain` of its last
+    /// seen size, a puppet below `ANNEX_POPULATION`, at its ease — with no army cost (the order's army is the war
+    /// machine's to form). None without an order on it or a city of it we have seen.
     fn ordered_case(&self, enemy: PlayerId) -> Option<WarCase> {
         let input = self.input;
-        let (aim, ease) = crate::ai::operations::with_net2(input.brief, crate::ai::net2::plan::Part::War, |p| p.war_on(enemy).and_then(|o| o.aim).map(|a| (a.city, p.aim_ease)))??;
-        let city = input.state.seen_cities().iter().find(|c| c.tile == aim && c.owner == enemy)?;
-        let puppet = city.population < crate::ai::combat::ANNEX_POPULATION;
-        let gain = crate::ai::operations::captured_gain(&self.prices, &self.stakes, city.population, self.prices.rounds_left, puppet);
-        Some(WarCase { gain: (gain * ease / 1000).max(0), cost: 0 })
+        let eases = crate::ai::operations::with_net2(input.brief, crate::ai::net2::plan::Part::War, |p| p.war_on(enemy).map(|_| p.order_eases.clone()))??;
+        let mut best: Option<WarCase> = None;
+        for (tile, ease) in eases {
+            let Some(city) = input.state.seen_cities().iter().find(|c| c.tile == tile && c.owner == enemy) else { continue };
+            let puppet = city.population < crate::ai::combat::ANNEX_POPULATION;
+            let gain = crate::ai::operations::captured_gain(&self.prices, &self.stakes, city.population, self.prices.rounds_left, puppet);
+            let case = WarCase { gain: (gain * ease / 1000).max(0), cost: 0 };
+            if best.is_none_or(|b| case.gain > b.gain) {
+                best = Some(case);
+            }
+        }
+        best
     }
 
     /// `value` of an item that flows to us later (gold a turn, a resource, a neighbour's open borders), read by a

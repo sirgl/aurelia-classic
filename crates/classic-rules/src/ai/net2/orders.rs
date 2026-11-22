@@ -5,13 +5,15 @@
 //! enemy whose army had not formed yet (or had formed nowhere) priced its war at 0 and took every white peace (HD8:
 //! 1.00 of seats; the design's "already guarded (code): `Negotiation::answer`" held only with an operation running).
 //! The order is the plan's decision that the war pays; its aim and the aim's ease are the plan's estimate of what it
-//! takes. `aim_ease` carries the ease to the executors (`Net2Plan::aim_ease`).
+//! takes. `order_eases` carries them to the executors (`Net2Plan::order_eases`).
 
 use super::plan::{TargetInputs, WarPlan};
 use crate::ai::strategy_net::Milli;
 
-/// The ease of the target the order aims at (0 without an order or an aim, or when the target is not read).
-pub fn aim_ease(war: &WarPlan, targets: &[TargetInputs], eases: &[Milli]) -> Milli {
-    let Some(aim) = war.order().and_then(|o| o.aim) else { return 0 };
-    targets.iter().zip(eases).find(|(t, _)| t.city == aim.city).map_or(0, |(_, e)| *e)
+/// The order rival's known cities with their eases, the easiest first (empty without an order).
+pub fn order_eases(war: &WarPlan, targets: &[TargetInputs], eases: &[Milli]) -> Vec<(crate::ids::TileId, Milli)> {
+    let Some(order) = war.order() else { return Vec::new() };
+    let mut out: Vec<(crate::ids::TileId, Milli)> = targets.iter().zip(eases).filter(|(t, _)| t.rival == order.rival).map(|(t, e)| (t.city, *e)).collect();
+    out.sort_by_key(|(t, e)| (std::cmp::Reverse(*e), t.0));
+    out
 }

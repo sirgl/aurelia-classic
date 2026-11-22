@@ -143,9 +143,9 @@ fn white_peace_answer(net2: Option<Net2Plan>, seen: bool) -> bool {
     Negotiation::new(&input).answer(&offer).0
 }
 
-fn ordered(game_tile: TileId) -> Net2Plan {
+fn ordered(game_tile: TileId, eases: Vec<(TileId, i64)>) -> Net2Plan {
     let war = WarOrder { rival: P1, kind: WarKind::Prey, since: 1, budget: 50, phase: OrderPhase::Fighting { since: 1 }, value: 900, aim: Some(WarAim { city: game_tile, why: AimWhy::Ease }), opening: Opening::Plain, raid: false };
-    Net2Plan { war: WarPlan::Order(war), aim_ease: 800, ..plan(vec![trusted(P1)]) }
+    Net2Plan { war: WarPlan::Order(war), order_eases: eases, ..plan(vec![trusted(P1)]) }
 }
 
 /// HD8: the enemy is losing and asks white peace; no operation of ours runs yet. Today going on is priced by a running
@@ -157,8 +157,11 @@ fn d8_a_white_peace_is_refused_while_the_war_order_aims_at_a_city() {
     let aim = tile(&game, 35, 3);
     assert!(white_peace_answer(None, true), "today: no operation, the white peace passes");
     assert!(white_peace_answer(Some(plan(vec![trusted(P1)])), true), "net2 without an order: passes");
-    assert!(!white_peace_answer(Some(ordered(aim)), true), "net2 with the order: refused");
-    assert!(white_peace_answer(Some(ordered(aim)), false), "the aimed city never seen: nothing priced, passes");
+    assert!(!white_peace_answer(Some(ordered(aim, vec![(aim, 800)])), true), "net2 with the order: refused");
+    assert!(white_peace_answer(Some(ordered(aim, vec![(aim, 800)])), false), "the aimed city never seen: nothing priced, passes");
+    // The aimed city is no longer the enemy's (taken the turn before, HD8 #1 r114): the next city of the order prices it.
+    let gone = tile(&game, 20, 15);
+    assert!(!white_peace_answer(Some(ordered(gone, vec![(gone, 1000), (aim, 800)])), true), "the order's next city: refused");
 }
 
 // ---- S3, CS2, W2: the contested city-state is a gift target (city_states::contested_beat) ----
