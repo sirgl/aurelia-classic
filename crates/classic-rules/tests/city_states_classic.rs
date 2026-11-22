@@ -743,3 +743,45 @@ fn peace_with_a_city_state_keeps_units_on_its_land() {
     game.execute(&rules, Command::MakePeace { player: P0, enemy: CS }).unwrap();
     assert_eq!(unit_tile(&game, raider), inside);
 }
+
+/// The first contact is told with its gold (`ClassicChange::CityStateMet`), once per nation.
+#[test]
+fn first_contact_is_in_the_journal_with_its_gold() {
+    use classic_rules::classic::ClassicChange;
+    let (mut game, rules) = world("core:city-state/byblos");
+    until_active(&mut game, &rules, CS);
+    let result = game.execute(&rules, Command::EndTurn { player: CS }).unwrap();
+    let mut met: Vec<_> = result
+        .changes()
+        .module_changes
+        .iter()
+        .filter_map(|c| match *c {
+            ClassicChange::CityStateMet { city_state, player, gold } => Some((city_state, player, gold)),
+            _ => None,
+        })
+        .collect();
+    met.sort_by_key(|m| m.1 .0);
+    assert_eq!(met, vec![(CS, P0, 30), (CS, P1, 15)], "30 gold to the first nation, 15 to the next");
+    let again = game.execute(&rules, Command::EndTurn { player: game.view().auth.active_player() }).unwrap();
+    assert!(!again.changes().module_changes.iter().any(|c| matches!(c, ClassicChange::CityStateMet { .. })), "told once");
+}
+
+/// A quest given and a quest done are told to the major nation it concerns.
+#[test]
+fn a_finished_quest_is_in_the_journal() {
+    use classic_rules::classic::ClassicChange;
+    let (mut game, rules) = world("core:city-state/byblos");
+    let camp = tile(&game, 16, 9);
+    game.debug_place_camp(&rules, camp);
+    game.debug_add_quest(CS, P0, QuestKind::KillCamp(camp), None);
+    let warrior = game.debug_spawn_unit(&rules, P0, tile(&game, 17, 9), unit(&rules, "core:unit/warrior"));
+    until_active(&mut game, &rules, P0);
+    game.execute(&rules, Command::MoveUnit { unit: warrior, destination: camp }).unwrap();
+    let mut done = Vec::new();
+    for _ in 0..3 {
+        let active = game.view().auth.active_player();
+        let result = game.execute(&rules, Command::EndTurn { player: active }).unwrap();
+        done.extend(result.changes().module_changes.iter().copied().filter(|c| matches!(c, ClassicChange::QuestDone { .. })));
+    }
+    assert_eq!(done, vec![ClassicChange::QuestDone { city_state: CS, player: P0, kind: QuestKind::KillCamp(camp) }]);
+}

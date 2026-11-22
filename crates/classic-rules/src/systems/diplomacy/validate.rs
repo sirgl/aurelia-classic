@@ -125,6 +125,11 @@ pub(crate) fn validate_denounce(
     Ok(ResolvedCommand::Denounce { player, target })
 }
 
+/// Two item lists name the same deal whatever their order.
+fn same_items(a: &[(PlayerId, DealItem)], b: &[(PlayerId, DealItem)]) -> bool {
+    a.len() == b.len() && a.iter().all(|item| b.contains(item))
+}
+
 pub(crate) fn validate_propose_deal(
     view: GameView<'_>,
     rules: &CompiledRuleset,
@@ -143,13 +148,12 @@ pub(crate) fn validate_propose_deal(
     if let Some(reason) = offer_problem(auth, rules, from, to, items) {
         return Err(violation(reason));
     }
-    let pending = auth
-        .module()
-        .relations()
-        .offers()
-        .iter()
-        .filter(|o| o.from == from && o.to == to)
-        .count();
+    let pending_offers = auth.module().relations().offers().iter().filter(|o| o.from == from && o.to == to);
+    // The same offer once: the first one waits in the inbox of the receiver until it is answered.
+    if pending_offers.clone().any(|o| same_items(&o.items, items)) {
+        return Err(violation("the same offer is waiting for an answer"));
+    }
+    let pending = pending_offers.count();
     if pending >= 3 {
         return Err(violation("too many pending offers"));
     }

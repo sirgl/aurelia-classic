@@ -30,7 +30,7 @@ pub mod world_size;
 pub mod yields;
 
 pub use advisors::ClassicSystem;
-pub use change::ClassicChange;
+pub use change::{Audience, ClassicChange};
 pub use save::SavedClassic;
 pub use turn::{ClassicCityStep, ClassicStep};
 pub use world::ClassicWorld;

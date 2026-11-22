@@ -12,6 +12,7 @@
 
 use super::{is_friends, majors, type_of};
 use crate::classic::effects::CityStateStat;
+use crate::classic::ClassicChange;
 use crate::ids::{PlayerId, UnitKindId};
 use crate::rules::content::{CityStateBonusKind, CityStateLevel, Domain, UnitRole};
 use crate::rules::CompiledRuleset;
@@ -98,6 +99,7 @@ impl<'a> WorldTransaction<'a> {
             s.contacted = true;
         }
         if self.world.module.city_states.major(major).minors_attacked >= super::AGGRESSOR_THRESHOLD {
+            self.journal.module_changes.push(ClassicChange::CityStateMet { city_state, player: major, gold: 0 });
             return;
         }
         let gold = if first {
@@ -106,6 +108,7 @@ impl<'a> WorldTransaction<'a> {
             CONTACT_GOLD_OTHER
         };
         self.world.players.earn(major, gold);
+        self.journal.module_changes.push(ClassicChange::CityStateMet { city_state, player: major, gold });
         let gives_faith = type_of(self.world, rules, city_state).is_some_and(|t| {
             t.bonuses
                 .iter()

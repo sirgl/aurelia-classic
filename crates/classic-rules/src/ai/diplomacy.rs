@@ -137,13 +137,13 @@ pub fn proposals_priced(obs: &AIObservation<'_>, rules: &CompiledRuleset, agreem
         // proposals): what it settles is not in this observation yet, so a
         // proposal of the same items would be refused (an embassy that
         // exists, friends already).
-        if obs.offers_to_us.iter().any(|o| o.from == r.other) {
+        if obs.offers_to_us.iter().any(|o| o.from == r.other) || obs.waiting_on(r.other) {
             continue;
         }
         // An offer of this partner is answered in the same turn: the
         // observation would be stale for a proposal (the core refused
         // "embassy exists" when both sides proposed the same exchange).
-        if obs.offers_to_us.iter().any(|o| o.from == r.other) {
+        if obs.offers_to_us.iter().any(|o| o.from == r.other) || obs.waiting_on(r.other) {
             continue;
         }
         let items: Vec<(PlayerId, DealItem)> = if r.at_war {
@@ -233,7 +233,7 @@ pub fn luxury_swaps(obs: &AIObservation<'_>, rules: &CompiledRuleset, others: &[
     let proposed = |other: PlayerId| others.iter().any(|c| matches!(c, Command::ProposeDeal { to, .. } if *to == other));
     let mut out = Vec::new();
     for r in &obs.relations {
-        let busy = r.at_war || proposed(r.other) || obs.offers_to_us.iter().any(|o| o.from == r.other);
+        let busy = r.at_war || proposed(r.other) || obs.offers_to_us.iter().any(|o| o.from == r.other) || obs.waiting_on(r.other);
         if r.kind != PlayerKind::Major || busy || spares.is_empty() {
             continue;
         }

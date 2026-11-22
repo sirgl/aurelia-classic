@@ -102,6 +102,20 @@ impl Spy {
     }
 }
 
+/// A theft the victim found out (`systems::espionage::heist`), kept for the victim's AI
+/// (`AIObservation::thefts_against_us`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Theft {
+    pub round: u32,
+    pub victim: PlayerId,
+    /// The thief, when the theft identified it.
+    pub thief: Option<PlayerId>,
+    pub city: CityHandle,
+}
+
+/// The thefts the world remembers: the newest ones, so the record stays small.
+pub const MAX_THEFTS_KEPT: usize = 32;
+
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct EspionageState {
     players: usize,
@@ -112,6 +126,8 @@ pub struct EspionageState {
     pub(crate) renaissance_granted: bool,
     /// The latest era index that granted the player spies.
     pub(crate) era_granted: Vec<u8>,
+    /// The thefts found out, oldest first (`MAX_THEFTS_KEPT` at most).
+    pub(crate) thefts: Vec<Theft>,
 }
 
 impl EspionageState {
@@ -122,7 +138,24 @@ impl EspionageState {
             steal_rights: vec![0; players * players],
             renaissance_granted: false,
             era_granted: vec![0; players],
+            thefts: Vec::new(),
         }
+    }
+
+    /// The thefts `victim` found out, oldest first.
+    pub fn thefts_against(&self, victim: PlayerId) -> impl Iterator<Item = &Theft> {
+        self.thefts.iter().filter(move |t| t.victim == victim)
+    }
+
+    pub fn all_thefts(&self) -> &[Theft] {
+        &self.thefts
+    }
+
+    pub(crate) fn record_theft(&mut self, theft: Theft) {
+        if self.thefts.len() == MAX_THEFTS_KEPT {
+            self.thefts.remove(0);
+        }
+        self.thefts.push(theft);
     }
 
     pub fn is_pristine(&self) -> bool {
@@ -188,6 +221,7 @@ impl EspionageState {
         steal_rights: Vec<u8>,
         renaissance_granted: bool,
         era_granted: Vec<u8>,
+        thefts: Vec<Theft>,
     ) -> Self {
         Self {
             players,
@@ -195,6 +229,7 @@ impl EspionageState {
             steal_rights,
             renaissance_granted,
             era_granted,
+            thefts,
         }
     }
 }

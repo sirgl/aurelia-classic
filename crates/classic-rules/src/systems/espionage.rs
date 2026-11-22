@@ -14,7 +14,8 @@ use crate::rules::effects::{CompiledEffect, Modifier, Selector};
 use crate::rules::stats::{EspionageStat, Stat};
 use crate::rules::CompiledRuleset;
 use crate::transaction::transaction::WorldTransaction;
-use crate::world::espionage::{Spy, SpyState, MAX_RANK};
+use crate::classic::ClassicChange;
+use crate::world::espionage::{Spy, SpyState, Theft, MAX_RANK};
 use crate::world::state::AuthWorld;
 use crate::world::player::ClassicPlayers;
 
@@ -491,6 +492,7 @@ impl<'a> WorldTransaction<'a> {
         let roll = self.world.rng.events.below(300) as i64;
         let catch = player_stat(self.world, rules, owner, EspionageStat::CatchPercent);
         let outcome = detection(roll, spy.rank, counter.map(|(_, rank)| rank), catch);
+        self.report_theft(player, owner, city, outcome);
         if outcome == Detection::Killed {
             if let Some((i, _)) = counter {
                 if let Some(c) = self.world.module.espionage.spy_mut(owner, i) {
@@ -525,6 +527,25 @@ impl<'a> WorldTransaction<'a> {
         };
         self.relations_changed(player);
         spy
+    }
+
+    /// What the victim learns of a theft (§7.5, Unciv `stealTech`): nothing when it went
+    /// undetected; that a theft happened when detected; the thief too when identified; that a spy
+    /// was caught when killed. The journal tells both nations; the victim's AI reads the record.
+    fn report_theft(&mut self, thief: PlayerId, victim: PlayerId, city: CityHandle, outcome: Detection) {
+        let identified = match outcome {
+            Detection::Undetected => return,
+            Detection::Killed => {
+                self.journal.module_changes.push(ClassicChange::SpyKilled { thief, victim, city });
+                return;
+            }
+            Detection::Detected => false,
+            Detection::Identified => true,
+        };
+        self.journal.module_changes.push(ClassicChange::TheftDetected { thief, victim, city, identified });
+        let round = self.world.turn.round;
+        let thief = identified.then_some(thief);
+        self.world.module.espionage.record_theft(Theft { round, victim, thief, city });
     }
 
     /// Recompute the steal rate of spies gathering intelligence; their

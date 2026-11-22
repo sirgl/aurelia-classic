@@ -320,7 +320,7 @@ impl Session {
     }
 }
 
-fn resolution_name(kind: ResolutionKind) -> &'static str {
+pub(super) fn resolution_name(kind: ResolutionKind) -> &'static str {
     match kind {
         ResolutionKind::DiplomaticVictory => t!("classic.game.congress.name-world-leader"),
         ResolutionKind::ChangeHost => t!("classic.game.congress.name-change-host"),

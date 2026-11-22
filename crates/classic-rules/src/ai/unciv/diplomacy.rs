@@ -371,7 +371,7 @@ fn offer_peace(d: &Diplomat<'_, '_>, out: &mut Vec<Decision>) {
             }
         }
         let command = Command::ProposeDeal { from: obs.player, to: enemy.other, items: vec![(obs.player, DealItem::Peace)] };
-        if obs.view.accepts(&command) {
+        if !obs.waiting_on(enemy.other) && obs.view.accepts(&command) {
             out.push(act(command, Reason::MakePeace));
         }
     }
@@ -557,7 +557,7 @@ fn offers(d: &Diplomat<'_, '_>, out: &mut Vec<Decision>, last: &dyn Fn(PlayerId,
     let recent = |p: PlayerId, kind: u8| last(p, kind).is_some_and(|r| obs.round < r + 5);
     let mut push = |to: PlayerId, items: Vec<(PlayerId, DealItem)>, reason: Reason| {
         let command = Command::ProposeDeal { from: me, to, items };
-        if obs.view.accepts(&command) {
+        if !obs.waiting_on(to) && obs.view.accepts(&command) {
             out.push(act(command, reason));
         }
     };

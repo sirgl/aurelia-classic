@@ -446,7 +446,7 @@ pub(crate) fn validate_air_sweep(
     if !crate::systems::combat::air::can_air_sweep(auth, rules, unit) {
         return Err(AirOrderBlock::CannotSweep.into());
     }
-    if core.moves_left == 0 || core.attacks_made > 0 {
+    if crate::combat::exchange::attacks_left(auth, rules, &core) == 0 {
         return Err(AirOrderBlock::NoAttacksLeft.into());
     }
     let range = rules

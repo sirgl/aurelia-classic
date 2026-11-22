@@ -13,9 +13,12 @@ use crate::world::state::AuthWorld;
 
 /// At most this many items in one deal. Own value (no Unciv equivalent).
 pub const MAX_DEAL_ITEMS: usize = 12;
-/// An offer waits this many rounds for its answer. Own value (no Unciv
-/// equivalent).
+/// An offer to an AI waits this many rounds for its answer; the AI answers at the start of its turn.
 pub const OFFER_ROUNDS: u32 = 1;
+/// An offer to a human waits this many rounds in the inbox. Unciv keeps a `TradeRequest` until it
+/// is answered or can no longer be met; ten rounds is the length of a deal (own bound, so the
+/// inbox does not grow for ever).
+pub const INBOX_ROUNDS: u32 = 10;
 /// An embassy reveals the tiles this close to the host's capital (our rule:
 /// public descriptions name the capital and the tiles around it, no
 /// number; classic/docs/classic/rules.md).
@@ -378,6 +381,15 @@ pub fn offer_problem(
     None
 }
 
+/// Rounds an offer to `to` waits: a human reads the inbox when it likes, an AI answers at once.
+pub fn offer_lifetime(auth: &AuthWorld, to: PlayerId) -> u32 {
+    if auth.settings().is_ai(to) {
+        OFFER_ROUNDS
+    } else {
+        INBOX_ROUNDS
+    }
+}
+
 impl<'a> WorldTransaction<'a> {
     pub(crate) fn propose_deal(
         &mut self,
@@ -386,6 +398,7 @@ impl<'a> WorldTransaction<'a> {
         items: Vec<(PlayerId, DealItem)>,
     ) -> Result<(), CommandError> {
         let round = self.world.turn.round;
+        let expires = round + offer_lifetime(self.world, to);
         let relations = &mut self.world.module.relations;
         let id = relations.next_offer;
         relations.next_offer += 1;
@@ -394,7 +407,7 @@ impl<'a> WorldTransaction<'a> {
             from,
             to,
             items,
-            expires: round + OFFER_ROUNDS,
+            expires,
         });
         self.relations_changed(to);
         Ok(())

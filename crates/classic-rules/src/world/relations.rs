@@ -62,7 +62,7 @@ pub struct DealOffer {
     pub to: PlayerId,
     /// (giver, item); a mutual item is listed once.
     pub items: Vec<(PlayerId, DealItem)>,
-    /// The offer lapses at the end of this round.
+    /// The offer lapses when the round reaches this value (`systems::diplomacy::deals::offer_lifetime`).
     pub expires: u32,
 }
 
@@ -167,6 +167,20 @@ pub struct Grievance {
     pub offender: PlayerId,
     pub kind: GrievanceKind,
     pub amount: i32,
+}
+
+/// Why an offer left the list of its receiver without an answer. Not stored: the journal tells it
+/// (`ClassicChange::OfferLapsed`) and the screen of the receiver says it once.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum OfferLapse {
+    /// Nobody answered before the round it expires.
+    Expired,
+    /// The proposer or the receiver is gone from the game.
+    NationGone,
+    /// The two nations are at war now, and the offer is not a peace.
+    WarBegan,
+    /// The terms cannot be met any more (a city changed hands, the gold is spent, the peace is made).
+    NoLongerPossible,
 }
 
 /// Why an offer that makes peace was refused, and what would turn the refusal into a yes.

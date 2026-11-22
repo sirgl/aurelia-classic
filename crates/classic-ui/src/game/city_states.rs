@@ -190,7 +190,7 @@ impl Session {
         out
     }
 
-    fn quest_text(&self, quest: QuestKind) -> String {
+    pub(super) fn quest_text(&self, quest: QuestKind) -> String {
         let task = match quest {
             QuestKind::KillCamp(_) => t!("classic.game.city-states.quest-kill-camp").to_string(),
             QuestKind::ConnectResource(r) => tf!("classic.game.city-states.quest-connect", name = self.resource_name(r)),

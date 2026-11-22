@@ -41,7 +41,7 @@ pub use game::ClassicGame;
 pub use knowledge::public::PlayerQueries;
 pub use systems::research::{plan_research, technology_cost, ResearchPlanError};
 pub use rules::{compile_rules, CompiledRuleset};
-pub use systems::diplomacy::MIN_WAR_ROUNDS_BEFORE_PEACE;
+pub use systems::diplomacy::{INBOX_ROUNDS, MIN_WAR_ROUNDS_BEFORE_PEACE, OFFER_ROUNDS};
 pub use systems::ruins;
 pub use systems::plunder::PlunderSource;
 pub use world::state::{GameConfig, GameState, GameView};

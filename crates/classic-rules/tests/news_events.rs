@@ -68,8 +68,8 @@ fn lapsed(changes: &[ClassicChange]) -> Vec<(PlayerId, PlayerId)> {
         .collect()
 }
 
-/// An offer nobody answers lapses on the turn of the nation it was made to, and its proposer is
-/// the one told; an offer that was answered never lapses.
+/// An offer nobody answers lapses when its inbox term (ten rounds for a human) has run out, and
+/// its proposer is the one told; an offer that was answered never lapses.
 #[test]
 fn an_unanswered_offer_lapses_and_names_its_proposer() {
     let rules = compile_rules(core_rules()).unwrap();
@@ -81,7 +81,7 @@ fn an_unanswered_offer_lapses_and_names_its_proposer() {
     until_active(&mut game, &rules, P0);
     game.execute(&rules, Command::ProposeDeal { from: P0, to: P1, items: vec![(P0, DealItem::Embassy)] }).unwrap();
     let mut told = Vec::new();
-    for _ in 0..3 {
+    for _ in 0..12 {
         told.extend(lapsed(&end_round(&mut game, &rules).0));
     }
     assert_eq!(told, vec![(P0, P1)], "told once, to the proposer");

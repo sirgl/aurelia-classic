@@ -10,19 +10,28 @@
 //! the orders removed by a wonder built elsewhere are told by `diplomacy.rs`, `turn.rs` and
 //! `lost_orders.rs`.
 use classic_rules::classic::ClassicChange;
+use classic_rules::ClassicGame;
 use classic_rules::derived::standing::{victory_warnings, VictoryWarning};
 use classic_rules::transaction::journal::{AppliedCommand, PlayerChange};
+use classic_rules::ids::PlayerId;
 use classic_rules::world::city::{CityCore, CityStatus};
+use classic_rules::world::relations::OfferLapse;
 use i18n::{t, tf};
+
+/// A foreign unit this close to a city of the player is at its border.
+const BORDER_DISTANCE: i32 = 2;
+/// The rounds a nation's sighting at the border stays told.
+const BORDER_QUIET_ROUNDS: u32 = 5;
 
 use super::session::Session;
 use super::turn::CitySnapshot;
 use crate::ui::model::NoticeKind;
 
 impl Session {
-    /// A notice for every war a nation the player has met declared on it and every offer of the
-    /// player that lapsed unanswered, in `records`. A war of a stranger (a city-state joins the
-    /// war of its ally) is not told: a notice names only whom the player knows.
+    /// A notice for every event of `records` that concerns the player: a war declared on it, an
+    /// offer of its own that lapsed, a theft, a dropped proposal, a first contact, a quest, a
+    /// wonder, a nation destroyed. A war of a stranger (a city-state joins the war of its ally) is
+    /// not told: a notice names only whom the player knows.
     pub(super) fn notify_news(&mut self, records: &[AppliedCommand]) {
         let me = self.me();
         if self.game().view().auth.settings().is_ai(me) {
@@ -30,25 +39,190 @@ impl Session {
         }
         for record in records {
             for change in &record.changes.player_changes {
-                let PlayerChange::WarDeclared { player, enemy } = *change else { continue };
-                if enemy == me && player != me && classic_rules::derived::tourism::met(self.game().view().auth, me, player) {
+                self.tell_player_change(change);
+            }
+            for change in &record.changes.module_changes {
+                self.tell_change(change);
+            }
+        }
+    }
+
+    /// The notice of one kernel event. Every kind of `PlayerChange` is named: told, or not a
+    /// matter for a notice (no `_` arm, so a new kind is decided here).
+    fn tell_player_change(&mut self, change: &PlayerChange) {
+        let me = self.me();
+        match *change {
+            PlayerChange::WarDeclared { player, enemy } => {
+                if enemy == me && player != me && self.is_met(player) {
                     let text = tf!("classic.game.news.war-declared", name = self.player_name(player));
                     self.notify(NoticeKind::Diplomacy, text);
                 }
             }
-            for change in &record.changes.module_changes {
-                let ClassicChange::OfferLapsed { from, to, peace } = *change else { continue };
-                if from != me {
-                    continue;
+            PlayerChange::Eliminated { player } => {
+                if player != me && self.is_met(player) {
+                    let text = tf!("classic.game.news.nation-destroyed", name = self.player_name(player));
+                    self.notify(NoticeKind::Diplomacy, text);
                 }
-                let name = self.player_name(to);
-                let text = if peace {
-                    tf!("classic.game.news.peace-lapsed", name = name)
+            }
+            // Silent: bookkeeping of the world, or told by another notice (peace by the answer
+            // to the offer, a tech chosen by the research report).
+            PlayerChange::TechnologyChosen { .. }
+            | PlayerChange::TurnEnded { .. }
+            | PlayerChange::PeaceMade { .. }
+            | PlayerChange::BordersOpened { .. }
+            | PlayerChange::EffectsChanged { .. }
+            | PlayerChange::MapRevealed { .. }
+            | PlayerChange::AreaRevealed { .. }
+            | PlayerChange::TileNoticed { .. } => {}
+        }
+    }
+
+    /// Has the player met `other`?
+    fn is_met(&self, other: PlayerId) -> bool {
+        classic_rules::derived::tourism::met(self.game().view().auth, self.me(), other)
+    }
+
+    /// The notice of one event of the classic rules, to the player it concerns
+    /// (`ClassicChange::is_told_to`). Every kind is named: told here, told by another notice
+    /// (`Elsewhere`), or silent (`Silent`: the screens show it). There is no `_` arm, so a new
+    /// kind does not compile until it is decided.
+    fn tell_change(&mut self, change: &ClassicChange) {
+        let me = self.me();
+        if !change.is_told_to(me) {
+            return;
+        }
+        match *change {
+            ClassicChange::OfferLapsed { from, to, peace, .. } => {
+                if from == me {
+                    let name = self.player_name(to);
+                    let text = if peace {
+                        tf!("classic.game.news.peace-lapsed", name = name)
+                    } else {
+                        tf!("classic.game.news.offer-lapsed", name = name)
+                    };
+                    self.notify(NoticeKind::Diplomacy, text);
+                }
+                // The receiver's notice, with the reason: `diplomacy.rs`.
+            }
+            ClassicChange::TheftDetected { thief, victim, city, identified } => {
+                let text = self.theft_notice(thief, victim, city, identified);
+                self.notify(NoticeKind::Diplomacy, text);
+            }
+            ClassicChange::SpyKilled { thief, victim, city } => {
+                let text = if victim == me {
+                    tf!("classic.game.news.spy-caught-ours", name = self.player_name(thief), city = self.city_name(city))
                 } else {
-                    tf!("classic.game.news.offer-lapsed", name = name)
+                    tf!("classic.game.news.spy-lost", name = self.player_name(victim), city = self.city_name(city))
                 };
                 self.notify(NoticeKind::Diplomacy, text);
             }
+            ClassicChange::ProposalDropped { kind, .. } => {
+                let text = tf!("classic.game.news.proposal-dropped", name = super::congress::resolution_name(kind));
+                self.notify(NoticeKind::Diplomacy, text);
+            }
+            ClassicChange::CityStateMet { city_state, gold, .. } => {
+                let name = self.player_name(city_state);
+                let text = if gold > 0 {
+                    tf!("classic.game.news.city-state-met-gold", name = name, gold = gold)
+                } else {
+                    tf!("classic.game.news.city-state-met", name = name)
+                };
+                self.notify(NoticeKind::Diplomacy, text);
+            }
+            ClassicChange::QuestGiven { city_state, kind, .. } => {
+                let text = tf!("classic.game.news.quest-given", name = self.player_name(city_state), task = self.quest_text(kind));
+                self.notify(NoticeKind::Diplomacy, text);
+            }
+            ClassicChange::QuestDone { city_state, kind, .. } => {
+                let text = tf!("classic.game.news.quest-done", name = self.player_name(city_state), task = self.quest_text(kind));
+                self.notify(NoticeKind::Diplomacy, text);
+            }
+            ClassicChange::WonderBuilt { player, city, building } => self.tell_wonder(player, city, building),
+            // Told by another notice.
+            ClassicChange::OfferAnswered { .. } | ClassicChange::DealBroken { .. } => {} // diplomacy.rs
+            ClassicChange::RuinsExplored { .. } => {}                                      // notify_ruins
+            ClassicChange::CampCleared { .. } | ClassicChange::CampUnitConverted { .. } => {} // notify_camp
+            ClassicChange::RebelsRose { .. } => {}                                         // notify_rebels
+            ClassicChange::Plundered { .. } | ClassicChange::KillYield { .. } | ClassicChange::WonderYield { .. } => {} // notify_income
+            ClassicChange::GoldenAgeChanged { .. } | ClassicChange::HappinessChanged { .. } => {} // report_society
+            // Silent: a recomputation signal or a number the screens show.
+            ClassicChange::ReligionChanged { .. }
+            | ClassicChange::GreatWorksChanged { .. }
+            | ClassicChange::TradeChanged { .. }
+            | ClassicChange::GeneralBorn { .. }
+            | ClassicChange::NaturalWonderFound { .. }
+            | ClassicChange::PolicyAdopted { .. }
+            | ClassicChange::RelationsChanged { .. }
+            | ClassicChange::CityDamaged { .. }
+            | ClassicChange::BuildingSold { .. } => {}
+        }
+    }
+
+    /// The text of a found-out theft for its victim or its thief.
+    fn theft_notice(&self, thief: PlayerId, victim: PlayerId, city: classic_rules::ids::CityHandle, identified: bool) -> String {
+        let city = self.city_name(city);
+        let victim_side = victim == self.me();
+        match (victim_side, identified) {
+            (true, true) => tf!("classic.game.news.theft-identified", name = self.player_name(thief), city = city),
+            (true, false) => tf!("classic.game.news.theft-unknown", city = city),
+            (false, true) => tf!("classic.game.news.theft-identified-thief", name = self.player_name(victim), city = city),
+            (false, false) => tf!("classic.game.news.theft-noticed", city = city),
+        }
+    }
+
+    /// A rival's world wonder is told by its name when the rival is met; the player's own wonder
+    /// is told by its city's notices.
+    fn tell_wonder(&mut self, builder: PlayerId, city: classic_rules::ids::CityHandle, building: classic_rules::ids::BuildingKindId) {
+        if builder == self.me() {
+            return;
+        }
+        let wonder = super::names::building(self.rules(), building);
+        let text = if self.is_met(builder) {
+            tf!("classic.game.news.wonder-built", name = self.player_name(builder), wonder = wonder, city = self.city_name(city))
+        } else {
+            tf!("classic.game.news.wonder-built-unmet", wonder = wonder)
+        };
+        self.notify(NoticeKind::Diplomacy, text);
+    }
+
+    /// A notice for each nation met since `before`.
+    pub(super) fn report_contacts(&mut self, before: &[PlayerId]) {
+        let met: Vec<PlayerId> = self.met_nations().iter().map(|r| r.other).collect();
+        for other in met.into_iter().filter(|p| !before.contains(p)) {
+            let text = tf!("classic.game.news.nation-met", name = self.player_name(other));
+            self.notify(NoticeKind::Diplomacy, text);
+        }
+    }
+
+    /// A notice for a nation (barbarians and city-states included) whose units stand within
+    /// `BORDER_DISTANCE` of a city of the player, at most once in `BORDER_QUIET_ROUNDS` rounds per
+    /// nation: a derived event of the round (nothing in the rules records a sighting).
+    pub(super) fn report_border(&mut self) {
+        let me = self.me();
+        let round = self.game().view().auth.turn().round;
+        let observation = self.game().ai_observation(self.rules(), me);
+        let dims = self.game().view().auth.map().dimensions;
+        let mut near: Vec<(PlayerId, classic_rules::ids::CityHandle)> = Vec::new();
+        for unit in &observation.visible_foreign_units {
+            let city = observation
+                .own_cities
+                .iter()
+                .find(|c| dims.distance(c.tile, unit.tile).is_some_and(|d| d <= BORDER_DISTANCE));
+            if let Some(city) = city {
+                if !near.iter().any(|(owner, _)| *owner == unit.owner) {
+                    near.push((unit.owner, city.handle));
+                }
+            }
+        }
+        for (owner, city) in near {
+            let quiet = self.border_told.iter().any(|(p, r)| *p == owner && round < r + BORDER_QUIET_ROUNDS);
+            if quiet {
+                continue;
+            }
+            self.border_told.retain(|(p, _)| *p != owner);
+            self.border_told.push((owner, round));
+            let text = tf!("classic.game.news.border-sighting", name = self.player_name(owner), city = self.city_name(city));
+            self.notify(NoticeKind::Diplomacy, text);
         }
     }
 
@@ -136,7 +310,7 @@ mod tests {
     }
 
     fn lapsed(from: PlayerId, to: PlayerId, peace: bool) -> AppliedCommand {
-        record(to, |j| j.module_changes.push(ClassicChange::OfferLapsed { from, to, peace }))
+        record(to, |j| j.module_changes.push(ClassicChange::OfferLapsed { from, to, peace, reason: OfferLapse::Expired }))
     }
 
     fn found_city(session: &mut Session, player: PlayerId) -> CityHandle {
@@ -418,5 +592,105 @@ mod tests {
             let name = name_of(&session, theirs);
             assert!(told.iter().all(|t| !t.contains(&name)), "{lang}: a razed city is told as hunger: {told:?}");
         }
+    }
+
+    fn changes(player: PlayerId, change: ClassicChange) -> AppliedCommand {
+        record(player, |j| j.module_changes.push(change))
+    }
+
+    /// Each new notice in every language: the text names what happened, has no missing key, and
+    /// reaches only the nation it concerns.
+    #[test]
+    fn the_events_of_the_news_stream_are_told_in_every_language_to_those_they_concern() {
+        use classic_rules::world::city_states::QuestKind;
+        use classic_rules::world::congress::ResolutionKind;
+        let mut session = new_match();
+        let (me, a, b) = (session.me(), PlayerId(1), PlayerId(2));
+        let mine = found_city(&mut session, me);
+        let theirs = found_city(&mut session, a);
+        session.refresh_after_harness();
+        session.harness_game().0.debug_meet(me, a);
+        let wonder = classic_rules::ids::BuildingKindId(0);
+        let cases: Vec<(&str, Vec<AppliedCommand>, usize)> = vec![
+            ("a theft identified, told to its victim", vec![changes(a, ClassicChange::TheftDetected { thief: a, victim: me, city: mine, identified: true })], 1),
+            ("a theft detected, told to its victim", vec![changes(a, ClassicChange::TheftDetected { thief: a, victim: me, city: mine, identified: false })], 1),
+            ("a theft of the player, told to the thief", vec![changes(me, ClassicChange::TheftDetected { thief: me, victim: a, city: theirs, identified: true })], 1),
+            ("a spy killed in a city of the player", vec![changes(a, ClassicChange::SpyKilled { thief: a, victim: me, city: mine })], 1),
+            ("a spy of the player killed", vec![changes(me, ClassicChange::SpyKilled { thief: me, victim: a, city: theirs })], 1),
+            ("a theft of others is not told", vec![changes(a, ClassicChange::TheftDetected { thief: a, victim: b, city: theirs, identified: true })], 0),
+            ("a proposal dropped", vec![changes(me, ClassicChange::ProposalDropped { proposer: me, kind: ResolutionKind::StandingArmyTax })], 1),
+            ("a proposal of another dropped is not told", vec![changes(a, ClassicChange::ProposalDropped { proposer: a, kind: ResolutionKind::StandingArmyTax })], 0),
+            ("a city-state met with a gift", vec![changes(me, ClassicChange::CityStateMet { city_state: b, player: me, gold: 30 })], 1),
+            ("a city-state met without a gift", vec![changes(me, ClassicChange::CityStateMet { city_state: b, player: me, gold: 0 })], 1),
+            ("a quest given", vec![changes(me, ClassicChange::QuestGiven { city_state: b, player: me, kind: QuestKind::Invest })], 1),
+            ("a quest done", vec![changes(me, ClassicChange::QuestDone { city_state: b, player: me, kind: QuestKind::Invest })], 1),
+            ("a quest of another nation is not told", vec![changes(a, ClassicChange::QuestDone { city_state: b, player: a, kind: QuestKind::Invest })], 0),
+            ("a wonder of a met rival", vec![changes(a, ClassicChange::WonderBuilt { player: a, city: theirs, building: wonder })], 1),
+            ("a wonder of an unmet rival", vec![changes(b, ClassicChange::WonderBuilt { player: b, city: theirs, building: wonder })], 1),
+            ("an own wonder is told by its city", vec![changes(me, ClassicChange::WonderBuilt { player: me, city: mine, building: wonder })], 0),
+            ("a nation destroyed that was met", vec![record(a, |j| j.player_changes.push(PlayerChange::Eliminated { player: a }))], 1),
+            ("a nation destroyed that was not met", vec![record(b, |j| j.player_changes.push(PlayerChange::Eliminated { player: b }))], 0),
+        ];
+        for (what, records, count) in cases {
+            for lang in LANGUAGES {
+                let told = told_in(lang, &mut session, |s| s.notify_news(&records));
+                assert_eq!(told.len(), count, "{what} in {lang}: {told:?}");
+                assert!(told.iter().all(|t| !t.contains("classic.") && !t.is_empty()), "{what} in {lang}: {told:?}");
+            }
+        }
+        let theft = vec![changes(a, ClassicChange::TheftDetected { thief: a, victim: me, city: mine, identified: true })];
+        let told = told_in("en", &mut session, |s| s.notify_news(&theft));
+        assert_eq!(told, vec![format!("{} stole a technology in {}", session.player_name(a), name_of(&session, mine))]);
+    }
+
+    /// A nation met since the round began is told once.
+    #[test]
+    fn a_new_contact_is_told_once() {
+        let mut session = new_match();
+        let (me, a) = (session.me(), PlayerId(1));
+        let before = session.snapshot();
+        session.harness_game().0.debug_meet(me, a);
+        session.notices.clear();
+        session.report_contacts(&before.contacts);
+        assert_eq!(texts(&mut session), vec![format!("You met a nation: {}", session.player_name(a))]);
+        session.notices.clear();
+        session.report_contacts(&session.snapshot().contacts);
+        assert!(texts(&mut session).is_empty(), "told once");
+    }
+
+    /// A unit next to a city of the player is told as at the border, once in five rounds per nation.
+    #[test]
+    fn a_unit_at_the_border_is_told_once_in_five_rounds() {
+        let mut session = new_match();
+        let (me, a) = (session.me(), PlayerId(1));
+        let mine = found_city(&mut session, me);
+        let at = session.game().view().auth.cities().get(mine).unwrap().tile;
+        let next_to = classic_rules::ids::TileId(at.0 + 1);
+        {
+            let (game, rules) = session.harness_game();
+            let warrior = classic_rules::ids::UnitKindId(rules.units.iter().position(|u| u.key == "core:unit/warrior").unwrap() as u16);
+            game.debug_spawn_unit(&rules, a, next_to, warrior);
+        }
+        session.refresh_after_harness();
+        session.notices.clear();
+        session.report_border();
+        let told = texts(&mut session);
+        assert_eq!(told.len(), 1, "{told:?}");
+        assert!(told[0].contains(&session.player_name(a)) && told[0].contains(&name_of(&session, mine)), "{told:?}");
+        session.report_border();
+        assert_eq!(texts(&mut session).len(), 1, "the second sighting within five rounds is quiet");
+    }
+
+    /// The audience of an event: both nations of a theft, every nation for a wonder.
+    #[test]
+    fn the_audience_of_a_theft_and_of_a_wonder() {
+        let me = PlayerId(0);
+        let city = CityHandle { index: 0, generation: 0 };
+        let all = [
+            ClassicChange::TheftDetected { thief: me, victim: PlayerId(1), city, identified: false },
+            ClassicChange::WonderBuilt { player: me, city, building: classic_rules::ids::BuildingKindId(0) },
+        ];
+        assert!(all[0].is_told_to(me) && all[0].is_told_to(PlayerId(1)) && !all[0].is_told_to(PlayerId(2)));
+        assert!(all[1].is_told_to(PlayerId(2)), "a wonder is announced to every nation");
     }
 }

@@ -390,7 +390,7 @@ pub fn embassy_offers(input: &AdvisorInput<'_, '_>, skip: &[PlayerId]) -> Vec<Co
         .relations
         .iter()
         .filter(|r| r.kind == PlayerKind::Major && !r.at_war && !r.our_embassy && !skip.contains(&r.other))
-        .filter(|r| !obs.offers_to_us.iter().any(|o| o.from == r.other))
+        .filter(|r| !obs.offers_to_us.iter().any(|o| o.from == r.other) && !obs.waiting_on(r.other))
         .collect();
     if candidates.is_empty() {
         return Vec::new();
@@ -418,7 +418,7 @@ pub fn peace_offers(input: &AdvisorInput<'_, '_>) -> Vec<Command> {
         .relations
         .iter()
         .filter(|r| r.at_war && r.kind == PlayerKind::Major)
-        .filter(|r| !obs.offers_to_us.iter().any(|o| o.from == r.other))
+        .filter(|r| !obs.offers_to_us.iter().any(|o| o.from == r.other) && !obs.waiting_on(r.other))
         .map(|r| r.other)
         .collect();
     if enemies.is_empty() {

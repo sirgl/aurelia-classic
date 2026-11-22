@@ -8,7 +8,7 @@ use std::time::Duration;
 use client::selection::Selection;
 use i18n::{t, tf};
 use client::simulation_driver::TickOutcome;
-use classic_rules::ids::{CityHandle, TechId, UnitHandle, UnitKindId};
+use classic_rules::ids::{CityHandle, PlayerId, TechId, UnitHandle, UnitKindId};
 
 use classic_rules::derived::standing::VictoryWarning;
 
@@ -38,6 +38,8 @@ pub(super) struct EmpireSnapshot {
     spies: Vec<(u8, u8, classic_rules::world::espionage::SpyState)>,
     /// The steps of rivals toward a victory that were true.
     victory_steps: Vec<VictoryWarning>,
+    /// The nations met.
+    pub(super) contacts: Vec<PlayerId>,
 }
 
 pub(super) struct CitySnapshot {
@@ -194,6 +196,7 @@ impl Session {
             routes: self.route_marks(),
             spies: self.spy_marks(),
             victory_steps: self.victory_steps(),
+            contacts: self.met_nations().iter().map(|r| r.other).collect(),
         }
     }
 
@@ -207,6 +210,8 @@ impl Session {
         self.report_trade(&before.routes);
         self.report_spies(&before.spies);
         self.report_victory_steps(&before.victory_steps);
+        self.report_contacts(&before.contacts);
+        self.report_border();
     }
 
     /// Golden ages starting and ending, the empire turning unhappy.

@@ -35,12 +35,18 @@ use crate::persistence::SaveGameV1;
 /// (`REVOLTS_SINCE`; older saves have none running); 25: the cities that
 /// sold a building this turn, in the player's economy record
 /// (`SALES_SINCE`; older saves have sold none); 26: the grievances of the
-/// relations section (`GRIEVANCES_SINCE`; older saves hold none).
+/// relations section (`GRIEVANCES_SINCE`; older saves hold none) and the
+/// thefts a victim found out, in the espionage section (`THEFTS_SINCE`; older
+/// saves remember none).
 pub const CODEC_VERSION: u32 = 26;
 
 /// The codec version whose relations section gained the grievances; older
 /// saves read none.
 const GRIEVANCES_SINCE: u32 = 26;
+
+/// The codec version whose espionage section gained the thefts found out;
+/// older saves read none.
+const THEFTS_SINCE: u32 = 26;
 
 /// The codec version whose player economy record gained the cities that
 /// sold a building this turn; older saves read none.
@@ -176,6 +182,7 @@ impl Field for crate::persistence::schema::SavedEspionage {
         self.steal_rights.put(out);
         self.renaissance_granted.put(out);
         self.era_granted.put(out);
+        self.thefts.put(out);
     }
     fn take(r: &mut Reader<'_>) -> Result<Self, CodecError> {
         Ok(Self {
@@ -183,6 +190,7 @@ impl Field for crate::persistence::schema::SavedEspionage {
             steal_rights: Field::take(r)?,
             renaissance_granted: Field::take(r)?,
             era_granted: Field::take(r)?,
+            thefts: r.since(THEFTS_SINCE)?,
         })
     }
 }

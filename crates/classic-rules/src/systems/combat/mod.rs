@@ -23,7 +23,7 @@ use crate::classic::effects::{ClassicUnitAbility, ClassicUnitStat};
 use crate::combat::damage::{
     resolve_mutual_kill, Roll, MELEE_EQUAL_STRENGTH_RANDOM_DAMAGE,
 };
-use crate::combat::exchange::{AttackKind, AttackPlan, Defender};
+use crate::combat::exchange::{attacks_allowed, AttackKind, AttackPlan, Defender};
 use crate::command::CommandError;
 use crate::effects::unit::unit_modifiers;
 use crate::ids::{PlayerId, TileId, UnitHandle, UnitKindId};
@@ -59,6 +59,17 @@ const UNIT_CAPTURE_MIN_CHANCE: i64 = 10;
 const UNIT_CAPTURE_MAX_CHANCE: i64 = 80;
 const UNIT_CAPTURE_RATIO_PERCENT: i64 = 40;
 pub(crate) const CAPTURED_UNIT_HP: u16 = 50;
+
+/// One attack more for the unit; the turn's moves end unless the unit can move after attacking or
+/// has attacks left (Unciv `Battle.kt`: `CanMoveAfterAttacking`, or `maxAttacksPerTurn() >
+/// attacksThisTurn`). Every attack that ends a unit's turn goes through here: melee and ranged
+/// attacks (`finish_attack`) and the air sweep.
+pub(crate) fn count_attack(core: &mut crate::world::unit::UnitCore, mods: &crate::effects::unit::UnitModifiers) {
+    core.attacks_made = core.attacks_made.saturating_add(1);
+    if !mods.has(UnitAbility::MoveAfterAttacking) && core.attacks_made >= attacks_allowed(mods) {
+        core.moves_left = 0;
+    }
+}
 
 impl<'a> WorldTransaction<'a> {
     /// Siege set up: one move point (§3.2).
@@ -265,7 +276,8 @@ impl<'a> WorldTransaction<'a> {
 
     /// The attack is over for the attacker (§7.7): one attack more, no
     /// stance, no work; the moves: a lost or stopped attack costs a point,
-    /// and without MoveAfterAttacking the turn ends.
+    /// and the turn ends unless the unit can move after attacking or has attacks left
+    /// (Unciv `Battle.kt`: `CanMoveAfterAttacking` or `maxAttacksPerTurn() > attacksThisTurn`).
     pub(crate) fn finish_attack(
         &mut self,
         attacker: UnitHandle,
@@ -282,7 +294,6 @@ impl<'a> WorldTransaction<'a> {
             .units
             .get_mut_core(attacker)
             .ok_or(CommandError::UnknownUnit)?;
-        core.attacks_made = core.attacks_made.saturating_add(1);
         core.stance = match core.stance {
             Stance::SetUp => Stance::SetUp,
             _ => Stance::Ready,
@@ -292,9 +303,7 @@ impl<'a> WorldTransaction<'a> {
         if stopped {
             core.moves_left = core.moves_left.saturating_sub(MOVE_DENOMINATOR);
         }
-        if !mods.has(UnitAbility::MoveAfterAttacking) {
-            core.moves_left = 0;
-        }
+        count_attack(core, &mods);
         Ok(())
     }
 

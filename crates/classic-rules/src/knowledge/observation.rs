@@ -174,6 +174,9 @@ pub struct AIObservation<'a> {
     pub relations: Vec<Relation>,
     /// Deal offers addressed to the player, waiting for its answer.
     pub offers_to_us: Vec<crate::world::relations::DealOffer>,
+    /// Deal offers of the player that wait for the answer of another nation. A new offer to the
+    /// same nation waits until the old one is answered or lapses (a human reads its inbox late).
+    pub offers_by_us: Vec<crate::world::relations::DealOffer>,
     /// The player's culture pool, policies and what it may adopt now.
     pub culture: crate::derived::culture::CultureOverview,
     /// The player's faith, its religious units, the religion of the cities it
@@ -194,6 +197,9 @@ pub struct AIObservation<'a> {
     pub spies: Vec<SpyInfo>,
     /// Victims we hold steal rights on, with what may be stolen.
     pub steal: Vec<(PlayerId, Vec<TechId>)>,
+    /// The thefts from us we found out, oldest first: when, by whom (when identified) and from
+    /// which city (`world::espionage::MAX_THEFTS_KEPT` at most).
+    pub thefts_against_us: Vec<crate::world::espionage::Theft>,
     /// The victories of the game and its last round (the setup screen).
     pub victories: crate::world::victory::VictoryOptions,
     /// The game's speed (the setup screen): the AI's horizons and gates in
@@ -386,6 +392,11 @@ pub struct SpreadFacts {
 }
 
 impl<'a> AIObservation<'a> {
+    /// Whether an offer of ours waits for the answer of `other`.
+    pub fn waiting_on(&self, other: PlayerId) -> bool {
+        self.offers_by_us.iter().any(|o| o.to == other)
+    }
+
     /// Build a filtered snapshot. Pub: used by both the AI and the render
     /// projection: ONE "what the player sees" filter for two consumers (§28).
     pub fn for_player(
@@ -469,6 +480,14 @@ impl<'a> AIObservation<'a> {
                 .filter(|o| o.to == player)
                 .cloned()
                 .collect(),
+            offers_by_us: auth
+                .module()
+                .relations()
+                .offers()
+                .iter()
+                .filter(|o| o.from == player)
+                .cloned()
+                .collect(),
             culture,
             faith,
             tourism,
@@ -478,6 +497,7 @@ impl<'a> AIObservation<'a> {
             public,
             spies: spies_of(auth, player),
             steal: steal_rights(auth, rules, player),
+            thefts_against_us: auth.module().espionage().thefts_against(player).copied().collect(),
             victories: auth.module().victory().options(),
             speed: auth.settings().speed_values(),
         };

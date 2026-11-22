@@ -68,7 +68,7 @@ fn damaged_bytes_are_errors_not_panics() {
 /// The classic module reads codec versions 19 to 26 (platform/docs/saves.md): a save of version
 /// 19 reads, and is written back as version 26 (every unit on no carrier, the game at Standard speed,
 /// every religious unit with its full strength, no rebellion counting down, no city that sold a
-/// building this turn, no grievance), which reads back to the
+/// building this turn, no grievance, no theft found out), which reads back to the
 /// same bytes; other versions are refused.
 #[test]
 fn the_codec_reads_classic_saves_byte_for_byte() {
@@ -101,6 +101,26 @@ fn a_player_record_of_codec_24_reads_with_no_sale_this_turn() {
     Vec::<u64>::new().put(&mut empty);
     v24.truncate(v24.len() - empty.len());
     let old = <SavedPlayerEconomy as Field>::take(&mut Reader::new(&v24, 24)).unwrap();
+    assert_eq!(old, quiet);
+}
+
+/// The espionage section as codec 25 wrote it (no list of thefts at its end) still reads, with no
+/// theft found out; codec 26 writes the list.
+#[test]
+fn an_espionage_section_of_codec_25_reads_with_no_thefts() {
+    use classic_rules::persistence::schema::SavedEspionage;
+    let found = SavedEspionage { spies: vec![vec![], vec![]], steal_rights: vec![0; 4], renaissance_granted: true, era_granted: vec![1, 0], thefts: vec![(7, 1, 0, 3)] };
+    let mut v26 = Vec::new();
+    found.put(&mut v26);
+    let back = <SavedEspionage as Field>::take(&mut Reader::new(&v26, 26)).unwrap();
+    assert_eq!(back, found);
+    let quiet = SavedEspionage { thefts: Vec::new(), ..found };
+    let mut v25 = Vec::new();
+    quiet.put(&mut v25);
+    let mut empty = Vec::new();
+    Vec::<(u32, u8, u8, u32)>::new().put(&mut empty);
+    v25.truncate(v25.len() - empty.len());
+    let old = <SavedEspionage as Field>::take(&mut Reader::new(&v25, 25)).unwrap();
     assert_eq!(old, quiet);
 }
 

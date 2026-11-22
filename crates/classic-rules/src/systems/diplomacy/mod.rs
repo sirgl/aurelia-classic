@@ -8,7 +8,7 @@
 //! RelationsChanged, CityChange::OwnerChanged (ceded cities).
 
 pub(crate) mod deals;
-pub use deals::MIN_WAR_ROUNDS_BEFORE_PEACE;
+pub use deals::{INBOX_ROUNDS, MIN_WAR_ROUNDS_BEFORE_PEACE, OFFER_ROUNDS};
 pub(crate) mod turn;
 pub(crate) mod validate;
 
@@ -19,7 +19,7 @@ use crate::classic::ClassicChange;
 use crate::transaction::journal::PlayerChange;
 use crate::transaction::transaction::WorldTransaction;
 use crate::world::relations::{
-    DealItem, GrievanceKind, RelationsState, BETRAYED_ALLY_POINTS, BETRAYED_FRIEND_POINTS, BETRAYED_FRIEND_WITNESS_POINTS,
+    DealItem, GrievanceKind, OfferLapse, RelationsState, BETRAYED_ALLY_POINTS, BETRAYED_FRIEND_POINTS, BETRAYED_FRIEND_WITNESS_POINTS,
     BETRAYED_PACT_POINTS, BETRAYED_PACT_WITNESS_POINTS, GRIEVANCE_POINT,
 };
 use crate::world::player::ClassicPlayers;
@@ -175,7 +175,12 @@ impl<'a> WorldTransaction<'a> {
         for offer in withdrawn {
             if offer.from != dead {
                 let peace = offer.items.iter().any(|(_, item)| *item == DealItem::Peace);
-                self.journal.module_changes.push(ClassicChange::OfferLapsed { from: offer.from, to: offer.to, peace });
+                self.journal.module_changes.push(ClassicChange::OfferLapsed {
+                    from: offer.from,
+                    to: offer.to,
+                    peace,
+                    reason: OfferLapse::NationGone,
+                });
                 self.relations_changed(offer.from);
             }
         }

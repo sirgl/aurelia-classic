@@ -82,9 +82,10 @@ pub enum ClassicChange {
     /// offer made peace between them (the proposer's screen tells the answer; no derived
     /// system reads it).
     OfferAnswered { from: PlayerId, to: PlayerId, accepted: bool, peace: bool },
-    /// `to` did not answer the offer of `from` before it expired; the offer is gone (the proposer's
-    /// screen tells it; no derived system reads it).
-    OfferLapsed { from: PlayerId, to: PlayerId, peace: bool },
+    /// The offer of `from` to `to` left the list of `to` unanswered, for `reason`
+    /// (`systems::diplomacy::turn`; the screens of both tell it, no derived system reads it).
+    /// `peace`: the offer asked for peace.
+    OfferLapsed { from: PlayerId, to: PlayerId, peace: bool, reason: crate::world::relations::OfferLapse },
     /// `debtor` could not pay the `gold` per turn it owes `creditor`: their deal is broken and
     /// the creditor remembers it (both screens tell it; no derived system reads it).
     DealBroken { debtor: PlayerId, creditor: PlayerId, gold: u32 },
@@ -105,6 +106,84 @@ pub enum ClassicChange {
     /// The player sold `building` of `city` for `gold` (`systems::building_sale`; the
     /// recomputation rides on the `EffectsChanged` beside it, the city screen tells the sale).
     BuildingSold { player: PlayerId, city: CityHandle, building: crate::ids::BuildingKindId, gold: u32 },
+    /// A theft in `city` of `victim` was found out (`systems::espionage::heist`): the victim's spy
+    /// service saw it (`identified`: it also learned the thief; otherwise the thief is unknown to
+    /// the victim). Not written for a theft nobody noticed.
+    TheftDetected { thief: PlayerId, victim: PlayerId, city: CityHandle, identified: bool },
+    /// The spy of `thief` was caught in `city` of `victim` and killed.
+    SpyKilled { thief: PlayerId, victim: PlayerId, city: CityHandle },
+    /// The World Congress dropped the proposal of `proposer` when it set the agenda of the World
+    /// Leader vote (`systems::congress::tick_session_timer`).
+    ProposalDropped { proposer: PlayerId, kind: crate::world::congress::ResolutionKind },
+    /// `player` met the city-state `city_state` and its first-contact gift paid `gold`
+    /// (`systems::city_states::turn::contact_gift`; 0 for an aggressor against city-states).
+    CityStateMet { city_state: PlayerId, player: PlayerId, gold: u32 },
+    /// The city-state `city_state` asked `player` for `kind`.
+    QuestGiven { city_state: PlayerId, player: PlayerId, kind: crate::world::city_states::QuestKind },
+    /// `player` finished the quest `kind` of `city_state` and won its influence reward.
+    QuestDone { city_state: PlayerId, player: PlayerId, kind: crate::world::city_states::QuestKind },
+    /// `player` completed the world wonder `building` in `city` (every nation hears of it).
+    WonderBuilt { player: PlayerId, city: CityHandle, building: crate::ids::BuildingKindId },
+}
+
+/// Who may be told of a rules event (`ClassicChange::audience`): the interface and the AI observation
+/// both read it, so the player and the AI learn the same facts.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Audience {
+    /// Only this nation.
+    Player(PlayerId),
+    /// Both nations of the event.
+    Pair(PlayerId, PlayerId),
+    /// Every nation.
+    All,
+}
+
+impl ClassicChange {
+    /// Who is told of the event.
+    pub fn audience(&self) -> Audience {
+        match *self {
+            ClassicChange::ReligionChanged { .. }
+            | ClassicChange::GreatWorksChanged { .. }
+            | ClassicChange::TradeChanged { .. }
+            | ClassicChange::CityDamaged { .. } => Audience::All,
+            ClassicChange::GoldenAgeChanged { player }
+            | ClassicChange::GeneralBorn { player }
+            | ClassicChange::RuinsExplored { player, .. }
+            | ClassicChange::CampCleared { player, .. }
+            | ClassicChange::CampUnitConverted { player, .. }
+            | ClassicChange::KillYield { player, .. }
+            | ClassicChange::NaturalWonderFound { player, .. }
+            | ClassicChange::WonderYield { player, .. }
+            | ClassicChange::Plundered { player, .. }
+            | ClassicChange::HappinessChanged { player }
+            | ClassicChange::PolicyAdopted { player }
+            | ClassicChange::RelationsChanged { player }
+            | ClassicChange::RebelsRose { player, .. }
+            | ClassicChange::BuildingSold { player, .. } => Audience::Player(player),
+            ClassicChange::OfferAnswered { from, to, .. } | ClassicChange::OfferLapsed { from, to, .. } => {
+                Audience::Pair(from, to)
+            }
+            ClassicChange::DealBroken { debtor, creditor, .. } => Audience::Pair(debtor, creditor),
+            ClassicChange::TheftDetected { thief, victim, .. } | ClassicChange::SpyKilled { thief, victim, .. } => {
+                Audience::Pair(thief, victim)
+            }
+            ClassicChange::ProposalDropped { proposer, .. } => Audience::Player(proposer),
+            ClassicChange::CityStateMet { player, .. } => Audience::Player(player),
+            ClassicChange::QuestGiven { player, .. } | ClassicChange::QuestDone { player, .. } => {
+                Audience::Player(player)
+            }
+            ClassicChange::WonderBuilt { .. } => Audience::All,
+        }
+    }
+
+    /// Is `viewer` in the audience of the event?
+    pub fn is_told_to(&self, viewer: PlayerId) -> bool {
+        match self.audience() {
+            Audience::Player(p) => p == viewer,
+            Audience::Pair(a, b) => a == viewer || b == viewer,
+            Audience::All => true,
+        }
+    }
 }
 
 impl ModuleChange for ClassicChange {
@@ -130,7 +209,14 @@ impl ModuleChange for ClassicChange {
             | ClassicChange::DealBroken { .. }
             | ClassicChange::RebelsRose { .. }
             | ClassicChange::CityDamaged { .. }
-            | ClassicChange::BuildingSold { .. } => {
+            | ClassicChange::BuildingSold { .. }
+            | ClassicChange::TheftDetected { .. }
+            | ClassicChange::SpyKilled { .. }
+            | ClassicChange::ProposalDropped { .. }
+            | ClassicChange::CityStateMet { .. }
+            | ClassicChange::QuestGiven { .. }
+            | ClassicChange::QuestDone { .. }
+            | ClassicChange::WonderBuilt { .. } => {
                 StaleYields::Nothing
             }
         }
