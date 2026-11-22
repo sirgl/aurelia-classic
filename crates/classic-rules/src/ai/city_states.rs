@@ -27,14 +27,32 @@ fn gift_value(info: &CityStateInfo, me: crate::ids::PlayerId) -> Option<i32> {
     Some(info.influence + if quest { 100 } else { 0 })
 }
 
+/// The reserve the treasury keeps before it gifts, under a `net2` gold share for the city-states (design §4.7,
+/// `Net2Plan::cs_gold_share`, 0…1000): `GIFT_RESERVE` × (1000 − share) / 1000. Share 0 is today's reserve.
+pub fn reserve_for(share: crate::ai::strategy_net::Milli) -> u32 {
+    GIFT_RESERVE * (1000 - share.clamp(0, 1000)) as u32 / 1000
+}
+
+/// The gift ceiling under the share: `ceiling` × (1000 + share) / 1000 (a seat that spends on city-states tops
+/// an alliance up higher before it turns the gold elsewhere). Share 0 is today's ceiling.
+pub fn ceiling_for(ceiling: i32, share: crate::ai::strategy_net::Milli) -> i32 {
+    (i64::from(ceiling) * (1000 + share.clamp(0, 1000)) / 1000) as i32
+}
+
 /// One gold gift a turn to the most valuable city-state while the treasury
 /// is above the reserve.
 pub fn gift_orders(obs: &AIObservation<'_>) -> Vec<Command> {
+    gift_orders_shared(obs, 0)
+}
+
+/// `gift_orders` under a `net2` gold share (`reserve_for`).
+pub fn gift_orders_shared(obs: &AIObservation<'_>, share: crate::ai::strategy_net::Milli) -> Vec<Command> {
     let treasury = obs.economy.treasury;
-    if treasury < GIFT_RESERVE + SMALL_GIFT {
+    let reserve = reserve_for(share);
+    if treasury < reserve + SMALL_GIFT {
         return Vec::new();
     }
-    let gold = if treasury >= 2 * GIFT_RESERVE + MEDIUM_GIFT {
+    let gold = if treasury >= 2 * reserve + MEDIUM_GIFT {
         MEDIUM_GIFT
     } else {
         SMALL_GIFT
@@ -207,6 +225,12 @@ pub struct PricedGift {
 /// delegates toward the World Leader vote. A gift is worth its share of the project's value per
 /// gold.
 pub fn priced_gifts(obs: &AIObservation<'_>, prices: &crate::ai::value::Prices, gold: u32) -> Vec<PricedGift> {
+    priced_gifts_shared(obs, prices, gold, 0)
+}
+
+/// `priced_gifts` under a `net2` gold share (`ceiling_for`): the ceiling above which a gift is thrown away rises
+/// with the share.
+pub fn priced_gifts_shared(obs: &AIObservation<'_>, prices: &crate::ai::value::Prices, gold: u32, share: crate::ai::strategy_net::Milli) -> Vec<PricedGift> {
     use crate::knowledge::public::PlayerQueries;
     let mut out = Vec::new();
     if gold < SMALL_GIFT {
@@ -234,7 +258,7 @@ pub fn priced_gifts(obs: &AIObservation<'_>, prices: &crate::ai::value::Prices, 
         let invest = info.quests.iter().any(|q| matches!(q, QuestKind::Invest));
         // A quest for gold pays its influence for any gift (`Invest` only makes a gift worth more).
         let quest = info.quests.iter().any(|q| matches!(q, QuestKind::GiveGold { .. }));
-        if contest.is_none() && prices.gift_cap && !quest && info.influence >= gift_ceiling(terms.allies_at, lead) {
+        if contest.is_none() && prices.gift_cap && !quest && info.influence >= ceiling_for(gift_ceiling(terms.allies_at, lead), share) {
             continue;
         }
         let (target, hold, guard) = match contest {
@@ -342,6 +366,6 @@ impl crate::ai::system::SystemAdvisor for CityStatesAdvisor {
         if priced {
             return Vec::new();
         }
-        crate::ai::combat::proposals(3, gift_orders(input.observation))
+        crate::ai::combat::proposals(3, gift_orders_shared(input.observation, input.brief.net2.as_ref().map_or(0, |p| p.cs_gold_share)))
     }
 }
