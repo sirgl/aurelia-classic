@@ -63,6 +63,12 @@ pub struct Parts {
 impl Parts {
     pub const ENV: &'static str = "AURELIA_X_PARTS";
 
+    /// The parts `strategist-x` plays (22 Nov, tuning offsets 1200 and 1202, classic/docs/ai-strategist-defects.md):
+    /// the threat, the client pledge and tall first. The supply (S1 not halved: 16-21 % lacking against
+    /// 26-32 %, and it cost alliances) and the prey (0.01 wars on city-states a seat against the 0.10 its gate
+    /// needs) stay in the code and are switched on by `AURELIA_X_PARTS` for their next step.
+    pub const ACCEPTED: Parts = Parts { supply: false, threat: true, stance: true, prey: false, client: true, style: true };
+
     pub fn of_env() -> Self {
         static PARTS: std::sync::OnceLock<Parts> = std::sync::OnceLock::new();
         *PARTS.get_or_init(|| match std::env::var(Self::ENV) {
@@ -70,7 +76,7 @@ impl Parts {
                 let (prey, client) = (list.contains("prey") || list.contains("stance"), list.contains("client") || list.contains("stance"));
                 Parts { supply: list.contains("supply"), threat: list.contains("threat"), stance: prey || client, prey, client, style: list.contains("style") }
             }
-            _ => Parts { supply: true, threat: true, stance: true, prey: true, client: true, style: true },
+            _ => Self::ACCEPTED,
         })
     }
 }

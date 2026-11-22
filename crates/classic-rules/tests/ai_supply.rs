@@ -26,6 +26,9 @@ fn tile(game: &GameState, q: i32, r: i32) -> TileId {
 }
 
 fn rules() -> CompiledRuleset {
+    // The supply is a part `strategist-x` does not play by default (`wishes::Parts::ACCEPTED`): these tests
+    // switch it on for the whole binary (the switch is read once a process, every test sets the same).
+    std::env::set_var(classic_rules::ai::strategy_net::wishes::Parts::ENV, "supply,threat,client,style");
     compile_rules(core_rules()).unwrap()
 }
 

@@ -185,3 +185,32 @@ real victories 67 of 400 games (diplomatic 9 + science 22 on 1201), AI ms p50 2.
 
 The probe counts a quest by its city-state, nation, kind and start; 48.6 quests a seat are counted
 (the audit counted 24.8 by another method); the share done (12.6 %) is the audit's (12 %).
+
+### Tuning (even seeds and instances only: offsets 1200, 1202; exam instances 0, 2, …, 58)
+
+Diagnosis first (`work/nets/lane-strategy/CONCLUSIONS.md` §4–7, traces `runs/trace-*`): in B9 the seats that met
+the leader read its technologies from the literacy row shared by score (32–50 of 81 while it knows ~70); half the
+seats never meet it; no met seat changes posture. In A5 the disarmed neighbour reads as an average army (the
+soldiers row, 10 [8…14]), so S-4 as designed would not fire: not written.
+
+| build (tuning) | weighted share vs `standard` | real wins | what it showed |
+|---|---:|---|---|
+| x1 all three, offset 1200 | 42.0 % | 20 / 34 | worse; diplomatic victories 5 / 19 |
+| threat alone, 1200 | 56.3 % | 40 / 26 | the threat pays |
+| supply alone, 1200 | 48.9 % | 35 / 38 | S1 16.3 % vs 25.7 % (not half); allies 1.08 vs 1.56 |
+| prey alone, 1200 | 51.0 % | 36 / 32 | 0.010 wars on city-states a seat |
+| client alone, 1200 | 55.9 % | 41 / 27 | tributes 0.95 vs 2.8 |
+| threat, 1202 | 53.0 % | 34 / 29 | |
+| threat + client, 1202 | 50.9 % | 32 / 30 | Y1's control |
+| threat + client + tall first, 1202 | **62.2 %** | **58 / 27** (science 35 / 17) | Y1 passes |
+
+Hand edits made between the rounds (each with its why in the code): the supply wish opens with the ship's progress
+(`SUPPLY_OPEN`); the client pledge at influence above 0 (not at 0, a tribute source); the threat's cities reached
+from the decisive range and formed for the decisive limit. The exam's wars on the leader did not move in three
+rounds (x1, x3, x4: `rival_cities_lost` 0, `wars_on_leader` Δ ≈ 0, `forming` 0 in the trace of B9 #6 with the
+posture at prepare): **stopped by the stop rule**. Not found: which condition of the war machine leaves the
+leader's cities without a candidate (seen cities, the route to a staging tile, the case, the chest); the next step
+is the war probe's start checks on B9 #6.
+
+Accepted parts (`wishes::Parts::ACCEPTED`): threat, client, tall first. The supply and the prey stay in the code
+behind `AURELIA_X_PARTS` (their gates failed on tuning).

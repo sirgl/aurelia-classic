@@ -1848,7 +1848,8 @@ fn candidate(
             phase_round: brief.round,
         };
         let chest = chest(brief, missing);
-        (value >= 0).then_some(Candidate { operation, horizon, assemble, march, distance, value, chest, decisive, pace: brief.speed.pace_percent })
+        // A staked city forms as long as a decisive one (`strategist-x`): its march is as far.
+        (value >= 0).then_some(Candidate { operation, horizon, assemble, march, distance, value, chest, decisive: decisive || staked, pace: brief.speed.pace_percent })
     };
     // The army alone, and with each weapon the player has or could build: the
     // weapon strikes the city before the army comes (`strikes::struck`), the army it
