@@ -226,9 +226,10 @@ pub struct Verdict {
     pub pass: bool,
 }
 
-/// The mean of `edited`, of `control` and of their paired difference with its standard error.
+/// The mean of `edited`, of `control` and of their paired difference with its standard error. A
+/// metric only the edited arm has (what its script counted, `script_*`) is 0 in the control.
 fn means(rows: &[&Row], metric: &str) -> Option<(usize, f64, f64, f64, f64)> {
-    let pairs: Vec<(f64, f64)> = rows.iter().filter_map(|r| Some((*r.edited.get(metric)?, *r.control.get(metric)?))).collect();
+    let pairs: Vec<(f64, f64)> = rows.iter().filter_map(|r| Some((*r.edited.get(metric)?, r.control.get(metric).copied().unwrap_or(0.0)))).collect();
     if pairs.is_empty() {
         return None;
     }
