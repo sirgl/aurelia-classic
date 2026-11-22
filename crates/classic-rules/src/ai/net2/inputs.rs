@@ -11,7 +11,7 @@
 //! bytes; this file writes and reads them): the design's seen-city garrison flag and betrayal log are
 //! here, not in the kernel's `SeenCity` (a platform type another repository owns).
 
-use crate::ai::planner::{role_of, AiRole, TurnBrief};
+use crate::ai::planner::TurnBrief;
 use crate::ai::rival_model::Rivals;
 use crate::ai::state::{AiState, UnitTask};
 use crate::ai::strategy_net::layers::ramp;
@@ -19,6 +19,7 @@ use crate::ai::strategy_net::weights::fe;
 use crate::ai::strategy_net::Milli;
 use crate::ids::{PlayerId, TileId};
 use crate::knowledge::observation::AIObservation;
+use crate::knowledge::public::PlayerQueries;
 use crate::rules::content::Domain;
 use crate::rules::CompiledRuleset;
 use crate::world::player::PlayerKind;
@@ -220,7 +221,7 @@ impl InputMemory {
         let sight = obs.speed.pace_rounds(SIGHT_ROUNDS);
         self.observe_cities(obs, state, first);
         self.observe_foreign(obs, state, rules, first);
-        self.observe_lost(obs);
+        self.observe_lost();
         // The happiness samples: kept for a window and a half.
         if self.happy.last().is_none_or(|(r, _)| *r < now) {
             self.happy.push((now, brief.happiness));
@@ -296,7 +297,7 @@ impl InputMemory {
         self.foreign = next;
     }
 
-    fn observe_lost(&mut self, obs: &AIObservation<'_>) {
+    fn observe_lost(&mut self) {
         let own: Vec<TileId> = self.own.iter().map(|(t, _)| *t).collect();
         let foreign = &self.foreign;
         self.lost.retain_mut(|l| {
@@ -311,7 +312,6 @@ impl InputMemory {
         if self.lost.len() > LOG_KEPT {
             self.lost.drain(..self.lost.len() - LOG_KEPT);
         }
-        let _ = obs;
     }
 
     fn observe_sights(&mut self, obs: &AIObservation<'_>, brief: &TurnBrief, rules: &CompiledRuleset, window: u32) {
@@ -545,7 +545,7 @@ pub fn read(obs: &AIObservation<'_>, brief: &TurnBrief, state: &AiState, rules: 
     memory.observe(obs, brief, state, rules);
     let seat = seat(obs, brief, rules, memory);
     let rival_rows = super::rival_inputs::read(obs, brief, state, rules, rivals, memory);
-    let cities = cities(obs, brief, state, rules, memory);
+    let cities = cities(obs, brief, state, memory);
     Inputs { situation: *situation, seat, rivals: rival_rows, cities, pairs: Vec::new(), aims: Vec::new() }
 }
 
@@ -628,7 +628,7 @@ fn contested_city_states(obs: &AIObservation<'_>) -> i64 {
 }
 
 /// The guard's inputs per own city (§4.5).
-fn cities(obs: &AIObservation<'_>, brief: &TurnBrief, state: &AiState, rules: &CompiledRuleset, memory: &InputMemory) -> Vec<CityInputs> {
+fn cities(obs: &AIObservation<'_>, brief: &TurnBrief, state: &AiState, memory: &InputMemory) -> Vec<CityInputs> {
     let now = obs.round;
     let young_window = obs.speed.pace_rounds(YOUNG_ROUNDS);
     let radius = crate::ai::planner_strategy::THREAT_RADIUS;
@@ -658,16 +658,9 @@ fn cities(obs: &AIObservation<'_>, brief: &TurnBrief, state: &AiState, rules: &C
             rivals_near.sort();
             rivals_near.dedup();
             let young = if memory.own_since(c.tile).is_some_and(|first| now.saturating_sub(first) < young_window && first > 0) { 1000 } else { 0 };
-            let _ = rules;
             CityInputs { city: c.id, stack_owner, danger, rivals_near, young }
         })
         .collect()
-}
-
-/// A military kind in the sightings: not a city's builders, workers or settlers (`AiRole`).
-#[allow(dead_code)]
-fn is_military(rules: &CompiledRuleset, kind: crate::ids::UnitKindId) -> bool {
-    role_of(rules, kind) == AiRole::Military
 }
 
 /// The seat's units that are free for a war (`UnitTask`: not a garrison, an escort, a scout, a settler, a worker).
