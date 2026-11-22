@@ -361,3 +361,9 @@ Measured by the gate R1–R4 above on offset 1555.
 Wars declared 285 against 318, wars on it 321 against 282, cities captured 135 against 183, seats eliminated
 3 against 1. Points share 49.8 % (45.5–54.0): the score is lower (the paired final-score difference −62 and
 −74 a seat block), as for every tall-first build.
+
+Control on the same seeds (measured after the gate, it does not change it): the candidate before the edit
+(threat + tall first, build `4269615`) takes 55.8 % (50.1–61.6) on 1555–1556, real 94 against 60, wars on
+it 628 against 397, risings 4 against 3. So offset 1555 is a harder draw for every tall-first build, and
+the edit loses no share (56.7 % against 55.8 %) while it halves the wars on the candidate (321 against 628).
+The gate R1 stays failed as written.
