@@ -18,7 +18,7 @@ import mlx.optimizers as optim
 
 from .data import F_ACT, F_TOK, S_CH, W, Flat, read_into
 from .export import export
-from .model import ArmyNet, map_planes
+from .model import ENCODER, ArmyNet, map_planes
 
 C_CAP = 128
 
@@ -41,6 +41,8 @@ class Device:
         self.statics = u16(flat.statics).view(mx.float16).reshape(-1, W * W, S_CH)
         self.play = mx.array(list(flat.play), mx.int32)
         i32 = lambda a: mx.array(list(a), mx.int32)
+        self.t_list = list(flat.t)
+        self.c_list = [min(c, cm) for c in flat.c]
         self.t = i32(flat.t)
         self.c = i32(flat.c)
         self.tok_off = i32(flat.tok_off)
@@ -64,8 +66,18 @@ class Device:
         self.n_tok = self.tok.shape[0]
         self.n_dist = self.dist.shape[0]
 
-    def batch(self, idx):
-        tm, cm = self.tm, self.cm
+    def buckets(self, t_sizes=(8, 12, 16, 24), c_sizes=(1, 16, 32, 64, 128)):
+        """Decision indices grouped by the padded shape (T, C) that holds them: little padding per batch."""
+        groups = collections.defaultdict(list)
+        for i, (t, c) in enumerate(zip(self.t_list, self.c_list)):
+            tb = next((x for x in t_sizes if t <= x), self.tm)
+            cb = next((x for x in c_sizes if c <= x), self.cm)
+            groups[(tb, min(cb, self.cm))].append(i)
+        return dict(groups)
+
+    def batch(self, idx, tm=None, cm=None):
+        tm = tm or self.tm
+        cm = cm or self.cm
         t = self.t[idx]
         c = self.c[idx]
         ar = mx.arange(tm)
@@ -148,16 +160,29 @@ def decision_weights(flat, best, lost_weight, best_factor):
 
 
 def evaluate(model, dev, bs):
+    train_dtype = ENCODER['dtype']
+    ENCODER['dtype'] = mx.float32
+    try:
+        return evaluate_f32(model, dev, bs)
+    finally:
+        ENCODER['dtype'] = train_dtype
+
+
+def evaluate_f32(model, dev, bs):
     tot = collections.defaultdict(float)
     n = 0
     n_act = 0.0
     fam_hit = collections.defaultdict(float)
     fam_n = collections.defaultdict(int)
-    for s in range(0, dev.n, bs):
-        idx = mx.arange(s, min(s + bs, dev.n))
-        b = dev.batch(idx)
+    chunks = []
+    for (tb, cb), ids in sorted(dev.buckets().items()):
+        for s in range(0, len(ids), bs):
+            chunks.append((tb, cb, ids[s:s + bs]))
+    for tb, cb, ids in chunks:
+        idx = mx.array(ids, mx.int32)
+        b = dev.batch(idx, tb, cb)
         loss, (main, val, dmse, acc_ptr, acc_act) = losses(model, b)
-        k = idx.shape[0]
+        k = len(ids)
         has = b['has_act']
         both = acc_ptr * mx.where(has > 0, acc_act, 1.0)
         tot['loss'] += loss.item() * k
@@ -167,7 +192,7 @@ def evaluate(model, dev, bs):
         tot['acc_both'] += mx.sum(both).item()
         n_act += mx.sum(has).item()
         for j, hit in enumerate(both.tolist()):
-            f = dev.families[dev.fam[s + j]]
+            f = dev.families[dev.fam[ids[j]]]
             fam_hit[f] += hit
             fam_n[f] += 1
         n += k
@@ -201,6 +226,7 @@ def main():
     ap.add_argument('--heads', type=int, default=4)
     ap.add_argument('--ff', type=int, default=128)
     ap.add_argument('--map', action='store_true', help='variant B: the hex-conv map encoder')
+    ap.add_argument('--enc-f32', action='store_true', help='B: train the encoder in f32 (default: bfloat16 compute, f32 weights)')
     ap.add_argument('--lost-weight', type=float, default=0.1)
     ap.add_argument('--best-factor', type=float, default=2.0)
     ap.add_argument('--eval-every', type=int, default=1000)
@@ -212,6 +238,8 @@ def main():
     a = ap.parse_args()
     if a.cpu:
         mx.set_default_device(mx.cpu)
+    if a.map and not a.enc_f32 and not a.cpu:
+        ENCODER['dtype'] = mx.bfloat16
     os.makedirs(a.out, exist_ok=True)
     mx.random.seed(a.seed)
     t0 = time.time()
@@ -235,13 +263,25 @@ def main():
     opt = optim.AdamW(learning_rate=sched, weight_decay=1e-4)
     state = [model.state, opt.state]
 
-    def step_fn(b):
-        (loss, aux), grads = nn.value_and_grad(model, losses)(model, b)
-        grads, _ = optim.clip_grad_norm(grads, 1.0)
-        opt.update(model, grads)
-        return loss, aux[0]
+    # Three compiled stages, each evaluated on its own so the step's time splits: the batch gathered on the
+    # GPU from the flat arrays; the loss and the gradients; the clip and the update. The forward alone is
+    # timed on one batch at every curve point (its share of the second stage).
+    gather = mx.compile(dev.batch)
 
-    step = mx.compile(step_fn, inputs=state, outputs=state)
+    def loss_and_grads(b):
+        (loss, aux), grads = nn.value_and_grad(model, losses)(model, b)
+        return loss, aux[0], grads
+
+    grad_step = mx.compile(loss_and_grads, inputs=[model.state], outputs=[model.state])
+    forward_only = mx.compile(lambda b: losses(model, b)[0], inputs=[model.state])
+
+    def apply(grads):
+        grads, norm = optim.clip_grad_norm(grads, 1.0)
+        opt.update(model, grads)
+        return norm
+
+    update = mx.compile(apply, inputs=state, outputs=state)
+
     def data_facts(flat, files):
         fam = collections.Counter()
         scenes = set()
@@ -260,54 +300,84 @@ def main():
               'promos': promos, 'T': tm, 'C': cm, 'parameters': n_params,
               'losses': {'pointer_ce': 1.0, 'action_ce': 1.0, 'value_bce_win': 0.5, 'value_mse_lost_share': 0.5, 'danger_mse': 0.5},
               'decision_weight': {'won_play': 1.0, 'lost_play': a.lost_weight, 'best_teacher_factor': a.best_factor}, 'best_teachers': best,
-              'seed': a.seed, 'init': a.init, 'device': str(mx.default_device()), 'eval_every_steps': a.eval_every, 'log_every_steps': a.log_every,
+              'seed': a.seed, 'init': a.init, 'target_dps': 5000 if a.map else 20000, 'encoder_compute': str(ENCODER['dtype']) if a.map else None,
+              'batching': 'decisions bucketed by padded shape T in (8, 12, 16, 24) x C in (1, 16, 32, 64, 128); batches drawn within a bucket, buckets shuffled',
+              'time_split_method': 'data, forward+backward (loss_and_grads), update timed every step (each stage evaluated); forward timed on one batch at each curve point and subtracted', 'device': str(mx.default_device()), 'eval_every_steps': a.eval_every, 'log_every_steps': a.log_every,
               'train': data_facts(train, a.train), 'hold': data_facts(hold, a.hold)}
     json.dump(config, open(os.path.join(a.out, 'config.json'), 'w'), indent=1)
     curves = open(os.path.join(a.out, 'curves.jsonl'), 'w')
     print(f'{n_params} parameters, {steps} steps of {a.bs}', flush=True)
     seen = 0
     t_train = 0.0
-    run_loss = 0.0
-    run_n = 0
     log_loss = 0.0
     log_n = 0
-    perm = mx.random.permutation(dev.n)
-    pos = 0
+    log_seen = 0
+    log_t = 0.0
+    split = collections.defaultdict(float)
+    norms = []
     best_both = -1.0
+    buckets = dev.buckets()
+    print('buckets', {f'{k[0]}x{k[1]}': len(v) for k, v in sorted(buckets.items())}, flush=True)
+
+    def epoch_batches():
+        order = []
+        for key, ids in buckets.items():
+            perm = mx.random.permutation(len(ids)).tolist()
+            for s in range(0, len(ids) - a.bs + 1, a.bs):
+                order.append((key, [ids[j] for j in perm[s:s + a.bs]]))
+        shuffle = mx.random.permutation(len(order)).tolist()
+        return [order[j] for j in shuffle]
+
+    queue = []
     for s in range(1, steps + 1):
-        if pos + a.bs > dev.n:
-            perm = mx.random.permutation(dev.n)
-            pos = 0
-        idx = perm[pos:pos + a.bs]
-        pos += a.bs
+        if not queue:
+            queue = epoch_batches()
+        (tb, cb), ids = queue.pop()
         ts = time.time()
-        b = dev.batch(idx)
-        loss, main = step(b)
-        mx.eval(loss, main, state)
-        t_train += time.time() - ts
-        seen += a.bs
-        run_loss += loss.item()
-        run_n += 1
+        b = gather(mx.array(ids, mx.int32), tb, cb)
+        mx.eval(b)
+        t1 = time.time()
+        loss, main, grads = grad_step(b)
+        mx.eval(loss, grads)
+        t2 = time.time()
+        norm = update(grads)
+        mx.eval(norm, state)
+        t3 = time.time()
+        split['data_ms'] += 1000 * (t1 - ts)
+        split['grad_ms'] += 1000 * (t2 - t1)
+        split['update_ms'] += 1000 * (t3 - t2)
+        norms.append(norm.item())
+        t_train += t3 - ts
+        log_t += t3 - ts
+        seen += len(ids)
+        log_seen += len(ids)
         log_loss += loss.item()
         log_n += 1
-        if s % a.log_every == 0 and s % a.eval_every != 0 and s != steps:
-            rec = {'step': s, 'epoch': seen / dev.n, 'train_loss': log_loss / log_n, 'dps': seen / t_train, 'wall_s': time.time() - t0}
-            log_loss, log_n = 0.0, 0
+        is_eval = s % a.eval_every == 0 or s == steps
+        if s % a.log_every == 0 or is_eval:
+            tf = time.time()
+            mx.eval(forward_only(b))
+            fwd = 1000 * (time.time() - tf)
+            n = max(log_n, 1)
+            rec = {'step': s, 'epoch': seen / dev.n, 'train_loss': log_loss / n, 'lr': float(sched(s)), 'grad_norm': sum(norms) / max(len(norms), 1), 'grad_norm_max': max(norms, default=0.0),
+                   'time_split': {'data_ms': split['data_ms'] / n, 'forward_ms': min(fwd, split['grad_ms'] / n), 'backward_ms': max(0.0, split['grad_ms'] / n - fwd), 'update_ms': split['update_ms'] / n},
+                   'dps': log_seen / max(log_t, 1e-9), 'dps_mean': seen / t_train, 'wall_s': time.time() - t0}
+            if is_eval:
+                ev, by_family = evaluate(model, hdev, 2048)
+                rec['hold'] = ev
+                rec['hold_by_family'] = by_family
+            log_loss, log_n, log_seen, log_t = 0.0, 0, 0, 0.0
+            split = collections.defaultdict(float)
+            norms = []
             curves.write(json.dumps(rec) + '\n')
             curves.flush()
-        if s % a.eval_every == 0 or s == steps:
-            ev, by_family = evaluate(model, hdev, 2048)
-            rec = {'step': s, 'epoch': seen / dev.n, 'train_loss': log_loss / max(log_n, 1), 'hold': ev, 'hold_by_family': by_family, 'dps': seen / t_train, 'wall_s': time.time() - t0}
-            run_loss, run_n = 0.0, 0
-            log_loss, log_n = 0.0, 0
-            curves.write(json.dumps(rec) + '\n')
-            curves.flush()
-            print(json.dumps({k: v for k, v in rec.items() if k != 'hold_by_family'}), flush=True)
-            model.save_weights(os.path.join(a.out, 'last.safetensors'))
-            if ev['acc_both'] > best_both:
-                best_both = ev['acc_both']
-                model.save_weights(os.path.join(a.out, 'weights.safetensors'))
-                export(model, os.path.join(a.out, 'army-net.bin'))
+            if is_eval:
+                print(json.dumps({k: v for k, v in rec.items() if k != 'hold_by_family'}), flush=True)
+                model.save_weights(os.path.join(a.out, 'last.safetensors'))
+                if ev['acc_both'] > best_both:
+                    best_both = ev['acc_both']
+                    model.save_weights(os.path.join(a.out, 'weights.safetensors'))
+                    export(model, os.path.join(a.out, 'army-net.bin'))
     print(f'done in {time.time() - t0:.0f} s; best held-out joint accuracy {best_both:.4f}', flush=True)
 
 

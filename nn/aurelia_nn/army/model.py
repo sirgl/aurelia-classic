@@ -19,7 +19,33 @@ DIL = [(1, 2), (2, 4), (2, 1), (1, 1)]
 HEX_MASK = [[0.0, 1.0, 1.0], [1.0, 1.0, 1.0], [1.0, 1.0, 0.0]]
 
 
+# The hex taps (dq, dr) in model.rs's order, and their place in the 3 x 3 kernel [ky = dr + 1][kx = dq + 1].
+TAPS = [(0, 0), (1, 0), (1, -1), (0, -1), (-1, 0), (-1, 1), (0, 1)]
+
+
+def neighbours(d):
+    """[W*W, 7]: the window index each tap reads at dilation d (W*W: off the window, a zero row)."""
+    out = []
+    for i in range(W * W):
+        q, r = i % W, i // W
+        row = []
+        for dq, dr in TAPS:
+            nq, nr = q + dq * d, r + dr * d
+            row.append(nr * W + nq if 0 <= nq < W and 0 <= nr < W else W * W)
+        out.append(row)
+    return mx.array(out, mx.int32)
+
+
+# The encoder's compute type: bfloat16 while training (mixed precision: the weights stay f32), f32 for
+# evaluation, export and the parity check (the Rust forward is f32).
+ENCODER = {'dtype': mx.float32}
+
+
 class HexConv(nn.Module):
+    """y[t] = b + sum over the 7 hex taps of W_tap x[t + d * tap]: MLX's dilated 3 x 3 convolution with the
+    two non-hex corners of the kernel masked to zero (the fastest of gather, shifted matmuls and conv2d on the
+    M4 Max: tools/convbench.py). Weight layout [out, 3, 3, in] (the export format)."""
+
     def __init__(self, c_in, c_out, d):
         super().__init__()
         self.d = d
@@ -28,8 +54,11 @@ class HexConv(nn.Module):
         self.bias = mx.zeros((c_out,))
 
     def __call__(self, x):
-        w = self.weight * mx.array(HEX_MASK)[None, :, :, None]
-        return mx.conv2d(x, w, stride=1, padding=self.d, dilation=self.d) + self.bias
+        """x [B, W, W, C]."""
+        dt = ENCODER['dtype']
+        w = (self.weight * mx.array(HEX_MASK)[None, :, :, None]).astype(dt)
+        y = mx.conv2d(x.astype(dt), w, stride=1, padding=self.d, dilation=self.d)
+        return y.astype(mx.float32) + self.bias
 
 
 class Block(nn.Module):
