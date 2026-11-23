@@ -93,6 +93,47 @@ impl Tokens {
     }
 }
 
+/// What the tokens remember between our turns of one play: every unit's tile and hit points at the start of
+/// our previous turn and of this one (numbers 46 and 47 of a unit's token: the hit points gained since our
+/// previous turn began, whether it has left the tile it stood on then). A reference's commitments (a unit
+/// resting to heal, the assault engaged) leave these traces; the net sees no other memory.
+#[derive(Default)]
+struct History {
+    round: Option<u32>,
+    prev: std::collections::BTreeMap<kernel::ids::EntityId, (TileId, u16)>,
+    this: std::collections::BTreeMap<kernel::ids::EntityId, (TileId, u16)>,
+}
+
+thread_local! {
+    static HISTORY: std::cell::RefCell<History> = std::cell::RefCell::new(History::default());
+}
+
+/// A new play: nothing remembered.
+pub fn reset_history() {
+    HISTORY.with(|h| *h.borrow_mut() = History::default());
+}
+
+/// The first look of a round: this turn's start becomes the remembered one.
+fn remember_turn_start(game: &GameState, field: &Field, round: u32) {
+    HISTORY.with(|h| {
+        let mut h = h.borrow_mut();
+        if h.round == Some(round) {
+            return;
+        }
+        let now: std::collections::BTreeMap<_, _> = field.own.iter().chain(&field.foes).map(|u| (u.id, (u.tile, u.hp))).collect();
+        h.prev = std::mem::replace(&mut h.this, now);
+        h.round = Some(round);
+        let _ = game;
+    });
+}
+
+fn since_last_turn(u: &UnitCore) -> (f32, f32) {
+    HISTORY.with(|h| match h.borrow().prev.get(&u.id) {
+        Some((tile, hp)) => ((f32::from(u.hp) - f32::from(*hp)) / 100.0, if *tile != u.tile { 1.0 } else { 0.0 }),
+        None => (0.0, 0.0),
+    })
+}
+
 /// x rounded to the nearest f16 (ties to even), as an f32.
 pub fn f16_round(x: f32) -> f32 {
     f16_to_f32(f32_to_f16(x))
@@ -243,6 +284,7 @@ pub fn tokens(game: &GameState, rules: &CompiledRuleset, orders: &Orders) -> Tok
     let field = Field::gather(game, rules, orders);
     let auth = game.view().auth;
     let round = auth.turn().round;
+    remember_turn_start(game, &field, round);
     let (ox, oy) = col_row(game, orders.tile);
     let mut t = Tokens { feat: Vec::new(), dist: Vec::new(), selectable: Vec::new(), unit: Vec::new(), tile: Vec::new(), pos: Vec::new() };
     // The objective.
@@ -278,6 +320,9 @@ pub fn tokens(game: &GameState, rules: &CompiledRuleset, orders: &Orders) -> Tok
             f[if own { TOK_OWN } else { TOK_FOE }] = 1.0;
             unit_features(game, rules, orders, &field, u, own, promotable, (ox, oy), &mut f);
             f[42] = if selectable { 1.0 } else { 0.0 };
+            let (gained, moved) = since_last_turn(u);
+            f[46] = gained;
+            f[47] = moved;
             t.feat.push(f);
             t.selectable.push(selectable);
             t.unit.push(Some(h));
