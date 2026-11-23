@@ -564,9 +564,6 @@ pub struct CityGuard {
     pub level: Milli,
 }
 
-/// The guard from which a city may buy a defender at peace (§4.5).
-pub const GUARD_PURCHASE: Milli = 600;
-
 /// The rival concepts of one rival (§4.2), each 0…1000, and what follows from them.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct RivalRead {
