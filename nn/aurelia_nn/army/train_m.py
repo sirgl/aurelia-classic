@@ -484,9 +484,9 @@ def compiled(model, name, with_aux=True):
     return COMPILED[key]
 
 
-def run_step(model, dev, plan, tm, aux_w, with_aux=True, compile_=True, head_w=0.0, value_w=0.0, awi=0.0):
-    """The loss of one step's plays (and its parts). MBA: head_w weighs the auxiliary heads (danger after layer 1,
-    the strike preview), value_w the value head, awi = the advantage weighting's beta (0: plain imitation)."""
+def unroll_memory(model, dev, plan, tm, with_aux=True, compile_=True):
+    """The memory unrolled over the turns of a step's plays: (turn maps or None, U [R + 1, B, S, U], P [R + 1, B,
+    PLANS, d], the auxiliary loss, its parts)."""
     R, ms, reset, groups = plan[:4]
     B = len(reset)
     Ms = turn_maps(model, dev, plan, tm) if isinstance(model, MBNet) else None
@@ -496,7 +496,6 @@ def run_step(model, dev, plan, tm, aux_w, with_aux=True, compile_=True, head_w=0
     aux_parts = collections.defaultdict(float)
     reset_a = mx.array(reset, mx.int32)
     unroll = compiled(model, 'unroll', with_aux) if compile_ else (lambda b, v, rs, um, pm, al: unroll_one(model, b, v, rs, um, pm, al, with_aux))
-    dec = compiled(model, 'dec') if compile_ else (lambda b, um, pm: dec_one(model, b, um, pm))
     for r in range(R):
         idx = mx.array(ms[r], mx.int32)
         valid = idx >= 0
@@ -518,6 +517,15 @@ def run_step(model, dev, plan, tm, aux_w, with_aux=True, compile_=True, head_w=0
         Ps.append(pm)
     Us = mx.stack(Us)  # [R + 1, B, S, U]
     Ps = mx.stack(Ps)
+    return Ms, Us, Ps, aux_tot, dict(aux_parts)
+
+
+def run_step(model, dev, plan, tm, aux_w, with_aux=True, compile_=True, head_w=0.0, value_w=0.0, awi=0.0):
+    """The loss of one step's plays (and its parts). MBA: head_w weighs the auxiliary heads (danger after layer 1,
+    the strike preview), value_w the value head, awi = the advantage weighting's beta (0: plain imitation)."""
+    groups = plan[3]
+    Ms, Us, Ps, aux_tot, aux_parts = unroll_memory(model, dev, plan, tm, with_aux, compile_)
+    dec = compiled(model, 'dec') if compile_ else (lambda b, um, pm: dec_one(model, b, um, pm))
     tot = collections.defaultdict(lambda: mx.array(0.0))
     accs = []
     for (tg, cg), (ids, cols, turns) in sorted(groups.items()):
@@ -553,7 +561,7 @@ def run_step(model, dev, plan, tm, aux_w, with_aux=True, compile_=True, head_w=0
              'value': tot['vsum'] / mx.maximum(tot['vn'], 1), 'value_win_acc': tot['v_win_ok'] / mx.maximum(tot['vn'], 1),
              'value_phi_mse': tot['v_phi_se'] / mx.maximum(tot['vn'], 1)}
     loss = main + 0.5 * val + 0.5 * dmse + aux_w * aux_tot + head_w * (heads['danger_early'] + heads['strike']) + value_w * heads['value']
-    parts = dict(aux_parts)
+    parts = aux_parts
     parts.update(heads)
     return loss, main, aux_tot, parts, accs
 
