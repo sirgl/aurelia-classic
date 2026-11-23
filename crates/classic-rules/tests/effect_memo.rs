@@ -10,6 +10,7 @@
 
 use classic_content::core::core_rules;
 use classic_rules::ai::{AiDriver, AiSettings};
+use classic_rules::derived::resources::{compute_unit_resource_penalty, unit_resource_penalty};
 use classic_rules::derived::connections::{compute_connected_cities, connected_cities};
 use classic_rules::effects::memo::MemoMode;
 use classic_rules::effects::player::{compute_player_modifiers, player_modifiers};
@@ -143,6 +144,16 @@ fn agrees(game: &GameState, rules: &CompiledRuleset, what: &str) {
                 compute_player_modifiers(auth, rules, p),
                 "{what}: modifiers of {p:?}"
             );
+        }
+        for kind in 0..rules.units.len() {
+            let kind = UnitKindId(kind as u16);
+            for _ in 0..2 {
+                assert_eq!(
+                    unit_resource_penalty(auth, rules, p, kind),
+                    compute_unit_resource_penalty(auth, rules, p, kind),
+                    "{what}: resource penalty of {p:?} for {kind:?}"
+                );
+            }
         }
         if let Some(capital) = classic_rules::world::city::capital_of(auth, rules, p) {
             for _ in 0..2 {
