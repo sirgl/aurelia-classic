@@ -27,7 +27,8 @@ from .model_m import AIMS, P_ENGAGED, P_ETA, P_STAGE, P_TURNS, P_WAITED, PLANS, 
 from .train import Device, best_teachers, decision_weights
 from .data import F_HIST
 from .model_mh import H_MAX, MHNet
-from .model_mb import MBNet
+from .model_mb import MBANet, MBNet
+from .potential import potential, price_of
 
 u16 = lambda b: mx.array(memoryview(b).cast('H'))
 
@@ -141,6 +142,33 @@ class DeviceM(Device):
         self.n_hist = self.hist.shape[0]
         self.flags_list = list(flat.flags)
         self.round_list = list(flat.round)
+        self.outcome_targets(flat)
+
+    def outcome_targets(self, flat):
+        """Per decision: the play's price [3], the capture (1 / 0; -1 where the scene has no city to take) and Phi's
+        change from this turn's first moment to the first moment 3 turns on (the play's last turn at most)."""
+        P = self.plays
+        price, capture, cur, fut, first = [], [], [], [], []
+        for i, p in enumerate(flat.play):
+            meta = flat.plays[p]
+            price.append(price_of(meta))
+            taken = meta.get('measures', {}).get('taken')
+            capture.append(-1.0 if taken is None else float(taken >= 0))
+            fd = P.fd[p]
+            r = min(P.turn[i], len(fd) - 1)
+            cur.append(fd[r])
+            fut.append(fd[min(r + 3, len(fd) - 1)])
+            first.append(P.first[p])
+        self.price = mx.array(price, mx.float32)
+        self.capture = mx.array(capture, mx.float32)
+        idx = mx.array(sorted(set(cur) | set(fut) | set(first)), mx.int32)
+        b = self.batch(idx, self.tm, 1)
+        pos = {int(j): k for k, j in enumerate(idx.tolist())}
+        own_first = b['tok'][:, 0, 18] * 8.0
+        first_of = mx.array([pos[f] for f in (P.first[flat.play[int(j)]] for j in idx.tolist())], mx.int32)
+        worth = self.price[idx][:, 0] * 8.0
+        phi = potential(b['tok'], b['tmask'], own_first[first_of], worth)
+        self.dphi = phi[mx.array([pos[j] for j in fut], mx.int32)] - phi[mx.array([pos[j] for j in cur], mx.int32)]
 
     def batch_m(self, idx, tm, cm):
         b = self.batch(idx, tm, cm)
@@ -160,6 +188,9 @@ class DeviceM(Device):
         b['hmask'] = hmask
         b['hslot'] = mx.where(hmask, self.hist_slot[hi].astype(mx.int32), -1)
         b['hage'] = mx.where(hmask, self.hist_age[hi].astype(mx.int32), 0)
+        b['price'] = self.price[idx]
+        b['capture'] = self.capture[idx]
+        b['dphi'] = self.dphi[idx]
         return b
 
 
@@ -195,6 +226,8 @@ def compiled_fn(model, name, fn):
 
 def body_any(model, b, um, pm):
     """M's body, or MH's with the history (b['hplan']: P_0 of each history token's turn), or MB's with the map."""
+    if isinstance(model, MBANet):
+        return model.body_mba(b['tok'], b['dist'], b['tmask'], b['slot'], um, pm, b['gtok'], b['tok_ok'], b['mmean'], b['price'])[0]
     if isinstance(model, MBNet):
         return model.body_mbg(b['tok'], b['dist'], b['tmask'], b['slot'], um, pm, b['gtok'], b['tok_ok'], b['mmean'])
     if isinstance(model, MHNet):
@@ -202,8 +235,38 @@ def body_any(model, b, um, pm):
     return model.body_m(b['tok'], b['dist'], b['tmask'], b['slot'], um, pm)
 
 
+def head_losses(model, b, hfull, h1, al_hid, w):
+    """MBA's heads on decisions: danger after layer 1, the strike preview from the scorer's state, the value
+    (win, capture, Phi's 3-turn change); and the advantage weights of the imitation (b['awi'] = beta, 0: off)."""
+    t = b['tok'].shape[1]
+    dmask = (b['danger'] >= 0) & b['sel']
+    de = model.danger_early(h1[:, :t])
+    esum = mx.sum(mx.where(dmask, (de - b['danger']) ** 2, 0.0))
+    cand = b['cand']
+    strike = ((cand[..., 2] + cand[..., 3] + cand[..., 4]) > 0.5) & b['cmask']
+    xs = model.xs(al_hid)
+    xsum = mx.sum(mx.where(strike[..., None], (xs - cand[..., 30:32]) ** 2, 0.0))
+    v = model.value_a(hfull, hfull[:, t])
+    live = (w > 0).astype(mx.float32)
+    v_win = nn.losses.binary_cross_entropy(v[:, 0], b['win'], with_logits=True, reduction='none')
+    cap_m = (b['capture'] >= 0).astype(mx.float32)
+    v_cap = nn.losses.binary_cross_entropy(v[:, 1], mx.maximum(b['capture'], 0.0), with_logits=True, reduction='none') * cap_m
+    v_phi = (v[:, 2] - b['dphi']) ** 2
+    vsum = mx.sum(live * (v_win + v_cap + v_phi))
+    adv = (b['win'] + b['dphi']) - mx.stop_gradient(mx.sigmoid(v[:, 0]) + v[:, 2])
+    beta = b['awi']
+    factor = mx.where(beta > 0, mx.exp(mx.clip(adv / mx.maximum(beta, 1e-3), -3.0, 1.0)), 1.0)
+    return {'esum': esum, 'xsum': xsum, 'xn': mx.sum(strike), 'vsum': vsum, 'vn': mx.sum(live), 'factor': factor,
+            'v_win_ok': mx.sum(live * ((v[:, 0] > 0) == (b['win'] > 0.5))), 'v_phi_se': mx.sum(live * v_phi)}
+
+
+HEAD_KEYS = ('esum', 'xsum', 'xn', 'vsum', 'vn', 'v_win_ok', 'v_phi_se')
+
+
 def decision_losses(model, b, um, pm):
     """The losses of `train.py` on decisions read with their memory (um [N, S, U], pm [N, P, d])."""
+    if isinstance(model, MBANet):
+        return decision_losses_a(model, b, um, pm)
     hfull = body_any(model, b, um, pm)
     t = b['tok'].shape[1]
     h = hfull[:, :t]
@@ -223,8 +286,35 @@ def decision_losses(model, b, um, pm):
     w = b['w']
     acc_ptr = (mx.argmax(pl, axis=1) == b['ptr']).astype(mx.float32)
     acc_act = (mx.argmax(al, axis=1) == b['act']).astype(mx.float32)
-    return {'main': mx.sum(w * (ce_ptr + ce_act)), 'val': mx.sum(w * (bce + lost)), 'w': mx.sum(w), 'dsum': dsum, 'dn': mx.sum(dmask),
-            'acc_ptr': acc_ptr, 'acc_act': acc_act, 'has_act': b['has_act']}
+    out = {'main': mx.sum(w * (ce_ptr + ce_act)), 'val': mx.sum(w * (bce + lost)), 'w': mx.sum(w), 'dsum': dsum, 'dn': mx.sum(dmask),
+           'acc_ptr': acc_ptr, 'acc_act': acc_act, 'has_act': b['has_act']}
+    out.update({k: mx.array(0.0) for k in HEAD_KEYS})
+    return out
+
+
+def decision_losses_a(model, b, um, pm):
+    """`decision_losses` for MBA: the same losses, the heads beside them, the imitation weighted by the advantage."""
+    hfull, h1 = model.body_mba(b['tok'], b['dist'], b['tmask'], b['slot'], um, pm, b['gtok'], b['tok_ok'], b['mmean'], b['price'])
+    t = b['tok'].shape[1]
+    h = hfull[:, :t]
+    pl = model.pointer_logits(h, b['sel'])
+    al, hid = model.action_logits_a(h, b['unit'], b['cand'], b['promo'], b['cmask'], b['gcand'], b['cand_ok'])
+    ce_ptr = mx.logsumexp(pl, axis=1) - mx.take_along_axis(pl, b['ptr'][:, None], axis=1)[:, 0]
+    ce_act = (mx.logsumexp(al, axis=1) - mx.take_along_axis(al, b['act'][:, None], axis=1)[:, 0]) * b['has_act']
+    v = model.value(h)
+    bce = nn.losses.binary_cross_entropy(v[:, 0], b['win'], with_logits=True, reduction='none')
+    lost = (mx.sigmoid(v[:, 1]) - b['lost']) ** 2
+    dg = model.danger(h)
+    dmask = (b['danger'] >= 0) & b['sel']
+    dsum = mx.sum(mx.where(dmask, (dg - b['danger']) ** 2, 0.0))
+    heads = head_losses(model, b, hfull, h1, hid, b['w'])
+    w = b['w'] * heads.pop('factor')
+    acc_ptr = (mx.argmax(pl, axis=1) == b['ptr']).astype(mx.float32)
+    acc_act = (mx.argmax(al, axis=1) == b['act']).astype(mx.float32)
+    out = {'main': mx.sum(w * (ce_ptr + ce_act)), 'val': mx.sum(w * (bce + lost)), 'w': mx.sum(w), 'dsum': dsum, 'dn': mx.sum(dmask),
+           'acc_ptr': acc_ptr, 'acc_act': acc_act, 'has_act': b['has_act']}
+    out.update(heads)
+    return out
 
 
 def aux_losses(model, b, um1, pm1, logits):
@@ -312,8 +402,10 @@ def plan_batch(dev, plays, L, drop, rng, tm, train=True):
 
 
 AUX_KEYS = ('aux_unit', 'aux_plan', 'aux_target', 'stage_acc', 'known')
-UNROLL_KEYS = ('tok', 'dist', 'tmask', 'slot', 'track', 'tis', 'eta', 'hist', 'hmask', 'hslot')
-DEC_KEYS = ('tok', 'dist', 'tmask', 'slot', 'sel', 'unit', 'cand', 'promo', 'cmask', 'ptr', 'act', 'has_act', 'win', 'lost', 'danger', 'w', 'hist', 'hmask', 'hslot')
+UNROLL_KEYS = ('tok', 'dist', 'tmask', 'slot', 'track', 'tis', 'eta', 'hist', 'hmask', 'hslot', 'price')
+DEC_KEYS = ('tok', 'dist', 'tmask', 'slot', 'sel', 'unit', 'cand', 'promo', 'cmask', 'ptr', 'act', 'has_act', 'win', 'lost', 'danger', 'w', 'hist', 'hmask', 'hslot',
+            'price', 'capture', 'dphi')
+DEC_OUT = ('main', 'val', 'w', 'dsum', 'dn') + HEAD_KEYS
 # History ablation (proof (a) of MH): the history masked everywhere.
 ABLATE = {'history': False}
 
@@ -354,7 +446,7 @@ def unroll_one(model, b, valid, rs, um, pm, alive, with_aux):
 
 def dec_one(model, b, um, pm):
     out = decision_losses(model, b, um, pm)
-    return tuple(out[k] for k in ('main', 'val', 'w', 'dsum', 'dn', 'acc_ptr', 'acc_act', 'has_act'))
+    return tuple(out[k] for k in DEC_OUT + ('acc_ptr', 'acc_act', 'has_act'))
 
 
 COMPILED = {}
@@ -392,8 +484,9 @@ def compiled(model, name, with_aux=True):
     return COMPILED[key]
 
 
-def run_step(model, dev, plan, tm, aux_w, with_aux=True, compile_=True):
-    """The loss of one step's plays (and its parts)."""
+def run_step(model, dev, plan, tm, aux_w, with_aux=True, compile_=True, head_w=0.0, value_w=0.0, awi=0.0):
+    """The loss of one step's plays (and its parts). MBA: head_w weighs the auxiliary heads (danger after layer 1,
+    the strike preview), value_w the value head, awi = the advantage weighting's beta (0: plain imitation)."""
     R, ms, reset, groups = plan[:4]
     B = len(reset)
     Ms = turn_maps(model, dev, plan, tm) if isinstance(model, MBNet) else None
@@ -433,6 +526,7 @@ def run_step(model, dev, plan, tm, aux_w, with_aux=True, compile_=True):
         idx = mx.array(ids + [ids[0]] * pad, mx.int32)
         full = dev.batch_m(idx, tg, cg)
         b = {k: full[k] for k in DEC_KEYS}
+        b['awi'] = mx.array(awi, mx.float32)
         hist_mask(b)
         live = mx.arange(n + pad) < n
         b['w'] = mx.where(live, b['w'], 0.0)
@@ -447,15 +541,21 @@ def run_step(model, dev, plan, tm, aux_w, with_aux=True, compile_=True):
             map_feats(b, Ms, tt, cc)
             del b['pos'], b['cpos']
         out = dec(b, Us[tt, cc], Ps[tt, cc])
-        for k, v in zip(('main', 'val', 'w', 'dsum', 'dn'), out[:5]):
+        k_out = len(DEC_OUT)
+        for k, v in zip(DEC_OUT, out[:k_out]):
             tot[k] = tot[k] + v
-        accs.append((ids, out[5][:n], out[6][:n], out[7][:n]))
+        accs.append((ids, out[k_out][:n], out[k_out + 1][:n], out[k_out + 2][:n]))
     sw = mx.maximum(tot['w'], 1e-6)
     main = tot['main'] / sw
     val = tot['val'] / sw
     dmse = tot['dsum'] / mx.maximum(tot['dn'], 1)
-    loss = main + 0.5 * val + 0.5 * dmse + aux_w * aux_tot
-    return loss, main, aux_tot, dict(aux_parts), accs
+    heads = {'danger_early': tot['esum'] / mx.maximum(tot['dn'], 1), 'strike': tot['xsum'] / mx.maximum(2 * tot['xn'], 1),
+             'value': tot['vsum'] / mx.maximum(tot['vn'], 1), 'value_win_acc': tot['v_win_ok'] / mx.maximum(tot['vn'], 1),
+             'value_phi_mse': tot['v_phi_se'] / mx.maximum(tot['vn'], 1)}
+    loss = main + 0.5 * val + 0.5 * dmse + aux_w * aux_tot + head_w * (heads['danger_early'] + heads['strike']) + value_w * heads['value']
+    parts = dict(aux_parts)
+    parts.update(heads)
+    return loss, main, aux_tot, parts, accs
 
 
 def evaluate(model, device_of, plays, tm, bs=256):
@@ -527,6 +627,10 @@ def main():
     ap.add_argument('--map-ch', type=int, default=32)
     ap.add_argument('--history', action='store_true', help='variant MH: the history window of facts, linked to the plan')
     ap.add_argument('--every-nth-play', type=int, default=1)
+    ap.add_argument('--aux-heads', action='store_true', help='variant MBA: MB with the price input and the auxiliary heads (needs --map)')
+    ap.add_argument('--head-w', type=float, default=0.2, help='MBA: weight of the auxiliary heads (decays to 0 over the second half)')
+    ap.add_argument('--value-w', type=float, default=0.5, help='MBA: weight of the value head (win, capture, Phi 3 turns on)')
+    ap.add_argument('--awi', type=float, default=0.0, help='MBA: advantage-weighted imitation, beta (0: plain)')
     ap.add_argument('--resume', action='store_true', help='continue OUT from its last checkpoint (OUT/state.json: the step; OUT/opt.safetensors: the optimizer)')
     ap.add_argument('--warmup', type=int, default=20, help='resumed without the optimizer state: lr ramps up over these steps')
     a = ap.parse_args()
@@ -568,7 +672,7 @@ def main():
     # The promotion vocabulary: 400 (every recording so far stays below; a larger id fails the gather loudly in MLX).
     promos = 400
     shape = dict(d=a.d, heads=a.heads, layers=a.layers, ff=2 * a.d, promos=promos)
-    model = MBNet(map_ch=a.map_ch, **shape) if a.map else (MHNet(**shape) if a.history else MemNet(**shape))
+    model = (MBANet if a.aux_heads else MBNet)(map_ch=a.map_ch, **shape) if a.map else (MHNet(**shape) if a.history else MemNet(**shape))
     model.hand_init()
     if a.init:
         # A net without memory (A / AH) starts the shared parts; an M net everything; an M net starts MH's shared
@@ -622,8 +726,8 @@ def main():
     curves = open(os.path.join(a.out, 'curves.jsonl'), 'a' if a.resume else 'w')
     print(f'{n_params} parameters, {steps} steps of {a.plays} plays; curriculum {cur}', flush=True)
 
-    def loss_fn(model, dev, plan):
-        loss, main, aux, parts, accs = run_step(model, dev, plan, tm, a.aux)
+    def loss_fn(model, dev, plan, head_w):
+        loss, main, aux, parts, accs = run_step(model, dev, plan, tm, a.aux, head_w=head_w, value_w=a.value_w, awi=a.awi)
         return loss, (main, aux)
 
     grad_fn = nn.value_and_grad(model, loss_fn)
@@ -645,7 +749,9 @@ def main():
         dev = device_of(train, chunk, up)
         plan = plan_batch(dev, list(range(len(chunk))), L, a.mem_drop, rng, tm)
         n_dec = sum(len(g[0]) for g in plan[3].values())
-        (loss, (main, aux)), grads = grad_fn(model, dev, plan)
+        # The auxiliary heads' weight: full over the first half of the run, then down to 0 at its end.
+        head_w = a.head_w * min(1.0, 2.0 * (1.0 - s / steps))
+        (loss, (main, aux)), grads = grad_fn(model, dev, plan, head_w)
         grads, norm = optim.clip_grad_norm(grads, 1.0)
         opt.update(model, grads)
         mx.eval(model.parameters(), opt.state, loss, main, aux, norm)

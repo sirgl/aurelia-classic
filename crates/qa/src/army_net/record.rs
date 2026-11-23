@@ -399,6 +399,7 @@ pub fn finish(mut meta: serde_json::Value) -> Option<(Vec<u8>, Counts)> {
     meta["kept"] = serde_json::json!(rec.counts.kept);
     meta["ends"] = serde_json::json!(rec.counts.ends);
     meta["dropped"] = serde_json::json!(rec.counts.dropped);
+    meta["price"] = serde_json::json!(rec.orders.price);
     let json = serde_json::to_vec(&meta).ok()?;
     let mut out = Vec::new();
     put_u32(&mut out, PLAY_MAGIC4);

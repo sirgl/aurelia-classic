@@ -64,7 +64,8 @@ pub fn read(bytes: &[u8], limit: usize) -> Result<Vec<Recorded>, String> {
         let v4 = magic == PLAY_MAGIC4;
         let v3 = magic == PLAY_MAGIC3 || v4;
         let jl = r.u32()? as usize;
-        r.take(jl)?;
+        let meta: serde_json::Value = serde_json::from_slice(r.take(jl)?).map_err(|e| format!("play json: {e}"))?;
+        let price = play_price(&meta);
         let statics = std::rc::Rc::new(r.f16s(super::W * super::W * super::S_CH)?);
         let play = out.last().map_or(0, |d: &Recorded| d.play + 1);
         let n = r.u32()?;
@@ -106,7 +107,7 @@ pub fn read(bytes: &[u8], limit: usize) -> Result<Vec<Recorded>, String> {
                 hist_age = r.take(h)?.to_vec();
             }
             let feat: Vec<[f32; F_TOK]> = tf.chunks_exact(F_TOK).map(|x| x.try_into().expect("chunks of F_TOK")).collect();
-            let tokens = Tokens { feat, dist, selectable, unit: vec![None; t], tile: vec![TileId(0); t], pos, hist, hist_slot, hist_age };
+            let tokens = Tokens { feat, dist, selectable, unit: vec![None; t], tile: vec![TileId(0); t], pos, price, hist, hist_slot, hist_age };
             let candidates = cf.chunks_exact(F_ACT).zip(promos).zip(cpos).map(|((x, promo), pos)| Candidate { feat: x.try_into().expect("chunks of F_ACT"), promo, pos, action: Action::Done }).collect();
             if out.len() < limit {
                 out.push(Recorded { statics: statics.clone(), play, round, tokens, candidates, pointer, action, flags, slots, track });
@@ -241,4 +242,15 @@ pub fn main(args: &[String]) -> Result<(), String> {
         }
     }
     Ok(())
+}
+
+/// The recorded play's stake, or (a recording before the field) the family's by `price_of` (`potential.py` alike).
+fn play_price(meta: &serde_json::Value) -> [f32; 3] {
+    if let Some(p) = meta.get("price").and_then(|p| p.as_array()) {
+        let at = |i: usize| p.get(i).and_then(|x| x.as_f64()).unwrap_or(0.0) as f32;
+        return [at(0), at(1), at(2)];
+    }
+    let family = meta.get("family").and_then(|f| f.as_str()).unwrap_or("");
+    let units = meta.get("measures").and_then(|m| m.get("units")).and_then(|u| u.as_f64()).unwrap_or(8.0) as usize;
+    super::price_of(family, if units == 0 { 8 } else { units }, None)
 }

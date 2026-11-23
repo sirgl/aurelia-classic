@@ -79,6 +79,8 @@ pub struct Tokens {
     pub tile: Vec<TileId>,
     /// The window index of each token's tile; -1 outside the window.
     pub pos: Vec<i16>,
+    /// The play's stake (`Orders::price`): MBA adds its projection to the objective token.
+    pub price: [f32; 3],
     /// Variant MH: the history tokens (`F_HIST` numbers), the army slot of each (-1: an enemy's), its age in turns.
     pub hist: Vec<[f32; F_HIST]>,
     pub hist_slot: Vec<i16>,
@@ -577,7 +579,7 @@ pub fn tokens(game: &GameState, rules: &CompiledRuleset, orders: &Orders) -> Tok
     remember_turn_start(game, &field, round);
     let (ox, oy) = col_row(game, orders.tile);
     let (hist, hist_slot, hist_age) = history_tokens(round);
-    let mut t = Tokens { feat: Vec::new(), dist: Vec::new(), selectable: Vec::new(), unit: Vec::new(), tile: Vec::new(), pos: Vec::new(), hist, hist_slot, hist_age };
+    let mut t = Tokens { feat: Vec::new(), dist: Vec::new(), selectable: Vec::new(), unit: Vec::new(), tile: Vec::new(), pos: Vec::new(), price: orders.price, hist, hist_slot, hist_age };
     // The objective.
     let mut f = [0f32; F_TOK];
     f[TOK_OBJECTIVE] = 1.0;

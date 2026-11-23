@@ -188,6 +188,8 @@ pub struct Net {
     hist: Option<HistW>,
     /// Variant MN (None: no notes).
     notes: Option<NoteW>,
+    /// Variant MBA: the stake's projection `[3][d]` (None: no price input).
+    price: Option<Vec<f32>>,
 }
 
 /// Variant MN's note weights (`army/model_mn.py`).
@@ -469,7 +471,17 @@ impl Net {
         } else {
             None
         };
+        let price = if t.contains_key("w_price") {
+            let (shape, w) = get("w_price")?;
+            if shape.as_slice() != [3, c.d] {
+                return Err(format!("w_price is {shape:?}, not [3, {}]", c.d));
+            }
+            Some(w.clone())
+        } else {
+            None
+        };
         Ok(Net {
+            price,
             notes,
             hist,
             mem,
@@ -761,6 +773,14 @@ impl Net {
             enc.pool.apply(&mean, &mut y);
             for c in 0..d {
                 h[c] += y[c];
+            }
+        }
+        // MBA: the stake's projection on the objective token (`w_price` [3, d]).
+        if let Some(wp) = self.price.as_ref() {
+            for (k, p) in tokens.price.iter().enumerate() {
+                for c in 0..d {
+                    h[c] += p * wp[k * d + c];
+                }
             }
         }
         let total = n + plans;

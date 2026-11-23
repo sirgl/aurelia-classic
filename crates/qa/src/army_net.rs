@@ -92,6 +92,31 @@ pub struct Orders {
     pub statics: Vec<f32>,
     /// The memory families (`trainers::memory`): the tokens hold only the foes our side sees.
     pub fog: bool,
+    /// The stake (`price_of`): the capture's worth in units / 8, the time pressure, "given".
+    pub price: [f32; 3],
+}
+
+/// The units each win rule lets us lose (`trainers/families.rs`, `assault.rs`); None: half the army; a family not
+/// listed sets no cap (the whole army). The same table as `army/potential.py::CAP`.
+fn loss_cap(family: &str) -> Option<Option<usize>> {
+    match family {
+        "assault-heal" | "promotion-choice" | "choke" | "citadel" => Some(None),
+        "hill-archers" | "city-fire" | "planned-assault" | "focus" | "bait" | "raid" | "flank" | "wounded" | "harass" => Some(Some(1)),
+        "kite" => Some(Some(0)),
+        _ => None,
+    }
+}
+
+/// The play's stake: [the capture's worth in units / 8 (the loss cap; the whole army without one), the time
+/// pressure (1 / the deadline's round, 0 none), 1]. `army/potential.py::price_of` reads it from the recording.
+pub fn price_of(family: &str, units: usize, deadline: Option<u32>) -> [f32; 3] {
+    let worth = match loss_cap(family) {
+        Some(None) => units / 2,
+        Some(Some(cap)) => cap,
+        None => units,
+    };
+    let pressure = deadline.map_or(0.0, |d| 1.0 / d.max(1) as f32);
+    [(worth as f32).max(0.5) / 8.0, pressure, 1.0]
 }
 
 /// The side of the map window (tiles).
@@ -181,7 +206,7 @@ impl Orders {
         let start_round = game.view().auth.turn().round;
         let window = MapWindow::around(game, scene.centre);
         let statics = statics_of(rules, game, &window, scene.learner, scene.enemy, tile, scene.refuge);
-        Orders { side: scene.learner, foe: scene.enemy, aim, tile, refuge: scene.refuge, optional, start_round, rounds: scene.rounds, army, mean_strength: mean_strength.max(1.0), window, statics, fog: crate::trainers::memory::is_memory(scene.fam) }
+        Orders { side: scene.learner, foe: scene.enemy, aim, tile, refuge: scene.refuge, optional, start_round, rounds: scene.rounds, army, mean_strength: mean_strength.max(1.0), window, statics, fog: crate::trainers::memory::is_memory(scene.fam), price: price_of(scene.fam.name(), scene.mine.len(), scene.deadline) }
     }
 }
 

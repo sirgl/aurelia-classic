@@ -22,7 +22,10 @@ def main():
     ap.add_argument('--weights', required=True)
     ap.add_argument('--rust', required=True)
     ap.add_argument('--plays-limit', type=int, default=60)
+    ap.add_argument('--cpu', action='store_true', help='MLX on the CPU (no GPU lock needed)')
     a = ap.parse_args()
+    if a.cpu:
+        mx.set_default_device(mx.cpu)
     rust = [json.loads(l) for l in open(a.rust)]
     flat = read_into(Flat(), a.plays)
     w = mx.load(a.weights)
@@ -33,6 +36,10 @@ def main():
         import aurelia_nn.army.train_m as TM
         TM.DeviceM.__init__ = TN._host_slots
         model = MNNet(promos=w['promo'].shape[0] - 1)
+    elif 'm_in.weight' in w:
+        # MB / MBA: the map encoded once per turn from the turn's first moment.
+        from .model_mb import MBANet, MBNet
+        model = (MBANet if 'w_price' in w else MBNet)(promos=w['promo'].shape[0] - 1, map_ch=w['m_in.weight'].shape[0])
     else:
         model = (MHNet if 'h1.weight' in w else MemNet)(promos=w['promo'].shape[0] - 1)
     model.load_weights(a.weights)
@@ -43,8 +50,20 @@ def main():
     worst_p = worst_a = 0.0
     checked = 0
     turns = 0
+    from .model_mb import MBANet, MBNet
+    from .train_m import map_feats
+    has_map = isinstance(model, MBNet)
+
+    def with_map(b, maps, k):
+        if has_map:
+            map_feats(b, maps, mx.array([k], mx.int32), mx.array([0], mx.int32))
+
     for p in plays:
         ms = P.ms[p]
+        maps = None
+        if has_map:
+            fd = P.fd[p]
+            maps = mx.stack([model.encode_turn(*(lambda b: (b['statics'], b['tok'], b['pos']))(dev.batch_m(mx.array([j], mx.int32), tm, 1))) for j in fd])
         um, pm, alive = model.initial(1)
         Us, Ps = [um], [pm]
         ns = model.initial_notes(1) if is_mn else None
@@ -55,6 +74,7 @@ def main():
         for k, i in enumerate(ms):
             b = dev.batch_m(mx.array([i], mx.int32), tm, 1)
             b['hplan'] = hplan(b, k)
+            with_map(b, maps, k)
             if is_mn:
                 b['n_teacher'] = mx.zeros((1,), mx.int32)  # the net's own notes, as in play
                 um, pm, alive, ns, _, _ = TN.unroll_one_mn(model, b, mx.array([True]), mx.array([False]), um, pm, alive, ns, None)
@@ -77,6 +97,7 @@ def main():
             b = dev.batch_m(mx.array([i], mx.int32), tm, cg)
             k = P.turn[i]
             b['hplan'] = hplan(b, k)
+            with_map(b, maps, k)
             hf = model.body_mn(b['tok'], b['dist'], b['tmask'], b['slot'], Us[k], Ps[k], b['hist'], b['hmask'], b['hslot'], b['hplan'], NS[k]) if is_mn else body_any(model, b, Us[k], Ps[k])
             h = hf[:, :tm]
             pl = model.pointer_logits(h, b['sel'])[0].tolist()
@@ -86,7 +107,12 @@ def main():
                     worst_p = max(worst_p, abs(r['ptr'][j] - pl[j]))
             worst_p = max(worst_p, abs(r['ptr'][t] - pl[tm]))
             if flat.ptr[i] >= 0:
-                al = model.action_logits(h, b['unit'], b['cand'], b['promo'], b['cmask'])[0].tolist()
+                if isinstance(model, MBANet):
+                    al = model.action_logits_a(h, b['unit'], b['cand'], b['promo'], b['cmask'], b['gcand'], b['cand_ok'])[0][0].tolist()
+                elif has_map:
+                    al = model.action_logits_g(h, b['unit'], b['cand'], b['promo'], b['cmask'], b['gcand'], b['cand_ok'])[0].tolist()
+                else:
+                    al = model.action_logits(h, b['unit'], b['cand'], b['promo'], b['cmask'])[0].tolist()
                 for j, v in enumerate(r['act'][:len(al)]):
                     worst_a = max(worst_a, abs(v - al[j]))
             checked += 1
