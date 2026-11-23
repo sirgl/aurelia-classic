@@ -117,6 +117,7 @@ def run(path, mode="free", limit=None, show=5, families=None, out=None):
     t0 = time.time()
     dumps = load_lines(path, limit=limit, families=families)
     batch, geo, sim = build(dumps)
+    sim.events = {"withdrawals": 0, "withdraw_rolls": 0, "captures_of_defeated": 0, "capture_rolls": 0}
     B, T, U = batch.b, batch.t, batch.u
     s = batch.initial_state()
     mx.eval(s)
@@ -261,6 +262,7 @@ def run(path, mode="free", limit=None, show=5, families=None, out=None):
     report = summarize(dumps, stats, diverged, examples, batch, t_load, t_run, mode)
     report["paths"] = {"checked": paths[0], "ok": paths[1], "examples": paths[2], "seconds": round(t_paths, 2)}
     report["unmodelled_taken"] = int(mx.sum(s["n_unmodelled"]).item()) if "n_unmodelled" in s else 0
+    report["events"] = dict(sim.events)
     report["odd_promotions"] = sorted({k for v in batch.odd_promos.values() for k in v})
     if out:
         with open(out, "w") as f:
@@ -319,6 +321,7 @@ def main(argv=None):
     print("causes:", rep["causes"])
     if rep["paths"]["checked"]:
         print(f"multi-turn path costs: {rep['paths']['ok']}/{rep['paths']['checked']} goals equal ({rep['paths']['seconds']} s)", rep["paths"]["examples"][:4])
+    print("events (MLX replay):", rep["events"])
     print("unmodelled promotions taken:", rep["unmodelled_taken"], "odd promotion changes in the tables:", rep["odd_promotions"])
     for e in rep["examples"]:
         print("  ex:", e)

@@ -990,6 +990,28 @@ fn plant_extras(rules: &CompiledRuleset, game: &mut GameState, sc: &mut Scene, p
             }
         }
     }
+    // `withdraw`: every military piece of both sides gets Withdraw Before Melee; `capture`: Prize Ships
+    // (CaptureDefeatedEnemy). The families rarely field the units that carry them (caravels,
+    // destroyers, privateers); granted to every piece, the aggressive script meets both rules often.
+    for (key, name) in [("withdraw", "Withdraw Before Melee"), ("capture", "Prize Ships")] {
+        if !plant.iter().any(|p| p == key) {
+            continue;
+        }
+        let Some(promo) = rules.promotions.iter().position(|d| d.name == name).map(|i| classic_rules::ids::PromotionId(i as u16)) else {
+            continue;
+        };
+        let pieces: Vec<UnitHandle> = sc.mine.iter().chain(&sc.theirs).map(|p| p.h).collect();
+        let mut n = 0;
+        for h in pieces {
+            let Some(kind) = game.view().auth.units().get(h).map(|u| u.core.kind) else { continue };
+            if rules.is_civilian(kind) || rules.units[kind.0 as usize].domain == kernel::rules::content::Domain::Air {
+                continue;
+            }
+            game.debug_grant_promotion(rules, h, promo);
+            n += 1;
+        }
+        done.push(format!("{key} on {n} pieces"));
+    }
     done
 }
 

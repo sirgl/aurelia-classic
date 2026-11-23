@@ -111,6 +111,8 @@ class Sim:
         self.f = {"promo": True, "withdraw": True, "capture_defeated": True, "spawn": True, "citadel": True, "mountains": True}
         self.f.update(features or {})
         self.has_air = has_air
+        # Parity runs count the rare events (`parity.run`): totals by name, None otherwise.
+        self.events = None
         self.geo = geo
         self.m = m
         self.cost_pool = cost_pool
@@ -950,13 +952,16 @@ class Sim:
                              mx.where(known, self.tg(self.z["sp_kind"], sp), kind), profile_from=sp)
         return s
 
-    def free_tile_near(self, s, owner, tile, cls, dest_id, where):
+    def free_tile_near(self, s, owner, tile, cls, dest_id, where, land=None):
         """`free_tile_near`: the tile itself when a unit of class `cls` of `owner` may stop there, else
         the first neighbour (direction order) it may stand on (`dest_id`'s table) and stop at, else the
-        tile."""
+        tile. `land` [B]: a land unit, whose class on a water tile is the embarked one (per candidate)."""
         nb = mx.take(self.geo.nbr, mx.maximum(tile, 0), axis=0)  # [B, 6]
         cand = mx.concatenate([tile[:, None], nb], axis=1)  # [B, 7]
-        stop = self.can_stop_at(s, owner, mx.broadcast_to(cls[:, None], cand.shape), cand)
+        cls_c = mx.broadcast_to(cls[:, None], cand.shape)
+        if land is not None:
+            cls_c = mx.where((self.mg("water", mx.maximum(cand, 0)) > 0) & land[:, None], CL_EMB, cls_c)
+        stop = self.can_stop_at(s, owner, cls_c, cand)
         dest = mx.take(self.dest_pool.reshape(-1), (mx.maximum(dest_id, 0) * self.T)[:, None] + mx.maximum(cand, 0))
         ok = stop & (cand >= 0) & ((mx.arange(7)[None, :] == 0) | dest)
         i = first_index(ok)
@@ -1074,6 +1079,9 @@ class Sim:
             rng, wroll = exact.draw(s["rng"], mx.full((B,), 100, dtype=mx.int64), can_wd)
             withdrew = can_wd & (wroll < d["withdraw"].astype(mx.int64))
             melee_unit = melee_unit & ~withdrew
+            if self.events is not None:
+                self.events["withdrawals"] += int(mx.sum(withdrew).item())
+                self.events["withdraw_rolls"] += int(mx.sum(can_wd).item())
         else:
             rng, withdrew, wtile = s["rng"], mx.zeros_like(take), d["tile"]
         # Interception of an air strike (`intercept`): evasion roll, interception roll, damage roll.
@@ -1107,14 +1115,18 @@ class Sim:
         win = melee_unit & d_killed & ~a_killed
         # CaptureDefeatedEnemy (`try_capture_defeated`): the roll, then the defeated kind joins the
         # attacker with half HP next to it.
+        # A captured unit placed on the conquered tile keeps the attacker out of it (`advance` asks
+        # `can_stop_at`: one unit of a kind per tile).
+        blocked = mx.zeros_like(win)
         if self.f["capture_defeated"]:
-            s = self.capture_defeated(s, a, d, win & a["capture_defeated"])
+            s, got, spot = self.capture_defeated(s, a, d, win & a["capture_defeated"])
+            blocked = got & (spot == to)
         s = self.finish_attack(s, slot, melee_unit & ~d_killed & ~a_killed, mx.ones_like(win))
         # A won melee, a withdrawal and a melee on civilians: capture the civilians there, advance, the
         # attack ends.
         moves_in = win | withdrew | (is_civ & ~ranged)
         s = self.capture_civilians(s, slot, to, moves_in, civ)
-        s = self.advance(s, slot, to, moves_in)
+        s = self.advance(s, slot, to, moves_in & ~blocked)
         s = self.finish_attack(s, slot, moves_in, mx.zeros_like(win))
         # --- melee on a city
         to_city = mx.minimum(d1, c_hp)
@@ -1211,14 +1223,16 @@ class Sim:
         got = where & (roll < chance.astype(mx.int64))
         sp = g2(s["p_capture_spawn"], a["slot"], d["slot"])
         got = got & (sp >= 0)
+        if self.events is not None:
+            self.events["captures_of_defeated"] += int(mx.sum(got).item())
+            self.events["capture_rolls"] += int(mx.sum(where).item())
         cls = mx.where(self.tg(self.z["sp_sea"], sp), CL_NAVAL, mx.where(self.tg(self.z["sp_civilian"], sp), CL_CIV, CL_MIL))
-        cls_on = lambda t: mx.where((self.mg("water", t[:, None])[:, 0] > 0) & self.tg(self.z["sp_land"], sp), CL_EMB, cls)
-        spot = self.free_tile_near(s, a["side"], a["tile"], cls_on(a["tile"]), self.tg(self.z["sp_dest_id"], sp), got)
+        spot = self.free_tile_near(s, a["side"], a["tile"], cls, self.tg(self.z["sp_dest_id"], sp), got, land=self.tg(self.z["sp_land"], sp))
         # The new unit's allowance on its tile (`moves_on`: embarked on water).
         water = self.mg("water", spot[:, None])[:, 0] > 0
         mmax = mx.where(water & self.tg(self.z["sp_land"], sp) & self.tg(self.z["sp_embarks"], sp), self.tg(self.z["sp_moves_embarked"], sp), self.tg(self.z["sp_moves_land"], sp))
         s, _ = self.new_unit(s, a["side"], spot, got, mx.full((B,), CAPTURED_UNIT_HP, dtype=I32), mmax, self.tg(self.z["sp_kind"], sp), profile_from=sp)
-        return s
+        return s, got, spot
 
     def heal_on_kill(self, s, slot, where, heal):
         hp = g1(s["u_hp"], slot)
