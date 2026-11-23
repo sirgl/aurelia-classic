@@ -382,6 +382,11 @@ pub struct TurnBrief {
     pub levers: crate::ai::science_levers::ScienceLevers,
     /// `science-flow`: `net2`'s science-flow neurons play (`Variant::science_flow`; `Net2Plan::science`).
     pub science_flow: bool,
+    /// `layout-defence`: `net2`'s hold of the cities plays (`Variant::layout_defence`; `Net2Plan::hold`).
+    pub layout_defence: bool,
+    /// `layout-defence`: the rivals at peace whose army the defence counts whole (`Net2Plan::hold`'s `whole` of the
+    /// turn before, from `net2`'s memory: the watch is made before `net2` thinks); empty for every other variant.
+    pub watch_whole: Vec<crate::ids::PlayerId>,
     /// The spaceship is built where it is finished soonest
     /// (`victory::space_plan`, `Variant::space_finish`).
     pub space_finish: bool,
@@ -587,6 +592,8 @@ impl TurnBrief {
             effects: crate::ai::effects::EffectChecks::NONE,
             levers: crate::ai::science_levers::ScienceLevers::NONE,
             science_flow: false,
+            layout_defence: false,
+            watch_whole: Vec::new(),
             space_finish: false,
             abilities: false,
             religion_fix: false,

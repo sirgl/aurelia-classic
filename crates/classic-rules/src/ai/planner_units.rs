@@ -464,7 +464,7 @@ fn surplus_defender(view: &UnitView<'_, '_>, state: &AiState, city: TileId) -> b
         .iter()
         .filter(|t| t.task == UnitTask::Defend { city } && t.unit < unit)
         .count();
-    senior >= garrison_target(view, state).max(1)
+    senior >= garrison_target(view, state, city).max(1)
 }
 
 /// A recon unit holding a city while the empire wants a scout (new land
@@ -492,9 +492,26 @@ fn escorted_settler_alive(view: &UnitView<'_, '_>, state: &AiState, ward: Entity
     alive && settling
 }
 
-/// Garrison holders a city wants.
-fn garrison_target(view: &UnitView<'_, '_>, state: &AiState) -> usize {
-    garrison_wanted_by(view.brief, state.strategy.current)
+/// Garrison holders the city on `city` wants (`garrison_wanted_at`).
+fn garrison_target(view: &UnitView<'_, '_>, state: &AiState, city: TileId) -> usize {
+    garrison_wanted_at(view.brief, state.strategy.current, city)
+}
+
+/// Garrison holders the city on `city` wants under `strategy`: the empire's standing garrison
+/// (`garrison_wanted_by`) and, once it has one, the holders beyond it that `net2`'s hold of the city asks for
+/// (`Net2Plan::hold`, `layout-defence`; none for every other variant). Every count of a city's garrison reads
+/// this one rule (`tests::every_garrison_count_reads_the_city`).
+pub fn garrison_wanted_at(brief: &TurnBrief, strategy: Strategy, city: TileId) -> usize {
+    let standing = garrison_wanted_by(brief, strategy);
+    if standing == 0 {
+        return 0;
+    }
+    standing + crate::ai::operations::with_net2(brief, crate::ai::net2::plan::Part::Guard, |plan| plan.hold.extra_at(city)).unwrap_or(0)
+}
+
+/// `net2`'s hold level of the city on `city` (`Net2Plan::hold`, `layout-defence`; 0 for every other variant).
+pub fn hold_level_at(brief: &TurnBrief, city: TileId) -> crate::ai::strategy_net::Milli {
+    crate::ai::operations::with_net2(brief, crate::ai::net2::plan::Part::Guard, |plan| plan.hold.level_at(city)).unwrap_or(0)
 }
 
 /// Garrison units each city wants under `strategy` (`garrison_wanted`). With
@@ -570,8 +587,22 @@ fn assign_military_task(
             return Some(UnitTask::Scout { target });
         }
     }
-    let city = view.brief.nearest_city(dims, unit.tile)?;
-    Some(UnitTask::Defend { city: city.tile })
+    reserve_city(view, unit.tile).map(|city| UnitTask::Defend { city })
+}
+
+/// The city a unit no garrison, assault, escort or scout wants defends: the nearest one; with `net2`'s hold of the
+/// cities (`layout-defence`) the most held one (`Net2Plan::hold`), the nearest of those on a tie: the spare army is
+/// the reserve of the cities the map threatens, not of the nearest (pangaea 4261012 p0: 4 spare defenders 4–6 tiles
+/// off while the capital fell).
+fn reserve_city(view: &UnitView<'_, '_>, from: TileId) -> Option<TileId> {
+    let dims = view.local.view.dimensions();
+    let nearest = view.brief.nearest_city(dims, from)?.tile;
+    let level = |tile: TileId| hold_level_at(view.brief, tile);
+    let best = view.brief.cities.iter().map(|c| c.tile).max_by_key(|t| (level(*t), std::cmp::Reverse(dims.distance(*t, from).unwrap_or(i32::MAX)), std::cmp::Reverse(*t)));
+    match best {
+        Some(tile) if level(tile) > level(nearest) => Some(tile),
+        _ => Some(nearest),
+    }
 }
 
 /// A hurt scout of a leader looking for a capital heals where it stands
@@ -588,13 +619,12 @@ fn is_recon(rules: &CompiledRuleset, kind: crate::ids::UnitKindId) -> bool {
 
 /// The nearest own city with fewer garrison holders than wanted.
 fn ungarrisoned_city(view: &UnitView<'_, '_>, state: &AiState) -> Option<TileId> {
-    let target = garrison_target(view, state);
     let dims = view.local.view.dimensions();
     let unit = view.local.unit;
     view.brief
         .cities
         .iter()
-        .filter(|c| state.holders(Reservation::Garrison(c.tile), Some(unit.id)) < target)
+        .filter(|c| state.holders(Reservation::Garrison(c.tile), Some(unit.id)) < garrison_target(view, state, c.tile))
         .min_by_key(|c| (dims.distance(c.tile, unit.tile).unwrap_or(i32::MAX), c.id))
         .map(|c| c.tile)
 }
@@ -684,11 +714,11 @@ fn scouts_wanted(view: &UnitView<'_, '_>, state: &AiState) -> usize {
         return 0;
     }
     let military = brief.count_role(AiRole::Military);
-    let garrisons = brief.cities.len() * garrison_target(view, state);
+    let garrisons: usize = brief.cities.iter().map(|c| garrison_target(view, state, c.tile)).sum();
     let free = military.saturating_sub(garrisons);
     let wanted = scouting::wanted(brief.speed.standard_round(brief.round), brief.known_percent);
     // One scout always, as long as another unit guards home (or early).
-    let one_scout = usize::from(military >= 2 || garrison_target(view, state) == 0);
+    let one_scout = usize::from(military >= 2 || garrison_wanted_by(brief, state.strategy.current) == 0);
     wanted.min(free.max(one_scout))
 }
 
@@ -976,5 +1006,43 @@ pub(crate) fn spare_garrison(view: &UnitView<'_, '_>, state: &AiState, city: Til
     }
     let unit = view.local.unit.id;
     let senior = state.tasks().iter().filter(|t| t.task == UnitTask::Defend { city } && t.unit < unit).count();
-    senior >= garrison_target(view, state).max(1)
+    senior >= garrison_target(view, state, city).max(1)
+}
+
+#[cfg(test)]
+mod tests {
+    /// The class (lane `layout-defence`): a count of one city's garrison read from the empire's flat count
+    /// (`garrison_wanted_by`) ignores what that city is to hold (`garrison_wanted_at`, `net2`'s hold), so the units
+    /// the hold puts in a city are freed again by a reader that counts it flat. Every reader of the count outside this
+    /// file goes through `garrison_wanted_at`; here only `garrison_wanted_at` itself and the empire's one-scout rule
+    /// (no city in hand) read the flat count.
+    #[test]
+    fn every_garrison_count_reads_the_city() {
+        let ai = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src/ai");
+        let mut flat = Vec::new();
+        let mut stack = vec![ai];
+        while let Some(dir) = stack.pop() {
+            for entry in std::fs::read_dir(&dir).expect("the ai sources are read") {
+                let path = entry.expect("an entry").path();
+                if path.is_dir() {
+                    stack.push(path);
+                    continue;
+                }
+                if path.extension().is_none_or(|e| e != "rs") {
+                    continue;
+                }
+                let source = std::fs::read_to_string(&path).expect("a source is read");
+                let own = path.ends_with("planner_units.rs");
+                for (i, line) in source.lines().enumerate() {
+                    let code = line.find("//").map_or(line, |at| &line[..at]);
+                    let calls = code.contains("garrison_wanted_by(") && !code.contains("fn garrison_wanted_by(");
+                    let allowed = own && (code.contains("let standing = garrison_wanted_by(brief, strategy);") || code.contains("garrison_wanted_by(brief, state.strategy.current) == 0"));
+                    if calls && !allowed {
+                        flat.push(format!("{}:{}: {}", path.display(), i + 1, line.trim()));
+                    }
+                }
+            }
+        }
+        assert!(flat.is_empty(), "a city's garrison counted flat (use garrison_wanted_at): {flat:#?}");
+    }
 }

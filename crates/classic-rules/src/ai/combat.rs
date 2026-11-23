@@ -222,15 +222,25 @@ pub fn promotion_choices(obs: &AIObservation<'_>, rules: &CompiledRuleset) -> Ve
 /// Upgrades while the treasury stays above `reserve` gold and the
 /// strategic resources of this turn's upgrades last (each offer counts the
 /// empire's free copies alone, less the copies `held` for the spaceship's
-/// parts: `Net2Plan::space_hold`).
-pub fn upgrade_orders(obs: &AIObservation<'_>, rules: &CompiledRuleset, reserve: u32, held: &[(crate::ids::ResourceId, i32)]) -> Vec<Command> {
+/// parts: `Net2Plan::space_hold`). `levels`: `net2`'s hold of the city each
+/// unit guards (`Net2Plan::hold`, `layout-defence`; empty for every other
+/// variant): the guards of the most held cities go first, and a guard's
+/// reserve is `reserve` × (1 − its level): the gold the hold kept for it
+/// (`Hold::chest`) is spent on it.
+pub fn upgrade_orders(obs: &AIObservation<'_>, rules: &CompiledRuleset, reserve: u32, held: &[(crate::ids::ResourceId, i32)], levels: &[(crate::ids::EntityId, crate::ai::strategy_net::Milli)]) -> Vec<Command> {
     let mut gold = obs.economy.treasury;
     let mut taken: Vec<(crate::ids::ResourceId, i32)> = held.to_vec();
     let mut out = Vec::new();
-    for unit in &obs.own_units {
+    let level = |id: crate::ids::EntityId| levels.iter().find(|(u, _)| *u == id).map_or(0, |(_, l)| (*l).clamp(0, 1000));
+    let mut units: Vec<&crate::knowledge::observation::OwnUnit> = obs.own_units.iter().collect();
+    if !levels.is_empty() {
+        units.sort_by_key(|u| std::cmp::Reverse(level(u.id)));
+    }
+    for unit in units {
         let Some((to, price)) = obs.view.upgrade_offer(unit.handle) else {
             continue;
         };
+        let reserve = (i64::from(reserve) * (1000 - level(unit.id)) / 1000) as u32;
         if gold < price + reserve {
             continue;
         }
@@ -797,9 +807,22 @@ impl crate::ai::system::SystemAdvisor for MilitaryAdvisor {
         };
         out.extend(proposals(10, promotions));
         let held = crate::ai::operations::with_net2(input.brief, crate::ai::net2::plan::Part::Economy, |p| p.space_hold.clone()).unwrap_or_default();
-        out.extend(proposals(5, upgrade_orders(obs, input.rules, UPGRADE_RESERVE, &held)));
+        let levels = hold_levels(input.brief, input.state);
+        out.extend(proposals(5, upgrade_orders(obs, input.rules, UPGRADE_RESERVE, &held, &levels)));
         out
     }
+}
+
+/// `net2`'s hold level of the city each guard defends (`planner_units::hold_level_at`); empty without the hold.
+fn hold_levels(brief: &crate::ai::planner::TurnBrief, state: &crate::ai::state::AiState) -> Vec<(crate::ids::EntityId, crate::ai::strategy_net::Milli)> {
+    if !crate::ai::operations::with_net2(brief, crate::ai::net2::plan::Part::Guard, |p| !p.hold.cities.is_empty()).unwrap_or(false) {
+        return Vec::new();
+    }
+    let guard = |u: &crate::ai::planner::UnitBrief| match state.task_of(u.id).map(|t| t.task) {
+        Some(crate::ai::state::UnitTask::Defend { city }) => Some((u.id, crate::ai::planner_units::hold_level_at(brief, city))),
+        _ => None,
+    };
+    brief.units.iter().filter_map(guard).collect()
 }
 
 /// Commands as proposals of one priority.

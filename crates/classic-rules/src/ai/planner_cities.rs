@@ -146,6 +146,10 @@ pub(crate) struct Empire {
     fit: Option<FitContext>,
     /// Barbarian camps want a clearing group the free units do not make (`ai::camps`).
     pub(crate) camp_demand: usize,
+    /// `layout-defence`: the cities with fewer holders than `net2`'s hold of them asks for (`hold_short`), and the
+    /// units the empire's army lacks for every city's garrison; empty and 0 for every other variant.
+    hold_short: Vec<crate::ids::TileId>,
+    hold_room: usize,
 }
 
 /// What `ai::army_fit` rates the kinds against this turn.
@@ -607,6 +611,8 @@ impl Empire {
             refused: Vec::new(),
             fit: brief.army_fit.then(|| FitContext::of(obs, brief, state, rules)),
             camp_demand: if brief.camps { crate::ai::camps::demand(obs, brief, state, rules) } else { 0 },
+            hold_short: hold_short(brief, state),
+            hold_room: hold_room(brief, state, military),
         }
     }
 }
@@ -1543,7 +1549,37 @@ fn needs_garrison(
 ) -> bool {
     let wanted =
         crate::ai::planner_units::garrison_wanted(obs.speed.standard_round(obs.round), &obs.relations, empire.strategy);
-    wanted > 0 && !garrisoned(obs, rules, city)
+    wanted > 0 && (!garrisoned(obs, rules, city) || held_short(empire, city))
+}
+
+/// `layout-defence`: the city has fewer holders than `net2`'s hold of it asks for and the empire's army (living and
+/// queued) is short of every city's garrison: the army no city spares is built where the hold asks for it.
+fn held_short(empire: &Empire, city: &OwnCity) -> bool {
+    empire.hold_room > 0 && empire.hold_short.contains(&city.tile)
+}
+
+/// The cities with fewer garrison holders than they want while `net2`'s hold asks for holders beyond the standing
+/// garrison (`planner_units::garrison_wanted_at`); empty without the hold (`Net2Plan::hold`).
+fn hold_short(brief: &TurnBrief, state: &AiState) -> Vec<crate::ids::TileId> {
+    let strategy = state.strategy.current;
+    let extra = |tile| crate::ai::operations::with_net2(brief, crate::ai::net2::plan::Part::Guard, |p| p.hold.extra_at(tile)).unwrap_or(0);
+    brief
+        .cities
+        .iter()
+        .filter(|c| extra(c.tile) > 0)
+        .filter(|c| state.holders(crate::ai::state::Reservation::Garrison(c.tile), None) < crate::ai::planner_units::garrison_wanted_at(brief, strategy, c.tile))
+        .map(|c| c.tile)
+        .collect()
+}
+
+/// The units the army (living and queued, `military`) lacks for every city's garrison (`garrison_wanted_at`); 0 without
+/// the hold.
+fn hold_room(brief: &TurnBrief, state: &AiState, military: usize) -> usize {
+    if !crate::ai::operations::with_net2(brief, crate::ai::net2::plan::Part::Guard, |p| !p.hold.cities.is_empty()).unwrap_or(false) {
+        return 0;
+    }
+    let wanted: usize = brief.cities.iter().map(|c| crate::ai::planner_units::garrison_wanted_at(brief, state.strategy.current, c.tile)).sum();
+    wanted.saturating_sub(military)
 }
 
 fn garrison_order(
@@ -1557,6 +1593,9 @@ fn garrison_order(
         return None;
     }
     let kind = military_kind(obs, empire, rules, crate::ai::army_fit::Purpose::Hold)?;
+    if held_short(empire, slot.city) {
+        empire.hold_room -= 1;
+    }
     empire.military += 1;
     Some(order(
         empire,

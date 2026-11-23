@@ -720,6 +720,49 @@ pub struct Net2Plan {
     pub capital_gate: Option<crate::ids::TileId>,
     /// `science-flow`'s levers (`net2::science`; all off for every other variant).
     pub science: Science,
+    /// `layout-defence`'s hold of the cities (`net2::hold`; empty for every other variant).
+    pub hold: Hold,
+}
+
+/// The hold of the cities (`weights::FRONT`, `weights::HOLD`): how many holders each city keeps beyond the empire's
+/// standing garrison, where the spare army stands, whose guards are upgraded first and the gold kept for the next of
+/// those upgrades. Read by the units' planner (`planner_units::garrison_wanted_at`, the reserve), the city planner
+/// (the garrison it builds), the upgrades (`combat::upgrade_orders`) and the allocator (the chest). Empty unless the
+/// seat plays `layout-defence` (`TurnBrief::layout_defence`).
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Hold {
+    /// Per own city.
+    pub cities: Vec<CityHold>,
+    /// Gold kept for the next upgrade of a held city's guard (the rules' price; `allocator::spend_gold` does not
+    /// spend it, the upgrade does).
+    pub chest: u32,
+    /// The rivals at peace whose army near our cities the defence counts whole, as an enemy's (`gate::STACK_WHOLE`):
+    /// kept in the memory (`Memory2::whole`) and read by the next turn's watch (`TurnBrief::watch_whole`,
+    /// `defence::hostility`), which is made before `net2` thinks.
+    pub whole: Vec<PlayerId>,
+}
+
+/// The hold of one own city.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CityHold {
+    pub city: EntityId,
+    pub tile: TileId,
+    /// `weights::HOLD`, 0…1000.
+    pub level: Milli,
+    /// The holders the city keeps beyond the empire's standing garrison (`gate::HOLD_ONE`, `gate::HOLD_TWO`).
+    pub extra: u8,
+}
+
+impl Hold {
+    /// The level of the city on `tile` (0 without a reading).
+    pub fn level_at(&self, tile: TileId) -> Milli {
+        self.cities.iter().find(|c| c.tile == tile).map_or(0, |c| c.level)
+    }
+
+    /// The holders beyond the standing garrison the city on `tile` keeps (0 without a reading).
+    pub fn extra_at(&self, tile: TileId) -> usize {
+        self.cities.iter().find(|c| c.tile == tile).map_or(0, |c| usize::from(c.extra))
+    }
 }
 
 /// The science flow's levers (`weights::SCIENTISTS`, `weights::AGREEMENT`), read by the citizens' executor, the diplomacy
@@ -861,6 +904,9 @@ pub struct Memory2 {
     pub inputs: super::inputs::InputMemory,
     /// `science-flow`'s own; empty for every other variant, whose bytes it leaves as they were (`memory.rs`).
     pub science: ScienceMemory,
+    /// `layout-defence`'s rivals whose army the next watch counts whole (`Hold::whole`); empty for every other variant,
+    /// whose bytes it leaves as they were (`memory.rs`).
+    pub whole: Vec<PlayerId>,
 }
 
 /// What `science-flow` keeps between turns: how long its gold has waited for each partner's research agreement.

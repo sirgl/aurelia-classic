@@ -10,6 +10,7 @@
 //! | L2 | the carried logits + `net2`'s tilt (`weights::TILT`) → softmax, held picks, lock | `strategy_net::intent_step` |
 //! | L2 | the prices (+ the military tilt), the goals, the city target | `strategy_net::plan_with_intent` |
 //! | L2 | peace, trust, help, guard, city-state share, embargo, escorts, generals | `levers::after_intent` |
+//! | L2 | the hold of the cities (`layout-defence` only) | `hold` |
 //! | site | one bounded neuron per candidate tile | `site_head` |
 //!
 //! Every weight is in `weights` with its reason; `trace` exports them and the turns for the float twin
@@ -18,6 +19,7 @@
 
 pub mod concepts;
 pub mod credit;
+pub mod hold;
 pub mod inputs;
 pub mod levers;
 pub mod memory;
@@ -82,10 +84,15 @@ pub fn think(obs: &AIObservation<'_>, brief: &TurnBrief, state: &mut AiState, ru
     if brief.science_flow {
         levers.science = science::plan(obs, rules, &pass, &intent, &inputs, &mut own.science);
     }
+    // `layout-defence`: the hold of the cities (`hold`); every other variant keeps it empty.
+    if brief.layout_defence {
+        levers.hold = hold::plan(obs, brief, state, &pass, &own.inputs, rules);
+        hold::trace(obs.player.0, obs.round, &levers.hold);
+    }
     read_soldiers(&mut levers, &own.inputs);
     // The offence whose inputs the pass has (`offence`; the driver clears it for `net2-defence`).
     offence::apply(&mut levers, &pass);
-    memory.net2 = Some(plan::Memory2 { core: pass.core.clone(), inputs: own.inputs, science: own.science });
+    memory.net2 = Some(plan::Memory2 { core: pass.core.clone(), inputs: own.inputs, science: own.science, whole: levers.hold.whole.clone() });
     let _plan_span = prof::span("net2/plan_with_intent");
     let price_tilt = if parts.plays(Part::Economy) { after.price_tilt } else { [0; pd::N] };
     let strategy = strategy_net::plan_with_intent(seat, state, memory, &situation, intent, &price_tilt, Wishes::default());
