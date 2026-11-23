@@ -92,7 +92,7 @@ pub fn think(obs: &AIObservation<'_>, brief: &TurnBrief, state: &mut AiState, ru
     read_soldiers(&mut levers, &own.inputs);
     // The offence whose inputs the pass has (`offence`; the driver clears it for `net2-defence`).
     offence::apply(&mut levers, &pass);
-    memory.net2 = Some(plan::Memory2 { core: pass.core.clone(), inputs: own.inputs, science: own.science, whole: levers.hold.whole.clone() });
+    memory.net2 = Some(plan::Memory2 { core: pass.core.clone(), inputs: own.inputs, science: own.science });
     let _plan_span = prof::span("net2/plan_with_intent");
     let price_tilt = if parts.plays(Part::Economy) { after.price_tilt } else { [0; pd::N] };
     let strategy = strategy_net::plan_with_intent(seat, state, memory, &situation, intent, &price_tilt, Wishes::default());

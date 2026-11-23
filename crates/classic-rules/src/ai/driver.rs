@@ -985,9 +985,6 @@ impl ClassicMind {
         let mut defended = Vec::new();
         if self.variant.defends() && major {
             let _span = prof::span("classic/defence_watch_respond");
-            if self.layout_defence {
-                brief.watch_whole = crate::ai::strategy_net::Memory::decode(&state.mind_memory).net2.map(|m| m.whole).unwrap_or_default();
-            }
             let mut watch = defence::watch(observation, &brief, state, rules);
             defended = defence::respond(observation, &brief, state, rules, &mut watch);
             brief.defence = Some(watch);

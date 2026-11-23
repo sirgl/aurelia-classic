@@ -13,8 +13,6 @@ use super::plan::{AimWhy, ChestWait, CoreMemory, Memory2, Opening, OrderPhase, S
 const VERSION: u8 = 3;
 /// The marker of `science-flow`'s section after the inputs' (`Memory2::science`), written only when it holds anything.
 const SCIENCE_SECTION: u8 = 0x53;
-/// The marker of `layout-defence`'s section after the science's (`Memory2::whole`), written only when it holds anything.
-const WHOLE_SECTION: u8 = 0x48;
 
 impl Memory2 {
     pub fn encode(&self) -> Vec<u8> {
@@ -25,11 +23,6 @@ impl Memory2 {
         self.inputs.encode(&mut out);
         if self.science != ScienceMemory::default() {
             encode_science(&self.science, &mut out);
-        }
-        if !self.whole.is_empty() {
-            out.push(WHOLE_SECTION);
-            out.push(self.whole.len().min(usize::from(u8::MAX)) as u8);
-            out.extend(self.whole.iter().take(usize::from(u8::MAX)).map(|p| p.0));
         }
         out
     }
@@ -45,15 +38,8 @@ impl Memory2 {
         let (inputs, read) = InputMemory::decode(r.0)?;
         let mut rest = Bytes(r.0.get(read..)?);
         let science = if rest.0.first() == Some(&SCIENCE_SECTION) { decode_science(&mut rest)? } else { ScienceMemory::default() };
-        let whole = if rest.0.first() == Some(&WHOLE_SECTION) { decode_whole(&mut rest)? } else { Vec::new() };
-        Some(Memory2 { core: CoreMemory { war, spent, hires }, inputs, science, whole })
+        Some(Memory2 { core: CoreMemory { war, spent, hires }, inputs, science })
     }
-}
-
-fn decode_whole(r: &mut Bytes<'_>) -> Option<Vec<PlayerId>> {
-    r.u8()?;
-    let n = r.u8()?;
-    (0..n).map(|_| r.u8().map(PlayerId)).collect()
 }
 
 fn encode_science(science: &ScienceMemory, out: &mut Vec<u8>) {
@@ -219,7 +205,7 @@ mod tests {
         let spent = vec![SpentWar { rival: PlayerId(2), until: 140 }];
         let hires = vec![SpentWar { rival: PlayerId(4), until: 150 }];
         let inputs = InputMemory { infamy: 175, ..InputMemory::default() };
-        let memory = Memory2 { core: CoreMemory { war: WarPlan::Order(order), spent, hires }, inputs, science: ScienceMemory::default(), whole: Vec::new() };
+        let memory = Memory2 { core: CoreMemory { war: WarPlan::Order(order), spent, hires }, inputs, science: ScienceMemory::default() };
         assert_eq!(Memory2::decode(&memory.encode()), Some(memory.clone()));
         // Without waits the bytes are the ones before `science-flow`: the other variants' memory (and hashes) keep them.
         let mut before = vec![VERSION];
@@ -229,12 +215,8 @@ mod tests {
         memory.inputs.encode(&mut before);
         assert_eq!(memory.encode(), before);
         let science = ScienceMemory { round: 160, waits: vec![ChestWait { rival: PlayerId(2), rounds: 7 }] };
-        let with_science = Memory2 { science, ..memory.clone() };
-        assert_eq!(Memory2::decode(&with_science.encode()), Some(with_science.clone()));
-        // `layout-defence`'s section after the science's, with or without it.
-        let whole = vec![PlayerId(1), PlayerId(4)];
-        assert_eq!(Memory2::decode(&Memory2 { whole: whole.clone(), ..with_science }.encode()).map(|m| m.whole), Some(whole.clone()));
-        assert_eq!(Memory2::decode(&Memory2 { whole: whole.clone(), ..memory }.encode()).map(|m| m.whole), Some(whole));
+        let with_science = Memory2 { science, ..memory };
+        assert_eq!(Memory2::decode(&with_science.encode()), Some(with_science));
         assert_eq!(Memory2::decode(&Memory2::default().encode()), Some(Memory2::default()));
         assert_eq!(Memory2::decode(&[9, 0]), None, "another version is no memory");
     }

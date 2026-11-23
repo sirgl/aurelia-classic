@@ -176,7 +176,7 @@ pub fn watch(obs: &AIObservation<'_>, brief: &TurnBrief, state: &AiState, rules:
     let Some(prices) = brief.prices.as_ref() else {
         return Watch::default();
     };
-    let hostile = hostile_units(obs, brief, rules);
+    let hostile = hostile_units(obs, rules);
     if hostile.is_empty() {
         return Watch::default();
     }
@@ -242,7 +242,7 @@ pub(crate) fn threats(obs: &AIObservation<'_>, brief: &TurnBrief, rules: &Compil
     if brief.prices.is_none() {
         return Vec::new();
     }
-    let hostile = hostile_units(obs, brief, rules);
+    let hostile = hostile_units(obs, rules);
     if hostile.is_empty() {
         return Vec::new();
     }
@@ -264,13 +264,13 @@ struct Hostile {
 
 /// The military units the player sees, by their owners' hostility; at
 /// peace only those in the field (a garrison guards its own city).
-fn hostile_units(obs: &AIObservation<'_>, brief: &TurnBrief, rules: &CompiledRuleset) -> Vec<Hostile> {
+fn hostile_units(obs: &AIObservation<'_>, rules: &CompiledRuleset) -> Vec<Hostile> {
     let in_city = |tile: TileId| obs.visible_foreign_cities.iter().any(|c| c.tile == tile);
     obs.visible_foreign_units
         .iter()
         .filter(|u| role_of(rules, u.kind) == AiRole::Military)
         .filter_map(|u| {
-            let hostility = hostility(obs, brief, u.owner);
+            let hostility = hostility(obs, u.owner);
             let garrison = hostility < 100 && in_city(u.tile);
             let power = i64::from(unit_power(rules, u.kind, u.hp)) * hostility / 100;
             (power > 0 && !garrison).then_some(Hostile { tile: u.tile, owner: u.owner, power: power as u32 })
@@ -283,15 +283,12 @@ fn hostile_units(obs: &AIObservation<'_>, brief: &TurnBrief, rules: &CompiledRul
 /// denunciation, warmongering: `diplomacy::trusted`); `STRANGER_PERCENT`
 /// of another nation's at peace — its army gathers at our border
 /// before it declares, a friend's too; none of an ally's (a defensive
-/// pact) or a city-state's. With `net2`'s hold (`layout-defence`) a nation whose
-/// stack the plan reads as the war before its declaration counts whole
-/// (`TurnBrief::watch_whole`, `gate::STACK_WHOLE`).
-fn hostility(obs: &AIObservation<'_>, brief: &TurnBrief, owner: PlayerId) -> i64 {
+/// pact) or a city-state's.
+fn hostility(obs: &AIObservation<'_>, owner: PlayerId) -> i64 {
     match obs.relation(owner) {
         Some(r) if r.at_war => 100,
         Some(r) if r.kind != PlayerKind::Major || r.defensive_pact => 0,
         Some(r) if !crate::ai::diplomacy::trusted(obs.round, r) => 100,
-        Some(_) if brief.watch_whole.contains(&owner) => 100,
         Some(_) => crate::ai::genome::get(crate::ai::genome::Knob::StrangerPercent),
         None => 0,
     }

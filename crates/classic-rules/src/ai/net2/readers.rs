@@ -33,7 +33,6 @@ const READERS: &[(&str, &str, &str)] = &[
     ("tile", "net2/plan.rs", "c.tile == tile"),
     ("level", "net2/hold.rs", "(c.level, std::cmp::Reverse(c.city))"),
     ("extra", "net2/plan.rs", "usize::from(c.extra)"),
-    ("whole", "driver.rs", "map(|m| m.whole)"),
     // CityGuard: the guard's level by city
     ("city", "net2/plan.rs", "g.city == city"),
     ("level", "defence.rs", "plan.guard_of(city.id)"),

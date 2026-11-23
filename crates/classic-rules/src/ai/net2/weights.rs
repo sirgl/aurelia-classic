@@ -242,7 +242,10 @@ pub mod c {
     pub const CAPITAL: usize = 4;
     /// `layout-defence`: the largest `FRONT` of a rival on the city (`hold::rows`, 0 for every other variant).
     pub const FRONT: usize = 5;
-    pub const N: usize = 6;
+    /// `layout-defence`: the watch's threat at the city over the threat and its planned guard (`defence::Danger`;
+    /// 500: level, 0 without a danger; `hold::rows`, 0 for every other variant).
+    pub const ALARM: usize = 6;
+    pub const N: usize = 7;
 }
 
 /// One known rival city's target inputs (`plan::TargetInputs` in order).
@@ -772,7 +775,7 @@ pub const HOLD: Neuron = Neuron {
         t(C(c::CAPITAL), 400, "the capital is the stake: its loss is the city and the game's share of it (`defence::capital_share`); the traced seats kept 0–3 cities after it"),
         t(C(c::FRONT), 600, "a city on a front holds more, but alone a front makes no holder outside the capital: the alarm does (`DANGER`)"),
         ts(C(c::CAPITAL), Shape::Times(C(c::FRONT)), 200, "the capital on a front first: at a front of 0.55 (a land neighbour at peace with a level army 5–6 tiles off) one holder more, at a full front (at war) two"),
-        t(C(c::DANGER), 800, "the alarm: a city in the watch holds one more at peace (the capital two), three at war on a front; 16 of 17 falls had the alarm 10 rounds or more ahead, time for 2–4 defenders from the city's own production"),
+        ts(C(c::ALARM), Shape::Above(250), 3200, "the alarm: the threat a third of the threat and the guard holds nothing more, level (0.5) 800 more: a city one, the capital two, three from 0.56. A scout or two in the ring is no alarm (the watch read a danger in 46 % of the seat-turns of the tuning games, most at a threat of 4–14 against a guard of 50–90: at a flat 800 the cities held 0.41 extra holders on the mean). 16 of 17 falls had the alarm 10 rounds or more ahead, time for 2–4 defenders from the city's own production (fractal 4101012 p1: a stack of 20 units 4–8 tiles from the capital at peace for 15 rounds, read at a stranger's half, 57 against 89, 0.39: one more; 0.56 and up: three)"),
         t(S(s::CAPITAL_FALL), 600, "after a fall the rest must hold: what is left is a few cities (0–3 in the traced falls)"),
     ],
 };
@@ -823,9 +826,6 @@ pub mod gate {
     pub const SCIENTIST_FOOD: (i32, &str) = (2, "two food a turn: the city still grows, slower, and never starves for a slot");
     /// `layout-defence`: the hold level from which a city keeps one holder beyond the standing garrison (`weights::HOLD`).
     pub const HOLD_ONE: (Milli, &str) = (500, "one more holder when the hold says so more likely than not");
-    /// `layout-defence`: the menace of a rival at peace from which the defence counts its army near our cities whole
-    /// (`Hold::whole`, `defence::hostility`), not at a stranger's half.
-    pub const STACK_WHOLE: (Milli, &str) = (500, "a stack larger than our units where it stands is the war before its declaration: fractal 4101012 p1, a stack of 20 units 4–8 tiles from the capital at peace for 15 rounds, counted at half (57 against a guard of 89, so the watch sent and built nothing), declared at r240 (threat 124–258) and took the capital at r246");
     /// `layout-defence`: the hold level from which a city keeps two.
     pub const HOLD_TWO: (Milli, &str) = (850, "two more only on a clear front: the capital at war with a near land rival, or a capital in the watch");
     /// `layout-defence`: the hold level at which a city keeps three (the top of the level).

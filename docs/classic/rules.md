@@ -2170,7 +2170,8 @@ Tuning numbers of the computer players (`classic/crates/classic-rules/src/ai`). 
 | `YOUNG` | `3` |  | own value (source not recorded) | `weights.rs` |
 | `CAPITAL` | `4` | `layout-defence`: the city holds our palace (0/1000; `hold::rows`, 0 for every other variant). | own value (source not recorded) | `weights.rs` |
 | `FRONT` | `5` | `layout-defence`: the largest `FRONT` of a rival on the city (`hold::rows`, 0 for every other variant). | own value (source not recorded) | `weights.rs` |
-| `N` | `6` |  | own value (source not recorded) | `weights.rs` |
+| `ALARM` | `6` | `layout-defence`: the watch's threat at the city over the threat and its planned guard (`defence::Danger`; 500: level, 0 without a danger; `hold::rows`, 0 for every other variant). | own value (source not recorded) | `weights.rs` |
+| `N` | `7` |  | own value (source not recorded) | `weights.rs` |
 | `SIZE` | `0` |  | own value (source not recorded) | `weights.rs` |
 | `GARRISON` | `1` |  | own value (source not recorded) | `weights.rs` |
 | `NEAR` | `2` |  | own value (source not recorded) | `weights.rs` |
@@ -2209,7 +2210,6 @@ Tuning numbers of the computer players (`classic/crates/classic-rules/src/ai`). 
 | `CHEST_WAIT_ROUNDS` | `(20, "four proposal intervals: past them a partner's refusal is not its gold, which a f...` | The Standard rounds of an unsigned chest at which `r::CHEST_WAIT` is full (`science::read_waits`). | own value (source not recorded) | `weights.rs` |
 | `SCIENTIST_FOOD` | `(2, "two food a turn: the city still grows, slower, and never starves for a slot")` | Food a turn a city keeps when it takes a science specialist (`citizens::science_specialist_commands`). | own value (source not recorded) | `weights.rs` |
 | `HOLD_ONE` | `(500, "one more holder when the hold says so more likely than not")` | `layout-defence`: the hold level from which a city keeps one holder beyond the standing garrison (`weights::HOLD`). | own value (source not recorded) | `weights.rs` |
-| `STACK_WHOLE` | `(500, "a stack larger than our units where it stands is the war before its declaration:...` | `layout-defence`: the menace of a rival at peace from which the defence counts its army near our cities whole (`Hold::whole`, `defence::hostility`), not at a stranger's half. | own value (source not recorded) | `weights.rs` |
 | `HOLD_TWO` | `(850, "two more only on a clear front: the capital at war with a near land rival, or a...` | `layout-defence`: the hold level from which a city keeps two. | own value (source not recorded) | `weights.rs` |
 | `HOLD_THREE` | `(1000, "three more only at the top: a city in the watch on the front of a war (the trac...` | `layout-defence`: the hold level at which a city keeps three (the top of the level). | own value (source not recorded) | `weights.rs` |
 | `ESCORT_SHIPS` | `(2, "the landing needs ships that shell the coast (`fleet.rs` 1-10)")` | Ships escorting an `Overseas` order (`fleet::FLEET_SIZE`). | own value (source not recorded) | `weights.rs` |

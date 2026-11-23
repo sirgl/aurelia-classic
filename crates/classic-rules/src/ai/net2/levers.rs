@@ -380,8 +380,8 @@ pub fn city_row(reads: &[RivalRead], city: &CityInputs) -> [Milli; w::c::N] {
             distrust = distrust.max(x.distrust);
         }
     }
-    // CAPITAL and FRONT are `layout-defence`'s (`hold::rows`): 0 here, the guard does not read them.
-    [menace, city.danger, distrust, city.young, 0, 0]
+    // CAPITAL, FRONT and ALARM are `layout-defence`'s (`hold::rows`): 0 here, the guard does not read them.
+    [menace, city.danger, distrust, city.young, 0, 0, 0]
 }
 
 fn guard_of(pass: &Pass, city: &CityInputs) -> Milli {

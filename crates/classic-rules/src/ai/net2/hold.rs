@@ -1,9 +1,8 @@
 //! The hold of the cities of `net2` (`layout-defence` only, `TurnBrief::layout_defence`; work/nets/layout-defence):
 //! how much of the army each own city keeps, from the place of the city on the map and the watch's alarm. Per city and
 //! rival a front (`weights::FRONT`: the rival's inputs with R1 `near` read from this city, its concepts), per city a
-//! hold (`weights::HOLD`: the capital, the largest front, the alarm, the seat's fall), the gold kept for a defender of
-//! a city in the watch short of its holders, and the rivals at peace whose army the next watch counts whole. The
-//! executors read `plan::Hold`; nothing here moves a unit, orders a build or spends gold.
+//! hold (`weights::HOLD`: the capital, the largest front, the alarm, the seat's fall) and the gold kept for a defender of
+//! a city in the watch short of its holders. The executors read `plan::Hold`; nothing here moves a unit, orders a build or spends gold.
 
 use crate::ai::planner::TurnBrief;
 use crate::ai::state::{AiState, Reservation};
@@ -18,7 +17,7 @@ use super::concepts::{fire, Frame};
 use super::inputs::InputMemory;
 use super::levers::{Pass, RivalPass};
 use super::plan::{CityHold, Hold};
-use super::weights::{self as w, c, gate, q, r};
+use super::weights::{self as w, c, gate, r};
 
 /// The hold of the turn: every own city's level and holders beyond the standing garrison, and the chest.
 pub fn plan(obs: &AIObservation<'_>, brief: &TurnBrief, state: &AiState, pass: &Pass, memory: &InputMemory, rules: &CompiledRuleset) -> Hold {
@@ -33,12 +32,7 @@ pub fn plan(obs: &AIObservation<'_>, brief: &TurnBrief, state: &AiState, pass: &
         })
         .collect();
     let chest = chest(obs, brief, state, rules, &cities);
-    Hold { cities, chest, whole: whole(pass) }
-}
-
-/// The rivals at peace whose army near our cities the next watch counts whole (`gate::STACK_WHOLE` on `menace`).
-fn whole(pass: &Pass) -> Vec<PlayerId> {
-    pass.rivals.iter().filter(|r| r.inputs[r::AT_WAR] == 0 && r.inputs[r::PACT] == 0 && r.concepts[q::MENACE] >= gate::STACK_WHOLE.0).map(|r| r.rival).collect()
+    Hold { cities, chest }
 }
 
 /// The holders beyond the standing garrison a hold level asks for (`gate::HOLD_ONE`, `gate::HOLD_TWO`).
@@ -58,7 +52,10 @@ pub fn extra_of(level: Milli) -> u8 {
 fn row(brief: &TurnBrief, rules: &CompiledRuleset, city: &OwnCity, known: &[(TileId, PlayerId, bool)], rivals: &[RivalPass]) -> [Milli; c::N] {
     let mut row = [0; c::N];
     row[c::CAPITAL] = if has_palace(rules, city) { 1000 } else { 0 };
-    row[c::DANGER] = if brief.endangered(city.tile) { 1000 } else { 0 };
+    if let Some(d) = brief.defence.as_ref().and_then(|w| w.danger(city.tile)) {
+        row[c::DANGER] = 1000;
+        row[c::ALARM] = (i64::from(d.threat) * 1000 / (i64::from(d.threat) + i64::from(d.planned)).max(1)).clamp(0, 1000);
+    }
     let dist = |a: TileId, b: TileId| brief.dims.distance(a, b).unwrap_or(i32::MAX);
     for rival in rivals {
         let nearest = known.iter().filter(|(_, o, _)| *o == rival.rival).map(|(t, _, _)| dist(*t, city.tile)).min();
@@ -115,6 +112,7 @@ pub fn trace(player: u8, round: u32, hold: &Hold) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::ai::net2::weights::q;
 
     fn rival(near_land: bool, soldiers: Milli, at_war: bool, pact: bool) -> RivalPass {
         let mut inputs = [0; r::N];
@@ -125,11 +123,12 @@ mod tests {
         RivalPass { rival: PlayerId(1), inputs, concepts: [0; q::N] }
     }
 
-    fn hold(capital: bool, front: Milli, danger: bool) -> Milli {
+    fn hold(capital: bool, front: Milli, alarm: Milli) -> Milli {
         let mut row = [0; c::N];
         row[c::CAPITAL] = if capital { 1000 } else { 0 };
         row[c::FRONT] = front;
-        row[c::DANGER] = if danger { 1000 } else { 0 };
+        row[c::DANGER] = if alarm > 0 { 1000 } else { 0 };
+        row[c::ALARM] = alarm;
         fire(&w::HOLD, &Frame { s: &[0; w::s::N], c: &row, ..Frame::default() })
     }
 
@@ -152,16 +151,19 @@ mod tests {
     }
 
     /// The executors' counts: an interior city keeps the standing garrison, the capital on half a front one more and
-    /// on a full front two; a frontier city only with the alarm: one at peace, three at war; a capital in the watch two.
+    /// on a full front two; elsewhere only the alarm adds: none for a scout in the ring, one for a city at a level
+    /// threat, three for the capital from 0.56.
     #[test]
     fn the_hold_asks_the_capital_first_and_the_alarm_most() {
-        assert_eq!(extra_of(hold(false, 0, false)), 0, "interior");
-        assert_eq!(extra_of(hold(true, 0, false)), 0, "a capital with no front");
-        assert_eq!(extra_of(hold(true, 550, false)), 1, "the capital on half a front");
-        assert_eq!(extra_of(hold(true, 1000, false)), 2, "the capital on a full front");
-        assert_eq!(extra_of(hold(false, 1000, false)), 0, "a frontier city at war, no alarm");
-        assert_eq!(extra_of(hold(false, 0, true)), 1, "a city in the watch at peace");
-        assert_eq!(extra_of(hold(true, 0, true)), 2, "the capital in the watch at peace");
-        assert_eq!(extra_of(hold(false, 1000, true)), 3, "a frontier city in the watch at war");
+        assert_eq!(extra_of(hold(false, 0, 0)), 0, "interior");
+        assert_eq!(extra_of(hold(true, 0, 0)), 0, "a capital with no front");
+        assert_eq!(extra_of(hold(true, 550, 0)), 1, "the capital on half a front");
+        assert_eq!(extra_of(hold(true, 1000, 0)), 2, "the capital on a full front");
+        assert_eq!(extra_of(hold(false, 1000, 0)), 0, "a frontier city at war, no alarm");
+        assert_eq!(extra_of(hold(false, 0, 100)), 0, "a scout in the ring (threat 6 against 50)");
+        assert_eq!(extra_of(hold(false, 0, 500)), 1, "a city at a level threat");
+        assert_eq!(extra_of(hold(true, 0, 390)), 1, "the capital at 0.39 (4101012 at peace, counted at half)");
+        assert_eq!(extra_of(hold(true, 0, 560)), 3, "the capital at a threat past level (0.56)");
+        assert_eq!(extra_of(hold(false, 1000, 500)), 3, "a frontier city at war at a level threat");
     }
 }

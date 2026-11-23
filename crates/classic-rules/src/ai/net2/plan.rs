@@ -725,10 +725,9 @@ pub struct Net2Plan {
 }
 
 /// The hold of the cities (`weights::FRONT`, `weights::HOLD`): how many holders each city keeps beyond the empire's
-/// standing garrison, the gold kept from the other purchases while a city in the watch is short of them, and the rivals
-/// whose army at peace the watch counts whole. Read by the units' planner (`planner_units::garrison_wanted_at`), the
-/// city planner (the garrison it builds, the defenders it switches to: `planner_cities::hold_orders`), the allocator
-/// (the chest) and the next turn's watch (`whole`). Empty unless the seat plays `layout-defence`
+/// standing garrison and the gold kept from the other purchases while a city in the watch is short of them. Read by
+/// the units' planner (`planner_units::garrison_wanted_at`), the city planner (the garrison it builds, the defenders it
+/// switches to: `planner_cities::hold_orders`) and the allocator (the chest). Empty unless the seat plays `layout-defence`
 /// (`TurnBrief::layout_defence`).
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Hold {
@@ -737,10 +736,6 @@ pub struct Hold {
     /// Gold kept while a city in the watch is short of its holders: the rules' price of buying a defender there
     /// (`allocator::spend_gold` does not spend it; `planner_cities::hold_orders` buys the defender).
     pub chest: u32,
-    /// The rivals at peace whose army near our cities the defence counts whole, as an enemy's (`gate::STACK_WHOLE`):
-    /// kept in the memory (`Memory2::whole`) and read by the next turn's watch (`TurnBrief::watch_whole`,
-    /// `defence::hostility`), which is made before `net2` thinks.
-    pub whole: Vec<PlayerId>,
 }
 
 /// The hold of one own city.
@@ -900,9 +895,6 @@ pub struct Memory2 {
     pub inputs: super::inputs::InputMemory,
     /// `science-flow`'s own; empty for every other variant, whose bytes it leaves as they were (`memory.rs`).
     pub science: ScienceMemory,
-    /// `layout-defence`'s rivals whose army the next watch counts whole (`Hold::whole`); empty for every other variant,
-    /// whose bytes it leaves as they were (`memory.rs`).
-    pub whole: Vec<PlayerId>,
 }
 
 /// What `science-flow` keeps between turns: how long its gold has waited for each partner's research agreement.
