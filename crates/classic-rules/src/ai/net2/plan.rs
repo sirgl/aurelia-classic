@@ -713,8 +713,9 @@ pub struct Net2Plan {
     /// reads it).
     pub space_research: bool,
     /// The capital is kept for the spaceship's parts (`weights::CAPITAL_GATE` at least `gate::CAPITAL_GATE`): no own
-    /// civilian parks in it, and the civilians in it walk out around the units in the way (`planner_workers::park`,
-    /// `victory::walked_orders` read it). The capital's tile when kept, else None.
+    /// civilian parks in it, the civilians in it walk out around the units in the way, and the caravans in it or at its
+    /// gate go to another city (`planner_workers::park` and `victory::Walk::Gated` read it). The capital's tile when
+    /// kept, else None.
     pub capital_gate: Option<crate::ids::TileId>,
 }
 

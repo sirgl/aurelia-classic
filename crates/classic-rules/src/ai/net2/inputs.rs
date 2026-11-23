@@ -576,8 +576,8 @@ pub fn read(obs: &AIObservation<'_>, brief: &TurnBrief, state: &AiState, rules: 
     let cities = cities(obs, brief, state, memory);
     let targets = targets(obs, brief, state, rules, memory);
     let space = space_needs(obs, rules);
-    let seat = SeatInputs { space_race: if space.is_empty() { 0 } else { 1000 }, parts_short: parts_short(&space), part_out: part_out(obs, rules), ..seat };
     let capital = crate::ai::victory::capital_tile(obs, rules);
+    let seat = SeatInputs { space_race: if space.is_empty() { 0 } else { 1000 }, parts_short: parts_short(&space), part_out: part_out(obs, rules, capital), ..seat };
     Inputs { situation: *situation, seat, rivals: rival_rows, cities, pairs: Vec::new(), aims: Vec::new(), targets, space, capital }
 }
 
@@ -621,10 +621,9 @@ fn resisting_from(obs: &AIObservation<'_>, state: &AiState, tile: TileId) -> Opt
     state.seen_cities().iter().filter(|c| enemies.contains(&c.owner)).filter_map(|c| Some((dims.distance(c.tile, city.tile)?, c.owner.0, c.owner))).min().map(|(_, _, p)| p)
 }
 
-/// G16 `part_out`: a spaceship part of ours stands outside the capital, where it is installed (`victory::capital`):
+/// G16 `part_out`: a spaceship part of ours stands outside the capital, where it is installed (`victory::capital_tile`):
 /// 1000, else 0.
-fn part_out(obs: &AIObservation<'_>, rules: &CompiledRuleset) -> Milli {
-    let capital = crate::ai::victory::capital_tile(obs, rules);
+fn part_out(obs: &AIObservation<'_>, rules: &CompiledRuleset, capital: Option<TileId>) -> Milli {
     let out = obs.own_units.iter().any(|u| crate::ai::victory::is_part(rules, u.kind) && Some(u.tile) != capital);
     if out { 1000 } else { 0 }
 }

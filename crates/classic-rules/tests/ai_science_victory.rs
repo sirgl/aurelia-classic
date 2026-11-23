@@ -273,35 +273,110 @@ fn the_science_fit_follows_the_victory_the_rounds_and_the_technologies() {
     assert!(!science_fits(&obs, &rules, ship + 5), "all technologies to find in five rounds");
 }
 
-/// `net2`'s capital gate (`Net2Plan::capital_gate`, `victory::spaceship_orders_gated`, space-parts SPACE.md): a jobless
+/// `net2`'s capital gate (`Net2Plan::capital_gate`, `victory::Walk::Gated`, space-parts SPACE.md): a jobless
 /// worker in the capital and two parts at its gate. The worker walks out on the AI's own path, off the tiles the parts
 /// step on, and a part steps into the capital after it in the same turn: every order is accepted when it is applied.
 #[test]
 fn the_gate_walks_the_worker_out_and_a_part_in() {
     let (mut game, rules, capital, _weak) = space_age(12);
     let at = game.view().auth.cities().get(capital).unwrap().tile;
-    let obs = game.ai_observation(&rules, P0);
-    let kinds = obs.view.terrain_kinds();
-    let dims = obs.view.dimensions();
-    let land: Vec<TileId> = dims
-        .neighbors(at)
-        .into_iter()
-        .filter(|t| obs.view.tile(*t).snapshot().is_some_and(|s| !kinds.is_water(s.terrain.0) && kinds.enter_cost(s.terrain).is_some()))
-        .collect();
-    drop(obs);
+    let land = land_at(&game, &rules, at, 1);
     assert!(land.len() >= 3, "the capital has land around it");
-    let worker = UnitKindId(rules.units.iter().position(|u| u.key == "core:unit/worker").unwrap() as u16);
-    let walker = game.debug_spawn_unit(&rules, P0, at, worker);
+    let walker = game.debug_spawn_unit(&rules, P0, at, kind(&rules, "core:unit/worker"));
     let parts = [game.debug_spawn_unit(&rules, P0, land[0], part(&rules, 0)), game.debug_spawn_unit(&rules, P0, land[1], part(&rules, 1))];
-    let obs = game.ai_observation(&rules, P0);
-    let orders = classic_rules::ai::victory::spaceship_orders_gated(&obs, &rules, true, Some(at));
-    drop(obs);
-    for order in orders {
-        game.execute(&rules, order.clone()).unwrap_or_else(|e| panic!("{order:?}: {e:?}"));
-    }
+    apply_gate(&mut game, &rules, at);
     let auth = game.view().auth;
     let tile_of = |u| auth.units().get(u).unwrap().core.tile;
     assert_ne!(tile_of(walker), at, "the worker left the capital");
     assert!(!parts.iter().any(|p| tile_of(*p) == tile_of(walker)), "and stands on no part's tile");
     assert!(parts.iter().any(|p| tile_of(*p) == at), "a part stands in the capital, to be installed next turn");
+}
+
+fn kind(rules: &CompiledRuleset, key: &str) -> UnitKindId {
+    UnitKindId(rules.units.iter().position(|u| u.key == key).unwrap() as u16)
+}
+
+/// The land tiles `distance` tiles from `at` that a land unit may enter, by id.
+fn land_at(game: &GameState, rules: &CompiledRuleset, at: TileId, distance: i32) -> Vec<TileId> {
+    let obs = game.ai_observation(rules, P0);
+    let kinds = obs.view.terrain_kinds();
+    let dims = obs.view.dimensions();
+    let land = |t: &TileId| obs.view.tile(*t).snapshot().is_some_and(|s| !kinds.is_water(s.terrain.0) && kinds.enter_cost(s.terrain).is_some() && !s.city);
+    classic_rules::math::hex_disc(dims, at, distance).filter(|t| dims.distance(at, *t) == Some(distance)).filter(land).collect()
+}
+
+/// The gate's orders of one turn (`Walk::Gated`), each applied in turn: every one must be accepted when it is applied.
+fn apply_gate(game: &mut GameState, rules: &CompiledRuleset, at: TileId) -> Vec<Command> {
+    let obs = game.ai_observation(rules, P0);
+    let orders = classic_rules::ai::victory::spaceship_orders(&obs, rules, classic_rules::ai::victory::Walk::Gated(at));
+    drop(obs);
+    for order in &orders {
+        game.execute(rules, order.clone()).unwrap_or_else(|e| panic!("{order:?}: {e:?}"));
+    }
+    orders
+}
+
+/// A part two tiles from the capital, on a tile next to one of `gate`.
+fn part_behind(game: &GameState, rules: &CompiledRuleset, at: TileId, gate: &[TileId]) -> TileId {
+    let dims = game.view().auth.map().dimensions;
+    land_at(game, rules, at, 2).into_iter().find(|t| gate.iter().any(|g| dims.distance(*g, *t) == Some(1))).expect("land two tiles from the capital")
+}
+
+/// The gate guards the class «an own civilian shuts a part out of the capital» (one civilian a tile, own units do not
+/// swap; space-parts SPACE.md): settlers on every land tile next to the capital and a part behind them. A settler steps
+/// off the gate and the part walks in through its tile: every order is accepted when it is applied.
+#[test]
+fn the_gate_steps_a_settler_off_a_full_gate_and_a_part_walks_in() {
+    let (mut game, rules, capital, _weak) = space_age(12);
+    let at = game.view().auth.cities().get(capital).unwrap().tile;
+    let gate = land_at(&game, &rules, at, 1);
+    let settlers: Vec<_> = gate.iter().map(|t| game.debug_spawn_unit(&rules, P0, *t, kind(&rules, "core:unit/settler"))).collect();
+    let behind = part_behind(&game, &rules, at, &gate);
+    let booster = game.debug_spawn_unit(&rules, P0, behind, part(&rules, 0));
+    let orders = apply_gate(&mut game, &rules, at);
+    let auth = game.view().auth;
+    let tile_of = |u| auth.units().get(u).unwrap().core.tile;
+    let dims = auth.map().dimensions;
+    assert!(settlers.iter().any(|s| !gate.contains(&tile_of(*s))), "a settler left the gate: {orders:?}");
+    assert!(dims.distance(at, tile_of(booster)).is_some_and(|d| d <= 1), "the part reached the gate or the capital: {orders:?}");
+}
+
+/// Caravans on every land tile next to the capital and a part behind them. A caravan cannot walk: one goes home to the
+/// second city (the rules' change of home), and the part walks into the gate through its tile in the same turn.
+#[test]
+fn the_gate_sends_a_caravan_home_and_a_part_walks_in() {
+    let (mut game, rules, capital, weak) = space_age(12);
+    let at = game.view().auth.cities().get(capital).unwrap().tile;
+    let weak_tile = game.view().auth.cities().get(weak).unwrap().tile;
+    let gate = land_at(&game, &rules, at, 1);
+    let caravans: Vec<_> = gate.iter().map(|t| game.debug_spawn_unit(&rules, P0, *t, kind(&rules, "core:unit/caravan"))).collect();
+    let behind = part_behind(&game, &rules, at, &gate);
+    let booster = game.debug_spawn_unit(&rules, P0, behind, part(&rules, 0));
+    let orders = apply_gate(&mut game, &rules, at);
+    let auth = game.view().auth;
+    let tile_of = |u| auth.units().get(u).unwrap().core.tile;
+    assert_eq!(caravans.iter().filter(|c| tile_of(**c) == weak_tile).count(), 1, "one caravan went home: {orders:?}");
+    assert!(orders.iter().any(|o| matches!(o, Command::MoveUnit { unit, .. } if *unit == booster)), "the part walks: {orders:?}");
+}
+
+/// A caravan in the capital and one at its gate, and no other city with room (a worker stands in the second city): the
+/// caravans get no order and stay where they are, every order of the plan is accepted when it is applied, and the part
+/// keeps its way to the capital.
+#[test]
+fn a_caravan_with_no_home_stays_and_the_gate_still_plans() {
+    let (mut game, rules, capital, weak) = space_age(12);
+    let at = game.view().auth.cities().get(capital).unwrap().tile;
+    let weak_tile = game.view().auth.cities().get(weak).unwrap().tile;
+    game.debug_spawn_unit(&rules, P0, weak_tile, kind(&rules, "core:unit/worker"));
+    let gate = land_at(&game, &rules, at, 1);
+    let caravans = [game.debug_spawn_unit(&rules, P0, at, kind(&rules, "core:unit/caravan")), game.debug_spawn_unit(&rules, P0, gate[0], kind(&rules, "core:unit/caravan"))];
+    let behind = part_behind(&game, &rules, at, &gate);
+    let booster = game.debug_spawn_unit(&rules, P0, behind, part(&rules, 0));
+    let orders = apply_gate(&mut game, &rules, at);
+    let ordered = |unit| orders.iter().any(|o| matches!(o, Command::MoveUnit { unit: u, .. } | Command::MarchTo { unit: u, .. } | Command::ChangeTradeHome { unit: u, .. } if *u == unit));
+    assert!(!caravans.iter().any(|c| ordered(*c)), "no order for a caravan: {orders:?}");
+    let auth = game.view().auth;
+    let tile_of = |u| auth.units().get(u).unwrap().core.tile;
+    assert_eq!([tile_of(caravans[0]), tile_of(caravans[1])], [at, gate[0]]);
+    assert!(ordered(booster), "the part keeps its way: {orders:?}");
 }

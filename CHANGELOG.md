@@ -20,6 +20,8 @@
   of the points (counting a win by a real victory in full and a win on the turn limit as a quarter) and wins 238 games by
   a real victory against 113. A computer turn takes no longer than before.
 - Saves made by the previous version still load.
+- A finished spaceship part no longer waits outside its capital behind the computer player's own workers, settlers
+  and caravans: they step aside, and caravans go to another city.
 - A loaded game now plays on exactly as it would have without the save: the computer players keep no memory outside it.
 
 ### Rules
