@@ -29,8 +29,8 @@ pub fn plan(obs: &AIObservation<'_>, brief: &TurnBrief, state: &crate::ai::state
     for city in &inputs.cities {
         let Some(own) = obs.own_cities.iter().find(|o| o.id == city.city) else { continue };
         let guard = city_row(&pass.reads, city);
-        let capital = inputs.capital == Some(own.tile);
-        let row = garrison_row(brief, own, &guard, &camps, mean, at_war, capital);
+        let place = CityPlace { capital: inputs.capital == Some(own.tile), rival_near: rival_near(obs, brief, state, own.tile) };
+        let row = garrison_row(brief, own, &guard, &camps, mean, at_war, place);
         if fire(&w::GARRISON, &Frame { c: &row, s: &pass.seat, ..Frame::default() }) < gate::GARRISON.0 {
             garrison_waits.push(own.tile);
         }
@@ -145,8 +145,27 @@ fn open_tiles(obs: &AIObservation<'_>, brief: &TurnBrief, state: &crate::ai::sta
     open.min(cap)
 }
 
+/// Where a city stands for its garrison (`weights::gc::CAPITAL`, `RIVAL_NEAR`).
+#[derive(Debug, Clone, Copy)]
+pub struct CityPlace {
+    pub capital: bool,
+    /// `gc::RIVAL_NEAR`.
+    pub rival_near: Milli,
+}
+
+/// `gc::RIVAL_NEAR` of the city on `tile`: the nearest city of a met major the player remembers, on the scale a rival's
+/// war net reads our city at (`inputs::targets`' `near`).
+fn rival_near(obs: &AIObservation<'_>, brief: &TurnBrief, state: &crate::ai::state::AiState, tile: crate::ids::TileId) -> Milli {
+    let major = |owner: crate::ids::PlayerId| obs.relation(owner).is_some_and(|r| r.kind == PlayerKind::Major);
+    let nearest = state.seen_cities().iter().filter(|c| major(c.owner)).filter_map(|c| brief.dims.distance(tile, c.tile)).min();
+    match nearest {
+        Some(distance) => crate::ai::strategy_net::layers::ramp(15 - i64::from(distance), 0, 10),
+        None => 0,
+    }
+}
+
 /// `weights::gc` of one city.
-pub fn garrison_row(brief: &TurnBrief, city: &OwnCity, guard: &[Milli; c::N], camps: &[crate::ids::TileId], mean: i64, at_war: Milli, capital: bool) -> [Milli; gc::N] {
+pub fn garrison_row(brief: &TurnBrief, city: &OwnCity, guard: &[Milli; c::N], camps: &[crate::ids::TileId], mean: i64, at_war: Milli, place: CityPlace) -> [Milli; gc::N] {
     let mut row = [0; gc::N];
     row[gc::LOW_PRODUCTION] = if i64::from(city.income.production) * 1000 < mean { 1000 } else { 0 };
     row[gc::CAMP_NEAR] = if camps.iter().any(|t| brief.dims.distance(*t, city.tile).is_some_and(|d| d <= crate::ai::camps::CAMP_REACH)) { 1000 } else { 0 };
@@ -154,7 +173,8 @@ pub fn garrison_row(brief: &TurnBrief, city: &OwnCity, guard: &[Milli; c::N], ca
     row[gc::DANGER] = guard[c::DANGER];
     row[gc::DISTRUST_NEAR] = guard[c::DISTRUST_NEAR];
     row[gc::AT_WAR] = at_war;
-    row[gc::CAPITAL] = if capital { 1000 } else { 0 };
+    row[gc::CAPITAL] = if place.capital { 1000 } else { 0 };
+    row[gc::RIVAL_NEAR] = place.rival_near;
     row
 }
 
@@ -258,6 +278,12 @@ mod tests {
         assert!(garrison(city(1000, 0, 1000, 0, 0, 0)) >= gate, "the watch's threat");
         assert!(garrison(city(1000, 0, 0, 0, 1000, 0)) >= gate, "at war");
         assert!(garrison(city(1000, 0, 0, 700, 0, 0)) < gate && garrison(city(1000, 0, 0, 800, 0, 0)) >= gate, "a distrusted neighbour above 715");
+        let near = |n: Milli| {
+            let mut row = city(1000, 0, 0, 0, 0, 0);
+            row[gc::RIVAL_NEAR] = n;
+            garrison(row)
+        };
+        assert!(near(400) < gate && near(500) >= gate, "a rival's city within 10 tiles: the city its war net would call soft");
     }
 
     #[test]

@@ -630,7 +630,7 @@ fn the_weights_count() {
     let n = super::weights::count();
     // `early-growth`: the opening's term of `CITY_CAP`, the opening's neurons, the tilts, the garrison and its bias, the
     // chest's neurons, the jobs' neurons and the bias of their cap, their gates, the shared land.
-    assert_eq!(n, 201, "net2's own hand weights (the 13 carried concepts and the carried logits are `strategy_net::weights`'s)");
+    assert_eq!(n, 202, "net2's own hand weights (the 13 carried concepts and the carried logits are `strategy_net::weights`'s)");
 }
 
 #[test]

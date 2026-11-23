@@ -830,7 +830,10 @@ pub mod gc {
     pub const AT_WAR: usize = 5;
     /// The city is the capital (0/1000).
     pub const CAPITAL: usize = 6;
-    pub const N: usize = 7;
+    /// How near the nearest seen city of a major is, as a rival's war net reads our city (`t::NEAR`: ramp(15 − tiles,
+    /// 0, 10), 1000 at 5 tiles or less).
+    pub const RIVAL_NEAR: usize = 7;
+    pub const N: usize = 8;
 }
 
 /// The early growth's purchase row of the seat (`net2::growth::buy_row`), read by `BUY_CHEST` through `Src::C`.
@@ -890,6 +893,7 @@ pub const GARRISON: Neuron = Neuron {
         t(C(gc::DISTRUST_NEAR), 700, "a distrusted neighbour within 8 tiles (above 715 distrust the garrison stays)"),
         t(C(gc::AT_WAR), 1000, "at war with a major every city keeps its garrison"),
         t(C(gc::CAPITAL), 1000, "the capital keeps its garrison: with the wait on every city early-growth lost 4 capitals against science-flow's 3 in E3 (offsets 3722–3723, 400 games); a capital was below the mean in 696 of its 64800 rounds (r ≤ 135), the only rounds the wait reached it"),
+        t(C(gc::RIVAL_NEAR), 1000, "a city a rival's war net reaches keeps its garrison: its `EASE` gives a small city with no defender seen about 1000·near (size +1000, no garrison +800, walls about +400, bias −2200), so from near 0.5 (10 tiles) it is the soft city that opens a prey war; in R3 (offsets 4840–4841) 3 of the 5 capitals early-growth lost fell in a prey war whose first target was such a city (pop 1–2, garrison 0, near 1000, ease 913–1000; runs/case/)"),
         t(S(s::CAPITAL_FALL), 1000, "after a fall the rest must hold"),
     ],
 };
