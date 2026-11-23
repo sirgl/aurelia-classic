@@ -752,24 +752,28 @@ pub const FRONT: Neuron = Neuron {
     ],
 };
 
-/// The hold of one own city (`Net2Plan::hold`): how much of the army stands there before an enemy is in sight. The
-/// executors read the level only: the holders beyond the standing garrison (`gate::HOLD_ONE`, `gate::HOLD_TWO`), the
-/// spare units' city (the reserve), the order of the upgrades and the gold kept for the next one. Why (the look): the
-/// standing garrison is one unit in every city, the capital too; the free units guard the nearest city (pangaea
-/// 4261012 p0: 4 defenders of other cities 4–6 tiles off, 34 power, while the capital's guard of 41 met a stack of 117
-/// and fell at r161); the upgrades go in the list's order above a reserve of 150 gold (continents 4261009 p5: 4
-/// upgrades of the capital's guard offered at 75 each, the treasury 128–180 for ten rounds, none taken, the capital
-/// lost at r184).
+/// The hold of one own city (`Net2Plan::hold`): how many holders it keeps beyond the standing garrison
+/// (`gate::HOLD_ONE`, `HOLD_TWO`, `HOLD_THREE`). The executors read the count only: the city's garrison
+/// (`planner_units::garrison_wanted_at`), the defenders the city switches its production to while it is short of them
+/// and the watch reads a danger there, and the gold kept from the other purchases for buying one (`Hold::chest`). Why
+/// (the look: 17 capitals of `standard` lost at Standard speed, offsets 4260–4264, and 10 more on 4100–4102): the guard
+/// within 3 tiles was weaker than the stack in 17 of 17 (median 0.28 of it), one unit stood in the city in 14 of 17;
+/// the watch read the danger at the capital 10 rounds or more before the fall in 16 of 17, net2's guard level at its
+/// top, and nothing answered it: 100 gold or more left in 12 of 17, nothing bought in the last 10 rounds in 10 of 17,
+/// tiles bought in 5 (pangaea 4261012 p0: 376 gold on 4 tiles and one unit while the capital's guard of 41 met 117).
+/// The defence's own price (`defence::defender_net`) pays no defender once the stack is three times the guard: the
+/// count must be set while the danger is young, from the city's place and the alarm, not from the odds at the walls.
 pub const HOLD: Neuron = Neuron {
     name: "hold",
     bias: -300,
-    why: "an interior city keeps the standing garrison: its units are the reserve of the others",
+    why: "an interior city at peace keeps the standing garrison",
     join: UNIT,
     terms: &[
-        t(C(c::CAPITAL), 400, "the capital is the stake: its loss is the city and the game's share of it (`defence::capital_share`); the 11 traced seats kept 0–3 cities after it"),
-        t(C(c::FRONT), 800, "a city on a front: at a full front (at war with a near land rival) one holder more (500)"),
-        ts(C(c::CAPITAL), Shape::Times(C(c::FRONT)), 300, "the capital on a front first: from a front of 0.36 (a land neighbour at peace with a level army 7 tiles off) it holds one more, at a full front (at war) two"),
-        t(S(s::CAPITAL_FALL), 600, "after a fall the rest must hold: what is left is a few cities (0–3 in the 11 traced falls)"),
+        t(C(c::CAPITAL), 400, "the capital is the stake: its loss is the city and the game's share of it (`defence::capital_share`); the traced seats kept 0–3 cities after it"),
+        t(C(c::FRONT), 600, "a city on a front holds more, but alone a front makes no holder outside the capital: the alarm does (`DANGER`)"),
+        ts(C(c::CAPITAL), Shape::Times(C(c::FRONT)), 200, "the capital on a front first: at a front of 0.55 (a land neighbour at peace with a level army 5–6 tiles off) one holder more, at a full front (at war) two"),
+        t(C(c::DANGER), 800, "the alarm: a city in the watch holds one more at peace (the capital two), three at war on a front; 16 of 17 falls had the alarm 10 rounds or more ahead, time for 2–4 defenders from the city's own production"),
+        t(S(s::CAPITAL_FALL), 600, "after a fall the rest must hold: what is left is a few cities (0–3 in the traced falls)"),
     ],
 };
 
@@ -823,7 +827,9 @@ pub mod gate {
     /// (`Hold::whole`, `defence::hostility`), not at a stranger's half.
     pub const STACK_WHOLE: (Milli, &str) = (500, "a stack larger than our units where it stands is the war before its declaration: fractal 4101012 p1, a stack of 20 units 4–8 tiles from the capital at peace for 15 rounds, counted at half (57 against a guard of 89, so the watch sent and built nothing), declared at r240 (threat 124–258) and took the capital at r246");
     /// `layout-defence`: the hold level from which a city keeps two.
-    pub const HOLD_TWO: (Milli, &str) = (850, "two more only on a clear front: the capital on a near land rival at war, or on a stronger distrusted one");
+    pub const HOLD_TWO: (Milli, &str) = (850, "two more only on a clear front: the capital at war with a near land rival, or a capital in the watch");
+    /// `layout-defence`: the hold level at which a city keeps three (the top of the level).
+    pub const HOLD_THREE: (Milli, &str) = (1000, "three more only at the top: a city in the watch on the front of a war (the traced stacks were 8–32 units against 3–9)");
     /// Ships escorting an `Overseas` order (`fleet::FLEET_SIZE`).
     pub const ESCORT_SHIPS: (u32, &str) = (2, "the landing needs ships that shell the coast (`fleet.rs` 1-10)");
     /// Standard rounds after a war order spent its budget without paying before another order on that rival.

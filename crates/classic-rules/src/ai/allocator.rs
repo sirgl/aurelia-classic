@@ -77,8 +77,8 @@ pub struct Allocator {
     /// A new city keeps the empire content (or the empire is young).
     may_settle: bool,
     /// Gold the running operations keep for their army's upkeep, `science-flow`'s gold for the research agreements
-    /// its ties still lack (`Net2Plan::science`'s chest) and `layout-defence`'s for the next upgrade of a held city's
-    /// guard (`Net2Plan::hold`'s chest).
+    /// its ties still lack (`Net2Plan::science`'s chest) and `layout-defence`'s for a defender of a city in the watch short
+    /// of its holders (`Net2Plan::hold`'s chest).
     war_chest: u32,
     /// The gold kept for the alliance of a rival that would win the World Leader vote
     /// (`city_states::guard_chest`, `vote-guard`); only the gifts that take it may spend it.

@@ -150,6 +150,8 @@ pub(crate) struct Empire {
     /// units the empire's army lacks for every city's garrison; empty and 0 for every other variant.
     hold_short: Vec<crate::ids::TileId>,
     hold_room: usize,
+    /// `layout-defence`: the cities of `hold_short` the watch reads a danger at (`TurnBrief::endangered`).
+    hold_alarm: Vec<crate::ids::TileId>,
 }
 
 /// What `ai::army_fit` rates the kinds against this turn.
@@ -275,6 +277,9 @@ fn city_orders(
     allocator: Option<&Allocator>,
 ) -> Vec<Decision> {
     if let Some(orders) = defend_now(obs, brief, empire, tools.rules, city) {
+        return orders;
+    }
+    if let Some(orders) = hold_orders(obs, empire, tools.rules, city) {
         return orders;
     }
     if let Some(orders) = defence_orders(obs, brief, empire, tools.rules, city) {
@@ -613,6 +618,7 @@ impl Empire {
             camp_demand: if brief.camps { crate::ai::camps::demand(obs, brief, state, rules) } else { 0 },
             hold_short: hold_short(brief, state),
             hold_room: hold_room(brief, state, military),
+            hold_alarm: hold_short(brief, state).into_iter().filter(|t| brief.endangered(*t)).collect(),
         }
     }
 }
@@ -1329,6 +1335,42 @@ fn defend_now(
         Decision::act(Actor::City(city.id), Reason::ProduceDefender, clear),
         order(empire, city, item, Reason::ProduceDefender),
     ];
+    orders.extend(hurry_defender(obs, empire, city, item));
+    Some(orders)
+}
+
+/// Tiles from a city in the watch short of its hold within which a city switches to a defender for it
+/// (`hold_orders`): the new unit garrisons the nearest city short of its holders (`planner_units::ungarrisoned_city`).
+const HOLD_NEIGHBOUR_TILES: i32 = 6;
+
+/// `layout-defence`: while a city in the watch is short of the holders `net2`'s hold of it asks for (`Empire::hold_alarm`)
+/// and the army is short of every city's garrison (`hold_room`), that city and the cities within `HOLD_NEIGHBOUR_TILES`
+/// of it switch their production to a defender now, the old head after it, and buy it when the treasury allows (the
+/// hold's chest keeps the price from the other purchases). Why: the alarm came 10 rounds or more before 16 of 17 traced
+/// falls and the cities kept building what they built (`defence_orders` prices no defender once the stack is three
+/// times the guard): 10 rounds of a city's production are the 2–4 defenders the guard lacked.
+fn hold_orders(obs: &AIObservation<'_>, empire: &mut Empire, rules: &CompiledRuleset, city: &OwnCity) -> Option<Vec<Decision>> {
+    if empire.hold_room == 0 || empire.military >= empire.supply {
+        return None;
+    }
+    let dims = obs.view.dimensions();
+    let near = empire.hold_alarm.iter().any(|t| dims.distance(*t, city.tile).is_some_and(|d| d <= HOLD_NEIGHBOUR_TILES));
+    let head_military = matches!(city.queue.first(), Some(ProductionItem::Unit(k)) if role_of(rules, *k) == AiRole::Military);
+    if !near || head_military {
+        return None;
+    }
+    let defender = military_kind(obs, empire, rules, crate::ai::army_fit::Purpose::Hold)?;
+    empire.military += 1;
+    empire.hold_room -= 1;
+    let item = ProductionItem::Unit(defender);
+    let mut orders = Vec::new();
+    if !city.queue.is_empty() {
+        orders.push(Decision::act(Actor::City(city.id), Reason::ProduceDefender, Command::ClearProduction { player: empire.player, city: city.handle }));
+    }
+    orders.push(order(empire, city, item, Reason::ProduceDefender));
+    if let Some(head) = city.queue.first() {
+        orders.push(order(empire, city, *head, Reason::ProduceDefender));
+    }
     orders.extend(hurry_defender(obs, empire, city, item));
     Some(orders)
 }

@@ -502,16 +502,17 @@ fn garrison_target(view: &UnitView<'_, '_>, state: &AiState, city: TileId) -> us
 /// (`Net2Plan::hold`, `layout-defence`; none for every other variant). Every count of a city's garrison reads
 /// this one rule (`tests::every_garrison_count_reads_the_city`).
 pub fn garrison_wanted_at(brief: &TurnBrief, strategy: Strategy, city: TileId) -> usize {
+    garrison_with(brief, strategy, crate::ai::operations::with_net2(brief, crate::ai::net2::plan::Part::Guard, |plan| plan.hold.extra_at(city)).unwrap_or(0))
+}
+
+/// The garrison of a city that `extra` holders beyond the standing garrison are asked of (`garrison_wanted_at`; the
+/// hold reads it with its own count before its plan stands): none before the empire keeps a standing garrison.
+pub fn garrison_with(brief: &TurnBrief, strategy: Strategy, extra: usize) -> usize {
     let standing = garrison_wanted_by(brief, strategy);
     if standing == 0 {
         return 0;
     }
-    standing + crate::ai::operations::with_net2(brief, crate::ai::net2::plan::Part::Guard, |plan| plan.hold.extra_at(city)).unwrap_or(0)
-}
-
-/// `net2`'s hold level of the city on `city` (`Net2Plan::hold`, `layout-defence`; 0 for every other variant).
-pub fn hold_level_at(brief: &TurnBrief, city: TileId) -> crate::ai::strategy_net::Milli {
-    crate::ai::operations::with_net2(brief, crate::ai::net2::plan::Part::Guard, |plan| plan.hold.level_at(city)).unwrap_or(0)
+    standing + extra
 }
 
 /// Garrison units each city wants under `strategy` (`garrison_wanted`). With
@@ -587,22 +588,8 @@ fn assign_military_task(
             return Some(UnitTask::Scout { target });
         }
     }
-    reserve_city(view, unit.tile).map(|city| UnitTask::Defend { city })
-}
-
-/// The city a unit no garrison, assault, escort or scout wants defends: the nearest one; with `net2`'s hold of the
-/// cities (`layout-defence`) the most held one (`Net2Plan::hold`), the nearest of those on a tie: the spare army is
-/// the reserve of the cities the map threatens, not of the nearest (pangaea 4261012 p0: 4 spare defenders 4–6 tiles
-/// off while the capital fell).
-fn reserve_city(view: &UnitView<'_, '_>, from: TileId) -> Option<TileId> {
-    let dims = view.local.view.dimensions();
-    let nearest = view.brief.nearest_city(dims, from)?.tile;
-    let level = |tile: TileId| hold_level_at(view.brief, tile);
-    let best = view.brief.cities.iter().map(|c| c.tile).max_by_key(|t| (level(*t), std::cmp::Reverse(dims.distance(*t, from).unwrap_or(i32::MAX)), std::cmp::Reverse(*t)));
-    match best {
-        Some(tile) if level(tile) > level(nearest) => Some(tile),
-        _ => Some(nearest),
-    }
+    let city = view.brief.nearest_city(dims, unit.tile)?;
+    Some(UnitTask::Defend { city: city.tile })
 }
 
 /// A hurt scout of a leader looking for a capital heals where it stands
@@ -1014,7 +1001,7 @@ mod tests {
     /// The class (lane `layout-defence`): a count of one city's garrison read from the empire's flat count
     /// (`garrison_wanted_by`) ignores what that city is to hold (`garrison_wanted_at`, `net2`'s hold), so the units
     /// the hold puts in a city are freed again by a reader that counts it flat. Every reader of the count outside this
-    /// file goes through `garrison_wanted_at`; here only `garrison_wanted_at` itself and the empire's one-scout rule
+    /// file goes through `garrison_wanted_at` (or `garrison_with`, the hold's own count); here only `garrison_wanted_at` itself and the empire's one-scout rule
     /// (no city in hand) read the flat count.
     #[test]
     fn every_garrison_count_reads_the_city() {

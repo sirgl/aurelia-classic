@@ -725,16 +725,17 @@ pub struct Net2Plan {
 }
 
 /// The hold of the cities (`weights::FRONT`, `weights::HOLD`): how many holders each city keeps beyond the empire's
-/// standing garrison, where the spare army stands, whose guards are upgraded first and the gold kept for the next of
-/// those upgrades. Read by the units' planner (`planner_units::garrison_wanted_at`, the reserve), the city planner
-/// (the garrison it builds), the upgrades (`combat::upgrade_orders`) and the allocator (the chest). Empty unless the
-/// seat plays `layout-defence` (`TurnBrief::layout_defence`).
+/// standing garrison, the gold kept from the other purchases while a city in the watch is short of them, and the rivals
+/// whose army at peace the watch counts whole. Read by the units' planner (`planner_units::garrison_wanted_at`), the
+/// city planner (the garrison it builds, the defenders it switches to: `planner_cities::hold_orders`), the allocator
+/// (the chest) and the next turn's watch (`whole`). Empty unless the seat plays `layout-defence`
+/// (`TurnBrief::layout_defence`).
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Hold {
     /// Per own city.
     pub cities: Vec<CityHold>,
-    /// Gold kept for the next upgrade of a held city's guard (the rules' price; `allocator::spend_gold` does not
-    /// spend it, the upgrade does).
+    /// Gold kept while a city in the watch is short of its holders: the rules' price of buying a defender there
+    /// (`allocator::spend_gold` does not spend it; `planner_cities::hold_orders` buys the defender).
     pub chest: u32,
     /// The rivals at peace whose army near our cities the defence counts whole, as an enemy's (`gate::STACK_WHOLE`):
     /// kept in the memory (`Memory2::whole`) and read by the next turn's watch (`TurnBrief::watch_whole`,
@@ -749,16 +750,11 @@ pub struct CityHold {
     pub tile: TileId,
     /// `weights::HOLD`, 0…1000.
     pub level: Milli,
-    /// The holders the city keeps beyond the empire's standing garrison (`gate::HOLD_ONE`, `gate::HOLD_TWO`).
+    /// The holders the city keeps beyond the empire's standing garrison (`gate::HOLD_ONE`, `HOLD_TWO`, `HOLD_THREE`).
     pub extra: u8,
 }
 
 impl Hold {
-    /// The level of the city on `tile` (0 without a reading).
-    pub fn level_at(&self, tile: TileId) -> Milli {
-        self.cities.iter().find(|c| c.tile == tile).map_or(0, |c| c.level)
-    }
-
     /// The holders beyond the standing garrison the city on `tile` keeps (0 without a reading).
     pub fn extra_at(&self, tile: TileId) -> usize {
         self.cities.iter().find(|c| c.tile == tile).map_or(0, |c| usize::from(c.extra))
