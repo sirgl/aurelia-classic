@@ -59,15 +59,16 @@ The results are in `work/nets/promote-net2/PROMOTE.md`.
 
 ## Candidate: science-flow (bench only, `experimental-ai`)
 
-`science-flow` is `standard` with four more neurons of `net2` (`net2/science.rs`, `weights::SCIENTISTS`, `AGREEMENT`,
-`SCIENCE_TILT`; `Net2Plan::science`). Every other variant keeps them off (`TurnBrief::science_flow`), so the hashes of
-`standard` and `pre-net2` do not move.
+`science-flow` is `standard` with two more neurons of `net2` (`net2/science.rs`, `weights::SCIENTISTS`, `AGREEMENT`;
+`Net2Plan::science`) and one more rival input (`r::CHEST_WAIT`, kept in `plan::ScienceMemory`). Every other variant keeps
+them off (`TurnBrief::science_flow`; the input is 0 and the memory writes no bytes), so the hashes of `standard` and
+`pre-net2` do not move.
 
 | neuron | output | executor that reads it |
 |---|---|---|
 | `SCIENTISTS` | the share of the science specialists' slots filled | `citizens::science_specialist_commands`: forced specialists, the city keeps `gate::SCIENTIST_FOOD` food a turn |
-| `AGREEMENT` (per rival) | the ties: a research agreement with this rival pays | `Net2Plan::denies_item` lifts the runaway's denial for the friendship and the agreement; `diplomacy` offers the ladder every round; the allocator keeps the agreements' gold (`Science::chest`) |
-| `SCIENCE_TILT` | the tilt of the allocator's beaker price | the driver multiplies `TurnBrief::prices`' science after `net2` thinks |
+| `AGREEMENT` (per rival) | the ties and the cadence of each (`science::cadence`: every round at 1000, `gate::LADDER_ROUNDS` at the gate) | `Net2Plan::denies_item` lifts the runaway's denial for the friendship and the agreement; `diplomacy::ladder_offers` offers the ladder at the tie's cadence; the allocator keeps the agreements' gold (`Science::chest`, the rules' cost: `deals::agreement_cost_of`) |
 
-The look, the measurements and the gates are in `work/nets/science-flow/SCIENCE-FLOW.md`. Diagnostic switch:
-`SCIENCE_FLOW_TRACE=<file>` writes the levers of each turn (it decides nothing).
+The chest is released by the net: `r::CHEST_WAIT` (the rounds the chest held a partner's gold unsigned, over
+`gate::CHEST_WAIT_ROUNDS`) lowers `AGREEMENT` until the rival is no tie. The look, the measurements and the gates are in
+`work/nets/science-flow/SCIENCE-FLOW.md`.

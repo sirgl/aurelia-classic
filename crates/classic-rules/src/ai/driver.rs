@@ -1026,10 +1026,6 @@ impl ClassicMind {
                 }
                 if let Some(p) = brief.prices.as_mut() {
                     p.city_cap = Some(plan.city_target);
-                    // `science-flow`: `net2`'s tilt of the beaker price (`weights::SCIENCE_TILT`) for the executors.
-                    if let Some(tilt) = brief.net2.as_ref().map(|n| n.science.beaker_tilt).filter(|t| *t != 0) {
-                        p.science = p.science * (1000 + tilt).max(0) / 1000;
-                    }
                 }
                 brief.tall_cities = Some(plan.city_target);
                 // `tall-real`'s tall play orders the science buildings first (`tall::BuildingOrder::Science`).

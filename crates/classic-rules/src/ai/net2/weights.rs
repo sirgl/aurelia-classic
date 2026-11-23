@@ -157,10 +157,14 @@ pub mod r {
     pub const ALONE: usize = 28;
     /// The city-states allied to it, / 3 (R31).
     pub const CS_HELD: usize = 29;
-    pub const N: usize = 30;
+    /// `science-flow`: the rounds our gold has waited for its research agreement unsigned, over
+    /// `gate::CHEST_WAIT_ROUNDS` (`science::read_waits`; 0 for every other variant).
+    pub const CHEST_WAIT: usize = 30;
+    pub const N: usize = 31;
     pub const NAMES: [&str; N] = [
         "near", "land", "sea", "soldiers", "seen_army", "open_cities", "tree", "lead", "pace", "culture", "stack", "warmonger", "betrayed", "denounced_us", "friend", "pact", "at_war",
         "war_rounds", "holds_capital", "holds_cities", "grab", "ally_hit", "local", "score", "retake_case", "captured_recent", "soft", "operating", "alone", "cs_held",
+        "chest_wait",
     ];
 }
 
@@ -670,9 +674,10 @@ pub const SCIENTISTS: Neuron = Neuron {
 };
 
 /// A research agreement with one rival pays our race (`Science::ties`): the friendship and the agreement with it are
-/// proposed and taken though it runs away (`Net2Plan::denies_item`), offered every round, and the gold they cost is kept
-/// (`Science::chest`). Why (the look): at the Modern era a seat met 3.45 majors and had 0.38 agreements; of its 1.55
-/// friends 1.17 had none: 0.36 our gold short (the allocator spent it; treasury 425 and +121 a turn at the Modern era),
+/// proposed and taken though it runs away (`Net2Plan::denies_item`), the ladder to it is offered at the level's cadence
+/// (`science::cadence`: every round at 1000, the diplomacy's own `PROPOSAL_INTERVAL` at the gate), and the gold it costs is
+/// kept (`Science::chest`) until the partner lets it wait too long (`r::CHEST_WAIT`). Why (the look): at the Modern
+/// era a seat met 3.45 majors and had 0.38 agreements; of its 1.55 friends 1.17 had none: 0.36 our gold short (the allocator spent it; treasury 425 and +121 a turn at the Modern era),
 /// 0.26 theirs, 0.58 nothing in the rules; and the runaway, whom `net2` denies every help (`gate::DENY_HELP`), is the
 /// partner with the most science (`net2-no-deals`, the denial off: 0.75 agreements at the Modern era, 1.06 at r300
 /// against 0.41, 42 science victories in 80 self-play games against 29). The rules pay min(both sciences over the deal)
@@ -692,25 +697,7 @@ pub const AGREEMENT: Neuron = Neuron {
         t(R(r::AT_WAR), -2000, "no deal in a war"),
         t(Q(q::RUNAWAY), -800, "the runaway wins with the beakers: a seat that does not race it gives it none (`gate::DENY_HELP`)"),
         ts(Q(q::RUNAWAY), Shape::Times(Y(y::AIM_SCIENCE)), 800, "a seat that races it gains as many beakers and shortens its lead in rounds: the denial lifts with the aim"),
-    ],
-};
-
-/// The tilt of the allocator's beaker price (`Science::beaker_tilt`; the driver multiplies `TurnBrief::prices`' science
-/// by 1000 + it, so the production ranks, the purchases and the focus read it). sf3 put it into the production head's
-/// multiplier (`price_tilt[pd::SCIENCE]`) instead: the head picks among the allocator's best orders only, and the lags
-/// below did not move (public school 80 rounds, research lab 40).
-/// Why (the look, science winners of 80 self-play games): from the technology to the building in every city a library
-/// took 55 rounds, a university 25, a public school 40, a research lab 35, while the Modern era lasted 55 and the
-/// Atomic 25; a human racing the ship builds each in the round it opens. The aim's row already tilts the price (+800 ×
-/// the aim's share × `PRICE_GAIN`); with the aim's share at 0.35 mid-game that is +140, beside the wonders' +400.
-pub const SCIENCE_TILT: Neuron = Neuron {
-    name: "science_tilt",
-    bias: 0,
-    why: "early the carried rows price the beaker: growth and cities come first (the full deviations grew 21 % fewer citizens)",
-    join: LINEAR,
-    terms: &[
-        ts(F(fe::PROGRESS), Shape::Above(400), 3000, "from 0.4 of the game (the Renaissance, r~135 of 330) the beakers are the race: 0.6 → +600, 0.8 → +1200"),
-        t(F(fe::AT_WAR), -400, "at war the hammers go to the army"),
+        t(R(r::CHEST_WAIT), -600, "a partner that let our gold wait this long does not sign (0.26 of the friends without an agreement lacked their own gold, which a few rounds of income bring): a level friend (740) frees the chest after 8 rounds, about three offers at its cadence; a sure tie (1000) after 17"),
     ],
 };
 
@@ -751,6 +738,10 @@ pub mod gate {
     pub const BLOCK: (Milli, &str) = (500, "the ballot goes against a rival only when it would win the vote");
     pub const SPACE_RESEARCH: (Milli, &str) = (500, "the research keeps to the ship's way when the science aim and the way gone say so more likely than not");
     pub const AGREEMENT: (Milli, &str) = (500, "a tie when the agreement pays more likely than not (`weights::AGREEMENT`)");
+    /// The rounds between two offers of a tie's ladder at the gate (`science::cadence`; 1 at a level of 1000).
+    pub const LADDER_ROUNDS: (u32, &str) = (5, "a tie at the gate asks no more often than any deal (`diplomacy::PROPOSAL_INTERVAL`); a sure one asks every round, so an agreement ended or a friendship made waits no interval for the next step (the look: 0.58 of a friend a turn without an agreement nothing in the rules blocked)");
+    /// The Standard rounds of an unsigned chest at which `r::CHEST_WAIT` is full (`science::read_waits`).
+    pub const CHEST_WAIT_ROUNDS: (u32, &str) = (20, "four proposal intervals: past them a partner's refusal is not its gold, which a few rounds of its income bring");
     /// Food a turn a city keeps when it takes a science specialist (`citizens::science_specialist_commands`).
     pub const SCIENTIST_FOOD: (i32, &str) = (2, "two food a turn: the city still grows, slower, and never starves for a slot");
     /// Ships escorting an `Overseas` order (`fleet::FLEET_SIZE`).

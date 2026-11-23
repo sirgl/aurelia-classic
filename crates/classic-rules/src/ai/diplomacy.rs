@@ -349,6 +349,21 @@ fn denounce_contained(obs: &AIObservation<'_>, rival: Option<PlayerId>) -> Vec<C
 /// Rounds between two rounds of proposals of one player.
 pub const PROPOSAL_INTERVAL: u32 = 5;
 
+/// `science-flow`: the steps of the ladder to a research agreement (embassies, friendship, the agreement) proposed to the
+/// ties (`Science::ties`) whose cadence falls in this round (`Tie::asks_in`, set by `net2`'s `weights::AGREEMENT`).
+/// Nothing without ties.
+pub fn ladder_offers(obs: &AIObservation<'_>, rules: &CompiledRuleset, agreements: Option<&Prices>, plan: &Net2Plan) -> Vec<Command> {
+    let asks = |to: PlayerId| plan.tie(to).is_some_and(|tie| tie.asks_in(obs.round, obs.player));
+    if !plan.science.ties.iter().any(|tie| asks(tie.rival)) {
+        return Vec::new();
+    }
+    let ladder = |item: &DealItem| matches!(item, DealItem::Embassy | DealItem::Friendship | DealItem::ResearchAgreement);
+    proposals_with(obs, rules, agreements, Some(plan))
+        .into_iter()
+        .filter(|c| matches!(c, Command::ProposeDeal { to, items, .. } if asks(*to) && items.iter().all(|(_, i)| ladder(i))))
+        .collect()
+}
+
 /// The diplomacy system's advisor (`ai::system`): answers every offer at
 /// the start of the turn; every PROPOSAL_INTERVAL rounds proposes deals and
 /// denounces warmongers. Wars with nations end by deals only (the rules
@@ -387,17 +402,10 @@ impl crate::ai::system::SystemAdvisor for DiplomacyAdvisor {
                 out.extend(crate::ai::combat::proposals(5, wanted.collect::<Vec<_>>()));
             }
         }
-        // `science-flow`: the ladder to an agreement with a rival of the science ties (embassies, friendship, the agreement)
-        // is offered in every round, not every fifth: an agreement ended or a friendship made waits no interval for the next
-        // step (`Net2Plan::ties_with`; the look: 0.58 of a friend a turn without an agreement nothing in the rules blocked).
+        // `science-flow`: the ladder to an agreement with a tie, between the seat's own rounds, at the tie's cadence.
         if !my_round {
-            if let Some(plan) = net2.filter(|p| !p.science.ties.is_empty()) {
-                let ladder = |item: &DealItem| matches!(item, DealItem::Embassy | DealItem::Friendship | DealItem::ResearchAgreement);
-                let deals: Vec<Command> = proposals_with(obs, input.rules, agreement_prices(input), net2)
-                    .into_iter()
-                    .filter(|c| matches!(c, Command::ProposeDeal { to, items, .. } if plan.ties_with(*to) && items.iter().all(|(_, i)| ladder(i))))
-                    .collect();
-                out.extend(crate::ai::combat::proposals(5, deals));
+            if let Some(plan) = net2 {
+                out.extend(crate::ai::combat::proposals(5, ladder_offers(obs, input.rules, agreement_prices(input), plan)));
             }
         }
         if my_round {

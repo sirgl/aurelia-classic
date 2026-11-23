@@ -135,6 +135,7 @@ impl RivalInputs {
             self.operating,
             self.alone,
             self.cs_held,
+            self.chest_wait,
         ]
     }
 }

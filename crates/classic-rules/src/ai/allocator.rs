@@ -128,6 +128,12 @@ struct TradeProspect {
 }
 
 impl Allocator {
+    /// The gold the purchases keep above the emergency reserve (`spend_gold`): the operations' upkeep, the war plan's
+    /// chest and `science-flow`'s agreements (`Science::chest`).
+    pub fn war_chest(&self) -> u32 {
+        self.war_chest
+    }
+
     pub fn new(obs: &AIObservation<'_>, brief: &TurnBrief, state: &AiState, rules: &CompiledRuleset) -> Self {
         // The turn's prices (from its start) unless the brief has none.
         let prices = brief.prices.unwrap_or_else(|| Prices::of(obs, rules, Default::default()));

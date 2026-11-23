@@ -457,7 +457,8 @@ impl Lcg {
 
 fn generated_rival(rng: &mut Lcg, id: u8) -> RivalInputs {
     let mut row = [0; super::weights::r::N];
-    for v in row.iter_mut() {
+    // `chest_wait` stays 0: only `science-flow` writes it (`science::read_waits`), and the turns before it keep their draws.
+    for v in row.iter_mut().take(super::weights::r::CHEST_WAIT) {
         *v = rng.milli();
     }
     let flags = [super::weights::r::LAND, super::weights::r::SEA, super::weights::r::FRIEND, super::weights::r::PACT, super::weights::r::AT_WAR, super::weights::r::HOLDS_CAPITAL, super::weights::r::ALLY_HIT, super::weights::r::RETAKE_CASE, super::weights::r::CAPTURED_RECENT, super::weights::r::DENOUNCED_US, super::weights::r::ALONE];
