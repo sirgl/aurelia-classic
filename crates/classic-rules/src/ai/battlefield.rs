@@ -513,7 +513,12 @@ impl FloodScratch {
             self.parent = vec![0; tiles];
             self.generation = 0;
         }
-        self.generation += 1;
+        // A stamp older than the generation counts as unset; after 2^32 searches the counter wraps
+        // and an old stamp could equal it again, so the tables are cleared and the count restarts.
+        self.generation = self.generation.checked_add(1).unwrap_or_else(|| {
+            self.stamp.fill(0);
+            1
+        });
         self.touched.clear();
     }
 

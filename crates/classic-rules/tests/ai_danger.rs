@@ -266,10 +266,13 @@ fn the_theatre_tiles_and_the_reach_equal_a_plain_reconstruction() {
             assert_eq!(info.own_city, own_cities.contains(tile));
         }
         assert!(!field.targets.is_empty());
+        let mut longest = 0;
         for (index, target) in field.targets.iter().enumerate() {
             let reach: Vec<(TileId, u32, TileId)> = field.reach[index].nodes().iter().map(|n: &ReachNode| (n.tile, n.left, n.parent)).collect();
+            longest = longest.max(reach.len());
             assert_eq!(reach, plain_reach(&obs.view, &field, index), "the reach of the target at {:?}", target.tile);
         }
+        assert!(longest > 1, "a reach that spreads over several tiles, not only the target's own ({longest})");
     }
 }
 
