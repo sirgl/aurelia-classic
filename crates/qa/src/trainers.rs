@@ -361,6 +361,10 @@ fn play_on<P: kernel::ai::mind::AiMind<Classic>>(rules: &CompiledRuleset, mut ga
             assault::keep_war(rules, &mut game, &scene);
             if active == scene.learner && scripted_mine != Some(now) && !game.is_over() {
                 scripted_mine = Some(now);
+                // The memory's persistence guard: save and load here (the game, and the net's memory beside it).
+                if let Some(at) = crate::army_net::seat::save_at().filter(|a| now.saturating_sub(round0) == a.round && matches!(seat, Seat::Net | Seat::Script(_))) {
+                    game = crate::army_net::seat::save_and_load(rules, &game, &orders, &mut scene, &at)?;
+                }
                 match &seat {
                     Seat::Mind(_) => {}
                     Seat::Script(name) => {

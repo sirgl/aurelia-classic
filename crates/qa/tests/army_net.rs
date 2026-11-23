@@ -40,3 +40,103 @@ fn a_probe_of_the_staged_assault_labels_what_the_reference_plays() {
         assert!(probed.len() * 4 >= taught.len() * 3, "{expert}: the probe holds {} of the {} decisions (the rest are the seat mind's)", probed.len(), taught.len());
     }
 }
+
+/// Variant M's weights, random (a fixed LCG), in the export format (`army/export.py`): the test needs a net whose
+/// memory moves its play, not a good one.
+fn random_m_weights(seed: u64) -> Vec<u8> {
+    let (d, heads, layers, ff, f_tok, f_act, promos, dmax) = (64usize, 4usize, 3usize, 128usize, 48usize, 40usize, 400usize, 15usize);
+    let mut shapes: Vec<(String, Vec<usize>, &str)> = Vec::new();
+    let dense = |name: &str, i: usize, o: usize, v: &mut Vec<(String, Vec<usize>, &str)>| {
+        v.push((format!("{name}.weight"), vec![i, o], "w"));
+        v.push((format!("{name}.bias"), vec![o], "b"));
+    };
+    for (n, i, o) in [("e1", f_tok, d), ("e2", d, d), ("pointer", d, 1), ("end", d, 1), ("c1", f_act, d), ("c2", d, d), ("s1", 4 * d, d), ("s2", d, 1), ("v1", d, d), ("v2", d, 2), ("um", 16, d), ("pq", d, d), ("pk", d, d)] {
+        dense(n, i, o, &mut shapes);
+    }
+    for l in 0..layers {
+        for (n, i, o) in [("q", d, d), ("k", d, d), ("v", d, d), ("o", d, d), ("f1", d, ff), ("f2", ff, d)] {
+            dense(&format!("layers.{l}.{n}"), i, o, &mut shapes);
+        }
+        for n in ["norm1", "norm2"] {
+            shapes.push((format!("layers.{l}.{n}.weight"), vec![d], "one"));
+            shapes.push((format!("layers.{l}.{n}.bias"), vec![d], "b"));
+        }
+        shapes.push((format!("layers.{l}.dist_bias"), vec![heads, dmax + 1], "b"));
+    }
+    shapes.push(("norm.weight".into(), vec![d], "one"));
+    shapes.push(("norm.bias".into(), vec![d], "b"));
+    shapes.push(("promo".into(), vec![promos + 1, d], "w"));
+    shapes.push(("plan0".into(), vec![4, d], "w"));
+    shapes.push(("plan_bias".into(), vec![layers, heads], "b"));
+    for (n, i, o) in [("gu", d + f_tok, 16), ("gp", d + f_tok, d)] {
+        shapes.push((format!("{n}_wx"), vec![i, 3 * o], "w"));
+        shapes.push((format!("{n}_bx"), vec![3 * o], "b"));
+        shapes.push((format!("{n}_wh"), vec![o, 3 * o], "w"));
+        shapes.push((format!("{n}_bh"), vec![3 * o], "b"));
+    }
+    shapes.push(("hyst".into(), vec![4, 3], "hyst"));
+    let mut state = seed;
+    let mut next = || {
+        state = state.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        ((state >> 33) as f32 / (1u64 << 31) as f32) * 2.0 - 1.0
+    };
+    let mut data: Vec<f32> = Vec::new();
+    let mut tensors = Vec::new();
+    for (name, shape, kind) in &shapes {
+        let n: usize = shape.iter().product();
+        tensors.push(serde_json::json!({"name": name, "shape": shape, "offset": data.len()}));
+        // The memory's way into the tokens strong, so that it moves the play.
+        let scale = if name.starts_with("um.") || name.starts_with("gu_") { 4.0 } else { 1.0 } / (shape[0] as f32).sqrt();
+        for k in 0..n {
+            data.push(match *kind {
+                "w" => next() * scale,
+                "one" => 1.0,
+                "hyst" => [0.15, 20.0, 10.0][k % 3],
+                _ => next() * 0.1,
+            });
+        }
+    }
+    let head = serde_json::to_vec(&serde_json::json!({"config": {"d": d, "heads": heads, "layers": layers, "ff": ff, "f_tok": f_tok, "f_act": f_act, "promos": promos, "dmax": dmax}, "tensors": tensors})).expect("json");
+    let mut out = Vec::new();
+    out.extend_from_slice(&u32::from_le_bytes(*b"ARMW").to_le_bytes());
+    out.extend_from_slice(&(head.len() as u32).to_le_bytes());
+    out.extend_from_slice(&head);
+    for x in data {
+        out.extend_from_slice(&x.to_le_bytes());
+    }
+    out
+}
+
+/// Variant M's memory survives a save and load in the middle of a siege: the game through the save format, the
+/// memory through its sidecar beside the save (keyed by the game's id). The play is then the same as without the
+/// save; without the sidecar it is not (the memory moves the play), and the reference's play does not change.
+#[test]
+fn the_army_nets_memory_survives_a_save_and_load_mid_siege() {
+    use aurelia_qa::army_net::{model::Net, seat};
+    let rules = ClassicBench::rules();
+    let era = lab::era_index(&rules, "classical").expect("the classical era");
+    let net = Net::from_bytes(&random_m_weights(7)).expect("the random M net loads");
+    assert!(net.has_memory());
+    seat::install_net(net);
+    let dir = std::env::temp_dir().join(format!("army-net-save-{}", std::process::id()));
+    let mut differs_without = 0;
+    for instance in 0..4 {
+        let (game, scene) = families::build(&rules, Fam::PlannedAssault, era, instance, 0).expect("the scene builds");
+        let run = |player: &str, at: Option<seat::SaveAt>| {
+            seat::set_save_at(at);
+            let row = play(&rules, game.clone(), scene.clone(), player, true).expect("the scene plays");
+            seat::set_save_at(None);
+            (row.win, row.rounds, row.trace)
+        };
+        let at = |sidecar| Some(seat::SaveAt { round: 3, dir: dir.clone(), sidecar });
+        assert_eq!(run("ref-planned", at(true)), run("ref-planned", None), "#{instance}: the save format keeps the scene (the reference plays the same)");
+        let plain = run("army-net", None);
+        assert!(plain.1 > 3, "#{instance}: the play lasts past the save");
+        assert_eq!(run("army-net", at(true)), plain, "#{instance}: with the sidecar the net plays as without the save");
+        if run("army-net", at(false)) != plain {
+            differs_without += 1;
+        }
+    }
+    let _ = std::fs::remove_dir_all(&dir);
+    assert!(differs_without > 0, "without the sidecar the memory starts fresh and the play changes (in some scene)");
+}

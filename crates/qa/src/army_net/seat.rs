@@ -80,6 +80,111 @@ pub fn teacher_state(game: &GameState, scene: &Scene, orders: &Orders, track: &c
     [i16::from(track.engaged), track.waited.min(i16::MAX as u32) as i16, stage, mask as i16]
 }
 
+/// The net for this process (a test: weights made in the test), when none is loaded yet.
+pub fn install_net(net: Net) -> bool {
+    NET.set(Ok(net)).is_ok()
+}
+
+/// Save and load in the middle of a play (the guard of the memory's persistence, `tests/army_net.rs`): at the
+/// learner's turn of this round (relative), the game goes through the save format, and the net's memory through
+/// its sidecar file beside the save (`sidecar`: false = the sidecar is not written, the memory starts fresh).
+#[derive(Debug, Clone)]
+pub struct SaveAt {
+    pub round: u32,
+    pub dir: std::path::PathBuf,
+    pub sidecar: bool,
+}
+
+thread_local! {
+    static SAVE_AT: std::cell::RefCell<Option<SaveAt>> = const { std::cell::RefCell::new(None) };
+}
+
+pub fn set_save_at(at: Option<SaveAt>) {
+    SAVE_AT.with(|s| *s.borrow_mut() = at);
+}
+
+pub fn save_at() -> Option<SaveAt> {
+    SAVE_AT.with(|s| s.borrow().clone())
+}
+
+const SIDECAR_MAGIC: u32 = u32::from_le_bytes(*b"ARMM");
+const SIDECAR_VERSION: u32 = 1;
+
+/// The memory of this thread's play as the sidecar of a save keyed by the game's id (until the net moves into the
+/// AI and the memory into the save body, as net2's): `"ARMM" u32 | version u32 | id_len u32 | id | u, p, alive (f32)`.
+pub fn memory_sidecar(id: &str) -> Option<Vec<u8>> {
+    MEMORY.with(|m| {
+        let m = m.borrow();
+        let st = &m.as_ref()?.state;
+        let mut out = Vec::new();
+        for v in [SIDECAR_MAGIC, SIDECAR_VERSION, id.len() as u32] {
+            out.extend_from_slice(&v.to_le_bytes());
+        }
+        out.extend_from_slice(id.as_bytes());
+        for x in st.u.iter().chain(&st.p).chain(&st.alive) {
+            out.extend_from_slice(&x.to_le_bytes());
+        }
+        Some(out)
+    })
+}
+
+/// The memory from a sidecar: false (and the memory starts fresh) when it is not this game's or does not decode.
+pub fn restore_memory(id: &str, bytes: &[u8], orders: &Orders, scene: &Scene) -> bool {
+    let Ok(net) = net() else { return false };
+    let Some(mut state) = net.initial_memory() else { return false };
+    let u32_at = |i: usize| bytes.get(i..i + 4).map(|b| u32::from_le_bytes([b[0], b[1], b[2], b[3]]));
+    let ok = (|| {
+        if u32_at(0)? != SIDECAR_MAGIC || u32_at(4)? != SIDECAR_VERSION {
+            return None;
+        }
+        let n = u32_at(8)? as usize;
+        if bytes.get(12..12 + n)? != id.as_bytes() {
+            return None;
+        }
+        let floats: Vec<f32> = bytes.get(12 + n..)?.chunks_exact(4).map(|b| f32::from_le_bytes([b[0], b[1], b[2], b[3]])).collect();
+        let (nu, np) = (state.u.len(), state.p.len());
+        if floats.len() != nu + np + super::model::SLOTS {
+            return None;
+        }
+        state.u.copy_from_slice(&floats[..nu]);
+        state.p.copy_from_slice(&floats[nu..nu + np]);
+        state.alive.copy_from_slice(&floats[nu + np..]);
+        Some(())
+    })()
+    .is_some();
+    MEMORY.with(|m| *m.borrow_mut() = net.initial_memory().map(|fresh| MemoryRun { orders: orders.clone(), scene: scene.clone(), state: if ok { state.clone() } else { fresh } }));
+    ok
+}
+
+/// `SaveAt`: the game written in the save format and read back, the memory through its sidecar (or lost).
+pub fn save_and_load(rules: &CompiledRuleset, game: &GameState, orders: &Orders, scene: &mut Scene, at: &SaveAt) -> Result<GameState, String> {
+    let id = format!("{}-{}-{}-{}", scene.fam.name(), scene.era, scene.instance, scene.attempt);
+    std::fs::create_dir_all(&at.dir).map_err(|e| e.to_string())?;
+    let save = at.dir.join(format!("{id}.aurelia"));
+    let side = at.dir.join(format!("{id}.aurelia.army-memory"));
+    std::fs::write(&save, classic_rules::save_codec::to_bytes(&classic_rules::persistence::encode::encode(game, rules))).map_err(|e| e.to_string())?;
+    let _ = std::fs::remove_file(&side);
+    if at.sidecar {
+        if let Some(bytes) = memory_sidecar(&id) {
+            std::fs::write(&side, bytes).map_err(|e| e.to_string())?;
+        }
+    }
+    // A new process: nothing of the play in memory.
+    MEMORY.with(|m| *m.borrow_mut() = None);
+    let bytes = std::fs::read(&save).map_err(|e| e.to_string())?;
+    let loaded = classic_rules::persistence::decode::decode(&classic_rules::save_codec::from_bytes(&bytes).map_err(|e| format!("{e:?}"))?, rules).map_err(|e| format!("{e:?}"))?;
+    // A load gives the units new handles: the scene's pieces are found again by their entity ids.
+    let auth = loaded.view().auth;
+    for p in scene.mine.iter_mut().chain(scene.theirs.iter_mut()) {
+        if let Some((h, _)) = auth.units().iter_handles().find(|(_, c)| c.id == p.id) {
+            p.h = h;
+        }
+    }
+    let side_bytes = std::fs::read(&side).unwrap_or_default();
+    restore_memory(&id, &side_bytes, orders, scene);
+    Ok(loaded)
+}
+
 /// Our turn ends (before the end-of-turn command runs): variant M's memory takes this moment, and in a DAgger
 /// play the moment is recorded as an unlabelled memory state with the expert's state then.
 pub fn turn_end(game: &GameState, rules: &CompiledRuleset) {
