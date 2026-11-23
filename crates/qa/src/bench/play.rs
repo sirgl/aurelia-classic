@@ -388,6 +388,15 @@ impl MatchResult {
 /// suite's order whatever the threads did. Failed matches are reported by
 /// label.
 pub fn tournament<R: BenchRules>(suite: &Suite, matches: &[Match], pairing: &Pairing, jobs: usize) -> Result<Vec<MatchResult>, Vec<String>> {
+    let only = std::env::var(MATCH_FILTER_ENV).ok().filter(|t| !t.is_empty());
+    let kept: Vec<Match>;
+    let matches = match &only {
+        Some(text) => {
+            kept = matches.iter().copied().filter(|m| m.label().contains(text.as_str())).collect();
+            &kept[..]
+        }
+        None => matches,
+    };
     let next = AtomicUsize::new(0);
     let results: Mutex<Vec<Option<Result<MatchResult, String>>>> = Mutex::new(vec![None; matches.len()]);
     std::thread::scope(|scope| {
@@ -429,6 +438,7 @@ pub fn play_match<R: BenchRules>(rules: &CompiledRuleset<R::M>, suite: &Suite, g
     driver.record_journal();
     let mut log = MatchLog::new(&seats, R::OPENING_ROUNDS);
     log.landless = landless;
+    log.capital_trace = std::env::var_os(CAPITAL_TRACE_ENV).map(|_| label.clone());
     if crate::bench::rival::enabled() {
         log.probe = Some(crate::bench::rival::RivalProbe::new(&seats));
     }
@@ -580,7 +590,18 @@ struct MatchLog {
     probe: Option<crate::bench::rival::RivalProbe>,
     /// The landless seat (`--landless-seat`): its player and its log.
     landless: Option<(PlayerId, crate::bench::landless::LandlessGame)>,
+    /// The match's label when `AURELIA_CAPITAL_TRACE` is set: every capture of an original capital is written to
+    /// stderr (`CAPITAL <label> ...`), so a lost capital can be found and its game played again alone
+    /// (`AURELIA_BENCH_MATCH`).
+    capital_trace: Option<String>,
 }
+
+/// Dev-only: `AURELIA_BENCH_MATCH=<text>` plays only the matches whose label (`Match::label`, e.g.
+/// `fractal/small/seed 1853017/odd`) contains the text: one game of a suite again, with its traces.
+pub const MATCH_FILTER_ENV: &str = "AURELIA_BENCH_MATCH";
+
+/// Dev-only: `AURELIA_CAPITAL_TRACE` (any value) writes every capture of an original capital to stderr.
+pub const CAPITAL_TRACE_ENV: &str = "AURELIA_CAPITAL_TRACE";
 
 impl MatchLog {
     fn new(seats: &[(PlayerId, Side)], opening: u32) -> Self {
@@ -608,7 +629,7 @@ impl MatchLog {
                 pace: Pace::default(),
             })
             .collect();
-        Self { seats, round_ms: Vec::new(), wars: Vec::new(), start_techs: Vec::new(), probe: None, landless: None }
+        Self { seats, round_ms: Vec::new(), wars: Vec::new(), start_techs: Vec::new(), probe: None, landless: None, capital_trace: None }
     }
 
     fn seat(&mut self, player: PlayerId) -> Option<&mut SeatResult> {
@@ -740,6 +761,13 @@ impl MatchLog {
         self.record(from, |r| r.cities_lost += 1);
         let capital = game.view().auth.cities().get(city).is_some_and(|c| c.original_capital && c.original_owner == from);
         if capital {
+            if let Some(label) = &self.capital_trace {
+                let side = |p: PlayerId| self.seats.iter().find(|s| s.player == p).map_or("other", |s| if s.side == Side::Candidate { "candidate" } else { "baseline" });
+                let war = self.wars.iter().find(|w| w.between(from, to)).map(|w| format!("declared by {} in round {}", w.declarer.0, w.since));
+                let size = game.view().auth.cities().get(city).map_or(0, |c| c.population);
+                let left = game.view().auth.cities().iter().filter(|(_, c)| c.owner == from).count();
+                eprintln!("CAPITAL {label} round {now} lost by {} ({}) to {} ({}) size {size} cities left {left} war {}", from.0, side(from), to.0, side(to), war.as_deref().unwrap_or("none"));
+            }
             self.record(from, |r| r.capitals_lost += 1);
             self.record(to, |r| {
                 r.capital_taken.get_or_insert(now);
