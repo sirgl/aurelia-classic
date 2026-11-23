@@ -4,6 +4,13 @@ You are Claude Code on the Apple M5 Max that ran stage 1 (`docs/m5/PROMPT.md`). 
 runs by itself, unattended, and ends with a report pushed as one new branch. Read this whole file first, then work through
 the numbered steps. You are the only agent on this machine for this job.
 
+**The machine is free only overnight: everything, the push included, ends by 08:00 local time.** The campaign enforces
+it: `deadline = "08:00"` in `tools/m5/campaign2.toml` (fixed at the first `start` in `lab/runs/campaign2/deadline.json`);
+it starts no job whose estimate would end after 07:15 and records such a job, with the rest of its chain, as
+`skipped_deadline`. The queue is ordered by value, so what is cut is the least important: the MBf recipe, then the MLX
+speed step, then seeds 21-23, then d 192, then seeds 24-25, then d 256. Overnight you will get the recipe, the speed
+table and one to three seeds; the wide nets most likely not. That is the expected result, not a failure.
+
 ## Why stage 2
 
 Stage 1 trained the MB net **from scratch** on the teacher recordings. It reached hold accuracy 0.68-0.69 and 2-5 of 13 quick
@@ -15,7 +22,7 @@ the recipe that worked and then measures it properly:
 |---|---|---|
 | 1 | The MBf recipe once: A0 -> M0 (memory), B -> B1 (map encoder), MBf = M0's trunk + memory + B1's encoder with zero projections, imitation only, no DAgger; quick eval, 32-family tables, memory-zeroed ablation; compare with the M4 | `docs/army-net/M-HANDOFF.md`, section "B-line restart" |
 | 2 | MLX speed: pinned vs newest MLX x f32 / TF32 / bf16 mixed precision, 200 steps each | below |
-| 3 | 5 seeds at the best stage-1 ladder size, MBf recipe, 4 epochs of MBf; full tables, memory-zeroed ablation, intervals | below |
+| 3 | Seeds 21-25 at the best stage-1 ladder size (as many as fit by the deadline), MBf recipe, 2 epochs of MBf; quick, quick memory-zeroed, full table, intervals | below |
 | 4 | Wider nets d 192 and d 256 (3 layers), MBf recipe, from scratch (the kit has no growth script) | below |
 | 5 | Report `docs/m5/STAGE2-RESULTS.md` + results, pushed as the new branch `exp/m5-stage2-result` | below |
 
@@ -49,6 +56,7 @@ M4's M0 for orientation: assault-heal 71 %, planned-assault 15 %.
 ```sh
 cd ~/aurelia-lab/classic
 tools/m5/campaign.sh status                        # stage 1 must say "finished"; if it is still running, wait (poll every 10 min), do not start stage 2 beside it
+date +%H:%M                                        # if stage 1 finished after 06:00, do not start stage 2: write "stage 1 ended too late for stage 2" into lab/STATUS2.md and stop
 git diff tools/m5/env.sh > lab/env-local.diff      # your local env.sh change (MLX_ENABLE_TF32=0); the branch now carries it
 git checkout -- tools/m5/env.sh                    # (a file of this clone only)
 git stash list | head -2; git status --short       # campaign.toml may stay modified (the stage-1 auto-tune); that is fine
@@ -71,7 +79,8 @@ tools/m5/campaign2.sh plan | tee lab/logs/plan2.txt | tail -4
 ```
 It reads stage 1's `lab/runs/campaign/results.jsonl`: the best ladder size (the `pick` line), the calibration (`sec_per_epoch`, quick-eval time),
 and prints every job with its estimated minutes, then the total and its parts (hours). If it says `stage 1 found: False`, stage 1 did not finish: stop and write that into `lab/STATUS2.md`.
-Copy the total into `lab/STATUS2.md` as "estimate at the start". The campaign prints it again as its `estimate` job and refines it after the speed step. If the estimate is above 30 h, cut in `tools/m5/campaign2.toml`: step 3 `seeds` to 3 entries, and say so in the report.
+Every line shows when the job would end; the jobs past the deadline say `past the deadline: skipped`. Copy the last
+lines into `lab/STATUS2.md` as "estimate at the start" (which jobs fit). Do not edit the order or the deadline.
 
 ## Step 2. Run stage 2 (hours)
 
@@ -90,11 +99,16 @@ The queue (all through the broker; resumable: finished jobs are skipped, a train
    bf16 = `train_m --bf16` (`nn/aurelia_nn/army/mixed.py`: matmuls and the map convolutions in bfloat16; weights, optimizer, memory state and its GRUs, softmax, losses in float32).
    `speed-pick` compares each with the reference (pinned, f32): decisions/s over steps 101-200, the late training loss (a combination is correct when it is within 3 % of the reference and its held-out joint accuracy within 0.01), the worst point of the loss curve; keeps the fastest correct one when it is at least 5 % faster, else the reference.
    It writes `lab/runs/campaign2/speed.json` and prints the choice. **Every later training of stage 2 (M0, MBf of steps 3 and 4) uses that choice.** If the newest MLX does not install or the code does not import on it, the `new-*` rows say "skipped" with the reason: report it.
-4. **Step 3 of the table, seeds**: at the best stage-1 size (d, layers from stage 1's `pick`), seeds 21-25: A0, M0, init-MB, MBf (4 epochs), quick, quick memory-zeroed, full, full memory-zeroed. The encoder B1 is shared by the seeds (`seed_encoders = false`); the intervals therefore do not include the encoder's variance: write that in the report. (`seed_encoders = true` retrains B and B1 per seed, about +1 h each.)
-5. **Step 4 of the table, wider nets**: d 192 and d 256, 3 layers, seeds 31 / 32, the full chain at that width, from scratch (A0 at that width, M0 from it, init-MB with the shared B1 encoder), MBf 4 epochs, the same evals. The kit has no function-preserving growth script: say "from scratch" in the report.
+4. **Step 3 of the table, seeds**: at the best stage-1 size (d, layers from stage 1's `pick`), seeds 21-23 first: A0, M0, init-MB, MBf (2 epochs), quick, quick memory-zeroed, full. The encoder B1 is shared by the seeds (`seed_encoders = false`); the intervals therefore do not include the encoder's variance: write that in the report. (`seed_encoders = true` retrains B and B1 per seed, about +1 h each.)
+5. **Step 4 of the table, wider nets** (d 192 after seed 23, d 256 last; seeds 24-25 between them): d 192 and d 256, 3 layers, seeds 31 / 32, the full chain at that width, from scratch (A0 at that width, M0 from it, init-MB with the shared B1 encoder), MBf 4 epochs, the same evals. The kit has no function-preserving growth script: say "from scratch" in the report.
 6. `summary` -> `lab/runs/campaign2/summary.md` (speed table, step-1 table against the M4, seed table with mean and 95 % interval, wide table).
 
 **Status file.** Every hour (the loop of step 0) and at every job end: elapsed hours, jobs done / total, the current job, the estimate left, free disk, `tools/res/res status`, the last 3 lines of `lab/runs/campaign2/results.jsonl`, any failure. Check the campaign at least every 30-60 minutes: is the PID alive (`lab/logs/campaign2.pid`), is a job stuck (no new line in `lab/logs/*.log` for 20 min), is the disk above 25 GB, any `thermal` line in `res status`.
+**The deadline, by hand.** The estimates are +-40 %. At 07:15, if the campaign is still running a job, run
+`tools/m5/campaign2.sh stop`; if that job is still running at 07:25, kill its training PID (the one in `tools/res/res status`,
+started by this campaign) and record it in the report as cut. Then `python3 tools/m5/campaign2.py summary` and go to the
+report (step 4) and the push (step 5): the push must be done by 08:00. If you are short of time, push the summary and a
+short report rather than nothing.
 **Crash or reboot.** Run `tools/m5/campaign2.sh start` again. If the whole campaign dies three times in a row for the same reason, stop and report. Do not edit the code to make a job pass. If the bf16 job fails with an error in `mixed.py` or the model, that is a finding: the combination is `failed_final` and the speed step keeps the best of the others.
 
 ## Step 3. Check the results while they come (do not skip)
@@ -104,7 +118,7 @@ After step 1 of the queue (the MBf recipe) finishes, read `lab/runs/campaign2/su
 
 ## Step 4. The report `docs/m5/STAGE2-RESULTS.md` (English)
 
-Sections: 1. Machine and versions (chip, cores, RAM, macOS, MLX pinned / newest, from `versions.json`). 2. The MBf recipe on the M5 against the M4 (the step-1 table; M0, init-MB, MBf; memory ablation; the function-preserving check line; mem-norms). 3. MLX speed: the six-row table with decisions/s, loss difference to f32, the choice and why (and the time of the whole stage that it saved or not). 4. Seeds: the table, mean +- 95 % interval, the full per-family table of one seed, the memory-zeroed gap, the caveat about the shared encoder. 5. Wider nets: the table against the best size. 6. Stage 1's from-scratch ladder as a **lower bound** (one paragraph with its numbers from `lab/runs/campaign/summary.md`). 7. Duration: estimated at the start, after the speed step, actual. 8. Problems, deviations from this prompt, every failed job with its log lines.
+Sections: 1. Machine and versions (chip, cores, RAM, macOS, MLX pinned / newest, from `versions.json`). 2. The MBf recipe on the M5 against the M4 (the step-1 table; M0, init-MB, MBf; memory ablation; the function-preserving check line; mem-norms). 3. MLX speed: the six-row table with decisions/s, loss difference to f32, the choice and why (and the time of the whole stage that it saved or not). 4. Seeds: the table, mean +- 95 % interval, the full per-family table of one seed, the memory-zeroed gap, the caveat about the shared encoder. 5. Wider nets: the table against the best size. 6. Stage 1's from-scratch ladder as a **lower bound** (one paragraph with its numbers from `lab/runs/campaign/summary.md`). 7. Duration: estimated at the start, after the speed step, actual; the jobs cut by the deadline (the last section of `summary.md`). 8. Problems, deviations from this prompt, every failed job with its log lines.
 Plain statements, numbers from the files, no guesses; mark what you did not verify.
 
 ## Step 5. Push the one new branch

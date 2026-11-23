@@ -10,6 +10,12 @@ chunk_min = 0             # 0: use campaign.toml's [train] chunk_min
 quick_hold_to = 100       # held-out instances 80..hold_to-1
 full_hold_to = 100
 stage1_results = "runs/campaign/results.jsonl"   # relative to the lab dir: where "the best ladder size" is read from
+# The M5 is free only overnight (Roman, 23 Nov 2026: «до утра только»). The campaign starts no job whose estimate does
+# not end before deadline - report_min; such a job and every later job of its chain are recorded "skipped_deadline".
+# deadline is a local clock time: the next one after the first `start` (kept in lab/runs/campaign2/deadline.json, so a
+# restart keeps it). The env var M5_DEADLINE (HH:MM) overrides it at the first start.
+deadline = "08:00"
+report_min = 45           # left for the summary, the report and the push
 
 # The MBf recipe (the M4 lab's "B-line restart", docs/army-net/M-HANDOFF.md): A0 -> M0 (memory, imitation only),
 # B -> B1 (map encoder, imitation only), init = M0's trunk + memory + B1's encoder with zero projections, MBf.
@@ -38,7 +44,8 @@ min_gain = 0.05           # a faster combination is taken only when it is at lea
 
 [step3]                   # paper-grade seeds at the best stage-1 ladder size, the MBf recipe
 seeds = [21, 22, 23, 24, 25]
-mbf_epochs = 4
+mbf_epochs = 2            # overnight: 2 epochs as in step 1 and the M4's MBf (was 4)
+evals = ["quick", "quickzero", "full"]   # overnight: the memory-zeroed run on the quick set only (fullzero costs ~30 min a seed)
 seed_encoders = false     # true: B and B1 are retrained per seed (about +1 h each on the M5); false: one B1 shared
 
 [step4]                   # wider nets, the MBf recipe from scratch at each width (the kit has no growth script)

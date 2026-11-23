@@ -8,6 +8,9 @@ Order: (1) the MBf recipe once at d 64 / 3 layers (A0 -> M0, B -> B1, init, MBf,
 (2) MLX speed: pinned vs newest MLX x f32 / TF32 / bf16 mixed, 200 steps each, (3) 5 seeds at the best stage-1 ladder
 size with the MBf recipe, (4) d 192 and d 256, (5) summary. Every finished job appends a line to
 lab/runs/campaign2/results.jsonl; a job with an "ok" line is skipped after a crash or a reboot.
+The machine is free only overnight: [stage2] deadline (local HH:MM) - report_min bounds every job's estimated end; a job
+that does not fit is recorded "skipped_deadline" with the rest of its chain, and the queue is ordered by value (seeds 21-23,
+then the first wide net, then the other seeds, then the other wide nets).
 """
 from __future__ import annotations
 
@@ -112,16 +115,18 @@ class Stage2(Campaign):
             for prec in PRECISIONS:
                 jobs.append({"job": f"speed:{venv}-{prec}", "kind": "speed", "venv": venv, "prec": prec})
         jobs.append({"job": "speed-pick", "kind": "speed-pick"})
-        # (3) seeds at the best stage-1 size
+        # (3) seeds at the best stage-1 size, (4) wider nets; ordered by value for an overnight run: the first three
+        # seeds (the least for an interval), then the first wide net, then the other seeds, then the other wide nets
         b = self.best()
+        seed_chains = []
         for seed in s3["seeds"]:
             enc = f"enc-s{seed}" if s3["seed_encoders"] else "enc"
-            if s3["seed_encoders"]:
-                jobs += self.encoder(enc, seed)
-            jobs += self.chain(f"s3-d{b['d']}-l{b['layers']}-s{seed}", b["d"], b["layers"], seed, s3["mbf_epochs"], "seeds", enc)
-        # (4) wider nets
-        for w in s4["wide"]:
-            jobs += self.chain(f"w-d{w['d']}-l{w['layers']}", w["d"], w["layers"], w["seed"], s4["mbf_epochs"], "wide", "enc")
+            ch = self.encoder(enc, seed) if s3["seed_encoders"] else []
+            seed_chains.append(ch + self.chain(f"s3-d{b['d']}-l{b['layers']}-s{seed}", b["d"], b["layers"], seed, s3["mbf_epochs"], "seeds", enc,
+                                                 evals=tuple(s3.get("evals", ("quick", "full", "fullzero")))))
+        wide_chains = [self.chain(f"w-d{w['d']}-l{w['layers']}", w["d"], w["layers"], w["seed"], s4["mbf_epochs"], "wide", "enc") for w in s4["wide"]]
+        for ch in seed_chains[:3] + wide_chains[:1] + seed_chains[3:] + wide_chains[1:]:
+            jobs += ch
         jobs.append({"job": "summary", "kind": "summary"})
         return jobs
 
@@ -451,10 +456,36 @@ class Stage2(Campaign):
                 row = [(t or {}).get("params"), (t or {}).get("hold_acc_both"), (q or {}).get("families_90"), (f or {}).get("families_90"), (f or {}).get("siege8_mean"),
                        self.win(q, "assault-heal"), (fz or {}).get("families_90"), (q or {}).get("ms_per_turn"), (t or {}).get("dps")]
                 L.append(f"| {n} | " + " | ".join("" if x is None else str(x) for x in row) + " |")
+        cut = [r for r in self.results() if r.get("status") == "skipped_deadline"]
+        if cut:
+            groups: dict = {}
+            for r in cut:
+                groups.setdefault(r.get("group") or r["kind"], []).append(r["job"])
+            L += ["", f"## Not run: the overnight deadline ({len(cut)} jobs)", ""]
+            L += [f"- {g}: {', '.join(v)}" for g, v in groups.items()]
+        out["skipped_deadline"] = [r["job"] for r in cut]
         self.dir.mkdir(parents=True, exist_ok=True)
         (self.dir / "summary.md").write_text("\n".join(L) + "\n")
         print("\n".join(L))
         return out
+
+    # ---- the overnight limit -------------------------------------------------------------------------
+    def deadline(self, write: bool = True) -> float:
+        """Epoch seconds of the deadline: fixed at the first start (deadline.json), so a restart keeps it."""
+        p = self.dir / "deadline.json"
+        if p.exists():
+            return float(json.loads(p.read_text())["epoch"])
+        hhmm = os.environ.get("M5_DEADLINE") or self.cfg["stage2"].get("deadline", "08:00")
+        h, m = (int(x) for x in hhmm.split(":"))
+        t = time.localtime()
+        d = time.mktime((t.tm_year, t.tm_mon, t.tm_mday, h, m, 0, 0, 0, -1))
+        if d <= time.time():
+            d += 86400
+        if not write:
+            return d
+        self.dir.mkdir(parents=True, exist_ok=True)
+        p.write_text(json.dumps({"epoch": d, "local": time.strftime("%Y-%m-%d %H:%M", time.localtime(d))}))
+        return d
 
     # ---- the loop ------------------------------------------------------------------------------------
     def run(self) -> int:
@@ -465,7 +496,11 @@ class Stage2(Campaign):
             ref = {r["job"]: r for r in self.ok().values()}.get("speed-pick") or {}
             self.gain = ref.get("gain", 1.0)
         retries = self.cfg["stage2"]["retries"]
-        failed_final = {r["job"] for r in self.results() if r.get("status") == "failed_final"}
+        failed_final = {r["job"] for r in self.results() if r.get("status") in ("failed_final", "skipped_deadline")}
+        deadline = self.deadline()
+        margin = 60 * float(self.cfg["stage2"].get("report_min", 45))
+        print(f"[campaign2] deadline {time.strftime('%Y-%m-%d %H:%M', time.localtime(deadline))} (no job starts that would end after "
+              f"{time.strftime('%H:%M', time.localtime(deadline - margin))})", flush=True)
         while True:
             jobs = self.plan()
             self.estimate(jobs)
@@ -474,6 +509,18 @@ class Stage2(Campaign):
             if not todo:
                 break
             job = todo[0]
+            # the overnight limit: a job that would not end in time is skipped with the rest of its chain (same tag);
+            # the summary always runs
+            cut_tags = {r.get("tag") for r in self.results() if r.get("status") == "skipped_deadline" and r.get("tag")}
+            late = job["kind"] not in ("summary", "teach", "estimate") and (
+                (job.get("tag") in cut_tags) or time.time() + self.est_job_s(job) > deadline - margin)
+            if late:
+                left = round((deadline - margin - time.time()) / 60)
+                print(f"[campaign2] {now()} skip {job['job']}: about {self.est_job_s(job) / 60:.0f} min, {left} min left before the deadline", flush=True)
+                self.append({"job": job["job"], "kind": job["kind"], "tag": job.get("tag"), "group": job.get("group"), "status": "skipped_deadline",
+                             "est_min": round(self.est_job_s(job) / 60), "left_min": left})
+                failed_final.add(job["job"])
+                continue
             self.current, self.state = job["job"], "running"
             self.write_status()
             print(f"[campaign2] {now()} start {job['job']}  (about {self.eta_h} h left)", flush=True)
@@ -507,9 +554,15 @@ def main() -> int:
         jobs = c.plan()
         s = c.estimate(jobs)
         print(f"{len(jobs)} jobs; stage 1 found: {c.s1['found']}; best size {c.best()}; plays {c.plays}; chunk {c.chunk} min")
+        dl = c.deadline(write=False) - 60 * float(c.cfg["stage2"].get("report_min", 45))
+        t, ok = time.time(), c.ok()
         for j in jobs:
-            print(f"  {j['job']:34} {c.est_job_s(j) / 60:7.1f} min")
+            if j["job"] not in ok:
+                t += c.est_job_s(j)
+            mark = "" if t <= dl or j["kind"] == "summary" else "   past the deadline: skipped"
+            print(f"  {j['job']:34} {c.est_job_s(j) / 60:7.1f} min  ends ~{time.strftime('%H:%M', time.localtime(t))}{mark}")
         print(f"estimated total: {s / 3600:.1f} h; by part (h): {c.breakdown(jobs)}")
+        print(f"no job may end after {time.strftime('%Y-%m-%d %H:%M', time.localtime(dl))} (the deadline minus the report margin)")
         return 0
     if a.cmd == "status":
         p = c.dir / "status.json"
