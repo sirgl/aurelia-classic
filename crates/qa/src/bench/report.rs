@@ -794,6 +794,9 @@ impl TournamentReport {
         }
         let Some(first) = self.sides.first() else { return };
         if versus {
+            if let Some(n) = self.deltas.iter().flatten().map(|d| d.blocks).min().filter(|n| *n < MIN_DELTA_BLOCKS) {
+                let _ = writeln!(out, "Δ intervals with N < {MIN_DELTA_BLOCKS} seed blocks are indicative only (N = {n}).\n");
+            }
             let _ = writeln!(out, "{}\n", self.flows_line());
         }
         let _ = writeln!(out, "| round | metric | {} |", header.join(" | "));
@@ -983,9 +986,14 @@ fn versus(results: &[MatchResult]) -> Versus {
     Versus::of(seed_blocks(results), candidate_wins, draws, expected)
 }
 
-/// The Δ interval excludes 0.
+/// Fewest seed blocks for which a Δ may be marked: the bootstrap interval of a few blocks is about
+/// the min and max of their differences, and with 4 blocks it excludes 0 in about one case in eight
+/// with no effect.
+pub const MIN_DELTA_BLOCKS: u32 = 8;
+
+/// The Δ interval excludes 0, and there are enough seed blocks to mark it.
 pub fn significant(d: &BlockEstimate) -> bool {
-    d.blocks > 1 && (d.low > 0.0 || d.high < 0.0)
+    d.blocks >= MIN_DELTA_BLOCKS && (d.low > 0.0 || d.high < 0.0)
 }
 
 fn delta_cell(d: &BlockEstimate) -> String {
@@ -1433,6 +1441,25 @@ mod tests {
         assert!(text.contains("| +2.0 [+2.0, +2.0] * |"), "{text}");
         assert!(text.contains("| +0.0 [-0.8, +0.8] |"), "{text}");
         assert!(text.contains("r100: food +2.0;"), "the flows line names food and not culture: {text}");
+    }
+
+    /// Below `MIN_DELTA_BLOCKS` seed blocks the interval is shown but never marked or listed in the
+    /// flows; at the threshold the same differences are marked.
+    #[test]
+    fn few_blocks_are_indicative_only() {
+        let rows = |n: u64| -> String {
+            let results: Vec<MatchResult> = (1..=n).map(|seed| flow_duel(seed, [10 * seed as i32 + 2, 10 * seed as i32], [0, 0])).collect();
+            let r = report(&results);
+            assert_eq!(significant(&metric_at(&r, "food")), n >= MIN_DELTA_BLOCKS);
+            r.markdown(false)
+        };
+        let few = rows(MIN_DELTA_BLOCKS as u64 - 1);
+        assert!(few.contains("| +2.0 [+2.0, +2.0] |"), "{few}");
+        assert!(!few.contains("[+2.0, +2.0] *") && !few.contains("food +2.0"), "{few}");
+        assert_eq!(few.matches("are indicative only (N = 7)").count(), 1, "{few}");
+        let enough = rows(MIN_DELTA_BLOCKS as u64);
+        assert!(enough.contains("| +2.0 [+2.0, +2.0] * |") && enough.contains("food +2.0"), "{enough}");
+        assert!(!enough.contains("indicative only"), "{enough}");
     }
 
     /// One seed block is no interval: nothing is marked; a solo run has no Δ column.
