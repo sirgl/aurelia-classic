@@ -127,7 +127,16 @@ fn remember_turn_start(game: &GameState, field: &Field, round: u32) {
     });
 }
 
+/// Nets trained before the history numbers existed read zeros there (`ARMY_NET_NO_HISTORY=1`).
+fn history_off() -> bool {
+    static OFF: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *OFF.get_or_init(|| std::env::var_os("ARMY_NET_NO_HISTORY").is_some())
+}
+
 fn since_last_turn(u: &UnitCore) -> (f32, f32) {
+    if history_off() {
+        return (0.0, 0.0);
+    }
     HISTORY.with(|h| match h.borrow().prev.get(&u.id) {
         Some((tile, hp)) => ((f32::from(u.hp) - f32::from(*hp)) / 100.0, if *tile != u.tile { 1.0 } else { 0.0 }),
         None => (0.0, 0.0),
