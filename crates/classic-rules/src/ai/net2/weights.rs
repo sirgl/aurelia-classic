@@ -159,10 +159,14 @@ pub mod r {
     pub const ALONE: usize = 28;
     /// The city-states allied to it, / 3 (R31).
     pub const CS_HELD: usize = 29;
-    pub const N: usize = 30;
+    /// `science-flow`: the rounds our gold has waited for its research agreement unsigned, over
+    /// `gate::CHEST_WAIT_ROUNDS` (`science::read_waits`; 0 for every other variant).
+    pub const CHEST_WAIT: usize = 30;
+    pub const N: usize = 31;
     pub const NAMES: [&str; N] = [
         "near", "land", "sea", "soldiers", "seen_army", "open_cities", "tree", "lead", "pace", "culture", "stack", "warmonger", "betrayed", "denounced_us", "friend", "pact", "at_war",
         "war_rounds", "holds_capital", "holds_cities", "grab", "ally_hit", "local", "score", "retake_case", "captured_recent", "soft", "operating", "alone", "cs_held",
+        "chest_wait",
     ];
 }
 
@@ -670,6 +674,55 @@ pub const CITY_CAP: Neuron = Neuron {
     ],
 };
 
+// ---- the science flow (work/nets/science-flow/SCIENCE-FLOW.md): played by `science-flow` only (`TurnBrief::science_flow`) ----
+
+/// The share of its science specialists' slots a seat fills (`Science::scientists`; the executor
+/// `citizens::science_specialist_commands` keeps each city's food at `gate::SCIENTIST_FOOD`). Why (the look, 80 self-play
+/// games of `standard`, Quick): the science winners entered the Modern era with 2 scientists in 11 slots and 25 food a
+/// turn to spare, the Atomic era with 9 in 16; small-continents 1 p4 went from 185 to 376 beakers when its cities took 9
+/// scientists (r170→r180) and back to 341 when they left them for food tiles (r210, food +100). A scientist is 3 beakers,
+/// 2 more with Secularism (taken by every seat at r~160), times the city's science percents, and 3 points of a great
+/// scientist; the rules' default weights rank it level with a 3-food tile.
+pub const SCIENTISTS: Neuron = Neuron {
+    name: "scientists",
+    bias: -900,
+    why: "early the citizens stay on the tiles: a growing citizen is a beaker and more (ai-growth.md); the level only adds slots to what the rules' weights fill themselves",
+    join: UNIT,
+    terms: &[
+        ts(F(fe::PROGRESS), Shape::Above(300), 2500, "the later the game, the fewer rounds a new citizen pays back its food (0.6 of the game: +750, 0.75: +1125); a human fills the slots of the universities and schools late whatever its aim"),
+        t(Y(y::AIM_SCIENCE), 600, "the science aim: the ship is beakers, and a filled slot is beakers now and great scientists later (sf1: the aim's share is 0.35 at the median mid-game, so the aim tilts and does not gate)"),
+        t(F(fe::AT_WAR), -500, "at war the cities work the hammers"),
+    ],
+};
+
+/// A research agreement with one rival pays our race (`Science::ties`): the friendship and the agreement with it are
+/// proposed and taken though it runs away (`Net2Plan::denies_item`), the ladder to it is offered at the level's cadence
+/// (`science::cadence`: every round at 1000, the diplomacy's own `PROPOSAL_INTERVAL` at the gate), and the gold it costs is
+/// kept (`Science::chest`) until the partner lets it wait too long (`r::CHEST_WAIT`). Why (the look): at the Modern
+/// era a seat met 3.45 majors and had 0.38 agreements; of its 1.55 friends 1.17 had none: 0.36 our gold short (the allocator spent it; treasury 425 and +121 a turn at the Modern era),
+/// 0.26 theirs, 0.58 nothing in the rules; and the runaway, whom `net2` denies every help (`gate::DENY_HELP`), is the
+/// partner with the most science (`net2-no-deals`, the denial off: 0.75 agreements at the Modern era, 1.06 at r300
+/// against 0.41, 42 science victories in 80 self-play games against 29). The rules pay min(both sciences over the deal)
+/// / 3 × 50 % at its end: with a partner as fast as us, a sixth of our science a turn for ~280 gold at Quick, 4 beakers
+/// a gold, where a bought building is about one. Equal beakers to both shorten a faster rival's lead in rounds: for a
+/// seat that races the runaway it is a good partner; for one that does not race it, the beakers are its victory.
+pub const AGREEMENT: Neuron = Neuron {
+    name: "agreement",
+    bias: 600,
+    why: "an agreement is 4 beakers a gold: a seat at peace signs one with every friend, as a human does",
+    join: UNIT,
+    terms: &[
+        t(Y(y::AIM_SCIENCE), 400, "the science aim: the beakers are the victory it plays for"),
+        ts(R(r::PACE), Shape::Below(500), -1200, "a slower partner pays a smaller pool (the smaller science): at a quarter less −300"),
+        t(Q(q::DISTRUST), -1000, "a distrusted rival breaks the friendship or comes with an army (D12)"),
+        t(Q(q::MENACE), -600, "its army at our border: a friendship feeds the sneak attack"),
+        t(R(r::AT_WAR), -2000, "no deal in a war"),
+        t(Q(q::RUNAWAY), -800, "the runaway wins with the beakers: a seat that does not race it gives it none (`gate::DENY_HELP`)"),
+        ts(Q(q::RUNAWAY), Shape::Times(Y(y::AIM_SCIENCE)), 800, "a seat that races it gains as many beakers and shortens its lead in rounds: the denial lifts with the aim"),
+        t(R(r::CHEST_WAIT), -600, "a partner that let our gold wait this long does not sign (0.26 of the friends without an agreement lacked their own gold, which a few rounds of income bring): a level friend (740) frees the chest after 8 rounds, about three offers at its cadence; a sure tie (1000) after 17"),
+    ],
+};
+
 // ---- the offence addendum (work/new-net-offence-addendum-2026-11-22.md §3): declared, not yet built ----
 
 /// The offence is off: `net2` plays as the addendum's control `net2-defence` (every `Offence` field and
@@ -707,6 +760,13 @@ pub mod gate {
     pub const BLOCK: (Milli, &str) = (500, "the ballot goes against a rival only when it would win the vote");
     pub const SPACE_RESEARCH: (Milli, &str) = (500, "the research keeps to the ship's way when the science aim and the way gone say so more likely than not");
     pub const CAPITAL_GATE: (Milli, &str) = (500, "the capital is kept for the parts when a part outside it says so more likely than not");
+    pub const AGREEMENT: (Milli, &str) = (500, "a tie when the agreement pays more likely than not (`weights::AGREEMENT`)");
+    /// The rounds between two offers of a tie's ladder at the gate (`science::cadence`; 1 at a level of 1000).
+    pub const LADDER_ROUNDS: (u32, &str) = (5, "a tie at the gate asks no more often than any deal (`diplomacy::PROPOSAL_INTERVAL`); a sure one asks every round, so an agreement ended or a friendship made waits no interval for the next step (the look: 0.58 of a friend a turn without an agreement nothing in the rules blocked)");
+    /// The Standard rounds of an unsigned chest at which `r::CHEST_WAIT` is full (`science::read_waits`).
+    pub const CHEST_WAIT_ROUNDS: (u32, &str) = (20, "four proposal intervals: past them a partner's refusal is not its gold, which a few rounds of its income bring");
+    /// Food a turn a city keeps when it takes a science specialist (`citizens::science_specialist_commands`).
+    pub const SCIENTIST_FOOD: (i32, &str) = (2, "two food a turn: the city still grows, slower, and never starves for a slot");
     /// Ships escorting an `Overseas` order (`fleet::FLEET_SIZE`).
     pub const ESCORT_SHIPS: (u32, &str) = (2, "the landing needs ships that shell the coast (`fleet.rs` 1-10)");
     /// Standard rounds after a war order spent its budget without paying before another order on that rival.

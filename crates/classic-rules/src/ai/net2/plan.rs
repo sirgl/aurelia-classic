@@ -159,6 +159,9 @@ pub struct RivalInputs {
     /// R32 (GAP.md): the league elects a World Leader and its delegates on the Congress screen reach the votes
     /// needed by themselves (0/1000): it wins the vote unless a tie or a higher candidate stops it.
     pub alone: Milli,
+    /// `science-flow`: the rounds our gold has waited for its research agreement unsigned (`science::read_waits`; 0 for
+    /// every other variant).
+    pub chest_wait: Milli,
 }
 
 impl RivalInputs {
@@ -201,6 +204,7 @@ impl RivalInputs {
             cs_held: 0,
             operating: 0,
             alone: 0,
+            chest_wait: 0,
         }
     }
 }
@@ -717,6 +721,37 @@ pub struct Net2Plan {
     /// gate go to another city (`planner_workers::park` and `victory::Walk::Gated` read it). The capital's tile when
     /// kept, else None.
     pub capital_gate: Option<crate::ids::TileId>,
+    /// `science-flow`'s levers (`net2::science`; all off for every other variant).
+    pub science: Science,
+}
+
+/// The science flow's levers (`weights::SCIENTISTS`, `weights::AGREEMENT`), read by the citizens' executor, the diplomacy
+/// and the allocator's gold. Off (zeros, empty) unless the seat plays `science-flow` (`TurnBrief::science_flow`).
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Science {
+    /// The share of the science specialists' slots the cities fill (thousandths; `citizens::science_specialist_commands`).
+    pub scientists: Milli,
+    /// The rivals a research agreement with pays our race (`weights::AGREEMENT` ≥ `gate::AGREEMENT`): the friendship
+    /// and the agreement with them are proposed and taken though the rival runs away (not the war order's target).
+    pub ties: Vec<Tie>,
+    /// Gold kept for the agreements the ties still lack (the rules' cost each; `allocator::spend_gold` does not spend it).
+    pub chest: u32,
+}
+
+/// A rival of the science ties and the cadence of its ladder (embassies, friendship, the agreement).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Tie {
+    pub rival: PlayerId,
+    /// Rounds between two offers of the ladder (`science::cadence` of the tie's `weights::AGREEMENT` level, at least 1):
+    /// the diplomacy offers it in the rounds where (round + our id) is a multiple of it.
+    pub every: u32,
+}
+
+impl Tie {
+    /// The ladder is offered to the tie in `round` by `player`.
+    pub fn asks_in(&self, round: u32, player: PlayerId) -> bool {
+        (round + u32::from(player.0)) % self.every.max(1) == 0
+    }
 }
 
 /// The trust of a rival without a reading (a city-state, a stranger): a stranger is not yet a liar.
@@ -751,6 +786,26 @@ impl Net2Plan {
     /// `deny_help[r]` (§4.6).
     pub fn denies_help(&self, rival: PlayerId) -> bool {
         self.rival(rival).is_some_and(|r| r.help == Help::Deny)
+    }
+
+    /// `denies_help` for one item: the friendship and the research agreement with a rival of the science ties
+    /// (`Science::ties`) are given though it runs away.
+    pub fn denies_item(&self, rival: PlayerId, item: crate::world::relations::DealItem) -> bool {
+        use crate::world::relations::DealItem;
+        if matches!(item, DealItem::Friendship | DealItem::ResearchAgreement) && self.ties_with(rival) {
+            return false;
+        }
+        self.denies_help(rival)
+    }
+
+    /// A research agreement with `rival` pays our race (`Science::ties`).
+    pub fn ties_with(&self, rival: PlayerId) -> bool {
+        self.tie(rival).is_some()
+    }
+
+    /// The tie with `rival` (`Science::ties`), if any.
+    pub fn tie(&self, rival: PlayerId) -> Option<&Tie> {
+        self.science.ties.iter().find(|t| t.rival == rival)
     }
 
     /// `peace_with ∋ r` (§4.4).
@@ -802,9 +857,27 @@ pub struct CoreMemory {
     pub hires: Vec<SpentWar>,
 }
 
-/// `net2`'s memory: the core's and the inputs' (part A's own type, `inputs::InputMemory`).
+/// `net2`'s memory: the core's, the inputs' (part A's own type, `inputs::InputMemory`) and the science flow's.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Memory2 {
     pub core: CoreMemory,
     pub inputs: super::inputs::InputMemory,
+    /// `science-flow`'s own; empty for every other variant, whose bytes it leaves as they were (`memory.rs`).
+    pub science: ScienceMemory,
+}
+
+/// What `science-flow` keeps between turns: how long its gold has waited for each partner's research agreement.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct ScienceMemory {
+    /// The round of the last turn written (a second pass in one round adds nothing).
+    pub round: u32,
+    pub waits: Vec<ChestWait>,
+}
+
+/// The rounds the chest held a partner's agreement's gold without the partner signing (`weights::AGREEMENT`'s
+/// `r::CHEST_WAIT`). Kept while the friendship lasts; an agreement signed or the friendship gone starts it again.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ChestWait {
+    pub rival: PlayerId,
+    pub rounds: u32,
 }

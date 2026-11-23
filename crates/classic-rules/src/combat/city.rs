@@ -237,8 +237,14 @@ pub fn current_era<'r>(
     rules: &'r CompiledRuleset,
     owner: PlayerId,
 ) -> Option<&'r EraDefinition> {
+    era_of_techs(rules, auth.players().techs_of(owner))
+}
+
+/// The era of a player who knows `techs` (`current_era`): the latest era of
+/// one of them, else the first era. The AI reads its own era with it.
+pub fn era_of_techs<'r>(rules: &'r CompiledRuleset, techs: &[crate::ids::TechId]) -> Option<&'r EraDefinition> {
     let mut best = rules.eras.iter().min_by_key(|e| e.index)?;
-    for tech in auth.players().techs_of(owner) {
+    for tech in techs {
         let era = rules
             .technologies
             .get(tech.0 as usize)
