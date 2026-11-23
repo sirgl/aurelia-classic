@@ -643,11 +643,18 @@ def main():
     ap.add_argument('--new-lr-mult', type=float, default=1.0, help='MBH: the history parameters (model_mb.HX_PARAMS) learn at this multiple of --lr')
     ap.add_argument('--warmup', type=int, default=20, help='resumed without the optimizer state: lr ramps up over these steps')
     ap.add_argument('--mem-gb', type=float, default=12.0, help='MLX memory limit (match the broker --ram reservation); cache 2 GB')
+    ap.add_argument('--bf16', action='store_true', help='mixed precision (mixed.py): matmuls and the map convolutions in bfloat16, weights / optimizer / memory / softmax / losses in float32')
+    ap.add_argument('--max-steps', type=int, default=0, help='stop after this many steps of this job (a speed benchmark: evaluates on the 1-in---eval-plays held-out subset)')
     ap.add_argument('--freeze', default='', help='top-level parameters kept fixed, comma-separated (e.g. w_price: a step that must not learn that input)')
     a = ap.parse_args()
     mx.set_memory_limit(int(a.mem_gb * 2 ** 30))
     mx.set_cache_limit(2 * 2 ** 30)
     from .train import SIEGE
+    if a.bf16:
+        from . import mixed
+        from .model import ENCODER
+        mixed.enable(True)
+        ENCODER['dtype'] = mx.bfloat16
     if a.cpu:
         mx.set_default_device(mx.cpu)
     os.makedirs(a.out, exist_ok=True)
@@ -742,7 +749,7 @@ def main():
     hold_eval = hold_plays[::a.eval_plays]
     config = {'run': os.path.basename(os.path.normpath(a.out)), 'variant': 'M (learned memory)', 'plays_per_step': a.plays, 'lr': a.lr, 'epochs': a.epochs, 'steps': steps,
               'schedule': f'AdamW (weight decay 1e-4), cosine decay to 0.05 lr over {steps} steps, grad clip 1.0' + (f'; history parameters {sorted(HX_PARAMS)} at {a.new_lr_mult} x lr' if multi else ''), 'aux_weight': a.aux, 'mem_drop': a.mem_drop, 'curriculum': cur,
-              'parameters': n_params, 'T': tm, 'C': cm, 'promos': promos, 'init': a.init or 'hand_init', 'best_teachers': best, 'labelled_decisions': labelled,
+              'parameters': n_params, 'bf16': a.bf16, 'mlx': mx.__version__ if hasattr(mx, '__version__') else None, 'T': tm, 'C': cm, 'promos': promos, 'init': a.init or 'hand_init', 'best_teachers': best, 'labelled_decisions': labelled,
               'decision_weight': {'won_play': 1.0, 'lost_play': a.lost_weight, 'best_teacher_factor': a.best_factor, 'dagger_label': 2.0, 'up_families': sorted(up), 'up_factor': a.up_factor if up else 1.0},
               'losses': {'pointer_ce': 1.0, 'action_ce': 1.0, 'value': 0.5, 'danger_mse': 0.5, 'aux_teacher_state': a.aux},
               'train': {'files': a.train, 'decisions': train.decisions, 'plays': len(train)}, 'hold': {'files': a.hold, 'decisions': hold.decisions, 'plays': len(hold)}, 'device': str(mx.default_device())}
@@ -793,10 +800,13 @@ def main():
         is_eval = s % a.eval_every == 0 or s == steps
         if time.time() - t0 > a.max_minutes * 60:
             is_eval, stopped = True, True
+        bench_stop = bool(a.max_steps) and s - start >= a.max_steps
+        if bench_stop:
+            is_eval, stopped = True, True
         if s % a.log_every == 0 or is_eval:
             rec = {'step': s, 'L': L, 'epoch': s * a.plays / len(plays_all), **{k: v / log_n for k, v in log.items()}, 'lr': float(sched(s)), 'dps': log_dec / max(log_t, 1e-9), 'dps_mean': seen_dec / t_train, 'wall_s': time.time() - t0}
             if is_eval:
-                ev, by_family = evaluate(model, hold_device, hold_plays if (stopped or s == steps) else hold_eval, tm)
+                ev, by_family = evaluate(model, hold_device, hold_plays if ((stopped and not bench_stop) or s == steps) else hold_eval, tm)
                 rec['hold'] = ev
                 rec['hold_by_family'] = by_family
             log = collections.defaultdict(float)

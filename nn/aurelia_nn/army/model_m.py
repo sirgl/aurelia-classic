@@ -19,6 +19,7 @@ import math
 import mlx.core as mx
 import mlx.nn as nn
 
+from . import mixed
 from .data import F_TOK
 from .model import D_MAX, NEG, ArmyNet
 
@@ -180,17 +181,22 @@ class MemNet(ArmyNet):
         q = layer.q(a).reshape(b, t, heads, dh).transpose(0, 2, 1, 3)
         k = layer.k(a).reshape(b, t, heads, dh).transpose(0, 2, 1, 3)
         v = layer.v(a).reshape(b, t, heads, dh).transpose(0, 2, 1, 3)
-        s = (q @ k.transpose(0, 1, 3, 2)) * (1.0 / math.sqrt(dh))
+        s = mixed.mm(q, k.transpose(0, 1, 3, 2)) * (1.0 / math.sqrt(dh))
         bias = layer.dist_bias[:, dist].transpose(1, 0, 2, 3)  # [b, h, t, t]
         bias = mx.where(pair_plan[None, None], pbias[None, :, None, None], bias)
         s = s + bias + mx.where(key_mask[:, None, None, :], 0.0, NEG)
         w = mx.softmax(s, axis=-1)
-        ctx = (w @ v).transpose(0, 2, 1, 3).reshape(b, t, d)
+        ctx = mixed.mm(w, v).transpose(0, 2, 1, 3).reshape(b, t, d)
         h = h + layer.o(ctx)
         m = layer.norm2(h)
         return h + layer.f2(nn.relu(layer.f1(m)))
 
-    def step(self, hfull, tok, slot, tmask, um, pm, alive):
+    def step(self, *args):
+        """The memory update in float32 whatever the training's precision (`mixed.exact`)."""
+        with mixed.exact():
+            return self._step(*args)
+
+    def _step(self, hfull, tok, slot, tmask, um, pm, alive):
         """The memory update at our turn's end. hfull [B, T + PLANS, d] from `body_m` on this moment with (um, pm).
         Returns (um', pm', alive', plan attention logits [B, PLANS, T])."""
         b, t, _ = tok.shape

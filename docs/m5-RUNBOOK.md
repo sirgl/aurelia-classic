@@ -153,6 +153,12 @@ Rust evals use all performance cores when no training runs (the campaign never o
 Estimated duration: from the M4 numbers about 9 nets x (30-60 min training + 25-40 min evals), roughly 12-18 h; the
 calibration prints the real estimate for this machine.
 
+### (g) Stage 2: the MBf recipe, MLX speed, seeds, wider nets
+
+`docs/m5/PROMPT-2.md` (the prompt), `tools/m5/campaign2.sh plan|start|status|summary`, config `tools/m5/campaign2.toml`,
+recipes `tools/m5/train2.sh` (kinds a / b / m / mb), `tools/m5/setup2.sh` (newest-MLX venv), `tools/m5/py/{make_init_mb_from,same_plays,mem_norms}.py`.
+Results in `lab/runs/campaign2/`.
+
 ## Memory and disk rules (learned the hard way)
 
 - One MLX training and at most one probe (`probe_m`, `probe_layers`) at a time; the GPU lock enforces one per broker. No

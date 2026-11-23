@@ -254,9 +254,13 @@ def main():
     ap.add_argument('--log-every', type=int, default=200, help='a train-loss point of the curve every N steps')
     ap.add_argument('--seed', type=int, default=1)
     ap.add_argument('--init', default=None, help='start from these MLX weights')
+    ap.add_argument('--mem-gb', type=float, default=0.0, help='MLX memory limit in GB (0: none); the cache is capped at 2 GB with it')
     ap.add_argument('--cpu', action='store_true', help='a smoke test on the CPU (no GPU lock needed)')
     ap.add_argument('--every-nth-play', type=int, default=1, help='keep one play in N (smoke tests)')
     a = ap.parse_args()
+    if a.mem_gb > 0:
+        mx.set_memory_limit(int(a.mem_gb * 2 ** 30))
+        mx.set_cache_limit(2 * 2 ** 30)
     if a.cpu:
         mx.set_default_device(mx.cpu)
     if a.map and not a.enc_f32 and not a.cpu:

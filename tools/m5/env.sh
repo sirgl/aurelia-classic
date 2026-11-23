@@ -10,6 +10,8 @@ M5_NN=$M5_REPO/nn
 M5_RUNS=$AURELIA_LAB/runs
 M5_LOGS=$AURELIA_LAB/logs
 export AURELIA_EXAM_BIN=$M5_EXAM
+# Plain fp32 matmuls, like the M4 (stage 1 ran so); stage 2's speed step also tries MLX_ENABLE_TF32=1. Override by environment.
+export MLX_ENABLE_TF32=${MLX_ENABLE_TF32:-0}
 mkdir -p "$M5_RUNS" "$M5_LOGS" "$AURELIA_LAB/data"
 [ -f "$AURELIA_LAB/data/kept-m.jsonl" ] || cp "$M5_REPO/tools/m5/data/kept-m.jsonl" "$AURELIA_LAB/data/kept-m.jsonl"
 # The broker's daemon must run for the budget; start it when it is not.

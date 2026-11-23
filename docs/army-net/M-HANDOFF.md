@@ -1,6 +1,6 @@
 # Variant M (learned memory) — design, gates (written before any M measurement), handoff
 
-State at handoff (23 Nov, ~14:00): clone `the M4 lab's army-net` (`classic` branch `nn/army-net`,
+State at handoff (23 Nov, ~14:00): clone `the M4 lab army-net clone` (`classic` branch `nn/army-net`,
 head see `git log`), DESIGN.md (A, B), tables `runs/table-*.json`, label shares `runs/label-shares.json`,
 `tools/label_shares.py`. M is NOT built yet; this file is its brief. Read DESIGN.md and
 `crates/qa/src/army_net/{observe,record,seat,model,parity}.rs`, `nn/aurelia_nn/army/{data,model,train}.py` first.
@@ -443,3 +443,94 @@ When MBN is reached, its experiments are designed for publication:
 - Function-preserving check: MBH0 at the init plays every quick-eval play exactly as MBa. Parity Rust vs MLX <= 1e-4.
 - Gates (as written at 15:40): assault-heal >= 80 % and planned-assault >= 50 % (held-out); no family below MB
   beyond its 95 % noise; plus the ablation (history masked) and time per turn <= 4.6 ms.
+
+## Addition 9 (coordinator, Roman approved, 23 Nov ~21:20): three attention changes as one ablation after MBH — written before any run
+- (G) an output GATE per attention head: sigmoid(W_g q_token + b_g) times the head's output, b_g initialised so the
+  gate passes everything (pass-through at the start: W_g = 0, the gate fixed to 1 by a scale of 2 * sigmoid, or
+  b_g large; the start equals the net without it — checked on the quick eval, every play identical).
+- (S) attention SINKS: 1-2 learned "nothing relevant" keys every query may attend to, values zero, in the field
+  attention and in the history attention (MBH0's null key is one already); the start: the sink logit very low (or
+  the field attention unchanged by a zero-value sink only if its logit starts at -inf-like), checked identical.
+- (L) LOCAL attention by hex distance: layers 1-2 attend only within radius R = 6 of the token's tile (the plan
+  tokens, the objective and the records excepted), layer 3 global. Not function-preserving from a global net:
+  trained from MBH's weights for the same steps, compared with MBH continued for the same steps.
+- Each switchable; each measured on / off on the quick eval with the same data and steps, then all three together.
+  Gates: no family below MBH beyond its 95 % noise (each change alone and together); time per turn on one core and
+  training decisions/s reported for each; Rust implements each (parity <= 1e-4). GQA for the history's cached keys
+  / values stays planned with the cache work (MBH1).
+
+## B-line restart (24 Nov, the fresh B-line agent) — diagnosis, then MBf; gate written before the run
+
+### Task 1: why the B line lost M0's memory gain (numbers)
+- Init chain (config.json `init`): MB0 <- init-MB <- **M1** (+ B1's encoder) <- M0 <- AH0; MBa / MBc / MBv <- MB0;
+  MBd1, MBp <- MBa; MBd2 <- MBd1; MBH0 <- init-MBH <- MBa. Every MB run starts from M1 (the coordinator's 15:50
+  order: "MB = M1's trunk") AND trains on `dagM1.bin` beside teach4 (2.29 GB of 9.8 GB; DAgger labels weigh 2.0).
+  M0 was trained on the teacher's plays only (teach-train-m.bin).
+- Quick eval on the CURRENT base (binary h13, `runs/quick-t1.json`; assault-heal wins of 140 / zeroed memory):
+  M0 71 % / 46 % (100 -> 64), M1 42 / 25, MB0 39 / 24; planned-assault M0 15, M1 10, MB0 7; raid M0 40, M1 63,
+  MB0 96; families (13 rows) M0 7, M1 7, MB0 9. M0's level on the new base equals the old one (71 %).
+- The memory works in MB and is not drowned by the map (`runs/mem-norms.json`, held-out assault plays, mean L2 per
+  army token): token embedding 6.2, memory um(u_s) 0.94, map m_tok 0.41 (memory / map 2.3); memory / token M0 0.12,
+  M1 0.14, MB0 0.15; attention mass on the plan tokens per layer M0 .039 / .031 / .027, MB0 .045 / .015 / .019. Zeroing
+  the memory costs MB0 15 points (M0: 25). So the loss sits in the policy MB inherited (M1's DAgger damage) and kept
+  learning (dagM1), not in the memory path.
+- The eval watcher's binary (`eval-daemon/ai-exam-eval`, 16:42) predates the main merge, MBA's price and MBH0's
+  history: the loader skips unknown tensors, so the per-checkpoint numbers of MBa, MBv, MBp, MBd1, MBd2 are without
+  the price input and MBH0's without its history. The quick tables of the previous agent (h11-h13) are right and
+  show the same picture (assault-heal 35-42). Replaced by h13 on 24 Nov (old one kept as ai-exam-eval.1642).
+
+### Task 2: MBf (MB re-initialised from M0), gate fixed here before the run
+- Init `runs/init-MB-M0` (tools/make_init_mb_from.py): M0's trunk and memory + B1's 64-channel encoder, m_tok /
+  m_cand / m_pool zero. Checked: 1 619 / 1 619 quick-eval plays identical to M0 (tools/same_plays.py).
+- Training: imitation only (teach4-train.bin, no DAgger data), 2 epochs, lr 3e-4 cosine, plays 128, the same
+  up-weighting as MB0 (siege set, ambush-fog, hunt-fog x2), `runs/train-chain.sh` (<= 16.5-min GPU jobs,
+  half-epoch checkpoints). Run `runs/netMBf`.
+- Gate (quick eval, current base, h13): assault-heal >= M0's 71.4 % minus the two-proportion 95 % noise at N 140
+  (10.6 points): >= 61 %; raid >= 90 %; families at >= 90 % of the best teacher (13 rows of quick_table) >= M0's 7.
+  Then the full 32-family table. If it fails: a diagnosis before any next step.
+
+### Task 2 result (24 Nov, 23:20): MBf passes its gate
+- Training: 735 steps (2 epochs of teach4-train, 2.13 M decisions; MB0 had 2.93 M with dagM1's 0.80 M), 2 GPU jobs,
+  21 min, 3.45 k decisions/s. Held-out joint accuracy 0.839 (MB0 0.812).
+- Quick eval (`runs/quick-MBf.json`, current base): assault-heal 65 % (gate >= 61: met; M0 71, MB0 39),
+  planned-assault 21 % (M0 15, MB0 7), raid 98 % (gate >= 90: met), families 8 of 13 (gate >= M0's 7: met; MB0 9).
+  Memory zeroed (MBfz): assault-heal 39 (-26 points, M0 -25): the memory gain is back.
+  Per checkpoint (watcher, h13): e0.5 assault-heal 66, planned-assault 21, raid 96.
+- Full table (`runs/table-MBf.json`, all on h13): MBf 17 of 32, M0 16, MB0 19, A2 17. Below A2 beyond noise: MBf
+  choke 61 vs 74, general 62 vs 76 (MB0 none: general 78, duel 82). So dagM1 helped the field fights (general,
+  duel, choke) while it broke the assault: the DAgger data is good outside the siege set. Memory trainers: ambush-fog
+  54, hunt-fog 51 (MB0 53 / 67; MH0 98 / 86); M0 0 / 0 (trained before v2).
+- Time per turn (all threads busy, quick-eval rows): MBf 3.07 ms, MB0 3.33, M0 2.39.
+- Next (my proposal, not started): MBf2 = MBf + 1 epoch on teach4 + dagM1 with dagM1's siege families skipped
+  (`--skip <dagM1>=siege`), function-preserving by construction (same net), gate: assault-heal not below MBf beyond
+  noise, general / choke back to A2's noise. Then MBH from it (init_mbh needs an MBA: price and heads zero first).
+
+### MBf2 (coordinator approved 24 Nov ~23:30) — gate fixed here before the run
+- MBf2 = MBf + 1 epoch on teach4-train + dagM1 with dagM1's siege set skipped (`--skip <dagM1>=siege`: siege, ram,
+  assault-heal, city-fire, hill-archers, planned-assault, promotion-choice, rush), lr 1.5e-4 cosine, the same
+  up-weighting, init MBf's weights (the same net: function-preserving by construction), half-epoch checkpoints.
+- Gate: (1) quick eval assault-heal not below MBf's 91 / 140 beyond the two-proportion 95 % noise (i.e. >= ~54 %);
+  (2) full table: general and choke not below A2 beyond noise (m_table's rule; roughly general >= 67 %,
+  choke >= 63 %); (3) raid >= 90 %. Reported beside: families of 32, planned-assault, the memory ablation.
+
+### MBf2 result (24 Nov, 23:40): gate met
+- 458 steps (teach4 2.13 M + dagM1 without the siege set 0.38 M decisions), 12.5 GPU min; held-out joint accuracy
+  0.819 (MBf 0.839: the DAgger labels are not the teacher's own, as expected).
+- Quick (`runs/quick-MBf2.json`): assault-heal 70 % (MBf 65; gate >= 54: met), planned-assault 24 (21), raid 96
+  (gate >= 90: met), families 7 of 13 (hill-archers 74 just under its 79 bar). Memory zeroed: assault-heal 46, planned 12.
+- Full (`runs/table-MBf2.json`): general 78 (MBf 62, A2 76), choke 71 (61, A2 74), duel 80: none below A2 beyond
+  noise (gate met). Families 16 of 32 (MBf 17, MB0 19): hill-archers and duel sit just under their 90 % bars.
+- The DAgger finding (for the paper): labels from a stateful planner relabelling the net's states help the reactive
+  field families (general MB0 78 / MBf 62 / MBf2 78) and hurt the staged siege families (assault-heal MB0 39 /
+  MBf 65 / MBf2 70) — keeping them only outside the siege set gets both.
+
+### MBH1 (24 Nov) — from MBf2; gate fixed here before the run
+- Init: `runs/init-MBAf` (tools/make_mba_from.py: MBf2 + w_price zero + heads drawn) -> `runs/init-MBH1` (init_mbh:
+  ho zero). Checked: both play all 1 619 quick-eval plays identical to MBf2.
+- Training: 1 epoch of MBf2's data, lr 1.5e-4, the history parameters at 6 x lr (as MBH0), `--aux-heads` only for
+  the class: `--head-w 0 --value-w 0` and `--freeze w_price` (new train_m switch), so the ONLY new learned path is
+  the history (the heads / value / price are the next step of the order). Control: MBf3 = MBf2 + the same epoch
+  without history (plain MB), trained after.
+- Gate (15:40's, unchanged): assault-heal >= 80 % and planned-assault >= 50 % (quick, held-out); no family below
+  MBf2 beyond its 95 % noise (quick and full); history masked (ARMY_NET_NO_HISTORY=1) loses >= 5 points in one of the
+  two; time per turn reported (<= 4.6 ms one core); Rust vs MLX parity <= 1e-4. Reported beside MBf3 (the epoch alone).
