@@ -117,6 +117,14 @@
 //! standard before it (the play of `NetsXSite`; bench only, `experimental-ai`); `Net2` stays as an alias that
 //! plays as `Standard`, and `NetsXSite` plays as `PreNet2`. Every other variant plays as it was measured
 //! (`Net2Defence`, `Net2Tac`, the ablation's `Net2Without` and `Net2Off`, `Tac2`, `PeaceFix` …).
+//! In the seventeenth promotion (24 November) `Standard` took the play of `EarlyGrowth`: the mind of `Net2` with
+//! `net2`'s science-flow neurons (`science_flow`: the research agreements and the scientists of a seat that races
+//! to the spaceship) and its opening read (`early_growth`: the opening's cities, the young cities' garrisons, the
+//! growth purchases, the shared land of a site), under the name `standard`, in every build (none of that code is
+//! behind the feature). `PreEarlyGrowth` is the standard before it (the play of `Net2`; bench only,
+//! `experimental-ai`); `Net2` plays as `PreEarlyGrowth` now; `EarlyGrowth` stays as an alias that plays as `Standard`, and `ScienceFlow` (measured on
+//! the standard before, with the science flow alone) stays a bench name. Every other variant plays as it was
+//! measured, on the standard before (`Net2` and the variants built on it, `LayoutDefence` …).
 
 use crate::ai::grand_strategy::Stakes;
 use crate::ai::operations::WarGate;
@@ -190,6 +198,10 @@ pub enum Variant {
     /// and their aims, the deals, the peace, the city-states, the congress, the guard of the cities,
     /// the fleet, the city cap and the research on the spaceship's way, and its site head values the
     /// settlers' sites (classic/docs/ai-net2.md); `PreNet2` is the standard before it.
+    /// Since the seventeenth promotion (24 November) it plays as `EarlyGrowth`: on top of `Net2` the science flow
+    /// (the research agreements and the scientists of a seat that races to the spaceship) and the early growth
+    /// (the opening's cities its happiness allows, the young cities' garrisons, the growth purchases, the land a
+    /// site shares with an own city; classic/docs/ai-net2.md); `PreEarlyGrowth` is the standard before it.
     #[default]
     Standard,
     /// The game's AI before the eleventh promotion (2 November): `Standard` without the
@@ -906,7 +918,8 @@ pub enum Variant {
     /// site head in place of the guarded site score. A bench-only candidate (`experimental-ai`); it plays
     /// as `NetsXSite` wherever `net2` has no say (`ClassicMind::new`).
     /// Promoted to `Standard` on 23 November (the sixteenth promotion): kept under its name as an alias
-    /// that plays as `Standard`.
+    /// that played as `Standard`; since the seventeenth promotion (24 November) it plays as `PreEarlyGrowth`,
+    /// the standard it was measured on.
     Net2,
     /// `net2-defence` (the offence addendum, work/new-net-offence-addendum-2026-11-22.md): `Net2` with the
     /// offence switched off (`Variant::net2_offence`), the control of every offence measure. Until the
@@ -927,15 +940,16 @@ pub enum Variant {
     /// without an operation at peace time (`values_war_at_peace`), the fix alone for its own promotion gate. Bench only
     /// (`experimental-ai`).
     PeaceFix,
-    /// `science-flow` (work/nets/science-flow/SCIENCE-FLOW.md): `Standard` with `net2`'s science-flow neurons on
+    /// `science-flow` (work/nets/science-flow/SCIENCE-FLOW.md): `PreEarlyGrowth` (the standard before the seventeenth promotion) with `net2`'s science-flow neurons on
     /// (`net2::weights::AGREEMENT`, `SCIENTISTS`; `Net2Plan::science`): the research agreements and the scientists of a
     /// seat that races to the spaceship. Bench only (`experimental-ai`).
     ScienceFlow,
     /// `early-growth` (work/nets/early-growth): `ScienceFlow` with `net2`'s opening read
-    /// (`net2::weights::g::OPENING`): a real tall seat founds the opening's cities its happiness allows. Bench only
-    /// (`experimental-ai`).
+    /// (`net2::weights::g::OPENING`): a real tall seat founds the opening's cities its happiness allows. Promoted to
+    /// `Standard` on 24 November (the seventeenth promotion): kept under its name as an alias that plays as `Standard`
+    /// (bench only, `experimental-ai`).
     EarlyGrowth,
-    /// `layout-defence` (work/nets/layout-defence): `Standard` with `net2`'s hold of the cities on (`net2::hold`:
+    /// `layout-defence` (work/nets/layout-defence): `PreEarlyGrowth` (the standard it was measured on) with `net2`'s hold of the cities on (`net2::hold`:
     /// `weights::FRONT`, `weights::HOLD`; `Net2Plan::hold`): the standing garrison, the reserve and the upgrades of a
     /// city follow the threat its place on the map makes, before an enemy is in sight. Bench only (`experimental-ai`).
     LayoutDefence,
@@ -945,6 +959,11 @@ pub enum Variant {
     /// and `Net2Off`, `Tac2`, `PeaceFix`) keep playing as they were measured. Kept for the bench
     /// (`experimental-ai` only).
     PreNet2,
+    /// The game's AI before the seventeenth promotion (24 November): the mind of `Net2` (the play of the sixteenth
+    /// promotion), without the science flow and the early growth. The control of the promotion. The variants built
+    /// on the standard of the sixteenth promotion (`Net2` and its relatives, `LayoutDefence`) keep playing as they
+    /// were measured. Kept for the bench (`experimental-ai` only).
+    PreEarlyGrowth,
 }
 
 /// The net's base: the expert the end-to-end net learns from and the mind it
@@ -965,7 +984,7 @@ const NUDGED_CANDIDATES: u32 = 40;
 
 impl Variant {
     /// The game's AI first.
-    pub const ALL: [Variant; 187] = [
+    pub const ALL: [Variant; 188] = [
         Variant::Standard,
         Variant::PreCamps,
         Variant::PreWorkers,
@@ -1153,6 +1172,7 @@ impl Variant {
         Variant::EarlyGrowth,
         Variant::LayoutDefence,
         Variant::PreNet2,
+        Variant::PreEarlyGrowth,
     ];
 
     /// The parts of the strategist's wishes the variant plays (`strategy_net::wishes::Parts`): a property
@@ -1346,6 +1366,7 @@ impl Variant {
             Variant::EarlyGrowth => "early-growth",
             Variant::LayoutDefence => "layout-defence",
             Variant::PreNet2 => "pre-net2",
+            Variant::PreEarlyGrowth => "pre-early-growth",
             Variant::ArmyFit => "army-fit",
             Variant::Camps => "camps",
             Variant::ArmyCamps => "army-camps",
@@ -1387,11 +1408,14 @@ impl Variant {
     /// The play of `net2` is the game's since the sixteenth promotion: `Standard` plays it in every build
     /// (none of `ai::net2` is behind the feature); the names `net2` and `pre-net2` (the standard before) are
     /// the bench's.
+    /// The play of `early-growth` (with `science-flow`'s neurons) is the game's since the seventeenth promotion:
+    /// `Standard` plays it in every build (none of `net2`'s science flow and early growth is behind the feature);
+    /// the names `early-growth` and `pre-early-growth` (the standard before) are the bench's, as is `science-flow`.
     pub fn compiled(self) -> bool {
         cfg!(feature = "experimental-ai")
             || !matches!(
                 self,
-                Variant::Net | Variant::UnitNet | Variant::Hybrid | Variant::SiteNet | Variant::ChoiceNet | Variant::ChoiceNetProduction | Variant::ChoiceNetResearch | Variant::StandardScripted | Variant::PreCsGifts | Variant::Sharp | Variant::TallReal | Variant::Next | Variant::WonderCancel | Variant::WonderRace | Variant::NextW | Variant::NextRace | Variant::PreNext | Variant::WarPays | Variant::TacticianFit | Variant::WarMuster | Variant::SiegeCall | Variant::NextWar | Variant::Retake2 | Variant::NextWarRetake | Variant::VoteGuard | Variant::FieldCraft | Variant::RaidWar | Variant::Landless | Variant::LandlessPlan | Variant::NextX | Variant::PreNextX | Variant::StrategistX | Variant::StrategistXThreat | Variant::EconSite | Variant::EconSiteTall | Variant::EconSiteOwnLand | Variant::NetsX | Variant::NetsXSite | Variant::PreNetsX | Variant::Net2 | Variant::Net2Defence | Variant::Tac2 | Variant::Net2Tac | Variant::Net2Without(_) | Variant::Net2Off | Variant::PeaceFix | Variant::ScienceFlow | Variant::EarlyGrowth | Variant::LayoutDefence | Variant::PreNet2
+                Variant::Net | Variant::UnitNet | Variant::Hybrid | Variant::SiteNet | Variant::ChoiceNet | Variant::ChoiceNetProduction | Variant::ChoiceNetResearch | Variant::StandardScripted | Variant::PreCsGifts | Variant::Sharp | Variant::TallReal | Variant::Next | Variant::WonderCancel | Variant::WonderRace | Variant::NextW | Variant::NextRace | Variant::PreNext | Variant::WarPays | Variant::TacticianFit | Variant::WarMuster | Variant::SiegeCall | Variant::NextWar | Variant::Retake2 | Variant::NextWarRetake | Variant::VoteGuard | Variant::FieldCraft | Variant::RaidWar | Variant::Landless | Variant::LandlessPlan | Variant::NextX | Variant::PreNextX | Variant::StrategistX | Variant::StrategistXThreat | Variant::EconSite | Variant::EconSiteTall | Variant::EconSiteOwnLand | Variant::NetsX | Variant::NetsXSite | Variant::PreNetsX | Variant::Net2 | Variant::Net2Defence | Variant::Tac2 | Variant::Net2Tac | Variant::Net2Without(_) | Variant::Net2Off | Variant::PeaceFix | Variant::ScienceFlow | Variant::EarlyGrowth | Variant::LayoutDefence | Variant::PreNet2 | Variant::PreEarlyGrowth
             )
     }
 
@@ -1651,21 +1675,22 @@ impl Variant {
     }
 
     /// `net2` (`ai::net2`) decides the strategist's pass and the settlers' site score: `Standard` (since the
-    /// sixteenth promotion) and its alias `Net2`, its control `Net2Defence`, `Net2Tac` and the ablation's
-    /// variants. No other variant, `pre-net2` and `nets-x-site` among them.
+    /// sixteenth promotion) and its alias `Net2`, `PreEarlyGrowth`, its control `Net2Defence`, `Net2Tac` and the
+    /// ablation's variants. No other variant, `pre-net2` and `nets-x-site` among them.
     pub fn net2(self) -> bool {
         self.net2_parts().is_some()
     }
 
-    /// `net2`'s science-flow neurons play (`net2::weights::AGREEMENT`, `SCIENTISTS`): `ScienceFlow` and `EarlyGrowth`,
-    /// which is built on it.
+    /// `net2`'s science-flow neurons play (`net2::weights::AGREEMENT`, `SCIENTISTS`): `Standard` (since the
+    /// seventeenth promotion), its alias `EarlyGrowth` and `ScienceFlow`, on which `EarlyGrowth` is built.
     pub fn science_flow(self) -> bool {
-        matches!(self, Variant::ScienceFlow | Variant::EarlyGrowth)
+        matches!(self, Variant::Standard | Variant::ScienceFlow | Variant::EarlyGrowth)
     }
 
-    /// `net2` reads the opening (`net2::weights::g::OPENING`): `EarlyGrowth` only.
+    /// `net2` reads the opening (`net2::weights::g::OPENING`): `Standard` (since the seventeenth promotion) and
+    /// its alias `EarlyGrowth`.
     pub fn early_growth(self) -> bool {
-        self == Variant::EarlyGrowth
+        matches!(self, Variant::Standard | Variant::EarlyGrowth)
     }
 
     /// `net2`'s hold of the cities plays (`net2::hold`, `Net2Plan::hold`): `LayoutDefence` only.
@@ -1678,7 +1703,7 @@ impl Variant {
     pub fn net2_parts(self) -> Option<crate::ai::net2::Parts> {
         use crate::ai::net2::Parts;
         match self {
-            Variant::Standard | Variant::Net2 | Variant::Net2Defence | Variant::Net2Tac | Variant::ScienceFlow | Variant::EarlyGrowth | Variant::LayoutDefence => Some(Parts::All),
+            Variant::Standard | Variant::PreEarlyGrowth | Variant::Net2 | Variant::Net2Defence | Variant::Net2Tac | Variant::ScienceFlow | Variant::EarlyGrowth | Variant::LayoutDefence => Some(Parts::All),
             Variant::Net2Without(part) => Some(Parts::Without(part)),
             Variant::Net2Off => Some(Parts::Nothing),
             _ => None,
@@ -1695,7 +1720,7 @@ impl Variant {
     /// `net2`'s offence (work/new-net-offence-addendum-2026-11-22.md) plays: every `net2` variant but
     /// `Net2Defence` (`standard` since the sixteenth promotion).
     pub fn net2_offence(self) -> bool {
-        matches!(self, Variant::Standard | Variant::Net2 | Variant::Net2Tac | Variant::Net2Without(_) | Variant::Net2Off | Variant::ScienceFlow | Variant::EarlyGrowth | Variant::LayoutDefence)
+        matches!(self, Variant::Standard | Variant::PreEarlyGrowth | Variant::Net2 | Variant::Net2Tac | Variant::Net2Without(_) | Variant::Net2Off | Variant::ScienceFlow | Variant::EarlyGrowth | Variant::LayoutDefence)
     }
 
     /// Its free military units clear the barbarian camps near its cities (`ai::camps`):

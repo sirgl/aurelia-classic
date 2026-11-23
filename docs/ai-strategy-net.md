@@ -266,8 +266,17 @@ No save section is added: a save of the old `standard` loads into the new one.
 `standard` plays as the bench's `net2` (classic/docs/ai-net2.md): the play of `nets-x-site` above, with `net2` in place of
 the strategist's pass (its intent through `intent_step` with `net2`'s tilt, its levers to the executors through
 `TurnBrief::net2`) and its site head in place of the guarded site score. `pre-net2` is the standard before it (the mind of
-`nets-x-site`, bench only); `nets-x-site` plays as `pre-net2`, and `net2` stays as an alias that plays as `standard`. The
-gates and their results are in classic/docs/ai-net2.md and `work/nets/promote-net2/PROMOTE.md`.
+`nets-x-site`, bench only); `nets-x-site` plays as `pre-net2`, and `net2` stayed as an alias that played as `standard`
+(as `pre-early-growth` since the seventeenth promotion). The gates and their results are in classic/docs/ai-net2.md and
+`work/nets/promote-net2/PROMOTE.md`.
+
+## Promoted: early-growth (the seventeenth promotion, 24 November)
+
+`standard` plays as the bench's `early-growth` (classic/docs/ai-net2.md): the play of `net2` above with `net2`'s science
+flow (the research agreements and the scientists of a seat that races to the spaceship) and its early growth (the
+opening's cities, the young cities' garrisons, the growth purchases, the shared land of a site). `pre-early-growth` is the
+standard before it (the play of `net2`, bench only); `early-growth` stays as an alias that plays as `standard`, and
+`science-flow` stays a bench name. The gates and their results are in classic/docs/ai-net2.md.
 
 ## Not done
 

@@ -1,4 +1,4 @@
-# net2: one net for the strategist's turn (the sixteenth promotion)
+# net2: one net for the strategist's turn (the sixteenth promotion; the science flow and the early growth, the seventeenth)
 
 `net2` (`ai::net2`, design `work/new-net-design-2026-11-22.md`) is one integer net that reads the seat and every rival
 and takes the strategist's turn: the style, the aim and the posture (`strategy_net::intent_step` with `net2`'s tilt),
@@ -20,7 +20,7 @@ without `experimental-ai` plays it (`ai_experimental_off`).
 `pre-net2` is the standard before it: the mind of `nets-x-site`, bench only (`experimental-ai`, last in `Variant::ALL`).
 Every other variant plays as it was measured: `nets-x-site` (now the play of `pre-net2`), `net2-defence`, `net2-tac`,
 the ablation's `net2-no-<part>` and `net2-off`, `tac2`, `peace-fix`, and the older lines; `net2` stays as an alias that
-plays as `standard`.
+played as `standard` (as `pre-early-growth` since the seventeenth promotion, below).
 
 No save section is added: `net2`'s memory is a section of the strategist's (`strategy_net::Memory::net2`); a save of the
 old `standard` has no such section and loads as `net2` with an empty memory.
@@ -89,6 +89,25 @@ does not reproduce on 1200 fresh games of main (0.85×); over every Standard-spe
 capital: the defence did not buy or build more (gold 171–240 unspent, buildings in the queue under a threat 2–3 × the
 guard); that is the shared defence executor's, not `net2`'s.
 
+## Promoted: early-growth (the seventeenth promotion, 24 November)
+
+`standard` plays as the bench's `early-growth`: the mind of `net2` with the science flow and the early growth below. The
+promotion is a choice of the mind (`ClassicMind::new`): `Variant::science_flow` and `Variant::early_growth` answer for
+`Standard` as for `EarlyGrowth`, under the name `standard`; `net2`'s parts and offence are the same as before. None of
+that code is behind `experimental-ai` (`net2::science`, `net2::growth`, their weights), so the game built without the
+feature plays it (`ai_experimental_off`). `pre-early-growth` is the standard before it: the mind of `net2` without the
+science flow and the early growth, bench only (`experimental-ai`, last in `Variant::ALL`). `early-growth` stays as an alias
+that plays as `standard`, and `science-flow` (measured on the standard before, with the science flow alone) stays a bench
+name. Every other variant plays as it was measured, on the standard before: `net2` and the variants built on it,
+`layout-defence`. No weight and no behaviour moved; the promotion is the choice of the mind.
+
+No save section is added: the science flow's wait counters are a section of the strategist's memory written only when a
+seat holds gold for an agreement (`net2/memory.rs`), so a save of the old `standard` loads as the new one with an empty
+section (`ai_save_load`: a save of main before the promotion).
+
+The gates and their results (lane `work/nets/early-growth`, `GATES.md`, section «Promotion (24 Nov)» and the rounds
+before it) are in "Measured" below.
+
 ## Candidate: science-flow (bench only, `experimental-ai`)
 
 `science-flow` is `standard` with two more neurons of `net2` (`net2/science.rs`, `weights::SCIENTISTS`, `AGREEMENT`;
@@ -105,12 +124,12 @@ The chest is released by the net: `r::CHEST_WAIT` (the rounds the chest held a p
 `gate::CHEST_WAIT_ROUNDS`) lowers `AGREEMENT` until the rival is no tie. The look, the measurements and the gates are in
 `work/nets/science-flow/SCIENCE-FLOW.md`.
 
-## Candidate: early-growth (bench only, `experimental-ai`; not measured against its gates)
+## Early growth, the lane's pieces (promoted to `standard` with the seventeenth promotion)
 
 `early-growth` is `science-flow` with three more inputs of `net2` (`weights::g::OPENING`, `OPENING_GAP`, `LUX_OPEN`;
 `net2::opening`, `opening_gap`, `lux_open`), one more term of `CITY_CAP` and two price tilts (`weights::EXPANSION_TILT`,
 `WORKER_TILT`, outside `neurons()` like the science-flow neurons). Every other variant keeps the inputs at 0
-(`TurnBrief::early_growth`), so the hashes of `standard`, `pre-net2` and `science-flow` do not move.
+(`TurnBrief::early_growth`), so before the promotion the hashes of `standard`, `pre-net2` and `science-flow` did not move.
 
 | piece | what | why (look, 20 self-play games, seeds 3610–3614, Quick) |
 |---|---|---|
@@ -131,15 +150,53 @@ why in `weights.rs` (the data: `work/nets/early-growth/runs/derive-e1-sf.md`, sc
 | piece | what the executor reads | why |
 |---|---|---|
 | `OPENING_ROOM` (a `Join::Min`), `OPENING` | `CITY_CAP`'s `g::OPENING`, `EXPANSION_TILT`'s `g::OPENING_GAP`: the first of four cities, the free sites, the cities the happiness pays for | seats at 3–4 cities at r80 made 82–83 beakers at r132 against 72 at 2 cities |
-| `GARRISON` (gate 500, per city; the capital keeps it) | `Growth::garrison_waits`: `planner_cities::garrison_order` orders no flat garrison there | young cities below the mean production had a military head in 49.6 % of their rounds, 70 % of it the flat garrison; capitals lost 4 against 3 in E3 with the wait on every city |
+| `GARRISON` (gate 500, per city; the capital keeps it) | `Growth::garrison_waits`: `planner_cities::needs_garrison` (read by `garrison_order`) lets the city need no flat garrison | young cities below the mean production had a military head in 49.6 % of their rounds, 70 % of it the flat garrison; capitals lost 4 against 3 in E3 with the wait on every city |
 | `CHEST_ITEM`, `BUY_CHEST` | `Growth::chest_heads`, `Growth::chest`: in `allocator::spend_gold` only the listed heads spend the chest | a library's offer had the better ratio (1853 against 1195) but its price was above the spendable gold in 3706 of 4591 offers |
 | `WORKER_SHORT`, `JOBS_CAP` | `Growth::jobs_ahead`: the allocator's worker counts at least the open tiles up to the citizens + 2 while a city lacks its worker | a city grows 2 citizens in 12 rounds, a first worker's second improvement takes 14 |
+| `GARRISON`'s `gc::RIVAL_NEAR` (+1000 at 5 tiles or less, a ramp to 0 at 15) | a city a rival's war net reaches keeps its garrison: `Growth::garrison_waits` does not list it | the war net's `EASE` gives a small city with no defender seen about 1000·near, so it is the soft city that opens a prey war; in round 3 (offsets 4840–4841) 3 of the 5 capitals early-growth lost fell in a prey war whose first target was such a city (pop 1–2, no garrison, ease 913–1000) |
 | site head S11·S12 (`site::SHARED` = 750) | three quarters of the land a site shares with an own city is subtracted | the share of citizens lost on the share of tiles shared: 0.76 (95 % CI 0.44–0.99) |
 
 Found and not changed: the building price does not count the buildings a building opens (`building_here`'s depth is
 the free buildings'); the worker's chop does not count the hammers the chop gives; a worker's job weight is linear in its
 gain. A higher worker gain for a lacking luxury (tried) left the improvable lacking luxuries as open as before (1.4 kinds
 at r50): their cause is not the job's value.
+
+### Measured (lane `work/nets/early-growth`, gates in `GATES.md`, each written before its run)
+
+Whole games, Quick, `--suite pace`, 400 games an offset, victory-weighted shares pooled with
+`work/nets/tools/victory-share.py`:
+
+| run | pairing | share | real victories |
+|---|---|---:|---|
+| E3, offsets 3722–3723 | `early-growth` against `science-flow` | 58.5 % | 195 / 138 |
+| round 3, offsets 4840–4841 (the review's conditions) | `early-growth` against `science-flow` | 61.0 % | 203 / 124 |
+| round 4, offsets 4850–4851 (`RIVAL_NEAR`, merged main edfa519) | `early-growth` against `science-flow` | 59.3 % | 214 / 146 |
+
+Against `pre-net2` (round 2) `early-growth` took 81.4 %, `science-flow` 72.3 %. Science a turn is +10 to +13 % from
+round 132 (production +13 %, population +10 to +12 %, technologies +1 to +2 %); gold is −18 % at round 66 and
+happiness −22 % at round 132, the cost of the bigger empire. Capitals lost in round 4: 0 against 1 for `science-flow`
+(early-growth's two went to early-growth seats). The AI's time of a turn is 1.15× `science-flow`'s (p50), 1.17–1.23×
+at p95: the empire is bigger (profile: `work/nets/early-growth/runs/sample-eg.txt`, `net2::growth` is 0.3 % of the thread).
+Gates that failed as written, reported here as they are: E1 (3.32 cities at round 80 against 3.5), E2 (median
+science-win round 0.984× against 0.92×), R4 (turn time 1.14× against 1.10×).
+
+The promotion's own gates and results (P1–P5) are at the end of this section's lane file, `GATES.md`; the table below
+is their summary.
+
+The promotion's gates (written first, in `GATES.md`; offsets 7310–7311 were used by no earlier run):
+
+| gate | what | result |
+|---|---|---|
+| P1 | the hashes, `--solo <v> --suite standard --speed quick` | new `standard` = `early-growth`'s on the build before (`02fd46640cbdd092`); `pre-early-growth` = the old standard (`cf535f70eb6b37bf`); `pre-net2` `380c45a20e751d31`, `science-flow` `76ce21789bdc687d` and `early-growth` `02fd46640cbdd092` unchanged |
+| P2 | the full tests with and without `experimental-ai` | 2338 / 2338 both ways |
+| P3 | a save of main before the promotion (`fixtures/standard-edfa519.aurelia`) loads and plays on | passes |
+| P4 | 400 games, Quick, offsets 7310–7311, `standard` against `pre-early-growth`, victory-weighted share ≥ 50 % | 61.7 % pooled (64.6 and 58.8 %); real victories 211 / 126 (`standard`: science 197, diplomatic 14; `pre-early-growth`: science 91, diplomatic 35); capitals lost 6 / 4 |
+| P5 | AI ms p50 a turn ≤ 1.20 × `pre-early-growth`'s | p50 1.17×, p95 1.19× |
+
+The game without the feature plays the promoted mind: `ai_experimental_off` is pinned on the feature-on game of
+`early-growth` (120 rounds: `132f3b49a3027bde`; the city-states case runs 380 rounds, since its games end by science
+before round 420). The garrison's wait is read once for the city's orders (`planner_cities::needs_garrison`): the
+cleanup of the review changes no hash.
 
 ## The beliefs by their effects (part `beliefs`, 23 November)
 
