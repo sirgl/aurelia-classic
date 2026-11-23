@@ -1,8 +1,10 @@
 //! Minimal faith and religion AI (PLAN M6 "AI for every mechanic"), from the
 //! observation only (`AIObservation::faith`). Deterministic: the pantheon by
 //! the score of its effects on the empire's land and situation
-//! (`ai::pantheon`), the other beliefs by fixed preference lists, ties by
-//! table order.
+//! (`ai::pantheon`); the other beliefs, with `net2`'s part `Beliefs`, by what
+//! their effects are worth at the strategy plan's prices (the belief head,
+//! `strategy_net::beliefs`), else by the fixed preference lists of the seats
+//! before it (`ai::belief_lists`); ties by table order.
 //!
 //! Strategy (own, simple):
 //! - found a pantheon as soon as the pool pays for one, the free belief that
@@ -37,43 +39,92 @@ use crate::world::religion::Creed;
 /// Missionaries an AI keeps out at most.
 pub const MISSIONARIES_WANTED: usize = 2;
 
-const FOUNDERS: [&str; 3] = [
-    "core:belief/founder/tithe",
-    "core:belief/founder/church-property",
-    "core:belief/founder/ceremonial-burial",
-];
-const FOLLOWERS: [&str; 4] = [
-    "core:belief/follower/pagodas",
-    "core:belief/follower/cathedrals",
-    "core:belief/follower/mosques",
-    "core:belief/follower/feed-the-world",
-];
-const ENHANCERS: [&str; 3] = [
-    "core:belief/enhancer/religious-texts",
-    "core:belief/enhancer/missionary-zeal",
-    "core:belief/enhancer/itinerant-preachers",
-];
+use crate::ai::belief_lists::{ENHANCERS, FOLLOWERS, FOUNDERS};
+
+/// Where the founder, follower, enhancer, reformation and bonus beliefs come from.
+#[derive(Debug, Clone, Copy, Default)]
+pub enum BeliefSource<'p> {
+    /// The fixed preference lists (`belief_lists`): every seat without `net2`'s part `Beliefs`. With the
+    /// strategy plan and the prices, the belief head is traced beside them (`strategy_net::trace::belief`),
+    /// never played.
+    #[default]
+    Lists,
+    ListsTraced(&'p crate::ai::strategy_net::Plan, &'p crate::ai::value::Prices),
+    /// The belief head at the strategy plan's prices (`strategy_net::beliefs`).
+    Head(&'p crate::ai::strategy_net::Plan, &'p crate::ai::value::Prices),
+}
+
+/// The belief choices of one turn: the head's model and reach are read once, at the first choice.
+struct Beliefs<'o, 'a, 'p> {
+    obs: &'o AIObservation<'a>,
+    rules: &'o CompiledRuleset,
+    source: BeliefSource<'p>,
+    read: std::cell::OnceCell<(crate::ai::strategy_net::model::Model, crate::ai::strategy_net::Base, crate::ai::strategy_net::beliefs::Reach)>,
+}
+
+impl<'o, 'a, 'p> Beliefs<'o, 'a, 'p> {
+    fn new(obs: &'o AIObservation<'a>, rules: &'o CompiledRuleset, source: BeliefSource<'p>) -> Self {
+        Self { obs, rules, source, read: std::cell::OnceCell::new() }
+    }
+
+    /// The belief of `slot` among `free` (none of `taken`): the head's, else the list's (`list`; empty: the
+    /// first free one). `founders`: the founder beliefs the religion holds or takes with it.
+    fn pick(&self, slot: &str, free: &[BeliefId], taken: &[BeliefId], list: &[&str], founders: &[BeliefId]) -> Option<BeliefId> {
+        let left: Vec<BeliefId> = free.iter().copied().filter(|b| !taken.contains(b)).collect();
+        let listed = crate::ai::belief_lists::pick(self.rules, &left, list);
+        let (plan, prices, plays) = match self.source {
+            BeliefSource::Head(plan, prices) => (plan, prices, true),
+            BeliefSource::ListsTraced(plan, prices) if crate::ai::strategy_net::trace::enabled() => (plan, prices, false),
+            _ => return listed,
+        };
+        let (model, base, reach) = self.read.get_or_init(|| {
+            use crate::ai::strategy_net::{beliefs::Reach, model::Model, Base};
+            (Model::of_observation_for_beliefs(self.obs, self.rules), Base::of(prices), Reach::of(self.obs, self.rules))
+        });
+        let head = crate::ai::strategy_net::beliefs::Head::new(model, self.rules, plan, base, *reach);
+        let (best, scored) = head.choose(&left, &[], founders);
+        crate::ai::strategy_net::trace::belief(self.obs.player.0, self.obs.round, slot, best, listed, &scored, self.rules);
+        if plays {
+            best
+        } else {
+            listed
+        }
+    }
+
+    /// The founder beliefs of the player's religion.
+    fn founders(&self) -> Vec<BeliefId> {
+        let faith = &self.obs.faith.overview;
+        let ours = faith.religion.and_then(|r| faith.religions.iter().find(|s| s.religion == r));
+        ours.map(|s| s.beliefs.iter().copied().filter(|b| self.category(*b) == Some(crate::classic::content::BeliefCategory::Founder)).collect()).unwrap_or_default()
+    }
+
+    fn category(&self, b: BeliefId) -> Option<crate::classic::content::BeliefCategory> {
+        self.rules.module.beliefs.get(usize::from(b.0)).and_then(|d| d.category)
+    }
+}
 
 /// The next faith decisions of the observed player: at most one per kind
 /// of decision (pantheon, prophet, reformation, purchase) and one per
 /// missionary. Every command is checked by the core; a refused one costs
 /// nothing.
 pub fn religion_commands(obs: &AIObservation<'_>, rules: &CompiledRuleset) -> Vec<Command> {
-    religion_commands_with(obs, rules, false, None)
+    religion_commands_with(obs, rules, false, None, BeliefSource::Lists)
 }
 
 /// `religion_commands`; with `priced` the missionaries' stop priced
 /// (`PricedStops::missionaries`); with `fix` the missionaries, the
 /// inquisitors and their purchase priced by the rules' formulas at those
-/// prices (`ai::religion_fix`).
+/// prices (`ai::religion_fix`); the beliefs from `source`.
 pub fn religion_commands_with(
     obs: &AIObservation<'_>,
     rules: &CompiledRuleset,
     priced: bool,
     fix: Option<&crate::ai::value::Prices>,
+    source: BeliefSource<'_>,
 ) -> Vec<Command> {
     let mut out = Vec::new();
     let faith = &obs.faith.overview;
+    let beliefs = Beliefs::new(obs, rules, source);
     if faith.can_found_pantheon {
         if let Some(belief) = crate::ai::pantheon::choose_pantheon(obs, rules, &faith.free_pantheon) {
             out.push(Command::FoundPantheon {
@@ -83,16 +134,16 @@ pub fn religion_commands_with(
         }
     }
     if faith.can_add_reformation {
-        if let Some(belief) = faith.free_reformation.first() {
+        if let Some(belief) = beliefs.pick("reformation", &faith.free_reformation, &[], &[], &beliefs.founders()) {
             out.push(Command::AddReformationBelief {
                 player: obs.player,
-                belief: *belief,
+                belief,
             });
         }
     }
     let mut scratch = MapScratch::default();
     for unit in &obs.own_units {
-        if let Some(cmd) = prophet_command(obs, rules, unit, priced, &mut scratch) {
+        if let Some(cmd) = prophet_command(obs, rules, unit, priced, &mut scratch, &beliefs) {
             out.push(cmd);
         } else if fix.is_some() {
             continue;
@@ -158,19 +209,6 @@ fn shrine_command(obs: &AIObservation<'_>, rules: &CompiledRuleset) -> Option<Co
     })
 }
 
-/// The first free belief of the preference list, else the first free one.
-fn pick(rules: &CompiledRuleset, free: &[BeliefId], preferred: &[&str]) -> Option<BeliefId> {
-    for key in preferred {
-        let found = free
-            .iter()
-            .find(|b| rules.module.beliefs[b.0 as usize].key == *key);
-        if let Some(b) = found {
-            return Some(*b);
-        }
-    }
-    free.first().copied()
-}
-
 pub(crate) fn has(rules: &CompiledRuleset, kind: UnitKindId, ability: UnitAbility) -> bool {
     rules
         .units
@@ -184,13 +222,14 @@ fn prophet_command(
     unit: &OwnUnit,
     priced: bool,
     scratch: &mut MapScratch,
+    beliefs: &Beliefs<'_, '_, '_>,
 ) -> Option<Command> {
     if !has(rules, unit.kind, UnitAbility::FoundReligion) {
         return None;
     }
     let faith = &obs.faith.overview;
     if faith.religion.is_none() && faith.religions_left > 0 {
-        return Some(found_or_walk(obs, rules, unit));
+        return Some(found_or_walk(obs, rules, unit, beliefs));
     }
     let religion = faith.religion?;
     let enhanced = faith
@@ -198,8 +237,9 @@ fn prophet_command(
         .iter()
         .any(|r| r.religion == religion && r.enhanced);
     if !enhanced {
-        let follower = pick(rules, &faith.free_follower, &FOLLOWERS)?;
-        let enhancer = pick(rules, &faith.free_enhancer, &ENHANCERS)?;
+        let founders = beliefs.founders();
+        let follower = beliefs.pick("follower2", &faith.free_follower, &[], &FOLLOWERS, &founders)?;
+        let enhancer = beliefs.pick("enhancer", &faith.free_enhancer, &[], &ENHANCERS, &founders)?;
         return Some(Command::EnhanceReligion {
             unit: unit.handle,
             follower,
@@ -257,11 +297,18 @@ fn holy_site_suits(obs: &AIObservation<'_>, rules: &CompiledRuleset, unit: &OwnU
 
 /// Found the religion where the prophet stands if it is an own city, else
 /// walk to the first own city.
-fn found_or_walk(obs: &AIObservation<'_>, rules: &CompiledRuleset, unit: &OwnUnit) -> Command {
+fn found_or_walk(obs: &AIObservation<'_>, rules: &CompiledRuleset, unit: &OwnUnit, beliefs: &Beliefs<'_, '_, '_>) -> Command {
     let in_city = obs.own_cities.iter().any(|c| c.tile == unit.tile);
     let faith = &obs.faith.overview;
-    let founder = pick(rules, &faith.free_founder, &FOUNDERS);
-    let follower = pick(rules, &faith.free_follower, &FOLLOWERS);
+    // The beliefs are chosen where the religion is founded (a walk chooses again in the city).
+    let (founder, follower) = match in_city {
+        true => {
+            let founder = beliefs.pick("founder", &faith.free_founder, &[], &FOUNDERS, &[]);
+            let founders: Vec<BeliefId> = founder.into_iter().collect();
+            (founder, beliefs.pick("follower", &faith.free_follower, &[], &FOLLOWERS, &founders))
+        }
+        false => (None, None),
+    };
     let religion = preferred_religion(obs, rules);
     match (in_city, founder, follower, religion) {
         (true, Some(founder), Some(follower), Some(religion)) => {
@@ -272,7 +319,7 @@ fn found_or_walk(obs: &AIObservation<'_>, rules: &CompiledRuleset, unit: &OwnUni
             let chosen = [Some(founder), Some(follower), pantheon];
             let bonus = match faith.extra_founding_beliefs {
                 0 => None,
-                _ => bonus_belief(obs, rules, faith, &chosen),
+                _ => bonus_belief(obs, rules, faith, &chosen, beliefs),
             };
             Command::FoundReligion {
                 unit: unit.handle,
@@ -293,15 +340,25 @@ fn found_or_walk(obs: &AIObservation<'_>, rules: &CompiledRuleset, unit: &OwnUni
     }
 }
 
-/// Byzantium's bonus belief: a second founder belief of the preference
-/// list, else a second follower, else an enhancer, else the pantheon belief
-/// that pays most (none of the beliefs already chosen).
+/// Byzantium's bonus belief (none of the beliefs already chosen): with the
+/// belief head the one of any kind worth most; else a second founder belief
+/// of the preference list, else a second follower, else an enhancer, else
+/// the pantheon belief that pays most.
 fn bonus_belief(
     obs: &AIObservation<'_>,
     rules: &CompiledRuleset,
     faith: &crate::derived::religion::FaithOverview,
     chosen: &[Option<BeliefId>],
+    beliefs: &Beliefs<'_, '_, '_>,
 ) -> Option<BeliefId> {
+    if let BeliefSource::Head(..) = beliefs.source {
+        let taken: Vec<BeliefId> = chosen.iter().flatten().copied().collect();
+        let founders: Vec<BeliefId> = taken.iter().copied().filter(|b| beliefs.category(*b) == Some(crate::classic::content::BeliefCategory::Founder)).collect();
+        let mut free: Vec<BeliefId> = [&faith.free_founder, &faith.free_follower, &faith.free_enhancer, &faith.free_pantheon].into_iter().flatten().copied().collect();
+        free.sort_unstable_by_key(|b| b.0);
+        free.dedup();
+        return beliefs.pick("bonus", &free, &taken, &[], &founders);
+    }
     let options = [
         (&faith.free_founder, &FOUNDERS[..]),
         (&faith.free_follower, &FOLLOWERS[..]),
@@ -309,7 +366,7 @@ fn bonus_belief(
     ];
     let left = |free: &[BeliefId]| -> Vec<BeliefId> { free.iter().copied().filter(|b| !chosen.contains(&Some(*b))).collect() };
     for (free, preferred) in options {
-        if let Some(belief) = pick(rules, &left(free), preferred) {
+        if let Some(belief) = crate::ai::belief_lists::pick(rules, &left(free), preferred) {
             return Some(belief);
         }
     }
@@ -551,6 +608,17 @@ pub fn religious_units(obs: &AIObservation<'_>, rules: &CompiledRuleset) -> Vec<
         .collect()
 }
 
+/// Where a seat's beliefs come from: the belief head with `net2`'s part `Beliefs` (and the strategy plan
+/// and the prices it reads), else the lists — traced beside the head when the seat has a plan.
+pub fn belief_source(brief: &crate::ai::planner::TurnBrief) -> BeliefSource<'_> {
+    let plays = brief.net2.as_ref().is_some_and(|n| n.parts.plays(crate::ai::net2::Part::Beliefs));
+    match (brief.strategy.as_deref(), brief.prices.as_ref()) {
+        (Some(plan), Some(prices)) if plays => BeliefSource::Head(plan, prices),
+        (Some(plan), Some(prices)) => BeliefSource::ListsTraced(plan, prices),
+        _ => BeliefSource::Lists,
+    }
+}
+
 /// The religion advisor of the AI driver (`ai::system`): pantheon,
 /// founding, beliefs, religious units and faith purchases, in the order of
 /// `religion_commands` (the first proposal has the highest priority).
@@ -563,7 +631,7 @@ impl crate::ai::system::SystemAdvisor for ReligionAdvisor {
         input: &crate::ai::system::AdvisorInput<'_, '_>,
     ) -> Vec<crate::ai::system::Proposal> {
         let fix = input.brief.prices.as_ref().filter(|_| input.brief.religion_fix);
-        let commands = religion_commands_with(input.observation, input.rules, input.brief.priced_stops.missionaries, fix);
+        let commands = religion_commands_with(input.observation, input.rules, input.brief.priced_stops.missionaries, fix, belief_source(input.brief));
         let count = commands.len() as i32;
         commands
             .into_iter()

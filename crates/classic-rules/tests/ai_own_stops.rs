@@ -10,7 +10,7 @@ use classic_rules::ai::driver::ClassicMind;
 use classic_rules::ai::planner::TurnBrief;
 use classic_rules::ai::planner_cities::{emergency_reserve, PricedStops, DEFICIT_RESERVE_TURNS};
 use classic_rules::ai::planner_value::building_gold;
-use classic_rules::ai::religion::religion_commands_with;
+use classic_rules::ai::religion::{religion_commands_with, BeliefSource};
 use classic_rules::ai::variant::Variant;
 use classic_rules::ai::AiSettings;
 use classic_rules::derived::religion::city_majority;
@@ -184,13 +184,13 @@ fn a_missionary_goes_to_a_foreign_city_the_rules_let_it_reach() {
     assert!(!obs.relations.iter().any(|r| r.other == P1 && r.they_grant_entry));
     let unit = obs.faith.units[0].0;
     let ordered = |commands: &[Command]| commands.iter().any(|c| matches!(c, Command::MarchTo { unit: u, .. } | Command::SpreadReligion { unit: u } if *u == unit));
-    assert!(!ordered(&religion_commands_with(&obs, &rules, false, None)), "the game's AI keeps it home");
+    assert!(!ordered(&religion_commands_with(&obs, &rules, false, None, BeliefSource::Lists)), "the game's AI keeps it home");
 
     let religion = Some(Creed::Religion(ReligionId(0)));
     let mut spread = false;
     for _ in 0..12 {
         let obs = game.ai_observation(&rules, P0);
-        let mine: Vec<Command> = religion_commands_with(&obs, &rules, true, None)
+        let mine: Vec<Command> = religion_commands_with(&obs, &rules, true, None, BeliefSource::Lists)
             .into_iter()
             .filter(|c| matches!(c, Command::MarchTo { unit: u, .. } | Command::SpreadReligion { unit: u } if *u == unit))
             .collect();
@@ -219,7 +219,7 @@ fn a_missionary_is_bought_only_for_a_city_to_spread_to() {
     game.debug_grant_faith(P0, 400);
     let bought = |commands: &[Command]| commands.iter().any(|c| matches!(c, Command::PurchaseWithFaith { .. }));
     let obs = game.ai_observation(&rules, P0);
-    assert!(bought(&religion_commands_with(&obs, &rules, true, None)), "P1's city is a target");
+    assert!(bought(&religion_commands_with(&obs, &rules, true, None, BeliefSource::Lists)), "P1's city is a target");
 
     // P1's city converted: no city left to spread to.
     let foreign = game.view().auth.cities().iter().find(|(_, c)| c.owner == P1).map(|(h, _)| h).unwrap();
@@ -228,6 +228,6 @@ fn a_missionary_is_bought_only_for_a_city_to_spread_to() {
     game.execute(&rules, Command::SpreadReligion { unit: preacher }).unwrap();
     assert_eq!(city_majority(game.view().auth, foreign), Some(Creed::Religion(ReligionId(0))));
     let obs = game.ai_observation(&rules, P0);
-    assert!(!bought(&religion_commands_with(&obs, &rules, true, None)), "no target, no missionary");
-    assert!(bought(&religion_commands_with(&obs, &rules, false, None)), "the game's AI buys one anyway");
+    assert!(!bought(&religion_commands_with(&obs, &rules, true, None, BeliefSource::Lists)), "no target, no missionary");
+    assert!(bought(&religion_commands_with(&obs, &rules, false, None, BeliefSource::Lists)), "the game's AI buys one anyway");
 }

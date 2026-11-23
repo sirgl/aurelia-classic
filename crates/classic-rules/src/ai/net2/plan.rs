@@ -636,10 +636,16 @@ pub enum Part {
     Guard,
     /// The tilt of the military price.
     Economy,
+    /// The beliefs of the religion chosen by their declared effects (`strategy_net::beliefs`), not by the fixed
+    /// preference lists (`ai::belief_lists`).
+    Beliefs,
+    /// The ideology by its tenets' worth (`strategy_net::heads::choose_policy`), not the one the rules' roles name
+    /// for the plan's posture and style (`ai_ideology`).
+    Ideology,
 }
 
 impl Part {
-    pub const ALL: [Part; 10] = [Part::Strategy, Part::War, Part::Deals, Part::Peace, Part::CityStates, Part::Congress, Part::Sites, Part::Fleet, Part::Guard, Part::Economy];
+    pub const ALL: [Part; 12] = [Part::Strategy, Part::War, Part::Deals, Part::Peace, Part::CityStates, Part::Congress, Part::Sites, Part::Fleet, Part::Guard, Part::Economy, Part::Beliefs, Part::Ideology];
 
     pub fn name(self) -> &'static str {
         match self {
@@ -653,6 +659,8 @@ impl Part {
             Part::Fleet => "fleet",
             Part::Guard => "guard",
             Part::Economy => "economy",
+            Part::Beliefs => "beliefs",
+            Part::Ideology => "ideology",
         }
     }
 }

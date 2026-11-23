@@ -201,6 +201,9 @@ pub struct Culture {
     pub adoptable: Vec<PolicyId>,
     pub unlockable: Vec<PolicyBranchId>,
     pub ideologies: Vec<(PolicyBranchId, u8)>,
+    /// The ideology by its tenets' worth only, not the one the rules' roles name for the plan
+    /// (`net2`'s part `Ideology`).
+    pub by_tenets: bool,
 }
 
 /// The policy choice (pure over the model: the scenario tests call it).
@@ -269,7 +272,8 @@ pub fn choose_policy(model: &Model, rules: &CompiledRuleset, plan: &Plan, base: 
         } else {
             IdeologyCase::Wide
         };
-        if let Some(named) = rules.roles.module.ai_ideology(case).filter(|b| culture.ideologies.iter().any(|(x, _)| x == b)) {
+        let named = rules.roles.module.ai_ideology(case).filter(|b| culture.ideologies.iter().any(|(x, _)| x == b));
+        if let (Some(named), false, false) = (named, culture.by_tenets, super::trace::enabled()) {
             return Some(PolicyChoice::Ideology(named));
         }
         let mut best: Option<(i64, PolicyBranchId)> = None;
@@ -288,7 +292,11 @@ pub fn choose_policy(model: &Model, rules: &CompiledRuleset, plan: &Plan, base: 
                 best = Some((v, *branch));
             }
         }
-        return best.map(|(_, b)| PolicyChoice::Ideology(b));
+        super::trace::ideology(named, best.map(|(_, b)| b), rules);
+        return match (named, culture.by_tenets) {
+            (Some(named), false) => Some(PolicyChoice::Ideology(named)),
+            _ => best.map(|(_, b)| PolicyChoice::Ideology(b)),
+        };
     }
     let branch_of = |p: PolicyId| rules.module.policies.get(usize::from(p.0)).and_then(|d| d.branch);
     let is_ideology = |b: PolicyBranchId| rules.module.policy_branches.get(usize::from(b.0)).is_some_and(|d| d.kind == crate::classic::content::PolicyBranchKind::Ideology);
@@ -384,13 +392,14 @@ pub fn science_ahead(model: &Model, rules: &CompiledRuleset, plan: &Plan, cultur
 }
 
 /// The culture decision of a turn.
-pub fn policy(obs: &AIObservation<'_>, rules: &CompiledRuleset, prices: &Prices, plan: &Plan) -> Option<Command> {
+/// `by_tenets`: the ideology by its tenets' worth only (`Culture::by_tenets`).
+pub fn policy(obs: &AIObservation<'_>, rules: &CompiledRuleset, prices: &Prices, plan: &Plan, by_tenets: bool) -> Option<Command> {
     let player = obs.player;
     let pressure = plan.intent.concepts[kc::CULTURE_PRESSURE];
     if obs.tourism.opinion == crate::world::tourism::PublicOpinion::Unrest && obs.tourism.preferred.is_some() && pressure >= w::SWITCH_PRESSURE {
         return Some(Command::SwitchIdeology { player });
     }
-    let mut culture = Culture { adoptable: obs.culture.adoptable.clone(), unlockable: obs.culture.unlockable.clone(), ideologies: obs.culture.ideologies.clone() };
+    let mut culture = Culture { adoptable: obs.culture.adoptable.clone(), unlockable: obs.culture.unlockable.clone(), ideologies: obs.culture.ideologies.clone(), by_tenets };
     // The first branch waits for the style's lock (it is the style's).
     if !plan.intent.locked && !obs.culture.branches.iter().any(|b| super::branches::is_normal(rules, *b)) {
         culture.unlockable.retain(|b| !super::branches::is_normal(rules, *b));
