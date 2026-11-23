@@ -430,7 +430,8 @@ impl<'t, 'v, 'a> Exposure<'t, 'v, 'a> {
         danger
     }
 
-    fn danger_fresh(&self, tile: TileId, hp: u16, struck: bool, hurt: &[(TileId, u16)]) -> Danger {
+    #[doc(hidden)]
+    pub fn danger_fresh(&self, tile: TileId, hp: u16, struck: bool, hurt: &[(TileId, u16)]) -> Danger {
         let end = danger::after(&self.unit, tile, hp, struck);
         let posture = self.threats.posture_with(&self.unit, tile);
         let place = Place { tile, posture: &posture, hurt };

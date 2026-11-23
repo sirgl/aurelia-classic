@@ -257,6 +257,11 @@ fn the_cell_runs_with_shared_base_choices_equal_the_runs_made_apart() {
                 let mut fed = Plan::new(&model);
                 fed.deltas[0].push(Delta { flat: [100, 0, 0, 0, 0, 0], ..Delta::default() });
                 plans.push(fed);
+                // A plan that changes the empire's mood with no delta on a tile: the cities' choice is asked
+                // at another food weight halfway (the base choices are asked at two weights in one run).
+                let mut moody = Plan::new(&model);
+                moody.deltas[0].push(Delta { from: 5, happy: 300, ..Delta::default() });
+                plans.push(moody);
                 for plan in &plans {
                     for (unit, citizen, sharp, horizon) in [([0, 100, 100, 100, 50, 50], 3000, false, 30), ([0, 80, 120, 90, 40, 20], 5000, true, 12)] {
                         let prices = CellPrices { unit, citizen, rounds_left: 150, sharp };
@@ -303,6 +308,50 @@ fn war_game(rules: &CompiledRuleset, seed: u64) -> GameState {
         game.debug_spawn_unit(rules, them, at(&game, qb, r), kind(key));
     }
     game
+}
+
+/// An exposure's answers from its memory, asked for the same place at other health, after a strike or not and
+/// with other enemies hurt, are the answers computed afresh (the memo's key holds all of them).
+#[test]
+fn an_exposure_keys_its_answers_by_the_place_the_health_the_strike_and_the_enemies_hurt() {
+    use classic_rules::ai::combat::Exposure;
+    use classic_rules::ai::danger::{Source, Threats};
+    let rules = compile_rules(core_rules()).unwrap();
+    let (mut asked, mut hurt_units, mut distinct) = (0, 0, std::collections::BTreeSet::new());
+    for seed in [3, 11] {
+        let mut game = war_game(&rules, seed);
+        let mut driver = AiDriver::new(AiSettings::for_rules(&rules, rules.default_difficulty()), Vec::new());
+        play_to(&mut game, &mut driver, &rules, 3);
+        for who in [PlayerId(0), PlayerId(1)] {
+            let obs = game.ai_observation(&rules, who);
+            let brief = TurnBrief::from_observation(&obs, &rules);
+            let threats = Threats::build(&obs, &rules, &brief, &[]);
+            let foes: Vec<TileId> = threats.foes.iter().map(|f| f.tile).collect();
+            for source in [Source::Net, Source::Search] {
+                for unit in threats.own.clone() {
+                    let exposure = Exposure::of(&threats, &rules, source, &unit);
+                    let places: Vec<TileId> = std::iter::once(unit.tile).chain(obs.view.dimensions().neighbors(unit.tile)).collect();
+                    for tile in places {
+                        for hp in [unit.hp, unit.hp / 2, 1] {
+                            for struck in [false, true] {
+                                let hurts: Vec<Vec<(TileId, u16)>> = vec![vec![], foes.iter().take(1).map(|t| (*t, 0)).collect(), foes.iter().take(1).map(|t| (*t, 30)).collect()];
+                                // Twice each, in two orders: the second ask of a key is the memory's.
+                                for hurt in hurts.iter().chain(hurts.iter().rev()) {
+                                    let answer = exposure.danger(tile, hp, struck, hurt);
+                                    let fresh = exposure.danger_fresh(tile, hp, struck, hurt);
+                                    assert_eq!(answer, fresh, "{tile:?} hp {hp} struck {struck} hurt {hurt:?}");
+                                    asked += 1;
+                                    hurt_units += usize::from(!hurt.is_empty() && answer.damage > 0);
+                                    distinct.insert((answer.damage, answer.death_permille));
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    assert!(asked > 500 && hurt_units > 20 && distinct.len() > 5, "real dangers were compared ({asked}, {hurt_units}, {})", distinct.len());
 }
 
 /// The dangers an exposure remembers are the dangers computed afresh: with the memo check on (`memo_check`) every
