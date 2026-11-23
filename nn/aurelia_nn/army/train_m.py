@@ -643,6 +643,7 @@ def main():
     ap.add_argument('--new-lr-mult', type=float, default=1.0, help='MBH: the history parameters (model_mb.HX_PARAMS) learn at this multiple of --lr')
     ap.add_argument('--warmup', type=int, default=20, help='resumed without the optimizer state: lr ramps up over these steps')
     ap.add_argument('--mem-gb', type=float, default=12.0, help='MLX memory limit (match the broker --ram reservation); cache 2 GB')
+    ap.add_argument('--freeze', default='', help='top-level parameters kept fixed, comma-separated (e.g. w_price: a step that must not learn that input)')
     a = ap.parse_args()
     mx.set_memory_limit(int(a.mem_gb * 2 ** 30))
     mx.set_cache_limit(2 * 2 ** 30)
@@ -693,6 +694,11 @@ def main():
         init = {k: v for k, v in mx.load(a.init).items() if k in own and own[k].shape == v.shape}
         model.load_weights(list(init.items()), strict=False)
     mx.eval(model.parameters())
+    frozen = [k for k in a.freeze.split(',') if k]
+    if frozen:
+        own_top = {k.split('.')[0] for k, _ in nn.utils.tree_flatten(model.parameters())}
+        assert all(k in own_top for k in frozen), (frozen, sorted(own_top))
+        model.freeze(keys=frozen, strict=True)
     n_params = sum(v.size for _, v in nn.utils.tree_flatten(model.parameters()))
     labelled = train.labelled
     plays_all = list(range(len(train)))
