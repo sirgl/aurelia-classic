@@ -131,6 +131,8 @@ pub enum Seat {
     Random,
     /// The army net (`army_net::seat`), weights from `ARMY_NET`.
     Net,
+    /// The DAgger probe's guard (`army_net::seat::probe_and_play`): a reference plays, probed each turn.
+    Probe(String),
 }
 
 impl Seat {
@@ -139,6 +141,7 @@ impl Seat {
             "passive" => Seat::Passive,
             "random" => Seat::Random,
             "army-net" => Seat::Net,
+            n if n.starts_with("probe:") => Seat::Probe(n["probe:".len()..].to_owned()),
             n if n.starts_with("ref-") => Seat::Script(n.to_owned()),
             n => Seat::Mind(n.to_owned()),
         }
@@ -331,7 +334,7 @@ fn play_on<P: kernel::ai::mind::AiMind<Classic>>(rules: &CompiledRuleset, mut ga
     let orders = crate::army_net::Orders::of_scene(rules, &game, &scene);
     if crate::army_net::record::wanted() {
         crate::army_net::record::start(orders.clone());
-        if seat == Seat::Net {
+        if matches!(seat, Seat::Net | Seat::Probe(_)) {
             crate::army_net::record::mute();
         }
     }
@@ -370,6 +373,9 @@ fn play_on<P: kernel::ai::mind::AiMind<Classic>>(rules: &CompiledRuleset, mut ga
                     }
                     Seat::Random => {
                         act::random_turn(&mut game, rules, scene.learner, &scene.mine, &rnd);
+                    }
+                    Seat::Probe(name) => {
+                        crate::army_net::seat::probe_and_play(rules, &mut game, &mut scene, name);
                     }
                     Seat::Net => {
                         let t = crate::army_net::seat::turn(rules, &mut game, &orders, &scene)?;
@@ -421,15 +427,17 @@ fn play_on<P: kernel::ai::mind::AiMind<Classic>>(rules: &CompiledRuleset, mut ga
         scene.info.insert("picks".into(), scene.track.picks.join("; "));
     }
     let mut measures = families::measures(rules, &game, &scene, rel);
-    measures.insert("learner_mind_us".into(), learner_us as f64);
+    // Times are not measures of the play (they differ from run to run): they go to `info`.
+    let mut info = scene.info.clone();
+    info.insert("learner_mind_us".into(), learner_us.to_string());
     if seat == Seat::Net {
         measures.insert("net_decisions".into(), net_time.decisions as f64);
-        measures.insert("net_observe_us".into(), net_time.observe_ns as f64 / 1000.0);
-        measures.insert("net_forward_us".into(), net_time.forward_ns as f64 / 1000.0);
-        measures.insert("net_encode_us".into(), net_time.encode_ns as f64 / 1000.0);
-        measures.insert("net_update_us".into(), net_time.update_ns as f64 / 1000.0);
         measures.insert("net_updates".into(), net_time.updates as f64);
         measures.insert("net_turns".into(), net_time.turns as f64);
+        info.insert("net_observe_us".into(), (net_time.observe_ns / 1000).to_string());
+        info.insert("net_forward_us".into(), (net_time.forward_ns / 1000).to_string());
+        info.insert("net_encode_us".into(), (net_time.encode_ns / 1000).to_string());
+        info.insert("net_update_us".into(), (net_time.update_ns / 1000).to_string());
     }
-    Ok(Row { family: scene.fam.name().to_owned(), era: lab::era_names(rules).get(scene.era as usize).cloned().unwrap_or_default(), instance: scene.instance, attempt: scene.attempt, player: player.to_owned(), win, rounds: rel, measures, info: scene.info.clone(), trace: rows_trace })
+    Ok(Row { family: scene.fam.name().to_owned(), era: lab::era_names(rules).get(scene.era as usize).cloned().unwrap_or_default(), instance: scene.instance, attempt: scene.attempt, player: player.to_owned(), win, rounds: rel, measures, info, trace: rows_trace })
 }

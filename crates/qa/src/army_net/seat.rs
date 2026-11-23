@@ -89,6 +89,20 @@ fn probe(rules: &CompiledRuleset, game: &GameState, scene: &Scene, first_of_turn
     if !super::record::active() || !dagger_family(scene) {
         return;
     }
+    probe_with(rules, game, scene, expert, first_of_turn);
+}
+
+/// The guard of the probe (`tests/army_net.rs`, player `probe:<reference>`): the reference plays the real
+/// game itself, muted, and before each of its turns the probe plays the same turn on a copy, recorded. When
+/// the probe is right its labels are the reference's own.
+pub fn probe_and_play(rules: &CompiledRuleset, game: &mut GameState, scene: &mut Scene, expert: &str) {
+    if super::record::active() {
+        probe_with(rules, game, scene, expert, true);
+    }
+    families::reference_turn(rules, game, scene, expert);
+}
+
+fn probe_with(rules: &CompiledRuleset, game: &GameState, scene: &Scene, expert: &str, first_of_turn: bool) {
     let mut copy = game.clone();
     let mut sc = scene.clone();
     if let Some(track) = EXPERT_TRACK.with(|t| t.borrow().clone()) {
