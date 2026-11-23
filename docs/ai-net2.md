@@ -88,3 +88,19 @@ does not reproduce on 1200 fresh games of main (0.85×); over every Standard-spe
 (P2, 1852–1853, 3340–3345) it is 37 / 34 = 1.09×. In the traced case the fixed outputs did not change the play at the
 capital: the defence did not buy or build more (gold 171–240 unspent, buildings in the queue under a threat 2–3 × the
 guard); that is the shared defence executor's, not `net2`'s.
+
+## Candidate: science-flow (bench only, `experimental-ai`)
+
+`science-flow` is `standard` with two more neurons of `net2` (`net2/science.rs`, `weights::SCIENTISTS`, `AGREEMENT`;
+`Net2Plan::science`) and one more rival input (`r::CHEST_WAIT`, kept in `plan::ScienceMemory`). Every other variant keeps
+them off (`TurnBrief::science_flow`; the input is 0 and the memory writes no bytes), so the hashes of `standard` and
+`pre-net2` do not move.
+
+| neuron | output | executor that reads it |
+|---|---|---|
+| `SCIENTISTS` | the share of the science specialists' slots filled | `citizens::science_specialist_commands`: forced specialists, the city keeps `gate::SCIENTIST_FOOD` food a turn |
+| `AGREEMENT` (per rival) | the ties and the cadence of each (`science::cadence`: every round at 1000, `gate::LADDER_ROUNDS` at the gate) | `Net2Plan::denies_item` lifts the runaway's denial for the friendship and the agreement; `diplomacy::ladder_offers` offers the ladder at the tie's cadence; the allocator keeps the agreements' gold (`Science::chest`, the rules' cost: `deals::agreement_cost_of`) |
+
+The chest is released by the net: `r::CHEST_WAIT` (the rounds the chest held a partner's gold unsigned, over
+`gate::CHEST_WAIT_ROUNDS`) lowers `AGREEMENT` until the rival is no tie. The look, the measurements and the gates are in
+`work/nets/science-flow/SCIENCE-FLOW.md`.

@@ -285,7 +285,7 @@ impl<'i, 'o, 'a> Negotiation<'i, 'o, 'a> {
     fn scale(&self, other: PlayerId, item: DealItem, receiving: bool) -> Centi {
         let agreements = crate::ai::diplomacy::agreement_prices(self.input);
         // `strategist-x`: no friendship, research agreement, pact or open borders for the rival running away.
-        if crate::ai::diplomacy::helps(item) && crate::ai::diplomacy::denied(self.input.brief, other) {
+        if crate::ai::diplomacy::helps(item) && crate::ai::diplomacy::denied_item(self.input.brief, other, item) {
             return self.gold(crate::ai::diplomacy::REFUSED);
         }
         let value = crate::ai::diplomacy::item_value_with(self.obs(), self.input.rules, agreements, self.input.brief.net2_for(crate::ai::net2::plan::Part::Deals), other, item, receiving);

@@ -330,6 +330,7 @@ pub fn after_intent(pass: &Pass, intent: &Intent, inputs: &Inputs, round: u32) -
         space_hold: space_hold(&inputs.space, part_hold),
         space_research: pass.parts.plays(Part::Strategy) && space_research >= gate::SPACE_RESEARCH.0,
         capital_gate: inputs.capital.filter(|_| pass.parts.plays(Part::Economy) && capital_gate >= gate::CAPITAL_GATE.0),
+        science: Default::default(),
     };
     After { plan, price_tilt, peace, part_hold, city_cap, space_research, capital_gate }
 }
