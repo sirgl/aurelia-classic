@@ -3,7 +3,8 @@
 //! Since the thirteenth promotion (11 November) `standard` plays as `next-w` in this build too, since
 //! the fourteenth (14 November) as `next-x`, since the fifteenth (22 November) as `nets-x-site`
 //! (the site net's table is compiled in this build since), and since the sixteenth (23 November) as `net2`
-//! (`ai::net2` is compiled in every build).
+//! (`ai::net2` is compiled in every build), and since the seventeenth (24 November) as `early-growth` (`net2`'s
+//! science flow and early growth are compiled in every build).
 
 #![cfg(not(feature = "experimental-ai"))]
 
@@ -16,19 +17,21 @@ use classic_rules::ai::strategy_net::trace;
 use classic_rules::scenario::{generate_new_game, generate_new_game_with, NewGameOptions, ScenarioConfig};
 use classic_rules::{compile_rules, CompiledRuleset};
 
-/// The hash after 120 rounds of the game of `rounds`, every seat played by `net2` with `experimental-ai` on the
-/// source of the sixteenth promotion (`ai/promote-net2`, the merge of `ai/net2` into main 64df245):
-/// `AiDriver::with_mind(.., ClassicMind::new(Variant::Net2))` on the same scenario, fasttest profile. The same source
-/// gave the old `standard` (now `pre-net2`, the play of `nets-x-site`) `PRE_NET2_120`, the pin before: `net2`
-/// plays these 120 rounds otherwise, so they tell the two apart.
+/// The hash after 120 rounds of the game of `rounds`, every seat played by `early-growth` with `experimental-ai` on the
+/// source of the seventeenth promotion (`ai/promote-early-growth`, classic 31d19c6 before the promotion):
+/// `AiDriver::with_mind(.., ClassicMind::new(Variant::EarlyGrowth))` on the same scenario, fasttest profile. The same
+/// source gave the old `standard` (now `pre-early-growth`, the play of `net2`) `PRE_EARLY_GROWTH_120`, the pin
+/// before: `early-growth` plays these 120 rounds otherwise, so they tell the two apart.
 /// History: the thirteenth promotion pinned `next-w` here (5667b774e7b92618 on 5079048; the
 /// standard before it, now `pre-next`, gave f9dde2e4e6e3d10c), re-pinned for deals by value
 /// (rules/deals, 12 November) to c13fb8a6f3dfced8; the fourteenth pinned `next-x` there, with the
 /// same hash (no war, no lost city and no vote in these rounds); the fifteenth pinned `nets-x-site`
-/// (0d2924db39996453; the old standard, now `pre-nets-x`, c13fb8a6f3dfced8).
-const NET2_120: u64 = 0x27a8_480f_a63f_cfd8;
-/// The same game after 120 rounds played by the old `standard` (now `pre-net2`), same source.
-const PRE_NET2_120: u64 = 0x0d29_24db_3999_6453;
+/// (0d2924db39996453; the old standard, now `pre-nets-x`, c13fb8a6f3dfced8); the sixteenth pinned `net2`
+/// (27a8480fa63fcfd8; the old standard, now `pre-net2`, 0d2924db39996453).
+const EARLY_GROWTH_120: u64 = 0x132f_3b49_a302_7bde;
+/// The same game after 120 rounds played by the old `standard` (now `pre-early-growth`), same source: the sixteenth
+/// promotion's pin.
+const PRE_EARLY_GROWTH_120: u64 = 0x27a8_480f_a63f_cfd8;
 
 fn rounds(rules: &CompiledRuleset, count: usize) -> Vec<u64> {
     let config = ScenarioConfig { seed: 0xA1_5EED, players: 4, width: 40, height: 32, cities: 0, units: 0, water_ratio: 15 };
@@ -49,7 +52,7 @@ fn the_variable_is_ignored_and_the_game_plays_standard() {
     std::env::remove_var("AURELIA_AI_VARIANT");
     let plain = rounds(&rules, 12);
     assert!(plain.windows(2).any(|w| w[0] != w[1]), "the AI moves: the hashes change");
-    for name in ["net", "strategy-net", "unit-net", "hybrid", "site-net", "choice-net", "standard-scripted", "no-such-variant", "pre-camps", "pre-next", "next-w", "pre-next-x", "next-x", "pre-nets-x", "nets-x-site", "econ-site", "net2", "net2-defence", "tac2", "net2-tac", "pre-net2"] {
+    for name in ["net", "strategy-net", "unit-net", "hybrid", "site-net", "choice-net", "standard-scripted", "no-such-variant", "pre-camps", "pre-next", "next-w", "pre-next-x", "next-x", "pre-nets-x", "nets-x-site", "econ-site", "net2", "net2-defence", "tac2", "net2-tac", "pre-net2", "science-flow", "early-growth", "pre-early-growth"] {
         std::env::set_var("AURELIA_AI_VARIANT", name);
         assert_eq!(ClassicMind::default().variant(), Variant::Standard, "{name}");
         assert_eq!(rounds(&rules, 12), plain, "{name}");
@@ -59,7 +62,7 @@ fn the_variable_is_ignored_and_the_game_plays_standard() {
 
 #[test]
 fn the_nets_have_no_name_in_this_build() {
-    for name in ["net", "unit-net", "hybrid", "site-net", "choice-net", "choice-net-production", "choice-net-research", "standard-scripted", "sharp", "tall-real", "next", "next-w", "next-race", "wonder-cancel", "wonder-race", "pre-next", "war-pays", "tactician-fit", "war-muster", "siege-call", "next-war", "retake2", "next-war-retake", "vote-guard", "landless-plan", "next-x", "pre-next-x", "strategist-x", "strategist-x-threat", "econ-site", "econ-site-tall", "econ-site-own-land", "nets-x", "nets-x-site", "pre-nets-x", "net2", "net2-defence", "tac2", "net2-tac", "net2-no-war", "net2-off", "pre-net2"] {
+    for name in ["net", "unit-net", "hybrid", "site-net", "choice-net", "choice-net-production", "choice-net-research", "standard-scripted", "sharp", "tall-real", "next", "next-w", "next-race", "wonder-cancel", "wonder-race", "pre-next", "war-pays", "tactician-fit", "war-muster", "siege-call", "next-war", "retake2", "next-war-retake", "vote-guard", "landless-plan", "next-x", "pre-next-x", "strategist-x", "strategist-x-threat", "econ-site", "econ-site-tall", "econ-site-own-land", "nets-x", "nets-x-site", "pre-nets-x", "net2", "net2-defence", "tac2", "net2-tac", "net2-no-war", "net2-off", "pre-net2", "science-flow", "early-growth", "pre-early-growth"] {
         assert_eq!(Variant::from_name(name), None, "{name}");
     }
     assert_eq!(Variant::from_name("standard"), Some(Variant::Standard));
@@ -69,19 +72,22 @@ fn the_nets_have_no_name_in_this_build() {
     assert_eq!(Variant::from_name("danger-net"), Some(Variant::DangerNet), "the danger net's table is the game's");
     // The game's AI reads the site net since the fifteenth promotion: its table is compiled in this build.
     assert!(!classic_rules::ai::site_net::references().is_empty(), "the site net's table is the game's");
-    // The game's AI plays `net2` since the sixteenth promotion, in this build too.
+    // The game's AI plays `net2` since the sixteenth promotion, in this build too, with its science flow and its early
+    // growth since the seventeenth.
     assert!(ClassicMind::default().plays_net2() && Variant::Standard.net2(), "the game's AI plays net2");
+    assert!(Variant::Standard.science_flow() && Variant::Standard.early_growth(), "the game's AI plays the early growth");
+    assert!(Variant::Standard.compiled() && !Variant::PreEarlyGrowth.compiled() && !Variant::EarlyGrowth.compiled() && !Variant::ScienceFlow.compiled());
 }
 
-/// The sixteenth promotion: the game built without the feature plays the game `net2` plays with it
-/// (`NET2_120`, pinned with the feature), not the old standard's.
+/// The seventeenth promotion: the game built without the feature plays the game `early-growth` plays with it
+/// (`EARLY_GROWTH_120`, pinned with the feature), not the old standard's.
 #[test]
-fn the_game_without_the_feature_plays_net2() {
+fn the_game_without_the_feature_plays_early_growth() {
     let rules = compile_rules(core_rules()).unwrap();
     std::env::remove_var("AURELIA_AI_VARIANT");
     let last = *rounds(&rules, 120).last().unwrap();
-    assert_ne!(NET2_120, PRE_NET2_120);
-    assert_eq!(last, NET2_120, "{last:016x}");
+    assert_ne!(EARLY_GROWTH_120, PRE_EARLY_GROWTH_120);
+    assert_eq!(last, EARLY_GROWTH_120, "{last:016x}");
 }
 
 /// The hash after `CITY_STATES_ROUNDS` rounds of a 5-seat game with 6 city-states, every seat played
@@ -117,15 +123,20 @@ fn the_game_without_the_feature_plays_net2() {
 /// Re-pinned for the belief head (`ai/beliefs`, 23 November: `net2`'s part `Beliefs` chooses the beliefs by their
 /// effects): 212 gifts, 19 votes; 495b1121a0570cd5 before. Re-pinned for the ideology by its tenets (`net2`'s part
 /// `Ideology`): 231 gifts, 14 votes; d70768d48fa075b3 before.
-const CITY_STATES_NET2: u64 = 0xb470_cbbe_30b1_52db;
-/// The same case played by the old `standard` (now `pre-net2`), same source.
-const CITY_STATES_OLD_STANDARD: u64 = 0xd7a7_a269_5f35_4aa9;
-const CITY_STATES_ROUNDS: usize = 420;
+/// Re-pinned for the seventeenth promotion (24 November): every seat played by `early-growth` with the feature on
+/// `ai/promote-early-growth` (`Variant::EarlyGrowth`). Its games end sooner (the science victories come before round
+/// 404: the game of 420 rounds ended at round 387 with 102 gifts and 15 votes), so the case runs 380 rounds: 95
+/// gifts, 10 votes; the old `standard` (`net2`, now `pre-early-growth`) gives `CITY_STATES_OLD_STANDARD` there (148
+/// gifts, 9 votes; b470cbbe30b152db after 420 rounds, the pin before).
+const CITY_STATES_EARLY_GROWTH: u64 = 0x2e92_1516_f310_35f4;
+/// The same case played by the old `standard` (now `pre-early-growth`), same source.
+const CITY_STATES_OLD_STANDARD: u64 = 0xfb02_91a5_8cfc_5986;
+const CITY_STATES_ROUNDS: usize = 380;
 
 /// The longer case of the promotion's review: city-states, gifts and votes are played in the game
-/// without the feature exactly as `net2` plays them with it.
+/// without the feature exactly as `early-growth` plays them with it.
 #[test]
-fn the_game_without_the_feature_plays_net2_with_city_states_gifts_and_votes() {
+fn the_game_without_the_feature_plays_early_growth_with_city_states_gifts_and_votes() {
     let rules = compile_rules(core_rules()).unwrap();
     std::env::remove_var("AURELIA_AI_VARIANT");
     let config = ScenarioConfig { seed: 0xA1_5EED, players: 5, width: 60, height: 40, cities: 0, units: 0, water_ratio: 15 };
@@ -149,6 +160,6 @@ fn the_game_without_the_feature_plays_net2_with_city_states_gifts_and_votes() {
     assert_eq!(rounds, CITY_STATES_ROUNDS, "the game stalled");
     assert!(gifts > 0 && votes > 0, "the case must exercise gifts and votes: {gifts} gifts, {votes} votes");
     let last = authoritative_hash(&game);
-    assert_ne!(CITY_STATES_NET2, CITY_STATES_OLD_STANDARD);
-    assert_eq!(last, CITY_STATES_NET2, "{last:016x} ({gifts} gifts, {votes} votes)");
+    assert_ne!(CITY_STATES_EARLY_GROWTH, CITY_STATES_OLD_STANDARD);
+    assert_eq!(last, CITY_STATES_EARLY_GROWTH, "{last:016x} ({gifts} gifts, {votes} votes)");
 }

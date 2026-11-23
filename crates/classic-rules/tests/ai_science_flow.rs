@@ -109,16 +109,17 @@ fn a_tie_lifts_the_denial_for_the_friendship_and_the_agreement_only() {
     assert!(plan.denies_item(P1, DealItem::OpenBorders) && plan.denies_item(P1, DealItem::DefensivePact));
 }
 
-/// `standard` and every other variant keep the science flow off; `science-flow` is `standard` with it, and
-/// `early-growth` is `science-flow` with the opening read (`net2::weights::g::OPENING`).
+/// Since the seventeenth promotion `standard` plays the science flow and the opening read; `science-flow` is the
+/// science flow alone (the standard before it with the science flow), `early-growth` is `science-flow` with the
+/// opening read, an alias of `standard`. Every other variant, `pre-early-growth` among them, keeps both off.
 #[test]
 fn only_science_flow_plays_the_science_flow() {
-    assert!(Variant::ALL.iter().all(|v| v.science_flow() == matches!(v, Variant::ScienceFlow | Variant::EarlyGrowth)));
-    assert!(Variant::ALL.iter().all(|v| v.early_growth() == (*v == Variant::EarlyGrowth)));
-    assert_eq!(Variant::EarlyGrowth.net2_parts(), Variant::Standard.net2_parts());
-    assert_eq!(Variant::EarlyGrowth.net2_offence(), Variant::Standard.net2_offence());
-    assert_eq!(Variant::ScienceFlow.net2_parts(), Variant::Standard.net2_parts());
-    assert_eq!(Variant::ScienceFlow.net2_offence(), Variant::Standard.net2_offence());
+    assert!(Variant::ALL.iter().all(|v| v.science_flow() == matches!(v, Variant::Standard | Variant::ScienceFlow | Variant::EarlyGrowth)));
+    assert!(Variant::ALL.iter().all(|v| v.early_growth() == matches!(v, Variant::Standard | Variant::EarlyGrowth)));
+    for v in [Variant::EarlyGrowth, Variant::ScienceFlow, Variant::PreEarlyGrowth] {
+        assert_eq!(v.net2_parts(), Variant::Standard.net2_parts());
+        assert_eq!(v.net2_offence(), Variant::Standard.net2_offence());
+    }
     assert_eq!(Net2Plan::default().science, Science::default());
 }
 
