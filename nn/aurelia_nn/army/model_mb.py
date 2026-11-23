@@ -236,3 +236,172 @@ class MBHNet(MBANet):
         h = h + layer.o(ctx) + ho(ctxh)
         m = layer.norm2(h)
         return h + layer.f2(nn.relu(layer.f1(m)))
+
+
+# MBN: the notes' parameters (their own lr group in train_m: `--new-lr-mult`).
+NX_PARAMS = ('n1', 'n2', 'nx_null', 'nx_same', 'nx_slope', 'no', 'rest', 'reason', 'free')
+
+
+class MBNNet(MBNet):
+    """MB plus the NOTES the net writes about its plan at the end of each of its turns (M-HANDOFF.md, «MBN (24 Nov)»),
+    read back by a separate per-layer cross-attention like MBH's. Starts equal to MB: the notes' output projections
+    `no` are zero.
+
+    The note stream of a play (`initial_notes`; MN's kinds, `model_mn.py`): PLAN(stage, engaged) with its age = turns
+    in the stage, lives until the next PLAN; PLAN_CHANGE(reason) for CHANGE_SPAN turns after the stage changed;
+    WAIT_STAGE(waited) while the plan is not engaged; PULL_BACK_HEAL(unit) while the unit rests (a state, not a transition: the teacher's
+    resting set), its age = turns resting. A note token: MN's F_NOTE numbers (kind, stage, reason, waited / 10, age / 3,
+    a free 8-vector tanh(free(P_0)), engaged), the unit's slot (-1 none) and its age (turns, for the bias).
+
+    Per layer the tokens and the plan tokens (queries: the layer's q on norm1 of the stream) attend to the notes (keys
+    / values: the layer's k / v on norm1 of the note embedding n2(relu(n1(note)))) with their own softmax over one
+    always-present null key (logit nx_null[l, h], value 0), minus nx_slope[l, h] x age, plus nx_same[l, h] for a note of
+    the query's own unit; the context enters the residual through no[l] (zero at the start).
+
+    Written at our turn's end, after the memory's update (`note_heads`, `write_notes`): the stage = the plan token's
+    stage readout (aux_p on P_0, trained by the auxiliary loss on the teacher's stage), engaged = aux_p[1] on
+    P_0[P_ENGAGED] > 0, waited = P_0[P_WAITED] x 10, the
+    resting units from `rest` on [H_i, token, u_s, resting before] (hand-set to the teacher's rule: rest under 70 hit
+    points, stay until 90: `assault::ROTATE_BELOW`, `ROTATE_BACK`), the change's reason from `reason` on its
+    indicators (a unit lost, the stage turned to heal-rotate, the stage advanced). In training the teacher's own track
+    writes the notes of its plays (teacher forcing) and supervises the heads; in play the net writes its own."""
+
+    def __init__(self, d=64, heads=4, layers=3, ff=128, promos=400, map_ch=MAP_CH):
+        super().__init__(d=d, heads=heads, layers=layers, ff=ff, promos=promos, map_ch=map_ch)
+        from .model_mn import F_NOTE, N_NOTES, NOTE_KINDS, REASONS
+        from .model_m import U
+        from .data import F_TOK
+        self.config['xnotes'] = {'kinds': NOTE_KINDS, 'reasons': REASONS, 'f_note': F_NOTE + 1, 'n_notes': N_NOTES, 'null_key': True, 'rest_state': True}
+        self.n1 = nn.Linear(F_NOTE + 1, d)
+        self.n2 = nn.Linear(d, d)
+        self.nx_null = mx.zeros((layers, heads))
+        self.nx_same = mx.full((layers, heads), 1.0)
+        self.nx_slope = mx.full((layers, heads), 0.5)
+        self.no = [nn.Linear(d, d) for _ in range(layers)]
+        for o in self.no:
+            o.weight = mx.zeros((d, d))
+            o.bias = mx.zeros((d,))
+        self.rest = nn.Linear(d + F_TOK + U + 1, 1)
+        self.reason = nn.Linear(4, len(REASONS))
+        from .model_mn import FREE
+        self.free = nn.Linear(d, FREE)
+
+    def hand_init(self):
+        super().hand_init()
+        from .model_mn import REASONS
+        d = self.config['d']
+        w = mx.zeros(self.rest.weight.shape)
+        w[0, d + 7] = -20.0  # the token's hit points / 100
+        w[0, -1] = 4.0       # resting before: stays until 90
+        self.rest.weight = w
+        self.rest.bias = mx.array([14.0])
+        self.reason.weight = mx.eye(len(REASONS)) * 5.0
+        self.reason.bias = mx.zeros((len(REASONS),))
+
+    @staticmethod
+    def initial_notes(b):
+        from .model_m import SLOTS, STAGES
+        from .model_mn import AGE_NONE, FREE, REASONS
+        return {'stage': mx.zeros((b, STAGES)), 'stage_age': mx.zeros((b,)), 'engaged': mx.zeros((b,)), 'waited': mx.zeros((b,)), 'free': mx.zeros((b, FREE)),
+                'change_age': mx.full((b,), AGE_NONE), 'reason': mx.zeros((b, len(REASONS))), 'rest': mx.zeros((b, SLOTS)), 'rest_age': mx.zeros((b, SLOTS))}
+
+    NOTE_STATE = ('stage', 'stage_age', 'engaged', 'waited', 'free', 'change_age', 'reason', 'rest', 'rest_age')
+
+    @staticmethod
+    def note_tokens(ns):
+        """[B, N_NOTES, F_NOTE + 1], mask [B, N_NOTES], slot [B, N_NOTES] (-1: not a unit's), age [B, N_NOTES] (turns).
+        The last number: PLAN's engaged (the assault went in). WAIT_STAGE lives while a plan is not engaged (the
+        teacher's stage label puts heal-rotate before stage, so "stage" alone misses the waits with units resting)."""
+        from .model_m import SLOTS, STAGES
+        from .model_mn import CHANGE_SPAN, FREE, NOTE_KINDS, REASONS, STAGE_WAIT
+        b = ns['stage'].shape[0]
+        k, st, rs = len(NOTE_KINDS), STAGES, len(REASONS)
+        z = mx.zeros((b,))
+
+        def tok(kind, stage=None, reason=None, waited=None, age=None, free=None, engaged=None):
+            parts = [mx.broadcast_to(mx.array([1.0 if i == kind else 0.0 for i in range(k)]), (b, k)),
+                     stage if stage is not None else mx.zeros((b, st)), reason if reason is not None else mx.zeros((b, rs)),
+                     (waited if waited is not None else z)[:, None] * 0.1, (age if age is not None else z)[:, None] / 3.0,
+                     free if free is not None else mx.zeros((b, FREE)), (engaged if engaged is not None else z)[:, None]]
+            return mx.concatenate(parts, axis=1)
+
+        has_plan = mx.sum(ns['stage'], axis=1) > 0
+        sa = mx.minimum(ns['stage_age'], 9.0)
+        ca = mx.minimum(ns['change_age'], 9.0)
+        ra = mx.minimum(ns['rest_age'], 9.0)
+        rows = [tok(0, stage=ns['stage'], age=sa, free=ns['free'], engaged=ns['engaged']), tok(1, stage=ns['stage'], reason=ns['reason'], age=ca), tok(2, waited=ns['waited'])]
+        masks = [has_plan, ns['change_age'] < CHANGE_SPAN, has_plan & (ns['engaged'] < 0.5)]
+        ages = [sa, ca, z]
+        for s in range(SLOTS):
+            rows.append(tok(3, age=ra[:, s]))
+            masks.append(ns['rest'][:, s] > 0.5)
+            ages.append(ra[:, s])
+        slot = mx.concatenate([mx.full((b, 3), -1, dtype=mx.int32), mx.broadcast_to(mx.arange(SLOTS, dtype=mx.int32)[None], (b, SLOTS))], axis=1)
+        return mx.stack(rows, axis=1), mx.stack(masks, axis=1), slot, mx.stack(ages, axis=1)
+
+    def body_b(self, b, um, pm):
+        """The body on a batch dict whose note stream is b['ns_<key>'] (b['ns_off'] [B] bool: the stream masked): (H, None)
+        (MBA's body_b shape: H and the stream after layer 1, not kept here)."""
+        ns = {k: b['ns_' + k] for k in self.NOTE_STATE}
+        return self.body_mbn(b['tok'], b['dist'], b['tmask'], b['slot'], um, pm, b['gtok'], b['tok_ok'], b['mmean'], ns, b['ns_off']), None
+
+    def body_mbn(self, tok, dist, tmask, slot, um, pm, gtok, tok_ok, mmean, ns, off):
+        """`body_mbg` with the notes' cross-attention in every layer."""
+        b, t, _ = tok.shape
+        h = self.e2(nn.relu(self.e1(tok)))
+        has = slot >= 0
+        us = um[mx.arange(b)[:, None], mx.maximum(slot, 0)]
+        h = h + mx.where(has[..., None], self.um(us), 0.0)
+        h = h + mx.where(tok_ok[..., None], self.m_tok(gtok), 0.0)
+        pooled = self.m_pool(mmean)
+        h = mx.concatenate([h[:, :1] + pooled[:, None, :], h[:, 1:]], axis=1)
+        x = mx.concatenate([h, pm], axis=1)
+        mask = mx.concatenate([tmask, mx.ones((b, PLANS), dtype=mx.bool_)], axis=1)
+        is_plan = mx.concatenate([mx.zeros((t,), dtype=mx.bool_), mx.ones((PLANS,), dtype=mx.bool_)])
+        pair_plan = is_plan[:, None] | is_plan[None, :]
+        dpad = mx.pad(dist, [(0, 0), (0, PLANS), (0, PLANS)])
+        nt, nmask, nslot, nage = self.note_tokens(ns)
+        nmask = nmask & ~off[:, None]
+        ne = self.n2(nn.relu(self.n1(nt)))
+        qslot = mx.concatenate([slot, mx.full((b, PLANS), -1, dtype=slot.dtype)], axis=1)
+        same = ((qslot[:, :, None] == nslot[:, None, :]) & (nslot[:, None, :] >= 0)).astype(mx.float32)
+        for li, layer in enumerate(self.layers):
+            x = MBHNet.layer_mbh(layer, self.no[li], x, dpad, mask, pair_plan, self.plan_bias[li], ne, nmask, same, nage,
+                                 self.nx_null[li], self.nx_same[li], self.nx_slope[li])
+        return self.norm(x)
+
+    def note_heads(self, hfull, tok, slot, tmask, um2, pm2, ns):
+        """The heads at our turn's end (after the memory's update um2 / pm2). Returns: stage logits [B, 6], engaged
+        logit [B] (aux_p[1] on P_0[P_ENGAGED]), rest logits per token [B, T]."""
+        from .model_m import P_ENGAGED, P_STAGE, STAGES
+        from .model_mn import STAGE_HEAL
+        t = tok.shape[1]
+        b = tok.shape[0]
+        ap = self.aux_p
+        stage = ap[0, 0] * pm2[:, 0, P_STAGE:P_STAGE + STAGES] + ap[0, 1]
+        sl = mx.maximum(slot, 0)
+        us = um2[mx.arange(b)[:, None], sl]
+        before = mx.take_along_axis(ns['rest'], sl, axis=1)[..., None]
+        x = mx.concatenate([hfull[:, :t], tok, us, before], axis=-1)
+        rest = self.rest(x)[..., 0]
+        engaged = ap[1, 0] * pm2[:, 0, P_ENGAGED] + ap[1, 1]
+        return stage, engaged, rest
+
+    def reason_logits(self, ns, new_stage, event):
+        from .model_mn import STAGE_HEAL
+        had = mx.sum(ns['stage'], axis=1) > 0
+        old = mx.argmax(ns['stage'], axis=1)
+        ind = mx.stack([event, (new_stage == STAGE_HEAL).astype(mx.float32), (had & (new_stage > old)).astype(mx.float32), mx.zeros(event.shape)], axis=1)
+        return self.reason(ind)
+
+    @staticmethod
+    def write_notes(ns, stage_oh, engaged, waited, reason_oh, rest_slots, free, valid):
+        """The stream after a turn; everything [B, ...]; valid: the play had this turn."""
+        had = mx.sum(ns['stage'], axis=1) > 0
+        changed = had & (mx.argmax(stage_oh, axis=1) != mx.argmax(ns['stage'], axis=1))
+        stage_age = mx.where(had & ~changed, ns['stage_age'] + 1.0, 0.0)
+        change_age = mx.where(changed, 0.0, ns['change_age'] + 1.0)
+        reason = mx.where(changed[:, None], reason_oh, ns['reason'])
+        rest_age = mx.where(rest_slots > 0.5, mx.where(ns['rest'] > 0.5, ns['rest_age'] + 1.0, 0.0), 0.0)
+        new = {'stage': stage_oh, 'stage_age': stage_age, 'engaged': engaged, 'waited': waited, 'free': free, 'change_age': change_age, 'reason': reason, 'rest': rest_slots, 'rest_age': rest_age}
+        return {k: mx.where(valid.reshape((-1,) + (1,) * (v.ndim - 1)), v, ns[k]) for k, v in new.items()}
