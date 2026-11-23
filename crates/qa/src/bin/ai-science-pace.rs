@@ -81,6 +81,11 @@ struct Options {
     /// (`trace_line`, `trace_end`); the science flow's look (work/nets/science-flow).
     trace: Option<String>,
     trace_every: u32,
+    /// `--early FILE`: one JSON line per living seat every round up to `early_to` (`early_line`): the cities with
+    /// their queue heads, the civilians, the gold, the seat's commands of the round and the strategist's trace lines
+    /// of its size model, city cap, reviews and production picks (work/nets/early-growth). It decides nothing.
+    early: Option<String>,
+    early_to: u32,
 }
 
 impl Options {
@@ -111,6 +116,8 @@ fn options() -> Result<Options, String> {
         ideal: false,
         trace: None,
         trace_every: 10,
+        early: None,
+        early_to: 0,
     };
     let mut rounds_given = false;
     let mut args = std::env::args().skip(1);
@@ -129,6 +136,8 @@ fn options() -> Result<Options, String> {
             "--ideal" => options.ideal = true,
             "--trace" => options.trace = Some(value()?),
             "--trace-every" => options.trace_every = value()?.parse().map_err(|e| format!("--trace-every: {e}"))?,
+            "--early" => options.early = Some(value()?),
+            "--early-to" => options.early_to = value()?.parse().map_err(|e| format!("--early-to: {e}"))?,
             "--seeds" => {
                 let text = value()?;
                 options.seeds = match text.split_once("..") {
@@ -164,6 +173,9 @@ fn options() -> Result<Options, String> {
     }
     if options.ideal {
         options.scripts = vec!["continents"];
+    }
+    if options.early_to == 0 {
+        options.early_to = options.scaled(225);
     }
     Ok(options)
 }
@@ -249,6 +261,8 @@ struct GameResult {
     opening: Vec<[u32; 5]>,
     /// `--trace`'s lines of the game.
     trace: Vec<String>,
+    /// `--early`'s lines of the game.
+    early: Vec<String>,
 }
 
 /// The opening's checkpoint, a Standard round (scaled by the speed).
@@ -283,6 +297,10 @@ fn main() {
     if let Some(path) = &options.trace {
         let lines: Vec<&str> = results.iter().flat_map(|g| g.trace.iter().map(String::as_str)).collect();
         std::fs::write(path, lines.join("\n") + "\n").expect("the trace file is writable");
+    }
+    if let Some(path) = &options.early {
+        let lines: Vec<&str> = results.iter().flat_map(|g| g.early.iter().map(String::as_str)).collect();
+        std::fs::write(path, lines.join("\n") + "\n").expect("the early file is writable");
     }
     let rules = ClassicBench::rules();
     print!("{}", report(&rules, &options, &results));
@@ -415,7 +433,7 @@ fn play(rules: &CompiledRuleset, options: &Options, script: &'static str, seed: 
     let map = MapSpec { script, size: options.size };
     let mut game = if options.ideal { ideal_game(rules, options, seed) } else { ClassicBench::new_game_at(rules, &map, seed, options.rounds, &options.speed) };
     let mut driver = AiDriver::with_mind(ClassicBench::settings(rules), Vec::new(), ClassicMind::new(options.variant));
-    driver.set_trace_capacity(0);
+    driver.set_trace_capacity(if options.early.is_some() { 100_000 } else { 0 });
     driver.record_journal();
     driver.configure_game(&mut game);
     let seats = majors(&game);
@@ -433,6 +451,10 @@ fn play(rules: &CompiledRuleset, options: &Options, script: &'static str, seed: 
     let mut adopted: Vec<Vec<(u16, u32)>> = vec![Vec::new(); seats.len()];
     let mut ruins = vec![0u32; seats.len()];
     let recon = |kind: classic_rules::ids::UnitKindId| rules.units.get(kind.0 as usize).and_then(|d| d.role) == Some(classic_rules::rules::content::UnitRole::Recon);
+    let mut early = Vec::new();
+    let mut early_cmds: Vec<Vec<String>> = vec![Vec::new(); seats.len()];
+    let mut early_seen: Vec<EarlySeen> = vec![EarlySeen::default(); seats.len()];
+    classic_rules::ai::strategy_net::trace::enable(options.early.is_some());
     while !game.is_over() && round(&game) <= options.rounds {
         loop {
             match driver.advance(&game, rules) {
@@ -446,8 +468,14 @@ fn play(rules: &CompiledRuleset, options: &Options, script: &'static str, seed: 
                         }
                         _ => None,
                     };
+                    let said = options.early.as_ref().filter(|_| round(&game) <= options.early_to).and_then(|_| early_command(&game, rules, &command));
                     let result = game.execute(rules, command);
                     let applied = result.is_ok();
+                    if let Some((owner, text)) = said.filter(|_| applied) {
+                        if let Some(seat) = seats.iter().position(|p| *p == owner) {
+                            early_cmds[seat].push(text);
+                        }
+                    }
                     driver.executed(result);
                     for done in driver.take_journal() {
                         for change in &done.changes.module_changes {
@@ -517,7 +545,35 @@ fn play(rules: &CompiledRuleset, options: &Options, script: &'static str, seed: 
                 checkpoints[index].insert(now, seat_at(&game, rules, *player, &buildings, &space));
             }
         }
+        if options.early.is_some() {
+            let lines = classic_rules::ai::strategy_net::trace::take();
+            // The reasons of the production orders of the round (the decision trace), then a fresh trace.
+            let reasons: Vec<(PlayerId, String)> = driver
+                .trace()
+                .entries()
+                .filter_map(|e| match &e.command {
+                    Some(Command::EnqueueProduction { player, city, item }) => Some((*player, format!("why:{}:{}:{:?}", auth.cities().get(*city).map_or(0, |c| c.id.0), item_key(rules, *item), e.reason))),
+                    _ => None,
+                })
+                .collect();
+            driver.set_trace_capacity(if now > options.early_to { 0 } else { 100_000 });
+            if now > options.early_to {
+                classic_rules::ai::strategy_net::trace::enable(false);
+            }
+            if now <= options.early_to + 1 {
+                for (index, player) in seats.iter().enumerate() {
+                    early_cmds[index].extend(reasons.iter().filter(|(p, _)| p == player).map(|(_, r)| r.clone()));
+                    if auth.players().is_alive(*player) {
+                        let mine: Vec<&String> = lines.iter().filter(|l| early_kept(l, player.0)).collect();
+                        let seen = early_seen_now(&game, rules, *player, now, &mut early_seen[index]);
+                        early.push(early_line(&game, rules, script, seed, *player, now, &early_cmds[index], &mine, &seen));
+                    }
+                    early_cmds[index].clear();
+                }
+            }
+        }
     }
+    classic_rules::ai::strategy_net::trace::enable(false);
     let end = round(&game).min(options.rounds);
     if !checkpoints_at.contains(&end) || game.is_over() {
         for (index, player) in seats.iter().enumerate() {
@@ -536,6 +592,7 @@ fn play(rules: &CompiledRuleset, options: &Options, script: &'static str, seed: 
         shared_land,
         opening,
         trace,
+        early,
     }
 }
 
@@ -966,4 +1023,202 @@ fn trace_end(
         })
         .collect();
     format!("{{\"g\":\"{script}/{seed}\",\"end\":{},\"outcome\":{out},\"seats\":[{}]}}", round(game), seat.join(","))
+}
+
+/// `--early`: the key of a production item.
+fn item_key(rules: &CompiledRuleset, item: classic_rules::ids::ProductionItem) -> String {
+    use classic_rules::ids::ProductionItem;
+    let short = |k: &str| k.rsplit('/').next().unwrap_or(k).to_owned();
+    match item {
+        ProductionItem::Unit(u) => rules.units.get(u.0 as usize).map_or("unit?".into(), |d| short(&d.key)),
+        ProductionItem::Building(b) => rules.buildings.get(b.0 as usize).map_or("building?".into(), |d| short(&d.key)),
+        ProductionItem::Project(_) => "project".into(),
+    }
+}
+
+/// `--early`: a command of a seat worth the look (its owner and a short text): an order, a purchase, a founding.
+fn early_command(game: &GameState<Classic>, rules: &CompiledRuleset, command: &Command) -> Option<(PlayerId, String)> {
+    let auth = game.view().auth;
+    match command {
+        Command::EnqueueProduction { player, city, item } => Some((*player, format!("enq:{}:{}", auth.cities().get(*city).map_or(0, |c| c.id.0), item_key(rules, *item)))),
+        Command::HurryProduction { player, city } => {
+            let head = auth.cities().get(*city).and_then(|c| c.queue.first().copied()).map_or("-".into(), |i| item_key(rules, i));
+            Some((*player, format!("buy:{}:{head}:{}", auth.cities().get(*city).map_or(0, |c| c.id.0), auth.players().treasury_of(*player))))
+        }
+        Command::PurchaseTile { player, city, .. } => Some((*player, format!("tile:{}", auth.cities().get(*city).map_or(0, |c| c.id.0)))),
+        Command::ClearProduction { player, city } => {
+            let core = auth.cities().get(*city);
+            let head = core.and_then(|c| c.queue.first().copied()).map_or("-".into(), |i| item_key(rules, i));
+            Some((*player, format!("clear:{}:{head}:{}", core.map_or(0, |c| c.id.0), core.map_or(0, |c| c.production))))
+        }
+        Command::FoundCity { settler } => auth.units().get(*settler).map(|u| {
+            // The distance to the nearest own and the nearest foreign city at the founding.
+            let dims = auth.map().dimensions;
+            let (mut own, mut foreign) = (99, 99);
+            for p in 0..auth.players().count() as u8 {
+                for h in auth.indexes().cities_of(PlayerId(p)) {
+                    let Some(c) = auth.cities().get(*h) else { continue };
+                    let d = dims.distance(c.tile, u.core.tile).unwrap_or(99);
+                    if PlayerId(p) == u.core.owner { own = own.min(d) } else { foreign = foreign.min(d) }
+                }
+            }
+            (u.core.owner, format!("found:{}:{}:{own}:{foreign}", u.core.id.0, u.core.tile.0))
+        }),
+        _ => None,
+    }
+}
+
+/// `--early`: what a seat's tiles and techs were (`early_seen_now`).
+#[derive(Debug, Clone, Default)]
+struct EarlySeen {
+    /// Own tile → its improvement last round.
+    improvement: BTreeMap<u32, Option<u16>>,
+    /// Own tile → the round its city began to work it unimproved.
+    worked_since: BTreeMap<u32, u32>,
+    techs: Vec<u16>,
+}
+
+/// `--early`: the improvements finished on our tiles since last round ([tile, key, worked now, rounds worked unimproved
+/// before]), the technologies learnt ([key]), our workers ([id, tile, working]).
+struct EarlyNow {
+    built: Vec<String>,
+    techs: Vec<String>,
+    workers: Vec<String>,
+}
+
+fn early_seen_now(game: &GameState<Classic>, rules: &CompiledRuleset, player: PlayerId, now: u32, seen: &mut EarlySeen) -> EarlyNow {
+    let auth = game.view().auth;
+    let map = auth.map();
+    let mut worked = std::collections::BTreeSet::new();
+    for handle in auth.indexes().cities_of(player) {
+        if let Some(core) = auth.cities().get(*handle) {
+            for (t, _) in kernel::derived::yields::city_work(auth, rules, core).worked() {
+                worked.insert(t.0);
+            }
+        }
+    }
+    let mut built = Vec::new();
+    for t in 0..map.dimensions.tile_count() as u32 {
+        let tile = kernel::ids::TileId(t);
+        let own = map.owning_city(tile).and_then(|c| auth.cities().get(c)).is_some_and(|c| c.owner == player);
+        if !own {
+            seen.improvement.remove(&t);
+            seen.worked_since.remove(&t);
+            continue;
+        }
+        let imp = map.working_improvement(tile).map(|i| i.0);
+        let before = seen.improvement.insert(t, imp);
+        if let Some(i) = imp.filter(|i| before.is_some_and(|b| b != Some(*i))) {
+            let key = rules.improvements.get(i as usize).map_or("?".to_owned(), |d| d.key.rsplit('/').next().unwrap_or(&d.key).to_owned());
+            let waited = seen.worked_since.get(&t).map_or(-1, |r| (now - r) as i64);
+            built.push(format!("[{t},\"{key}\",{},{waited}]", u8::from(worked.contains(&t))));
+        }
+        if imp.is_none() && worked.contains(&t) {
+            seen.worked_since.entry(t).or_insert(now);
+        } else {
+            seen.worked_since.remove(&t);
+        }
+    }
+    let mut techs = Vec::new();
+    for tech in auth.players().techs_of(player).iter() {
+        if !seen.techs.contains(&tech.0) {
+            seen.techs.push(tech.0);
+            techs.push(format!("\"{}\"", rules.technologies.get(tech.0 as usize).map_or("?", |d| d.key.rsplit('/').next().unwrap_or(&d.key))));
+        }
+    }
+    let mut workers = Vec::new();
+    for h in auth.indexes().units_of(player) {
+        let Some(u) = auth.units().get(*h) else { continue };
+        if rules.units.get(u.core.kind.0 as usize).is_some_and(|d| d.builder && d.domain == classic_rules::rules::content::Domain::Land) {
+            workers.push(format!("[{},{},{}]", u.core.id.0, u.core.tile.0, u8::from(u.core.work.is_some())));
+        }
+    }
+    EarlyNow { built, techs, workers }
+}
+
+/// `--early`: a strategist's trace line of `player` worth the look.
+fn early_kept(line: &str, player: u8) -> bool {
+    let tag = format!(" p{player} ");
+    line.contains(&tag) && ["TALLR", "CAP", "BUILD", "REVIEW", "GOALMISS", "FIT", "OPEN"].iter().any(|k| line.contains(&format!("{tag}{k}")))
+}
+
+/// `--early`: a living seat now.
+#[allow(clippy::too_many_arguments)]
+fn early_line(game: &GameState<Classic>, rules: &CompiledRuleset, script: &str, seed: u64, player: PlayerId, now: u32, commands: &[String], ai: &[&String], seen: &EarlyNow) -> String {
+    use classic_rules::derived::income::{city_income, player_income};
+    let auth = game.view().auth;
+    let quote = |s: &str| format!("\"{}\"", s.replace('\\', "\\\\").replace('"', "'"));
+    let mut cities = Vec::new();
+    let (mut pop, mut food, mut prod, mut libs, mut wonders) = (0u32, 0i64, 0i64, 0u32, 0u32);
+    for handle in auth.indexes().cities_of(player) {
+        let Some(core) = auth.cities().get(*handle) else { continue };
+        let income = city_income(auth, rules, core);
+        pop += core.population;
+        food += i64::from(income.food_surplus);
+        prod += i64::from(income.production);
+        let has = |key: &str| core.buildings.iter().any(|b| rules.buildings.get(b.0 as usize).is_some_and(|d| d.key.ends_with(key)));
+        libs += u32::from(has("library"));
+        wonders += core.buildings.iter().filter(|b| rules.buildings.get(b.0 as usize).is_some_and(|d| d.wonder)).count() as u32;
+        let head = core.queue.first().map_or("-".into(), |i| item_key(rules, *i));
+        let blds: Vec<String> = core.buildings.iter().filter_map(|b| rules.buildings.get(b.0 as usize)).map(|d| d.key.rsplit('/').next().unwrap_or(&d.key).to_owned()).collect();
+        cities.push(format!("[{},{},{},{},{},{},{}]", core.id.0, core.population, income.food_surplus, income.production, quote(&head), core.production, quote(&blds.join(","))));
+    }
+    let (mut settlers, mut workers, mut military) = (0u32, 0u32, 0u32);
+    let mut settler_ids = Vec::new();
+    for h in auth.indexes().units_of(player) {
+        let Some(u) = auth.units().get(*h) else { continue };
+        let Some(d) = rules.units.get(u.core.kind.0 as usize) else { continue };
+        if d.founder {
+            settlers += 1;
+            settler_ids.push(format!("[{},{}]", u.core.id.0, u.core.tile.0));
+        } else if d.builder {
+            workers += 1;
+        } else if d.strength > 0 || d.ranged_strength > 0 {
+            military += 1;
+        }
+    }
+    let income = player_income(auth, rules, player);
+    // Happiness by source, and the luxury deposits inside our borders: kinds not yet connected, tiles of them.
+    let h = classic_rules::derived::happiness::player_happiness(auth, rules, player);
+    let (mut open_kinds, mut open_tiles) = (std::collections::BTreeSet::new(), 0u32);
+    {
+        use classic_rules::rules::content::ResourceClass;
+        let ledger = classic_rules::derived::resources::resource_ledger(auth, rules, player);
+        let map = auth.map();
+        for t in 0..map.dimensions.tile_count() as u32 {
+            let tile = kernel::ids::TileId(t);
+            let Some(city) = map.owning_city(tile) else { continue };
+            if auth.cities().get(city).is_none_or(|c| c.owner != player) {
+                continue;
+            }
+            let Some(resource) = map.resource(tile).flatten() else { continue };
+            let Some(def) = rules.resources.get(resource.0 as usize) else { continue };
+            let improved = map.working_improvement(tile).is_some_and(|i| def.improvements.contains(&i));
+            if def.class == Some(ResourceClass::Luxury) && !improved && ledger.total(resource) == 0 {
+                open_kinds.insert(resource.0);
+                open_tiles += 1;
+            }
+        }
+    }
+    let happy = format!("[{},{},{},{},{},{},{},{},{}]", h.handicap, h.luxuries, h.luxury_kinds, h.local, h.buildings, h.per_city, h.from_cities, h.from_population, h.unhappiness_total);
+    let ai: Vec<String> = ai.iter().map(|l| quote(l.split(" | f[").next().unwrap_or(l))).collect();
+    let cmds: Vec<String> = commands.iter().map(|c| quote(c)).collect();
+    format!(
+        "{{\"g\":\"{script}/{seed}\",\"p\":{},\"r\":{now},\"cities\":{},\"pop\":{pop},\"food\":{food},\"prod\":{prod},\"sci\":{},\"gold\":{},\"treasury\":{},\"excess\":{},\"settlers\":{settlers},\"workers\":{workers},\"mil\":{military},\"libs\":{libs},\"wonders\":{wonders},\"techs\":{},\"happy\":{happy},\"lux_open\":[{},{open_tiles}],\"c\":[{}],\"cmd\":[{}],\"ai\":[{}],\"imp\":[{}],\"newtech\":[{}],\"w\":[{}],\"settler_ids\":[{}]}}",
+        player.0,
+        cities.len(),
+        income.science,
+        income.gold,
+        auth.players().treasury_of(player),
+        classic_rules::derived::happiness::excess_snapshot(auth, player),
+        auth.players().techs_of(player).len(),
+        open_kinds.len(),
+        cities.join(","),
+        cmds.join(","),
+        ai.join(","),
+        seen.built.join(","),
+        seen.techs.join(","),
+        seen.workers.join(","),
+        settler_ids.join(","),
+    )
 }
