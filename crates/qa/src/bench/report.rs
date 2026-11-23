@@ -1450,7 +1450,7 @@ mod tests {
         let rows = |n: u64| -> String {
             let results: Vec<MatchResult> = (1..=n).map(|seed| flow_duel(seed, [10 * seed as i32 + 2, 10 * seed as i32], [0, 0])).collect();
             let r = report(&results);
-            assert_eq!(significant(&metric_at(&r, "food")), n >= MIN_DELTA_BLOCKS);
+            assert_eq!(significant(&metric_at(&r, "food")), n >= MIN_DELTA_BLOCKS as u64);
             r.markdown(false)
         };
         let few = rows(MIN_DELTA_BLOCKS as u64 - 1);
