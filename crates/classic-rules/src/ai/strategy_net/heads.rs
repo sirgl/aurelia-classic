@@ -173,8 +173,8 @@ pub fn research(brief: &TurnBrief, rules: &CompiledRuleset, prices: &Prices, pla
 
 /// `net2`'s `space_research` lever (`Net2Plan::space_research`): the available technologies on the spaceship's way
 /// (`sharp::space_techs` and their prerequisites), when there is one; every available one otherwise, and for every
-/// seat without the lever.
-fn space_way(brief: &TurnBrief, rules: &CompiledRuleset, available: Vec<TechId>) -> Vec<TechId> {
+/// seat without the lever. Public for its test (`tests/ai_space_way.rs`).
+pub fn space_way(brief: &TurnBrief, rules: &CompiledRuleset, available: Vec<TechId>) -> Vec<TechId> {
     if !brief.net2.as_ref().is_some_and(|n| n.space_research) {
         return available;
     }
