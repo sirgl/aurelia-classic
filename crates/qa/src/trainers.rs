@@ -336,6 +336,8 @@ fn play_on<P: kernel::ai::mind::AiMind<Classic>>(rules: &CompiledRuleset, mut ga
         }
     }
     let mut net_time = crate::army_net::seat::Timing::default();
+    // The mind's time on the learner's turns (the AI's own turn time, for the army net's budget).
+    let mut learner_us = 0u64;
     let mut rows_trace = Vec::new();
     if trace {
         rows_trace.push(families::line(rules, &game, &scene, 0));
@@ -387,6 +389,9 @@ fn play_on<P: kernel::ai::mind::AiMind<Classic>>(rules: &CompiledRuleset, mut ga
             let t_step = std::time::Instant::now();
             let stepped = if active == scene.learner && crate::army_net::record::active() { crate::army_net::record::step(&mut driver, &mut game, rules) } else { driver.step(&mut game, rules) };
             PROF[0].fetch_add(t_step.elapsed().as_micros() as u64, std::sync::atomic::Ordering::Relaxed);
+            if active == scene.learner {
+                learner_us += t_step.elapsed().as_micros() as u64;
+            }
             let t_s = std::time::Instant::now();
             assault::sample(rules, &game, &mut scene, active);
             PROF[1].fetch_add(t_s.elapsed().as_micros() as u64, std::sync::atomic::Ordering::Relaxed);
@@ -415,6 +420,7 @@ fn play_on<P: kernel::ai::mind::AiMind<Classic>>(rules: &CompiledRuleset, mut ga
         scene.info.insert("picks".into(), scene.track.picks.join("; "));
     }
     let mut measures = families::measures(rules, &game, &scene, rel);
+    measures.insert("learner_mind_us".into(), learner_us as f64);
     if seat == Seat::Net {
         measures.insert("net_decisions".into(), net_time.decisions as f64);
         measures.insert("net_observe_us".into(), net_time.observe_ns as f64 / 1000.0);
