@@ -395,8 +395,44 @@ impl Choice {
     }
 }
 
+/// The choice of each city of one model while no delta of the plan is on its tiles, by food weight, kept for
+/// the runs of one review: a review runs the cell for the empire as it is and for every candidate goal, and
+/// nearly every city of nearly every run starts from the same choice (its tiles ranked at one of three food
+/// weights). Holds the model it was made for: a run of another one is a bug.
+pub struct BaseChoices<'m> {
+    model: &'m Model,
+    held: std::cell::RefCell<Vec<Vec<(i64, std::rc::Rc<Choice>)>>>,
+}
+
+impl<'m> BaseChoices<'m> {
+    pub fn new(model: &'m Model) -> Self {
+        Self { model, held: std::cell::RefCell::new(vec![Vec::new(); model.cities.len()]) }
+    }
+
+    fn get(&self, city: usize, food_weight: i64) -> std::rc::Rc<Choice> {
+        let mut held = self.held.borrow_mut();
+        if let Some((_, choice)) = held[city].iter().find(|(w, _)| *w == food_weight) {
+            return choice.clone();
+        }
+        let choice = std::rc::Rc::new(Choice::of(&self.model.cities[city], &[], &[], food_weight));
+        held[city].push((food_weight, choice.clone()));
+        choice
+    }
+}
+
 /// The run of `model` under `plan` over `horizon` rounds.
 pub fn run(model: &Model, plan: &Plan, prices: &CellPrices, horizon: i64) -> Outcome {
+    run_with(model, plan, prices, horizon, None)
+}
+
+/// `run` with the base choices of the review at hand (`BaseChoices`): the same outcome, the cities' rankings
+/// made once.
+pub fn run_cached(model: &Model, plan: &Plan, prices: &CellPrices, horizon: i64, cache: &BaseChoices<'_>) -> Outcome {
+    run_with(model, plan, prices, horizon, Some(cache))
+}
+
+fn run_with(model: &Model, plan: &Plan, prices: &CellPrices, horizon: i64, cache: Option<&BaseChoices<'_>>) -> Outcome {
+    assert!(cache.is_none_or(|c| std::ptr::eq(c.model, model)), "the base choices belong to another model");
     // `sharp`: no more steps than rounds in the horizon (a horizon of 3 rounds ran 10 of them,
     // every yield priced as kept to the last round: the food price at 4.00 at the game's end).
     let steps = if prices.sharp { STEPS.min(horizon.max(1)) } else { STEPS };
@@ -414,7 +450,7 @@ pub fn run(model: &Model, plan: &Plan, prices: &CellPrices, horizon: i64) -> Out
     let each = super::model::per_citizen();
     // A city's choice is ranked anew only when its food weight or the plan's
     // deltas on its tiles change: most steps of most runs reuse it.
-    let mut choices: Vec<Option<Choice>> = (0..n).map(|_| None).collect();
+    let mut choices: Vec<Option<std::rc::Rc<Choice>>> = (0..n).map(|_| None).collect();
     let mut active: Vec<usize> = Vec::new();
     let mut on_tiles: Vec<usize> = Vec::new();
     let mut taken: Vec<bool> = Vec::new();
@@ -463,7 +499,11 @@ pub fn run(model: &Model, plan: &Plan, prices: &CellPrices, horizon: i64) -> Out
                 }
             }
             if choices[i].as_ref().is_none_or(|c| c.food_weight != food_weight || c.on_tiles != on_tiles) {
-                choices[i] = Some(Choice::of(city, deltas, &on_tiles, food_weight));
+                choices[i] = Some(match cache {
+                    // No delta on its tiles: the choice does not read the plan.
+                    Some(cache) if on_tiles.is_empty() => cache.get(i, food_weight),
+                    _ => std::rc::Rc::new(Choice::of(city, deltas, &on_tiles, food_weight)),
+                });
             }
             let choice = choices[i].as_ref().expect("chosen above");
             // The citizens take tiles one by one: food at its weight until the
@@ -589,17 +629,26 @@ pub fn span(horizon: i64) -> i64 {
 /// brings citizens earlier, their yields count at the prices, and the last
 /// step's rate goes on to the end.
 pub fn food_price(model: &Model, plan: &Plan, prices: &CellPrices, horizon: i64) -> i64 {
+    food_price_with(model, plan, prices, horizon, None)
+}
+
+/// `food_price` with the base choices of the review at hand.
+pub fn food_price_cached(model: &Model, plan: &Plan, prices: &CellPrices, horizon: i64, cache: &BaseChoices<'_>) -> i64 {
+    food_price_with(model, plan, prices, horizon, Some(cache))
+}
+
+fn food_price_with(model: &Model, plan: &Plan, prices: &CellPrices, horizon: i64, cache: Option<&BaseChoices<'_>>) -> i64 {
     if model.cities.is_empty() {
         return 0;
     }
-    let base = run(model, plan, prices, horizon).value;
+    let base = run_with(model, plan, prices, horizon, cache).value;
     let mut total = 0;
     for i in 0..model.cities.len() {
         let mut fed = plan.clone();
         let mut flat = [0; 6];
         flat[0] = 100;
         fed.deltas[i].push(Delta { flat, ..Delta::default() });
-        total += run(model, &fed, prices, horizon).value - base;
+        total += run_with(model, &fed, prices, horizon, cache).value - base;
     }
     total / model.cities.len() as i64
 }

@@ -12,7 +12,7 @@
 //! growth, then more tiles of the kind another goal improves — are found
 //! together. The review also sets the cell's food price and growth factors.
 
-use super::cell::{food_price, run, CellPrices, Place, Plan as CellPlan};
+use super::cell::{food_price_cached, run_cached, BaseChoices, CellPrices, Place, Plan as CellPlan};
 use super::effects::Valuer;
 use super::layers::ONE;
 use super::model::Model;
@@ -311,10 +311,10 @@ type Rating = (i64, i64, i64, Vec<TechId>);
 
 /// A candidate rated against `plan`.
 #[allow(clippy::too_many_arguments)]
-fn rate(model: &Model, rules: &CompiledRuleset, prices: &CellPrices, plan: &CellPlan, base: i64, c: &Candidate, horizon: i64, rounds_left: i64) -> Rating {
+fn rate(model: &Model, rules: &CompiledRuleset, prices: &CellPrices, plan: &CellPlan, base: i64, c: &Candidate, horizon: i64, rounds_left: i64, cache: &BaseChoices<'_>) -> Rating {
     let way = c.tech.map_or_else(Vec::new, |t| path(rules, &model.techs, &plan.techs, t));
     let turns = timing(model, rules, plan, c, &way).0;
-    let gained = if turns < horizon { run(model, &applied(model, rules, plan, c, turns, &way), prices, horizon).value - base } else { 0 };
+    let gained = if turns < horizon { run_cached(model, &applied(model, rules, plan, c, turns, &way), prices, horizon, cache).value - base } else { 0 };
     let chance = match c.kind {
         GoalKind::Wonder { .. } => {
             let standard = turns * 100 / model.pace.max(1);
@@ -336,8 +336,9 @@ pub fn review(model: &Model, rules: &CompiledRuleset, intent: &Intent, mult: &mu
     let horizon = i64::from(intent.horizon.max(1));
     let prices = CellPrices::of(base, mult).scaled(intent.sharp);
     let empty = CellPlan::new(model);
-    let food = food_price(model, &empty, &prices, horizon);
-    let outcome = run(model, &empty, &prices, horizon);
+    let cache = BaseChoices::new(model);
+    let food = food_price_cached(model, &empty, &prices, horizon, &cache);
+    let outcome = run_cached(model, &empty, &prices, horizon, &cache);
     // `sharp`: the allocator's food price on the cell's scale (its citizen worth its yields too).
     let reference = if intent.sharp { super::sharp::food_reference(model, &prices, base) } else { base.food };
     if reference > 0 {
@@ -358,7 +359,7 @@ pub fn review(model: &Model, rules: &CompiledRuleset, intent: &Intent, mult: &mu
             (c.id, g)
         })
         .collect();
-    let goals = choose(model, rules, intent, mult, base);
+    let goals = choose_with(model, rules, intent, mult, base, &cache);
     Review { round, cities: model.cities.len() as u32, at_war, food: mult[pd::FOOD], goals, growth }
 }
 
@@ -370,11 +371,12 @@ pub fn ranked(model: &Model, rules: &CompiledRuleset, intent: &Intent, mult: &[M
     let rounds_left = base.rounds_left.max(1);
     let valuer = Valuer { model, rules, base, mult, horizon: rounds_left, room: i64::from(intent.more_cities), fight: super::heads::fight(intent) };
     let plan = CellPlan::new(model);
-    let value = run(model, &plan, &prices, horizon).value;
+    let cache = BaseChoices::new(model);
+    let value = run_cached(model, &plan, &prices, horizon, &cache).value;
     let mut out: Vec<(GoalKind, i64, i64, i64)> = candidates(model, rules, intent, &valuer)
         .iter()
         .map(|c| {
-            let (worth, r, turns, _) = rate(model, rules, &prices, &plan, value, c, horizon, rounds_left);
+            let (worth, r, turns, _) = rate(model, rules, &prices, &plan, value, c, horizon, rounds_left, &cache);
             (c.kind, worth, r, turns)
         })
         .collect();
@@ -384,6 +386,11 @@ pub fn ranked(model: &Model, rules: &CompiledRuleset, intent: &Intent, mult: &[M
 
 /// The pointer: the goals, best first.
 pub fn choose(model: &Model, rules: &CompiledRuleset, intent: &Intent, mult: &[Milli; pd::N], base: &Base) -> Vec<Goal> {
+    choose_with(model, rules, intent, mult, base, &BaseChoices::new(model))
+}
+
+/// `choose` with the base choices of the review at hand.
+fn choose_with(model: &Model, rules: &CompiledRuleset, intent: &Intent, mult: &[Milli; pd::N], base: &Base, cache: &BaseChoices<'_>) -> Vec<Goal> {
     if model.cities.is_empty() {
         return Vec::new();
     }
@@ -392,11 +399,11 @@ pub fn choose(model: &Model, rules: &CompiledRuleset, intent: &Intent, mult: &[M
     let rounds_left = base.rounds_left.max(1);
     let valuer = Valuer { model, rules, base, mult, horizon: rounds_left, room: i64::from(intent.more_cities), fight: super::heads::fight(intent) };
     let mut plan = CellPlan::new(model);
-    let mut value = run(model, &plan, &prices, horizon).value;
+    let mut value = run_cached(model, &plan, &prices, horizon, cache).value;
     let all = candidates(model, rules, intent, &valuer);
     // Screening: the best by their rate against the empire as it is. Their
     // ratings serve the first choice, which rates them against the same plan.
-    let mut rated: Vec<(Rating, usize)> = all.iter().enumerate().map(|(i, c)| (rate(model, rules, &prices, &plan, value, c, horizon, rounds_left), i)).collect();
+    let mut rated: Vec<(Rating, usize)> = all.iter().enumerate().map(|(i, c)| (rate(model, rules, &prices, &plan, value, c, horizon, rounds_left, cache), i)).collect();
     rated.sort_by_key(|(r, i)| (std::cmp::Reverse(r.1), *i));
     rated.truncate(w::CANDIDATES);
     let mut pool: Vec<(Candidate, Option<Rating>)> = rated.into_iter().filter(|(r, _)| r.1 > 0).map(|(r, i)| (all[i].clone(), Some(r))).collect();
@@ -413,7 +420,7 @@ pub fn choose(model: &Model, rules: &CompiledRuleset, intent: &Intent, mult: &[M
         }
         let mut best: Option<(i64, i64, i64, Vec<TechId>, usize)> = None;
         for (i, (c, screened)) in pool.iter_mut().enumerate() {
-            let (worth, r, turns, way) = screened.take().unwrap_or_else(|| rate(model, rules, &prices, &plan, value, c, horizon, rounds_left));
+            let (worth, r, turns, way) = screened.take().unwrap_or_else(|| rate(model, rules, &prices, &plan, value, c, horizon, rounds_left, cache));
             if best.as_ref().is_none_or(|b| r > b.1) {
                 best = Some((worth, r, turns, way, i));
             }
@@ -429,7 +436,7 @@ pub fn choose(model: &Model, rules: &CompiledRuleset, intent: &Intent, mult: &[M
         let (_, known) = timing(model, rules, &plan, &c, &way);
         plan = applied(model, rules, &plan, &c, turns, &way);
         occupy(&mut plan, &c, turns, known);
-        value = run(model, &plan, &prices, horizon).value;
+        value = run_cached(model, &plan, &prices, horizon, cache).value;
         // A wonder is one goal whatever its city; a branch excludes its rivals.
         pool.retain(|(o, _)| match (o.kind, c.kind) {
             (GoalKind::Wonder { building: a, .. }, GoalKind::Wonder { building: b, .. }) => a != b,

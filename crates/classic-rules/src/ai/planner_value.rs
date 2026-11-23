@@ -11,7 +11,7 @@ use crate::rules::effects::{CompiledEffect, EffectSet, Modifier, YieldKind};
 use crate::rules::CompiledRuleset;
 
 /// Strategy weights per kind of benefit.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Weights {
     pub food: i32,
     pub production: i32,

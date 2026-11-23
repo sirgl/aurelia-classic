@@ -192,7 +192,7 @@ pub struct AIObservation<'a> {
     /// The World Congress as its screen shows it (None: not founded).
     pub congress: Option<CongressInfo>,
     /// The public screens: scores, demographics, victory rows, wonder news (`PublicScreens`).
-    pub public: PublicScreens,
+    pub public: LazyScreens<'a>,
     /// Our spies (the espionage overview).
     pub spies: Vec<SpyInfo>,
     /// Victims we hold steal rights on, with what may be stolen.
@@ -243,6 +243,54 @@ impl PublicScreens {
     /// The score of a nation on the list (the player's own included).
     pub fn score_of(&self, player: PlayerId) -> Option<i64> {
         self.scores.iter().find(|(p, _)| *p == player).map(|(_, s)| *s)
+    }
+}
+
+/// The public screens of an observation, built when first read: most observations are read for the
+/// units, the cities and the economy only, and the screens (the demographics rank every living nation
+/// by a value of each, the score list scores every met one) cost more than the rest. The world the
+/// observation borrows cannot change while it lives, so the screens built later are the ones built
+/// at once. Reads as a `PublicScreens` (`Deref`).
+pub struct LazyScreens<'a> {
+    auth: &'a AuthWorld,
+    derived: &'a DerivedWorld,
+    rules: &'a CompiledRuleset,
+    view: PlayerView<'a>,
+    player: PlayerId,
+    built: std::sync::OnceLock<PublicScreens>,
+}
+
+impl<'a> LazyScreens<'a> {
+    pub fn new(auth: &'a AuthWorld, derived: &'a DerivedWorld, rules: &'a CompiledRuleset, view: PlayerView<'a>, player: PlayerId) -> Self {
+        Self { auth, derived, rules, view, player, built: std::sync::OnceLock::new() }
+    }
+
+    /// Have the screens been built (a guard reads it).
+    pub fn is_built(&self) -> bool {
+        self.built.get().is_some()
+    }
+}
+
+impl std::ops::Deref for LazyScreens<'_> {
+    type Target = PublicScreens;
+
+    fn deref(&self) -> &PublicScreens {
+        self.built.get_or_init(|| {
+            let _span = prof::span("nation5/obs public");
+            public_screens(self.auth, self.derived, self.rules, &self.view, self.player)
+        })
+    }
+}
+
+impl Clone for LazyScreens<'_> {
+    fn clone(&self) -> Self {
+        Self { auth: self.auth, derived: self.derived, rules: self.rules, view: self.view, player: self.player, built: self.built.clone() }
+    }
+}
+
+impl std::fmt::Debug for LazyScreens<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("LazyScreens").field(&self.built.get()).finish()
     }
 }
 
@@ -455,10 +503,7 @@ impl<'a> AIObservation<'a> {
             let _span = prof::span("nation5/obs congress");
             congress_info(auth, rules, player, &relations)
         };
-        let public = {
-            let _span = prof::span("nation5/obs public");
-            public_screens(auth, derived, rules, &view, player)
-        };
+        let public = LazyScreens::new(auth, derived, rules, view, player);
         let _spies_span = prof::span("nation5/obs spies+steal");
         let observation = Self {
             player,

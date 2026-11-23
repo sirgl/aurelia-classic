@@ -248,12 +248,13 @@ pub(crate) fn buildable(rules: &CompiledRuleset, brief: &TurnBrief, kind: Improv
 /// (`world::builds::site`: technology, terrain, feature removal, resource,
 /// ownership), so a chosen build is one the core accepts.
 pub(crate) fn site_ok(view: &PlayerView<'_>, rules: &CompiledRuleset, brief: &TurnBrief, tile: TileId, kind: ImprovementId) -> bool {
-    let builder = Builder {
-        player: brief.player,
-        nation: brief.nation,
-        techs: TechSet::of(&brief.techs),
-    };
-    site(view, rules, &builder, tile, kind).is_ok()
+    site(view, rules, &builder_of(brief), tile, kind).is_ok()
+}
+
+/// The builder the site rule asks about: the player, its nation and technologies (the bitset made once for
+/// the many kinds `best_improvement` tries on a tile).
+fn builder_of(brief: &TurnBrief) -> Builder {
+    Builder { player: brief.player, nation: brief.nation, techs: TechSet::of(&brief.techs) }
 }
 
 /// A job a tile offers: what to do first, its gain and its work turns.
@@ -262,6 +263,120 @@ struct JobOffer {
     job: WorkerJob,
     gain: i32,
     turns: i32,
+}
+
+/// What `best_job` reads of the world for one tile: the known tile and its neighbours, the
+/// pillage of the tile and the static geography the site rule asks (the coast of the tile, a
+/// neighbour's lake for fresh water). The offer is a function of this, the weights and the `Ctx`.
+#[derive(Clone, Copy, PartialEq, Eq)]
+struct Around {
+    snapshots: [Option<TileSnapshot>; 7],
+    pillaged: bool,
+    coast: bool,
+    /// A bit for each neighbour, set when it is a lake.
+    lakes: u8,
+}
+
+impl Around {
+    fn of(view: &PlayerView<'_>, tile: TileId) -> Around {
+        let mut snapshots = [None; 7];
+        snapshots[0] = view.tile(tile).snapshot().copied();
+        let mut lakes = 0;
+        for (i, near) in view.dimensions().neighbors(tile).into_iter().enumerate() {
+            snapshots[i + 1] = view.tile(near).snapshot().copied();
+            lakes |= u8::from(view.static_geography(near).0) << i;
+        }
+        Around { snapshots, pillaged: view.known_pillaged(tile), coast: view.static_geography(tile).1, lakes }
+    }
+}
+
+/// What the offers of the memo hold fixed: the ruleset (by address: one ruleset serves a thread's
+/// games), the map's size, the player and what `best_job` reads of the brief (its nation, the repair
+/// switch and the technologies).
+#[derive(PartialEq, Eq)]
+struct Ctx {
+    rules: usize,
+    size: (u32, u32),
+    player: PlayerId,
+    nation: u8,
+    repair: bool,
+    techs: Vec<crate::ids::TechId>,
+}
+
+impl Ctx {
+    fn matches(&self, view: &PlayerView<'_>, rules: &CompiledRuleset, brief: &TurnBrief) -> bool {
+        let dims = view.dimensions();
+        self.rules == rules as *const CompiledRuleset as usize
+            && self.size == (dims.width, dims.height)
+            && self.player == brief.player
+            && self.nation == brief.nation
+            && self.repair == brief.workers.repair
+            && self.techs == brief.techs
+    }
+
+    fn of(view: &PlayerView<'_>, rules: &CompiledRuleset, brief: &TurnBrief) -> Ctx {
+        let dims = view.dimensions();
+        Ctx { rules: rules as *const CompiledRuleset as usize, size: (dims.width, dims.height), player: brief.player, nation: brief.nation, repair: brief.workers.repair, techs: brief.techs.clone() }
+    }
+}
+
+/// Offers the memo of a thread holds at most: beyond it, it starts over.
+const MEMO_OFFERS: usize = 1 << 15;
+
+#[derive(Default)]
+struct OfferMemo {
+    ctx: Option<Ctx>,
+    offers: std::collections::HashMap<(TileId, Weights), (Around, Option<JobOffer>)>,
+}
+
+thread_local! {
+    /// One memo for each player: the players take their turns in turn on a thread, and what a player
+    /// asked in its last turn is mostly still true in its next.
+    static OFFERS: std::cell::RefCell<Vec<OfferMemo>> = Default::default();
+}
+
+/// `best_job`, remembered by what it reads (`Around`, the weights and the `Ctx`): the allocator's work
+/// load, its count of jobs and every worker's choice ask the same tiles again, in a turn and in the
+/// next, and a tile whose neighbourhood did not change offers the same job. Exact: a tile is answered
+/// from the memo only when everything `best_job` reads of it is equal to what it read when the offer
+/// was made.
+fn best_job_memo(view: &PlayerView<'_>, rules: &CompiledRuleset, brief: &TurnBrief, w: &Weights, tile: TileId) -> Option<JobOffer> {
+    let around = Around::of(view, tile);
+    let slot = usize::from(brief.player.0);
+    let found = OFFERS.with(|m| {
+        let mut all = m.borrow_mut();
+        if all.len() <= slot {
+            all.resize_with(slot + 1, Default::default);
+        }
+        let memo = &mut all[slot];
+        if !memo.ctx.as_ref().is_some_and(|c| c.matches(view, rules, brief)) {
+            memo.offers.clear();
+            memo.ctx = Some(Ctx::of(view, rules, brief));
+        }
+        memo.offers.get(&(tile, *w)).filter(|(seen, _)| *seen == around).map(|(_, offer)| *offer)
+    });
+    if let Some(offer) = found {
+        return offer;
+    }
+    let offer = best_job(view, rules, brief, w, tile);
+    OFFERS.with(|m| {
+        let mut all = m.borrow_mut();
+        let memo = &mut all[slot];
+        if memo.offers.len() >= MEMO_OFFERS {
+            memo.offers.clear();
+        }
+        memo.offers.insert((tile, *w), (around, offer));
+    });
+    offer
+}
+
+/// The guard's view of the memo: the offer on `tile` as the memo answers and as `best_job` computes it
+/// (job, gain, build turns).
+#[doc(hidden)]
+pub fn offer_memo_and_fresh(view: &PlayerView<'_>, rules: &CompiledRuleset, brief: &TurnBrief, strategy: crate::ai::state::Strategy, tile: TileId) -> (Option<(WorkerJob, i32, i32)>, Option<(WorkerJob, i32, i32)>) {
+    let w = Weights::for_empire(strategy, brief.gold_income, brief.turn_happiness);
+    let plain = |o: JobOffer| (o.job, o.gain, o.turns);
+    (best_job_memo(view, rules, brief, &w, tile).map(plain), best_job(view, rules, brief, &w, tile).map(plain))
 }
 
 /// The best job of a tile: an improvement over what stands there, or —
@@ -276,10 +391,11 @@ fn best_job(
 ) -> Option<JobOffer> {
     let known = view.tile(tile);
     let snapshot = *known.snapshot()?;
-    if let Some(offer) = repair_job(view, rules, brief, w, tile, &snapshot) {
+    let builder = builder_of(brief);
+    if let Some(offer) = repair_job(view, rules, brief, &builder, w, tile, &snapshot) {
         return Some(offer);
     }
-    let direct = best_improvement(view, rules, brief, w, tile, &snapshot).map(|(kind, gain)| JobOffer {
+    let direct = best_improvement(view, rules, brief, &builder, w, tile, &snapshot).map(|(kind, gain)| JobOffer {
         job: WorkerJob::Improvement(kind),
         gain,
         turns: work_turns(rules, kind),
@@ -291,7 +407,7 @@ fn best_job(
         feature: None,
         ..snapshot
     };
-    let (kind, gain) = best_improvement(view, rules, brief, w, tile, &cleared)?;
+    let (kind, gain) = best_improvement(view, rules, brief, &builder, w, tile, &cleared)?;
     let lost = w.production * feature.yields.production * 10;
     let removal = feature.removal?;
     let chop = JobOffer {
@@ -313,6 +429,7 @@ fn repair_job(
     view: &PlayerView<'_>,
     rules: &CompiledRuleset,
     brief: &TurnBrief,
+    builder: &Builder,
     w: &Weights,
     tile: TileId,
     snapshot: &TileSnapshot,
@@ -321,8 +438,7 @@ fn repair_job(
     if !brief.workers.repair || !view.known_pillaged(tile) || !buildable(rules, brief, kind) {
         return None;
     }
-    let builder = Builder { player: brief.player, nation: brief.nation, techs: TechSet::of(&brief.techs) };
-    let plan = site(view, rules, &builder, tile, kind).ok()?;
+    let plan = site(view, rules, builder, tile, kind).ok()?;
     let resource = match snapshot.resource {
         Some(r) if rules.improvements[kind.0 as usize].resources.contains(&r) => resource_value(rules, r, w),
         _ => 0,
@@ -352,6 +468,7 @@ fn best_improvement(
     view: &PlayerView<'_>,
     rules: &CompiledRuleset,
     brief: &TurnBrief,
+    builder: &Builder,
     w: &Weights,
     tile: TileId,
     snapshot: &TileSnapshot,
@@ -371,7 +488,7 @@ fn best_improvement(
         let kind = ImprovementId(index as u16);
         if snapshot.improvement == Some(kind)
             || !buildable(rules, brief, kind)
-            || !site_ok(view, rules, brief, tile, kind)
+            || site(view, rules, builder, tile, kind).is_err()
         {
             continue;
         }
@@ -434,7 +551,7 @@ fn choose_job(
             None => dims.distance(unit.tile, tile).unwrap_or(99),
         };
         tools.counters.candidates += 1;
-        let Some(offer) = best_job(&view.local.view, tools.rules, view.brief, &w, tile) else {
+        let Some(offer) = best_job_memo(&view.local.view, tools.rules, view.brief, &w, tile) else {
             continue;
         };
         let score = offer.gain * 10 / (offer.turns + 2 * travel);
@@ -665,7 +782,7 @@ impl WorkLoad {
         let (mut turns, mut jobs) = (0u32, 0u32);
         for tile in own_work_tiles(brief, view, brief.player) {
             let land = view.tile(tile).snapshot().is_some_and(|s| !kinds.is_water(s.terrain.0));
-            if let Some(offer) = land.then(|| best_job(view, rules, brief, &w, tile)).flatten() {
+            if let Some(offer) = land.then(|| best_job_memo(view, rules, brief, &w, tile)).flatten() {
                 turns += offer.turns.max(1) as u32;
                 jobs += 1;
             }
@@ -814,7 +931,7 @@ pub fn open_jobs(view: &PlayerView<'_>, rules: &CompiledRuleset, brief: &TurnBri
     let w = Weights::for_empire(strategy, brief.gold_income, brief.turn_happiness);
     let kinds = view.terrain_kinds();
     let land = |tile: TileId| view.tile(tile).snapshot().is_some_and(|s| !s.city && !kinds.is_water(s.terrain.0));
-    tiles.filter(|t| land(*t) && best_job(view, rules, brief, &w, *t).is_some()).count() as u32
+    tiles.filter(|t| land(*t) && best_job_memo(view, rules, brief, &w, *t).is_some()).count() as u32
 }
 
 #[cfg(test)]

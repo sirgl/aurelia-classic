@@ -27,7 +27,7 @@ use std::collections::{BTreeMap, BinaryHeap};
 
 use crate::ai::planner::{role_of, AiRole, TurnBrief};
 use crate::ai::state::SeenCity;
-use crate::ai::planner_map::{step_points, KnownMap};
+use crate::ai::planner_map::{KnownMap, StepsFrom};
 use crate::combat::city::CITY_ATTACK_RANGE;
 use crate::combat::damage::{city_strike_damage, melee_damage, ranged_damage, MeleeSide, Roll};
 use crate::ids::{CityHandle, PlayerId, TileId, UnitHandle, UnitKindId};
@@ -463,11 +463,12 @@ impl<'v, 'a> Battlefield<'v, 'a> {
                 if expanded > REACH_NODES || cost >= budget {
                     continue;
                 }
+                let steps = StepsFrom::new(&map, tile);
                 for next in self.dims.neighbors(tile) {
                     if !self.tiles.contains_key(&next) {
                         continue;
                     }
-                    let Some(points) = step_points(&map, tile, next) else { continue };
+                    let Some(points) = steps.to(next) else { continue };
                     let cost = cost.saturating_add(points);
                     if scratch.get(next).is_none_or(|(c, _)| cost < c) {
                         scratch.set(next, cost, tile);

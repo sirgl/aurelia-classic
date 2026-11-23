@@ -573,22 +573,26 @@ impl<'v, 'a> Threats<'v, 'a> {
     /// The row of `unit` ending its turn at `place` (the module's table);
     /// `unit` as it will be then (`moved`).
     pub fn row(&self, rules: &CompiledRuleset, unit: &OwnUnit, place: &Place<'_>) -> [i32; FEATURES] {
+        self.row_in(rules, unit, place, &self.scene(place)).0
+    }
+
+    /// `row` for the `scene` of the place, with the fog's blow it reads (`fog_at`).
+    fn row_in(&self, rules: &CompiledRuleset, unit: &OwnUnit, place: &Place<'_>, scene: &Scene) -> ([i32; FEATURES], u16) {
         let tile = place.tile;
         let distance = |a: TileId, b: TileId| self.distance(a, b);
         let stats = KindStats::of(rules, unit.kind);
-        let scene = self.scene(place);
-        let field = self.field_at(place, &scene).unwrap_or(&self.near);
+        let field = self.field_at(place, scene).unwrap_or(&self.near);
         let info = field.tile(tile).copied();
         let owner = info.and_then(|i| i.owner);
         let enemy_land = owner.is_some_and(|o| self.enemies.contains(&o));
         let others = place.others();
         let city_distance = self.own_cities.iter().map(|c| distance(*c, tile)).min().unwrap_or(FAR).min(FAR);
 
-        let blows = self.blows_at(&stats, unit, place, &scene);
+        let blows = self.blows_at(&stats, unit, place, scene);
         let blow_sum: i32 = blows.iter().map(|(_, _, b)| i32::from(*b)).sum();
         let blow_max = blows.iter().map(|(_, _, b)| i32::from(*b)).max().unwrap_or(0);
-        let prior = self.prior_blow(&stats, unit.hp, place, &scene);
-        let unseen = self.unseen(place, &scene);
+        let prior = self.prior_blow(&stats, unit.hp, place, scene);
+        let unseen = self.unseen(place, scene);
         let fog_blow = (i64::from(prior) * i64::from(unseen) * FOG_PRIOR_PERCENT / 100) as u16;
         let foes: Vec<(ObservedUnit, u16)> = self.foes.iter().filter_map(|f| place.foe_hp(f.tile, f.hp).map(|hp| (*f, hp))).collect();
         let within = |r: i32| foes.iter().filter(move |(f, _)| distance(f.tile, tile) <= r);
@@ -596,7 +600,7 @@ impl<'v, 'a> Threats<'v, 'a> {
         let foe_cities: Vec<TileId> = self.foe_cities.iter().copied().filter(|c| place.foe_hp(*c, 1).is_some()).collect();
 
         let b = |v: bool| i32::from(v);
-        [
+        let row = [
             i32::from(unit.hp),
             (stats.melee / 100) as i32,
             (stats.ranged / 100) as i32,
@@ -634,7 +638,8 @@ impl<'v, 'a> Threats<'v, 'a> {
             foe_cities.iter().map(|c| distance(*c, tile)).min().unwrap_or(FAR).min(FAR),
             self.wars,
             self.round as i32,
-        ]
+        ];
+        (row, fog_blow)
     }
 
     /// The net's answer for `unit` ending its turn at `place` (`unit` as it
@@ -672,11 +677,10 @@ impl<'v, 'a> Threats<'v, 'a> {
         match source {
             Source::Search => self.search_danger(rules, unit, place),
             Source::Net => {
-                let danger = self.net_danger(rules, unit, place).unwrap_or_else(|| {
-                    let stats = KindStats::of(rules, unit.kind);
-                    let fog = self.fog_at(&stats, unit, place, &self.scene(place));
-                    Danger { damage: fog.min(unit.hp), death_permille: 0 }
-                });
+                // The row reads the scene and the fog the answer without a threat needs: once.
+                let scene = self.scene(place);
+                let (row, fog) = self.row_in(rules, unit, place, &scene);
+                let danger = if row[THREATS] > 0 { danger_net::predict(&row) } else { Danger { damage: fog.min(unit.hp), death_permille: 0 } };
                 self.with_zone(rules, unit, place, danger)
             }
         }
