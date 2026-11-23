@@ -27,7 +27,7 @@ from .model_m import AIMS, P_ENGAGED, P_ETA, P_STAGE, P_TURNS, P_WAITED, PLANS, 
 from .train import Device, best_teachers, decision_weights
 from .data import F_HIST
 from .model_mh import H_MAX, MHNet
-from .model_mb import MBANet, MBNet
+from .model_mb import HX_PARAMS, MBANet, MBHNet, MBNet
 from .potential import potential, price_of
 
 u16 = lambda b: mx.array(memoryview(b).cast('H'))
@@ -227,7 +227,7 @@ def compiled_fn(model, name, fn):
 def body_any(model, b, um, pm):
     """M's body, or MH's with the history (b['hplan']: P_0 of each history token's turn), or MB's with the map."""
     if isinstance(model, MBANet):
-        return model.body_mba(b['tok'], b['dist'], b['tmask'], b['slot'], um, pm, b['gtok'], b['tok_ok'], b['mmean'], b['price'])[0]
+        return model.body_b(b, um, pm)[0]
     if isinstance(model, MBNet):
         return model.body_mbg(b['tok'], b['dist'], b['tmask'], b['slot'], um, pm, b['gtok'], b['tok_ok'], b['mmean'])
     if isinstance(model, MHNet):
@@ -294,7 +294,7 @@ def decision_losses(model, b, um, pm):
 
 def decision_losses_a(model, b, um, pm):
     """`decision_losses` for MBA: the same losses, the heads beside them, the imitation weighted by the advantage."""
-    hfull, h1 = model.body_mba(b['tok'], b['dist'], b['tmask'], b['slot'], um, pm, b['gtok'], b['tok_ok'], b['mmean'], b['price'])
+    hfull, h1 = model.body_b(b, um, pm)
     t = b['tok'].shape[1]
     h = hfull[:, :t]
     pl = model.pointer_logits(h, b['sel'])
@@ -402,9 +402,9 @@ def plan_batch(dev, plays, L, drop, rng, tm, train=True):
 
 
 AUX_KEYS = ('aux_unit', 'aux_plan', 'aux_target', 'stage_acc', 'known')
-UNROLL_KEYS = ('tok', 'dist', 'tmask', 'slot', 'track', 'tis', 'eta', 'hist', 'hmask', 'hslot', 'price')
+UNROLL_KEYS = ('tok', 'dist', 'tmask', 'slot', 'track', 'tis', 'eta', 'hist', 'hmask', 'hslot', 'hage', 'price')
 DEC_KEYS = ('tok', 'dist', 'tmask', 'slot', 'sel', 'unit', 'cand', 'promo', 'cmask', 'ptr', 'act', 'has_act', 'win', 'lost', 'danger', 'w', 'hist', 'hmask', 'hslot',
-            'price', 'capture', 'dphi')
+            'hage', 'price', 'capture', 'dphi')
 DEC_OUT = ('main', 'val', 'w', 'dsum', 'dn') + HEAD_KEYS
 # History ablation (proof (a) of MH): the history masked everywhere.
 ABLATE = {'history': False}
@@ -640,6 +640,7 @@ def main():
     ap.add_argument('--value-w', type=float, default=0.5, help='MBA: weight of the value head (win, capture, Phi 3 turns on)')
     ap.add_argument('--awi', type=float, default=0.0, help='MBA: advantage-weighted imitation, beta (0: plain)')
     ap.add_argument('--resume', action='store_true', help='continue OUT from its last checkpoint (OUT/state.json: the step; OUT/opt.safetensors: the optimizer)')
+    ap.add_argument('--new-lr-mult', type=float, default=1.0, help='MBH: the history parameters (model_mb.HX_PARAMS) learn at this multiple of --lr')
     ap.add_argument('--warmup', type=int, default=20, help='resumed without the optimizer state: lr ramps up over these steps')
     a = ap.parse_args()
     from .train import SIEGE
@@ -680,7 +681,7 @@ def main():
     # The promotion vocabulary: 400 (every recording so far stays below; a larger id fails the gather loudly in MLX).
     promos = 400
     shape = dict(d=a.d, heads=a.heads, layers=a.layers, ff=2 * a.d, promos=promos)
-    model = (MBANet if a.aux_heads else MBNet)(map_ch=a.map_ch, **shape) if a.map else (MHNet(**shape) if a.history else MemNet(**shape))
+    model = ((MBHNet if a.history else MBANet) if a.aux_heads else MBNet)(map_ch=a.map_ch, **shape) if a.map else (MHNet(**shape) if a.history else MemNet(**shape))
     model.hand_init()
     if a.init:
         # A net without memory (A / AH) starts the shared parts; an M net everything; an M net starts MH's shared
@@ -694,6 +695,8 @@ def main():
     plays_all = list(range(len(train)))
     steps = int(a.epochs * len(plays_all) / a.plays)
     sched = optim.cosine_decay(a.lr, steps, a.lr * 0.05)
+    multi = isinstance(model, MBHNet) and a.new_lr_mult != 1.0
+    sched_h = optim.cosine_decay(a.lr * a.new_lr_mult, steps, a.lr * a.new_lr_mult * 0.05)
     start = 0
     best_both = -1.0
     state_path = os.path.join(a.out, 'state.json')
@@ -704,15 +707,20 @@ def main():
         model.load_weights(os.path.join(a.out, 'last.safetensors'))
         if not os.path.exists(opt_path):
             # No optimizer state (a run of the code before checkpoints): fresh moments, the lr ramped up again.
-            base, w0 = sched, start
+            base, base_h, w0 = sched, sched_h, start
             sched = lambda s: base(s) * mx.minimum(1.0, (mx.array(s).astype(mx.float32) - w0) / a.warmup)
+            sched_h = lambda s: base_h(s) * mx.minimum(1.0, (mx.array(s).astype(mx.float32) - w0) / a.warmup)
     opt = optim.AdamW(learning_rate=sched, weight_decay=1e-4)
+    if multi:
+        # MBH: the history's new parameters (zero / freshly drawn) in their own group at --new-lr-mult x the lr.
+        opt = optim.MultiOptimizer([optim.AdamW(learning_rate=sched_h, weight_decay=1e-4), opt], [lambda path, _: path.split('.')[0] in HX_PARAMS])
     if a.resume:
         opt.init(model.trainable_parameters())
         if os.path.exists(opt_path):
             opt.state = nn.utils.tree_unflatten(list(mx.load(opt_path).items()))
         else:
-            opt.state['step'] = mx.array(start, mx.uint64)
+            for o in (opt.optimizers if multi else [opt]):
+                o.state['step'] = mx.array(start, mx.uint64)
         rng = random.Random(a.seed * 1000003 + start)  # a resumed job draws a new play order
         print(f'resumed at step {start} (best held-out joint accuracy {best_both:.4f}; optimizer state {"loaded" if os.path.exists(opt_path) else "fresh, lr warm-up " + str(a.warmup)})', flush=True)
     cur = []
@@ -724,7 +732,7 @@ def main():
     hold_plays = list(range(len(hold)))
     hold_eval = hold_plays[::a.eval_plays]
     config = {'run': os.path.basename(os.path.normpath(a.out)), 'variant': 'M (learned memory)', 'plays_per_step': a.plays, 'lr': a.lr, 'epochs': a.epochs, 'steps': steps,
-              'schedule': f'AdamW (weight decay 1e-4), cosine decay to 0.05 lr over {steps} steps, grad clip 1.0', 'aux_weight': a.aux, 'mem_drop': a.mem_drop, 'curriculum': cur,
+              'schedule': f'AdamW (weight decay 1e-4), cosine decay to 0.05 lr over {steps} steps, grad clip 1.0' + (f'; history parameters {sorted(HX_PARAMS)} at {a.new_lr_mult} x lr' if multi else ''), 'aux_weight': a.aux, 'mem_drop': a.mem_drop, 'curriculum': cur,
               'parameters': n_params, 'T': tm, 'C': cm, 'promos': promos, 'init': a.init or 'hand_init', 'best_teachers': best, 'labelled_decisions': labelled,
               'decision_weight': {'won_play': 1.0, 'lost_play': a.lost_weight, 'best_teacher_factor': a.best_factor, 'dagger_label': 2.0, 'up_families': sorted(up), 'up_factor': a.up_factor if up else 1.0},
               'losses': {'pointer_ce': 1.0, 'action_ce': 1.0, 'value': 0.5, 'danger_mse': 0.5, 'aux_teacher_state': a.aux},

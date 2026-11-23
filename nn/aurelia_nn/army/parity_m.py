@@ -38,8 +38,9 @@ def main():
         model = MNNet(promos=w['promo'].shape[0] - 1)
     elif 'm_in.weight' in w:
         # MB / MBA: the map encoded once per turn from the turn's first moment.
-        from .model_mb import MBANet, MBNet
-        model = (MBANet if 'w_price' in w else MBNet)(promos=w['promo'].shape[0] - 1, map_ch=w['m_in.weight'].shape[0])
+        from .model_mb import MBANet, MBHNet, MBNet
+        cls = MBHNet if 'hx_slope' in w else (MBANet if 'w_price' in w else MBNet)
+        model = cls(promos=w['promo'].shape[0] - 1, map_ch=w['m_in.weight'].shape[0])
     else:
         model = (MHNet if 'h1.weight' in w else MemNet)(promos=w['promo'].shape[0] - 1)
     model.load_weights(a.weights)

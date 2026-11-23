@@ -190,6 +190,35 @@ pub struct Net {
     notes: Option<NoteW>,
     /// Variant MBA: the stake's projection `[3][d]` (None: no price input).
     price: Option<Vec<f32>>,
+    /// Variant MBH: the history's separate cross-attention (None: none).
+    xhist: Option<XHistW>,
+}
+
+/// Variant MBH's history weights (`army/model_mb.py`, `MBHNet`): a fact's embedding `hx2(relu(hx1(fact, its age
+/// number zeroed))) + hxp(P_0 of its turn)`; per layer a cross-attention of the tokens and plan tokens to the facts
+/// with its own softmax over a null key (logit `null`, value 0) and the facts (the layer's q / k / v, minus
+/// `slope` x age, plus `same` for a fact of the query's unit), its context through `ho[layer]` into the residual.
+#[derive(Debug, Clone)]
+struct XHistW {
+    h1: Dense,
+    h2: Dense,
+    hp: Dense,
+    /// `[layer][head]`.
+    null: Vec<f32>,
+    same: Vec<f32>,
+    slope: Vec<f32>,
+    ho: Vec<Dense>,
+}
+
+/// The fact's own age number (history column 10): MBH's embedding reads it as zero (age enters as a bias).
+const HX_AGE_COL: usize = 10;
+
+/// MBH's facts for one body: their embedding `[nh][d]`, slots, ages.
+struct XHistIn {
+    he: Vec<f32>,
+    slots: Vec<i16>,
+    ages: Vec<f32>,
+    qslots: Vec<i16>,
 }
 
 /// Variant MN's note weights (`army/model_mn.py`).
@@ -471,6 +500,13 @@ impl Net {
         } else {
             None
         };
+        let xhist = if t.contains_key("hx_slope") {
+            let raw = |name: &str| -> Result<Vec<f32>, String> { Ok(get(name)?.1.clone()) };
+            let ho = (0..c.layers).map(|l| dense(&format!("ho.{l}"))).collect::<Result<Vec<_>, _>>()?;
+            Some(XHistW { h1: dense("hx1")?, h2: dense("hx2")?, hp: dense("hxp")?, null: raw("hx_null")?, same: raw("hx_same")?, slope: raw("hx_slope")?, ho })
+        } else {
+            None
+        };
         let price = if t.contains_key("w_price") {
             let (shape, w) = get("w_price")?;
             if shape.as_slice() != [3, c.d] {
@@ -481,6 +517,7 @@ impl Net {
             None
         };
         Ok(Net {
+            xhist,
             price,
             notes,
             hist,
@@ -784,10 +821,35 @@ impl Net {
             }
         }
         let total = n + plans;
+        // MBH: the facts' embedding (fixed while a fact lives: its turn's plan, its age only as a bias).
+        let xin = match (self.xhist.as_ref(), mem) {
+            (Some(xw), Some(mi)) => {
+                let mut f = [0f32; super::observe::F_HIST];
+                let mut e1 = vec![0.0; d];
+                let mut y = vec![0.0; d];
+                let mut z = vec![0.0; d];
+                let mut he = Vec::with_capacity(tokens.hist.len() * d);
+                for (k, fact) in tokens.hist.iter().enumerate() {
+                    f.copy_from_slice(fact);
+                    f[HX_AGE_COL] = 0.0;
+                    xw.h1.apply(&f, &mut e1);
+                    relu(&mut e1);
+                    xw.h2.apply(&e1, &mut y);
+                    xw.hp.apply(mi.state.p0_at(tokens.hist_age[k], d), &mut z);
+                    he.extend(y.iter().zip(&z).map(|(a, b)| a + b));
+                }
+                let qslots = (0..n).map(|i| mi.slots[i]).chain(std::iter::repeat(-1).take(plans)).collect();
+                Some(XHistIn { he, slots: tokens.hist_slot.clone(), ages: tokens.hist_age.iter().map(|a| f32::from(*a)).collect(), qslots })
+            }
+            _ => None,
+        };
         let mut a = vec![0.0; total * d];
         let hist_in = if he.is_empty() { None } else { Some((he.as_slice(), hslots.as_slice(), qslots.as_slice())) };
         for (li, layer) in self.layers.iter().enumerate() {
-            self.attend(layer, li, &tokens.dist, n, total, &mut h, &mut a, hist_in);
+            let q = self.attend(layer, li, &tokens.dist, n, total, &mut h, &mut a, hist_in);
+            if let (Some(xw), Some(xi)) = (self.xhist.as_ref(), xin.as_ref()) {
+                self.cross(xw, layer, li, total, &q, &mut h, xi);
+            }
             self.feed(layer, total, &mut h, &mut a);
         }
         let mut out = vec![0.0; total * d];
@@ -799,7 +861,9 @@ impl Net {
 
     #[allow(clippy::too_many_arguments)]
     #[allow(clippy::too_many_arguments)]
-    fn attend(&self, layer: &Layer, li: usize, dist: &[u8], n: usize, total: usize, h: &mut [f32], a: &mut [f32], hist: Option<(&[f32], &[i16], &[i16])>) {
+    /// The layer's self-attention (MH: with the history in its softmax) added to `h`; leaves norm1 of the old
+    /// stream in `a` and returns the queries (MBH's cross-attention reads both).
+    fn attend(&self, layer: &Layer, li: usize, dist: &[u8], n: usize, total: usize, h: &mut [f32], a: &mut [f32], hist: Option<(&[f32], &[i16], &[i16])>) -> Vec<f32> {
         let d = self.config.d;
         let heads = self.config.heads;
         let dh = d / heads;
@@ -862,6 +926,56 @@ impl Net {
             }
         }
         let o = layer.o.rows(&ctx, n);
+        for (x, y) in h.iter_mut().zip(o) {
+            *x += y;
+        }
+        q
+    }
+
+    /// MBH: the cross-attention of the `n` stream tokens (queries `q`) to the facts, its own softmax over the null
+    /// key and the facts, through `ho[li]` into `h`.
+    #[allow(clippy::too_many_arguments)]
+    fn cross(&self, xw: &XHistW, layer: &Layer, li: usize, n: usize, q: &[f32], h: &mut [f32], xi: &XHistIn) {
+        let d = self.config.d;
+        let heads = self.config.heads;
+        let dh = d / heads;
+        let nh = xi.he.len() / d;
+        let mut ah = vec![0.0; xi.he.len()];
+        for j in 0..nh {
+            layer.norm1.apply(&xi.he[j * d..(j + 1) * d], &mut ah[j * d..(j + 1) * d]);
+        }
+        let kh = layer.k.rows(&ah, nh);
+        let vh = layer.v.rows(&ah, nh);
+        let scale = 1.0 / (dh as f32).sqrt();
+        let mut ctx = vec![0.0; n * d];
+        let mut s = vec![0.0; nh];
+        for hd in 0..heads {
+            let (null, same, slope) = (xw.null[li * heads + hd], xw.same[li * heads + hd], xw.slope[li * heads + hd]);
+            for i in 0..n {
+                let qi = &q[i * d + hd * dh..i * d + hd * dh + dh];
+                let mut max = null;
+                for j in 0..nh {
+                    let kj = &kh[j * d + hd * dh..j * d + hd * dh + dh];
+                    let own = xi.slots[j] >= 0 && xi.qslots[i] == xi.slots[j];
+                    s[j] = dot(qi, kj) * scale - slope * xi.ages[j] + if own { same } else { 0.0 };
+                    max = max.max(s[j]);
+                }
+                let mut sum = (null - max).exp();
+                for x in s.iter_mut() {
+                    *x = (*x - max).exp();
+                    sum += *x;
+                }
+                let out = &mut ctx[i * d + hd * dh..i * d + hd * dh + dh];
+                for j in 0..nh {
+                    let w = s[j] / sum;
+                    let vj = &vh[j * d + hd * dh..j * d + hd * dh + dh];
+                    for c in 0..dh {
+                        out[c] += w * vj[c];
+                    }
+                }
+            }
+        }
+        let o = xw.ho[li].rows(&ctx, n);
         for (x, y) in h.iter_mut().zip(o) {
             *x += y;
         }
