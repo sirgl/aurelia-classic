@@ -23,6 +23,7 @@ import mlx.optimizers as optim
 
 from .data import MEMORY_STATE, TRACK, Flat, map_file, read_play_at, skip_play_at
 from .export import export
+from .model import ENCODER
 from .model_m import AIMS, P_ENGAGED, P_ETA, P_STAGE, P_TURNS, P_WAITED, PLANS, SLOTS, STAGES, U_ENGAGED, U_RESTING, U_WAITED, MemNet
 from .train import Device, best_teachers, decision_weights
 from .data import F_HIST
@@ -140,6 +141,7 @@ class DeviceM(Device):
         self.hist_slot = mx.array(memoryview(flat.hist_slot).cast('h')) if self.has_hist else mx.zeros((1,), mx.int16)
         self.hist_age = mx.array(memoryview(flat.hist_age).cast('B')) if self.has_hist else mx.zeros((1,), mx.uint8)
         self.n_hist = self.hist.shape[0]
+        self.h_list = list(flat.h)
         self.flags_list = list(flat.flags)
         self.round_list = list(flat.round)
         self.outcome_targets(flat)
@@ -170,7 +172,19 @@ class DeviceM(Device):
         phi = potential(b['tok'], b['tmask'], own_first[first_of], worth)
         self.dphi = phi[mx.array([pos[j] for j in fut], mx.int32)] - phi[mx.array([pos[j] for j in cur], mx.int32)]
 
-    def batch_m(self, idx, tm, cm):
+    def map_inputs(self, idx, tm):
+        """What the map encoder reads at decisions `idx` (the same numbers as `batch`): statics, tokens, positions."""
+        t = self.t[idx]
+        ar = mx.arange(tm)
+        tmask = ar[None, :] < t[:, None]
+        ti = mx.minimum(self.tok_off[idx][:, None] + mx.minimum(ar[None, :], t[:, None] - 1), self.n_tok - 1)
+        tok = mx.where(tmask[..., None], self.tok[ti].astype(mx.float32), 0.0)
+        pos = mx.where(tmask, self.pos[ti].astype(mx.int32), -1)
+        return self.statics[self.play[idx]].astype(mx.float32), tok, pos
+
+    def batch_m(self, idx, tm, cm, hm=H_MAX):
+        """`batch` plus M's fields; the history padded to hm rows (>= the longest history of idx: the rows past a
+        decision's own are masked, and a masked fact weighs exactly 0 in the softmax and in every sum)."""
         b = self.batch(idx, tm, cm)
         t = self.t[idx]
         ar = mx.arange(tm)
@@ -181,7 +195,7 @@ class DeviceM(Device):
         b['tis'] = self.tis[idx]
         b['eta'] = self.eta[idx]
         h = self.h[idx]
-        ah = mx.arange(H_MAX)
+        ah = mx.arange(hm)
         hmask = ah[None, :] < h[:, None]
         hi = mx.minimum(self.hist_off[idx][:, None] + mx.minimum(ah[None, :], mx.maximum(h[:, None] - 1, 0)), self.n_hist - 1)
         b['hist'] = mx.where(hmask[..., None], self.hist[hi].astype(mx.float32), 0.0)
@@ -194,20 +208,47 @@ class DeviceM(Device):
         return b
 
 
+# The turn maps are encoded in chunks of this many maps (padded: the compiled encoder sees one shape).
+MAP_CHUNK = 128
+
+
+class TurnMaps:
+    """MB: the maps of the turns the step's plays have, each from its turn's first moment, encoded once (the padded
+    turns of the shorter plays are not encoded: nothing reads them). `rows` [R + 1, B]: the row of (turn, play
+    column) in `m` [N + 1, W*W, C] (N: a zero row where the play has no such turn); `mean` [N + 1, C]: each map's
+    mean over the window (taken once per map, not once per decision that reads it)."""
+
+    def __init__(self, model, dev, fds, tm):
+        pairs = [(k, col, i) for k, row in enumerate(fds) for col, i in enumerate(row) if i >= 0]
+        n = len(pairs)
+        rows = [[n] * len(fds[0]) for _ in fds] if fds else []
+        for j, (k, col, _) in enumerate(pairs):
+            rows[k][col] = j
+        self.rows = mx.array(rows, mx.int32)
+        enc = compiled_fn(model, 'encode', lambda st, tok, pos: model.encode_turn(st, tok, pos))
+        idx = [i for _, _, i in pairs]
+        idx += idx[:1] * ((-n) % MAP_CHUNK)
+        out = []
+        for s in range(0, len(idx), MAP_CHUNK):
+            out.append(enc(*dev.map_inputs(mx.array(idx[s:s + MAP_CHUNK], mx.int32), tm)))
+        m = mx.concatenate(out)[:n]
+        self.m = mx.concatenate([m, mx.zeros((1,) + m.shape[1:], m.dtype)])
+        self.mean = mx.mean(self.m, axis=1)
+
+    def dense(self):
+        """[R + 1, B, W*W, C] (zero where a play has no such turn): the layout of the probes."""
+        return self.m[self.rows]
+
+
 def turn_maps(model, dev, plan, tm):
-    """MB: every turn's map of the step's plays, [R + 1, B, W*W, C], from each turn's first moment."""
-    fds = plan[4]
-    out = []
-    enc = compiled_fn(model, 'encode', lambda st, tok, pos: model.encode_turn(st, tok, pos))
-    for k in range(len(fds)):
-        idx = mx.maximum(mx.array(fds[k], mx.int32), 0)
-        full = dev.batch_m(idx, tm, 1)
-        out.append(enc(full['statics'], full['tok'], full['pos']))
-    return mx.stack(out)
+    """MB: every turn's map of the step's plays, [R + 1, B, W*W, C], from each turn's first moment (zero past a
+    play's last turn)."""
+    return TurnMaps(model, dev, plan[4], tm).dense()
 
 
 def map_feats(b, Ms, tt, cc):
-    """The map at the tokens' and candidates' tiles of decisions (turn tt, play column cc), and its mean."""
+    """The map at the tokens' and candidates' tiles of decisions (turn tt, play column cc), and its mean (dense
+    maps [R + 1, B, W*W, C]; the probes' and the parity check's layout)."""
     tt2, cc2 = tt[:, None], cc[:, None]
     b['gtok'] = Ms[tt2, cc2, mx.maximum(b['pos'], 0)]
     b['tok_ok'] = b['pos'] >= 0
@@ -217,8 +258,21 @@ def map_feats(b, Ms, tt, cc):
         b['cand_ok'] = b['cpos'] >= 0
 
 
+def map_feats_rows(b, maps, rows):
+    """`map_feats` on TurnMaps: rows [N] = the map row of each decision's (turn, play)."""
+    r2 = rows[:, None]
+    b['gtok'] = maps.m[r2, mx.maximum(b['pos'], 0)]
+    b['tok_ok'] = b['pos'] >= 0
+    b['mmean'] = maps.mean[rows]
+    if 'cpos' in b:
+        b['gcand'] = maps.m[r2, mx.maximum(b['cpos'], 0)]
+        b['cand_ok'] = b['cpos'] >= 0
+
+
 def compiled_fn(model, name, fn):
-    key = (id(model), name)
+    # The encoder's compute type is read when a function is traced: one compiled function per type (training in
+    # bfloat16 with --enc-bf16, evaluation in f32).
+    key = (id(model), name, ENCODER['dtype'])
     if key not in COMPILED:
         COMPILED[key] = mx.compile(fn, inputs=[model.state])
     return COMPILED[key]
@@ -484,47 +538,87 @@ def compiled(model, name, with_aux=True):
     return COMPILED[key]
 
 
-def unroll_memory(model, dev, plan, tm, with_aux=True, compile_=True):
-    """The memory unrolled over the turns of a step's plays: (turn maps or None, U [R + 1, B, S, U], P [R + 1, B,
-    PLANS, d], the auxiliary loss, its parts)."""
-    R, ms, reset, groups = plan[:4]
+# A batch's history is padded to the longest of its decisions, rounded up to this (few compiled shapes).
+HIST_ROUND = 8
+
+
+def hist_rows(dev, ids):
+    return min(H_MAX, max(HIST_ROUND, -(-max(dev.h_list[i] for i in ids) // HIST_ROUND) * HIST_ROUND))
+
+
+# The plays a turn of the unroll runs are padded to a multiple of this (the compiled step sees few shapes).
+UNROLL_PAD = 16
+
+
+class Unrolled:
+    """The memory unrolled over a step's plays. The plays run in the order `perm` (most turns first), so turn r runs
+    only the prefix of the plays that have it (padded to UNROLL_PAD; the rest keep their memory, exactly as the
+    masked update of the whole batch did). `U` [R + 1, B, S, U] and `P` [R + 1, B, PLANS, d] are in that order:
+    `col[c]` is play column c's place in it. `maps`: TurnMaps (MB) or None."""
+
+    def __init__(self, maps, U, P, col, aux, parts):
+        self.maps, self.U, self.P, self.col, self.aux, self.parts = maps, U, P, col, aux, parts
+
+
+def unroll_compact(model, dev, plan, tm, with_aux=True, compile_=True):
+    R, ms, reset, groups, fds = plan
     B = len(reset)
-    Ms = turn_maps(model, dev, plan, tm) if isinstance(model, MBNet) else None
+    maps = TurnMaps(model, dev, fds, tm) if isinstance(model, MBNet) else None
+    turns = [sum(1 for r in range(R) if ms[r][c] >= 0) for c in range(B)]
+    perm = sorted(range(B), key=lambda c: -turns[c])
+    col = [0] * B
+    for j, c in enumerate(perm):
+        col[c] = j
     um, pm, alive = model.initial(B)
     Us, Ps = [um], [pm]
     aux_tot = mx.array(0.0)
     aux_parts = collections.defaultdict(float)
-    reset_a = mx.array(reset, mx.int32)
+    reset_p = mx.array([reset[c] for c in perm], mx.int32)
     unroll = compiled(model, 'unroll', with_aux) if compile_ else (lambda b, v, rs, um, pm, al: unroll_one(model, b, v, rs, um, pm, al, with_aux))
     for r in range(R):
-        idx = mx.array(ms[r], mx.int32)
+        live = sum(1 for c in perm if ms[r][c] >= 0)
+        n = min(B, live + (-live) % UNROLL_PAD)
+        cols = perm[:n]
+        ids = [ms[r][c] for c in cols]
+        idx = mx.array(ids, mx.int32)
         valid = idx >= 0
-        full = dev.batch_m(mx.maximum(idx, 0), tm, 1)
+        full = dev.batch_m(mx.maximum(idx, 0), tm, 1, hist_rows(dev, [max(i, 0) for i in ids]))
         b = {k: full[k] for k in UNROLL_KEYS}
-        if Ms is not None:
+        if maps is not None:
             b['pos'] = full['pos']
-            map_feats(b, Ms, mx.full((B,), r, mx.int32), mx.arange(B))
+            map_feats_rows(b, maps, maps.rows[r][mx.array(cols, mx.int32)])
             del b['pos']
         hist_mask(b)
         # P_0 of each history token's turn (age 0: this turn's plan, pm).
-        p0s = mx.stack([P[:, 0] for P in Ps[::-1][:4]] + [Ps[0][:, 0]] * max(0, 4 - len(Ps)), axis=1)  # [B, 4, d], age 0..3
-        b['hplan'] = p0s[mx.arange(B)[:, None], mx.minimum(full['hage'], 3)]
-        um, pm, alive, a, parts = unroll(b, valid, reset_a == r + 1, um, pm, alive)
+        p0s = mx.stack([P[:n, 0] for P in Ps[::-1][:4]] + [Ps[0][:n, 0]] * max(0, 4 - len(Ps)), axis=1)  # [n, 4, d], age 0..3
+        b['hplan'] = p0s[mx.arange(n)[:, None], mx.minimum(full['hage'], 3)]
+        un, pn, aln, a, parts = unroll(b, valid, reset_p[:n] == r + 1, um[:n], pm[:n], alive[:n])
+        if n < B:
+            un, pn, aln = (mx.concatenate([x, y[n:]]) for x, y in ((un, um), (pn, pm), (aln, alive)))
+        um, pm, alive = un, pn, aln
         aux_tot = aux_tot + a / R
         for k, v in zip(AUX_KEYS, parts):
             aux_parts[k] = aux_parts[k] + v / R
         Us.append(um)
         Ps.append(pm)
-    Us = mx.stack(Us)  # [R + 1, B, S, U]
-    Ps = mx.stack(Ps)
-    return Ms, Us, Ps, aux_tot, dict(aux_parts)
+    return Unrolled(maps, mx.stack(Us), mx.stack(Ps), col, aux_tot, dict(aux_parts))
+
+
+def unroll_memory(model, dev, plan, tm, with_aux=True, compile_=True):
+    """The memory unrolled over the turns of a step's plays: (turn maps [R + 1, B, W*W, C] or None, U [R + 1, B, S,
+    U], P [R + 1, B, PLANS, d], the auxiliary loss, its parts), in the plays' own column order (the probes' layout)."""
+    u = unroll_compact(model, dev, plan, tm, with_aux, compile_)
+    back = mx.array(u.col, mx.int32)
+    return (u.maps.dense() if u.maps is not None else None), u.U[:, back], u.P[:, back], u.aux, u.parts
 
 
 def run_step(model, dev, plan, tm, aux_w, with_aux=True, compile_=True, head_w=0.0, value_w=0.0, awi=0.0):
     """The loss of one step's plays (and its parts). MBA: head_w weighs the auxiliary heads (danger after layer 1,
     the strike preview), value_w the value head, awi = the advantage weighting's beta (0: plain imitation)."""
     groups = plan[3]
-    Ms, Us, Ps, aux_tot, aux_parts = unroll_memory(model, dev, plan, tm, with_aux, compile_)
+    u = unroll_compact(model, dev, plan, tm, with_aux, compile_)
+    Us, Ps, maps, aux_tot, aux_parts = u.U, u.P, u.maps, u.aux, u.parts
+    col = mx.array(u.col, mx.int32)
     dec = compiled(model, 'dec') if compile_ else (lambda b, um, pm: dec_one(model, b, um, pm))
     tot = collections.defaultdict(lambda: mx.array(0.0))
     accs = []
@@ -532,7 +626,7 @@ def run_step(model, dev, plan, tm, aux_w, with_aux=True, compile_=True, head_w=0
         n = len(ids)
         pad = (-n) % PAD
         idx = mx.array(ids + [ids[0]] * pad, mx.int32)
-        full = dev.batch_m(idx, tg, cg)
+        full = dev.batch_m(idx, tg, cg, hist_rows(dev, ids))
         b = {k: full[k] for k in DEC_KEYS}
         b['awi'] = mx.array(awi, mx.float32)
         hist_mask(b)
@@ -541,14 +635,15 @@ def run_step(model, dev, plan, tm, aux_w, with_aux=True, compile_=True, head_w=0
         b['danger'] = mx.where(live[:, None], b['danger'], -1.0)
         tt = mx.array(turns + [turns[0]] * pad, mx.int32)
         cc = mx.array(cols + [cols[0]] * pad, mx.int32)
+        uc = col[cc]
         P0 = Ps[:, :, 0]  # [R + 1, B, d]
-        b['hplan'] = P0[mx.maximum(tt[:, None] - full['hage'], 0), cc[:, None]]
-        if Ms is not None:
+        b['hplan'] = P0[mx.maximum(tt[:, None] - full['hage'], 0), uc[:, None]]
+        if maps is not None:
             b['pos'] = full['pos']
             b['cpos'] = full['cpos']
-            map_feats(b, Ms, tt, cc)
+            map_feats_rows(b, maps, maps.rows[tt, cc])
             del b['pos'], b['cpos']
-        out = dec(b, Us[tt, cc], Ps[tt, cc])
+        out = dec(b, Us[tt, uc], Ps[tt, uc])
         k_out = len(DEC_OUT)
         for k, v in zip(DEC_OUT, out[:k_out]):
             tot[k] = tot[k] + v
@@ -568,7 +663,17 @@ def run_step(model, dev, plan, tm, aux_w, with_aux=True, compile_=True, head_w=0
 
 def evaluate(model, device_of, plays, tm, bs=256):
     """Held-out accuracy with the memory unrolled over whole plays (no dropout), by family; and the aux numbers.
-    `device_of(ids)`: the DeviceM of those plays (streamed: one chunk at a time on the device)."""
+    `device_of(ids)`: the DeviceM of those plays (streamed: one chunk at a time on the device). The encoder runs in
+    f32 (the Rust forward's type) whatever it trains in."""
+    train_dtype = ENCODER['dtype']
+    ENCODER['dtype'] = mx.float32
+    try:
+        return evaluate_f32(model, device_of, plays, tm, bs)
+    finally:
+        ENCODER['dtype'] = train_dtype
+
+
+def evaluate_f32(model, device_of, plays, tm, bs):
     fam_hit = collections.defaultdict(float)
     fam_n = collections.defaultdict(int)
     tot = collections.defaultdict(float)
@@ -643,7 +748,12 @@ def main():
     ap.add_argument('--new-lr-mult', type=float, default=1.0, help='MBH: the history parameters (model_mb.HX_PARAMS) learn at this multiple of --lr')
     ap.add_argument('--warmup', type=int, default=20, help='resumed without the optimizer state: lr ramps up over these steps')
     ap.add_argument('--mem-gb', type=float, default=12.0, help='MLX memory limit (match the broker --ram reservation); cache 2 GB')
+    ap.add_argument('--no-pipeline', action='store_true', help='wait for each step before building the next (the same numbers; for timing)')
+    ap.add_argument('--enc-bf16', action='store_true', help='MB: the map encoder computes in bfloat16 while training (f32 weights, optimizer, memory, '
+                    'softmax and losses; evaluation in f32). Default f32')
     a = ap.parse_args()
+    if a.enc_bf16 and a.map and not a.cpu:
+        ENCODER['dtype'] = mx.bfloat16
     mx.set_memory_limit(int(a.mem_gb * 2 ** 30))
     mx.set_cache_limit(2 * 2 ** 30)
     from .train import SIEGE
@@ -739,7 +849,8 @@ def main():
               'parameters': n_params, 'T': tm, 'C': cm, 'promos': promos, 'init': a.init or 'hand_init', 'best_teachers': best, 'labelled_decisions': labelled,
               'decision_weight': {'won_play': 1.0, 'lost_play': a.lost_weight, 'best_teacher_factor': a.best_factor, 'dagger_label': 2.0, 'up_families': sorted(up), 'up_factor': a.up_factor if up else 1.0},
               'losses': {'pointer_ce': 1.0, 'action_ce': 1.0, 'value': 0.5, 'danger_mse': 0.5, 'aux_teacher_state': a.aux},
-              'train': {'files': a.train, 'decisions': train.decisions, 'plays': len(train)}, 'hold': {'files': a.hold, 'decisions': hold.decisions, 'plays': len(hold)}, 'device': str(mx.default_device())}
+              'train': {'files': a.train, 'decisions': train.decisions, 'plays': len(train)}, 'hold': {'files': a.hold, 'decisions': hold.decisions, 'plays': len(hold)}, 'device': str(mx.default_device()),
+              'encoder_compute': str(ENCODER['dtype']) if a.map else None}
     if not a.resume:
         json.dump(config, open(os.path.join(a.out, 'config.json'), 'w'), indent=1)
     curves = open(os.path.join(a.out, 'curves.jsonl'), 'a' if a.resume else 'w')
@@ -751,13 +862,32 @@ def main():
 
     grad_fn = nn.value_and_grad(model, loss_fn)
     order = []
-    seen_dec = 0
+    st = {'seen_dec': 0, 'log_n': 0, 'log_t': 0.0, 'log_dec': 0, 't_train': 0.0, 'last': time.time()}
     log = collections.defaultdict(float)
-    log_n = 0
-    log_t = 0.0
-    log_dec = 0
-    t_train = 0.0
+    step_losses = []
     stopped = False
+
+    def account(p):
+        """Reads a step's numbers (waits for that step only) into the running log."""
+        n_dec, loss, main, aux, norm = p
+        now = time.time()
+        dt = now - st['last']
+        st['last'] = now
+        st['t_train'] += dt
+        st['log_t'] += dt
+        st['seen_dec'] += n_dec
+        st['log_dec'] += n_dec
+        step_losses.append(loss.item())
+        log['loss'] += step_losses[-1]
+        log['main'] += main.item()
+        log['aux'] += aux.item()
+        log['norm'] += norm.item()
+        st['log_n'] += 1
+
+    # Pipelined: a step's update is evaluated asynchronously while the next step's data and graph are built on the
+    # host; its numbers are read after that (the same computation in the same order). A step that logs, evaluates
+    # or saves a checkpoint waits for itself first.
+    pending = None
     for s in range(start + 1, steps + 1):
         L = next((l for upto, l in cur if s <= upto), cur[-1][1])
         if not order:
@@ -767,37 +897,44 @@ def main():
         ts = time.time()
         dev = device_of(train, chunk, up)
         plan = plan_batch(dev, list(range(len(chunk))), L, a.mem_drop, rng, tm)
+        log['host_ms'] += 1000 * (time.time() - ts)
         n_dec = sum(len(g[0]) for g in plan[3].values())
         # The auxiliary heads' weight: full over the first half of the run, then down to 0 at its end.
         head_w = a.head_w * min(1.0, 2.0 * (1.0 - s / steps))
         (loss, (main, aux)), grads = grad_fn(model, dev, plan, head_w)
         grads, norm = optim.clip_grad_norm(grads, 1.0)
         opt.update(model, grads)
-        mx.eval(model.parameters(), opt.state, loss, main, aux, norm)
-        dt = time.time() - ts
-        t_train += dt
-        log_t += dt
-        seen_dec += n_dec
-        log_dec += n_dec
-        log['loss'] += loss.item()
-        log['main'] += main.item()
-        log['aux'] += aux.item()
-        log['norm'] += norm.item()
-        log_n += 1
+        mx.async_eval(model.parameters(), opt.state, loss, main, aux, norm)
+        if pending is not None:
+            account(pending)
+        pending = (n_dec, loss, main, aux, norm)
         is_eval = s % a.eval_every == 0 or s == steps
         if time.time() - t0 > a.max_minutes * 60:
             is_eval, stopped = True, True
+        half_epoch = int(2 * s * a.plays / len(plays_all)) > int(2 * (s - 1) * a.plays / len(plays_all))
+        if not (s % a.log_every == 0 or is_eval or half_epoch or stopped):
+            if a.no_pipeline:
+                mx.eval(model.parameters(), opt.state)
+                account(pending)
+                pending = None
+            continue
+        mx.eval(model.parameters(), opt.state)
+        account(pending)
+        pending = None
         if s % a.log_every == 0 or is_eval:
-            rec = {'step': s, 'L': L, 'epoch': s * a.plays / len(plays_all), **{k: v / log_n for k, v in log.items()}, 'lr': float(sched(s)), 'dps': log_dec / max(log_t, 1e-9), 'dps_mean': seen_dec / t_train, 'wall_s': time.time() - t0}
+            log_n = st['log_n']
+            rec = {'step': s, 'L': L, 'epoch': s * a.plays / len(plays_all), **{k: v / log_n for k, v in log.items()}, 'lr': float(sched(s)), 'dps': st['log_dec'] / max(st['log_t'], 1e-9),
+                   'dps_mean': st['seen_dec'] / st['t_train'], 'wall_s': time.time() - t0, 'mlx_peak_gb': mx.get_peak_memory() / 2 ** 30, 'step_losses': step_losses}
             if is_eval:
                 ev, by_family = evaluate(model, hold_device, hold_plays if (stopped or s == steps) else hold_eval, tm)
                 rec['hold'] = ev
                 rec['hold_by_family'] = by_family
             log = collections.defaultdict(float)
-            log_n, log_t, log_dec = 0, 0.0, 0
+            step_losses = []
+            st['log_n'], st['log_t'], st['log_dec'] = 0, 0.0, 0
             curves.write(json.dumps(rec) + '\n')
             curves.flush()
-            print(json.dumps({k: v for k, v in rec.items() if k != 'hold_by_family'}), flush=True)
+            print(json.dumps({k: v for k, v in rec.items() if k not in ('hold_by_family', 'step_losses')}), flush=True)
             if is_eval:
                 model.save_weights(os.path.join(a.out, 'last.safetensors'))
                 mx.save_safetensors(opt_path, dict(nn.utils.tree_flatten(opt.state)))
@@ -806,9 +943,10 @@ def main():
                     model.save_weights(os.path.join(a.out, 'weights.safetensors'))
                     export(model, os.path.join(a.out, 'army-net.bin'))
                 json.dump({'step': s, 'steps': steps, 'best_both': best_both}, open(state_path, 'w'))
-        half_epoch = int(2 * s * a.plays / len(plays_all)) > int(2 * (s - 1) * a.plays / len(plays_all))
         if half_epoch or stopped or s == steps:
             save_checkpoint(model, a.out, s * a.plays / len(plays_all))
+        # The evaluation and the checkpoints are not training time.
+        st['last'] = time.time()
         if stopped:
             print(f'stopped at step {s} of {steps} (the {a.max_minutes} min limit of one GPU job)', flush=True)
             break
