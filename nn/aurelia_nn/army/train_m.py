@@ -642,7 +642,10 @@ def main():
     ap.add_argument('--resume', action='store_true', help='continue OUT from its last checkpoint (OUT/state.json: the step; OUT/opt.safetensors: the optimizer)')
     ap.add_argument('--new-lr-mult', type=float, default=1.0, help='MBH: the history parameters (model_mb.HX_PARAMS) learn at this multiple of --lr')
     ap.add_argument('--warmup', type=int, default=20, help='resumed without the optimizer state: lr ramps up over these steps')
+    ap.add_argument('--mem-gb', type=float, default=12.0, help='MLX memory limit (match the broker --ram reservation); cache 2 GB')
     a = ap.parse_args()
+    mx.set_memory_limit(int(a.mem_gb * 2 ** 30))
+    mx.set_cache_limit(2 * 2 ** 30)
     from .train import SIEGE
     if a.cpu:
         mx.set_default_device(mx.cpu)

@@ -131,6 +131,7 @@ def collect(model, stream, ids, tm, project=None):
         ptr, act = choices(model, b, hfull)
         mx.eval(ptr, act, *stages)
         odd = [flat.plays[flat.play[i]]['instance'] % 2 for i in dec]
+        mx.eval(b['ptr'], b['act'], b['has_act'])
         picks.append((ptr, act, b['ptr'], b['act'], b['has_act'], odd))
         t = b['tok'].shape[1]
         own = (b['tok'][..., K_OWN] > 0.5) & b['sel'] & (b['danger'] >= 0)
@@ -150,7 +151,10 @@ def collect(model, stream, ids, tm, project=None):
             feats = {'danger': x[:, :t].reshape(n * t, -1)[sel['danger']], 'dealt': x[mx.arange(n), b['unit']][sel['dealt']], 'stage': x[:, t][sel['stage']]}
             for k in rows:
                 if sel[k].size:
-                    rows[k].append((s, odd_a[dec_of[k]], feats[k], target[k]))
+                    row = (s, odd_a[dec_of[k]], feats[k], target[k])
+                    # Evaluated now: a lazy row would keep the whole chunk (its turn maps, the batch) alive.
+                    mx.eval(*row[1:])
+                    rows[k].append(row)
     return rows, picks
 
 
@@ -185,9 +189,12 @@ def main():
     ap.add_argument('--out', required=True)
     ap.add_argument('--every', type=int, default=16)
     ap.add_argument('--cpu', action='store_true')
+    ap.add_argument('--mem-gb', type=float, default=6.0, help='MLX memory limit (match the broker --ram reservation)')
     a = ap.parse_args()
     if a.cpu:
         mx.set_default_device(mx.cpu)
+    mx.set_memory_limit(int(a.mem_gb * 2 ** 30))
+    mx.set_cache_limit(2 ** 30)
     w = mx.load(a.weights)
     model = (MBANet if 'w_price' in w else MBNet)(promos=w['promo'].shape[0] - 1, map_ch=w['m_in.weight'].shape[0])
     model.load_weights(a.weights)
@@ -197,6 +204,7 @@ def main():
     rows, picks = {'danger': [], 'dealt': [], 'stage': []}, []
     for s in range(0, len(ids), 64):
         r, p = collect(model, stream, ids[s:s + 64], tm)
+        mx.clear_cache()
         for k in rows:
             rows[k] += r[k]
         picks += p
