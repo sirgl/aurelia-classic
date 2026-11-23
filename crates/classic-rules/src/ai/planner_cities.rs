@@ -146,7 +146,7 @@ pub(crate) struct Empire {
     fit: Option<FitContext>,
     /// Barbarian camps want a clearing group the free units do not make (`ai::camps`).
     pub(crate) camp_demand: usize,
-    /// Cities whose garrison waits (`early-growth`: `Net2Plan::garrison_waits`, `net2::weights::GARRISON`); empty for
+    /// Cities whose garrison waits (`early-growth`: `Growth::garrison_waits`, `net2::weights::GARRISON`); empty for
     /// every other variant.
     garrison_waits: Vec<crate::ids::EntityId>,
 }
@@ -610,7 +610,7 @@ impl Empire {
             refused: Vec::new(),
             fit: brief.army_fit.then(|| FitContext::of(obs, brief, state, rules)),
             camp_demand: if brief.camps { crate::ai::camps::demand(obs, brief, state, rules) } else { 0 },
-            garrison_waits: crate::ai::operations::with_net2(brief, crate::ai::net2::plan::Part::Guard, |plan| obs.own_cities.iter().map(|c| c.id).filter(|c| plan.garrison_waits(*c)).collect()).unwrap_or_default(),
+            garrison_waits: garrison_waits(brief),
         }
     }
 }
@@ -1342,10 +1342,6 @@ fn defence_orders(obs: &AIObservation<'_>, brief: &TurnBrief, empire: &mut Empir
     let watch = brief.defence.as_ref()?;
     let danger = watch.danger(city.tile)?;
     let item = defence_item(obs, brief, empire, rules, city, watch, danger)?;
-    if crate::ai::strategy_net::trace::enabled() {
-        let kind = danger.attacker.and_then(|a| obs.relation(a)).map_or("none".to_owned(), |r| format!("{:?}{}", r.kind, if r.at_war { "@war" } else { "" }));
-        crate::ai::strategy_net::trace::push(format!("r{} p{} DEF city {}: attacker {kind} threat {} guard {} planned {} level {} pop {} prod {}", obs.round, obs.player.0, city.id.0, danger.threat, danger.guard, danger.planned, danger.level, city.population, city.income.production));
-    }
     if let ProductionItem::Unit(_) = item {
         empire.military += 1;
     }
@@ -1543,6 +1539,13 @@ fn allocated_order(
     process_order(obs, slot).unwrap_or_else(|| Decision::refuse(Actor::City(slot.city.id), Reason::NothingToBuild))
 }
 
+/// The cities whose flat garrison waits this turn (`early-growth`: `Growth::garrison_waits`); none without `net2`'s
+/// guard part.
+fn garrison_waits(brief: &TurnBrief) -> Vec<crate::ids::EntityId> {
+    let waits = crate::ai::operations::with_net2(brief, crate::ai::net2::plan::Part::Guard, |plan| plan.growth.garrison_waits.clone());
+    waits.unwrap_or_default()
+}
+
 fn needs_garrison(
     obs: &AIObservation<'_>,
     empire: &Empire,
@@ -1562,15 +1565,13 @@ fn garrison_order(
 ) -> Option<Decision> {
     // `early-growth`: net2's garrison (`weights::GARRISON`) lets a quiet city below the mean production build its
     // infrastructure first; a seen threat is `defence_orders`'.
-    let needed = needs_garrison(obs, empire, rules, slot.city) && !slot.plans_military(rules) && !empire.garrison_waits.contains(&slot.city.id);
+    let waits = empire.garrison_waits.contains(&slot.city.id);
+    let needed = needs_garrison(obs, empire, rules, slot.city) && !slot.plans_military(rules) && !waits;
     if !needed || empire.military >= empire.military_cap {
         return None;
     }
     let kind = military_kind(obs, empire, rules, crate::ai::army_fit::Purpose::Hold)?;
     empire.military += 1;
-    if crate::ai::strategy_net::trace::enabled() {
-        crate::ai::strategy_net::trace::push(format!("r{} p{} GARR city {}: pop {} prod {}", obs.round, obs.player.0, slot.city.id.0, slot.city.population, slot.city.income.production));
-    }
     Some(order(
         empire,
         slot.city,

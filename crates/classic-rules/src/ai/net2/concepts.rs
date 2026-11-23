@@ -75,6 +75,17 @@ pub fn fire(neuron: &Neuron, frame: &Frame<'_>) -> Milli {
             }
             unit(best)
         }
+        Join::Min => {
+            let mut least: Option<Milli> = None;
+            for term in neuron.terms {
+                let value = term.w * frame.shaped(term) / ONE;
+                least = Some(match least {
+                    Some(l) => l.min(value),
+                    None => value,
+                });
+            }
+            least.unwrap_or(0)
+        }
     }
 }
 

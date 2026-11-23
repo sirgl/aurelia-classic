@@ -63,7 +63,7 @@ pub fn goal_name(rules: &CompiledRuleset, kind: GoalKind) -> String {
     }
 }
 
-pub fn item_name(rules: &CompiledRuleset, item: ProductionItem) -> String {
+fn item_name(rules: &CompiledRuleset, item: ProductionItem) -> String {
     match item {
         ProductionItem::Unit(k) => rules.units.get(usize::from(k.0)).map_or("?", |d| short(&d.key)).to_owned(),
         ProductionItem::Building(b) => rules.buildings.get(usize::from(b.0)).map_or("?", |d| short(&d.key)).to_owned(),

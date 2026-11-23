@@ -552,7 +552,10 @@ fn play(rules: &CompiledRuleset, options: &Options, script: &'static str, seed: 
                 .trace()
                 .entries()
                 .filter_map(|e| match &e.command {
-                    Some(Command::EnqueueProduction { player, city, item }) => Some((*player, format!("why:{}:{}:{:?}", auth.cities().get(*city).map_or(0, |c| c.id.0), item_key(rules, *item), e.reason))),
+                    Some(Command::EnqueueProduction { player, city, item }) => {
+                        let id = auth.cities().get(*city).map_or(0, |c| c.id.0);
+                        Some((*player, format!("why:{id}:{}:{:?}", item_key(rules, *item), e.reason)))
+                    }
                     _ => None,
                 })
                 .collect();
@@ -1139,7 +1142,7 @@ fn early_seen_now(game: &GameState<Classic>, rules: &CompiledRuleset, player: Pl
 /// `--early`: a strategist's trace line of `player` worth the look.
 fn early_kept(line: &str, player: u8) -> bool {
     let tag = format!(" p{player} ");
-    line.contains(&tag) && ["TALLR", "CAP", "BUILD", "REVIEW", "GOALMISS", "FIT", "OPEN", "GOLD", "DEF", "GARR", "ALLOC"].iter().any(|k| line.contains(&format!("{tag}{k}")))
+    line.contains(&tag) && ["TALLR", "CAP", "BUILD", "REVIEW", "GOALMISS", "FIT"].iter().any(|k| line.contains(&format!("{tag}{k}")))
 }
 
 /// `--early`: a living seat now.
@@ -1209,7 +1212,13 @@ fn early_line(game: &GameState<Classic>, rules: &CompiledRuleset, script: &str, 
     let ai: Vec<String> = ai.iter().map(|l| quote(l.split(" | f[").next().unwrap_or(l))).collect();
     let cmds: Vec<String> = commands.iter().map(|c| quote(c)).collect();
     format!(
-        "{{\"g\":\"{script}/{seed}\",\"p\":{},\"r\":{now},\"cities\":{},\"pop\":{pop},\"food\":{food},\"prod\":{prod},\"sci\":{},\"gold\":{},\"treasury\":{},\"excess\":{},\"settlers\":{settlers},\"workers\":{workers},\"mil\":{military},\"libs\":{libs},\"wonders\":{wonders},\"techs\":{},\"happy\":{happy},\"lux_open\":[{},{open_tiles},{}],\"c\":[{}],\"cmd\":[{}],\"ai\":[{}],\"imp\":[{}],\"newtech\":[{}],\"w\":[{}],\"settler_ids\":[{}]}}",
+        concat!(
+            "{{\"g\":\"{script}/{seed}\",\"p\":{},\"r\":{now},\"cities\":{},\"pop\":{pop},\"food\":{food},\"prod\":{prod},",
+            "\"sci\":{},\"gold\":{},\"treasury\":{},\"excess\":{},\"settlers\":{settlers},\"workers\":{workers},",
+            "\"mil\":{military},\"libs\":{libs},\"wonders\":{wonders},\"techs\":{},\"happy\":{happy},",
+            "\"lux_open\":[{},{open_tiles},{}],\"c\":[{}],\"cmd\":[{}],\"ai\":[{}],\"imp\":[{}],\"newtech\":[{}],",
+            "\"w\":[{}],\"settler_ids\":[{}]}}"
+        ),
         player.0,
         cities.len(),
         income.science,
@@ -1226,5 +1235,18 @@ fn early_line(game: &GameState<Classic>, rules: &CompiledRuleset, script: &str, 
         seen.techs.join(","),
         seen.workers.join(","),
         settler_ids.join(","),
+        script = script,
+        seed = seed,
+        now = now,
+        pop = pop,
+        food = food,
+        prod = prod,
+        settlers = settlers,
+        workers = workers,
+        military = military,
+        libs = libs,
+        wonders = wonders,
+        happy = happy,
+        open_tiles = open_tiles,
     )
 }

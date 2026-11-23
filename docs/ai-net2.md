@@ -114,7 +114,7 @@ The chest is released by the net: `r::CHEST_WAIT` (the rounds the chest held a p
 
 | piece | what | why (look, 20 self-play games, seeds 3610–3614, Quick) |
 |---|---|---|
-| `OPENING` → `CITY_CAP` | the opening's cities (below `gate::OPENING_CITIES` = 4, on free sites, each keeping excess happiness ≥ 0) beyond the size model's | the model keeps 6 points after a city (`tall_real::CONTENT_FLOOR`): 2 cities in 4909 of 6650 turns of r1–100 |
+| `OPENING` → `CITY_CAP` | the opening's cities (below four, on free sites, each keeping excess happiness ≥ 0) beyond the size model's | the model keeps 6 points after a city (`tall_real::CONTENT_FLOOR`): 2 cities in 4909 of 6650 turns of r1–100 |
 | `OPENING_GAP` → `EXPANSION_TILT` | the expansion price +1.5 per opening city | the head replaced the allocator's settler by a granary or a library; a city the cap allowed waited 32 rounds for its settler |
 | `LUX_OPEN` → `WORKER_TILT` | the worker price +2 per luxury kind waiting beyond the workers | first worker r46 with 1.9 luxury kinds unconnected at r40 |
 
@@ -124,14 +124,17 @@ science-win round 314 against 309). The research did not move: each city adds 5 
 pace maps, the new cities have no library (lag 34 rounds), and the first worker stays at r45. The look and the tables are
 in `work/nets/early-growth`; the trace is `ai-science-pace --early FILE`.
 
-Round 2 (`net2::growth`, `plan::Growth`; off for every other variant):
+Round 2 (`net2::growth`, `plan::Growth`; off for every other variant). Every number that decides is a weight with its
+why in `weights.rs` (the data: `work/nets/early-growth/runs/derive-e1-sf.md`, science-flow's self-play 3700–3716,
+`tools/derive.py`); the executors only read the plan.
 
-| piece | what the executor reads | why (look 3610–3614 with the GOLD, DEF, GARR, ALLOC trace lines) |
+| piece | what the executor reads | why |
 |---|---|---|
-| `GARRISON` (gate 500, per city) | `planner_cities::garrison_order` orders no flat garrison in a city the net leaves out (a city founded after the plan waits for the next reading) | young non-capital cities before their library built a military unit or a scout in 47 % of their rounds, 79 % of it the flat garrison ordered at founding (pop 1, 3 hammers); below the empire's mean production a quiet city builds its infrastructure first, the watch answers a seen threat |
-| `BUY_CHEST` | `allocator::spend_gold`: the tiles, the gifts and the other heads leave the hurry price of the cheapest worker, settler or science building heading a queue | 2533 tiles and 4 libraries bought by r135 (120 seats); a library's offer had the better ratio (1853 against 1195) but its price (300) was above the spendable gold in 3706 of 4591 offers |
-| `Growth::jobs_ahead` (`gate::JOBS_AHEAD`) | the allocator's worker counts at least the cities' owned tiles with a job, up to the citizens + 2 | the worked tiles alone gave the worker no value in most decisions before the first one (0 jobs in 34 of 74) |
-| site head S11·S12 (`site::SHARED` = 333) | a third of the land a site shares with an own city is subtracted | 263 of 394 cities were founded 3 tiles from their nearest own city |
+| `OPENING_ROOM` (a `Join::Min`), `OPENING` | `CITY_CAP`'s `g::OPENING`, `EXPANSION_TILT`'s `g::OPENING_GAP`: the first of four cities, the free sites, the cities the happiness pays for | seats at 3–4 cities at r80 made 82–83 beakers at r132 against 72 at 2 cities |
+| `GARRISON` (gate 500, per city; the capital keeps it) | `Growth::garrison_waits`: `planner_cities::garrison_order` orders no flat garrison there | young cities below the mean production had a military head in 49.6 % of their rounds, 70 % of it the flat garrison; capitals lost 4 against 3 in E3 with the wait on every city |
+| `CHEST_ITEM`, `BUY_CHEST` | `Growth::chest_heads`, `Growth::chest`: in `allocator::spend_gold` only the listed heads spend the chest | a library's offer had the better ratio (1853 against 1195) but its price was above the spendable gold in 3706 of 4591 offers |
+| `WORKER_SHORT`, `JOBS_CAP` | `Growth::jobs_ahead`: the allocator's worker counts at least the open tiles up to the citizens + 2 while a city lacks its worker | a city grows 2 citizens in 12 rounds, a first worker's second improvement takes 14 |
+| site head S11·S12 (`site::SHARED` = 750) | three quarters of the land a site shares with an own city is subtracted | the share of citizens lost on the share of tiles shared: 0.76 (95 % CI 0.44–0.99) |
 
 Found and not changed: the building price does not count the buildings a building opens (`building_here`'s depth is
 the free buildings'); the worker's chop does not count the hammers the chop gives; a worker's job weight is linear in its
