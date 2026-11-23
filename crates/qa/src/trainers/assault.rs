@@ -19,6 +19,15 @@
 //!   enemy's turn before the capture, units lost, rounds.
 //! - planned-assault: the composite: hills round the city, worn units, a home city, promotions to
 //!   choose: the city taken within 30 rounds with at most 1 of ours lost. Measures: all of the above.
+//! - assault-reinforce ("at any cost"): the assault-heal ground and forces, the army at the edge of
+//!   the city's strike; at round N (6-8, drawn from the instance alone) 2-3 of the era's strongest melee of the enemy land in and next to the city. Win:
+//!   the city taken before them (`taken` <= N - 1, the scene's `deadline`); NO loss cap; the play ends
+//!   at round N. Measures: the assault's, and `deadline`.
+//! - assault-peace ("at any cost"): the city is the war's goal and the peace comes at round N (7-9,
+//!   drawn from the instance alone): the planned-assault composite with a fourth melee unit and five
+//!   worn units, the army at the edge of the city's strike. Win: the city taken by round N (`deadline`
+//!   = N); NO loss cap; the play ends at round N. (N was 8-10 in the spec; at 10 the careful plan won
+//!   half the scenes, so 7-9.)
 //!
 //! THE REFERENCES (one planner, `turn`, with three switches; every reference plays only by the rules'
 //! own previews, data and the game's public state):
@@ -36,6 +45,11 @@
 //!   city's fire, healing for an army with no friendly land near).
 //!   ref-fire = stage; ref-hills = stage + tiles; ref-rotate = stage + tiles + rotate; ref-promo =
 //!   stage + tiles + promote; ref-planned = all four.
+//! - burst (ref-burst = stage + tiles + promote + burst, no rotation): once engaged every unit strikes the
+//!   city every turn (the shooters as in the others; every melee unit too, from the tile of its best blow,
+//!   a blow it survives by the preview or one that takes the city), no unit leaves to heal, and a melee
+//!   unit goes in (takes the city) at the first blow that can. It pays units for time: the reference of
+//!   the "at any cost" families, where `ref-planned` is the careful control.
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -59,6 +73,8 @@ pub const ROTATE_BELOW: u16 = 70;
 pub const ROTATE_BACK: u16 = 90;
 /// A shooter in the burst leaves below this (the city's strongest strike takes about 90).
 pub const ROTATE_BURST: u16 = 45;
+/// The turns `ref-burst` waits for the staging at most.
+pub const BURST_WAIT: u32 = 2;
 
 /// What a scene keeps between rounds (the measures and the references' memory).
 #[derive(Debug, Clone, Default)]
@@ -90,24 +106,45 @@ impl Track {
 }
 
 pub fn is_assault(f: Fam) -> bool {
-    matches!(f, Fam::AssaultHeal | Fam::PromotionChoice | Fam::HillArchers | Fam::CityFire | Fam::PlannedAssault)
+    matches!(f, Fam::AssaultHeal | Fam::PromotionChoice | Fam::HillArchers | Fam::CityFire | Fam::PlannedAssault) || any_cost(f)
 }
 
-/// The most of ours that may be lost for the win (by family).
+/// The "at any cost" families: a deadline, no loss cap.
+pub fn any_cost(f: Fam) -> bool {
+    matches!(f, Fam::AssaultReinforce | Fam::AssaultPeace)
+}
+
+/// The most of ours that may be lost for the win (by family; the "at any cost" families: no cap).
 pub fn loss_cap(f: Fam, n: usize) -> usize {
     match f {
         Fam::AssaultHeal | Fam::PromotionChoice => n / 2,
+        f if any_cost(f) => usize::MAX,
         _ => 1,
     }
 }
 
+/// The round limit (the "at any cost" families: the longest N; the scene's own N is drawn in `build`).
 pub fn rounds(f: Fam) -> u32 {
     match f {
         Fam::AssaultHeal | Fam::PlannedAssault => 30,
         Fam::PromotionChoice => 20,
         Fam::HillArchers => 16,
+        Fam::AssaultReinforce => REINFORCE_N.1,
+        Fam::AssaultPeace => PEACE_N.1,
         _ => 14,
     }
+}
+
+/// The round N of the "at any cost" families, (lowest, highest).
+pub const REINFORCE_N: (u32, u32) = (6, 8);
+pub const PEACE_N: (u32, u32) = (7, 9);
+/// Where the army of an "at any cost" family stands (x from the arena centre; the city stands at 4).
+const ANY_COST_ANCHOR: i64 = 0;
+
+/// N of an instance: drawn from the family and the instance alone (the redraw of an attempt keeps it).
+pub fn deadline_round(f: Fam, instance: usize) -> u32 {
+    let (lo, hi) = if f == Fam::AssaultReinforce { REINFORCE_N } else { PEACE_N };
+    lo + (super::lab::mix(0x0a11_c057 ^ (f as u64) << 32 ^ instance as u64) % u64::from(hi - lo + 1)) as u32
 }
 
 pub fn solvers(f: Fam) -> &'static [&'static str] {
@@ -116,6 +153,7 @@ pub fn solvers(f: Fam) -> &'static [&'static str] {
         Fam::PromotionChoice => &["ref-promo", "ref-planned"],
         Fam::HillArchers => &["ref-hills", "ref-planned"],
         Fam::CityFire => &["ref-fire", "ref-planned"],
+        f if any_cost(f) => &["ref-burst", "ref-planned"],
         _ => &["ref-planned", "ref-rotate"],
     }
 }
@@ -126,6 +164,8 @@ pub fn task(f: Fam) -> &'static str {
         Fam::PromotionChoice => "promotions earned in a staged fight: heal, city-attack or cover by the plan",
         Fam::HillArchers => "archers take the hills from which they reach the city, minimising its return fire",
         Fam::CityFire => "invest a city while minimising the damage of its ranged strike",
+        Fam::AssaultReinforce => "take the city before the enemy's reinforcements land, at any cost in units",
+        Fam::AssaultPeace => "take the city, the war's goal, before the peace, at any cost in units",
         _ => "the whole plan: approach, hills, rotation, promotions, the capture",
     }
 }
@@ -136,6 +176,7 @@ pub fn tricks(f: Fam) -> &'static [(&'static str, char)] {
         Fam::PromotionChoice => &[("MT7", 'U')],
         Fam::HillArchers => &[("MT1", 'U'), ("MO9", 'U')],
         Fam::CityFire => &[("MO9", 'U'), ("MO10", 'U')],
+        f if any_cost(f) => &[("MO9", 'U'), ("MO10", 'U')],
         _ => &[("MO9", 'U'), ("MO10", 'U'), ("V2", 'U')],
     }
 }
@@ -182,6 +223,9 @@ fn hill_ring(p: &mut Painter, city_t: TileId, n2: usize) -> Vec<TileId> {
 pub(super) fn build(p: &mut Painter, fam: Fam, lab: &Lab, instance: usize, attempt: u32) -> Result<Scene, String> {
     let rules = p.rules;
     let mut s = blank(fam, lab, instance, attempt);
+    // The ground and the forces of an "at any cost" family are those of an older family's scene (its draws in the same order).
+    let fam_any = fam;
+    let fam = set_up(fam);
     let (me, foe) = (lab.learner, lab.enemy);
     let at = |p: &Painter, dx: i64, dy: i64| p.at(dx, dy).ok_or_else(|| "off the map".to_owned());
     let city_dx = if fam == Fam::PromotionChoice { 7 } else { 4 };
@@ -243,7 +287,8 @@ pub(super) fn build(p: &mut Painter, fam: Fam, lab: &Lab, instance: usize, attem
     };
     match fam {
         Fam::AssaultHeal | Fam::CityFire | Fam::PlannedAssault => {
-            add(&mut plan, Arm::Melee, "capturer", 3);
+            // assault-peace: a fourth melee unit (the hills round the city cost the burst its melee).
+            add(&mut plan, Arm::Melee, "capturer", if fam_any == Fam::AssaultPeace { 4 } else { 3 });
             add(&mut plan, Arm::Ranged, "ranged", 3);
             add(&mut plan, Arm::Siege, "siege", 3);
         }
@@ -258,7 +303,8 @@ pub(super) fn build(p: &mut Painter, fam: Fam, lab: &Lab, instance: usize, attem
             add(&mut plan, Arm::Siege, "siege", p.d.range(1, 2));
         }
     }
-    let anchor = if fam == Fam::PromotionChoice { at(p, -4, 0)? } else if home { at(p, -2, 0)? } else { at(p, -3, 0)? };
+    // The "at any cost" families: the army stands at the edge of the city's strike (the deadline is short).
+    let anchor = if any_cost(fam_any) { at(p, ANY_COST_ANCHOR, 0)? } else if fam == Fam::PromotionChoice { at(p, -4, 0)? } else if home { at(p, -2, 0)? } else { at(p, -3, 0)? };
     let spots = p.spots(anchor, 2, plan.len())?;
     for ((arm, role), t) in plan.iter().zip(spots) {
         let k = p.kind(*arm).ok_or("no kind")?;
@@ -269,7 +315,8 @@ pub(super) fn build(p: &mut Painter, fam: Fam, lab: &Lab, instance: usize, attem
     if matches!(fam, Fam::AssaultHeal | Fam::PlannedAssault) {
         let mut ix: Vec<usize> = (0..s.mine.len()).collect();
         p.d.shuffle(&mut ix);
-        for i in ix.into_iter().take(3) {
+        // assault-peace: five worn (the careful plan rests them; the deadline does not wait).
+        for i in ix.into_iter().take(if fam_any == Fam::AssaultPeace { 5 } else { 3 }) {
             let piece = s.mine[i].clone();
             wound(p, &piece, 45, 70);
         }
@@ -290,9 +337,31 @@ pub(super) fn build(p: &mut Painter, fam: Fam, lab: &Lab, instance: usize, attem
     s.aim_learner = Some(city_t);
     s.centre = if fam == Fam::PromotionChoice { at(p, 3, 0)? } else { city_t };
     s.rounds = rounds(fam);
+    if any_cost(fam_any) {
+        let n = deadline_round(fam_any, instance);
+        s.rounds = n;
+        if fam_any == Fam::AssaultReinforce {
+            s.deadline = Some(n - 1);
+            let strong = lab.kinds.by_arm.get(&Arm::Melee).and_then(|v| v.iter().copied().max_by_key(|k| (rules.units[k.0 as usize].strength, k.0))).ok_or("no melee")?;
+            s.reinforce = vec![strong; p.d.range(2, 3) as usize];
+            s.info.insert("reinforce".into(), format!("{} x{} at round {n}", rules.units[strong.0 as usize].name, s.reinforce.len()));
+        } else {
+            s.deadline = Some(n);
+            s.info.insert("peace".into(), format!("round {n}"));
+        }
+    }
     s.info.insert("mine".into(), kinds_label(rules, &s.mine));
     s.info.insert("theirs".into(), kinds_label(rules, &s.theirs));
     Ok(s)
+}
+
+/// The older family whose scene an "at any cost" family is drawn as (the same ground, forces and draws).
+fn set_up(f: Fam) -> Fam {
+    match f {
+        Fam::AssaultReinforce => Fam::AssaultHeal,
+        Fam::AssaultPeace => Fam::PlannedAssault,
+        f => f,
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -433,15 +502,18 @@ pub struct Flags {
     pub tiles: bool,
     pub rotate: bool,
     pub promote: bool,
+    /// Every melee unit strikes the city every turn once engaged (`burst_melee`), the capture at the first chance.
+    pub burst: bool,
 }
 
 pub fn flags(name: &str) -> Option<Flags> {
     Some(match name {
-        "ref-fire" => Flags { tiles: false, rotate: false, promote: false },
-        "ref-hills" => Flags { tiles: true, rotate: false, promote: false },
-        "ref-rotate" => Flags { tiles: true, rotate: true, promote: false },
-        "ref-promo" => Flags { tiles: true, rotate: false, promote: true },
-        "ref-planned" => Flags { tiles: true, rotate: true, promote: true },
+        "ref-fire" => Flags { tiles: false, rotate: false, promote: false, burst: false },
+        "ref-hills" => Flags { tiles: true, rotate: false, promote: false, burst: false },
+        "ref-rotate" => Flags { tiles: true, rotate: true, promote: false, burst: false },
+        "ref-promo" => Flags { tiles: true, rotate: false, promote: true, burst: false },
+        "ref-planned" => Flags { tiles: true, rotate: true, promote: true, burst: false },
+        "ref-burst" => Flags { tiles: true, rotate: false, promote: true, burst: true },
         _ => return None,
     })
 }
@@ -600,7 +672,8 @@ pub fn turn(rules: &CompiledRuleset, game: &mut GameState, sc: &mut Scene, f: Fl
         let all_ready = arrive >= shooters.min(slots.len().max(1)) && states.iter().zip(&active).all(|(s, (p, _))| s.1 || matches!(p.role, "ranged" | "siege"));
         // The army goes whole: while a unit still rests the others wait (the rotation's first turns), up to a limit.
         let wait_for_rest = !sc.track.resting.is_empty() && sc.track.waited < 4;
-        if (all_ready && !wait_for_rest) || active.is_empty() || sc.track.waited >= 5 {
+        // The burst waits at most `BURST_WAIT` turns (time is what it buys with units).
+        if (all_ready && !wait_for_rest) || active.is_empty() || sc.track.waited >= 5 || (f.burst && sc.track.waited >= BURST_WAIT) {
             sc.track.engaged = true;
         } else {
             sc.track.waited += 1;
@@ -632,7 +705,12 @@ pub fn turn(rules: &CompiledRuleset, game: &mut GameState, sc: &mut Scene, f: Fl
         let reach: Vec<(TileId, u16)> = act::reachable(game, rules, me, p.h).into_iter().filter(|(t, _)| act::free_for(game, rules, p.h, *t)).collect();
         // The firing tile: out of the city's strike if the range allows, else (tiles) a tile it can shoot from this turn, the best defence, the least threatened.
         let firing = reach.iter().filter(|(t, _)| can_fire_from(game, rules, range, *t, &targets)).map(|(t, left)| (*t, *left));
-        let pick = if f.tiles {
+        let pick = if f.burst {
+            // The burst fires this turn: from where it stands if it can, else from the nearest firing tile with moves left (a
+            // siege unit sets up there).
+            // Not next to the city (the melee strike from there).
+            firing.filter(|(t, left)| *t == c.tile || *left > 0).min_by_key(|(t, _)| (dist(game, *t, city) <= 1, u8::from(*t != c.tile), in_range(game, *t), -act::defence(game, rules, *t, me), act::threat_on(game, rules, foe, *t), t.0)).map(|x| x.0)
+        } else if f.tiles {
             firing.min_by_key(|(t, left)| (in_range(game, *t), u8::from(*left == 0 && *t != c.tile), -act::defence(game, rules, *t, me), act::threat_on(game, rules, foe, *t), u8::from(*t != c.tile), t.0)).map(|x| x.0)
         } else {
             firing.min_by_key(|(t, left)| (u8::from(*left == 0 && *t != c.tile), dist(game, *t, city), u8::from(*t != c.tile), t.0)).map(|x| x.0)
@@ -672,8 +750,16 @@ pub fn turn(rules: &CompiledRuleset, game: &mut GameState, sc: &mut Scene, f: Fl
         act::stand(game, rules, p.h);
     }
     let go_in = low || !any_shooter_alive;
+    // The burst's capturer: the last melee unit alive waits two tiles off until a blow takes the city (the others spend
+    // themselves on it).
+    let melee: Vec<EntityId> = active.iter().filter(|(p, _)| !matches!(p.role, "ranged" | "siege")).map(|(p, _)| p.id).collect();
+    let capturer = if f.burst && melee.len() == 1 { melee.first().copied() } else { None };
     for (p, c) in &active {
         if matches!(p.role, "ranged" | "siege") {
+            continue;
+        }
+        if f.burst {
+            burst_melee(rules, game, sc, p.h, city, targets_fn, capturer == Some(p.id));
             continue;
         }
         if go_in || city_hp(rules, game, city).is_some_and(|(hp, max)| hp * 2 <= max) {
@@ -698,8 +784,81 @@ pub fn turn(rules: &CompiledRuleset, game: &mut GameState, sc: &mut Scene, f: Fl
     let _ = round;
 }
 
+/// A melee unit of the burst: the best blow it survives by the preview (or one that kills: the capture), from where it
+/// stands or from a reachable tile with moves left (a kill first, then the most dealt, then the least threatened tile);
+/// else it closes on the city. The capturer (the last melee unit) strikes only a blow that takes the city (or kills) and else waits two tiles off (next to the
+/// city once it is down to a third).
+fn burst_melee(rules: &CompiledRuleset, game: &mut GameState, sc: &Scene, h: UnitHandle, city: TileId, targets: &dyn Fn(&GameState) -> Vec<TileId>, capturer: bool) {
+    let (me, foe) = (sc.learner, sc.enemy);
+    let Some(c) = act::core_of(game, h).filter(|c| c.owner == me && c.moves_left > 0) else { return };
+    let ts = targets(game);
+    let mut best: Option<((i64, i64, i32, u32), TileId, TileId)> = None;
+    for (from, left) in act::reachable(game, rules, me, h) {
+        if (left == 0 && from != c.tile) || !act::free_for(game, rules, h, from) {
+            continue;
+        }
+        for &t in &ts {
+            if dist(game, from, t) > 1 {
+                continue;
+            }
+            let Some((dealt, taken, hp)) = act::preview(game, rules, h, (from != c.tile).then_some(from), t) else { continue };
+            let kills = dealt >= hp;
+            if !kills && (capturer || taken >= i64::from(c.hp)) {
+                continue;
+            }
+            let key = (-i64::from(kills), -dealt, act::threat_on(game, rules, foe, from), from.0);
+            if best.as_ref().is_none_or(|b| key < b.0) {
+                best = Some((key, from, t));
+            }
+        }
+    }
+    if let Some((_, from, t)) = best {
+        if from == c.tile || act::try_cmd(game, rules, me, Command::MoveUnit { unit: h, destination: from }) {
+            let _ = act::strike(game, rules, me, h, t);
+        }
+    } else if capturer {
+        // Two tiles off; next to the city once it is down to a third (the blow from where it stands next turn: a hill next to
+        // the city takes the moves of a step).
+        let wait = if city_hp(rules, game, city).is_some_and(|(hp, max)| hp * 3 <= max) { 1 } else { CITY_ATTACK_RANGE };
+        let _ = act::move_by(game, rules, me, h, |g, x, _| ((dist(g, x, city) - wait).abs(), act::threat_on(g, rules, foe, x)));
+    } else {
+        let _ = act::move_by(game, rules, me, h, |g, x, _| (dist(g, x, city), act::threat_on(g, rules, foe, x)));
+    }
+    act::stand(game, rules, h);
+}
+
+/// The enemy's reinforcements (assault-reinforce) land at the start of the enemy's turn of round N (the round after the
+/// deadline) if the city is still the enemy's: in the city if no military unit holds it, else on the free tiles next to
+/// it, the farthest from our units first. They are scene pieces (the closed arena keeps them), played by the enemy's AI.
+fn land_reinforcements(rules: &CompiledRuleset, game: &mut GameState, sc: &mut Scene) {
+    let (Some(d), Some(city)) = (sc.deadline, sc.target) else { return };
+    let round = game.view().auth.turn().round.saturating_sub(sc.start_round);
+    if sc.reinforce.is_empty() || round < d {
+        return;
+    }
+    let kinds = std::mem::take(&mut sc.reinforce);
+    let auth = game.view().auth;
+    if auth.indexes().city_on_tile(city).and_then(|c| auth.cities().get(c)).is_none_or(|c| c.owner != sc.enemy) {
+        return;
+    }
+    let ours: Vec<TileId> = sc.mine_alive(game).iter().map(|(_, c)| c.tile).collect();
+    let empty = |g: &GameState, t: TileId| {
+        let a = g.view().auth;
+        crate::battle::standable(rules, g, t) && a.indexes().units_on(t).iter().filter_map(|h| a.units().get(*h)).all(|u| act::is_civilian(rules, u.core.kind))
+    };
+    let mut tiles: Vec<TileId> = tiles_within(game, city, 1).into_iter().filter(|t| empty(game, *t) && (*t == city || auth.indexes().city_on_tile(*t).is_none())).collect();
+    tiles.sort_by_key(|t| (u8::from(*t != city), -act::nearest(game, *t, &ours), t.0));
+    for (k, t) in kinds.into_iter().zip(tiles) {
+        let h = game.debug_spawn_unit(rules, sc.enemy, t, k);
+        let id = game.view().auth.units().get(h).expect("a spawned unit").core.id;
+        sc.theirs.push(Piece { h, id, kind: k, role: "reinforce" });
+    }
+}
+
 /// The hunters of the field force (promotion-choice): they strike at even odds or better, else close on the nearest of ours.
-pub fn enemy_turn(rules: &CompiledRuleset, game: &mut GameState, sc: &Scene) {
+/// The reinforcements of assault-reinforce land first.
+pub fn enemy_turn(rules: &CompiledRuleset, game: &mut GameState, sc: &mut Scene) {
+    land_reinforcements(rules, game, sc);
     let (me, foe) = (sc.enemy, sc.learner);
     let friends: Vec<UnitHandle> = sc.theirs.iter().map(|p| p.h).collect();
     let ours = |g: &GameState| -> Vec<TileId> { sc.mine_alive(g).iter().map(|(_, c)| c.tile).collect() };

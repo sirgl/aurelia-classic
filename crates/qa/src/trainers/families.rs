@@ -109,10 +109,13 @@ pub enum Fam {
     // The memory trainers (`memory.rs`; appended again: the older families keep their seeds).
     AmbushFog,
     HuntFog,
+    // The "at any cost" assault trainers (`assault.rs`; appended again: the older families keep their seeds).
+    AssaultReinforce,
+    AssaultPeace,
 }
 
 impl Fam {
-    pub const ALL: [Fam; 32] = [
+    pub const ALL: [Fam; 34] = [
         Fam::Duel,
         Fam::Focus,
         Fam::Hold,
@@ -145,6 +148,8 @@ impl Fam {
         Fam::PlannedAssault,
         Fam::AmbushFog,
         Fam::HuntFog,
+        Fam::AssaultReinforce,
+        Fam::AssaultPeace,
     ];
 
     pub fn name(self) -> &'static str {
@@ -181,6 +186,8 @@ impl Fam {
             Fam::PlannedAssault => "planned-assault",
             Fam::AmbushFog => "ambush-fog",
             Fam::HuntFog => "hunt-fog",
+            Fam::AssaultReinforce => "assault-reinforce",
+            Fam::AssaultPeace => "assault-peace",
         }
     }
 
@@ -319,7 +326,7 @@ impl Fam {
             Fam::Sink => (k.has(Arm::NavalMelee) || k.has(Arm::NavalRanged)) && embark_known(rules, k.era),
             Fam::Airstrike => k.has(Arm::Bomber),
             // The assault families need the era's siege unit (a city of any era wears down the archers of the era before it).
-            Fam::AssaultHeal | Fam::PromotionChoice | Fam::HillArchers | Fam::CityFire | Fam::PlannedAssault => land && k.has(Arm::Siege),
+            f if assault::is_assault(f) => land && k.has(Arm::Siege),
             _ => land,
         }
     }
@@ -505,6 +512,8 @@ pub(super) fn blank(fam: Fam, lab: &Lab, instance: usize, attempt: u32) -> Scene
         first_kill: None,
         kills_by: BTreeMap::new(),
         track: Default::default(),
+        deadline: None,
+        reinforce: Vec::new(),
     }
 }
 
@@ -1135,7 +1144,7 @@ pub fn build(rules: &CompiledRuleset, fam: Fam, era: u8, instance: usize, attemp
                 s.aim_enemy = Some(home_t);
             }
         }
-        Fam::AssaultHeal | Fam::PromotionChoice | Fam::HillArchers | Fam::CityFire | Fam::PlannedAssault => unreachable!("built by assault::build"),
+        Fam::AssaultHeal | Fam::PromotionChoice | Fam::HillArchers | Fam::CityFire | Fam::PlannedAssault | Fam::AssaultReinforce | Fam::AssaultPeace => unreachable!("built by assault::build"),
         Fam::AmbushFog | Fam::HuntFog => unreachable!("built by memory::build"),
         Fam::Airstrike => {
             let home_t = at(&p, -3, 0)?;
@@ -1758,7 +1767,7 @@ pub fn judge(rules: &CompiledRuleset, game: &GameState, sc: &mut Scene, rel: u32
                 None
             }
         }
-        f @ (Fam::AssaultHeal | Fam::PromotionChoice | Fam::HillArchers | Fam::CityFire | Fam::PlannedAssault) => {
+        f @ (Fam::AssaultHeal | Fam::PromotionChoice | Fam::HillArchers | Fam::CityFire | Fam::PlannedAssault | Fam::AssaultReinforce | Fam::AssaultPeace) => {
             let cap = assault::loss_cap(f, sc.mine.len());
             if lost > cap && sc.cap_broken.is_none() {
                 sc.cap_broken = Some(rel);
@@ -1766,8 +1775,9 @@ pub fn judge(rules: &CompiledRuleset, game: &GameState, sc: &mut Scene, rel: u32
             let broken = sc.cap_broken.is_some();
             if broken && !play_on_past_cap() {
                 Some(false)
-            } else if sc.taken.is_some() {
-                Some(!broken)
+            } else if let Some(t) = sc.taken {
+                // The "at any cost" families: a capture after the deadline (the reinforcements landed, the peace) loses.
+                Some(!broken && sc.deadline.is_none_or(|d| t <= d))
             } else if limit || !mine.iter().any(|(p, _)| !act::is_civilian(rules, p.kind)) {
                 Some(false)
             } else {
@@ -1919,6 +1929,9 @@ pub fn measures(rules: &CompiledRuleset, game: &GameState, sc: &Scene, rel: u32)
     if sc.target.is_some() {
         m.insert("taken".into(), sc.taken.map_or(-1.0, f64::from));
         m.insert("cap_broken".into(), sc.cap_broken.map_or(-1.0, f64::from));
+        if let Some(d) = sc.deadline {
+            m.insert("deadline".into(), f64::from(d));
+        }
         if let Some((hp, max)) = sc.target.and_then(|t| city_hp(rules, game, t)) {
             m.insert("city_hp_share".into(), hp as f64 / max as f64);
         }

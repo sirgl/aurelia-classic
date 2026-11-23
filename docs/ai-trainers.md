@@ -106,6 +106,8 @@ captured, "killed" the enemy's combat units dead.
 | `hill-archers` | ranged units take hills to reach a city whose neighbours shut the view | classical, medieval, renaissance, industrial, modern, atomic, information | 16 | the city taken within 16 rounds with at most 1 of ours lost; its neighbours on our side are hills (and some tiles two away), only a shooter on a hill sees it. Measures: city damage dealt per round, damage taken, rounds. | ref-hills, ref-planned | MO9 U |
 | `city-fire` | invest a strong city without feeding its strike | classical, medieval, renaissance, industrial, modern, atomic, information | 14 | the city taken within 14 rounds with at most 1 of ours lost; open ground, all defences, one garrison. Measures: damage taken in the enemy's turn before the capture, lost, rounds. | ref-fire, ref-planned | MO9 U |
 | `planned-assault` | the composite: hills, a worn army, a home city, promotions | classical, medieval, renaissance, industrial, modern, atomic, information | 30 | the city taken within 30 rounds with at most 1 of ours lost. Measures: all of the above. | ref-planned, ref-rotate | MO9 U, MT7 U |
+| `assault-reinforce` | take the city before the enemy's reinforcements land, at any cost in units | classical, medieval, renaissance, industrial, modern, atomic, information | 6-8 | the assault-heal ground and forces, the army at the edge of the city's strike; at round N (6-8, drawn from the instance alone: the scene's `deadline` is N - 1) 2-3 of the era's strongest melee of the enemy land in and next to the city. Win: the city taken by round N - 1; NO loss cap; the play ends at N. | ref-burst, ref-planned | MO9 U, MO10 U |
+| `assault-peace` | take the city, the war's goal, before the peace, at any cost in units | classical, medieval, renaissance, industrial, modern, atomic, information | 8-10 | the planned-assault composite with a fourth melee unit, the army at the edge of the city's strike; the peace comes at round N (7-9, drawn from the instance alone; `deadline` = N). Win: the city taken by round N; NO loss cap; the play ends at N. | ref-burst, ref-planned | MO9 U, MO10 U |
 
 The references (`families::reference_turn`, built on `act::unit_turn`): **ref-fight** (ranged keep at range behind a
 melee unit and strike the best blow by the rules' previews: a kill first, then the most wounded, the units that capture
@@ -119,7 +121,13 @@ ranged on the city and the units by it, melee wait 3 tiles off until the city is
 at the city at any odds), **ref-defend**, **ref-flee**, **ref-flank** (surround, then strike at any odds),
 **ref-bombard**, **ref-air** (bombers strike the weakest in range; a melee spotter stands in front, an air strike
 needs its target in sight), **ref-flee-wounded**, **ref-screen** (melee guard the ranged unit, our horse runs the
-horse archers down), **ref-snipe**, **ref-break**.
+horse archers down), **ref-snipe**, **ref-break**. The assault references (`assault.rs`, one planner with switches: stage, tiles, rotate, promote,
+burst): ref-fire, ref-hills, ref-rotate, ref-promo, ref-planned (all but burst) and **ref-burst** (stage for at most 2
+turns, then every unit strikes the city every turn and none leaves to heal: the shooters from where they stand or the
+nearest firing tile they can fire from this turn, not next to the city; every melee unit the best blow it survives by
+the preview; the last melee unit alive waits two tiles off, next to the city once it is down to a third, and takes it at
+the first blow that can). ref-burst pays units for time: the reference of the "at any cost" families, where ref-planned
+is the careful control.
 
 ## The 91 tricks
 
@@ -362,6 +370,23 @@ Target (written before the runs, above): the reference wins at least 70 % of all
 Both meet the second clause (planned-assault only just). tac2 13-25 %, unciv 20-21 % on the two. The other three
 families were re-proved with the same planner (assault-heal 99 %, promotion-choice 81 %, city-fire 95 % on the drawn
 attempts); the table above is the new one. The first part-2 run is `runs/t2`.
+
+## The "at any cost" families (23 November 2026, army-net clone `runs/fam-anycost`, 100 instances × 7 eras a family)
+
+The proof as asked before the runs: `ref-burst` wins >= 70 %, `ref-planned` (the careful rotation) <= 30 %, the passive
+control loses. Kept attempts (kept file `data/kept-anycost.jsonl` of the army-net clone), win / capture / units lost a play:
+
+| family | kept | ref-burst | ref-planned | passive | held out 80-99: ref-burst | ref-planned | standard | unciv |
+|---|---|---|---|---|---|---|---|---|
+| `assault-reinforce` | 696/700 | 99.4 % / 99.4 % / 2.10 | 9.9 % / 23.3 % / 0.44 | 0 % | 98.6 % / 2.15 (N 139) | 12.2 % / 30.2 % / 0.51 | 51.8 % / 54.7 % / 2.01 | 48.2 % / 53.2 % / 2.97 |
+| `assault-peace` | 677/700 | 98.8 % / 98.8 % / 3.18 | 12.0 % / 12.0 % / 0.72 | 0 % | 97.9 % / 3.21 (N 140) | 18.6 % / 18.6 % / 0.72 | 65.0 % / 65.0 % / 1.64 | 40.0 % / 40.0 % / 3.36 |
+
+The kept attempts are selected (a solver won them). Unselected, on attempt 0 of every instance: assault-reinforce
+ref-burst 80.7 %, ref-planned 9.3 %; assault-peace ref-burst 57.0 %, ref-planned 7.1 %. The scene was tuned in 7
+quick runs (attempt 0, 15 instances) and 2 full ones: the army starts at the edge of the city's strike, the burst stages for at most
+2 turns, its shooters fire from where they stand, the last melee unit keeps itself for the capture; assault-peace has
+a fourth melee unit, five worn units and N 7-9 (with N 8-10 ref-planned won 38 % held out, 52 % at N 10). The older
+families play bit-identically (1493 rows of 8 families, instances 0-2, solvers and standard, against the build before).
 
 ## Limits
 

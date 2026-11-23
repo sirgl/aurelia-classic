@@ -57,7 +57,7 @@ impl Aim {
         match fam {
             Fam::Duel | Fam::Focus | Fam::Kite | Fam::Flank | Fam::General | Fam::Sink | Fam::Airstrike | Fam::Harass | Fam::Choke | Fam::Citadel | Fam::Bait => Aim::Destroy,
             Fam::Hold | Fam::Rush => Aim::Hold,
-            Fam::Siege | Fam::Ram | Fam::Bombard | Fam::Prey | Fam::AssaultHeal | Fam::PromotionChoice | Fam::HillArchers | Fam::CityFire | Fam::PlannedAssault => Aim::TakeCity,
+            Fam::Siege | Fam::Ram | Fam::Bombard | Fam::Prey | Fam::AssaultHeal | Fam::PromotionChoice | Fam::HillArchers | Fam::CityFire | Fam::PlannedAssault | Fam::AssaultReinforce | Fam::AssaultPeace => Aim::TakeCity,
             Fam::Guard | Fam::Counter => Aim::Protect,
             Fam::Raid => Aim::Pillage,
             Fam::Retreat | Fam::Wounded | Fam::Surrounded | Fam::AmbushFog => Aim::Survive,

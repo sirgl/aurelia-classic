@@ -93,6 +93,10 @@ pub struct Scene {
     pub kills_by: BTreeMap<u32, u32>,
     /// What the assault families keep between rounds (damage, resting, promotions seen).
     pub track: assault::Track,
+    /// The "at any cost" assault families: the last round a capture wins (None: the round limit) and the enemy's
+    /// reinforcements that land in the round after it (kinds; spawned once, then scene pieces).
+    pub deadline: Option<u32>,
+    pub reinforce: Vec<UnitKindId>,
 }
 
 impl Scene {

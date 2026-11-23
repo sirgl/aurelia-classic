@@ -152,6 +152,37 @@ fn the_assault_win_rules_decide_what_they_say() {
     }
 }
 
+/// The "at any cost" assault win rules: the city taken by the deadline wins whatever was lost, a capture after it
+/// (the reinforcements landed, the peace) loses, the scene ends at N; N is drawn from the instance alone.
+#[test]
+fn the_any_cost_win_rules_decide_what_they_say() {
+    let rules = ClassicBench::rules();
+    let era = lab::era_index(&rules, "medieval").unwrap();
+    for (fam, lag) in [(Fam::AssaultReinforce, 1), (Fam::AssaultPeace, 0)] {
+        let (game, sc) = families::build(&rules, fam, era, 0, 0).unwrap();
+        let (_, again) = families::build(&rules, fam, era, 0, 1).unwrap();
+        assert_eq!(sc.rounds, again.rounds, "{}: N does not change with the attempt", fam.name());
+        let n = sc.rounds;
+        assert!(n <= fam.rounds() && n >= fam.rounds() - 2, "{}: N {n}", fam.name());
+        assert_eq!(sc.deadline, Some(n - lag), "{}", fam.name());
+        assert_eq!(sc.reinforce.is_empty(), fam == Fam::AssaultPeace, "{}", fam.name());
+        assert_eq!(families::judge(&rules, &game, &mut sc.clone(), n), Some(false), "{}: the limit loses", fam.name());
+        // All but one of ours lost: no loss cap.
+        let mut g = game.clone();
+        for p in sc.mine.iter().skip(1) {
+            g.debug_remove_unit(&rules, p.h);
+        }
+        let mut won = sc.clone();
+        won.taken = Some(n - lag);
+        assert_eq!(families::judge(&rules, &g, &mut won, n - lag), Some(true), "{}: taken by the deadline wins", fam.name());
+        let mut late = sc.clone();
+        late.taken = Some(n - lag + 1);
+        if lag > 0 {
+            assert_eq!(families::judge(&rules, &g, &mut late, n), Some(false), "{}: taken after the deadline loses", fam.name());
+        }
+    }
+}
+
 /// The citadel stands on the holders' land (its damage zone hurts only units next to a citadel an enemy at war
 /// owns); a citadel on neutral land damaged nobody.
 #[test]
