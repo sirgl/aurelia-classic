@@ -44,6 +44,9 @@ fn play(
         water_ratio: 20,
     };
     let mut game = generate_new_game(rules, &config);
+    // The world's making asks the memo too (the visibility rebuild reads the owners' unit modifiers) while it
+    // is on: what a mode answers is what it answers after the switch.
+    let made = game.view().auth.memo().stats();
     game.set_memo_mode(mode);
     let mut driver = AiDriver::new(
         AiSettings::for_rules(rules, rules.default_difficulty()),
@@ -58,6 +61,7 @@ fn play(
         hashes.push(authoritative_hash(&game));
     }
     let stats = game.view().auth.memo().stats();
+    let stats = classic_rules::effects::memo::MemoStats { hits: stats.hits - made.hits, misses: stats.misses - made.misses };
     (hashes, stats)
 }
 
@@ -329,7 +333,12 @@ fn every_kind_of_change_reaches_the_next_answer() {
 fn the_memo_is_closed_while_the_world_may_change() {
     let (mut game, rules) = three_nations();
     game.set_memo_mode(MemoMode::On);
-    let memo = |game: &GameState| game.view().auth.memo().stats();
+    // What the setup's journal commits asked the memo is not what this test counts.
+    let setup = game.view().auth.memo().stats();
+    let memo = |game: &GameState| {
+        let now = game.view().auth.memo().stats();
+        classic_rules::effects::memo::MemoStats { hits: now.hits - setup.hits, misses: now.misses - setup.misses }
+    };
     let first = player_modifiers(game.view().auth, &rules, P0);
     let again = player_modifiers(game.view().auth, &rules, P0);
     assert!(
