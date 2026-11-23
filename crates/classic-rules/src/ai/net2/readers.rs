@@ -24,6 +24,8 @@ const READERS: &[(&str, &str, &str)] = &[
     ("order_eases", "peace.rs", "p.order_eases"),
     ("space_hold", "planner_cities.rs", "p.space_hold"),
     ("space_research", "strategy_net/heads.rs", "n.space_research"),
+    ("capital_gate", "victory.rs", "|p| p.capital_gate"),
+    ("science", "economy.rs", "plan.science.scientists"),
     // CityGuard: the guard's level by city
     ("city", "net2/plan.rs", "g.city == city"),
     ("level", "defence.rs", "plan.guard_of(city.id)"),
