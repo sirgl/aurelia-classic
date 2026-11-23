@@ -271,6 +271,26 @@ impl Grounds {
     }
 }
 
+/// The fast-mode switches of a run (set once from the command line, read by the lab and `play`).
+pub mod mode {
+    use std::sync::atomic::{AtomicU8, Ordering};
+    /// World size of the lab: 0 small (the whole map as before), 1 tiny, 2 duel.
+    pub static WORLD: AtomicU8 = AtomicU8::new(0);
+    /// Fog: 0 the whole map shown to both sides (as before), 1 each side sees what its units and cities see.
+    pub static FOG: AtomicU8 = AtomicU8::new(0);
+    /// AI: 0 full, 1 combat layer only.
+    pub static AI: AtomicU8 = AtomicU8::new(0);
+    pub fn world() -> u8 {
+        WORLD.load(Ordering::Relaxed)
+    }
+    pub fn fog() -> bool {
+        FOG.load(Ordering::Relaxed) == 1
+    }
+    pub fn combat_only() -> bool {
+        AI.load(Ordering::Relaxed) == 1
+    }
+}
+
 /// The lab of an era: the world before the scene.
 #[derive(Clone)]
 pub struct Lab {
@@ -301,7 +321,7 @@ pub fn tiles_within(game: &GameState, centre: TileId, reach: i32) -> Vec<TileId>
 
 /// The lab of `era` (deterministic: the same for every scene of the era).
 pub fn build_lab(rules: &CompiledRuleset, era: u8) -> Result<Lab, String> {
-    let mut spec = GameSpec::new(MapScript::Pangaea, WorldSize::Small, 0x7a1e_5ab0);
+    let mut spec = GameSpec::new(MapScript::Pangaea, match mode::world() { 1 => WorldSize::Tiny, 2 => WorldSize::Duel, _ => WorldSize::Small }, 0x7a1e_5ab0);
     spec.nations = 2;
     spec.city_states = 0;
     spec.barbarians = classic_rules::world::barbarians::BarbarianMode::None;

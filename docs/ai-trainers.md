@@ -298,6 +298,34 @@ the build's `standard` on the drawn attempts (the scenes are solvable only by re
 more work (the hills' line of sight and the burst against the city's 20 a turn healing). Row measures: `dmg_city`,
 `dmg_own`, `city_dealt`, `dealt_per_round`, `rested`, `picks`. Traces: `runs/t2-traces/` (`tools/trace.sh`).
 
+## Fast mode (23 November 2026, `runs/fast-*`, 30 instances a cell, every family, standard and unciv)
+
+The trainers had no whole-game prefix to cut: the lab is built synthetically (a repainted Small world, a home city
+each, round 0), and the profile (`TRAINERS_PROF=1`, `sample`) shows 90 % of a play inside `driver.step`, 73 % of that
+in the AI's own siege planner (`ai::siege_walls::plan_turn` -> `evaluate` -> `find_path`, an A* that already carries
+a node limit and prices one step with `PlayerView::tile`), not in `validate_move`. Switches (all default to the
+old behaviour; set by `ai-exam suite`/`suite-one` options):
+
+| option | what | whole suite (6 threads, proof included) | plays/s | agreement with the default (Wilson 95 %, 60 cells: 30 families x standard, unciv) |
+|---|---|---|---|---|
+| default (`--world small --fog off --ai full`) | the whole map shown to both sides, the whole AI | 129 s | 450 | - |
+| `--world duel` | a 40 x 24 lab (960 tiles) instead of 66 x 42 | 92 s | 622 | 6 of 60 differ: convoy, guard, surrounded (standard); convoy, flank, sink (unciv): the home cities' distance is part of those scenes |
+| `--ai combat` | wrapper `CombatOnly`: only the decisions of war and the army (moves, attacks, fortify, strikes, promotions, declarations) are kept; research, production, city management, policies, religion, trade and peace are dropped | 126 s | 442 | 1 of 60 differs (unciv, ram); no saving: the cost is in the planning (`begin_turn`, siege planner), not in the decisions dropped; a saving needs a change inside the AI, outside this measurement-only branch |
+| `--world duel --ai combat` | both | 91 s | 616 | 12 of 60 differ |
+| `--fog on` | each side sees what its units and cities see (the game's visibility), no `reveal` | 95 s | 595 | 43 of 60 differ: the AI blind plays another game (the references and the scenes' aims use the true map) |
+| `--world duel --fog on` | both | 89 s | 631 | 38 of 60 differ |
+
+One family (city-fire medieval, 100 instances, one thread): 12.5 s default, 5.0 s fog, 6.7 s duel, 4.8 s duel + fog,
+12.6 s combat (the first, stricter filter of `combat` changed the outcome: standard 35 % to 0 %, because it dropped the
+operations' orders; the kept filter gives 35 % as the default). Early stop was already there: `judge` ends a play at
+the round the outcome is decided (city taken, one side gone, the convoy through).
+
+Verdict: the defaults stay (open map, full AI, Small lab): fog is a different measurement (use it to measure the AI's
+scouting and its blindness, not combat tactics), `duel` is safe for the families whose win rate agrees (everything but
+convoy, guard, surrounded, flank, sink) at 1.4 x, `combat` is equivalent but not faster until the AI's planner is
+bounded (the siege planner's path searches allocate a scratch of the map's size every call: an exact fix, with hashes
+to check, in `ai::siege_walls`).
+
 ## Limits
 
 - Scripts are simple and competent, not optimal: the best solver's win rate is a floor of what is winnable. A
