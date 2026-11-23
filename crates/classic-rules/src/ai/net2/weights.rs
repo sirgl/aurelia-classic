@@ -756,7 +756,7 @@ pub mod gate {
     pub const WAR_KEEP: (Milli, &str) = (350, "the order is kept below its start (hysteresis) while the reason lasts");
     pub const PEACE: (Milli, &str) = (500, "the peace wish wins over the war's inertia");
     pub const DENY_HELP: (Milli, &str) = (500, "a rival more likely than not to run away gets no help (lane A T4/T1: science wins 0.311 → 0.256, no war cost)");
-    pub const EMBARGO: (Milli, &str) = (600, "the embargo, the cheap brake, only on a clear runaway (W2, VP #8)");
+    pub const EMBARGO: (Milli, &str) = (600, "the congress embargo cuts the runaway's trade routes and deals for a proposal's price, no war: it is proposed and voted only on a rival whose runaway is clearly above even, so a level race is not braked (W2)");
     pub const BLOCK: (Milli, &str) = (500, "the ballot goes against a rival only when it would win the vote");
     pub const SPACE_RESEARCH: (Milli, &str) = (500, "the research keeps to the ship's way when the science aim and the way gone say so more likely than not");
     pub const CAPITAL_GATE: (Milli, &str) = (500, "the capital is kept for the parts when a part outside it says so more likely than not");
