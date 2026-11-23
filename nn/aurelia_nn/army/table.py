@@ -17,6 +17,7 @@ def main():
     ap.add_argument('--kept', required=True)
     ap.add_argument('--rows', nargs='+', required=True)
     ap.add_argument('--tac2', nargs='*', default=[])
+    ap.add_argument('--variant', nargs='*', default=[], help='NAME=rows.jsonl: the army-net rows of a variant, as player NAME')
     ap.add_argument('--from', dest='lo', type=int, default=80)
     ap.add_argument('--to', dest='hi', type=int, default=100)
     ap.add_argument('--out', required=True)
@@ -47,6 +48,16 @@ def main():
         for l in open(path):
             r = json.loads(l)
             add(r, r['player'])
+    variants = []
+    for spec in a.variant:
+        name, path = spec.split('=', 1)
+        variants.append(name)
+        for l in open(path):
+            r = json.loads(l)
+            if r['player'] == 'army-net':
+                add(r, name)
+    if not variants:
+        variants = ['army-net']
     for path in a.tac2:
         for l in open(path):
             r = json.loads(l)
@@ -58,17 +69,25 @@ def main():
         rate = {p: (w / n if n else 0.0, n) for p, (w, n) in cells.items()}
         teachers = {p: v for p, v in rate.items() if p.startswith('ref-') or p == 'unciv'}
         best = max(teachers.items(), key=lambda x: (x[1][0], x[0] != 'unciv')) if teachers else (None, (0.0, 0))
-        n = rate.get('army-net', (0, 0))[1]
-        net = rate.get('army-net', (0.0, 0))[0]
-        share = net / best[1][0] if best[1][0] > 0 else None
+        n = max((rate.get(v, (0, 0))[1] for v in variants), default=0)
+        n = n or max((v[1] for v in rate.values()), default=0)
+        shares = {}
+        passes = {}
+        for v in variants:
+            net = rate.get(v, (0.0, 0))[0]
+            shares[v] = net / best[1][0] if best[1][0] > 0 else None
+            passes[v] = shares[v] is not None and shares[v] >= 0.9 and rate.get(v, (0, 0))[1] >= 10
         out.append({'family': fam, 'n': n, 'rates': {p: v[0] for p, v in rate.items()}, 'counts': {p: cells[p] for p in cells},
-                    'best': best[0], 'best_rate': best[1][0], 'net_share': share, 'pass': share is not None and share >= 0.9 and n >= 10})
+                    'best': best[0], 'best_rate': best[1][0], 'share': shares, 'pass': passes})
     eligible = [r for r in out if r['n'] >= 10 and r['best_rate'] > 0]
-    passed = [r for r in eligible if r['pass']]
-    summary = {'families': len(eligible), 'passed': len(passed), 'gate_win': len(eligible) > 0 and len(passed) * 2 >= len(eligible)}
+    summary = {'families': len(eligible), 'variants': variants}
+    for v in variants:
+        passed = sum(1 for r in eligible if r['pass'][v])
+        summary[v] = {'passed': passed, 'gate_win': len(eligible) > 0 and passed * 2 >= len(eligible)}
     json.dump({'rows': out, 'summary': summary}, open(a.out, 'w'), indent=1)
     for r in out:
-        print(f"{r['family']:18} n={r['n']:4} net={r['rates'].get('army-net', 0):.2f} std={r['rates'].get('standard', 0):.2f} tac2={r['rates'].get('tac2', float('nan')):.2f} unciv={r['rates'].get('unciv', 0):.2f} best={r['best']}:{r['best_rate']:.2f} share={r['net_share'] if r['net_share'] is None else round(r['net_share'], 2)} {'PASS' if r['pass'] else ''}")
+        nets = ' '.join(f"{v}={r['rates'].get(v, 0):.2f}{'*' if r['pass'][v] else ''}" for v in variants)
+        print(f"{r['family']:18} n={r['n']:4} {nets} std={r['rates'].get('standard', 0):.2f} tac2={r['rates'].get('tac2', float('nan')):.2f} unciv={r['rates'].get('unciv', 0):.2f} best={r['best']}:{r['best_rate']:.2f}")
     print(json.dumps(summary))
 
 

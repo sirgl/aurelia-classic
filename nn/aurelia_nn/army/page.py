@@ -20,6 +20,8 @@ def curves_svg(nets, key, title, w=560, h=240):
         pts = []
         for l in open(n['curves']):
             r = json.loads(l)
+            if 'hold' not in r:
+                continue
             v = r['hold'][key] if key in r['hold'] else r.get(key)
             x = r['epoch'] + n.get('epoch0', 0.0)
             pts.append((x, v))
@@ -58,8 +60,12 @@ def cell(v, best):
     return f'<td class="{cls}">{round(100 * v)}</td>'
 
 
+GEOMETRY = {'choke', 'hold', 'flank', 'kite', 'harass', 'hill-archers', 'surrounded', 'convoy'}
+
+
 def table_html(path, label):
     t = json.load(open(path))
+    variants = t['summary']['variants']
     rows = []
     for r in t['rows']:
         if r['n'] < 10:
@@ -67,15 +73,17 @@ def table_html(path, label):
         rt = r['rates']
         b = r['best_rate']
         refs = ', '.join(f'{p[4:]} {round(100 * v)}' for p, v in sorted(rt.items()) if p.startswith('ref-'))
-        share = '—' if r['net_share'] is None else f"{round(100 * r['net_share'])} %"
-        mark = '✔' if r['pass'] else '✘'
-        rows.append(f"<tr><td>{r['family']}</td><td>{r['n']}</td>{cell(rt.get('army-net'), b)}{cell(rt.get('standard'), b)}{cell(rt.get('tac2'), b)}"
-                    f"{cell(rt.get('unciv'), b)}<td>{round(100 * b)} <small>{html.escape(str(r['best']))}</small></td><td>{share} {mark}</td><td><small>{html.escape(refs)}</small></td></tr>")
+        nets = ''.join(cell(rt.get(v), b) for v in variants)
+        shares = ''.join(f"<td>{'—' if r['share'][v] is None else str(round(100 * r['share'][v])) + ' %'} {'✔' if r['pass'][v] else '✘'}</td>" for v in variants)
+        fam = f"<b>{r['family']}</b>" if r['family'] in GEOMETRY else r['family']
+        rows.append(f"<tr><td>{fam}</td><td>{r['n']}</td>{nets}{cell(rt.get('standard'), b)}{cell(rt.get('tac2'), b)}"
+                    f"{cell(rt.get('unciv'), b)}<td>{round(100 * b)} <small>{html.escape(str(r['best']))}</small></td>{shares}<td><small>{html.escape(refs)}</small></td></tr>")
     s = t['summary']
-    head = ('<tr><th>семейство</th><th>N</th><th>army-net</th><th>standard</th><th>tac2</th><th>Unciv</th><th>лучший учитель</th>'
-            '<th>доля сети от лучшего (порог 90 %)</th><th>эталоны</th></tr>')
-    return (f'<h3>{html.escape(label)}: порог пройден в {s["passed"]} из {s["families"]} семейств</h3>'
-            f'<table>{head}{"".join(rows)}</table>')
+    head = ('<tr><th>семейство</th><th>N</th>' + ''.join(f'<th>{html.escape(v)}</th>' for v in variants) +
+            '<th>standard</th><th>tac2</th><th>Unciv</th><th>лучший учитель</th>' +
+            ''.join(f'<th>доля {html.escape(v)} от лучшего</th>' for v in variants) + '<th>эталоны</th></tr>')
+    verdict = '; '.join(f'{v}: порог 90 % пройден в {s[v]["passed"]} из {s["families"]} семейств' for v in variants)
+    return f'<h3>{html.escape(label)} — {verdict}</h3><table>{head}{"".join(rows)}</table>'
 
 
 def main():
@@ -94,6 +102,7 @@ def main():
     parts.append('<ul>' + ''.join(f'<li>{v}</li>' for v in sp['verdict']) + '</ul>')
     parts.append(table_html(sp['table'], sp['table_label']))
     parts.append('<p><small>Цвет — доля от лучшего учителя в семействе: зелёный ≥ 90 %, жёлтый 50–90 %, красный &lt; 50 %. '
+                 'Жирным — семейства геометрии (проход, фланг, кайт, холмы, окружение, конвой). '
                  'Отложенные экземпляры 80–99 каждой клетки (на них сеть не училась). tac2 — прежние прогоны тренажёров на тех же сценах.</small></p>')
     for t in sp.get('extra_tables', []):
         parts.append('<details><summary>' + html.escape(t['label']) + '</summary>' + table_html(t['path'], t['label']) + '</details>')

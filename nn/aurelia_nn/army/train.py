@@ -57,6 +57,9 @@ class Device:
             units = m.get('units', 0) or 1
             lost.append(min(1.0, m.get('lost', 0) / units))
         self.lost = mx.array(lost, mx.float32)
+        self.families = sorted({m['family'] for m in plays})
+        fam_ix = {f: i for i, f in enumerate(self.families)}
+        self.fam = [fam_ix[plays[p]['family']] for p in flat.play]
         self.n_cand = self.cand.shape[0]
         self.n_tok = self.tok.shape[0]
         self.n_dist = self.dist.shape[0]
@@ -148,6 +151,8 @@ def evaluate(model, dev, bs):
     tot = collections.defaultdict(float)
     n = 0
     n_act = 0.0
+    fam_hit = collections.defaultdict(float)
+    fam_n = collections.defaultdict(int)
     for s in range(0, dev.n, bs):
         idx = mx.arange(s, min(s + bs, dev.n))
         b = dev.batch(idx)
@@ -161,8 +166,13 @@ def evaluate(model, dev, bs):
         tot['acc_act'] += mx.sum(acc_act * has).item()
         tot['acc_both'] += mx.sum(both).item()
         n_act += mx.sum(has).item()
+        for j, hit in enumerate(both.tolist()):
+            f = dev.families[dev.fam[s + j]]
+            fam_hit[f] += hit
+            fam_n[f] += 1
         n += k
-    return {'loss': tot['loss'] / n, 'main': tot['main'] / n, 'acc_ptr': tot['acc_ptr'] / n, 'acc_act': tot['acc_act'] / max(n_act, 1), 'acc_both': tot['acc_both'] / n}
+    ev = {'loss': tot['loss'] / n, 'main': tot['main'] / n, 'acc_ptr': tot['acc_ptr'] / n, 'acc_act': tot['acc_act'] / max(n_act, 1), 'acc_both': tot['acc_both'] / n}
+    return ev, {f: fam_hit[f] / fam_n[f] for f in sorted(fam_n)}
 
 
 def load(paths, nth=1):
@@ -194,6 +204,7 @@ def main():
     ap.add_argument('--lost-weight', type=float, default=0.1)
     ap.add_argument('--best-factor', type=float, default=2.0)
     ap.add_argument('--eval-every', type=int, default=1000)
+    ap.add_argument('--log-every', type=int, default=200, help='a train-loss point of the curve every N steps')
     ap.add_argument('--seed', type=int, default=1)
     ap.add_argument('--init', default=None, help='start from these MLX weights')
     ap.add_argument('--cpu', action='store_true', help='a smoke test on the CPU (no GPU lock needed)')
@@ -231,12 +242,35 @@ def main():
         return loss, aux[0]
 
     step = mx.compile(step_fn, inputs=state, outputs=state)
+    def data_facts(flat, files):
+        fam = collections.Counter()
+        scenes = set()
+        for p in flat.play:
+            fam[flat.plays[p]['family']] += 1
+        for m in flat.plays:
+            scenes.add((m['family'], m['era'], m['instance']))
+        players = collections.Counter()
+        for m in flat.plays:
+            players[m['player']] += m['count']
+        return {'files': files, 'decisions': len(flat), 'plays': len(flat.plays), 'scenes': len(scenes), 'decisions_by_family': dict(sorted(fam.items())), 'decisions_by_teacher': dict(players.most_common())}
+
+    config = {'run': os.path.basename(os.path.normpath(a.out)), 'variant': 'B (hex-conv map encoder)' if a.map else 'A (no map)', 'map': a.map,
+              'bs': a.bs, 'lr': a.lr, 'schedule': f'AdamW (weight decay 1e-4), cosine decay from lr to 0.05 lr over {steps} steps, grad clip 1.0',
+              'epochs': a.epochs, 'steps': steps, 'd': a.d, 'layers': a.layers, 'heads': a.heads, 'ff': a.ff, 'map_ch': a.d if a.map else 0,
+              'promos': promos, 'T': tm, 'C': cm, 'parameters': n_params,
+              'losses': {'pointer_ce': 1.0, 'action_ce': 1.0, 'value_bce_win': 0.5, 'value_mse_lost_share': 0.5, 'danger_mse': 0.5},
+              'decision_weight': {'won_play': 1.0, 'lost_play': a.lost_weight, 'best_teacher_factor': a.best_factor}, 'best_teachers': best,
+              'seed': a.seed, 'init': a.init, 'device': str(mx.default_device()), 'eval_every_steps': a.eval_every, 'log_every_steps': a.log_every,
+              'train': data_facts(train, a.train), 'hold': data_facts(hold, a.hold)}
+    json.dump(config, open(os.path.join(a.out, 'config.json'), 'w'), indent=1)
     curves = open(os.path.join(a.out, 'curves.jsonl'), 'w')
     print(f'{n_params} parameters, {steps} steps of {a.bs}', flush=True)
     seen = 0
     t_train = 0.0
     run_loss = 0.0
     run_n = 0
+    log_loss = 0.0
+    log_n = 0
     perm = mx.random.permutation(dev.n)
     pos = 0
     best_both = -1.0
@@ -254,13 +288,21 @@ def main():
         seen += a.bs
         run_loss += loss.item()
         run_n += 1
-        if s % a.eval_every == 0 or s == steps:
-            ev = evaluate(model, hdev, 2048)
-            rec = {'step': s, 'epoch': seen / dev.n, 'train_loss': run_loss / run_n, 'hold': ev, 'dps': seen / t_train, 'wall_s': time.time() - t0}
-            run_loss, run_n = 0.0, 0
+        log_loss += loss.item()
+        log_n += 1
+        if s % a.log_every == 0 and s % a.eval_every != 0 and s != steps:
+            rec = {'step': s, 'epoch': seen / dev.n, 'train_loss': log_loss / log_n, 'dps': seen / t_train, 'wall_s': time.time() - t0}
+            log_loss, log_n = 0.0, 0
             curves.write(json.dumps(rec) + '\n')
             curves.flush()
-            print(json.dumps(rec), flush=True)
+        if s % a.eval_every == 0 or s == steps:
+            ev, by_family = evaluate(model, hdev, 2048)
+            rec = {'step': s, 'epoch': seen / dev.n, 'train_loss': log_loss / max(log_n, 1), 'hold': ev, 'hold_by_family': by_family, 'dps': seen / t_train, 'wall_s': time.time() - t0}
+            run_loss, run_n = 0.0, 0
+            log_loss, log_n = 0.0, 0
+            curves.write(json.dumps(rec) + '\n')
+            curves.flush()
+            print(json.dumps({k: v for k, v in rec.items() if k != 'hold_by_family'}), flush=True)
             model.save_weights(os.path.join(a.out, 'last.safetensors'))
             if ev['acc_both'] > best_both:
                 best_both = ev['acc_both']
