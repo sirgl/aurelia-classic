@@ -594,7 +594,8 @@ pub fn armory(obs: &AIObservation<'_>, brief: &TurnBrief, rules: &CompiledRulese
         let Some(weapon) = weapon(rules, kind) else { continue };
         let def = &rules.units[index];
         let known = def.required_tech.is_none_or(|t| brief.knows(t)) && !def.obsolete_tech.is_some_and(|t| brief.knows(t));
-        let resources = def.required_resources.iter().all(|(r, n)| obs.economy.resources.available(*r) >= i32::from(*n));
+        let held = |r: &crate::ids::ResourceId| crate::ai::operations::with_net2(brief, crate::ai::net2::plan::Part::Economy, |p| p.held(*r)).unwrap_or(0);
+        let resources = def.required_resources.iter().all(|(r, n)| obs.economy.resources.available(*r) - held(r) >= i32::from(*n));
         let allowed = rules.production_gate(crate::ids::ProductionItem::Unit(kind), brief.nation).is_none() && !def.unbuildable && def.cost > 0;
         if !(known && resources && allowed) {
             continue;

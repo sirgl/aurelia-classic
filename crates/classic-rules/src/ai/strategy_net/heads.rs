@@ -143,6 +143,7 @@ pub fn research(brief: &TurnBrief, rules: &CompiledRuleset, prices: &Prices, pla
     if available.is_empty() {
         return Some(Decision::refuse(Actor::Player, Reason::NoTechAvailable));
     }
+    let available = space_way(brief, rules, available);
     let net = net_prices(prices, &plan.mult);
     let weights = net.weights();
     let cities = brief.cities.len().max(1) as i32;
@@ -168,6 +169,22 @@ pub fn research(brief: &TurnBrief, rules: &CompiledRuleset, prices: &Prices, pla
     let technology = pick_tech(plan, &scores)?;
     super::trace::research(brief.player.0, brief.round, technology, &scores, rules);
     Some(Decision::act(Actor::Player, Reason::Research, Command::ChooseTechnology { player: brief.player, technology }))
+}
+
+/// `net2`'s `space_research` lever (`Net2Plan::space_research`): the available technologies on the spaceship's way
+/// (`sharp::space_techs` and their prerequisites), when there is one; every available one otherwise, and for every
+/// seat without the lever. Public for its test (`tests/ai_space_way.rs`).
+pub fn space_way(brief: &TurnBrief, rules: &CompiledRuleset, available: Vec<TechId>) -> Vec<TechId> {
+    if !brief.net2.as_ref().is_some_and(|n| n.space_research) {
+        return available;
+    }
+    let mut way: Vec<TechId> = Vec::new();
+    for t in super::sharp::space_techs(rules) {
+        let path = super::goals::path(rules, &brief.techs, &way, t);
+        way.extend(path);
+    }
+    let on: Vec<TechId> = available.iter().copied().filter(|t| way.contains(t)).collect();
+    if on.is_empty() { available } else { on }
 }
 
 // ---- policies ----

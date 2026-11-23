@@ -117,6 +117,9 @@ use kernel::replay::hash::authoritative_hash;
 ///   "Promoted: nets-x-site"); its tall first and its site net change the smoke game: 0c770e6ba5d4e5a8, the
 ///   hash of the benched `nets-x-site` against itself (`ai-tournament-266bd4d`, `ai/nets-x` 266bd4d),
 ///   measured; the old `standard` against itself (now `pre-nets-x`) gave the old 2bfc4393a36c5fba there.
+/// - 23 November, the sixteenth promotion: `standard` plays as `net2` (classic/docs/ai-net2.md); the smoke game's
+///   70 rounds play the same: the benched `net2` against itself (`ai/promote-net2` bfe8966, before the promotion)
+///   gave 0c770e6ba5d4e5a8, as the old `standard` did, and so do the new `standard` and `pre-net2`; the hash stays.
 const SMOKE_RESULT_HASH: &str = "0c770e6ba5d4e5a8";
 
 fn pairing(candidate: &str) -> Pairing {

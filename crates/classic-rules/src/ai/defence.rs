@@ -79,6 +79,9 @@ pub struct Danger {
     pub stake: Centi,
     /// The owner of the most hostile power near it.
     pub attacker: Option<PlayerId>,
+    /// `net2`'s guard level of the city, 0…1000 (`Net2Plan::guard_of`, §4.5); 0 is `standard`'s (no plan, or no
+    /// guard asked): every saving of a defender or a wall at this city counts × (1 + level).
+    pub level: crate::ai::strategy_net::Milli,
 }
 
 impl Danger {
@@ -87,9 +90,11 @@ impl Danger {
         self.stake * chance(self.threat, guard) / 1000
     }
 
-    /// The loss `power` more on a guard of `guard` saves.
+    /// The loss `power` more on a guard of `guard` saves; with a `net2` guard level × (1 + level): the plan reads
+    /// the stack at the border and the fall of a capital as a reason to hold a city that the seen power alone
+    /// (`threat`, at a stranger's 50 %) does not pay (B1, B2, P3: no defender bought).
     pub fn saving(&self, guard: u32, power: u32) -> Centi {
-        self.loss(guard) - self.loss(guard + power)
+        (self.loss(guard) - self.loss(guard + power)) * (1000 + self.level) / 1000
     }
 
     /// How many of `units` (power and worth of each, in the order they
@@ -151,6 +156,18 @@ impl Watch {
     pub fn danger(&self, city: TileId) -> Option<&Danger> {
         self.dangers.iter().find(|d| d.city == city)
     }
+
+    /// The guard levels of the turn's `net2` plan (`Net2Plan::guard_of`) on the dangers already made. The watch
+    /// is made before `net2` thinks (`driver.rs`), so the driver calls this once the plan stands, before the
+    /// city planner reads the watch; a seat with no plan is left as it is.
+    pub fn apply_net2(&mut self, brief: &TurnBrief, own_cities: &[OwnCity]) {
+        for danger in &mut self.dangers {
+            let Some(city) = own_cities.iter().find(|c| c.tile == danger.city) else { continue };
+            if let Some(level) = crate::ai::operations::with_net2(brief, crate::ai::net2::plan::Part::Guard, |plan| plan.guard_of(city.id)) {
+                danger.level = level;
+            }
+        }
+    }
 }
 
 /// The dangers of the turn: every own city with hostile power within
@@ -170,7 +187,7 @@ pub fn watch(obs: &AIObservation<'_>, brief: &TurnBrief, state: &AiState, rules:
         let attacker = strongest(&near.hostile);
         let capital = attacker.map_or(0, |attacker| capital_share(obs, brief, rules, city.tile, attacker, &mut race));
         let stake = operations::city_worth(prices, city.population, 0) + capital;
-        dangers.push(Danger { city: city.tile, threat: near.threat, guard: near.guard, planned: near.own + defenders(brief, state, rules, city.tile), stake, attacker });
+        dangers.push(Danger { city: city.tile, threat: near.threat, guard: near.guard, planned: near.own + defenders(brief, state, rules, city.tile), stake, attacker, level: crate::ai::operations::with_net2(brief, crate::ai::net2::plan::Part::Guard, |plan| plan.guard_of(city.id)).unwrap_or(0) });
     }
     dangers.sort_by_key(|d| (Reverse(d.loss(d.guard)), d.city));
     let defender = if dangers.is_empty() { None } else { Arsenal::of(brief, rules).melee };
@@ -759,7 +776,7 @@ mod tests {
     /// guard already is.
     #[test]
     fn a_guard_saves_less_and_less() {
-        let danger = Danger { city: TileId(0), threat: 20, guard: 20, planned: 20, stake: 10_000, attacker: None };
+        let danger = Danger { city: TileId(0), threat: 20, guard: 20, planned: 20, stake: 10_000, attacker: None, level: 0 };
         assert_eq!(danger.loss(20), 5_000);
         let first = danger.saving(20, 6);
         let second = danger.saving(26, 6);
@@ -771,7 +788,7 @@ mod tests {
     /// guard holds.
     #[test]
     fn several_guards_may_be_worth_what_one_is_not() {
-        let danger = Danger { city: TileId(0), threat: 60, guard: 20, planned: 20, stake: 10_000, attacker: None };
+        let danger = Danger { city: TileId(0), threat: 60, guard: 20, planned: 20, stake: 10_000, attacker: None, level: 0 };
         let unit = (10, 1_000);
         assert!(danger.saving(20, 10) < 1_000);
         assert_eq!(danger.best_count(20, &[unit]), 0);
@@ -779,15 +796,28 @@ mod tests {
         assert_eq!(danger.best_count(120, &[unit; 6]), 0);
     }
 
+    /// A `net2` guard level multiplies what a defender saves: level 0 is `standard`'s saving to the digit, 1000
+    /// doubles it, so a defender the seen threat does not pay becomes worth its cost.
+    #[test]
+    fn a_guard_level_scales_the_saving() {
+        let plain = Danger { city: TileId(0), threat: 20, guard: 50, planned: 50, stake: 11_000, attacker: None, level: 0 };
+        let guarded = Danger { level: 1000, ..plain };
+        assert_eq!(guarded.saving(50, 10), 2 * plain.saving(50, 10));
+        assert_eq!(Danger { level: 500, ..plain }.saving(50, 10), plain.saving(50, 10) * 3 / 2);
+        let unit = [(10, 150)];
+        assert_eq!(plain.best_count(50, &unit), 0, "not worth it as the seen threat prices it");
+        assert_eq!(guarded.best_count(50, &unit), 1, "worth it with the guard asked");
+    }
+
     /// A recall counts the saving beyond the worth of the units, as the guards that take them
     /// do: a small threat saves less than six units cost, so nothing is worth recalling for.
     #[test]
     fn the_net_saving_of_a_recall_is_what_the_guards_would_take() {
-        let small = Danger { city: TileId(0), threat: 20, guard: 50, planned: 50, stake: 11_000, attacker: None };
+        let small = Danger { city: TileId(0), threat: 20, guard: 50, planned: 50, stake: 11_000, attacker: None, level: 0 };
         let army = [(10, 1_000); 5];
         assert!(small.saving(50, 50) > 0, "the gross saving is positive: {}", small.saving(50, 50));
         assert_eq!(small.best(50, &army), (0, 0), "but no count of units pays for itself");
-        let big = Danger { city: TileId(0), threat: 60, guard: 20, planned: 20, stake: 10_000, attacker: None };
+        let big = Danger { city: TileId(0), threat: 60, guard: 20, planned: 20, stake: 10_000, attacker: None, level: 0 };
         let (count, net) = big.best(20, &[(10, 1_000); 10]);
         assert_eq!(count, 6);
         assert!(net > 0);
