@@ -1514,7 +1514,6 @@ Tuning numbers of the computer players (`classic/crates/classic-rules/src/ai`). 
 | `MAX_RIVALS` | `7` | The most rivals read per turn (met majors, by id). | own value (source not recorded) | `plan.rs` |
 | `MAX_TARGETS` | `40` | The most targets read per turn (the nearest first). | own value (source not recorded) | `plan.rs` |
 | `ALL` | `[WarKind::Prey, WarKind::Retake, WarKind::Spoiler, WarKind::Duty, WarKind::Border, WarK...` |  | own value (source not recorded) | `plan.rs` |
-| `GUARD_PURCHASE` | `600` | The guard from which a city may buy a defender at peace (§4.5). | own value (source not recorded) | `plan.rs` |
 | `SOLDIERS_DOUBT_MAX` | `300` | The doubt up to which the war machine counts the estimate instead of its army per city (§2.4 step 4). | own value (source not recorded) | `plan.rs` |
 | `ALL` | `[Part::Strategy, Part::War, Part::Deals, Part::Peace, Part::CityStates, Part::Congress,...` |  | own value (source not recorded) | `plan.rs` |
 | `TRUST_UNKNOWN` | `1000` | The trust of a rival without a reading (a city-state, a stranger): a stranger is not yet a liar. | own value (source not recorded) | `plan.rs` |

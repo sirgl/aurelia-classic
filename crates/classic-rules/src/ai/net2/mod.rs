@@ -24,6 +24,8 @@ pub mod memory;
 pub mod offence;
 pub mod orders;
 pub mod plan;
+#[cfg(test)]
+mod readers;
 pub mod rival_inputs;
 pub mod site_head;
 pub mod trace;
