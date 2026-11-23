@@ -68,6 +68,7 @@ use serde::{Deserialize, Serialize};
 
 use super::act::{self, Aim, Nerve};
 use super::assault;
+use super::memory;
 use super::lab::{self, dist, Arm, Draw, Lab};
 use super::{Piece, Scene};
 
@@ -105,10 +106,13 @@ pub enum Fam {
     HillArchers,
     CityFire,
     PlannedAssault,
+    // The memory trainers (`memory.rs`; appended again: the older families keep their seeds).
+    AmbushFog,
+    HuntFog,
 }
 
 impl Fam {
-    pub const ALL: [Fam; 30] = [
+    pub const ALL: [Fam; 32] = [
         Fam::Duel,
         Fam::Focus,
         Fam::Hold,
@@ -139,6 +143,8 @@ impl Fam {
         Fam::HillArchers,
         Fam::CityFire,
         Fam::PlannedAssault,
+        Fam::AmbushFog,
+        Fam::HuntFog,
     ];
 
     pub fn name(self) -> &'static str {
@@ -173,6 +179,8 @@ impl Fam {
             Fam::HillArchers => "hill-archers",
             Fam::CityFire => "city-fire",
             Fam::PlannedAssault => "planned-assault",
+            Fam::AmbushFog => "ambush-fog",
+            Fam::HuntFog => "hunt-fog",
         }
     }
 
@@ -192,6 +200,7 @@ impl Fam {
             Fam::Harass => 12,
             Fam::Snipe => 8,
             Fam::Surrounded => 4,
+            f if memory::is_memory(f) => memory::rounds(f),
             f => assault::rounds(f),
         }
     }
@@ -222,6 +231,7 @@ impl Fam {
             Fam::Harass => &["ref-screen", "ref-fight"],
             Fam::Snipe => &["ref-snipe"],
             Fam::Surrounded => &["ref-break", "ref-flee"],
+            f if memory::is_memory(f) => memory::solvers(f),
             f => assault::solvers(f),
         }
     }
@@ -255,6 +265,7 @@ impl Fam {
             Fam::Harass => &[("MO12", 'D')],
             Fam::Snipe => &[("MO7", 'U'), ("MT8", 'U'), ("E1", 'U'), ("M4", 'U'), ("CS4", 'U')],
             Fam::Surrounded => &[("MT4", 'D')],
+            f if memory::is_memory(f) => &[],
             f => assault::tricks(f),
         }
     }
@@ -287,6 +298,7 @@ impl Fam {
             Fam::Harass => "slow melee and a ranged unit against a human's hit-and-run horse (keshik)",
             Fam::Snipe => "catch an escorted civilian (worker, Great General) of the enemy",
             Fam::Surrounded => "a strong unit of ours about to be surrounded: break out or survive",
+            f if memory::is_memory(f) => memory::task(f),
             f => assault::task(f),
         }
     }
@@ -520,6 +532,11 @@ pub fn build(rules: &CompiledRuleset, fam: Fam, era: u8, instance: usize, attemp
     let mut p = Painter { rules, lab: &lab, game: lab.game.clone(), d: Draw::new(seed(fam, era, instance, attempt)), w, h, cx: w / 2, cy: h / 2 };
     if assault::is_assault(fam) {
         let mut s = assault::build(&mut p, fam, &lab, instance, attempt)?;
+        s.info.insert("attempt".into(), attempt.to_string());
+        return Ok((p.game, s));
+    }
+    if memory::is_memory(fam) {
+        let mut s = memory::build(&mut p, fam, &lab, instance, attempt)?;
         s.info.insert("attempt".into(), attempt.to_string());
         return Ok((p.game, s));
     }
@@ -1118,6 +1135,7 @@ pub fn build(rules: &CompiledRuleset, fam: Fam, era: u8, instance: usize, attemp
             }
         }
         Fam::AssaultHeal | Fam::PromotionChoice | Fam::HillArchers | Fam::CityFire | Fam::PlannedAssault => unreachable!("built by assault::build"),
+        Fam::AmbushFog | Fam::HuntFog => unreachable!("built by memory::build"),
         Fam::Airstrike => {
             let home_t = at(&p, -3, 0)?;
             p.city(me, home_t, 4, false);
@@ -1152,7 +1170,7 @@ pub fn build(rules: &CompiledRuleset, fam: Fam, era: u8, instance: usize, attemp
     Ok((p.game, s))
 }
 
-fn civil_kind(rules: &CompiledRuleset) -> Option<UnitKindId> {
+pub(super) fn civil_kind(rules: &CompiledRuleset) -> Option<UnitKindId> {
     (0..rules.units.len())
         .map(|i| UnitKindId(i as u16))
         .filter(|&k| {
@@ -1209,6 +1227,10 @@ fn city_hp(rules: &CompiledRuleset, game: &GameState, t: TileId) -> Option<(i64,
 pub fn reference_turn(rules: &CompiledRuleset, game: &mut GameState, scene: &mut Scene, name: &str) {
     if let Some(f) = assault::flags(name) {
         assault::turn(rules, game, scene, f);
+        return;
+    }
+    if memory::is_memory(scene.fam) && matches!(name, "ref-recall" | "ref-forget") {
+        memory::reference_turn(rules, game, scene, name);
         return;
     }
     let (me, foe) = (scene.learner, scene.enemy);
@@ -1438,6 +1460,10 @@ pub fn enemy_turn(rules: &CompiledRuleset, game: &mut GameState, scene: &mut Sce
         assault::enemy_turn(rules, game, scene);
         return;
     }
+    if memory::is_memory(scene.fam) {
+        memory::enemy_turn(rules, game, scene);
+        return;
+    }
     let (me, foe) = (scene.enemy, scene.learner);
     let sc = scene.clone();
     let friends = handles(&sc.theirs);
@@ -1618,6 +1644,7 @@ pub fn judge(rules: &CompiledRuleset, game: &GameState, sc: &mut Scene, rel: u32
     let n = sc.mine.len();
     let civ_ok = sc.mine.iter().filter(|p| p.role == "civilian").all(|p| act::alive(game, p, sc.learner).is_some());
     let v = match sc.fam {
+        Fam::AmbushFog | Fam::HuntFog => memory::judge(rules, game, sc, rel),
         Fam::Duel => {
             if combat_theirs == 0 && !mine.is_empty() {
                 Some(true)

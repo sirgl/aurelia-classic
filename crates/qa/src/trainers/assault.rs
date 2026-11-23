@@ -77,13 +77,15 @@ pub struct Track {
     pub engaged: bool,
     pub waited: u32,
     pub picks: Vec<String>,
+    /// The memory families' references (`memory.rs`): the foes seen, their last tile and round.
+    pub seen: BTreeMap<EntityId, (TileId, u32)>,
 }
 
 impl Track {
-    /// The track without the planner's commitments (engaged, waited, resting): what the scene of a seat the
+    /// The track without the planner's commitments (engaged, waited, resting, the foes seen): what the scene of a seat the
     /// planner does not play holds (the army net's), the samples of the play kept.
     pub fn without_commitments(&self) -> Track {
-        Track { engaged: false, waited: 0, resting: BTreeSet::new(), ..self.clone() }
+        Track { engaged: false, waited: 0, resting: BTreeSet::new(), seen: BTreeMap::new(), ..self.clone() }
     }
 }
 

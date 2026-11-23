@@ -20,6 +20,7 @@ pub mod assault;
 pub mod dump;
 pub mod families;
 pub mod lab;
+pub mod memory;
 pub mod suite;
 
 use std::collections::{BTreeMap, BTreeSet};

@@ -59,8 +59,8 @@ impl Aim {
             Fam::Siege | Fam::Ram | Fam::Bombard | Fam::Prey | Fam::AssaultHeal | Fam::PromotionChoice | Fam::HillArchers | Fam::CityFire | Fam::PlannedAssault => Aim::TakeCity,
             Fam::Guard | Fam::Counter => Aim::Protect,
             Fam::Raid => Aim::Pillage,
-            Fam::Retreat | Fam::Wounded | Fam::Surrounded => Aim::Survive,
-            Fam::Snipe => Aim::Catch,
+            Fam::Retreat | Fam::Wounded | Fam::Surrounded | Fam::AmbushFog => Aim::Survive,
+            Fam::Snipe | Fam::HuntFog => Aim::Catch,
             Fam::Convoy => Aim::Escort,
         }
     }
@@ -89,6 +89,8 @@ pub struct Orders {
     pub window: MapWindow,
     /// The window's static planes (`[tile][S_CH]`, f16-rounded): the ground and who holds it at the start.
     pub statics: Vec<f32>,
+    /// The memory families (`trainers::memory`): the tokens hold only the foes our side sees.
+    pub fog: bool,
 }
 
 /// The side of the map window (tiles).
@@ -178,7 +180,7 @@ impl Orders {
         let start_round = game.view().auth.turn().round;
         let window = MapWindow::around(game, scene.centre);
         let statics = statics_of(rules, game, &window, scene.learner, scene.enemy, tile, scene.refuge);
-        Orders { side: scene.learner, foe: scene.enemy, aim, tile, refuge: scene.refuge, optional, start_round, rounds: scene.rounds, army, mean_strength: mean_strength.max(1.0), window, statics }
+        Orders { side: scene.learner, foe: scene.enemy, aim, tile, refuge: scene.refuge, optional, start_round, rounds: scene.rounds, army, mean_strength: mean_strength.max(1.0), window, statics, fog: crate::trainers::memory::is_memory(scene.fam) }
     }
 }
 

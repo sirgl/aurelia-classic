@@ -27,7 +27,8 @@ from .model_m import AIMS, P_ENGAGED, P_ETA, P_STAGE, P_TURNS, P_WAITED, PLANS, 
 from .train import Device, best_teachers, decision_weights, load
 
 ASSAULT = {'assault-heal', 'promotion-choice', 'hill-archers', 'city-fire', 'planned-assault'}
-C_GROUPS = (1, 16, 32, 64, 128)
+C_GROUPS = (16, 48, 128)
+T_GROUPS = (12, 24, 40)
 
 
 class Plays:
@@ -188,14 +189,66 @@ def plan_batch(dev, plays, L, drop, rng, tm, train=True):
             if dev.ptr_list[i] < -1:
                 continue
             cg = next(x for x in C_GROUPS if dev.c_list[i] <= x)
-            g = groups[cg]
+            tg = next(x for x in T_GROUPS if dev.t_list[i] <= x)
+            g = groups[(min(tg, tm), cg)]
             g[0].append(i)
             g[1].append(col)
             g[2].append(P.turn[i])
     return R, ms, reset, dict(groups)
 
 
-def run_step(model, dev, plan, tm, aux_w, with_aux=True):
+AUX_KEYS = ('aux_unit', 'aux_plan', 'aux_target', 'stage_acc', 'known')
+UNROLL_KEYS = ('tok', 'dist', 'tmask', 'slot', 'track', 'tis', 'eta')
+DEC_KEYS = ('tok', 'dist', 'tmask', 'slot', 'sel', 'unit', 'cand', 'promo', 'cmask', 'ptr', 'act', 'has_act', 'win', 'lost', 'danger', 'w')
+# Decision groups are padded to a multiple of this (rows of weight 0), so the compiled forward sees few shapes.
+PAD = 256
+
+
+def unroll_one(model, b, valid, rs, um, pm, alive, with_aux):
+    """One turn of the memory unroll on the memory states `b` (valid: the play has this turn; rs: reset after it)."""
+    hfull = model.body_m(b['tok'], b['dist'], b['tmask'], b['slot'], um, pm)
+    um2, pm2, al2, lg = model.step(hfull, b['tok'], b['slot'], b['tmask'], um, pm, alive)
+    if with_aux:
+        bb = dict(b)
+        bb['track'] = mx.where(valid[:, None], b['track'], -1)
+        bb['tis'] = mx.where(valid, b['tis'], -1.0)
+        bb['eta'] = mx.where(valid, b['eta'], -1.0)
+        bb['tmask'] = b['tmask'] & valid[:, None]
+        a, parts = aux_losses(model, bb, um2, pm2, lg)
+        parts = tuple(parts[k] for k in AUX_KEYS)
+    else:
+        a, parts = mx.array(0.0), tuple(mx.array(0.0) for _ in AUX_KEYS)
+    um = mx.where(valid[:, None, None], um2, um)
+    pm = mx.where(valid[:, None, None], pm2, pm)
+    alive = mx.where(valid[:, None], al2, alive)
+    p0 = mx.broadcast_to(model.plan0[None], pm.shape)
+    um = mx.where(rs[:, None, None], 0.0, um)
+    pm = mx.where(rs[:, None, None], p0, pm)
+    alive = mx.where(rs[:, None], 0.0, alive)
+    return um, pm, alive, a, parts
+
+
+def dec_one(model, b, um, pm):
+    out = decision_losses(model, b, um, pm)
+    return tuple(out[k] for k in ('main', 'val', 'w', 'dsum', 'dn', 'acc_ptr', 'acc_act', 'has_act'))
+
+
+COMPILED = {}
+
+
+def compiled(model, name, with_aux=True):
+    """The compiled stage `name` (its parameters read from the model's state at each call)."""
+    key = (id(model), name, with_aux)
+    if key not in COMPILED:
+        if name == 'unroll':
+            fn = lambda b, valid, rs, um, pm, alive: unroll_one(model, b, valid, rs, um, pm, alive, with_aux)
+        else:
+            fn = lambda b, um, pm: dec_one(model, b, um, pm)
+        COMPILED[key] = mx.compile(fn, inputs=[model.state])
+    return COMPILED[key]
+
+
+def run_step(model, dev, plan, tm, aux_w, with_aux=True, compile_=True):
     """The loss of one step's plays (and its parts)."""
     R, ms, reset, groups = plan
     B = len(reset)
@@ -204,45 +257,38 @@ def run_step(model, dev, plan, tm, aux_w, with_aux=True):
     aux_tot = mx.array(0.0)
     aux_parts = collections.defaultdict(float)
     reset_a = mx.array(reset, mx.int32)
-    p0 = mx.broadcast_to(model.plan0[None], pm.shape)
+    unroll = compiled(model, 'unroll', with_aux) if compile_ else (lambda b, v, rs, um, pm, al: unroll_one(model, b, v, rs, um, pm, al, with_aux))
+    dec = compiled(model, 'dec') if compile_ else (lambda b, um, pm: dec_one(model, b, um, pm))
     for r in range(R):
         idx = mx.array(ms[r], mx.int32)
         valid = idx >= 0
-        b = dev.batch_m(mx.maximum(idx, 0), tm, 1)
-        hfull = model.body_m(b['tok'], b['dist'], b['tmask'], b['slot'], um, pm)
-        um2, pm2, al2, lg = model.step(hfull, b['tok'], b['slot'], b['tmask'], um, pm, alive)
-        if with_aux:
-            bb = dict(b)
-            bb['track'] = mx.where(valid[:, None], b['track'], -1)
-            bb['tis'] = mx.where(valid, b['tis'], -1.0)
-            bb['eta'] = mx.where(valid, b['eta'], -1.0)
-            bb['tmask'] = b['tmask'] & valid[:, None]
-            a, parts = aux_losses(model, bb, um2, pm2, lg)
-            aux_tot = aux_tot + a / R
-            for k, v in parts.items():
-                aux_parts[k] = aux_parts[k] + v / R
-        um = mx.where(valid[:, None, None], um2, um)
-        pm = mx.where(valid[:, None, None], pm2, pm)
-        alive = mx.where(valid[:, None], al2, alive)
-        rs = reset_a == r + 1
-        um = mx.where(rs[:, None, None], 0.0, um)
-        pm = mx.where(rs[:, None, None], p0, pm)
-        alive = mx.where(rs[:, None], 0.0, alive)
+        full = dev.batch_m(mx.maximum(idx, 0), tm, 1)
+        b = {k: full[k] for k in UNROLL_KEYS}
+        um, pm, alive, a, parts = unroll(b, valid, reset_a == r + 1, um, pm, alive)
+        aux_tot = aux_tot + a / R
+        for k, v in zip(AUX_KEYS, parts):
+            aux_parts[k] = aux_parts[k] + v / R
         Us.append(um)
         Ps.append(pm)
     Us = mx.stack(Us)  # [R + 1, B, S, U]
     Ps = mx.stack(Ps)
     tot = collections.defaultdict(lambda: mx.array(0.0))
     accs = []
-    for cg, (ids, cols, turns) in sorted(groups.items()):
-        idx = mx.array(ids, mx.int32)
-        b = dev.batch_m(idx, tm, cg)
-        tt = mx.array(turns, mx.int32)
-        cc = mx.array(cols, mx.int32)
-        out = decision_losses(model, b, Us[tt, cc], Ps[tt, cc])
-        for k in ('main', 'val', 'w', 'dsum', 'dn'):
-            tot[k] = tot[k] + out[k]
-        accs.append((ids, out['acc_ptr'], out['acc_act'], out['has_act']))
+    for (tg, cg), (ids, cols, turns) in sorted(groups.items()):
+        n = len(ids)
+        pad = (-n) % PAD
+        idx = mx.array(ids + [ids[0]] * pad, mx.int32)
+        full = dev.batch_m(idx, tg, cg)
+        b = {k: full[k] for k in DEC_KEYS}
+        live = mx.arange(n + pad) < n
+        b['w'] = mx.where(live, b['w'], 0.0)
+        b['danger'] = mx.where(live[:, None], b['danger'], -1.0)
+        tt = mx.array(turns + [turns[0]] * pad, mx.int32)
+        cc = mx.array(cols + [cols[0]] * pad, mx.int32)
+        out = dec(b, Us[tt, cc], Ps[tt, cc])
+        for k, v in zip(('main', 'val', 'w', 'dsum', 'dn'), out[:5]):
+            tot[k] = tot[k] + v
+        accs.append((ids, out[5][:n], out[6][:n], out[7][:n]))
     sw = mx.maximum(tot['w'], 1e-6)
     main = tot['main'] / sw
     val = tot['val'] / sw

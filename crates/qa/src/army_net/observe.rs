@@ -243,8 +243,12 @@ impl Field {
             v.sort_by_key(|t| t.0);
             v
         };
-        let _ = rules;
-        Field { own: units_of(orders.side), foes: units_of(orders.foe), foe_cities: cities_of(orders.foe), own_cities: cities_of(orders.side) }
+        let mut foes = units_of(orders.foe);
+        if orders.fog {
+            let view = game.player_view(rules, orders.side);
+            foes.retain(|c| view.sees_unit(c));
+        }
+        Field { own: units_of(orders.side), foes, foe_cities: cities_of(orders.foe), own_cities: cities_of(orders.side) }
     }
 
     fn military_foes<'a>(&'a self, rules: &'a CompiledRuleset) -> impl Iterator<Item = &'a UnitCore> + 'a {
