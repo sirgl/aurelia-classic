@@ -1,4 +1,4 @@
-//! Raid in a war (`Variant::RaidWar`; the tactics exam, /Users/roman.ivanov/civ/work/nets/exam/LOG.md): a
+//! Raid in a war (`Variant::RaidWar`; the tactics exam, the M4 lab's exam/LOG.md): a
 //! unit with nothing better to do pillages the improvements of a nation we are at war with. The war is
 //! never the raid's: this module declares nothing and provokes nothing (it asks only the relations that
 //! already say "at war"), and the formed raids of `ai::raid` stay off as in `Standard`.

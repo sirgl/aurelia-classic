@@ -1,4 +1,4 @@
-//! Field craft (`Variant::FieldCraft`; the tactics exam, /Users/roman.ivanov/civ/work/nets/exam/REPORT.md):
+//! Field craft (`Variant::FieldCraft`; the tactics exam, the M4 lab's exam/REPORT.md):
 //! what a few units do in the field that the game's AI left out. Each rule is a class, written from the
 //! rules' numbers; nothing here names a nation, a unit, a building or an improvement, and everything
 //! reads what the unit's seat sees.

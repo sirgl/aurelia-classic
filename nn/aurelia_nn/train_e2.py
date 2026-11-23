@@ -2019,7 +2019,7 @@ def add_arguments(ap: argparse.ArgumentParser):
     t.add_argument("--no-reuse-ref", dest="reuse_ref", action="store_false",
                    help="recompute the frozen reference every epoch (default: its log-probabilities are made in a batch's first epoch and reused)")
     t.add_argument("--games-per-batch", type=int, default=16, help="games (whole learner windows) per update batch")
-    t.add_argument("--features-bin", default="/Users/roman.ivanov/civ/work/nn-data/bin/ai-features-e2")
+    t.add_argument("--features-bin", default="the M4 lab's nn-data/bin/ai-features-e2")
     t.add_argument("--workers", type=int, default=12, help="feature binaries at once")
     t.add_argument("--prefetch", type=int, default=0, help="shards waiting in memory (default 2 × workers)")
     t.add_argument("--tmp-root", default=None)

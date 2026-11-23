@@ -19,3 +19,8 @@ __pycache__/
 /assets/visual/generated/civilizations/*
 !/assets/visual/generated/civilizations/artwork-catalog.tsv
 !/assets/visual/generated/civilizations/artwork-index.tsv
+
+# the M5 kit: broker state, venv, the lab (recordings, runs, logs)
+/.res/
+/.venv-m5/
+/lab/

@@ -1,0 +1,12 @@
+# Overrides of the broker's auto-detected budget. Every key is optional: delete the leading "#" to use it.
+# The file read: $RES_CONFIG, else <RES_HOME>/res.toml, else this file.
+#
+# cpu_charger = 8        # CPU slots for our jobs on the charger (auto: the performance cores; the efficiency cores are left to the system)
+# cpu_battery = 3        # CPU slots on battery (auto: half of the performance cores)
+# cpu_floor = 2          # the dynamic budget never falls below this
+# other_load_allowed = 2 # cores of other work (not ours) before our budget gives way
+# disk_min_gb = 25       # `res run` default for --disk: jobs wait while free disk is below it
+# ram_total_gb = 24      # the machine's RAM (auto: hw.memsize)
+# mlx_gb = 12            # the MLX memory limit handed to jobs as RES_MLX_GB (auto: 60 % of RAM)
+# ram_free_min_percent = 12 # the daemon starts no queued job below this free-RAM share
+# tick = 30              # seconds between the daemon's budget updates
