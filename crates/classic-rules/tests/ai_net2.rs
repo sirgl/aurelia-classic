@@ -213,7 +213,7 @@ fn only_the_net2_variants_think_with_net2() {
     let named: Vec<&str> = Variant::ALL.into_iter().filter(|v| v.net2()).map(|v| v.name()).collect();
     assert_eq!(
         named,
-        ["standard", "net2", "net2-defence", "net2-tac", "net2-no-strategy", "net2-no-war", "net2-no-deals", "net2-no-peace", "net2-no-cs", "net2-no-congress", "net2-no-sites", "net2-no-fleet", "net2-no-guard", "net2-no-economy", "net2-no-beliefs", "net2-off", "science-flow"]
+        ["standard", "net2", "net2-defence", "net2-tac", "net2-no-strategy", "net2-no-war", "net2-no-deals", "net2-no-peace", "net2-no-cs", "net2-no-congress", "net2-no-sites", "net2-no-fleet", "net2-no-guard", "net2-no-economy", "net2-no-beliefs", "net2-no-ideology", "net2-off", "science-flow"]
     );
     for name in ["net2", "net2-defence", "tac2", "net2-tac", "net2-no-war", "net2-off", "science-flow"] {
         let variant = Variant::from_name(name).unwrap_or_else(|| panic!("{name}"));

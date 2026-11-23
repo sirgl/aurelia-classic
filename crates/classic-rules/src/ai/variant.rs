@@ -957,7 +957,7 @@ const NUDGED_CANDIDATES: u32 = 40;
 
 impl Variant {
     /// The game's AI first.
-    pub const ALL: [Variant; 184] = [
+    pub const ALL: [Variant; 185] = [
         Variant::Standard,
         Variant::PreCamps,
         Variant::PreWorkers,
@@ -1138,6 +1138,7 @@ impl Variant {
         Variant::Net2Without(crate::ai::net2::Part::Guard),
         Variant::Net2Without(crate::ai::net2::Part::Economy),
         Variant::Net2Without(crate::ai::net2::Part::Beliefs),
+        Variant::Net2Without(crate::ai::net2::Part::Ideology),
         Variant::Net2Off,
         Variant::PeaceFix,
         Variant::ScienceFlow,
@@ -1327,6 +1328,7 @@ impl Variant {
                 crate::ai::net2::Part::Guard => "net2-no-guard",
                 crate::ai::net2::Part::Economy => "net2-no-economy",
                 crate::ai::net2::Part::Beliefs => "net2-no-beliefs",
+                crate::ai::net2::Part::Ideology => "net2-no-ideology",
             },
             Variant::Net2Off => "net2-off",
             Variant::PeaceFix => "peace-fix",

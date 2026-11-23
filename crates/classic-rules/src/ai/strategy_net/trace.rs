@@ -241,6 +241,16 @@ pub fn belief(player: u8, round: u32, slot: &str, head: Option<crate::ids::Belie
     push(format!("r{round} p{player} BELIEF {slot} head {} list {} | {}", name(head), name(list), all.join(" ")));
 }
 
+/// The ideology the rules' roles name for the plan and the one its tenets' worth picks (`heads::choose_policy`);
+/// the policy line that follows says which is taken.
+pub fn ideology(named: Option<crate::rules::content::PolicyBranchId>, tenets: Option<crate::rules::content::PolicyBranchId>, rules: &CompiledRuleset) {
+    if !enabled() {
+        return;
+    }
+    let name = |b: Option<crate::rules::content::PolicyBranchId>| b.and_then(|b| rules.module.policy_branches.get(usize::from(b.0))).map_or("-", |d| short(&d.key)).to_owned();
+    push(format!("r- p- IDEOLOGY named {} tenets {}", name(named), name(tenets)));
+}
+
 /// A goal wonder of a city the allocator does not offer it.
 pub fn missing(player: u8, round: u32, city: u64, building: crate::ids::BuildingKindId, rules: &CompiledRuleset) {
     if !enabled() {

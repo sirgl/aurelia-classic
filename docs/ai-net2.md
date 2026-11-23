@@ -124,7 +124,17 @@ cities follow, ~27 foreign followers in ~4.5 foreign cities at the end). `net2-n
 Measured (`work/nets/beliefs/GATES.md`): 400 Quick pace games, offsets 3910-3911, `standard` against
 `net2-no-beliefs` (hash = the base `standard`'s ded99cb94d6e55fc): victory-weighted share 48.8 % (52.0 / 45.7), real
 victories 129 / 138; religions founded 61 % / 60 % of the seats, faith a turn at the end 18.3 / 16.1, followers of a
-religion 147 / 160; AI ms p50 1.00×. Hashes: `standard` d81486aa82df06e7, `pre-net2` 380c45a20e751d31.
+religion 147 / 160; AI ms p50 1.00×. Hashes then: `standard` d81486aa82df06e7, `pre-net2` 380c45a20e751d31.
 
 A guard (`tests/ai_content_names.rs`) fails when a content key or a content's display name is written in the AI's
 code outside the scripted probes and the frozen lists.
+
+## The ideology by its tenets (part `ideology`, 23 November)
+
+The policy head took the ideology the rules' roles name for the plan (`roles.ai_ideologies`: Order wide, Autocracy at
+war, Freedom at peace) and valued the tenets only when that one was not offered. With the part `ideology` it takes the
+ideology whose tenets are worth most at the plan's prices (`Culture::by_tenets`); `net2-no-ideology` plays the named
+one. In 12 traced Quick pace games the two disagree in 48 of 72 choices (the roles' Freedom against the tenets' Order
+25 times, Autocracy 18). 400 Quick pace games, offsets 3920-3921, `standard` against `net2-no-ideology` (= the
+beliefs build's `standard`): victory-weighted share 54.7 % (55.3 / 54.1), real victories 154 / 123. Hash `standard`
+cf535f70eb6b37bf; `net2-no-ideology` d81486aa82df06e7.
