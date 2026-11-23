@@ -38,16 +38,34 @@ pub fn plan(obs: &AIObservation<'_>, brief: &TurnBrief, state: &crate::ai::state
     Growth { plays: true, garrisons, chest, shared: w::site::SHARED.0, jobs_ahead }
 }
 
-/// The jobs the workers have ahead (`Growth::jobs_ahead`): per own city, its owned land tiles in the work radius with a
-/// job the known technologies allow (`planner_workers::open_jobs`), at most its citizens and `gate::JOBS_AHEAD` more —
-/// the tiles it works now and the next ones it will.
+/// The jobs the workers have ahead (`Growth::jobs_ahead`) while the empire has fewer land workers (alive or queued) than
+/// cities: per own city, its owned unimproved land tiles in the work radius with a job the known technologies allow
+/// (`planner_workers::open_jobs`), at most its citizens and `gate::JOBS_AHEAD` more — the tiles it works now and the
+/// next ones it will.
 fn jobs_ahead(obs: &AIObservation<'_>, brief: &TurnBrief, state: &crate::ai::state::AiState, rules: &CompiledRuleset) -> u32 {
+    // A worker a city: past it the allocator's own count of the worked tiles decides (the workers per city at r120
+    // went from 0.95 to 1.41 with the jobs ahead for every worker, idle 23 %).
+    let builder = |kind: crate::ids::UnitKindId| rules.units.get(kind.0 as usize).is_some_and(|d| d.builder && d.domain == crate::rules::content::Domain::Land);
+    let workers = obs.own_units.iter().filter(|u| builder(u.kind)).count() + obs.own_cities.iter().flat_map(|c| c.queue.iter()).filter(|i| matches!(i, ProductionItem::Unit(k) if builder(*k))).count();
+    if workers >= obs.own_cities.len() {
+        return 0;
+    }
     let dims = obs.view.dimensions();
     let mut total = 0;
     for city in &obs.own_cities {
-        let owned = crate::math::hex_disc(dims, city.tile, crate::world::city::CITY_WORK_RADIUS).filter(|t| obs.view.tile(*t).snapshot().is_some_and(|s| s.owner == Some(obs.player)));
-        let open = crate::ai::planner_workers::open_jobs(&obs.view, rules, brief, state.strategy.current, owned);
-        total += open.min(city.population + gate::JOBS_AHEAD.0);
+        let cap = city.population + gate::JOBS_AHEAD.0;
+        let mut open = 0;
+        // Unimproved owned land tiles only, and no more than the cap: each costs the worker planner's job search.
+        for tile in crate::math::hex_disc(dims, city.tile, crate::world::city::CITY_WORK_RADIUS) {
+            if open >= cap {
+                break;
+            }
+            let bare = obs.view.tile(tile).snapshot().is_some_and(|s| s.owner == Some(obs.player) && s.improvement.is_none() && !s.city);
+            if bare {
+                open += crate::ai::planner_workers::open_jobs(&obs.view, rules, brief, state.strategy.current, std::iter::once(tile));
+            }
+        }
+        total += open;
     }
     total
 }
