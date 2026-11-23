@@ -16,6 +16,7 @@
 //! units that fight.
 
 pub mod act;
+pub mod assault;
 pub mod dump;
 pub mod families;
 pub mod lab;
@@ -87,6 +88,8 @@ pub struct Scene {
     pub hold_lost: Option<u32>,
     pub first_kill: Option<u32>,
     pub kills_by: BTreeMap<u32, u32>,
+    /// What the assault families keep between rounds (damage, resting, promotions seen).
+    pub track: assault::Track,
 }
 
 impl Scene {
@@ -186,6 +189,9 @@ fn close_arena(rules: &CompiledRuleset, game: &mut GameState, scene: &Scene) {
     }
 }
 
+/// Profile counters (microseconds): driver steps, samples, arena closing, whole plays.
+pub static PROF: [std::sync::atomic::AtomicU64; 4] = [std::sync::atomic::AtomicU64::new(0), std::sync::atomic::AtomicU64::new(0), std::sync::atomic::AtomicU64::new(0), std::sync::atomic::AtomicU64::new(0)];
+
 /// Plays `scene` on `game` with `player` on the learner's seat. `trace`: one line a round in the row.
 pub fn play(rules: &CompiledRuleset, mut game: GameState, mut scene: Scene, player: &str, trace: bool) -> Result<Row, String> {
     let seat = Seat::parse(player);
@@ -197,9 +203,106 @@ pub fn play(rules: &CompiledRuleset, mut game: GameState, mut scene: Scene, play
     for p in majors(&game) {
         seats.push((p, if p == scene.learner { mind(&base)? } else { mind("standard")? }));
     }
-    let mut driver = AiDriver::<Classic, kernel::ai::seats::Seated<ClassicMind>>::with_mind(ClassicBench::settings(rules), Vec::new(), kernel::ai::seats::Seated::new(mind("standard")?, seats));
+    let settings = ClassicBench::settings(rules);
+    let seated = kernel::ai::seats::Seated::new(mind("standard")?, seats);
+    if lab::mode::combat_only() {
+        let driver = AiDriver::<Classic, CombatOnly<kernel::ai::seats::Seated<ClassicMind>>>::with_mind(settings, Vec::new(), CombatOnly(seated));
+        play_on(rules, game, scene, player, trace, seat, driver)
+    } else {
+        let driver = AiDriver::<Classic, kernel::ai::seats::Seated<ClassicMind>>::with_mind(settings, Vec::new(), seated);
+        play_on(rules, game, scene, player, trace, seat, driver)
+    }
+}
+
+/// The combat layer only (`--ai combat`): the decisions of war and of the army stay (operations, tactics,
+/// defence, the cities' strikes); research, production, city management, policies, religion, trade and
+/// peace are dropped from every list the mind returns. The closed arena takes away what a city would
+/// build, so what is lost is only the AI's own peace and economy.
+#[derive(Debug)]
+pub struct CombatOnly<P>(pub P);
+
+impl<P: kernel::ai::mind::AiMind<Classic>> kernel::ai::mind::AiMind<Classic> for CombatOnly<P> {
+    type Brief = P::Brief;
+    type Sight<'g> = P::Sight<'g>;
+    type Near<'g> = P::Near<'g>;
+
+    fn sense<'g>(&self, game: &'g GameState, rules: &'g CompiledRuleset, player: PlayerId) -> Self::Sight<'g> {
+        self.0.sense(game, rules, player)
+    }
+    fn sense_unit<'g>(&self, game: &'g GameState, rules: &'g CompiledRuleset, settings: &kernel::ai::plan::AiSettings, player: PlayerId, unit: UnitHandle) -> Option<Self::Near<'g>> {
+        self.0.sense_unit(game, rules, settings, player, unit)
+    }
+    fn note_humans(&mut self, humans: &[PlayerId]) {
+        self.0.note_humans(humans);
+    }
+    fn start_turn(&self, sight: &Self::Sight<'_>, rules: &CompiledRuleset, player: PlayerId, state: &mut kernel::ai::state::AiState) -> kernel::ai::mind::TurnStart<Classic, Self::Brief> {
+        let mut start = self.0.start_turn(sight, rules, player, state);
+        start.opening.retain(combat_decision);
+        start
+    }
+    fn order_units(&self, brief: &Self::Brief, rules: &CompiledRuleset, order: &mut Vec<(classic_rules::ids::EntityId, UnitHandle)>) {
+        self.0.order_units(brief, rules, order);
+    }
+    fn picks_next(&self, brief: &Self::Brief) -> bool {
+        self.0.picks_next(brief)
+    }
+    fn next_unit(&self, near: &Self::Near<'_>, brief: &Self::Brief, state: &kernel::ai::state::AiState, remaining: &[(classic_rules::ids::EntityId, UnitHandle)]) -> Option<classic_rules::ids::EntityId> {
+        self.0.next_unit(near, brief, state, remaining)
+    }
+    fn plan_strategic(&self, brief: &Self::Brief, state: &mut kernel::ai::state::AiState, rules: &CompiledRuleset) -> Vec<kernel::ai::plan::Decision<Classic>> {
+        let mut out = self.0.plan_strategic(brief, state, rules);
+        out.retain(combat_decision);
+        out
+    }
+    fn decide_unit(&self, near: &Self::Near<'_>, player: PlayerId, unit: UnitHandle, brief: &Self::Brief, state: &mut kernel::ai::state::AiState, tools: &mut kernel::ai::plan::PlanTools<'_, Classic>) -> Option<kernel::ai::plan::Decision<Classic>> {
+        self.0.decide_unit(near, player, unit, brief, state, tools)
+    }
+    fn permits(&self, game: &GameState, rules: &CompiledRuleset, player: PlayerId, command: &classic_rules::command::Command) -> bool {
+        self.0.permits(game, rules, player, command)
+    }
+    fn plan_end_of_turn(&self, sight: &Self::Sight<'_>, player: PlayerId, brief: &Self::Brief, state: &kernel::ai::state::AiState, tools: &mut kernel::ai::plan::PlanTools<'_, Classic>) -> Vec<kernel::ai::plan::Decision<Classic>> {
+        let mut out = self.0.plan_end_of_turn(sight, player, brief, state, tools);
+        out.retain(combat_decision);
+        out
+    }
+}
+
+/// A decision of the combat layer: war and the army's commands; not research, production, the cities'
+/// management, policies, religion, trade or peace (a decision with no command is a refusal and stays).
+fn combat_decision(d: &kernel::ai::plan::Decision<Classic>) -> bool {
+    use classic_rules::command::Command as C;
+    match &d.command {
+        None => true,
+        Some(c) => matches!(
+            c,
+            C::MoveUnit { .. }
+                | C::MarchTo { .. }
+                | C::AttackUnit { .. }
+                | C::AttackCity { .. }
+                | C::Fortify { .. }
+                | C::RangedAttack { .. }
+                | C::CityStrike { .. }
+                | C::SetUpRangedAttack { .. }
+                | C::Promote { .. }
+                | C::UpgradeUnit { .. }
+                | C::Pillage { .. }
+                | C::DeclareWar { .. }
+                | C::Rebase { .. }
+                | C::RebaseToCarrier { .. }
+                | C::AirSweep { .. }
+                | C::Intercept { .. }
+                | C::BuildCitadel { .. }
+                | C::EndTurn { .. }
+                | C::Paradrop { .. }
+        ),
+    }
+}
+
+fn play_on<P: kernel::ai::mind::AiMind<Classic>>(rules: &CompiledRuleset, mut game: GameState, mut scene: Scene, player: &str, trace: bool, seat: Seat, mut driver: AiDriver<Classic, P>) -> Result<Row, String> {
     driver.set_trace_capacity(0);
-    reveal(&mut game, &scene);
+    if !lab::mode::fog() {
+        reveal(&mut game, &scene);
+    }
     let round0 = game.view().auth.turn().round;
     scene.start_round = round0;
     if let Some(t) = scene.aim_learner {
@@ -210,6 +313,10 @@ pub fn play(rules: &CompiledRuleset, mut game: GameState, mut scene: Scene, play
     }
     if scene.hunt {
         hunt(&mut driver, &game, &scene);
+    }
+    {
+        let l = scene.learner;
+        assault::sample(rules, &game, &mut scene, l);
     }
     let mut rows_trace = Vec::new();
     if trace {
@@ -225,12 +332,17 @@ pub fn play(rules: &CompiledRuleset, mut game: GameState, mut scene: Scene, play
         loop {
             let now = game.view().auth.turn().round;
             let active = game.view().auth.active_player();
+            assault::keep_war(rules, &mut game, &scene);
             if active == scene.learner && scripted_mine != Some(now) && !game.is_over() {
                 scripted_mine = Some(now);
                 match &seat {
                     Seat::Mind(_) => {}
                     Seat::Script(name) => {
                         families::reference_turn(rules, &mut game, &mut scene, name);
+                        {
+        let l = scene.learner;
+        assault::sample(rules, &game, &mut scene, l);
+    }
                     }
                     Seat::Passive => {
                         act::passive_turn(&mut game, rules, scene.learner, &scene.mine);
@@ -244,14 +356,22 @@ pub fn play(rules: &CompiledRuleset, mut game: GameState, mut scene: Scene, play
                 scripted_theirs = Some(now);
                 families::enemy_turn(rules, &mut game, &mut scene);
             }
-            match driver.step(&mut game, rules) {
+            let t_step = std::time::Instant::now();
+            let stepped = driver.step(&mut game, rules);
+            PROF[0].fetch_add(t_step.elapsed().as_micros() as u64, std::sync::atomic::Ordering::Relaxed);
+            let t_s = std::time::Instant::now();
+            assault::sample(rules, &game, &mut scene, active);
+            PROF[1].fetch_add(t_s.elapsed().as_micros() as u64, std::sync::atomic::Ordering::Relaxed);
+            match stepped {
                 kernel::ai::StepOutcome::Worked | kernel::ai::StepOutcome::PlayerDone(_) => {}
                 kernel::ai::StepOutcome::RoundDone => break,
                 kernel::ai::StepOutcome::Waiting if game.is_over() => break,
                 kernel::ai::StepOutcome::Waiting => return Err(format!("round {} waits for a human", game.view().auth.turn().round)),
             }
         }
+        let t_c = std::time::Instant::now();
         close_arena(rules, &mut game, &scene);
+        PROF[2].fetch_add(t_c.elapsed().as_micros() as u64, std::sync::atomic::Ordering::Relaxed);
         let rel = game.view().auth.turn().round.saturating_sub(round0);
         verdict = families::judge(rules, &game, &mut scene, rel);
         if trace {
@@ -263,6 +383,9 @@ pub fn play(rules: &CompiledRuleset, mut game: GameState, mut scene: Scene, play
     }
     let rel = game.view().auth.turn().round.saturating_sub(round0);
     let win = verdict.unwrap_or(false);
+    if assault::is_assault(scene.fam) {
+        scene.info.insert("picks".into(), scene.track.picks.join("; "));
+    }
     let measures = families::measures(rules, &game, &scene, rel);
     Ok(Row { family: scene.fam.name().to_owned(), era: lab::era_names(rules).get(scene.era as usize).cloned().unwrap_or_default(), instance: scene.instance, attempt: scene.attempt, player: player.to_owned(), win, rounds: rel, measures, info: scene.info.clone(), trace: rows_trace })
 }

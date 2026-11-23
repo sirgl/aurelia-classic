@@ -92,7 +92,7 @@ captured, "killed" the enemy's combat units dead.
 | `retreat` | save the army from a force twice its size | ancient, classical, medieval, renaissance, industrial, modern, atomic, information | 10 | at least 75 % of our army alive when 10 rounds end against a force twice its size. | ref-flee |  |
 | `flank` | surround and kill a strong defender in 3 rounds | ancient, classical, medieval, renaissance, industrial, modern, atomic, information | 3 | the strong defender killed within 3 rounds with at most 1 of ours lost. | ref-flank, ref-press | MT4 U |
 | `general` | fight with a Great General's aura and keep him alive | ancient, classical, medieval, renaissance, industrial, modern, atomic, information | 12 | every enemy unit dead within 12 rounds and our Great General alive. | ref-fight, ref-careful | MT12 U, MT8 U |
-| `citadel` | break a holder on a citadel (damage to every adjacent unit) | ancient, classical, medieval, renaissance, industrial, modern, atomic, information | 14 | every holder dead within 14 rounds with at least half of ours alive; the holder stands on a citadel (the rules' improvement that damages adjacent enemies). | ref-choke, ref-fight | MT10 D, MO2 D, MO4 D |
+| `citadel` | break a holder on a citadel (damage to every adjacent unit) | ancient, classical, medieval, renaissance, industrial, modern, atomic, information | 14 | every holder dead within 14 rounds with at least half of ours alive; the holder stands on a citadel (the rules' improvement that damages adjacent enemies). | ref-choke (melee go in only for a kill below 30 %), ref-fight | MT10 D, MO2 D, MO4 D |
 | `bombard` | bombard and take a coastal city with ships | ancient, medieval, renaissance, modern, information | 12 | (3 ranged ships and a melee ship against a city of 2-4 without walls) the coastal city taken, or at 10 % of its hit points or less at a round end, within 12 rounds, by ships. | ref-bombard | N3 U, N4 U |
 | `sink` | sink embarked units | classical, medieval, renaissance, industrial, modern, atomic, information | 6 | every embarked enemy unit dead within 6 rounds. | ref-fight | MT5 U, MT6 U, N1 U, N2 U |
 | `airstrike` | strike a stack with bombers | modern, atomic, information | 6 | 2 enemy units killed within 6 rounds (bombers based in our city, a melee spotter in front: an air strike needs its target in sight). | ref-air | A1 U, A3 U |
@@ -101,6 +101,11 @@ captured, "killed" the enemy's combat units dead.
 | `harass` | slow melee and a ranged unit against a human's hit-and-run horse (keshik) | ancient, classical, medieval | 12 | both raiders dead within 12 rounds with at most 1 of ours lost (2 slow melee, a mounted and a ranged unit of ours against 2 horse archers of a scripted human, the keshik half the time, that shoot and step back out of reach). | ref-screen, ref-fight | MO12 D |
 | `snipe` | catch an escorted civilian (worker, Great General) of the enemy | classical, medieval, renaissance, industrial, modern, atomic, information | 8 | an enemy civilian (worker, Great General) captured or killed within 8 rounds (it walks to its city with an escort). | ref-snipe | MO7 U, MT8 U, E1 U, M4 U, CS4 U |
 | `surrounded` | a strong unit of ours about to be surrounded: break out or survive | ancient, classical, medieval, renaissance, industrial, modern, atomic, information | 4 | our strong unit alive when 4 rounds end, or 2 attackers killed (3-4 melee of a scripted human close round it, then strike). | ref-break, ref-flee | MT4 D |
+| `assault-heal` | a worn army takes a city, rotating the wounded out of its fire (home city 10 tiles back) | classical, medieval, renaissance, industrial, modern, atomic, information | 30 | the enemy city (all its defences, 1-2 garrison) taken within 30 rounds with at most half of ours lost; 3 of ours start at 45-70 %. Measures: rounds, lost, damage taken (and the part in the enemy's turn), turns rested. | ref-rotate, ref-planned | MT7 D, MO9 U |
+| `promotion-choice` | promotions earned in a fight with a field force, then the assault | classical, medieval, renaissance, industrial, modern, atomic, information | 20 | the city taken within 20 rounds with at most half of ours lost; every unit holds two promotions of its role's ladder and is a few experience points short of a third. Measures: as above and the picks (`picks`). | ref-promo, ref-planned | MT7 U, MT4 U |
+| `hill-archers` | ranged units take hills to reach a city whose neighbours shut the view | classical, medieval, renaissance, industrial, modern, atomic, information | 16 | the city taken within 16 rounds with at most 1 of ours lost; its neighbours on our side are hills (and some tiles two away), only a shooter on a hill sees it. Measures: city damage dealt per round, damage taken, rounds. | ref-hills, ref-planned | MO9 U |
+| `city-fire` | invest a strong city without feeding its strike | classical, medieval, renaissance, industrial, modern, atomic, information | 14 | the city taken within 14 rounds with at most 1 of ours lost; open ground, all defences, one garrison. Measures: damage taken in the enemy's turn before the capture, lost, rounds. | ref-fire, ref-planned | MO9 U |
+| `planned-assault` | the composite: hills, a worn army, a home city, promotions | classical, medieval, renaissance, industrial, modern, atomic, information | 30 | the city taken within 30 rounds with at most 1 of ours lost. Measures: all of the above. | ref-planned, ref-rotate | MO9 U, MT7 U |
 
 The references (`families::reference_turn`, built on `act::unit_turn`): **ref-fight** (ranged keep at range behind a
 melee unit and strike the best blow by the rules' previews: a kill first, then the most wounded, the units that capture
@@ -216,6 +221,21 @@ non-combat ones stay in ai-stress, the rest are not applicable to the rules or n
 | M4 | Intercept AI settlers heading to distant poor spots, or kill border cities the A | snipe | convoy |  |
 | M5 | Stop city-spamming AIs early to cap their expansion. | – | – | non-combat: stays in ai-stress (whole-game positions) |
 
+The assault references (`trainers/assault.rs`, one planner with four switches; they play only by the rules' previews,
+data and the public state): **stage** (no unit enters the city's strike, range 2, until every attacker can reach its
+firing tile or an adjacent tile in one move; they go on the same turn, so the city strikes once with one target at a
+time at most); **tiles** (a shooter takes, of the tiles it reaches with a clear line and in range, one outside the
+strike, else the best defence, else the least threatened); **rotate** (a unit under 70 hit points leaves for the
+nearest friendly land out of the city's reach, rests without moving, and returns at 90); **promote** (the promotion
+with the highest plan value from the rules' effects: city attack for the blows, defence against ranged for the line,
+healing for an army with no friendly land). ref-fire = stage; ref-hills = stage + tiles; ref-rotate = stage + tiles +
+rotate; ref-promo = stage + tiles + promote; ref-planned = all four. What makes them good by construction: the city's
+strike is once a turn at the weakest-defence tile within 2, so staging and going together bounds its damage to one
+strike a turn, and the burst on the city (it heals 20 a turn) is kept shorter than its healing.
+
+Part 2 adds these measures to every row of the five families: `dmg_city` (damage taken from the city's strike),
+`dmg_own`, `dmg_total`, `city_dealt`, `dealt_per_round`, `rested`, `picks` (the promotion picks, in `info`).
+
 ## First measurement (22 November 2026, `runs/final`, 100 instances a cell)
 
 Means over the family's cells with 10 or more kept instances; win rates on the kept attempts; tac2 is the build of
@@ -257,6 +277,91 @@ retreat information 12/100, airstrike atomic 25/100, harass medieval 1/100 (no s
 one horse).
 
 Roman's page: `/Users/roman.ivanov/civ/work/trainers-2026-11-23.html`.
+
+## Part 2 measurement: the planned assault (23 November 2026, `runs/t2`, `runs/t2-tac2`, 100 instances a cell)
+
+Seven eras a family (classical to information: the ancient era has no siege unit). Win rates on the kept attempts, all
+cells together; "best solver" is on all drawn attempts (the proof keeps the attempts the solver wins, so the kept
+rate is 100 % by construction); tac2 is work/tac a2a1b36 plus this module (`tac2-src-b`, `target-tac`).
+
+| family | kept / drawn | passive % | random % | best solver % (drawn) | standard % | tac2 % | unciv % |
+|---|---|---|---|---|---|---|---|
+| `assault-heal` | 700/700 | 0 | 0 | 99 | 40 | 46 | 59 |
+| `promotion-choice` | 700/700 | 0 | 0 | 81 | 26 | 27 | 62 |
+| `hill-archers` | 700/700 | 0 | 0 | 66 | 33 | 25 | 20 |
+| `city-fire` | 700/700 | 0 | 0 | 95 | 42 | 30 | 31 |
+| `planned-assault` | 690/700 | 0 | 0 | 43 | 28 | 13 | 21 |
+
+Findings: standard and tac2 lose assault-heal and promotion-choice mainly by not resting the wounded and not staging
+the approach (see the traces on the page); in hill-archers and planned-assault the references are still weaker than
+the build's `standard` on the drawn attempts (the scenes are solvable only by redraw): these two references need
+more work (the hills' line of sight and the burst against the city's 20 a turn healing). Row measures: `dmg_city`,
+`dmg_own`, `city_dealt`, `dealt_per_round`, `rested`, `picks`. Traces: `runs/t2-traces/` (`tools/trace.sh`).
+
+## Fast mode (23 November 2026, `runs/fast-*`, 30 instances a cell, every family, standard and unciv)
+
+The trainers had no whole-game prefix to cut: the lab is built synthetically (a repainted Small world, a home city
+each, round 0), and the profile (`TRAINERS_PROF=1`, `sample`) shows 90 % of a play inside `driver.step`, 73 % of that
+in the AI's own siege planner (`ai::siege_walls::plan_turn` -> `evaluate` -> `find_path`, an A* that already carries
+a node limit and prices one step with `PlayerView::tile`), not in `validate_move`. Switches (all default to the
+old behaviour; set by `ai-exam suite`/`suite-one` options):
+
+| option | what | whole suite (6 threads, proof included) | plays/s | agreement with the default (Wilson 95 %, 60 cells: 30 families x standard, unciv) |
+|---|---|---|---|---|
+| default (`--world small --fog off --ai full`) | the whole map shown to both sides, the whole AI | 129 s | 450 | - |
+| `--world duel` | a 40 x 24 lab (960 tiles) instead of 66 x 42 | 92 s | 622 | 6 of 60 differ: convoy, guard, surrounded (standard); convoy, flank, sink (unciv): the home cities' distance is part of those scenes |
+| `--ai combat` | wrapper `CombatOnly`: only the decisions of war and the army (moves, attacks, fortify, strikes, promotions, declarations) are kept; research, production, city management, policies, religion, trade and peace are dropped | 126 s | 442 | 1 of 60 differs (unciv, ram); no saving: the cost is in the planning (`begin_turn`, siege planner), not in the decisions dropped; a saving needs a change inside the AI, outside this measurement-only branch |
+| `--world duel --ai combat` | both | 91 s | 616 | 12 of 60 differ |
+| `--fog on` | each side sees what its units and cities see (the game's visibility), no `reveal` | 95 s | 595 | 43 of 60 differ: the AI blind plays another game (the references and the scenes' aims use the true map) |
+| `--world duel --fog on` | both | 89 s | 631 | 38 of 60 differ |
+
+One family (city-fire medieval, 100 instances, one thread): 12.5 s default, 5.0 s fog, 6.7 s duel, 4.8 s duel + fog,
+12.6 s combat (the first, stricter filter of `combat` changed the outcome: standard 35 % to 0 %, because it dropped the
+operations' orders; the kept filter gives 35 % as the default). Early stop was already there: `judge` ends a play at
+the round the outcome is decided (city taken, one side gone, the convoy through).
+
+Verdict: the defaults stay (open map, full AI, Small lab): fog is a different measurement (use it to measure the AI's
+scouting and its blindness, not combat tactics), `duel` is safe for the families whose win rate agrees (everything but
+convoy, guard, surrounded, flank, sink) at 1.4 x, `combat` is equivalent but not faster until the AI's planner is
+bounded (the siege planner's path searches allocate a scratch of the map's size every call: an exact fix, with hashes
+to check, in `ai::siege_walls`).
+
+## Citadel correction (23 November 2026, `runs/cit5`)
+
+Found by the MLX parity lane: the citadel stood on neutral land and damaged nobody (the zone hurts only units next to a
+citadel on land owned by an enemy at war, `citadel_damage`; `debug_raise_citadel` gives the land only to an owner's
+city within 5 tiles, `CITADEL_CITY_REACH`). The scene now founds a small town of the holders 5 tiles behind the pass,
+raises the citadel from it (`debug_raise_citadel`), and checks the pass tile is the holders'. The attackers are mostly
+shooters; ref-choke sends melee in only for a kill. Test `the_citadel_stands_on_the_holders_land`. Re-proved and
+re-measured (100 instances a cell, seven eras; the ancient era also builds): kept 679/800 (was 714/800); passive 0 %,
+random 0 %, standard 0 % (was 0 %), tac2 0 %, unciv 26 % (was 25 %); ref-choke 8 % and ref-fight 9 % on the drawn
+attempts (the proof keeps those they win). The first-measurement row of `citadel` above is superseded.
+
+## Targets for the hill-archers and planned-assault references (written 23 November 2026, before the runs)
+
+The reference must win at least 70 % of all drawn attempts in the family, or at least 1.5 times the win rate of
+`standard` on the kept attempts (all cells together, 100 instances a cell). Measured with `runs/t3` after the
+improvement; the result is written in the section below.
+
+## Improvement of the references (23 November 2026, `runs/t3`, `runs/t3-tac2`, 100 instances a cell)
+
+Target (written before the runs, above): the reference wins at least 70 % of all drawn attempts or at least 1.5 times
+`standard` on the kept attempts. Causes found by trace and fixed in the one planner `assault::turn`:
+1. The readiness deadlock: with fewer firing tiles (hills round the city) than shooters, a surplus shooter was never
+   "ready", so the army waited the full 12 rounds and went after the city had bought its defences (hill-archers
+   medieval: the assault began at round 13). Now the army goes when as many shooters can arrive as there are tiles
+   (the rest are a reserve), and waits at most 4 rounds for a resting unit and 5 for the staging.
+2. The rotation took shooters out of the burst at 70 hit points, and the city heals 20 a turn: a shooter in the burst
+   now leaves below 45 (`ROTATE_BURST`; the city's strongest strike takes about 90), melee waiting still at 70.
+
+| family | reference (all drawn attempts) before | after | standard (kept) | ratio |
+|---|---|---|---|---|
+| `hill-archers` | ref-hills 22 %, ref-planned 11 % | ref-hills 57 %, ref-planned 66 % | 33 % | 2.0 |
+| `planned-assault` | ref-planned 25 % | ref-planned 43 % | 28 % | 1.5 |
+
+Both meet the second clause (planned-assault only just). tac2 13-25 %, unciv 20-21 % on the two. The other three
+families were re-proved with the same planner (assault-heal 99 %, promotion-choice 81 %, city-fire 95 % on the drawn
+attempts); the table above is the new one. The first part-2 run is `runs/t2`.
 
 ## Limits
 

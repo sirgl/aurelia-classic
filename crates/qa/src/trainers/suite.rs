@@ -85,6 +85,9 @@ fn opts(args: &[String]) -> Result<Opts, String> {
             "--instance" => o.instance = v()?.parse().map_err(|e| format!("{e}"))?,
             "--attempt" => o.attempt = v()?.parse().map_err(|e| format!("{e}"))?,
             "--player" => o.player = v()?,
+            "--world" => lab::mode::WORLD.store(match v()?.as_str() { "small" => 0, "tiny" => 1, "duel" => 2, w => return Err(format!("--world small|tiny|duel, not {w}")) }, std::sync::atomic::Ordering::Relaxed),
+            "--fog" => lab::mode::FOG.store(match v()?.as_str() { "on" => 1, "off" => 0, w => return Err(format!("--fog on|off, not {w}")) }, std::sync::atomic::Ordering::Relaxed),
+            "--ai" => lab::mode::AI.store(match v()?.as_str() { "full" => 0, "combat" => 1, w => return Err(format!("--ai full|combat, not {w}")) }, std::sync::atomic::Ordering::Relaxed),
             other => return Err(format!("unknown option {other}")),
         }
     }
@@ -274,6 +277,10 @@ fn run(rules: &CompiledRuleset, o: &Opts) -> Result<(), String> {
             println!("{n} instances, {:.0} s", started.elapsed().as_secs_f64());
         }
     });
+    if std::env::var_os("TRAINERS_PROF").is_some() {
+        let p: Vec<u64> = crate::trainers::PROF.iter().map(|a| a.load(std::sync::atomic::Ordering::Relaxed) / 1000).collect();
+        eprintln!("prof ms: driver.step {} sample {} close_arena {}", p[0], p[1], p[2]);
+    }
     println!("done: {} instances in {:.0} s", count.load(std::sync::atomic::Ordering::Relaxed), started.elapsed().as_secs_f64());
     Ok(())
 }
