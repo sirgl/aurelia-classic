@@ -151,3 +151,18 @@ fn the_assault_win_rules_decide_what_they_say() {
         assert_eq!(families::judge(&rules, &game, &mut sc, 1), Some(true), "{}: the city taken wins", fam.name());
     }
 }
+
+/// The citadel stands on the holders' land (its damage zone hurts only units next to a citadel an enemy at war
+/// owns); a citadel on neutral land damaged nobody.
+#[test]
+fn the_citadel_stands_on_the_holders_land() {
+    let rules = ClassicBench::rules();
+    let era = lab::era_index(&rules, "medieval").unwrap();
+    for i in 0..4 {
+        let (game, sc) = families::build(&rules, Fam::Citadel, era, i, 0).unwrap();
+        let pass = sc.hold.unwrap();
+        let map = game.view().auth.map();
+        assert_eq!(map.owner(pass).flatten(), Some(sc.enemy), "instance {i}: the pass tile is the holders'");
+        assert!(map.improvement(pass).flatten().is_some_and(|imp| rules.improvements[imp.0 as usize].nearby_enemy_damage > 0), "instance {i}: a citadel on the pass");
+    }
+}

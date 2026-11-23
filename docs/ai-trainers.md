@@ -92,7 +92,7 @@ captured, "killed" the enemy's combat units dead.
 | `retreat` | save the army from a force twice its size | ancient, classical, medieval, renaissance, industrial, modern, atomic, information | 10 | at least 75 % of our army alive when 10 rounds end against a force twice its size. | ref-flee |  |
 | `flank` | surround and kill a strong defender in 3 rounds | ancient, classical, medieval, renaissance, industrial, modern, atomic, information | 3 | the strong defender killed within 3 rounds with at most 1 of ours lost. | ref-flank, ref-press | MT4 U |
 | `general` | fight with a Great General's aura and keep him alive | ancient, classical, medieval, renaissance, industrial, modern, atomic, information | 12 | every enemy unit dead within 12 rounds and our Great General alive. | ref-fight, ref-careful | MT12 U, MT8 U |
-| `citadel` | break a holder on a citadel (damage to every adjacent unit) | ancient, classical, medieval, renaissance, industrial, modern, atomic, information | 14 | every holder dead within 14 rounds with at least half of ours alive; the holder stands on a citadel (the rules' improvement that damages adjacent enemies). | ref-choke, ref-fight | MT10 D, MO2 D, MO4 D |
+| `citadel` | break a holder on a citadel (damage to every adjacent unit) | ancient, classical, medieval, renaissance, industrial, modern, atomic, information | 14 | every holder dead within 14 rounds with at least half of ours alive; the holder stands on a citadel (the rules' improvement that damages adjacent enemies). | ref-choke (melee go in only for a kill below 30 %), ref-fight | MT10 D, MO2 D, MO4 D |
 | `bombard` | bombard and take a coastal city with ships | ancient, medieval, renaissance, modern, information | 12 | (3 ranged ships and a melee ship against a city of 2-4 without walls) the coastal city taken, or at 10 % of its hit points or less at a round end, within 12 rounds, by ships. | ref-bombard | N3 U, N4 U |
 | `sink` | sink embarked units | classical, medieval, renaissance, industrial, modern, atomic, information | 6 | every embarked enemy unit dead within 6 rounds. | ref-fight | MT5 U, MT6 U, N1 U, N2 U |
 | `airstrike` | strike a stack with bombers | modern, atomic, information | 6 | 2 enemy units killed within 6 rounds (bombers based in our city, a melee spotter in front: an air strike needs its target in sight). | ref-air | A1 U, A3 U |
@@ -325,6 +325,17 @@ scouting and its blindness, not combat tactics), `duel` is safe for the families
 convoy, guard, surrounded, flank, sink) at 1.4 x, `combat` is equivalent but not faster until the AI's planner is
 bounded (the siege planner's path searches allocate a scratch of the map's size every call: an exact fix, with hashes
 to check, in `ai::siege_walls`).
+
+## Citadel correction (23 November 2026, `runs/cit5`)
+
+Found by the MLX parity lane: the citadel stood on neutral land and damaged nobody (the zone hurts only units next to a
+citadel on land owned by an enemy at war, `citadel_damage`; `debug_raise_citadel` gives the land only to an owner's
+city within 5 tiles, `CITADEL_CITY_REACH`). The scene now founds a small town of the holders 5 tiles behind the pass,
+raises the citadel from it (`debug_raise_citadel`), and checks the pass tile is the holders'. The attackers are mostly
+shooters; ref-choke sends melee in only for a kill. Test `the_citadel_stands_on_the_holders_land`. Re-proved and
+re-measured (100 instances a cell, seven eras; the ancient era also builds): kept 679/800 (was 714/800); passive 0 %,
+random 0 %, standard 0 % (was 0 %), tac2 0 %, unciv 26 % (was 25 %); ref-choke 8 % and ref-fight 9 % on the drawn
+attempts (the proof keeps those they win). The first-measurement row of `citadel` above is superseded.
 
 ## Limits
 

@@ -617,12 +617,26 @@ pub fn build(rules: &CompiledRuleset, fam: Fam, era: u8, instance: usize, attemp
                 def_pieces.push(piece);
             }
             if fam == Fam::Citadel {
-                let cit = citadel(rules).ok_or("no citadel")?;
-                p.game.debug_set_improvement_batch(rules, &[(pass, cit)]);
+                // Raised by the holders' side (`debug_raise_citadel` claims the land round it): the damage zone
+                // hurts only units next to a citadel on land an enemy at war owns (`citadel_damage`), so a citadel
+                // set on neutral land damaged nobody.
+                // The rules give the pass to a city of the holders within 5 tiles (`CITADEL_CITY_REACH`): a small
+                // town of theirs stands 5 tiles behind the pass, out of the attackers' way (and of its own strike).
+                citadel(rules).ok_or("no citadel")?;
+                let town = at(&p, def_side * 5, pass_dy)?;
+                p.game.debug_found_city(rules, def, town);
+                if !p.game.debug_raise_citadel(rules, def, pass) {
+                    return Err("no citadel to raise".into());
+                }
+                let owned = p.game.view().auth.map().owner(pass).flatten() == Some(def);
+                if !owned {
+                    return Err("the citadel's land is not the holders'".into());
+                }
             }
             let n_att = if fam == Fam::Hold { (def_pieces.len() * 3).div_ceil(2).max(3) } else { (def_pieces.len() * 2).max(3) };
             let anchor = at(&p, att_side * p.d.range(4, 5), pass_dy)?;
-            let arms = [Arm::Melee, Arm::Mounted, Arm::Ranged, Arm::Melee, Arm::Siege, Arm::Ranged];
+            // Against a citadel the army is mostly shooters (the zone hurts what stands next to the pass).
+            let arms = if fam == Fam::Citadel { [Arm::Ranged, Arm::Ranged, Arm::Melee, Arm::Siege, Arm::Ranged, Arm::Melee] } else { [Arm::Melee, Arm::Mounted, Arm::Ranged, Arm::Melee, Arm::Siege, Arm::Ranged] };
             let mut att_pieces = Vec::new();
             for (i, t) in p.spots(anchor, 2, n_att)?.into_iter().enumerate() {
                 let arm = if fam == Fam::Hold { [Arm::Melee, Arm::Mounted, Arm::Melee, Arm::Mounted][i % 4] } else { arms[i % arms.len()] };
@@ -1237,7 +1251,9 @@ pub fn reference_turn(rules: &CompiledRuleset, game: &mut GameState, scene: &mut
             ("ref-choke", _) => {
                 let pass = sc.hold.unwrap_or(sc.centre);
                 let held = sc.theirs_alive(game).iter().any(|(_, f)| f.tile == pass);
-                let weak = !held || sc.theirs_alive(game).iter().any(|(_, f)| f.hp < kernel::world::unit::UNIT_MAX_HP * 6 / 10);
+                // Against a citadel the melee go in only for a kill (its zone hurts every unit next to the pass each turn).
+                let below = if sc.fam == Fam::Citadel { 3 } else { 6 };
+                let weak = !held || sc.theirs_alive(game).iter().any(|(_, f)| f.hp < kernel::world::unit::UNIT_MAX_HP * below / 10);
                 if ranged {
                     (Aim::Support, Nerve::Even, false)
                 } else if weak {
