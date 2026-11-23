@@ -335,6 +335,7 @@ fn play_on<P: kernel::ai::mind::AiMind<Classic>>(rules: &CompiledRuleset, mut ga
             crate::army_net::record::mute();
         }
     }
+    crate::army_net::seat::reset_expert();
     let mut net_time = crate::army_net::seat::Timing::default();
     // The mind's time on the learner's turns (the AI's own turn time, for the army net's budget).
     let mut learner_us = 0u64;

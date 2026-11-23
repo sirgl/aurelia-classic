@@ -26,6 +26,18 @@ const PER_UNIT: u32 = 6;
 const PER_TURN: u32 = 96;
 
 static NET: OnceLock<Result<Net, String>> = OnceLock::new();
+
+thread_local! {
+    /// The DAgger expert's own memory between the turns of one play (the staged assault's "engaged",
+    /// "waited", "resting" live in `Scene::track`): a probe plays on a copy, and without this the copy's
+    /// commitments were thrown away, so the expert answered every turn as its first ("wait for the stage").
+    static EXPERT_TRACK: std::cell::RefCell<Option<crate::trainers::assault::Track>> = const { std::cell::RefCell::new(None) };
+}
+
+/// A new play: the expert's memory starts empty.
+pub fn reset_expert() {
+    EXPERT_TRACK.with(|t| *t.borrow_mut() = None);
+}
 static EXPERTS: OnceLock<Option<BTreeMap<String, String>>> = OnceLock::new();
 
 /// The DAgger expert of each family: the reference with the highest win rate on the training plays
@@ -79,6 +91,9 @@ fn probe(rules: &CompiledRuleset, game: &GameState, scene: &Scene, first_of_turn
     }
     let mut copy = game.clone();
     let mut sc = scene.clone();
+    if let Some(track) = EXPERT_TRACK.with(|t| t.borrow().clone()) {
+        sc.track = track;
+    }
     if turn_probed(scene) {
         if !first_of_turn {
             return;
@@ -87,12 +102,17 @@ fn probe(rules: &CompiledRuleset, game: &GameState, scene: &Scene, first_of_turn
         families::reference_turn(rules, &mut copy, &mut sc, expert);
         super::record::push_end(&copy, rules);
         super::record::mute();
+        EXPERT_TRACK.with(|t| *t.borrow_mut() = Some(sc.track));
         return;
     }
     super::record::probe();
     families::reference_turn(rules, &mut copy, &mut sc, expert);
     if !super::record::probe_done() {
         super::record::push_end(game, rules);
+    }
+    // A per-decision probe changes the expert's memory only at the turn's first decision (its plan's start).
+    if first_of_turn {
+        EXPERT_TRACK.with(|t| *t.borrow_mut() = Some(sc.track));
     }
 }
 
