@@ -2,7 +2,7 @@
 //! and read by no executor is a decision that is never played. `GUARD_PURCHASE` (design §4.5) was declared
 //! with no reader from the promotion on; it is removed.
 //!
-//! The guard reads `plan.rs` itself: every field of `Net2Plan`, `CityGuard`, `WarOrder` and `Offence` and every `pub const` there
+//! The guard reads `plan.rs` itself: every field of `Net2Plan`, `CityGuard`, `Hold`, `CityHold`, `WarOrder` and `Offence` and every `pub const` there
 //! must be in `READERS` with the file that reads it and the token it reads it by, and that token must stand on a line
 //! of code (not a comment) of that file. A lever declared and not yet built names why in `DECLARED` instead (the
 //! offence addendum, off by `weights::OFFENCE`); a new lever with neither fails here.
@@ -26,6 +26,13 @@ const READERS: &[(&str, &str, &str)] = &[
     ("space_research", "strategy_net/heads.rs", "n.space_research"),
     ("capital_gate", "victory.rs", "|p| p.capital_gate"),
     ("science", "economy.rs", "plan.science.scientists"),
+    ("hold", "planner_units.rs", "plan.hold.extra_at(city)"),
+    // Hold and CityHold: the hold of the cities (`layout-defence`)
+    ("cities", "planner_cities.rs", "p.hold.cities.is_empty()"),
+    ("chest", "allocator.rs", "plan.hold.chest"),
+    ("tile", "net2/plan.rs", "c.tile == tile"),
+    ("level", "net2/hold.rs", "(c.level, std::cmp::Reverse(c.city))"),
+    ("extra", "net2/plan.rs", "usize::from(c.extra)"),
     // CityGuard: the guard's level by city
     ("city", "net2/plan.rs", "g.city == city"),
     ("level", "defence.rs", "plan.guard_of(city.id)"),
@@ -99,7 +106,7 @@ fn code(source: &str) -> String {
 #[test]
 fn every_net2_lever_has_a_reader() {
     let plan = std::fs::read_to_string(ai_dir().join("net2/plan.rs")).expect("plan.rs is read");
-    let mut levers: Vec<String> = ["Net2Plan", "CityGuard", "WarOrder", "Offence"].iter().flat_map(|s| fields(&plan, s)).collect();
+    let mut levers: Vec<String> = ["Net2Plan", "CityGuard", "Hold", "CityHold", "WarOrder", "Offence"].iter().flat_map(|s| fields(&plan, s)).collect();
     levers.extend(consts(&plan));
     assert!(levers.len() > 30, "the parse finds the levers: {levers:?}");
     let mut missing = Vec::new();

@@ -331,6 +331,7 @@ pub fn after_intent(pass: &Pass, intent: &Intent, inputs: &Inputs, round: u32) -
         space_research: pass.parts.plays(Part::Strategy) && space_research >= gate::SPACE_RESEARCH.0,
         capital_gate: inputs.capital.filter(|_| pass.parts.plays(Part::Economy) && capital_gate >= gate::CAPITAL_GATE.0),
         science: Default::default(),
+        hold: Default::default(),
     };
     After { plan, price_tilt, peace, part_hold, city_cap, space_research, capital_gate }
 }
@@ -379,7 +380,8 @@ pub fn city_row(reads: &[RivalRead], city: &CityInputs) -> [Milli; w::c::N] {
             distrust = distrust.max(x.distrust);
         }
     }
-    [menace, city.danger, distrust, city.young]
+    // CAPITAL, FRONT and ALARM are `layout-defence`'s (`hold::rows`): 0 here, the guard does not read them.
+    [menace, city.danger, distrust, city.young, 0, 0, 0]
 }
 
 fn guard_of(pass: &Pass, city: &CityInputs) -> Milli {

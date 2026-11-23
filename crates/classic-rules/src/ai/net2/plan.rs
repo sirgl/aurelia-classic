@@ -728,6 +728,40 @@ pub struct Net2Plan {
     pub capital_gate: Option<crate::ids::TileId>,
     /// `science-flow`'s levers (`net2::science`; all off for every other variant).
     pub science: Science,
+    /// `layout-defence`'s hold of the cities (`net2::hold`; empty for every other variant).
+    pub hold: Hold,
+}
+
+/// The hold of the cities (`weights::FRONT`, `weights::HOLD`): how many holders each city keeps beyond the empire's
+/// standing garrison and the gold kept from the other purchases while a city in the watch is short of them. Read by
+/// the units' planner (`planner_units::garrison_wanted_at`), the city planner (the garrison it builds, the defenders it
+/// switches to: `planner_cities::hold_orders`) and the allocator (the chest). Empty unless the seat plays `layout-defence`
+/// (`TurnBrief::layout_defence`).
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Hold {
+    /// Per own city.
+    pub cities: Vec<CityHold>,
+    /// Gold kept while a city in the watch is short of its holders: the rules' price of buying a defender there
+    /// (`allocator::spend_gold` does not spend it; `planner_cities::hold_orders` buys the defender).
+    pub chest: u32,
+}
+
+/// The hold of one own city.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CityHold {
+    pub city: EntityId,
+    pub tile: TileId,
+    /// `weights::HOLD`, 0…1000.
+    pub level: Milli,
+    /// The holders the city keeps beyond the empire's standing garrison (`gate::HOLD_ONE`, `HOLD_TWO`, `HOLD_THREE`).
+    pub extra: u8,
+}
+
+impl Hold {
+    /// The holders beyond the standing garrison the city on `tile` keeps (0 without a reading).
+    pub fn extra_at(&self, tile: TileId) -> usize {
+        self.cities.iter().find(|c| c.tile == tile).map_or(0, |c| usize::from(c.extra))
+    }
 }
 
 /// The science flow's levers (`weights::SCIENTISTS`, `weights::AGREEMENT`), read by the citizens' executor, the diplomacy

@@ -138,7 +138,7 @@ pub fn worth(brief: &TurnBrief, rules: &CompiledRuleset) -> Option<Centi> {
 /// The free units: land military units, not recon, healthy, without a task or holding a
 /// city beyond its garrison (the higher ids first), none on a city in danger.
 fn free_units<'b>(brief: &'b TurnBrief, state: &AiState, rules: &CompiledRuleset) -> Vec<&'b UnitBrief> {
-    let wanted = crate::ai::planner_units::garrison_wanted_by(brief, state.strategy.current);
+    let wanted = |city| crate::ai::planner_units::garrison_wanted_at(brief, state.strategy.current, city);
     let mut out = Vec::new();
     for unit in &brief.units {
         if unit.role != AiRole::Military || unit.hp < READY_HP || rules.units.get(unit.kind.0 as usize).and_then(|d| d.role) == Some(UnitRole::Recon) {
@@ -148,7 +148,7 @@ fn free_units<'b>(brief: &'b TurnBrief, state: &AiState, rules: &CompiledRuleset
             None => true,
             Some(UnitTask::Defend { city }) => {
                 let senior = state.tasks().iter().filter(|t| t.task == UnitTask::Defend { city } && t.unit < unit.id).count();
-                senior >= wanted.max(1) && !brief.endangered(city)
+                senior >= wanted(city).max(1) && !brief.endangered(city)
             }
             _ => false,
         };
