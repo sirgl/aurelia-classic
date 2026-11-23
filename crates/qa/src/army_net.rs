@@ -12,6 +12,7 @@
 
 pub mod map_conv;
 pub mod model;
+pub mod obsdump;
 pub mod observe;
 pub mod parity;
 pub mod record;

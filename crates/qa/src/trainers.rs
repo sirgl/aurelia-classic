@@ -348,6 +348,9 @@ fn play_on<P: kernel::ai::mind::AiMind<Classic>>(rules: &CompiledRuleset, mut ga
     crate::army_net::seat::reset_expert();
     crate::army_net::observe::reset_history();
     crate::army_net::observe::set_history_orders(&orders);
+    if seat == Seat::Net {
+        crate::army_net::obsdump::start(rules, &game, &scene, &orders);
+    }
     let mut net_time = crate::army_net::seat::Timing::default();
     // The mind's time on the learner's turns (the AI's own turn time, for the army net's budget).
     let mut learner_us = 0u64;
@@ -447,6 +450,7 @@ fn play_on<P: kernel::ai::mind::AiMind<Classic>>(rules: &CompiledRuleset, mut ga
     }
     let rel = game.view().auth.turn().round.saturating_sub(round0);
     let win = verdict.unwrap_or(false);
+    crate::army_net::obsdump::finish(win, rel);
     if assault::is_assault(scene.fam) {
         scene.info.insert("picks".into(), scene.track.picks.join("; "));
         scene.info.insert("city_strikes".into(), crate::army_net::observe::city_strikes(round0));

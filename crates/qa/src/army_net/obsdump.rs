@@ -1,0 +1,259 @@
+//! The army net's observations with the scene state they were built from (`ARMY_OBS_DUMP=FILE`, the player
+//! `army-net` of `ai-exam suite`): the parity source of the MLX twin of `observe` (`nn/aurelia_nn/tacsim/armyobs.py`).
+//! A MEASUREMENT tool: it changes no rule, no AI and no decision of the net.
+//!
+//! Per play a `scene` line: the scene in the form of `ai-exam suite-dump` (`trainers::dump::Track`: window
+//! tiles, units with their compiled profiles, cities, the RNG), the orders (the objective token's inputs, the army's
+//! slots, the static map planes) and a table of unit kinds (the arm, range, moves, strengths the tokens read). Per
+//! decision of the net a `moment` line: the state (the dump's state record), every slot's map tile and entity id,
+//! the history's turn-start snapshot (numbers 46 and 47), the tokens (f16 bits, hex), the distances, the window
+//! positions, the army slots, and the candidates of every selectable army unit; then the net's pick and the
+//! candidate it applied (the in-loop comparison). Lines of a play are written together at its end.
+
+use std::cell::RefCell;
+use std::io::Write;
+use std::sync::Mutex;
+
+use classic_rules::{CompiledRuleset, GameState};
+use serde_json::{json, Value};
+
+use super::observe::{self, Action, Candidate, Tokens};
+use super::Orders;
+use crate::trainers::dump::Track;
+use crate::trainers::{act, Scene};
+
+struct Play {
+    name: String,
+    track: Track,
+    lines: Vec<String>,
+    moment: Option<Value>,
+}
+
+thread_local! {
+    static PLAY: RefCell<Option<Play>> = const { RefCell::new(None) };
+}
+
+static OUT: Mutex<Option<std::fs::File>> = Mutex::new(None);
+
+pub fn wanted() -> bool {
+    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ON.get_or_init(|| std::env::var_os("ARMY_OBS_DUMP").is_some())
+}
+
+fn hex16(v: &[f32]) -> String {
+    v.iter().map(|x| format!("{:04x}", observe::f32_to_f16(*x))).collect()
+}
+
+/// A new play of the net: the scene line.
+pub fn start(rules: &CompiledRuleset, game: &GameState, scene: &Scene, orders: &Orders) {
+    if !wanted() {
+        return;
+    }
+    let (mut track, sc, initial) = Track::start(rules, game, scene);
+    let name = format!("{}/{}/{}/{}", scene.fam.name(), scene.era, scene.instance, scene.attempt);
+    let army: Vec<i64> = orders.army.iter().map(|id| track.slot_of(*id).map_or(-1, |s| s as i64)).collect();
+    let (q0, r0, w, map_w) = track.window();
+    let kinds: Vec<Value> = (0..rules.units.len())
+        .map(|k| {
+            let kind = classic_rules::ids::UnitKindId(k as u16);
+            let d = &rules.units[k];
+            json!([
+                observe::arm_slot(rules, kind),
+                act::range_of(rules, kind).unwrap_or(-1),
+                act::moves_of(rules, kind),
+                act::is_civilian(rules, kind),
+                d.strength,
+                d.ranged_strength,
+                d.domain == classic_rules::rules::content::Domain::Land,
+                super::in_army(rules, kind),
+                super::base_strength(rules, kind),
+                d.combat.pillage,
+                d.combat.air_intercept_range
+            ])
+        })
+        .collect();
+    let auth = game.view().auth;
+    let far: Vec<Value> = auth
+        .cities()
+        .iter()
+        .filter(|(_, c)| (c.owner == orders.side || c.owner == orders.foe) && track.index(c.tile) < 0)
+        .map(|(_, c)| json!([c.tile.0, if c.owner == orders.side { 0 } else { 1 }]))
+        .collect();
+    let city_handles: Vec<i64> = track.cities().iter().map(|t| auth.indexes().city_on_tile(*t).map_or(-1, |h| i64::from(h.index))).collect();
+    let o = json!({
+        "aim": orders.aim.index(), "tile": orders.tile.0, "refuge": orders.refuge.map_or(-1, |t| t.0 as i64),
+        "optional": orders.optional, "start_round": orders.start_round, "rounds": orders.rounds, "army": army,
+        "mean_strength": orders.mean_strength, "fog": orders.fog, "price": orders.price,
+        "statics": hex16(&orders.statics), "map_window": [orders.window.q0, orders.window.r0, orders.window.map_w, orders.window.map_h],
+        "window": [q0, r0, w, map_w], "far_cities": far, "city_handles": city_handles,
+        "promos": track.promos().iter().map(|p| p.0).collect::<Vec<u16>>(),
+        "pillageable": pillageable(rules, game, &track),
+        // The judge's inputs (`families::judge`): the scene's improved tiles (window indices), its context, the pieces.
+        "improved": scene.improved.iter().map(|t| track.index(*t)).collect::<Vec<i32>>(),
+        "context": scene.context, "n_mine": scene.mine.len(), "family": scene.fam.name(),
+        "roles": scene.mine.iter().chain(&scene.theirs).map(|p| p.role).collect::<Vec<&str>>(),
+        "deadline": scene.deadline,
+    });
+    let line = json!({"type": "scene", "play": name, "scene": sc, "initial": initial, "orders": o, "kinds": kinds});
+    PLAY.with(|p| *p.borrow_mut() = Some(Play { name, track, lines: vec![line.to_string()], moment: None }));
+}
+
+fn action_of(rules: &CompiledRuleset, game: &GameState, track: &mut Track, c: &Candidate) -> Value {
+    let auth = game.view().auth;
+    let kind = c.feat[..10].iter().position(|x| *x > 0.5).unwrap_or(9);
+    let extra: i64 = match &c.action {
+        Action::Done => -1,
+        Action::Command(cmd) => match *cmd {
+            classic_rules::Command::AttackUnit { defender, .. } => auth.units().get(defender).and_then(|u| track.slot_of(u.core.id)).map_or(-2, |s| s as i64),
+            classic_rules::Command::AttackCity { city, .. } => auth.cities().get(city).map_or(-2, |c| i64::from(c.tile.0)),
+            classic_rules::Command::MoveUnit { destination, .. } => i64::from(destination.0),
+            classic_rules::Command::RangedAttack { target, .. } => i64::from(target.0),
+            _ => -1,
+        },
+    };
+    // The Rust plan of a strike (diagnostics of the twin's previews): strengths, the attacker's damage and wounded mod.
+    let plan = match &c.action {
+        Action::Command(cmd) => match *cmd {
+            classic_rules::Command::AttackUnit { attacker, defender } => auth.units().get(defender).map(|u| (attacker, u.core.tile)),
+            classic_rules::Command::AttackCity { attacker, city } => auth.cities().get(city).map(|x| (attacker, x.tile)),
+            classic_rules::Command::RangedAttack { unit, target } => Some((unit, target)),
+            _ => None,
+        },
+        Action::Done => None,
+    };
+    let p = plan.and_then(|(u, t)| {
+        let me = act::core_of(game, u)?;
+        let how = if act::range_of(rules, me.kind).is_some() { classic_rules::combat::AttackKind::Ranged } else { classic_rules::combat::AttackKind::Melee };
+        classic_rules::combat::plan_attack(game.view(), rules, u, t, how).ok().map(|p| json!([p.attacker_strength, p.defender_strength, p.attacker_damage, p.attacker_wounded_mod, p.defender_hp]))
+    });
+    json!([kind, c.pos, c.promo, extra, p])
+}
+
+
+/// Per window tile: something a unit could pillage there (a working improvement that is not permanent, or a road).
+fn pillageable(rules: &CompiledRuleset, game: &GameState, track: &Track) -> String {
+    let map = game.view().auth.map();
+    let (q0, r0, w, map_w) = track.window();
+    (0..w * w)
+        .map(|i| {
+            let (q, r) = (q0 + i % w, r0 + i / w);
+            if q >= map_w || r * map_w + q < 0 || (r * map_w + q) as usize >= map.tile_count() {
+                return '0';
+            }
+            let t = classic_rules::ids::TileId((r * map_w + q) as u32);
+            let permanent = map.working_improvement(t).and_then(|imp| rules.improvements.get(imp.0 as usize)).is_some_and(|d| {
+                matches!(d.kind, classic_rules::rules::content::ImprovementKind::AncientRuins | classic_rules::classic::content::BARBARIAN_CAMP)
+            });
+            if (map.working_improvement(t).is_some() && !permanent) || map.road(t) {
+                '1'
+            } else {
+                '0'
+            }
+        })
+        .collect()
+}
+
+/// A decision moment of the net (before its pick): the state and what the builder made of it.
+#[allow(clippy::too_many_arguments)]
+pub fn moment(rules: &CompiledRuleset, game: &GameState, orders: &Orders, tokens: &Tokens, slots: &[i16], step: u32, made: &[(kernel::ids::EntityId, u32)]) {
+    if !wanted() {
+        return;
+    }
+    PLAY.with(|p| {
+        let mut p = p.borrow_mut();
+        let Some(play) = p.as_mut() else { return };
+        let auth = game.view().auth;
+        let state = play.track.state(rules, game);
+        let ids: Vec<u64> = play.track.ids().iter().map(|i| i.0).collect();
+        let by_id: std::collections::BTreeMap<u64, (u32, u32)> = auth.units().iter_handles().map(|(h, c)| (c.id.0, (c.tile.0, h.index))).collect();
+        let maptile: Vec<i64> = ids.iter().map(|i| by_id.get(i).map_or(-1, |x| i64::from(x.0))).collect();
+        let handles: Vec<i64> = ids.iter().map(|i| by_id.get(i).map_or(-1, |x| i64::from(x.1))).collect();
+        let prev: Vec<Value> = observe::history_prev().into_iter().filter_map(|(id, t, hp)| play.track.ids().iter().position(|x| *x == id).map(|s| json!([s, t.0, hp]))).collect();
+        let n = tokens.len();
+        let feat: Vec<f32> = tokens.feat.iter().flat_map(|f| f.iter().copied()).collect();
+        let dist: String = tokens.dist.iter().map(|d| format!("{d:02x}")).collect();
+        let refs: Vec<Value> = (0..n)
+            .map(|i| match tokens.unit[i] {
+                Some(h) => auth.units().get(h).and_then(|u| play.track.slot_of(u.core.id)).map_or(json!(["u", -1]), |s| json!(["u", s])),
+                None if i == 0 => json!(["o", -1]),
+                None => json!(["c", tokens.tile[i].0]),
+            })
+            .collect();
+        let mut cands = serde_json::Map::new();
+        for i in 0..n {
+            if !tokens.selectable[i] {
+                continue;
+            }
+            let Some(h) = tokens.unit[i] else { continue };
+            let list = observe::candidates(game, rules, orders, h);
+            let feat: Vec<f32> = list.iter().flat_map(|c| c.feat.iter().copied()).collect();
+            let acts: Vec<Value> = list.iter().map(|c| action_of(rules, game, &mut play.track, c)).collect();
+            cands.insert(i.to_string(), json!({"feat": hex16(&feat), "act": acts}));
+        }
+        let wm: Vec<i64> = ids
+            .iter()
+            .map(|i| {
+                auth.units().iter_handles().find(|(_, c)| c.id.0 == *i).map_or(0, |(_, c)| {
+                    i64::from(classic_rules::effects::unit::unit_modifiers(auth, rules, c).stat(classic_rules::rules::effects::UnitStat::WoundedDamagePercent))
+                })
+            })
+            .collect();
+        let war = auth.diplomacy().at_war(orders.side, orders.foe);
+        // The window cities' strength without the garrison and hit points now (techs and buildings change them: an
+        // exogenous schedule for the simulator, whose scene has them at the start).
+        use classic_rules::combat::city as cc;
+        let cstr: Vec<Value> = play
+            .track
+            .cities()
+            .iter()
+            .map(|t| match auth.indexes().city_on_tile(*t).and_then(|c| auth.cities().get(c)) {
+                Some(c) => {
+                    let mods = cc::city_combat_mods(auth, rules, c);
+                    let hill = if classic_rules::navigation::terrain::is_hills(auth.map(), *t) { cc::CITY_HILL_STRENGTH } else { 0 };
+                    json!([cc::CITY_STRENGTH_BASE + i64::from(c.population) * cc::CITY_STRENGTH_PER_POP + mods.modified_defense() + cc::tech_strength(auth, rules, c.owner) + hill, cc::max_hit_points(auth, rules, c)])
+                }
+                None => json!([0, 1]),
+            })
+            .collect();
+        let pill = pillageable(rules, game, &play.track);
+        let made: Vec<Value> = made.iter().filter_map(|(id, k)| play.track.ids().iter().position(|x| x == id).map(|s| json!([s, k]))).collect();
+        play.moment = Some(json!({
+            "type": "moment", "play": play.name, "round": auth.turn().round, "step": step, "state": state, "ids": ids, "maptile": maptile,
+            "handles": handles, "prev": prev, "made": made, "wm": wm, "war": war, "pillageable": pill, "cstr": cstr,
+            "tok": {"n": n, "feat": hex16(&feat), "dist": dist, "pos": tokens.pos, "tile": tokens.tile.iter().map(|t| t.0).collect::<Vec<u32>>(), "slot": slots, "ref": refs},
+            "cands": cands,
+        }));
+    });
+}
+
+/// The net's choice at the moment: the picked token (-1 the end) and the candidate it applied (-1 none).
+pub fn choice(pick: i64, applied: i64) {
+    PLAY.with(|p| {
+        let mut p = p.borrow_mut();
+        let Some(play) = p.as_mut() else { return };
+        if let Some(mut m) = play.moment.take() {
+            m["pick"] = json!(pick);
+            m["applied"] = json!(applied);
+            play.lines.push(m.to_string());
+        }
+    });
+}
+
+/// The play is over: its lines go to the file together, with its outcome.
+pub fn finish(win: bool, rounds: u32) {
+    let Some(mut play) = PLAY.with(|p| p.borrow_mut().take()) else { return };
+    if let Some(m) = play.moment.take() {
+        play.lines.push(m.to_string());
+    }
+    play.lines.push(json!({"type": "end", "play": play.name, "win": win, "rounds": rounds}).to_string());
+    let mut out = OUT.lock().unwrap_or_else(|e| e.into_inner());
+    if out.is_none() {
+        let Some(path) = std::env::var_os("ARMY_OBS_DUMP") else { return };
+        *out = std::fs::OpenOptions::new().create(true).append(true).open(path).ok();
+    }
+    if let Some(f) = out.as_mut() {
+        let mut text = play.lines.join("\n");
+        text.push('\n');
+        let _ = f.write_all(text.as_bytes());
+    }
+}

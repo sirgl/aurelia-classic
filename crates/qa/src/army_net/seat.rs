@@ -225,6 +225,10 @@ pub fn turn_end(game: &GameState, rules: &CompiledRuleset) {
             observe::mask_history(&mut tokens);
         }
         let slots = super::record::slots_of(game, &run.orders, &tokens);
+        if super::obsdump::wanted() {
+            super::obsdump::moment(rules, game, &run.orders, &tokens, &slots, u32::MAX, &[]);
+            super::obsdump::choice(-2, -2);
+        }
         if super::record::active() {
             let track = EXPERT_TRACK.with(|t| t.borrow().as_ref().map(|t| teacher_state(game, &run.scene, &run.orders, t))).unwrap_or(super::record::NO_TRACK);
             super::record::push_memory_state(game, rules, track);
@@ -515,6 +519,10 @@ pub fn turn(rules: &CompiledRuleset, game: &mut GameState, orders: &Orders, scen
         let t1 = Instant::now();
         let slots = if memory.is_some() { super::record::slots_of(game, orders, &tokens) } else { Vec::new() };
         let mem_in = memory.as_ref().map(|state| super::model::MemIn { state, slots: &slots });
+        if super::obsdump::wanted() {
+            let slots = super::record::slots_of(game, orders, &tokens);
+            super::obsdump::moment(rules, game, orders, &tokens, &slots, step, &made);
+        }
         let body = net.body(&tokens, map.as_ref(), mem_in.as_ref());
         let (logits, end) = net.pointer(&body, &tokens);
         let t2 = Instant::now();
@@ -527,6 +535,7 @@ pub fn turn(rules: &CompiledRuleset, game: &mut GameState, orders: &Orders, scen
         if end >= best {
             timing.decisions += 1;
             follow(-1, -1);
+            super::obsdump::choice(-1, -1);
             break;
         }
         let Some(unit) = tokens.unit[at] else { break };
@@ -563,6 +572,7 @@ pub fn turn(rules: &CompiledRuleset, game: &mut GameState, orders: &Orders, scen
         if !acted {
             act::stand(game, rules, unit);
         }
+        super::obsdump::choice(at as i64, if acted { i64::from(chosen) } else { -1 });
         follow(at as i16, if acted { chosen } else { 0 });
     }
     TURN_LABELS.with(|t| *t.borrow_mut() = None);

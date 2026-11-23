@@ -770,6 +770,66 @@ fn scene_json(rules: &CompiledRuleset, game: &GameState, sc: &Scene, win: &Windo
     })
 }
 
+/// A play of `ai-exam suite` in the dump's form (`army_net::obsdump`, a MEASUREMENT): the scene line the MLX
+/// simulator rebuilds and the state at any moment, with the same window, slots and city list as `dump_one`.
+pub struct Track {
+    win: Window,
+    slots: Slots,
+    cities: Vec<TileId>,
+    sides: [PlayerId; 2],
+}
+
+impl Track {
+    /// The scene (`scene_json`) and the initial state of the play `sc` on `game` (the whole map known to both
+    /// sides, as the trainers play it).
+    pub fn start(rules: &CompiledRuleset, game: &GameState, sc: &Scene) -> (Track, Value, Value) {
+        let win = Window::around(game, sc.centre);
+        let mut cities: Vec<TileId> = game.view().auth.cities().iter().map(|(_, c)| c.tile).filter(|t| win.index(*t).is_some()).collect();
+        cities.sort_by_key(|t| t.0);
+        let pieces: Vec<UnitHandle> = sc.mine.iter().chain(&sc.theirs).map(|p| p.h).collect();
+        let mut slots = Slots { ids: Vec::new(), promos: promotion_table(rules, game, &pieces) };
+        let scene = scene_json(rules, game, sc, &win, &cities, &mut slots);
+        let sides = [sc.learner, sc.enemy];
+        let initial = state(rules, game, &win, &mut slots, sides, &cities);
+        (Track { win, slots, cities, sides }, scene, initial)
+    }
+
+    /// The state now (units by slot, cities, the RNG, both sides' sight, the owners).
+    pub fn state(&mut self, rules: &CompiledRuleset, game: &GameState) -> Value {
+        state(rules, game, &self.win, &mut self.slots, self.sides, &self.cities)
+    }
+
+    /// The slot of a unit (new units get the next slot).
+    pub fn slot_of(&mut self, id: EntityId) -> Option<usize> {
+        self.slots.slot_of(id)
+    }
+
+    /// The slots' entity ids.
+    pub fn ids(&self) -> &[EntityId] {
+        &self.slots.ids
+    }
+
+    /// The window index of a map tile (-1 outside).
+    pub fn index(&self, t: TileId) -> i32 {
+        self.win.index(t).unwrap_or(-1)
+    }
+
+    /// The window's cities (map tiles, in the scene's city order).
+    pub fn cities(&self) -> &[TileId] {
+        &self.cities
+    }
+
+    /// The window's origin and side, the map's width.
+    pub fn window(&self) -> (i32, i32, i32, i32) {
+        (self.win.q0, self.win.r0, self.win.w, self.win.map_w)
+    }
+
+    /// The scene's promotion table (global ids, in the state's bit order).
+    pub fn promos(&self) -> &[PromotionId] {
+        &self.slots.promos
+    }
+}
+
 /// One dumped play of a scene.
 /// How a dump is taken: the play's script, the variants, the window.
 #[derive(Debug, Clone, Default)]

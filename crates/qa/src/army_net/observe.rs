@@ -378,6 +378,12 @@ thread_local! {
     static HISTORY: std::cell::RefCell<History> = std::cell::RefCell::new(History::default());
 }
 
+/// The units' tiles and hit points at the start of our previous turn (numbers 46 and 47 read them; the
+/// observation dump writes them as the twin's input).
+pub fn history_prev() -> Vec<(kernel::ids::EntityId, TileId, u16)> {
+    HISTORY.with(|h| h.borrow().prev.iter().map(|(id, (t, hp))| (*id, *t, *hp)).collect())
+}
+
 /// A new play: nothing remembered.
 pub fn reset_history() {
     HISTORY.with(|h| *h.borrow_mut() = History::default());
@@ -560,7 +566,7 @@ impl Field {
     }
 }
 
-fn arm_slot(rules: &CompiledRuleset, kind: classic_rules::ids::UnitKindId) -> usize {
+pub fn arm_slot(rules: &CompiledRuleset, kind: classic_rules::ids::UnitKindId) -> usize {
     if act::is_civilian(rules, kind) {
         return ARMS.len();
     }
