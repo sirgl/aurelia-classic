@@ -4,6 +4,7 @@
 //! a bootstrap over seed blocks for the spread. The recording mind
 //! (`record`) writes a game's decisions and observations as a dataset.
 
+pub mod army_net;
 pub mod battle;
 pub mod bench;
 pub mod choice;

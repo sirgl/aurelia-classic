@@ -546,7 +546,7 @@ pub fn turn(rules: &CompiledRuleset, game: &mut GameState, sc: &mut Scene, f: Fl
         if let Some(t) = best {
             if t != c.tile && (heal_rate(game, rules, me, t) > heal_rate(game, rules, me, c.tile) || in_range(game, c.tile) || act::threat_on(game, rules, foe, c.tile) > act::threat_on(game, rules, foe, t)) {
                 let _ = act::try_cmd(game, rules, me, Command::MoveUnit { unit: p.h, destination: t });
-                act::stand(game, p.h);
+                act::stand(game, rules, p.h);
                 continue;
             }
         }
@@ -597,7 +597,7 @@ pub fn turn(rules: &CompiledRuleset, game: &mut GameState, sc: &mut Scene, f: Fl
             for (p, c) in &active {
                 // A unit that stands staged (outside the strike, in reach of its firing or striking tile) waits; the others close in.
                 if !in_range(game, c.tile) && ready(game, p, c).1 && dist(game, c.tile, city) <= 3 {
-                    act::stand(game, p.h);
+                    act::stand(game, rules, p.h);
                     continue;
                 }
                 let best = act::reachable(game, rules, me, p.h)
@@ -610,7 +610,7 @@ pub fn turn(rules: &CompiledRuleset, game: &mut GameState, sc: &mut Scene, f: Fl
                 if act::debug() {
                     eprintln!("  stage-move {} {} -> {} d{} moved {moved}", rules.units[c.kind.0 as usize].name, c.tile.0, best.0, dist(game, best, city));
                 }
-                act::stand(game, p.h);
+                act::stand(game, rules, p.h);
             }
             return;
         }
@@ -659,7 +659,7 @@ pub fn turn(rules: &CompiledRuleset, game: &mut GameState, sc: &mut Scene, f: Fl
                 }
             }
         }
-        act::stand(game, p.h);
+        act::stand(game, rules, p.h);
     }
     let go_in = low || !any_shooter_alive;
     for (p, c) in &active {
@@ -682,7 +682,7 @@ pub fn turn(rules: &CompiledRuleset, game: &mut GameState, sc: &mut Scene, f: Fl
             if let Some((_, x)) = act::best_blow(game, rules, me, p.h, &act::foe_tiles(game, foe, Some(&sc.theirs), false), Nerve::Careful) {
                 let _ = act::strike(game, rules, me, p.h, x);
             }
-            act::stand(game, p.h);
+            act::stand(game, rules, p.h);
         }
     }
     let _ = round;

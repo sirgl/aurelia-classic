@@ -129,6 +129,8 @@ pub enum Seat {
     Script(String),
     Passive,
     Random,
+    /// The army net (`army_net::seat`), weights from `ARMY_NET`.
+    Net,
 }
 
 impl Seat {
@@ -136,6 +138,7 @@ impl Seat {
         match name {
             "passive" => Seat::Passive,
             "random" => Seat::Random,
+            "army-net" => Seat::Net,
             n if n.starts_with("ref-") => Seat::Script(n.to_owned()),
             n => Seat::Mind(n.to_owned()),
         }
@@ -205,6 +208,13 @@ pub fn play(rules: &CompiledRuleset, mut game: GameState, mut scene: Scene, play
     }
     let settings = ClassicBench::settings(rules);
     let seated = kernel::ai::seats::Seated::new(mind("standard")?, seats);
+    let played = play_seated(rules, game, scene, player, trace, seat, settings, seated);
+    crate::army_net::record::close(played.as_ref().ok());
+    played
+}
+
+#[allow(clippy::too_many_arguments)]
+fn play_seated(rules: &CompiledRuleset, game: GameState, scene: Scene, player: &str, trace: bool, seat: Seat, settings: kernel::ai::plan::AiSettings, seated: kernel::ai::seats::Seated<ClassicMind>) -> Result<Row, String> {
     if lab::mode::combat_only() {
         let driver = AiDriver::<Classic, CombatOnly<kernel::ai::seats::Seated<ClassicMind>>>::with_mind(settings, Vec::new(), CombatOnly(seated));
         play_on(rules, game, scene, player, trace, seat, driver)
@@ -318,6 +328,11 @@ fn play_on<P: kernel::ai::mind::AiMind<Classic>>(rules: &CompiledRuleset, mut ga
         let l = scene.learner;
         assault::sample(rules, &game, &mut scene, l);
     }
+    let orders = crate::army_net::Orders::of_scene(rules, &game, &scene);
+    if crate::army_net::record::wanted() {
+        crate::army_net::record::start(orders.clone());
+    }
+    let mut net_time = crate::army_net::seat::Timing::default();
     let mut rows_trace = Vec::new();
     if trace {
         rows_trace.push(families::line(rules, &game, &scene, 0));
@@ -350,6 +365,12 @@ fn play_on<P: kernel::ai::mind::AiMind<Classic>>(rules: &CompiledRuleset, mut ga
                     Seat::Random => {
                         act::random_turn(&mut game, rules, scene.learner, &scene.mine, &rnd);
                     }
+                    Seat::Net => {
+                        let t = crate::army_net::seat::turn(rules, &mut game, &orders)?;
+                        net_time.decisions += t.decisions;
+                        net_time.observe_ns += t.observe_ns;
+                        net_time.forward_ns += t.forward_ns;
+                    }
                 }
             }
             if active == scene.enemy && scripted_theirs != Some(now) && !game.is_over() {
@@ -357,7 +378,7 @@ fn play_on<P: kernel::ai::mind::AiMind<Classic>>(rules: &CompiledRuleset, mut ga
                 families::enemy_turn(rules, &mut game, &mut scene);
             }
             let t_step = std::time::Instant::now();
-            let stepped = driver.step(&mut game, rules);
+            let stepped = if active == scene.learner && crate::army_net::record::active() { crate::army_net::record::step(&mut driver, &mut game, rules) } else { driver.step(&mut game, rules) };
             PROF[0].fetch_add(t_step.elapsed().as_micros() as u64, std::sync::atomic::Ordering::Relaxed);
             let t_s = std::time::Instant::now();
             assault::sample(rules, &game, &mut scene, active);
@@ -386,6 +407,11 @@ fn play_on<P: kernel::ai::mind::AiMind<Classic>>(rules: &CompiledRuleset, mut ga
     if assault::is_assault(scene.fam) {
         scene.info.insert("picks".into(), scene.track.picks.join("; "));
     }
-    let measures = families::measures(rules, &game, &scene, rel);
+    let mut measures = families::measures(rules, &game, &scene, rel);
+    if seat == Seat::Net {
+        measures.insert("net_decisions".into(), net_time.decisions as f64);
+        measures.insert("net_observe_us".into(), net_time.observe_ns as f64 / 1000.0);
+        measures.insert("net_forward_us".into(), net_time.forward_ns as f64 / 1000.0);
+    }
     Ok(Row { family: scene.fam.name().to_owned(), era: lab::era_names(rules).get(scene.era as usize).cloned().unwrap_or_default(), instance: scene.instance, attempt: scene.attempt, player: player.to_owned(), win, rounds: rel, measures, info: scene.info.clone(), trace: rows_trace })
 }

@@ -88,6 +88,10 @@ fn real() -> Result<(), String> {
     if let Some(cmd) = args.first().filter(|c| c.starts_with("suite")) {
         return aurelia_qa::trainers::suite::main(cmd, &args[1..]);
     }
+    // The army net's forward on recorded decisions (`aurelia_qa::army_net::parity`).
+    if args.first().is_some_and(|c| c == "army-parity") {
+        return aurelia_qa::army_net::parity::main(&args[1..]);
+    }
     let o = opts()?;
     let rules = ClassicBench::rules();
     match o.cmd.as_str() {

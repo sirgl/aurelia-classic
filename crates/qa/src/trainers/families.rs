@@ -1345,7 +1345,7 @@ pub fn reference_turn(rules: &CompiledRuleset, game: &mut GameState, scene: &mut
                     if let Some((_, t)) = act::best_blow(game, rules, me, p.h, &foes_only(game), Nerve::Reckless) {
                         let _ = act::strike(game, rules, me, p.h, t);
                     }
-                    act::stand(game, p.h);
+                    act::stand(game, rules, p.h);
                     continue;
                 }
                 (Aim::Hold(c.tile), Nerve::Careful, false)
@@ -1416,7 +1416,7 @@ fn pillage_turn(rules: &CompiledRuleset, game: &mut GameState, side: PlayerId, p
     let auth = game.view().auth;
     let open: Vec<TileId> = improved.iter().copied().filter(|t| !auth.map().pillaged(*t) && matches!(auth.map().improvement(*t), Some(Some(_)))).collect();
     if open.contains(&c.tile) && act::try_cmd(game, rules, side, Command::Pillage { unit: p.h }) {
-        act::stand(game, p.h);
+        act::stand(game, rules, p.h);
         return;
     }
     let strike = classic_rules::combat::city::CITY_ATTACK_RANGE;
@@ -1428,7 +1428,7 @@ fn pillage_turn(rules: &CompiledRuleset, game: &mut GameState, side: PlayerId, p
             let _ = act::try_cmd(game, rules, side, Command::Pillage { unit: p.h });
         }
     }
-    act::stand(game, p.h);
+    act::stand(game, rules, p.h);
 }
 
 /// The scripted human of the enemy's seat (the defence scenes); the other families leave the
@@ -1469,7 +1469,7 @@ pub fn enemy_turn(rules: &CompiledRuleset, game: &mut GameState, scene: &mut Sce
             for p in &sc.theirs {
                 let Some(c) = act::alive(game, p, me) else { continue };
                 if p.role == "bait" {
-                    act::stand(game, p.h);
+                    act::stand(game, rules, p.h);
                     continue;
                 }
                 let aim = if near || rel >= 4 { Aim::Close } else { Aim::Hold(c.tile) };
@@ -1508,7 +1508,7 @@ pub fn enemy_turn(rules: &CompiledRuleset, game: &mut GameState, scene: &mut Sce
                 // A kill when one is offered, else pillage.
                 if let Some((score, t)) = act::best_blow(game, rules, me, p.h, &ours(game), Nerve::Careful) {
                     if score >= 10_000 && act::strike(game, rules, me, p.h, t) {
-                        act::stand(game, p.h);
+                        act::stand(game, rules, p.h);
                         continue;
                     }
                 }
@@ -1542,13 +1542,13 @@ fn civilian_hunt(rules: &CompiledRuleset, game: &mut GameState, sc: &Scene, me: 
             continue;
         }
         if act::try_cmd(game, rules, me, Command::AttackUnit { attacker: p.h, defender: q.h }) {
-            act::stand(game, p.h);
+            act::stand(game, rules, p.h);
             return;
         }
         let near: Vec<TileId> = act::reachable(game, rules, me, p.h).into_iter().filter(|(x, left)| *left > 0 && dist(game, *x, *t) == 1 && act::free_for(game, rules, p.h, *x)).map(|(x, _)| x).collect();
         if let Some(&x) = near.iter().min_by_key(|x| x.0) {
             if act::try_cmd(game, rules, me, Command::MoveUnit { unit: p.h, destination: x }) && act::try_cmd(game, rules, me, Command::AttackUnit { attacker: p.h, defender: q.h }) {
-                act::stand(game, p.h);
+                act::stand(game, rules, p.h);
                 return;
             }
         }
@@ -1556,7 +1556,7 @@ fn civilian_hunt(rules: &CompiledRuleset, game: &mut GameState, sc: &Scene, me: 
     let targets = targets_of(sc, foe == sc.enemy, false);
     if let Some((_, t)) = act::best_blow(game, rules, me, p.h, &targets(game), Nerve::Careful) {
         if act::strike(game, rules, me, p.h, t) {
-            act::stand(game, p.h);
+            act::stand(game, rules, p.h);
             return;
         }
     }
@@ -1566,7 +1566,7 @@ fn civilian_hunt(rules: &CompiledRuleset, game: &mut GameState, sc: &Scene, me: 
     if let Some(goal) = goal {
         act::move_by(game, rules, me, p.h, |g, x, _| (cities.iter().any(|ct| dist(g, *ct, x) <= strike), dist(g, x, goal), x.0));
     }
-    act::stand(game, p.h);
+    act::stand(game, rules, p.h);
 }
 
 // ---------------------------------------------------------------------------
