@@ -34,9 +34,73 @@ thread_local! {
     static EXPERT_TRACK: std::cell::RefCell<Option<crate::trainers::assault::Track>> = const { std::cell::RefCell::new(None) };
 }
 
-/// A new play: the expert's memory starts empty.
+/// A new play: the expert's memory starts empty, and so does the net's (variant M).
 pub fn reset_expert() {
     EXPERT_TRACK.with(|t| *t.borrow_mut() = None);
+    MEMORY.with(|m| *m.borrow_mut() = None);
+}
+
+/// Variant M's memory of the play on this thread: the orders and scene it plays, the memory state.
+struct MemoryRun {
+    orders: Orders,
+    scene: Scene,
+    state: super::model::MemoryState,
+}
+
+thread_local! {
+    static MEMORY: std::cell::RefCell<Option<MemoryRun>> = const { std::cell::RefCell::new(None) };
+}
+
+/// The memory kept at its start every turn (`ARMY_NET_ZERO_MEMORY=1`: the ablation of proof (a)).
+fn memory_zeroed() -> bool {
+    static ZERO: OnceLock<bool> = OnceLock::new();
+    *ZERO.get_or_init(|| std::env::var_os("ARMY_NET_ZERO_MEMORY").is_some())
+}
+
+/// The teacher's own state numbers (`record::TRACK`) for a staged-assault scene: engaged, waited, the stage
+/// (0 gather: a field force stands; 1 march; 2 stage: waiting for the shooters; 3 assault; 4 heal-rotate:
+/// someone rests; 5 withdraw: not played by the planner), the resting slots as bits. None elsewhere.
+pub fn teacher_state(game: &GameState, scene: &Scene, orders: &Orders, track: &crate::trainers::assault::Track) -> [i16; super::record::TRACK] {
+    if !crate::trainers::assault::is_assault(scene.fam) {
+        return super::record::NO_TRACK;
+    }
+    let field = scene.theirs_alive(game).iter().any(|(p, _)| p.role == "field");
+    let stage = if field {
+        0
+    } else if !track.resting.is_empty() {
+        4
+    } else if track.engaged {
+        3
+    } else if track.waited > 0 {
+        2
+    } else {
+        1
+    };
+    let mask = orders.army.iter().take(super::model::SLOTS).enumerate().filter(|(_, id)| track.resting.contains(id)).fold(0u16, |m, (s, _)| m | (1 << s));
+    [i16::from(track.engaged), track.waited.min(i16::MAX as u32) as i16, stage, mask as i16]
+}
+
+/// Our turn ends (before the end-of-turn command runs): variant M's memory takes this moment, and in a DAgger
+/// play the moment is recorded as an unlabelled memory state with the expert's state then.
+pub fn turn_end(game: &GameState, rules: &CompiledRuleset) {
+    let Ok(net) = net() else { return };
+    MEMORY.with(|m| {
+        let mut m = m.borrow_mut();
+        let Some(run) = m.as_mut() else { return };
+        let tokens = observe::tokens(game, rules, &run.orders);
+        let slots = super::record::slots_of(game, &run.orders, &tokens);
+        if super::record::active() {
+            let track = EXPERT_TRACK.with(|t| t.borrow().as_ref().map(|t| teacher_state(game, &run.scene, &run.orders, t))).unwrap_or(super::record::NO_TRACK);
+            super::record::push_memory_state(game, rules, track);
+        }
+        if memory_zeroed() {
+            return;
+        }
+        let body = net.body(&tokens, None, Some(&super::model::MemIn { state: &run.state, slots: &slots }));
+        let mut state = run.state.clone();
+        net.memory_step(&body, &tokens, &slots, &mut state);
+        run.state = state;
+    });
 }
 static EXPERTS: OnceLock<Option<BTreeMap<String, String>>> = OnceLock::new();
 
@@ -161,6 +225,15 @@ pub struct Timing {
 /// One turn of the army: decisions until the net ends it.
 pub fn turn(rules: &CompiledRuleset, game: &mut GameState, orders: &Orders, scene: &Scene) -> Result<Timing, String> {
     let net = net()?;
+    if net.has_memory() {
+        MEMORY.with(|m| {
+            let mut m = m.borrow_mut();
+            if m.is_none() {
+                *m = net.initial_memory().map(|state| MemoryRun { orders: orders.clone(), scene: scene.clone(), state });
+            }
+        });
+    }
+    let memory = MEMORY.with(|m| m.borrow().as_ref().map(|r| r.state.clone()));
     let mut timing = Timing::default();
     let mut made: Vec<(kernel::ids::EntityId, u32)> = Vec::new();
     let mut map: Option<super::model::MapState> = None;
@@ -196,7 +269,9 @@ pub fn turn(rules: &CompiledRuleset, game: &mut GameState, orders: &Orders, scen
             }
         }
         let t1 = Instant::now();
-        let body = net.body(&tokens, map.as_ref());
+        let slots = if memory.is_some() { super::record::slots_of(game, orders, &tokens) } else { Vec::new() };
+        let mem_in = memory.as_ref().map(|state| super::model::MemIn { state, slots: &slots });
+        let body = net.body(&tokens, map.as_ref(), mem_in.as_ref());
         let (logits, end) = net.pointer(&body, &tokens);
         let t2 = Instant::now();
         let pick = logits.iter().enumerate().filter_map(|(i, l)| l.map(|l| (i, l))).fold(None::<(usize, f32)>, |best, (i, l)| if best.is_none_or(|b| l > b.1) { Some((i, l)) } else { best });

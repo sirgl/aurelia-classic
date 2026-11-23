@@ -365,9 +365,13 @@ fn play_on<P: kernel::ai::mind::AiMind<Classic>>(rules: &CompiledRuleset, mut ga
                     Seat::Script(name) => {
                         families::reference_turn(rules, &mut game, &mut scene, name);
                         {
-        let l = scene.learner;
-        assault::sample(rules, &game, &mut scene, l);
-    }
+                            let l = scene.learner;
+                            assault::sample(rules, &game, &mut scene, l);
+                        }
+                        // The staged planner's own state, for the memory state of this turn's end (record v3).
+                        if crate::army_net::record::active() && assault::flags(name).is_some() {
+                            crate::army_net::record::set_track(crate::army_net::seat::teacher_state(&game, &scene, &orders, &scene.track));
+                        }
                     }
                     Seat::Passive => {
                         act::passive_turn(&mut game, rules, scene.learner, &scene.mine);
@@ -395,7 +399,9 @@ fn play_on<P: kernel::ai::mind::AiMind<Classic>>(rules: &CompiledRuleset, mut ga
                 families::enemy_turn(rules, &mut game, &mut scene);
             }
             let t_step = std::time::Instant::now();
-            let stepped = if active == scene.learner && crate::army_net::record::active() { crate::army_net::record::step(&mut driver, &mut game, rules) } else { driver.step(&mut game, rules) };
+            // The recorder and the army net's memory (its turn-end hook) see the learner's commands through `record::step`
+            // (`AiDriver::step` with hooks; the same commands).
+            let stepped = if active == scene.learner && (crate::army_net::record::active() || seat == Seat::Net) { crate::army_net::record::step(&mut driver, &mut game, rules) } else { driver.step(&mut game, rules) };
             PROF[0].fetch_add(t_step.elapsed().as_micros() as u64, std::sync::atomic::Ordering::Relaxed);
             if active == scene.learner {
                 learner_us += t_step.elapsed().as_micros() as u64;

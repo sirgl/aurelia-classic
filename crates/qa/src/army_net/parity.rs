@@ -10,7 +10,7 @@ use classic_rules::ids::TileId;
 
 use super::model::Net;
 use super::observe::{f16_to_f32, Action, Candidate, Tokens, F_ACT, F_TOK};
-use super::record::{DECISION_MAGIC, PLAY_MAGIC};
+use super::record::{DECISION_MAGIC, MEMORY_STATE, PLAY_MAGIC, PLAY_MAGIC3, TRACK};
 
 /// One recorded decision, as the net reads it.
 pub struct Recorded {
@@ -22,6 +22,10 @@ pub struct Recorded {
     pub candidates: Vec<Candidate>,
     pub pointer: i16,
     pub action: i16,
+    /// Record v3: the decision's flags (`MEMORY_STATE`), each token's army slot (-1 none), the teacher's state.
+    pub flags: u16,
+    pub slots: Vec<i16>,
+    pub track: [i16; TRACK],
 }
 
 struct Reader<'a> {
@@ -53,9 +57,11 @@ pub fn read(bytes: &[u8], limit: usize) -> Result<Vec<Recorded>, String> {
     let mut r = Reader { b: bytes, at: 0 };
     let mut out = Vec::new();
     while r.at < bytes.len() && out.len() < limit {
-        if r.u32()? != PLAY_MAGIC {
+        let magic = r.u32()?;
+        if magic != PLAY_MAGIC && magic != PLAY_MAGIC3 {
             return Err(format!("no play at {}", r.at - 4));
         }
+        let v3 = magic == PLAY_MAGIC3;
         let jl = r.u32()? as usize;
         r.take(jl)?;
         let statics = std::rc::Rc::new(r.f16s(super::W * super::W * super::S_CH)?);
@@ -70,7 +76,7 @@ pub fn read(bytes: &[u8], limit: usize) -> Result<Vec<Recorded>, String> {
             let pointer = r.u16()? as i16;
             let action = r.u16()? as i16;
             let round = r.u16()?;
-            let _zero = r.u16()?;
+            let flags = r.u16()?;
             let tf = r.f16s(t * F_TOK)?;
             let dist = r.take(t * t)?.to_vec();
             let selectable: Vec<bool> = r.take(t)?.iter().map(|x| *x != 0).collect();
@@ -79,11 +85,22 @@ pub fn read(bytes: &[u8], limit: usize) -> Result<Vec<Recorded>, String> {
             let promos: Vec<u16> = (0..c).map(|_| r.u16()).collect::<Result<_, _>>()?;
             let pos: Vec<i16> = (0..t).map(|_| r.u16().map(|x| x as i16)).collect::<Result<_, _>>()?;
             let cpos: Vec<i16> = (0..c).map(|_| r.u16().map(|x| x as i16)).collect::<Result<_, _>>()?;
+            let (slots, track) = if v3 {
+                let slots: Vec<i16> = (0..t).map(|_| r.u16().map(|x| x as i16)).collect::<Result<_, _>>()?;
+                let mut track = [0i16; TRACK];
+                for x in track.iter_mut() {
+                    *x = r.u16()? as i16;
+                }
+                (slots, track)
+            } else {
+                (vec![-1; t], [-1; TRACK])
+            };
+            let flags = if v3 { flags } else { 0 };
             let feat: Vec<[f32; F_TOK]> = tf.chunks_exact(F_TOK).map(|x| x.try_into().expect("chunks of F_TOK")).collect();
             let tokens = Tokens { feat, dist, selectable, unit: vec![None; t], tile: vec![TileId(0); t], pos };
             let candidates = cf.chunks_exact(F_ACT).zip(promos).zip(cpos).map(|((x, promo), pos)| Candidate { feat: x.try_into().expect("chunks of F_ACT"), promo, pos, action: Action::Done }).collect();
             if out.len() < limit {
-                out.push(Recorded { statics: statics.clone(), play, round, tokens, candidates, pointer, action });
+                out.push(Recorded { statics: statics.clone(), play, round, tokens, candidates, pointer, action, flags, slots, track });
             }
         }
     }
@@ -119,7 +136,14 @@ pub fn main(args: &[String]) -> Result<(), String> {
     // Variant B: the map of the previous decision of the same play and round, updated incrementally, is
     // checked against the map encoded whole.
     let mut prev: Option<(usize, u16, super::model::MapState)> = None;
+    // Variant M: the memory of each play is carried in the file's order and updated at its memory states.
+    let mut memory: Option<(usize, super::model::MemoryState)> = None;
+    let mut memory_ns = 0u128;
+    let mut memory_steps = 0u64;
     for d in &decisions {
+        if net.has_memory() && memory.as_ref().is_none_or(|(p, _)| *p != d.play) {
+            memory = net.initial_memory().map(|m| (d.play, m));
+        }
         let map = if net.has_map() {
             let planes = super::model::planes(&d.statics, &d.tokens);
             let te = Instant::now();
@@ -140,10 +164,19 @@ pub fn main(args: &[String]) -> Result<(), String> {
             None
         };
         let t0 = Instant::now();
-        let body = net.body(&d.tokens, map.as_ref());
+        let mem_in = memory.as_ref().map(|(_, m)| super::model::MemIn { state: m, slots: &d.slots });
+        let body = net.body(&d.tokens, map.as_ref(), mem_in.as_ref());
         let (ptr, end) = net.pointer(&body, &d.tokens);
         let acts = if d.pointer >= 0 { net.actions(&body, d.pointer as usize, &d.candidates, map.as_ref()) } else { Vec::new() };
         forward_ns += t0.elapsed().as_nanos();
+        if d.flags & MEMORY_STATE != 0 {
+            if let Some((_, m)) = memory.as_mut() {
+                let tm = Instant::now();
+                net.memory_step(&body, &d.tokens, &d.slots, m);
+                memory_ns += tm.elapsed().as_nanos();
+                memory_steps += 1;
+            }
+        }
         if d.pointer >= 0 {
             unit_decisions += 1;
         }
@@ -152,6 +185,9 @@ pub fn main(args: &[String]) -> Result<(), String> {
     }
     let n = decisions.len().max(1) as f64;
     println!("{} decisions ({} with a unit), forward {:.1} us per decision (body + pointer + its unit's scorer), one thread", decisions.len(), unit_decisions, forward_ns as f64 / 1000.0 / n);
+    if net.has_memory() {
+        println!("memory: {memory_steps} updates, {:.1} us each (one thread)", memory_ns as f64 / 1000.0 / memory_steps.max(1) as f64);
+    }
     if net.has_map() {
         println!("map: whole encode {:.2} ms; incremental update {:.2} ms mean over {updates} consecutive decisions, max |incremental - whole| {update_worst:e}", encode_ns as f64 / 1e6 / n, update_ns as f64 / 1e6 / updates.max(1) as f64);
     }

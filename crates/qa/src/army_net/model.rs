@@ -276,12 +276,77 @@ pub struct Net {
     v2: Dense,
     /// Variant B (None: variant A, no map).
     map: Option<Encoder>,
+    /// Variant M (None: no memory).
+    mem: Option<Memory>,
 }
 
-/// The token states after the body (`[T][d]`).
+/// The token states after the body (`[T + plans][d]`: the tokens, then variant M's plan tokens).
 pub struct Body {
     pub h: Vec<f32>,
+    /// Tokens (without the plan tokens).
     pub n: usize,
+    pub plans: usize,
+}
+
+/// Unit slots of variant M's memory (a unit's index in `Orders::army`), its width, the plan tokens.
+pub const SLOTS: usize = 16;
+pub const U_DIM: usize = 16;
+pub const PLANS: usize = 4;
+
+/// One GRU cell (PyTorch's convention, gates r, z, n): `wx` from the input, `wh` from the state, biases inside.
+#[derive(Debug, Clone)]
+struct Gru {
+    wx: Dense,
+    wh: Dense,
+    h: usize,
+}
+
+impl Gru {
+    fn step(&self, x: &[f32], h: &[f32]) -> Vec<f32> {
+        let n = self.h;
+        let mut gx = vec![0.0; 3 * n];
+        let mut gh = vec![0.0; 3 * n];
+        self.wx.apply(x, &mut gx);
+        self.wh.apply(h, &mut gh);
+        let sig = |v: f32| 1.0 / (1.0 + (-v).exp());
+        (0..n)
+            .map(|k| {
+                let r = sig(gx[k] + gh[k]);
+                let z = sig(gx[n + k] + gh[n + k]);
+                let c = (gx[2 * n + k] + r * gh[2 * n + k]).tanh();
+                (1.0 - z) * c + z * h[k]
+            })
+            .collect()
+    }
+}
+
+/// Variant M's memory weights (`army/model_m.py`).
+#[derive(Debug, Clone)]
+struct Memory {
+    um: Dense,
+    plan0: Vec<f32>,
+    /// `[layer][head]`: the attention bias of any pair with a plan token.
+    plan_bias: Vec<f32>,
+    gu: Gru,
+    pq: Dense,
+    pk: Dense,
+    gp: Gru,
+    /// `[plan][theta, kappa, w_event]`.
+    hyst: Vec<f32>,
+}
+
+/// The memory of one play (variant M): every army slot's u, the plan tokens, the slots seen at the last update.
+#[derive(Debug, Clone)]
+pub struct MemoryState {
+    pub u: Vec<f32>,
+    pub p: Vec<f32>,
+    pub alive: [f32; SLOTS],
+}
+
+/// What variant M's body reads besides the tokens: the memory and each token's slot (-1 none).
+pub struct MemIn<'a> {
+    pub state: &'a MemoryState,
+    pub slots: &'a [i16],
 }
 
 fn relu_into(x: &[f32], y: &mut [f32]) {
@@ -357,7 +422,20 @@ impl Net {
         } else {
             None
         };
+        let mem = if t.contains_key("plan0") {
+            let raw = |name: &str| -> Result<Vec<f32>, String> { Ok(get(name)?.1.clone()) };
+            let mat = |w: &str, b: &str| -> Result<Dense, String> {
+                let (shape, wv) = get(w)?;
+                Dense::new(wv, shape, &raw(b)?)
+            };
+            let gu = Gru { wx: mat("gu_wx", "gu_bx")?, wh: mat("gu_wh", "gu_bh")?, h: U_DIM };
+            let gp = Gru { wx: mat("gp_wx", "gp_bx")?, wh: mat("gp_wh", "gp_bh")?, h: c.d };
+            Some(Memory { um: dense("um")?, plan0: raw("plan0")?, plan_bias: raw("plan_bias")?, gu, pq: dense("pq")?, pk: dense("pk")?, gp, hyst: raw("hyst")? })
+        } else {
+            None
+        };
         Ok(Net {
+            mem,
             map,
             e1: dense("e1")?,
             e2: dense("e2")?,
@@ -378,6 +456,78 @@ impl Net {
 
     pub fn has_map(&self) -> bool {
         self.map.is_some()
+    }
+
+    pub fn has_memory(&self) -> bool {
+        self.mem.is_some()
+    }
+
+    /// Variant M: the memory at a play's start (None: no memory).
+    pub fn initial_memory(&self) -> Option<MemoryState> {
+        let m = self.mem.as_ref()?;
+        Some(MemoryState { u: vec![0.0; SLOTS * U_DIM], p: m.plan0.clone(), alive: [0.0; SLOTS] })
+    }
+
+    /// Variant M at our turn's end: `body` is this moment's body (read with `state`); every army token updates its
+    /// slot, the plan tokens attend to the tokens and update with hysteresis (`army/model_m.py`, `MemNet.step`).
+    pub fn memory_step(&self, body: &Body, tokens: &Tokens, slots: &[i16], state: &mut MemoryState) {
+        let Some(m) = self.mem.as_ref() else { return };
+        let d = self.config.d;
+        let n = body.n;
+        let mut cover = [0f32; SLOTS];
+        let mut x = vec![0.0; d + F_TOK];
+        let mut news: Vec<(usize, Vec<f32>)> = Vec::new();
+        for i in 0..n {
+            let Ok(s) = usize::try_from(slots[i]) else { continue };
+            if s >= SLOTS {
+                continue;
+            }
+            x[..d].copy_from_slice(&body.h[i * d..(i + 1) * d]);
+            x[d..].copy_from_slice(&tokens.feat[i]);
+            news.push((s, m.gu.step(&x, &state.u[s * U_DIM..(s + 1) * U_DIM])));
+            cover[s] = 1.0;
+        }
+        for (s, u) in news {
+            state.u[s * U_DIM..(s + 1) * U_DIM].copy_from_slice(&u);
+        }
+        let event = cover.iter().zip(&state.alive).map(|(c, a)| a * (1.0 - c)).sum::<f32>().min(1.0);
+        let keys = m.pk.rows(&body.h[..n * d], n);
+        let scale = 1.0 / (d as f32).sqrt();
+        let mut q = vec![0.0; d];
+        let mut w = vec![0.0; n];
+        for k in 0..PLANS {
+            let pk = state.p[k * d..(k + 1) * d].to_vec();
+            m.pq.apply(&pk, &mut q);
+            let mut max = f32::NEG_INFINITY;
+            for j in 0..n {
+                w[j] = dot(&q, &keys[j * d..(j + 1) * d]) * scale;
+                max = max.max(w[j]);
+            }
+            let mut sum = 0.0;
+            for v in w.iter_mut().take(n) {
+                *v = (*v - max).exp();
+                sum += *v;
+            }
+            let mut pooled = vec![0.0; d];
+            for j in 0..n {
+                let a = w[j] / sum;
+                for c in 0..d {
+                    pooled[c] += a * body.h[j * d + c];
+                }
+            }
+            x[..d].copy_from_slice(&pooled);
+            x[d..].copy_from_slice(&tokens.feat[0]);
+            let pn = m.gp.step(&x, &pk);
+            let diff = pn.iter().zip(&pk).map(|(a, b)| (a - b) * (a - b)).sum::<f32>();
+            let norm = pk.iter().map(|a| a * a).sum::<f32>();
+            let delta = (diff + 1e-12).sqrt() / ((norm + 1e-12).sqrt() + 1e-3);
+            let (theta, kappa, we) = (m.hyst[k * 3], m.hyst[k * 3 + 1], m.hyst[k * 3 + 2]);
+            let c = 1.0 / (1.0 + (-(kappa * (delta - theta) + we * event)).exp());
+            for i in 0..d {
+                state.p[k * d + i] = pk[i] + c * (pn[i] - pk[i]);
+            }
+        }
+        state.alive = cover;
     }
 
     /// Variant B: the whole map encoded (at the start of the side's turn).
@@ -454,13 +604,30 @@ impl Net {
 
     /// The token states: embedding (plus, in variant B, the map at each token's tile and the map's mean on
     /// the objective token), then the transformer layers with the distance bias.
-    pub fn body(&self, tokens: &Tokens, map: Option<&MapState>) -> Body {
+    pub fn body(&self, tokens: &Tokens, map: Option<&MapState>, mem: Option<&MemIn>) -> Body {
         let n = tokens.len();
         let d = self.config.d;
         let flat: Vec<f32> = tokens.feat.iter().flat_map(|f| f.iter().copied()).collect();
         let mut e = self.e1.rows(&flat, n);
         relu(&mut e);
         let mut h = self.e2.rows(&e, n);
+        // Variant M: each unit's slot memory enters its token; the plan tokens follow the tokens.
+        let mut plans = 0;
+        if let (Some(m), Some(mi)) = (self.mem.as_ref(), mem) {
+            let mut y = vec![0.0; d];
+            for i in 0..n {
+                let Ok(s) = usize::try_from(mi.slots[i]) else { continue };
+                if s >= SLOTS {
+                    continue;
+                }
+                m.um.apply(&mi.state.u[s * U_DIM..(s + 1) * U_DIM], &mut y);
+                for c in 0..d {
+                    h[i * d + c] += y[c];
+                }
+            }
+            h.extend_from_slice(&mi.state.p);
+            plans = PLANS;
+        }
         if let (Some(enc), Some(st)) = (self.map.as_ref(), map) {
             let m = st.out();
             let mut y = vec![0.0; d];
@@ -485,23 +652,28 @@ impl Net {
                 h[c] += y[c];
             }
         }
-        let mut a = vec![0.0; n * d];
-        for layer in &self.layers {
-            self.attend(layer, &tokens.dist, n, &mut h, &mut a);
-            self.feed(layer, n, &mut h, &mut a);
+        let total = n + plans;
+        let mut a = vec![0.0; total * d];
+        for (li, layer) in self.layers.iter().enumerate() {
+            self.attend(layer, li, &tokens.dist, n, total, &mut h, &mut a);
+            self.feed(layer, total, &mut h, &mut a);
         }
-        let mut out = vec![0.0; n * d];
-        for i in 0..n {
+        let mut out = vec![0.0; total * d];
+        for i in 0..total {
             self.norm.apply(&h[i * d..(i + 1) * d], &mut out[i * d..(i + 1) * d]);
         }
-        Body { h: out, n }
+        Body { h: out, n, plans }
     }
 
-    fn attend(&self, layer: &Layer, dist: &[u8], n: usize, h: &mut [f32], a: &mut [f32]) {
+    #[allow(clippy::too_many_arguments)]
+    fn attend(&self, layer: &Layer, li: usize, dist: &[u8], n: usize, total: usize, h: &mut [f32], a: &mut [f32]) {
         let d = self.config.d;
         let heads = self.config.heads;
         let dh = d / heads;
         let nb = self.config.dmax + 1;
+        let plan_bias = self.mem.as_ref().map(|m| &m.plan_bias[li * heads..(li + 1) * heads]);
+        let n_real = n;
+        let n = total;
         for i in 0..n {
             layer.norm1.apply(&h[i * d..(i + 1) * d], &mut a[i * d..(i + 1) * d]);
         }
@@ -517,7 +689,8 @@ impl Net {
                 let mut max = f32::NEG_INFINITY;
                 for j in 0..n {
                     let kj = &k[j * d + hd * dh..j * d + hd * dh + dh];
-                    s[j] = dot(qi, kj) * scale + layer.bias[hd * nb + usize::from(dist[i * n + j])];
+                    let bias = if i < n_real && j < n_real { layer.bias[hd * nb + usize::from(dist[i * n_real + j])] } else { plan_bias.map_or(0.0, |p| p[hd]) };
+                    s[j] = dot(qi, kj) * scale + bias;
                     max = max.max(s[j]);
                 }
                 let mut sum = 0.0;
