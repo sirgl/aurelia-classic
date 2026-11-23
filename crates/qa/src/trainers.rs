@@ -16,9 +16,11 @@
 //! units that fight.
 
 pub mod act;
+pub mod assault;
 pub mod dump;
 pub mod families;
 pub mod lab;
+pub mod memory;
 pub mod suite;
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -81,12 +83,20 @@ pub struct Scene {
     // State.
     pub pillaged: BTreeSet<TileId>,
     pub taken: Option<u32>,
+    /// The round the learner's losses first passed the family's loss cap (the assault families).
+    pub cap_broken: Option<u32>,
     pub founded: Option<u32>,
     pub crossed: bool,
     pub city_low: bool,
     pub hold_lost: Option<u32>,
     pub first_kill: Option<u32>,
     pub kills_by: BTreeMap<u32, u32>,
+    /// What the assault families keep between rounds (damage, resting, promotions seen).
+    pub track: assault::Track,
+    /// The "at any cost" assault families: the last round a capture wins (None: the round limit) and the enemy's
+    /// reinforcements that land in the round after it (kinds; spawned once, then scene pieces).
+    pub deadline: Option<u32>,
+    pub reinforce: Vec<UnitKindId>,
 }
 
 impl Scene {
@@ -126,6 +136,10 @@ pub enum Seat {
     Script(String),
     Passive,
     Random,
+    /// The army net (`army_net::seat`), weights from `ARMY_NET`.
+    Net,
+    /// The DAgger probe's guard (`army_net::seat::probe_and_play`): a reference plays, probed each turn.
+    Probe(String),
 }
 
 impl Seat {
@@ -133,6 +147,8 @@ impl Seat {
         match name {
             "passive" => Seat::Passive,
             "random" => Seat::Random,
+            "army-net" => Seat::Net,
+            n if n.starts_with("probe:") => Seat::Probe(n["probe:".len()..].to_owned()),
             n if n.starts_with("ref-") => Seat::Script(n.to_owned()),
             n => Seat::Mind(n.to_owned()),
         }
@@ -186,6 +202,9 @@ fn close_arena(rules: &CompiledRuleset, game: &mut GameState, scene: &Scene) {
     }
 }
 
+/// Profile counters (microseconds): driver steps, samples, arena closing, whole plays.
+pub static PROF: [std::sync::atomic::AtomicU64; 4] = [std::sync::atomic::AtomicU64::new(0), std::sync::atomic::AtomicU64::new(0), std::sync::atomic::AtomicU64::new(0), std::sync::atomic::AtomicU64::new(0)];
+
 /// Plays `scene` on `game` with `player` on the learner's seat. `trace`: one line a round in the row.
 pub fn play(rules: &CompiledRuleset, mut game: GameState, mut scene: Scene, player: &str, trace: bool) -> Result<Row, String> {
     let seat = Seat::parse(player);
@@ -197,9 +216,113 @@ pub fn play(rules: &CompiledRuleset, mut game: GameState, mut scene: Scene, play
     for p in majors(&game) {
         seats.push((p, if p == scene.learner { mind(&base)? } else { mind("standard")? }));
     }
-    let mut driver = AiDriver::<Classic, kernel::ai::seats::Seated<ClassicMind>>::with_mind(ClassicBench::settings(rules), Vec::new(), kernel::ai::seats::Seated::new(mind("standard")?, seats));
+    let settings = ClassicBench::settings(rules);
+    let seated = kernel::ai::seats::Seated::new(mind("standard")?, seats);
+    let played = play_seated(rules, game, scene, player, trace, seat, settings, seated);
+    crate::army_net::record::close(played.as_ref().ok());
+    played
+}
+
+#[allow(clippy::too_many_arguments)]
+fn play_seated(rules: &CompiledRuleset, game: GameState, scene: Scene, player: &str, trace: bool, seat: Seat, settings: kernel::ai::plan::AiSettings, seated: kernel::ai::seats::Seated<ClassicMind>) -> Result<Row, String> {
+    if lab::mode::combat_only() {
+        let driver = AiDriver::<Classic, CombatOnly<kernel::ai::seats::Seated<ClassicMind>>>::with_mind(settings, Vec::new(), CombatOnly(seated));
+        play_on(rules, game, scene, player, trace, seat, driver)
+    } else {
+        let driver = AiDriver::<Classic, kernel::ai::seats::Seated<ClassicMind>>::with_mind(settings, Vec::new(), seated);
+        play_on(rules, game, scene, player, trace, seat, driver)
+    }
+}
+
+/// The combat layer only (`--ai combat`): the decisions of war and of the army stay (operations, tactics,
+/// defence, the cities' strikes); research, production, city management, policies, religion, trade and
+/// peace are dropped from every list the mind returns. The closed arena takes away what a city would
+/// build, so what is lost is only the AI's own peace and economy.
+#[derive(Debug)]
+pub struct CombatOnly<P>(pub P);
+
+impl<P: kernel::ai::mind::AiMind<Classic>> kernel::ai::mind::AiMind<Classic> for CombatOnly<P> {
+    type Brief = P::Brief;
+    type Sight<'g> = P::Sight<'g>;
+    type Near<'g> = P::Near<'g>;
+
+    fn sense<'g>(&self, game: &'g GameState, rules: &'g CompiledRuleset, player: PlayerId) -> Self::Sight<'g> {
+        self.0.sense(game, rules, player)
+    }
+    fn sense_unit<'g>(&self, game: &'g GameState, rules: &'g CompiledRuleset, settings: &kernel::ai::plan::AiSettings, player: PlayerId, unit: UnitHandle) -> Option<Self::Near<'g>> {
+        self.0.sense_unit(game, rules, settings, player, unit)
+    }
+    fn note_humans(&mut self, humans: &[PlayerId]) {
+        self.0.note_humans(humans);
+    }
+    fn start_turn(&self, sight: &Self::Sight<'_>, rules: &CompiledRuleset, player: PlayerId, state: &mut kernel::ai::state::AiState) -> kernel::ai::mind::TurnStart<Classic, Self::Brief> {
+        let mut start = self.0.start_turn(sight, rules, player, state);
+        start.opening.retain(combat_decision);
+        start
+    }
+    fn order_units(&self, brief: &Self::Brief, rules: &CompiledRuleset, order: &mut Vec<(classic_rules::ids::EntityId, UnitHandle)>) {
+        self.0.order_units(brief, rules, order);
+    }
+    fn picks_next(&self, brief: &Self::Brief) -> bool {
+        self.0.picks_next(brief)
+    }
+    fn next_unit(&self, near: &Self::Near<'_>, brief: &Self::Brief, state: &kernel::ai::state::AiState, remaining: &[(classic_rules::ids::EntityId, UnitHandle)]) -> Option<classic_rules::ids::EntityId> {
+        self.0.next_unit(near, brief, state, remaining)
+    }
+    fn plan_strategic(&self, brief: &Self::Brief, state: &mut kernel::ai::state::AiState, rules: &CompiledRuleset) -> Vec<kernel::ai::plan::Decision<Classic>> {
+        let mut out = self.0.plan_strategic(brief, state, rules);
+        out.retain(combat_decision);
+        out
+    }
+    fn decide_unit(&self, near: &Self::Near<'_>, player: PlayerId, unit: UnitHandle, brief: &Self::Brief, state: &mut kernel::ai::state::AiState, tools: &mut kernel::ai::plan::PlanTools<'_, Classic>) -> Option<kernel::ai::plan::Decision<Classic>> {
+        self.0.decide_unit(near, player, unit, brief, state, tools)
+    }
+    fn permits(&self, game: &GameState, rules: &CompiledRuleset, player: PlayerId, command: &classic_rules::command::Command) -> bool {
+        self.0.permits(game, rules, player, command)
+    }
+    fn plan_end_of_turn(&self, sight: &Self::Sight<'_>, player: PlayerId, brief: &Self::Brief, state: &kernel::ai::state::AiState, tools: &mut kernel::ai::plan::PlanTools<'_, Classic>) -> Vec<kernel::ai::plan::Decision<Classic>> {
+        let mut out = self.0.plan_end_of_turn(sight, player, brief, state, tools);
+        out.retain(combat_decision);
+        out
+    }
+}
+
+/// A decision of the combat layer: war and the army's commands; not research, production, the cities'
+/// management, policies, religion, trade or peace (a decision with no command is a refusal and stays).
+fn combat_decision(d: &kernel::ai::plan::Decision<Classic>) -> bool {
+    use classic_rules::command::Command as C;
+    match &d.command {
+        None => true,
+        Some(c) => matches!(
+            c,
+            C::MoveUnit { .. }
+                | C::MarchTo { .. }
+                | C::AttackUnit { .. }
+                | C::AttackCity { .. }
+                | C::Fortify { .. }
+                | C::RangedAttack { .. }
+                | C::CityStrike { .. }
+                | C::SetUpRangedAttack { .. }
+                | C::Promote { .. }
+                | C::UpgradeUnit { .. }
+                | C::Pillage { .. }
+                | C::DeclareWar { .. }
+                | C::Rebase { .. }
+                | C::RebaseToCarrier { .. }
+                | C::AirSweep { .. }
+                | C::Intercept { .. }
+                | C::BuildCitadel { .. }
+                | C::EndTurn { .. }
+                | C::Paradrop { .. }
+        ),
+    }
+}
+
+fn play_on<P: kernel::ai::mind::AiMind<Classic>>(rules: &CompiledRuleset, mut game: GameState, mut scene: Scene, player: &str, trace: bool, seat: Seat, mut driver: AiDriver<Classic, P>) -> Result<Row, String> {
     driver.set_trace_capacity(0);
-    reveal(&mut game, &scene);
+    if !lab::mode::fog() {
+        reveal(&mut game, &scene);
+    }
     let round0 = game.view().auth.turn().round;
     scene.start_round = round0;
     if let Some(t) = scene.aim_learner {
@@ -211,6 +334,23 @@ pub fn play(rules: &CompiledRuleset, mut game: GameState, mut scene: Scene, play
     if scene.hunt {
         hunt(&mut driver, &game, &scene);
     }
+    {
+        let l = scene.learner;
+        assault::sample(rules, &game, &mut scene, l);
+    }
+    let orders = crate::army_net::Orders::of_scene(rules, &game, &scene);
+    if crate::army_net::record::wanted() {
+        crate::army_net::record::start(orders.clone());
+        if matches!(seat, Seat::Net | Seat::Probe(_)) {
+            crate::army_net::record::mute();
+        }
+    }
+    crate::army_net::seat::reset_expert();
+    crate::army_net::observe::reset_history();
+    crate::army_net::observe::set_history_orders(&orders);
+    let mut net_time = crate::army_net::seat::Timing::default();
+    // The mind's time on the learner's turns (the AI's own turn time, for the army net's budget).
+    let mut learner_us = 0u64;
     let mut rows_trace = Vec::new();
     if trace {
         rows_trace.push(families::line(rules, &game, &scene, 0));
@@ -225,12 +365,25 @@ pub fn play(rules: &CompiledRuleset, mut game: GameState, mut scene: Scene, play
         loop {
             let now = game.view().auth.turn().round;
             let active = game.view().auth.active_player();
+            assault::keep_war(rules, &mut game, &scene);
             if active == scene.learner && scripted_mine != Some(now) && !game.is_over() {
                 scripted_mine = Some(now);
+                // The memory's persistence guard: save and load here (the game, and the net's memory beside it).
+                if let Some(at) = crate::army_net::seat::save_at().filter(|a| now.saturating_sub(round0) == a.round && matches!(seat, Seat::Net | Seat::Script(_))) {
+                    game = crate::army_net::seat::save_and_load(rules, &game, &orders, &mut scene, &at)?;
+                }
                 match &seat {
                     Seat::Mind(_) => {}
                     Seat::Script(name) => {
                         families::reference_turn(rules, &mut game, &mut scene, name);
+                        {
+                            let l = scene.learner;
+                            assault::sample(rules, &game, &mut scene, l);
+                        }
+                        // The staged planner's own state, for the memory state of this turn's end (record v3).
+                        if crate::army_net::record::active() && assault::flags(name).is_some() {
+                            crate::army_net::record::set_track(crate::army_net::seat::teacher_state(&game, &scene, &orders, &scene.track));
+                        }
                     }
                     Seat::Passive => {
                         act::passive_turn(&mut game, rules, scene.learner, &scene.mine);
@@ -238,24 +391,55 @@ pub fn play(rules: &CompiledRuleset, mut game: GameState, mut scene: Scene, play
                     Seat::Random => {
                         act::random_turn(&mut game, rules, scene.learner, &scene.mine, &rnd);
                     }
+                    Seat::Probe(name) => {
+                        crate::army_net::seat::probe_and_play(rules, &mut game, &mut scene, name);
+                    }
+                    Seat::Net => {
+                        let t = crate::army_net::seat::turn(rules, &mut game, &orders, &scene)?;
+                        net_time.decisions += t.decisions;
+                        net_time.observe_ns += t.observe_ns;
+                        net_time.forward_ns += t.forward_ns;
+                        net_time.encode_ns += t.encode_ns;
+                        net_time.update_ns += t.update_ns;
+                        net_time.updates += t.updates;
+                        net_time.turns += 1;
+                    }
                 }
             }
             if active == scene.enemy && scripted_theirs != Some(now) && !game.is_over() {
                 scripted_theirs = Some(now);
                 families::enemy_turn(rules, &mut game, &mut scene);
             }
-            match driver.step(&mut game, rules) {
+            let t_step = std::time::Instant::now();
+            // The recorder and the army net's memory (its turn-end hook) see the learner's commands through `record::step`
+            // (`AiDriver::step` with hooks; the same commands).
+            let stepped = if active == scene.learner && (crate::army_net::record::active() || seat == Seat::Net) { crate::army_net::record::step(&mut driver, &mut game, rules) } else { driver.step(&mut game, rules) };
+            PROF[0].fetch_add(t_step.elapsed().as_micros() as u64, std::sync::atomic::Ordering::Relaxed);
+            if active == scene.learner {
+                learner_us += t_step.elapsed().as_micros() as u64;
+            }
+            let t_s = std::time::Instant::now();
+            assault::sample(rules, &game, &mut scene, active);
+            PROF[1].fetch_add(t_s.elapsed().as_micros() as u64, std::sync::atomic::Ordering::Relaxed);
+            match stepped {
                 kernel::ai::StepOutcome::Worked | kernel::ai::StepOutcome::PlayerDone(_) => {}
                 kernel::ai::StepOutcome::RoundDone => break,
                 kernel::ai::StepOutcome::Waiting if game.is_over() => break,
                 kernel::ai::StepOutcome::Waiting => return Err(format!("round {} waits for a human", game.view().auth.turn().round)),
             }
         }
+        let t_c = std::time::Instant::now();
         close_arena(rules, &mut game, &scene);
+        PROF[2].fetch_add(t_c.elapsed().as_micros() as u64, std::sync::atomic::Ordering::Relaxed);
         let rel = game.view().auth.turn().round.saturating_sub(round0);
         verdict = families::judge(rules, &game, &mut scene, rel);
         if trace {
-            rows_trace.push(families::line(rules, &game, &scene, rel));
+            let mut l = families::line(rules, &game, &scene, rel);
+            let notes = crate::army_net::seat::take_notes();
+            if !notes.is_empty() {
+                l.push_str(&format!(" | notes: {}", notes.join(" ; ")));
+            }
+            rows_trace.push(l);
         }
         if verdict.is_none() && scene.hunt {
             hunt(&mut driver, &game, &scene);
@@ -263,6 +447,23 @@ pub fn play(rules: &CompiledRuleset, mut game: GameState, mut scene: Scene, play
     }
     let rel = game.view().auth.turn().round.saturating_sub(round0);
     let win = verdict.unwrap_or(false);
-    let measures = families::measures(rules, &game, &scene, rel);
-    Ok(Row { family: scene.fam.name().to_owned(), era: lab::era_names(rules).get(scene.era as usize).cloned().unwrap_or_default(), instance: scene.instance, attempt: scene.attempt, player: player.to_owned(), win, rounds: rel, measures, info: scene.info.clone(), trace: rows_trace })
+    if assault::is_assault(scene.fam) {
+        scene.info.insert("picks".into(), scene.track.picks.join("; "));
+        scene.info.insert("city_strikes".into(), crate::army_net::observe::city_strikes(round0));
+    }
+    let mut measures = families::measures(rules, &game, &scene, rel);
+    // Times are not measures of the play (they differ from run to run): they go to `info`.
+    let mut info = scene.info.clone();
+    info.insert("learner_mind_us".into(), learner_us.to_string());
+    if seat == Seat::Net {
+        measures.insert("net_decisions".into(), net_time.decisions as f64);
+        measures.insert("net_updates".into(), net_time.updates as f64);
+        measures.insert("net_turns".into(), net_time.turns as f64);
+        info.insert("net_observe_us".into(), (net_time.observe_ns / 1000).to_string());
+        info.insert("net_forward_us".into(), (net_time.forward_ns / 1000).to_string());
+        info.insert("net_memory_us".into(), (crate::army_net::seat::memory_ns() / 1000).to_string());
+        info.insert("net_encode_us".into(), (net_time.encode_ns / 1000).to_string());
+        info.insert("net_update_us".into(), (net_time.update_ns / 1000).to_string());
+    }
+    Ok(Row { family: scene.fam.name().to_owned(), era: lab::era_names(rules).get(scene.era as usize).cloned().unwrap_or_default(), instance: scene.instance, attempt: scene.attempt, player: player.to_owned(), win, rounds: rel, measures, info, trace: rows_trace })
 }

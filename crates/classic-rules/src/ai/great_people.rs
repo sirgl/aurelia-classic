@@ -26,6 +26,8 @@
 
 use crate::knowledge::public::PlayerQueries;
 use crate::command::Command;
+use crate::ai::net2::plan::Generals;
+use crate::classic::content::GreatPersonKind;
 use crate::derived::great_people::{great_person_of, GreatPersonAction};
 use crate::derived::tile_yields::TechSet;
 use crate::ids::{ImprovementId, TileId};
@@ -105,6 +107,37 @@ pub(crate) fn unit_order(obs: &AIObservation<'_>, rules: &CompiledRuleset, unit:
         destination: site,
     };
     obs.view.accepts(&walk).then_some(walk)
+}
+
+/// The Great Generals' orders under `net2`'s `Generals::Hold` (no war order and not at war, design §4.4, MT8): a
+/// general stands in the nearest own city, where a lone general in the field is a free kill. A general in a
+/// city, or one with no move left, or with no city it may march to, has no order; with `Generals::AsToday` no
+/// general has one (the standard AI leaves them where they stand). One order per general, so the advisor that
+/// runs these (`economy.rs`, after `great_person_commands`) adds them to its list.
+pub fn general_commands(obs: &AIObservation<'_>, rules: &CompiledRuleset, generals: Generals) -> Vec<Command> {
+    if generals != Generals::Hold {
+        return Vec::new();
+    }
+    let dims = obs.view.dimensions();
+    let mut out = Vec::new();
+    for unit in obs.own_units.iter().filter(|u| u.moves_left > 0) {
+        let general = great_person_of(rules, unit.kind).is_some_and(|gp| gp.kind == GreatPersonKind::General);
+        if !general || obs.own_cities.iter().any(|c| c.tile == unit.tile) {
+            continue;
+        }
+        let nearest = obs.own_cities.iter().map(|c| (dims.distance(unit.tile, c.tile).unwrap_or(i32::MAX), c.tile.0, c.tile)).min();
+        let Some((_, _, tile)) = nearest else { continue };
+        let walk = Command::MarchTo { unit: unit.handle, destination: tile };
+        if obs.view.accepts(&walk) {
+            out.push(walk);
+        }
+    }
+    out
+}
+
+/// The `net2` plan's `Generals` of the turn (`AsToday` without a plan).
+pub fn generals_of(brief: &crate::ai::planner::TurnBrief) -> Generals {
+    crate::ai::operations::with_net2(brief, crate::ai::net2::plan::Part::Fleet, |plan| plan.generals).unwrap_or_default()
 }
 
 /// Own tiles this close to an own city are building sites.

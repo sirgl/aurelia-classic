@@ -231,16 +231,27 @@ pub fn route_maintenance(auth: &AuthWorld, rules: &CompiledRuleset, player: Play
     let map = auth.map();
     let stats = &crate::effects::player::player_modifiers(auth, rules, player).stats;
     let free_hills = crate::rules::stats::has_rule(&stats, PlayerRule::FreeHillsRouteMaintenance);
-    let total: i64 = territory(auth, player)
-        .into_iter()
-        .filter(|(_, t)| auth.indexes().city_on_tile(*t).is_none())
-        .filter(|(_, t)| !(free_hills && is_hills(auth, *t)))
-        .map(|(_, t)| match map.route(t) {
-            Route::None => 0,
-            Route::Road => ROAD_MAINTENANCE,
-            Route::Railroad => RAILROAD_MAINTENANCE,
-        })
-        .sum();
+    // The tiles of `territory`, read without listing them: most carry no route, which costs nothing
+    // and is the cheapest test, so it comes first.
+    let mut total: i64 = 0;
+    for handle in auth.indexes().cities_of(player) {
+        let Some(core) = auth.cities().get(*handle) else {
+            continue;
+        };
+        for t in hex_disc(map.dimensions, core.tile, MAX_TERRITORY_RADIUS) {
+            if map.owning_city(t) != Some(*handle) {
+                continue;
+            }
+            let price = match map.route(t) {
+                Route::None => continue,
+                Route::Road => ROAD_MAINTENANCE,
+                Route::Railroad => RAILROAD_MAINTENANCE,
+            };
+            if auth.indexes().city_on_tile(t).is_none() && !(free_hills && is_hills(auth, t)) {
+                total += price;
+            }
+        }
+    }
     let modifier = 100 + i64::from(stats.get(Stat::RouteMaintenancePercent));
     let total = total * modifier.max(0) / 100;
     let percent = auth.settings().handicap(rules, player).route_cost_percent;

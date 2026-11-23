@@ -8,17 +8,17 @@
 
 ## Summary
 
-Rule constants: 518 (AI constants: 966; 14 constants of engine plumbing in `platform/crates/kernel/src/persistence/`, `platform/crates/kernel/src/test_module.rs`, `platform/crates/kernel/src/math.rs`, `platform/crates/kernel/src/module.rs`, `classic/crates/classic-rules/src/save_codec.rs`, `classic/crates/classic-rules/src/fixtures.rs` are not listed).
+Rule constants: 519 (AI constants: 1120; 14 constants of engine plumbing in `platform/crates/kernel/src/persistence/`, `platform/crates/kernel/src/test_module.rs`, `platform/crates/kernel/src/math.rs`, `platform/crates/kernel/src/module.rs`, `classic/crates/classic-rules/src/save_codec.rs`, `classic/crates/classic-rules/src/fixtures.rs` are not listed).
 
 | Source | Rule constants | AI constants |
 |---|---|---|
 | Unciv | 267 | 0 |
 | own design | 72 | 11 |
 | own formula (expansion-only system; Unciv has no equivalent) | 0 | 0 |
-| own value | 15 | 4 |
+| own value | 16 | 4 |
 | own value (unverified) | 17 | 4 |
-| own value (source not recorded) | 147 | 947 |
-| total | 518 | 966 |
+| own value (source not recorded) | 147 | 1101 |
+| total | 519 | 1120 |
 
 Sections:
 
@@ -472,7 +472,7 @@ Every `pub const` of the rule code, by system. Value as written in the code; mea
 
 ### Diplomacy
 
-16 constants (Unciv 5, own value 5, own value (source not recorded) 6). Files: `classic/crates/classic-rules/src/systems/diplomacy/deals.rs`, `classic/crates/classic-rules/src/systems/diplomacy/mod.rs`.
+17 constants (Unciv 5, own value 6, own value (source not recorded) 6). Files: `classic/crates/classic-rules/src/systems/diplomacy/deals.rs`, `classic/crates/classic-rules/src/systems/diplomacy/mod.rs`.
 
 | Name | Value | Meaning | Source | File |
 |---|---|---|---|---|
@@ -492,6 +492,7 @@ Every `pub const` of the rule code, by system. Value as written in the code; mea
 | `WARMONGER_CITY_STATE_PERCENT` | `50` | Percent of the warmonger weight kept when the victim is a city-state. | own value | `mod.rs` |
 | `RESEARCH_AGREEMENT_POOL_DIVISOR` | `3` | Divisor of the boost a research agreement gives (the smaller of the two partners' science during the agreement, / 3), and the base percent of it paid (50, plus the player's research-agreement percent). | Unciv: logic/nation/diplomacy/DiplomacyTurnManager.kt and managers/TechManager.kt (`scienceFromResearchA... | `mod.rs` |
 | `MEDIAN_TECH_PERCENT` | `50` | Unciv: DiplomacyTurnManager.kt and TechManager.kt, equal. | Unciv: DiplomacyTurnManager.kt and TechManager.kt, equal | `mod.rs` |
+| `WARMONGER_PERCENT` | `[50, 60, 70, 80, 90, 100, 100, 100]` | Percent by which the warmonger weight is scaled, per era index (later eras weigh more). | own value | `mod.rs` |
 
 ### Espionage
 
@@ -930,6 +931,14 @@ Tuning numbers of the computer players (`classic/crates/classic-rules/src/ai`). 
 |---|---|---|---|---|
 | `OPTIONS` | `["attack", "wait", "hold", "retreat"]` | The operation head's options (design section 6). | own value (source not recorded) | `commander.rs` |
 
+### `credit.rs`
+
+1 constants (own value (source not recorded) 1). Files: `classic/crates/classic-rules/src/ai/net2/credit.rs`.
+
+| Name | Value | Meaning | Source | File |
+|---|---|---|---|---|
+| `CREDIT` | `(0, "nothing in these rules makes a nation that ends a flow by war pay for it: a flow p...` | The credit of every rival on these rules, with its reason (a hand weight, `weights`' method). | own value (source not recorded) | `credit.rs` |
+
 ### `danger.rs`
 
 4 constants (own value (source not recorded) 4). Files: `classic/crates/classic-rules/src/ai/danger.rs`.
@@ -966,7 +975,7 @@ Tuning numbers of the computer players (`classic/crates/classic-rules/src/ai`). 
 
 ### `diplomacy.rs`
 
-7 constants (own value (unverified) 1, own value (source not recorded) 6). Files: `classic/crates/classic-rules/src/ai/diplomacy.rs`.
+8 constants (own value (unverified) 1, own value (source not recorded) 7). Files: `classic/crates/classic-rules/src/ai/diplomacy.rs`.
 
 | Name | Value | Meaning | Source | File |
 |---|---|---|---|---|
@@ -975,7 +984,8 @@ Tuning numbers of the computer players (`classic/crates/classic-rules/src/ai`). 
 | `DISTRUST_WARMONGER` | `100` | Warmonger memory above which the AI distrusts (no friendship, pacts). | own value (source not recorded) | `diplomacy.rs` |
 | `DENOUNCE_WARMONGER` | `250` | Warmonger memory above which the AI denounces. | own value (source not recorded) | `diplomacy.rs` |
 | `RECENT_WAR_ROUNDS` | `30` | No friendly deal with a former enemy for this many rounds after the peace treaty ends. | own value (source not recorded) | `diplomacy.rs` |
-| `REFUSED` | `-1000` | The gold-scale value of an item the AI refuses outright (`item_value_priced`'s untrusted). | own value (source not recorded) | `diplomacy.rs` |
+| `REFUSED` | `-1000` | The gold-scale value of an item the AI refuses outright (`item_value_with`'s untrusted). | own value (source not recorded) | `diplomacy.rs` |
+| `PROTECTED` | `-100_000` | The value of a deal item that no gold buys: a war on the ally the seat is bound to (`third_party_war`). | own value (source not recorded) | `diplomacy.rs` |
 | `PROPOSAL_INTERVAL` | `5` | Rounds between two rounds of proposals of one player. | own value (source not recorded) | `diplomacy.rs` |
 
 ### `driver.rs`
@@ -1276,6 +1286,22 @@ Tuning numbers of the computer players (`classic/crates/classic-rules/src/ai`). 
 | `CENTI_PER_POINT` | `6` | Hundredths of a score point one point of warmonger memory is worth: a nation that remembers 400 points (one strike) distrusts, denounces and will not make peace but for 24 points of compensation (own design, not tuned: a city of six citizens is about 100 points). | own value (source not recorded) | `infamy.rs` |
 | `WAR_BONUS_PERCENT` | `50` | The part of the price of peace that is a bonus for war, percent: the world forgives a war on an aggressor, it does not pay for it. | own value (source not recorded) | `infamy.rs` |
 
+### `inputs.rs`
+
+9 constants (own value (source not recorded) 9). Files: `classic/crates/classic-rules/src/ai/net2/inputs.rs`.
+
+| Name | Value | Meaning | Source | File |
+|---|---|---|---|---|
+| `SIGHT_ROUNDS` | `10` | Standard rounds the rivals' sightings, the army estimate and the captures count (`pace_rounds`). | own value (source not recorded) | `inputs.rs` |
+| `WAR_RAMP_ROUNDS` | `30` | Standard rounds the war inputs (G3, R18) and a past betrayal's tie window run over. | own value (source not recorded) | `inputs.rs` |
+| `LOST_ROUNDS` | `20` | Standard rounds a lost city counts for G2 (`SeatInputs::cities_lost`). | own value (source not recorded) | `inputs.rs` |
+| `LOST_KEPT_ROUNDS` | `100` | Standard rounds a lost city stays remembered while its holder is unknown or it is not retaken. | own value (source not recorded) | `inputs.rs` |
+| `GRAB_ROUNDS` | `40` | Standard rounds a forward city of a rival counts for `grab` (R21), and a city of ours is young (CityInputs::young). | own value (source not recorded) | `inputs.rs` |
+| `YOUNG_ROUNDS` | `20` |  | own value (source not recorded) | `inputs.rs` |
+| `SURVEY_ROUNDS` | `10` | Standard rounds between two surveys of the routes (R2, R3). | own value (source not recorded) | `inputs.rs` |
+| `GRAB_TILES` | `4` | A city of a rival this near one of ours (tiles) is a forward city when it came after ours (R21). | own value (source not recorded) | `inputs.rs` |
+| `RIVALS_NEAR_TILES` | `8` | Rivals with a seen city this near an own city are its `rivals_near` (CityInputs). | own value (source not recorded) | `inputs.rs` |
+
 ### `landless.rs`
 
 5 constants (own design 1, own value (source not recorded) 4). Files: `classic/crates/classic-rules/src/ai/landless.rs`.
@@ -1323,7 +1349,7 @@ Tuning numbers of the computer players (`classic/crates/classic-rules/src/ai`). 
 
 ### `mod.rs`
 
-17 constants (own value (source not recorded) 17). Files: `classic/crates/classic-rules/src/ai/books/mod.rs`, `classic/crates/classic-rules/src/ai/net_e2e/v2/mod.rs`, `classic/crates/classic-rules/src/ai/unciv/mod.rs`, `classic/crates/classic-rules/src/ai/unit_net/mod.rs`.
+18 constants (own value (source not recorded) 18). Files: `classic/crates/classic-rules/src/ai/books/mod.rs`, `classic/crates/classic-rules/src/ai/net_e2e/v2/mod.rs`, `classic/crates/classic-rules/src/ai/strategy_net/mod.rs`, `classic/crates/classic-rules/src/ai/unciv/mod.rs`, `classic/crates/classic-rules/src/ai/unit_net/mod.rs`.
 
 | Name | Value | Meaning | Source | File |
 |---|---|---|---|---|
@@ -1341,6 +1367,7 @@ Tuning numbers of the computer players (`classic/crates/classic-rules/src/ai`). 
 | `WAYPOINT_RADIUS` | `8` | A long march's leg reaches this far; this many leg ends are tried. | own value (source not recorded) | `mod.rs` |
 | `WAYPOINT_TRIES` | `4` |  | own value (source not recorded) | `mod.rs` |
 | `PREFIX` | `"v2:"` | The prefix of a v2 weights spec (`v2:W.v2`). | own value (source not recorded) | `mod.rs` |
+| `NONE` | `Tilt { style: [0; 3], aim: [0; 4], posture: [0; 4] }` |  | own value (source not recorded) | `mod.rs` |
 | `UNCIV_RADIUS` | `9` | The local observation's radius of an Unciv decision: Unciv's threat queries look 4-6 tiles around the tiles a unit reaches. | own value (source not recorded) | `mod.rs` |
 | `CANDIDATE_LIMIT` | `24` | Candidate tiles a search tries before it gives up (each may cost a path search; Unciv walks lazy sequences with the same effect). | own value (source not recorded) | `mod.rs` |
 | `UNIT` | `ONE` | Kept for `ONE`'s import in the docs. | own value (source not recorded) | `mod.rs` |
@@ -1376,6 +1403,14 @@ Tuning numbers of the computer players (`classic/crates/classic-rules/src/ai`). 
 |---|---|---|---|---|
 | `ACT` | `16` | The fraction bits of the activations between the layers (Q16). | own value (source not recorded) | `net.rs` |
 | `MAX_WIDTH` | `256` | The widest layer, inputs included, the inference takes (stack buffers). | own value (source not recorded) | `net.rs` |
+
+### `offence.rs`
+
+1 constants (own value (source not recorded) 1). Files: `classic/crates/classic-rules/src/ai/net2/offence.rs`.
+
+| Name | Value | Meaning | Source | File |
+|---|---|---|---|---|
+| `RAID` | `true` | The switch of the raid (the stop rule of work/nets/tricks/GATES.md). | own value (source not recorded) | `offence.rs` |
 
 ### `operations.rs`
 
@@ -1435,6 +1470,14 @@ Tuning numbers of the computer players (`classic/crates/classic-rules/src/ai`). 
 | `JUMP_MIN_DISTANCE` | `3` | A paratrooper jumps when the way to the muster point is at least this long (a shorter one is walked in a round or two). | own value (source not recorded) | `operations.rs` |
 | `JUMP_CANDIDATES` | `7` | Tiles near the muster point one jump tries. | own value (source not recorded) | `operations.rs` |
 
+### `orders.rs`
+
+1 constants (own value (source not recorded) 1). Files: `classic/crates/classic-rules/src/ai/net2/orders.rs`.
+
+| Name | Value | Meaning | Source | File |
+|---|---|---|---|---|
+| `PRICES_PEACE` | `true` | The switch of this lever (the stop rule of work/nets/tricks/GATES.md): false gives the peace answer back its pricing by a running operation alone. | own value (source not recorded) | `orders.rs` |
+
 ### `pantheon.rs`
 
 1 constants (own value (source not recorded) 1). Files: `classic/crates/classic-rules/src/ai/pantheon.rs`.
@@ -1464,10 +1507,17 @@ Tuning numbers of the computer players (`classic/crates/classic-rules/src/ai`). 
 
 ### `plan.rs`
 
-1 constants (own value (unverified) 1). Files: `platform/crates/kernel/src/ai/plan.rs`.
+9 constants (own value (unverified) 1, own value (source not recorded) 8). Files: `classic/crates/classic-rules/src/ai/net2/plan.rs`, `platform/crates/kernel/src/ai/plan.rs`.
 
 | Name | Value | Meaning | Source | File |
 |---|---|---|---|---|
+| `MAX_RIVALS` | `7` | The most rivals read per turn (met majors, by id). | own value (source not recorded) | `plan.rs` |
+| `MAX_TARGETS` | `40` | The most targets read per turn (the nearest first). | own value (source not recorded) | `plan.rs` |
+| `ALL` | `[WarKind::Prey, WarKind::Retake, WarKind::Spoiler, WarKind::Duty, WarKind::Border, WarK...` |  | own value (source not recorded) | `plan.rs` |
+| `SOLDIERS_DOUBT_MAX` | `300` | The doubt up to which the war machine counts the estimate instead of its army per city (§2.4 step 4). | own value (source not recorded) | `plan.rs` |
+| `ALL` | `[Part::Strategy, Part::War, Part::Deals, Part::Peace, Part::CityStates, Part::Congress,...` |  | own value (source not recorded) | `plan.rs` |
+| `TRUST_UNKNOWN` | `1000` | The trust of a rival without a reading (a city-state, a stranger): a stranger is not yet a liar. | own value (source not recorded) | `plan.rs` |
+| `TRUST_MIN` | `500` | The trust below which items that flow later are worth nothing and no open borders pass (§4.6). | own value (source not recorded) | `plan.rs` |
 | `WITHOUT_HANDICAPS` | `UnitSupply { free_units: 7, per_city: 3, population_percent: 50, ai_percent: 20, }` | Content without a difficulty table (old test fixtures): the AI row's supply at the default level. | own value (unverified) | `plan.rs` |
 
 ### `plan_search.rs`
@@ -1519,7 +1569,7 @@ Tuning numbers of the computer players (`classic/crates/classic-rules/src/ai`). 
 
 ### `planner_settle.rs`
 
-12 constants (own value (source not recorded) 12). Files: `classic/crates/classic-rules/src/ai/planner_settle.rs`.
+14 constants (own value (source not recorded) 14). Files: `classic/crates/classic-rules/src/ai/planner_settle.rs`.
 
 | Name | Value | Meaning | Source | File |
 |---|---|---|---|---|
@@ -1530,6 +1580,8 @@ Tuning numbers of the computer players (`classic/crates/classic-rules/src/ai`). 
 | `SITE_MIN_SCORE` | `20` | A site below this score is not worth a city. | own value (source not recorded) | `planner_settle.rs` |
 | `ESCORT_WAIT_ROUNDS` | `10` | Rounds a settler that met danger waits for an escort before it gives its site up. | own value (source not recorded) | `planner_settle.rs` |
 | `DANGER_RANGE` | `3` | No site this close to a hostile military unit in sight. | own value (source not recorded) | `planner_settle.rs` |
+| `FILL_REACH` | `5` | Tiles within which two own cities make a site a gap to fill (`SiteContext::head_inputs`, S8). | own value (source not recorded) | `planner_settle.rs` |
+| `FILL_MIN_SPACING` | `3` | Tiles from every city a gap site keeps at least (S8). | own value (source not recorded) | `planner_settle.rs` |
 | `RIVAL_SAFE_DISTANCE` | `7` | Tiles from the nearest rival city a site on the net's path is free of `rival_risk`. | own value (source not recorded) | `planner_settle.rs` |
 | `RIVAL_PENALTY` | `30` | Score points a tile closer than `RIVAL_SAFE_DISTANCE` costs: at 4 tiles 3 × 30 = 90, three turns of travel, about what the land score takes for 15 rival tiles in the radius. | own value (source not recorded) | `planner_settle.rs` |
 | `ARMY_RANGE` | `6` | Hostile military units in sight within this many tiles of a site weigh on it. | own value (source not recorded) | `planner_settle.rs` |
@@ -2019,10 +2071,140 @@ Tuning numbers of the computer players (`classic/crates/classic-rules/src/ai`). 
 
 ### `weights.rs`
 
-322 constants (own value 2, own value (source not recorded) 320). Files: `classic/crates/classic-rules/src/ai/net_e2e/v2/weights.rs`, `classic/crates/classic-rules/src/ai/strategy_net/weights.rs`, `classic/crates/classic-rules/src/ai/unit_net/weights.rs`.
+452 constants (own value 2, own value (source not recorded) 450). Files: `classic/crates/classic-rules/src/ai/net2/weights.rs`, `classic/crates/classic-rules/src/ai/net_e2e/v2/weights.rs`, `classic/crates/classic-rules/src/ai/strategy_net/weights.rs`, `classic/crates/classic-rules/src/ai/unit_net/weights.rs`.
 
 | Name | Value | Meaning | Source | File |
 |---|---|---|---|---|
+| `CAPITAL_LOST` | `0` |  | own value (source not recorded) | `weights.rs` |
+| `CITIES_LOST` | `1` |  | own value (source not recorded) | `weights.rs` |
+| `WAR_ROUNDS` | `2` |  | own value (source not recorded) | `weights.rs` |
+| `WAR_GAIN` | `3` |  | own value (source not recorded) | `weights.rs` |
+| `UNHAPPY_TREND` | `4` |  | own value (source not recorded) | `weights.rs` |
+| `EMBARK` | `5` |  | own value (source not recorded) | `weights.rs` |
+| `ENEMY_AIR` | `6` |  | own value (source not recorded) | `weights.rs` |
+| `GOLD_STOCK` | `7` |  | own value (source not recorded) | `weights.rs` |
+| `CS_ALLIES` | `8` |  | own value (source not recorded) | `weights.rs` |
+| `CS_CONTESTED` | `9` |  | own value (source not recorded) | `weights.rs` |
+| `OWN_INFAMY` | `10` |  | own value (source not recorded) | `weights.rs` |
+| `TIES_AT_RISK` | `11` |  | own value (source not recorded) | `weights.rs` |
+| `SPACE_RACE` | `12` | The space race is open to us: the parts' prerequisite projects are complete or their technologies known, and a part of the ship is still missing (0/1000). | own value (source not recorded) | `weights.rs` |
+| `PARTS_SHORT` | `13` | The copies of strategic resources the missing parts need beyond the free ones, 0…3 → 0…1000. | own value (source not recorded) | `weights.rs` |
+| `SIZE_MODEL` | `14` | The new cities the rules' size model pays for a real tall seat, 250 a city (set after the intent; `CITY_CAP` only). | own value (source not recorded) | `weights.rs` |
+| `PART_OUT` | `15` | A spaceship part of ours stands outside the capital, the tile it is installed on (0/1000). | own value (source not recorded) | `weights.rs` |
+| `N` | `16` |  | own value (source not recorded) | `weights.rs` |
+| `NAMES` | `["capital_lost", "cities_lost", "war_rounds", "war_gain", "unhappy_trend", "embark", "e...` |  | own value (source not recorded) | `weights.rs` |
+| `NEAR` | `0` |  | own value (source not recorded) | `weights.rs` |
+| `LAND` | `1` |  | own value (source not recorded) | `weights.rs` |
+| `SEA` | `2` |  | own value (source not recorded) | `weights.rs` |
+| `SOLDIERS` | `3` |  | own value (source not recorded) | `weights.rs` |
+| `SEEN_ARMY` | `4` |  | own value (source not recorded) | `weights.rs` |
+| `OPEN_CITIES` | `5` |  | own value (source not recorded) | `weights.rs` |
+| `TREE` | `6` |  | own value (source not recorded) | `weights.rs` |
+| `LEAD` | `7` |  | own value (source not recorded) | `weights.rs` |
+| `PACE` | `8` |  | own value (source not recorded) | `weights.rs` |
+| `CULTURE` | `9` |  | own value (source not recorded) | `weights.rs` |
+| `STACK` | `10` |  | own value (source not recorded) | `weights.rs` |
+| `WARMONGER` | `11` |  | own value (source not recorded) | `weights.rs` |
+| `BETRAYED` | `12` |  | own value (source not recorded) | `weights.rs` |
+| `DENOUNCED_US` | `13` |  | own value (source not recorded) | `weights.rs` |
+| `FRIEND` | `14` |  | own value (source not recorded) | `weights.rs` |
+| `PACT` | `15` |  | own value (source not recorded) | `weights.rs` |
+| `AT_WAR` | `16` |  | own value (source not recorded) | `weights.rs` |
+| `WAR_ROUNDS` | `17` |  | own value (source not recorded) | `weights.rs` |
+| `HOLDS_CAPITAL` | `18` |  | own value (source not recorded) | `weights.rs` |
+| `HOLDS_CITIES` | `19` |  | own value (source not recorded) | `weights.rs` |
+| `GRAB` | `20` |  | own value (source not recorded) | `weights.rs` |
+| `ALLY_HIT` | `21` |  | own value (source not recorded) | `weights.rs` |
+| `LOCAL` | `22` |  | own value (source not recorded) | `weights.rs` |
+| `SCORE` | `23` |  | own value (source not recorded) | `weights.rs` |
+| `RETAKE_CASE` | `24` |  | own value (source not recorded) | `weights.rs` |
+| `CAPTURED_RECENT` | `25` |  | own value (source not recorded) | `weights.rs` |
+| `SOFT` | `26` | The largest `ease` of its targets (`EASE`): the core's aggregate of the T rows, before the rival concepts. | own value (source not recorded) | `weights.rs` |
+| `OPERATING` | `27` | An operation of ours against it forms or marches (0/1000). | own value (source not recorded) | `weights.rs` |
+| `ALONE` | `28` | Its delegates reach the World Leader's votes by themselves (0/1000). | own value (source not recorded) | `weights.rs` |
+| `CS_HELD` | `29` | The city-states allied to it, / 3 (R31). | own value (source not recorded) | `weights.rs` |
+| `N` | `30` |  | own value (source not recorded) | `weights.rs` |
+| `NAMES` | `[ "near", "land", "sea", "soldiers", "seen_army", "open_cities", "tree", "lead", "pace"...` |  | own value (source not recorded) | `weights.rs` |
+| `WAR_WEARY` | `0` |  | own value (source not recorded) | `weights.rs` |
+| `CAPITAL_FALL` | `1` |  | own value (source not recorded) | `weights.rs` |
+| `CITY_STATE_ROOM` | `2` |  | own value (source not recorded) | `weights.rs` |
+| `AIR_NEED` | `3` |  | own value (source not recorded) | `weights.rs` |
+| `INFAMY_COST` | `4` |  | own value (source not recorded) | `weights.rs` |
+| `LATE` | `5` |  | own value (source not recorded) | `weights.rs` |
+| `N` | `6` |  | own value (source not recorded) | `weights.rs` |
+| `WEAK` | `0` |  | own value (source not recorded) | `weights.rs` |
+| `REACH` | `1` |  | own value (source not recorded) | `weights.rs` |
+| `DISTRUST` | `2` |  | own value (source not recorded) | `weights.rs` |
+| `MENACE` | `3` |  | own value (source not recorded) | `weights.rs` |
+| `RUNAWAY` | `4` |  | own value (source not recorded) | `weights.rs` |
+| `PREY` | `5` |  | own value (source not recorded) | `weights.rs` |
+| `SPOILER` | `6` |  | own value (source not recorded) | `weights.rs` |
+| `RETAKE` | `7` |  | own value (source not recorded) | `weights.rs` |
+| `DUTY` | `8` |  | own value (source not recorded) | `weights.rs` |
+| `GRABBER` | `9` |  | own value (source not recorded) | `weights.rs` |
+| `BORDER` | `10` |  | own value (source not recorded) | `weights.rs` |
+| `WAR_VALUE` | `11` |  | own value (source not recorded) | `weights.rs` |
+| `BLOCK` | `12` |  | own value (source not recorded) | `weights.rs` |
+| `N` | `13` |  | own value (source not recorded) | `weights.rs` |
+| `KINDS` | `[PREY, RETAKE, SPOILER, DUTY, BORDER]` | The war kinds' values in `plan::WarKind`'s order of the argmax (Prey, Retake, Spoiler, Duty, Border). | own value (source not recorded) | `weights.rs` |
+| `ONE` | `0` | 1000: a term on it is a bias change. | own value (source not recorded) | `weights.rs` |
+| `MAX_PREY` | `1` |  | own value (source not recorded) | `weights.rs` |
+| `MAX_MENACE` | `2` |  | own value (source not recorded) | `weights.rs` |
+| `ORDER_AT_PEACE` | `3` | The order's value while at peace with its rival (0 else). | own value (source not recorded) | `weights.rs` |
+| `ORDER_AT_WAR` | `4` | The order's value while at war with its rival (0 else). | own value (source not recorded) | `weights.rs` |
+| `NO_ORDER` | `5` | 1000 when there is no order and no war. | own value (source not recorded) | `weights.rs` |
+| `ORDER_VALUE` | `6` | The order's value (0 without one). | own value (source not recorded) | `weights.rs` |
+| `N` | `7` |  | own value (source not recorded) | `weights.rs` |
+| `NAMES` | `["one", "max_prey", "max_menace", "order_at_peace", "order_at_war", "no_order", "order_...` |  | own value (source not recorded) | `weights.rs` |
+| `STYLE_TALL` | `0` |  | own value (source not recorded) | `weights.rs` |
+| `STYLE_WIDE` | `1` |  | own value (source not recorded) | `weights.rs` |
+| `STYLE_CONQUEST` | `2` |  | own value (source not recorded) | `weights.rs` |
+| `AIM_SCIENCE` | `3` |  | own value (source not recorded) | `weights.rs` |
+| `AIM_DIPLOMACY` | `6` |  | own value (source not recorded) | `weights.rs` |
+| `POSTURE_PREPARE` | `9` |  | own value (source not recorded) | `weights.rs` |
+| `N` | `11` |  | own value (source not recorded) | `weights.rs` |
+| `STACK_MENACE` | `0` | The menace of the owner of the strongest stack near the city (0: none). | own value (source not recorded) | `weights.rs` |
+| `DANGER` | `1` |  | own value (source not recorded) | `weights.rs` |
+| `DISTRUST_NEAR` | `2` | The largest distrust of the rivals with a city within 8 tiles. | own value (source not recorded) | `weights.rs` |
+| `YOUNG` | `3` |  | own value (source not recorded) | `weights.rs` |
+| `N` | `4` |  | own value (source not recorded) | `weights.rs` |
+| `SIZE` | `0` |  | own value (source not recorded) | `weights.rs` |
+| `GARRISON` | `1` |  | own value (source not recorded) | `weights.rs` |
+| `NEAR` | `2` |  | own value (source not recorded) | `weights.rs` |
+| `WALLS` | `3` |  | own value (source not recorded) | `weights.rs` |
+| `N` | `4` |  | own value (source not recorded) | `weights.rs` |
+| `NAMES` | `["size", "garrison", "near", "walls"]` |  | own value (source not recorded) | `weights.rs` |
+| `SEAT` | `[ Neuron { name: "war_weary", bias: -400, why: "a short war is no weariness", join: UNI...` |  | own value (source not recorded) | `weights.rs` |
+| `EASE` | `Neuron { name: "ease", bias: -2200, why: "a city is no target by default: it takes a sm...` | The ease of one target (the T rows): the war order aims at its rival's easiest city, and `soft` (the largest) is the rival's prey term. | own value (source not recorded) | `weights.rs` |
+| `RIVAL` | `[ Neuron { name: "weak", bias: 1000, why: "1000 − 2·soldiers: a level army (500) → 0, n...` |  | own value (source not recorded) | `weights.rs` |
+| `TILT` | `&[ (Table::Style, 1, t(A(a::ONE), -1200, "wide: −600 → −1800, the tall first (`weights:...` | Terms added to the carried logits (`strategy_net::Tilt`): (table, index, term). | own value (source not recorded) | `weights.rs` |
+| `PEACE` | `Neuron { name: "peace", bias: -300, why: "a war is not ended for nothing", join: UNIT,...` | The peace wish with a rival at war with us and without an order on it (§4.4). | own value (source not recorded) | `weights.rs` |
+| `GUARD` | `Neuron { name: "guard", bias: -200, why: "a quiet city keeps today's saving", join: UNI...` | The guard of one own city (§4.5). | own value (source not recorded) | `weights.rs` |
+| `MILITARY` | `Neuron { name: "military_tilt", bias: 0, why: "the carried row prices the posture; thes...` | The tilt of the military price's multiplier, added to the carried row (§4.5). | own value (source not recorded) | `weights.rs` |
+| `CS_SHARE` | `Neuron { name: "cs_gold_share", bias: -200, why: "the reserve as today without a reason...` | The share of the gold for city-states (§4.7). | own value (source not recorded) | `weights.rs` |
+| `PART_HOLD` | `Neuron { name: "part_hold", bias: -500, why: "no hold outside the space race: aluminium...` | The copies of the strategic resources the missing spaceship parts need that no other unit may take (`Net2Plan:: space_hold`: the level × the copies the missing parts need). | own value (source not recorded) | `weights.rs` |
+| `SPACE_RESEARCH` | `Neuron { name: "space_research", bias: -1000, why: "no seat turns its research to the s...` | The research on the spaceship's way (`Net2Plan::space_research`). | own value (source not recorded) | `weights.rs` |
+| `CAPITAL_GATE` | `Neuron { name: "capital_gate", bias: -500, why: "no part outside the capital, no gate:...` | The capital is kept for the spaceship's parts (`Net2Plan::capital_gate`): no own civilian waits in it while a part is outside, and the civilians standing in it walk out around the units in the way (the executors `planner_workers::park` and `victory::walked_orders` only read the lever). | own value (source not recorded) | `weights.rs` |
+| `CITY_CAP` | `Neuron { name: "city_cap", bias: 0, why: "the model's count unless a reason moves it",...` | The new cities a real tall seat founds (`Intent::more_cities` of a `tall_real` seat, thousandths of a city, rounded half up; the executors `tall_real::adjust` and `Prices::city_cap` only read the target). | own value (source not recorded) | `weights.rs` |
+| `OFFENCE` | `false` | The offence is off: `net2` plays as the addendum's control `net2-defence` (every `Offence` field and the `WarOrder` aim, opening and raid at their defaults). | own value (source not recorded) | `weights.rs` |
+| `OFFENCE_SEAT` | `[ declared("isolation", "unit(1000 − 1200·max reach − 600·max menace − 400·max(runaway·...` | The offence's seat concepts (addendum §3.1) not built yet: no terms, each fires 0; not in `neurons()` (`infamy_cost` is built: `SEAT`). | own value (source not recorded) | `weights.rs` |
+| `OFFENCE_RIVAL` | `[ declared("brake", "unit(−200 + 1200·runaway − 1000·spoiler): a runaway we cannot beat...` | The offence's rival (and pair) concepts (addendum §3.2): no terms yet, each fires 0; not in `neurons()`. | own value (source not recorded) | `weights.rs` |
+| `WAR_START` | `(550, "a war order starts on a clear reason: a target must not flicker")` |  | own value (source not recorded) | `weights.rs` |
+| `WAR_KEEP` | `(350, "the order is kept below its start (hysteresis) while the reason lasts")` |  | own value (source not recorded) | `weights.rs` |
+| `PEACE` | `(500, "the peace wish wins over the war's inertia")` |  | own value (source not recorded) | `weights.rs` |
+| `DENY_HELP` | `(500, "a rival more likely than not to run away gets no help (lane A T4/T1: science win...` |  | own value (source not recorded) | `weights.rs` |
+| `EMBARGO` | `(600, "the embargo, the cheap brake, only on a clear runaway (W2, VP #8)")` |  | own value (source not recorded) | `weights.rs` |
+| `BLOCK` | `(500, "the ballot goes against a rival only when it would win the vote")` |  | own value (source not recorded) | `weights.rs` |
+| `SPACE_RESEARCH` | `(500, "the research keeps to the ship's way when the science aim and the way gone say s...` |  | own value (source not recorded) | `weights.rs` |
+| `CAPITAL_GATE` | `(500, "the capital is kept for the parts when a part outside it says so more likely tha...` |  | own value (source not recorded) | `weights.rs` |
+| `ESCORT_SHIPS` | `(2, "the landing needs ships that shell the coast (`fleet.rs` 1-10)")` | Ships escorting an `Overseas` order (`fleet::FLEET_SIZE`). | own value (source not recorded) | `weights.rs` |
+| `SPENT_ROUNDS` | `(20, "the war that did not pay ends, and is not restarted at once")` | Standard rounds after a war order spent its budget without paying before another order on that rival. | own value (source not recorded) | `weights.rs` |
+| `PREPARE_ROUNDS` | `(30, "the war machine's `FORM_LIMIT`: an army that has not marched by then does not")` | Standard rounds a war order may wait for its army at peace before it is spent. | own value (source not recorded) | `weights.rs` |
+| `BOUND` | `(169, "`bounded_net`: one citizen; outside it the net reads off its data")` |  | own value (source not recorded) | `weights.rs` |
+| `GAP` | `(30, "`RIVAL_PENALTY`: the forward city is the one the next war takes first; up to twic...` |  | own value (source not recorded) | `weights.rs` |
+| `ARMY` | `(60, "`ARMY_PENALTY`: an army 4–6 tiles off reaches the settler in a turn or two")` |  | own value (source not recorded) | `weights.rs` |
+| `TRAVEL` | `(40, "`TRAVEL_COST` 30 + `NET_TRAVEL_RISK` 10")` |  | own value (source not recorded) | `weights.rs` |
+| `FILL` | `(0, "read, no weight: a gap inside our land stays ours, the outward site is the one a r...` |  | own value (source not recorded) | `weights.rs` |
 | `CLIP` | `128.0` |  | own value (source not recorded) | `weights.rs` |
 | `N_BUCKETS` | `14` | Hex distance buckets (`model_v2._BUCKET_OF`, `N_BUCKETS`, `NO_POSITION`). | own value (source not recorded) | `weights.rs` |
 | `N_BUCKETS_PAD` | `16` | [`N_BUCKETS`] rounded up to whole vector blocks. | own value (source not recorded) | `weights.rs` |

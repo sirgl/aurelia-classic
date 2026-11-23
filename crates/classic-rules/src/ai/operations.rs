@@ -17,7 +17,7 @@
 use crate::ai::combat::ranged_range;
 use crate::ai::front::{siege_rounds, wears_down, Besieger};
 use crate::ai::planner::{role_of, unit_power, AiRole, Decision, DecisionBudget, PlanTools, TurnBrief, UnitBrief, UnitView};
-use crate::ai::planner_map::{explore, turns_for, Blockers, KnownMap, MapScratch, SearchStats, Visit};
+use crate::ai::planner_map::{explore, explored_path, step_points, turns_for, Blockers, KnownMap, MapScratch, SearchStats, Visit};
 use crate::ai::planner_strategy::{
     rounds_since, EARLIEST_WAR_ROUND, MIN_WAR_ROUNDS, OBJECTIVE_RANGE, PEACE_COOLDOWN_ROUNDS, PREPARE_ROUNDS,
     WAR_WEARINESS_ROUNDS,
@@ -28,6 +28,7 @@ use crate::ai::state::{
     WarPlan,
 };
 use crate::ai::grand_strategy::Stakes;
+use crate::ai::net2::plan::{Net2Plan, Part, Soldiers, WarKind, WarOrder, WarPlan as OrderPlan, SOLDIERS_DOUBT_MAX};
 use crate::ai::value::{Centi, Prices};
 use crate::ai::trace::{Actor, Reason};
 use crate::combat::city::{
@@ -45,6 +46,144 @@ use crate::rules::content::UnitRole;
 use crate::rules::effects::{CombatContext, Modifier};
 use crate::rules::CompiledRuleset;
 use crate::world::city::CITY_BASE_HIT_POINTS;
+
+// ---- `net2`'s war order: what the war machine reads (design §1.3, §4.4) ----
+
+thread_local! {
+    static NET2_OVERRIDE: std::cell::RefCell<Option<Net2Plan>> = const { std::cell::RefCell::new(None) };
+}
+
+/// A test sets the `net2` plan the executors of this part read (None: no plan, the war machine plays as
+/// `standard`). The tests of the executors drive the real driver, whose brief only `net2::think` fills.
+#[doc(hidden)]
+pub fn set_net2_for_test(plan: Option<Net2Plan>) {
+    NET2_OVERRIDE.with(|p| *p.borrow_mut() = plan);
+}
+
+/// Reads the `net2` plan of the turn for a reader of `part`: None when the seat has none (every variant but
+/// `net2`) or does not play that part (`Parts`, the ablation's `net2-no-<part>`), and then the reader plays as
+/// `nets-x-site`. THE ONE PLACE the plan is fetched: the brief's (`TurnBrief::net2`, filled by the driver after
+/// `net2::think`), unless a test set its own (`set_net2_for_test`).
+pub fn with_net2<T>(brief: &TurnBrief, part: Part, read: impl FnOnce(&Net2Plan) -> T) -> Option<T> {
+    NET2_OVERRIDE.with(|p| {
+        let overridden = p.borrow();
+        let plan = match overridden.as_ref() {
+            Some(plan) => Some(plan),
+            None => brief.net2.as_ref(),
+        };
+        match plan {
+            Some(plan) if plan.parts.plays(part) => Some(read(plan)),
+            _ => None,
+        }
+    })
+}
+
+/// What `net2` says of the war this turn.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Net2War {
+    /// No `net2` plan: the war machine picks its targets as in `standard`.
+    Absent,
+    /// A plan with no war order: no offensive war (the war machine picks no target of its own).
+    NoWar,
+    Order(WarOrder),
+}
+
+impl Net2War {
+    pub fn of(brief: &TurnBrief) -> Net2War {
+        with_net2(brief, Part::War, |plan| match plan.war {
+            OrderPlan::Order(order) => Net2War::Order(order),
+            _ => Net2War::NoWar,
+        })
+        .unwrap_or(Net2War::Absent)
+    }
+
+    fn order(self) -> Option<WarOrder> {
+        match self {
+            Net2War::Order(order) => Some(order),
+            _ => None,
+        }
+    }
+}
+
+/// The order decides the war on `city`, not the case's value: its kind's reason is not the worth of a city
+/// (`Retake`, `Spoiler`, `Duty`), or `net2` aimed at this city by its ease (`WarOrder::aim`, WAR-LEVER.md §2).
+fn order_decides(war: Net2War, city: &SeenCity) -> bool {
+    let Some(order) = war.order().filter(|o| o.rival == city.owner) else { return false };
+    matches!(order.kind, WarKind::Retake | WarKind::Spoiler | WarKind::Duty) || aimed_at(order, city.tile)
+}
+
+/// `net2` aimed the order at the city on `tile`.
+fn aimed_at(order: WarOrder, tile: TileId) -> bool {
+    order.aim.is_some_and(|aim| aim.city == tile)
+}
+
+/// The wait after the last peace is over: the war machine's own cooldown (`PEACE_COOLDOWN_ROUNDS`), or, for an
+/// order whose kind does not wait it (`WarKind::waits_own_cooldown`: a retake, a duty), only the rules' treaty
+/// (`Relation::peace_treaty_until`), which the rules enforce on a declaration.
+fn peace_waited(brief: &TurnBrief, relation: &crate::knowledge::observation::Relation, last: Option<u32>, order: Option<WarOrder>) -> bool {
+    match order.filter(|o| !o.kind.waits_own_cooldown()) {
+        Some(_) => brief.round >= relation.peace_treaty_until,
+        None => rounds_since(brief, last) >= brief.speed.pace_rounds(PEACE_COOLDOWN_ROUNDS),
+    }
+}
+
+/// A city of the order's rival passes the odds gate of `war-pays` (`odds_are_good`): the order's kinds that
+/// pass it at war (`WarKind::passes_odds_at_war`, like `staked`), a retake at any time (the city is ours
+/// by right, and the first operation of a war on it is the one the 3 % of `odds_are_good` was counted on), and
+/// the city the order aims at (its ease, `weights::EASE`, read the size the gate reads, with the garrison, the
+/// distance and the walls).
+fn order_passes_odds(war: Net2War, city: &SeenCity, horizon: Horizon) -> bool {
+    let Some(order) = war.order().filter(|o| o.rival == city.owner) else { return false };
+    order.kind == WarKind::Retake || (order.kind.passes_odds_at_war() && matches!(horizon, Horizon::War(_))) || aimed_at(order, city.tile)
+}
+
+/// What the commander of `unit_net` offers the war machine (tactical design §6.2): the army an operation's call
+/// asks for beyond its need (`unit_net::calls`) and how easy each city is to take (`commander::city_ease`).
+/// Both are empty until `unit_net` exports them; the readers below (`recruit`, the ranking in `start`) are
+/// written against this shape and are inert while it is empty.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct TacticalHints {
+    /// An operation's call (by its target): units more than the plan's need while the call lasts.
+    pub calls: Vec<(TileId, Composition)>,
+    /// A city's ease × value, thousandths (by tile).
+    pub ease: Vec<(TileId, i64)>,
+}
+
+thread_local! {
+    static HINTS_OVERRIDE: std::cell::RefCell<TacticalHints> = std::cell::RefCell::new(TacticalHints::default());
+}
+
+/// A test sets the commander's hints (see `TacticalHints`).
+#[doc(hidden)]
+pub fn set_hints_for_test(hints: TacticalHints) {
+    HINTS_OVERRIDE.with(|h| *h.borrow_mut() = hints);
+}
+
+impl TacticalHints {
+    /// The hints of the turn. THE ONE PLACE they are fetched (the commander's exports replace the override).
+    pub fn of(_brief: &TurnBrief) -> TacticalHints {
+        HINTS_OVERRIDE.with(|h| h.borrow().clone())
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.calls.is_empty() && self.ease.is_empty()
+    }
+
+    /// The ease of the city on `tile` (a city the commander does not rank is a level one, 1000).
+    fn ease_of(&self, tile: TileId) -> i64 {
+        self.ease.iter().find(|(t, _)| *t == tile).map_or(1000, |(_, e)| *e)
+    }
+
+    /// The units the call of the operation on `target` asks for beyond its need.
+    fn call_for(&self, target: TileId) -> Composition {
+        self.calls.iter().find(|(t, _)| *t == target).map_or_else(Composition::default, |(_, c)| *c)
+    }
+}
+
+/// `need` and `extra` together.
+fn plus(need: Composition, extra: Composition) -> Composition {
+    Composition { melee: need.melee.saturating_add(extra.melee), ranged: need.ranged.saturating_add(extra.ranged), siege: need.siege.saturating_add(extra.siege) }
+}
 
 /// Most units an operation plans for: a bigger need means the target is
 /// too strong.
@@ -557,11 +696,19 @@ pub struct Routes<'a> {
     view: PlayerView<'a>,
     scratch: MapScratch,
     stats: SearchStats,
+    /// `stage` also finds the sea leg of its route (`Stage::embark`, `land`): one more search for a route that
+    /// crosses water, asked for only under a `net2` war order.
+    legs: bool,
 }
 
 impl<'a> Routes<'a> {
     pub fn new(view: PlayerView<'a>) -> Self {
-        Self { view, scratch: MapScratch::default(), stats: SearchStats::default() }
+        Self { view, scratch: MapScratch::default(), stats: SearchStats::default(), legs: false }
+    }
+
+    /// `stage` returns the sea leg of a route that crosses water.
+    pub fn with_legs(&mut self, legs: bool) {
+        self.legs = legs;
     }
 
     /// The player's view of the map the routes are searched over.
@@ -595,8 +742,34 @@ impl<'a> Routes<'a> {
         // The rest is the enemy's land, walked at war: two thirds of a tile
         // a round.
         let strike = (distance as u32 - 1).saturating_mul(2).div_ceil(3) + 1;
-        Some(Stage { tile, walk: turns_for(points, moves), strike })
+        let leg = if self.legs { self.sea_leg(&map, from, tile, moves) } else { SeaLeg::default() };
+        Some(Stage { tile, walk: turns_for(points, moves), strike, embark: leg.embark, land: leg.land, to_embark: leg.to_embark })
     }
+
+    /// The water the route from `from` to `to` crosses (the walker embarks once the player knows how, and the
+    /// search above walks the water as its profile allows): the own or neutral land tile it leaves, the land tile
+    /// it first reaches, and the rounds to the first. Nothing for a route over land only. The units embark
+    /// by themselves (`fleet.rs`); the leg tells where an army boards and lands, so that the escorts and the
+    /// landing wait for each other.
+    fn sea_leg(&self, map: &KnownMap<'_, '_>, from: TileId, to: TileId, moves: u16) -> SeaLeg {
+        // The search of `stage` has just run: its scratch holds the way to every tile it reached.
+        let Some(tiles) = explored_path(&self.scratch, from, to) else { return SeaLeg::default() };
+        let wet = |tile: TileId| crate::ai::fleet::water(&self.view, tile);
+        let Some(first) = tiles.iter().position(|t| wet(*t)) else { return SeaLeg::default() };
+        // A route that starts afloat has no boarding tile.
+        let Some(board) = first.checked_sub(1).map(|i| tiles[i]) else { return SeaLeg::default() };
+        let land = tiles[first..].iter().find(|t| !wet(**t)).copied();
+        let points: u32 = tiles[..=first.saturating_sub(1)].windows(2).filter_map(|w| step_points(map, w[0], w[1])).sum();
+        SeaLeg { embark: Some(board), land, to_embark: turns_for(points, moves) }
+    }
+}
+
+/// The water of a route (`Routes::sea_leg`).
+#[derive(Debug, Clone, Copy, Default)]
+struct SeaLeg {
+    embark: Option<TileId>,
+    land: Option<TileId>,
+    to_embark: u32,
 }
 
 /// An army's staging tile on the way to its target.
@@ -607,6 +780,19 @@ pub struct Stage {
     pub walk: u32,
     /// Rounds from the staging tile to the target.
     pub strike: u32,
+    /// The route crosses water (only when `Routes::with_legs`): the land tile the army boards from, and the
+    /// land tile it first reaches over the water (None: the route ends afloat). The tactical landing reads them.
+    pub embark: Option<TileId>,
+    pub land: Option<TileId>,
+    /// Rounds from the muster city to `embark` (0 with no sea leg).
+    pub to_embark: u32,
+}
+
+impl Stage {
+    /// The route crosses water.
+    pub fn is_sea(&self) -> bool {
+        self.embark.is_some()
+    }
 }
 
 /// The members of the operation against `target`, by id.
@@ -627,9 +813,17 @@ fn advance(brief: &TurnBrief, state: &mut AiState, rules: &CompiledRuleset, oper
     let at_war = brief.at_war(operation.enemy);
     let form_limit = brief.speed.pace_rounds(if decisive { DECISIVE_FORM_LIMIT } else { FORM_LIMIT });
     let untaken = brief.landless_untaken == Some(operation.target);
+    // `net2`: an army still forming for a war the plan no longer orders (no order, or another rival's) is a war
+    // without its reason (design §4.4: a war must not outlive its reason); one that has marched fights on.
+    let ordered = match Net2War::of(brief) {
+        Net2War::Absent => true,
+        Net2War::NoWar => false,
+        Net2War::Order(order) => order.rival == operation.enemy,
+    };
     let over = match operation.phase {
         _ if !target_held(state, operation) => true,
         _ if untaken => true,
+        OperationPhase::Forming if !ordered && !at_war => true,
         OperationPhase::Forming => age > form_limit,
         OperationPhase::Marching => !at_war || age > march_end(brief, operation) || outmatched(brief, rules, operation, &members),
     };
@@ -652,6 +846,7 @@ fn advance(brief: &TurnBrief, state: &mut AiState, rules: &CompiledRuleset, oper
             };
             p.ends.push(crate::ai::war_probe::OperationEnd { round: brief.round, player: brief.player, enemy: operation.enemy, cause, marching, age, target: operation.target.0 });
         });
+        war_trace::ended(brief, state, operation, ordered, untaken);
         state.end_operation(operation.target);
         return vec![Decision::refuse(Actor::Player, Reason::EndOperation)];
     }
@@ -762,6 +957,7 @@ fn launch(brief: &TurnBrief, state: &mut AiState, operation: &Operation, at_war:
         out.push(Decision::act(Actor::Player, Reason::DeclareWar, command));
         crate::ai::war_probe::note(|p| p.declarations.push((brief.round, brief.player, operation.enemy, false)));
     }
+    war_trace::launched(brief, operation, at_war);
     crate::ai::war_probe::note(|p| p.launched.push((brief.round, brief.player, operation.enemy)));
     let objective = WarObjective { tile: operation.target, kind: ObjectiveKind::City, chosen_round: brief.round };
     state.relation_mut(operation.enemy).objective = Some(objective);
@@ -778,7 +974,7 @@ fn may_declare(brief: &TurnBrief, state: &AiState, operation: &Operation) -> boo
     let season = brief.landless_planned() || brief.round >= brief.speed.game_round(EARLIEST_WAR_ROUND);
     season
         && !brief.relations.iter().any(|r| r.at_war)
-        && rounds_since(brief, last) >= brief.speed.pace_rounds(PEACE_COOLDOWN_ROUNDS)
+        && brief.relation(operation.enemy).is_some_and(|r| peace_waited(brief, r, last, Net2War::of(brief).order().filter(|o| o.rival == operation.enemy)))
 }
 
 /// A candidate operation and its time to march and to arrive.
@@ -869,10 +1065,16 @@ fn start(brief: &TurnBrief, state: &mut AiState, rules: &CompiledRuleset, routes
     if brief.landless_planned() {
         return start_landless(brief, state, rules, routes);
     }
+    let war = Net2War::of(brief);
+    if war != Net2War::Absent {
+        war_trace::start(brief, state, rules, gate, war);
+    }
+    // A retake is the way out of a Recover strategy (our capital in the rival's hands puts the seat there).
+    let strategy_ok = strategy_wages_war(brief, state.strategy.current) || war.order().is_some_and(|o| o.kind == WarKind::Retake);
     let ready = in_season(brief)
         && brief.cities.len() >= 2
         && brief.round + brief.speed.pace_rounds(PREPARE_ROUNDS) >= brief.speed.game_round(EARLIEST_WAR_ROUND)
-        && strategy_wages_war(brief, state.strategy.current)
+        && strategy_ok
         && posture_permits(brief);
     if !ready {
         return None;
@@ -880,12 +1082,19 @@ fn start(brief: &TurnBrief, state: &mut AiState, rules: &CompiledRuleset, routes
     let arsenal = Arsenal::of(brief, rules);
     let walker = arsenal.melee?;
     let free = counted_free(brief, state, rules);
-    let mut candidates: Vec<Candidate> = targets(brief, state)
+    routes.with_legs(war.order().is_some());
+    let mut candidates: Vec<Candidate> = targets_for(brief, state, war)
         .into_iter()
-        .filter_map(|(city, horizon)| candidate(brief, state, rules, &arsenal, free, &city, horizon, gate))
+        .filter_map(|(city, horizon)| candidate(brief, state, rules, &arsenal, free, &city, horizon, gate, war))
         .filter(Candidate::fits)
         .collect();
     candidates.sort_by_key(Candidate::key);
+    // Within the ordered rival the cities are ranked by how easy they are to take (the commander's
+    // `city_ease` × value, MO8 / MO9), soonest-to-march only on a tie; no hint, today's order.
+    let hints = TacticalHints::of(brief);
+    if war.order().is_some() && !hints.is_empty() {
+        candidates.sort_by_key(|c| (std::cmp::Reverse(hints.ease_of(c.operation.target).saturating_mul(c.value.max(1))), c.key()));
+    }
     let considered = candidates.len();
     let mut chosen = None;
     for mut candidate in candidates.into_iter().take(MAX_ROUTE_CHECKS) {
@@ -898,9 +1107,20 @@ fn start(brief: &TurnBrief, state: &mut AiState, rules: &CompiledRuleset, routes
         };
         let stage = routes.stage(walker, candidate.operation.muster, candidate.operation.target, ring, reach);
         let Some(stage) = stage else { continue };
-        candidate.operation.muster = stage.tile;
-        candidate.assemble += stage.walk;
-        candidate.march = stage.strike;
+        match stage.embark.filter(|_| war.order().is_some_and(|o| o.kind == WarKind::Overseas)) {
+            // An `Overseas` order musters on the shore the army boards from: the rounds of the crossing
+            // belong to the march, and the escorts sail with them (`fleet::wanted`).
+            Some(embark) => {
+                candidate.operation.muster = embark;
+                candidate.assemble += stage.to_embark;
+                candidate.march = stage.walk.saturating_sub(stage.to_embark) + stage.strike;
+            }
+            None => {
+                candidate.operation.muster = stage.tile;
+                candidate.assemble += stage.walk;
+                candidate.march = stage.strike;
+            }
+        }
         if candidate.fits() {
             chosen = Some(candidate);
             break;
@@ -926,6 +1146,9 @@ fn start(brief: &TurnBrief, state: &mut AiState, rules: &CompiledRuleset, routes
             started: chosen.is_some(),
         })
     });
+    if war != Net2War::Absent {
+        war_trace::chosen(brief, considered, chosen.as_ref().map(|c| (c.operation.target, c.operation.enemy, c.value)), state.war_plan.map(|p| (p.target, p.chest)));
+    }
     let chosen = chosen?;
     crate::ai::war_probe::note(|p| {
         let city = state.seen_cities().iter().find(|c| c.tile == chosen.operation.target).copied();
@@ -1053,7 +1276,14 @@ pub(crate) fn strategy_wages_war(brief: &TurnBrief, strategy: Strategy) -> bool 
 /// starts none (one brain: the net opens the window, the operation picks the target in it).
 /// Every other variant: always.
 pub(crate) fn posture_permits(brief: &TurnBrief) -> bool {
-    !brief.war_open || brief.strategy.as_ref().is_some_and(|plan| plan.intent.posture_pick >= 2)
+    match Net2War::of(brief) {
+        // `net2`: the order is the permission (one brain: the posture follows the order, with its hysteresis
+        // behind it; a start waiting for the posture to turn was the wall of B9 #6, where the leader's cities
+        // were candidates and no operation formed), and no order is none.
+        Net2War::Order(_) => true,
+        Net2War::NoWar => false,
+        Net2War::Absent => !brief.war_open || brief.strategy.as_ref().is_some_and(|plan| plan.intent.posture_pick >= 2),
+    }
 }
 
 /// The war plan's turn (classic/docs/ai-allocator.md "Military treasury"): a plan keeps
@@ -1442,6 +1672,32 @@ pub fn running_case(brief: &TurnBrief, state: &AiState, rules: &CompiledRuleset,
     Some(case)
 }
 
+/// `running_case` of an assault with no operation (work/nets/tricks/CHAIN.md D8, tac/runs/C1.md): the units with
+/// `UnitTask::Assault` on a seen city of `enemy` (the planners' assault group; the exam's C1 army) priced as the
+/// operation they are, the group its own army and need (nothing missing), the walk of its farthest member and the
+/// siege. The best such city; None without an assault on the enemy. Without it the peace layer priced a war with no
+/// operation at 0 and took the first white peace the enemy offered (C1: 55 of 56 `tac2` losses).
+pub fn assault_case(brief: &TurnBrief, state: &AiState, rules: &CompiledRuleset, prices: &Prices, stakes: &Stakes, enemy: PlayerId) -> Option<WarCase> {
+    let arsenal = Arsenal::of(brief, rules);
+    let mut best: Option<WarCase> = None;
+    for city in state.seen_cities().iter().filter(|c| c.owner == enemy) {
+        let task = Some(UnitTask::Assault { target: city.tile });
+        let group: Vec<&UnitBrief> = brief.units.iter().filter(|u| state.task_of(u.id).map(|t| t.task) == task).collect();
+        if group.is_empty() {
+            continue;
+        }
+        let army = composition_of(rules, group.iter().map(|u| u.kind));
+        let distance = group.iter().filter_map(|u| brief.dims.distance(u.tile, city.tile)).max().unwrap_or(0).max(0) as u32;
+        let rounds = (distance * 2).div_ceil(3) + 1 + SIEGE_ROUNDS_ESTIMATE;
+        let chance = model_chance(brief, state, rules, &arsenal, city, &estimate_target(brief, rules, city), army, Some(brief.round));
+        let case = war_case(prices, stakes, rules, &arsenal, city, army, Composition::default(), rounds, crate::ai::strikes::on_hand_best(&brief.armory), chance, brief.war.siege, rival_percent(brief, city.owner));
+        if best.is_none_or(|b| case.value(stakes) > b.value(stakes)) {
+            best = Some(case);
+        }
+    }
+    best
+}
+
 /// The score a captured city of `population` brings by the rules (`SiegeFixes::priced`):
 /// the rules' capture leaves it fewer citizens (`captured_population`); the AI keeps a city of
 /// `ANNEX_POPULATION` and more annexed, the rest as puppets (`combat::conquest_decisions`); a
@@ -1563,7 +1819,7 @@ pub fn outlook(brief: &TurnBrief, state: &AiState, rules: &CompiledRuleset, pric
     if arsenal.melee.is_some() && brief.cities.len() >= 2 {
         // `war-pays`: the units `start` counts (`free_units`), so that the two verdicts agree.
         let free = if brief.war_pays { counted_free(brief, state, rules) } else { composition_of(rules, strike_units(brief, state, rules).map(|u| u.kind)) };
-        out.pays = crate::ai::war_probe::muted(|| targets(brief, state).into_iter().any(|(city, horizon)| candidate(brief, state, rules, &arsenal, free, &city, horizon, WarGate::Value(prices, stakes)).is_some_and(|c| c.fits())));
+        out.pays = crate::ai::war_probe::muted(|| targets(brief, state).into_iter().any(|(city, horizon)| candidate(brief, state, rules, &arsenal, free, &city, horizon, WarGate::Value(prices, stakes), Net2War::Absent).is_some_and(|c| c.fits())));
     }
     let rival = out.enemy.or(nearest.map(|(_, p)| p));
     if let Some(rival) = rival {
@@ -1580,7 +1836,8 @@ pub const ARMY_PER_CITY_TENTHS: u64 = 26;
 /// The military power of `rival` as the player can know it (`unit_power`): the largest of its
 /// units in sight, its army remembered near our cities (`RelationMemory::threat`) and the army a
 /// nation of its known cities keeps (`ARMY_PER_CITY_TENTHS`) of its era's best melee unit
-/// (`era_strength`), since nothing tells the size of an army out of sight. `met_eras`: the era of
+/// (`era_strength`), since nothing tells the size of an army out of sight; with `net2`'s estimate of its
+/// soldiers (`estimated_soldiers`) that many of the era's best melee unit instead. `met_eras`: the era of
 /// every nation met.
 pub fn known_power(brief: &TurnBrief, state: &AiState, rules: &CompiledRuleset, rival: PlayerId, met_eras: &[(PlayerId, u8)]) -> u32 {
     let seen: u32 = brief.sightings.iter().filter(|s| s.owner == rival && s.military).map(|s| s.power).sum();
@@ -1588,8 +1845,22 @@ pub fn known_power(brief: &TurnBrief, state: &AiState, rules: &CompiledRuleset, 
     let cities = state.seen_cities().iter().filter(|c| c.owner == rival).count() as u64;
     let own_era = crate::ai::strategy_net::features::era_of(rules, &brief.techs);
     let their_era = met_eras.iter().find(|(p, _)| *p == rival).map_or(own_era, |(_, e)| usize::from(*e));
-    let kept = cities * ARMY_PER_CITY_TENTHS * era_strength(rules, their_era) / 10;
+    let kept = match estimated_soldiers(brief, rival) {
+        Some(soldiers) => soldiers * era_strength(rules, their_era),
+        None => cities * ARMY_PER_CITY_TENTHS * era_strength(rules, their_era) / 10,
+    };
     seen.max(threat).max(kept.min(u64::from(u32::MAX)) as u32)
+}
+
+/// `net2`'s estimate of `rival`'s soldiers (`RivalRead::soldiers`, design §2.4 step 4) when its doubt is small
+/// enough to count instead of the army per city: a disarmed neighbour then reads as disarmed. None without a
+/// plan, or with a doubtful estimate.
+fn estimated_soldiers(brief: &TurnBrief, rival: PlayerId) -> Option<u64> {
+    let soldiers = with_net2(brief, Part::War, |plan| plan.rival(rival).map(|read| read.soldiers)).flatten()?;
+    match soldiers {
+        Soldiers::Estimate { count, doubt } if doubt <= SOLDIERS_DOUBT_MAX => Some(count.max(0) as u64),
+        _ => None,
+    }
 }
 
 /// The strength of the best melee unit the rules give by an era (its index): what an army of that
@@ -1667,16 +1938,47 @@ enum Horizon {
 /// The enemy cities an operation may aim at: of the players at war with
 /// us; with no war, of the players at peace past the cooldown.
 fn targets(brief: &TurnBrief, state: &AiState) -> Vec<(SeenCity, Horizon)> {
+    targets_for(brief, state, Net2War::Absent)
+}
+
+/// `targets` under `net2`'s war (`Net2War`): with a plan, no war order is no target at all; an order names
+/// the rival whose cities are the candidates (a `Retake` order the cities we lost to it first), and the war's
+/// age is the order's own (its budget, not the relation's last change, runs the time the war may last).
+fn targets_for(brief: &TurnBrief, state: &AiState, war: Net2War) -> Vec<(SeenCity, Horizon)> {
+    if war == Net2War::NoWar {
+        return Vec::new();
+    }
     let at_war: Vec<_> = brief.relations.iter().filter(|r| r.at_war).collect();
     let mut out = Vec::new();
     for relation in &brief.relations {
+        if war.order().is_some_and(|o| o.rival != relation.other) {
+            continue;
+        }
         let last = state.relation(relation.other).and_then(|m| m.last_change_round);
         let horizon = match (relation.at_war, at_war.is_empty()) {
-            (true, _) => Horizon::War(rounds_since(brief, last).min(WAR_WEARINESS_ROUNDS)),
-            (false, true) if rounds_since(brief, last) >= brief.speed.pace_rounds(PEACE_COOLDOWN_ROUNDS) => Horizon::Peace,
+            (true, _) => {
+                // The war's own age: the order's war since its declaration (`OrderPhase::Fighting`), else the relation's.
+                let since = war.order().and_then(|o| o.war_since()).or(last);
+                Horizon::War(rounds_since(brief, since).min(WAR_WEARINESS_ROUNDS))
+            }
+            (false, true) if peace_waited(brief, relation, last, war.order()) => Horizon::Peace,
             _ => continue,
         };
-        out.extend(state.seen_cities().iter().filter(|c| c.owner == relation.other).map(|c| (*c, horizon)));
+        let cities = state.seen_cities().iter().filter(|c| c.owner == relation.other);
+        out.extend(cities.map(|c| (*c, horizon)));
+    }
+    // A named city (the offence addendum's `WarOrder::aim`) is the one candidate while it is in sight.
+    if let Some(aim) = war.order().and_then(|o| o.aim) {
+        if out.iter().any(|(c, _)| c.tile == aim.city) {
+            out.retain(|(c, _)| c.tile == aim.city);
+        }
+    }
+    if let Some(order) = war.order().filter(|o| o.kind == WarKind::Retake) {
+        // The cities the seat lost come first: the rest of the rival's cities only when none is in sight.
+        let lost = crate::ai::retake::lost_tiles(state);
+        if out.iter().any(|(c, _)| c.owner == order.rival && lost.contains(&c.tile)) {
+            out.retain(|(c, _)| lost.contains(&c.tile));
+        }
     }
     out
 }
@@ -1706,12 +2008,16 @@ fn candidate(
     city: &SeenCity,
     horizon: Horizon,
     gate: WarGate<'_>,
+    war: Net2War,
 ) -> Option<Candidate> {
     // `strategist-x`: a city of the rival running away (`Stakes::runaway`, its race's share set by
     // `Stakes::with_plan`) is weighed by its case, not turned away by the odds. A stake of the domination
     // path alone is not: it stays behind the odds gate and `OBJECTIVE_RANGE`, as in `standard`.
     let staked = matches!(gate, WarGate::Value(_, stakes) if stakes.runaway(city.tile));
-    if brief.war_pays && !odds_are_good(city, horizon) && !staked {
+    // `net2`: a city of the order's rival is weighed by the order's reason, not turned away by the odds
+    // (`order_passes_odds`; the other kinds keep the gate).
+    let ordered = war.order().is_some_and(|o| o.rival == city.owner);
+    if brief.war_pays && !odds_are_good(city, horizon) && !staked && !order_passes_odds(war, city, horizon) {
         return None;
     }
     let muster = brief.nearest_city(brief.dims, city.tile)?;
@@ -1720,7 +2026,9 @@ fn candidate(
     // `strategist-x`: a city carrying the race of the rival running away is reached from as far as a capture
     // that wins the game (the leader's cities lay beyond `OBJECTIVE_RANGE` of the seats that met it in the
     // exam's traces: their army postured to prepare and no operation formed, B9 instance 6).
-    if distance > if decisive || staked { DECISIVE_RANGE } else { OBJECTIVE_RANGE } {
+    // An ordered city is reached from as far as `net2` read its reach (`RivalInputs::land`, `sea`: the staging
+    // within `BORDER_REACH`, or the sea route within `DECISIVE_RANGE`); the route and the horizon still decide.
+    if distance > if decisive || staked || ordered { DECISIVE_RANGE } else { OBJECTIVE_RANGE } {
         return None;
     }
     let threat = threat_to(brief, state, city.owner, city.tile);
@@ -1786,8 +2094,11 @@ fn candidate(
             phase_round: brief.round,
         };
         let chest = chest(brief, missing);
-        // A staked city forms as long as a decisive one (`strategist-x`): its march is as far.
-        (value >= 0).then_some(Candidate { operation, horizon, assemble, march, distance, value, chest, decisive: decisive || staked, pace: brief.speed.pace_percent })
+        // A staked city forms as long as a decisive one (`strategist-x`): its march is as far. An order whose reason
+        // is not the city's worth (a retake, a spoiler on the runaway, a duty to an ally), or whose city `net2`
+        // aimed at by its ease, is not turned away by the case's value: the case ranks it (`net2` named the reason
+        // and a budget; the order is the decision, the war machine executes it).
+        (value >= 0 || order_decides(war, city)).then_some(Candidate { operation, horizon, assemble, march, distance, value, chest, decisive: decisive || staked, pace: brief.speed.pace_percent })
     };
     // The army alone, and with each weapon the player has or could build: the
     // weapon strikes the city before the army comes (`strikes::struck`), the army it
@@ -1951,6 +2262,9 @@ fn recruit(brief: &TurnBrief, state: &mut AiState, rules: &CompiledRuleset, oper
     let dims = brief.dims;
     let target = operation.target;
     let mut have = composition_of(rules, members(brief, state, target).iter().map(|u| u.kind));
+    // The commander's call (`TacticalHints`) brings units, not only orders to the cities: the army it asks for
+    // is part of the need while the call lasts.
+    let need = plus(operation.need, TacticalHints::of(brief).call_for(target));
     let switching = if brief.war.siege.assault { assault_recruits(brief, state, rules, operation, gate) } else { Vec::new() };
     let arsenal = Arsenal::of(brief, rules);
     let mut candidates: Vec<(i32, EntityId, UnitKindId)> = strike_units(brief, state, rules)
@@ -1968,7 +2282,7 @@ fn recruit(brief: &TurnBrief, state: &mut AiState, rules: &CompiledRuleset, oper
     for (_, unit, kind) in candidates {
         let Some(role) = army_role(rules, kind) else { continue };
         // A player with no city takes every free unit into its operation: no city wants one, and the army is all it has.
-        if operation.phase == OperationPhase::Forming && !wanted(operation.need, have, role) && !brief.landless_planned() {
+        if operation.phase == OperationPhase::Forming && !wanted(need, have, role) && !brief.landless_planned() {
             continue;
         }
         have.add(role);
@@ -2202,4 +2516,148 @@ pub fn demand(obs: &AIObservation<'_>, state: &AiState, rules: &CompiledRuleset)
         ProductionItem::Building(_) | ProductionItem::Project(_) => None,
     });
     shortfall(need, composition_of(rules, queued))
+}
+
+/// Scratch trace of the war machine under `net2` (`NET2_WAR_TRACE=<file>`): for every start of a seat with a
+/// plan, the gates of the start, each ordered city's verdict, and the cities the old machine (no order) would
+/// have taken (the shadow), one JSON line each.
+mod war_trace {
+    use super::*;
+    use crate::ai::net2::plan::Opening;
+    use std::io::Write as _;
+
+    fn write(line: &str) {
+        let Some(path) = std::env::var_os("NET2_WAR_TRACE") else { return };
+        if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open(path) {
+            let _ = f.write_all(format!("{line}\n").as_bytes());
+        }
+    }
+
+    fn thread() -> String {
+        format!("{:?}", std::thread::current().id()).replace(|c: char| !c.is_ascii_digit(), "")
+    }
+
+    fn horizon_text(h: Horizon) -> String {
+        match h {
+            Horizon::Peace => "peace".into(),
+            Horizon::War(age) => format!("war{age}"),
+        }
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn explain(brief: &TurnBrief, state: &AiState, rules: &CompiledRuleset, arsenal: &Arsenal, free: Composition, city: &SeenCity, horizon: Horizon, gate: WarGate<'_>, war: Net2War) -> String {
+        let staked = matches!(gate, WarGate::Value(_, stakes) if stakes.runaway(city.tile));
+        if brief.war_pays && !odds_are_good(city, horizon) && !staked && !order_passes_odds(war, city, horizon) {
+            return "odds".into();
+        }
+        let Some(muster) = brief.nearest_city(brief.dims, city.tile) else { return "nocity".into() };
+        let distance = brief.dims.distance(muster.tile, city.tile).unwrap_or(i32::MAX);
+        let ordered = war.order().is_some_and(|o| o.rival == city.owner);
+        let limit = if gate.decisive(city.tile) || staked || ordered { DECISIVE_RANGE } else { OBJECTIVE_RANGE };
+        if distance > limit {
+            return format!("far{distance}");
+        }
+        let forced = Net2War::Order(WarOrder { rival: city.owner, kind: WarKind::Retake, since: brief.round, budget: 100, phase: crate::ai::net2::plan::OrderPhase::Preparing, value: 1000, aim: None, opening: Opening::Plain, raid: false });
+        match candidate(brief, state, rules, arsenal, free, city, horizon, gate, forced) {
+            None => format!("nofit{distance}"),
+            Some(c) if c.value < 0 && !order_decides(war, city) => format!("value{}", c.value),
+            Some(c) => format!("ok{}a{}m{}d{distance}", c.value, c.assemble, c.march),
+        }
+    }
+
+    pub(super) fn start(brief: &TurnBrief, state: &AiState, rules: &CompiledRuleset, gate: WarGate<'_>, war: Net2War) {
+        if std::env::var_os("NET2_WAR_TRACE").is_none() {
+            return;
+        }
+        let order = match war.order() {
+            Some(o) => format!("{{\"rival\":{},\"kind\":\"{}\",\"value\":{},\"since\":{},\"budget\":{}}}", o.rival.0, o.kind.name(), o.value, o.since, o.budget),
+            None => "null".into(),
+        };
+        let season = in_season(brief);
+        if !season {
+            return;
+        }
+        let early = brief.round + brief.speed.pace_rounds(PREPARE_ROUNDS) >= brief.speed.game_round(EARLIEST_WAR_ROUND);
+        let strategy = strategy_wages_war(brief, state.strategy.current) || war.order().is_some_and(|o| o.kind == WarKind::Retake);
+        let arsenal = Arsenal::of(brief, rules);
+        let free = counted_free(brief, state, rules);
+        let verdicts = |w: Net2War| -> Vec<String> {
+            crate::ai::war_probe::muted(|| {
+                targets_for(brief, state, w)
+                    .iter()
+                    .map(|(c, h)| format!("{{\"o\":{},\"t\":{},\"pop\":{},\"h\":\"{}\",\"v\":\"{}\"}}", c.owner.0, c.tile.0, c.population, horizon_text(*h), explain(brief, state, rules, &arsenal, free, c, *h, gate, w)))
+                    .collect()
+            })
+        };
+        let ordered = if war.order().is_some() { verdicts(war) } else { Vec::new() };
+        let shadow = verdicts(Net2War::Absent);
+        let reads: Vec<String> = with_net2(brief, Part::War, |p| {
+            p.rivals.iter().map(|r| format!("{{\"r\":{},\"weak\":{},\"reach\":{},\"prey\":{},\"spoiler\":{},\"retake\":{},\"wv\":{},\"kind\":\"{}\"}}", r.rival.0, r.weak, r.reach, r.prey, r.spoiler, r.retake, r.war_value, r.war_kind.name())).collect()
+        })
+        .unwrap_or_default();
+        write(&format!(
+            "{{\"ev\":\"start\",\"th\":{},\"p\":{},\"r\":{},\"cities\":{},\"at_war\":{},\"order\":{order},\"season\":{season},\"early\":{early},\"strategy\":{strategy},\"free\":{},\"ordered\":[{}],\"shadow\":[{}],\"reads\":[{}]}}",
+            thread(),
+            brief.player.0,
+            brief.round,
+            brief.cities.len(),
+            brief.relations.iter().any(|r| r.at_war),
+            free.total(),
+            ordered.join(","),
+            shadow.join(","),
+            reads.join(",")
+        ));
+    }
+
+    pub(super) fn launched(brief: &TurnBrief, operation: &Operation, at_war: bool) {
+        if std::env::var_os("NET2_WAR_TRACE").is_none() {
+            return;
+        }
+        let d = brief.nearest_city(brief.dims, operation.target).and_then(|c| brief.dims.distance(c.tile, operation.target)).unwrap_or(-1);
+        write(&format!("{{\"ev\":\"launch\",\"th\":{},\"p\":{},\"r\":{},\"e\":{},\"t\":{},\"at_war\":{at_war},\"d\":{d},\"since\":{},\"net2\":{}}}", thread(), brief.player.0, brief.round, operation.enemy.0, operation.target.0, operation.since_round, Net2War::of(brief) != Net2War::Absent));
+    }
+
+    pub(super) fn ended(brief: &TurnBrief, state: &AiState, operation: &Operation, ordered: bool, untaken: bool) {
+        if std::env::var_os("NET2_WAR_TRACE").is_none() {
+            return;
+        }
+        let at_war = brief.at_war(operation.enemy);
+        let marching = operation.phase == OperationPhase::Marching;
+        let cause = if !target_held(state, operation) {
+            if brief.cities.iter().any(|c| c.tile == operation.target) { "captured" } else { "gone" }
+        } else if untaken {
+            "untaken"
+        } else if !marching && !ordered && !at_war {
+            "unordered"
+        } else if !marching {
+            "form_timeout"
+        } else if !at_war {
+            "peace"
+        } else if brief.round.saturating_sub(operation.phase_round) > march_end(brief, operation) {
+            "march_timeout"
+        } else {
+            "outmatched"
+        };
+        let pop = state.seen_cities().iter().find(|c| c.tile == operation.target).map_or(0, |c| c.population);
+        let d = brief.nearest_city(brief.dims, operation.target).and_then(|c| brief.dims.distance(c.tile, operation.target)).unwrap_or(-1);
+        write(&format!(
+            "{{\"ev\":\"end\",\"th\":{},\"p\":{},\"r\":{},\"e\":{},\"t\":{},\"cause\":\"{cause}\",\"since\":{},\"pop\":{pop},\"d\":{d},\"net2\":{}}}",
+            thread(),
+            brief.player.0,
+            brief.round,
+            operation.enemy.0,
+            operation.target.0,
+            operation.since_round,
+            Net2War::of(brief) != Net2War::Absent
+        ));
+    }
+
+    pub(super) fn chosen(brief: &TurnBrief, considered: usize, chosen: Option<(TileId, PlayerId, i64)>, plan: Option<(TileId, u32)>) {
+        if std::env::var_os("NET2_WAR_TRACE").is_none() {
+            return;
+        }
+        let chosen = chosen.map_or("null".into(), |(t, e, v)| format!("{{\"t\":{},\"e\":{},\"v\":{v}}}", t.0, e.0));
+        let plan = plan.map_or("null".into(), |(t, c)| format!("{{\"t\":{},\"chest\":{c},\"treasury\":{}}}", t.0, brief.treasury));
+        write(&format!("{{\"ev\":\"chosen\",\"th\":{},\"p\":{},\"r\":{},\"considered\":{considered},\"chosen\":{chosen},\"plan\":{plan}}}", thread(), brief.player.0, brief.round));
+    }
 }

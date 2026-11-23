@@ -76,7 +76,8 @@ pub struct Allocator {
     jobs: u32,
     /// A new city keeps the empire content (or the empire is young).
     may_settle: bool,
-    /// Gold the running operations keep for their army's upkeep.
+    /// Gold the running operations keep for their army's upkeep, and `science-flow`'s gold for the research agreements
+    /// its ties still lack (`Net2Plan::science`'s chest).
     war_chest: u32,
     /// The gold kept for the alliance of a rival that would win the World Leader vote
     /// (`city_states::guard_chest`, `vote-guard`); only the gifts that take it may spend it.
@@ -110,6 +111,8 @@ pub struct Allocator {
     race: u8,
     /// What the seat knows of the wonder race (`ai::wonder_race`).
     known: crate::ai::wonder_race::Known,
+    /// `net2`'s share of the gold for the city-states (`Net2Plan::cs_gold_share`, 0…1000); 0 without a plan.
+    cs_gold_share: crate::ai::strategy_net::Milli,
     /// The unit net's turn (`ai::unit_net`): its commander's orders are offered. None: off.
     #[cfg(feature = "experimental-ai")]
     unit_net: Option<std::sync::Arc<crate::ai::unit_net::UnitNetTurn>>,
@@ -125,6 +128,12 @@ struct TradeProspect {
 }
 
 impl Allocator {
+    /// The gold the purchases keep above the emergency reserve (`spend_gold`): the operations' upkeep, the war plan's
+    /// chest and `science-flow`'s agreements (`Science::chest`).
+    pub fn war_chest(&self) -> u32 {
+        self.war_chest
+    }
+
     pub fn new(obs: &AIObservation<'_>, brief: &TurnBrief, state: &AiState, rules: &CompiledRuleset) -> Self {
         // The turn's prices (from its start) unless the brief has none.
         let prices = brief.prices.unwrap_or_else(|| Prices::of(obs, rules, Default::default()));
@@ -136,7 +145,7 @@ impl Allocator {
             cities: obs.own_cities.len() as i32,
             jobs: if brief.effects.demand { finder_jobs(obs, brief, state, rules) } else { open_jobs(obs) },
             may_settle: may_settle(obs, brief, state, prices.model),
-            war_chest: war_chest(obs, state) + state.war_plan.map_or(0, |plan| plan.chest),
+            war_chest: war_chest(obs, state) + state.war_plan.map_or(0, |plan| plan.chest) + brief.net2.as_ref().map_or(0, |plan| plan.science.chest),
             guard_chest: crate::ai::city_states::guard_chest(obs, &prices),
             personality: brief.personality,
             sea: brief.sea_jobs.clone(),
@@ -153,6 +162,7 @@ impl Allocator {
             strategy: brief.strategy.clone(),
             race: brief.wonder_race,
             known: if brief.wonder_race > 1 { crate::ai::wonder_race::Known::of(obs, brief, state) } else { Default::default() },
+            cs_gold_share: crate::ai::city_states::gold_share_of(brief),
             #[cfg(feature = "experimental-ai")]
             unit_net: brief.unit_net.clone(),
         }
@@ -419,6 +429,7 @@ impl Allocator {
             }
             if let Command::GiftGold { city_state, gold, .. } = offer.command {
                 crate::ai::strategy_net::trace::gift(obs, city_state, gold, offer.value as i64);
+                crate::ai::tricks_trace::line(|| format!("{{\"ev\":\"gift\",\"r\":{},\"p\":{},\"cs\":{},\"gold\":{gold},\"value\":{},\"share\":{}}}", obs.round, obs.player.0, city_state.0, offer.value, self.cs_gold_share));
             }
             out.push(Decision::act(offer.actor, reason, offer.command));
         }
@@ -426,9 +437,9 @@ impl Allocator {
     }
 
     /// Gold gifts to city-states the gold above the reserve pays
-    /// (`ai::city_states::priced_gifts`).
+    /// (`ai::city_states::priced_gifts_shared`, with `net2`'s share of the gold for them).
     fn gift_offers(&self, obs: &AIObservation<'_>, spendable: u32) -> Vec<Offer> {
-        crate::ai::city_states::priced_gifts(obs, &self.prices, spendable)
+        crate::ai::city_states::priced_gifts_shared(obs, &self.prices, spendable, self.cs_gold_share)
             .into_iter()
             .map(|gift| {
                 let command = Command::GiftGold { player: obs.player, city_state: gift.city_state, gold: gift.gold };

@@ -51,9 +51,15 @@ pub fn research_agreement_cost(
     b: PlayerId,
 ) -> u32 {
     let era = |p| crate::combat::city::current_era(auth, rules, p);
-    let costs = [era(a), era(b)].map(|e| e.map(|e| e.research_agreement_cost).unwrap_or(0));
-    // × the game speed's gold percent (Unciv: DiplomacyFunctions, `goldCostModifier`).
-    kernel::rules::speeds::SpeedValues::scale(costs[0].max(costs[1]), auth.settings().speed(rules).gold_percent)
+    agreement_cost_of([era(a), era(b)], auth.settings().speed(rules).gold_percent)
+}
+
+/// Research agreement cost between players of these eras: the higher era's cost × the game speed's gold percent
+/// (Unciv: DiplomacyFunctions, `goldCostModifier`). The rules (`research_agreement_cost`) and the AI's reading of
+/// it (`ai::net2::science`) share this formula.
+pub fn agreement_cost_of(eras: [Option<&crate::rules::compiled::EraDefinition>; 2], gold_percent: u32) -> u32 {
+    let costs = eras.map(|e| e.map(|e| e.research_agreement_cost).unwrap_or(0));
+    kernel::rules::speeds::SpeedValues::scale(costs[0].max(costs[1]), gold_percent)
 }
 
 /// Copies of `resource` `player` can give: what its resource ledger has

@@ -7,7 +7,9 @@
 
 use classic_content::core::core_rules;
 use classic_rules::ai::danger::{self, heuristic_exposure, unit_features, Place, Sight, Threats, FEATURES, NAMES, THREATS};
+use classic_rules::ai::battlefield::{Battlefield, ReachNode, REACH_NODES};
 use classic_rules::ai::planner::TurnBrief;
+use classic_rules::ai::planner_map::{step_points, KnownMap};
 use classic_rules::ids::{PlayerId, TerrainId, TileId, UnitHandle, UnitKindId};
 use classic_rules::knowledge::observation::OwnUnit;
 use classic_rules::math::HexCoord;
@@ -230,4 +232,85 @@ fn a_decision_reads_the_row_of_the_tile_it_moves_to() {
     let mut expected = unit_features(&whole, &rules, standing);
     expected[column("moved")] = 1;
     assert_eq!(ahead, expected);
+}
+
+/// The theatre model's tiles are the union of the discs round the centres,
+/// and the enemy's reach is the plain Dijkstra of the known map within them
+/// (the tree-map reference the bitmap and the reused tables replaced).
+#[test]
+fn the_theatre_tiles_and_the_reach_equal_a_plain_reconstruction() {
+    let rules = compile_rules(core_rules()).unwrap();
+    let mut game = world(&rules);
+    let (sword, horse, archer) = (unit_kind(&rules, "swordsman"), unit_kind(&rules, "horseman"), unit_kind(&rules, "archer"));
+    for (q, r, kind) in [(10, 10, sword), (11, 12, archer), (9, 8, sword), (12, 9, horse)] {
+        game.debug_spawn_unit(&rules, US, tile(&game, q, r), kind);
+    }
+    for (q, r, kind) in [(14, 10, sword), (14, 9, horse), (15, 12, archer), (16, 8, sword)] {
+        game.debug_spawn_unit(&rules, THEM, tile(&game, q, r), kind);
+    }
+    let obs = game.ai_observation(&rules, US);
+    let brief = TurnBrief::from_observation(&obs, &rules);
+    let dims = obs.view.dimensions();
+    let own_cities = [tile(&game, 2, 10)];
+    let centres: Vec<TileId> = obs.own_units.iter().map(|u| u.tile).chain(obs.visible_foreign_units.iter().map(|u| u.tile)).collect();
+    for radius in [1, 5] {
+        let field = Battlefield::build(&obs.view, &rules, &brief, 1, &obs.visible_foreign_units, &[], &[], &own_cities, &centres, radius, None);
+        let mut expected: Vec<TileId> = centres.iter().flat_map(|c| classic_rules::math::hex_disc(dims, *c, radius)).collect();
+        expected.sort();
+        expected.dedup();
+        assert_eq!(field.tiles.keys().copied().collect::<Vec<_>>(), expected, "the tiles at radius {radius}");
+        for (tile, info) in &field.tiles {
+            let known = obs.view.tile(*tile);
+            assert_eq!(info.visible, known.is_visible());
+            assert_eq!(info.owner, known.snapshot().and_then(|s| s.owner));
+            assert_eq!(info.own_city, own_cities.contains(tile));
+        }
+        assert!(!field.targets.is_empty());
+        let mut longest = 0;
+        for (index, target) in field.targets.iter().enumerate() {
+            let reach: Vec<(TileId, u32, TileId)> = field.reach[index].nodes().iter().map(|n: &ReachNode| (n.tile, n.left, n.parent)).collect();
+            longest = longest.max(reach.len());
+            assert_eq!(reach, plain_reach(&obs.view, &field, index), "the reach of the target at {:?}", target.tile);
+        }
+        assert!(longest > 1, "a reach that spreads over several tiles, not only the target's own ({longest})");
+    }
+}
+
+/// The reach search as it was written with tree maps: (tile, movement left, parent) by tile.
+fn plain_reach(view: &classic_rules::knowledge::view::PlayerView<'_>, field: &Battlefield<'_, '_>, index: usize) -> Vec<(TileId, u32, TileId)> {
+    use std::cmp::Reverse;
+    use std::collections::{BTreeMap, BinaryHeap};
+    let target = &field.targets[index];
+    if target.is_city() || !target.stats.military {
+        return Vec::new();
+    }
+    let budget = target.stats.movement;
+    let map = KnownMap::land(view);
+    let mut best: BTreeMap<TileId, (u32, TileId)> = BTreeMap::new();
+    let mut heap = BinaryHeap::new();
+    best.insert(target.tile, (0, target.tile));
+    heap.push(Reverse((0u32, target.tile.0)));
+    let mut expanded = 0;
+    while let Some(Reverse((cost, tile))) = heap.pop() {
+        let tile = TileId(tile);
+        if best.get(&tile).is_some_and(|(c, _)| *c < cost) {
+            continue;
+        }
+        expanded += 1;
+        if expanded > REACH_NODES || cost >= budget {
+            continue;
+        }
+        for next in field.dims.neighbors(tile) {
+            if !field.tiles.contains_key(&next) {
+                continue;
+            }
+            let Some(points) = step_points(&map, tile, next) else { continue };
+            let cost = cost.saturating_add(points);
+            if best.get(&next).is_none_or(|(c, _)| cost < *c) {
+                best.insert(next, (cost, tile));
+                heap.push(Reverse((cost, next.0)));
+            }
+        }
+    }
+    best.into_iter().map(|(tile, (cost, parent))| (tile, budget.saturating_sub(cost), parent)).collect()
 }

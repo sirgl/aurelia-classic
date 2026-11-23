@@ -251,7 +251,7 @@ built without the feature plays it (`ai_experimental_off`). The choice net's tab
 `pre-nets-x` is the standard before it: the mind of `next-x`, bench only (`experimental-ai`). Every other variant plays as
 it was measured: `strategist-x`, `strategist-x-threat`, `econ-site` and its hand edits and `nets-x` on the mind of
 `next-x`, `next-x` itself (now the play of `pre-nets-x`), and the older lines as before; `nets-x-site` stays as an alias
-that plays as `standard`.
+that plays as `standard` (as `pre-net2` since the sixteenth promotion).
 
 Measured on the bench (pace, Quick, against the old `standard`): `nets-x-site` 63.3 % victory-weighted over 800 games
 (offsets 1500–1503; 238 real victories against 113, risings of rebels 4 against 15), 62.9 % on the replication
@@ -260,6 +260,14 @@ Measured on the bench (pace, Quick, against the old `standard`): `nets-x-site` 6
 `work/nets/nets-x/PROMOTE.md`.
 
 No save section is added: a save of the old `standard` loads into the new one.
+
+## Promoted: net2 (the sixteenth promotion, 23 November)
+
+`standard` plays as the bench's `net2` (classic/docs/ai-net2.md): the play of `nets-x-site` above, with `net2` in place of
+the strategist's pass (its intent through `intent_step` with `net2`'s tilt, its levers to the executors through
+`TurnBrief::net2`) and its site head in place of the guarded site score. `pre-net2` is the standard before it (the mind of
+`nets-x-site`, bench only); `nets-x-site` plays as `pre-net2`, and `net2` stays as an alias that plays as `standard`. The
+gates and their results are in classic/docs/ai-net2.md and `work/nets/promote-net2/PROMOTE.md`.
 
 ## Not done
 

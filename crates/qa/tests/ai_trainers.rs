@@ -97,7 +97,7 @@ fn every_family_builds_in_every_era_it_claims() {
     }
 }
 
-/// Slow tier: a sample of every family stays solvable: of instances 0-3 in the family's middle claimed era,
+/// Slow tier: a sample of every family stays solvable: of instances 0-7 in the family's middle claimed era,
 /// at least two are kept by the proof (a solver wins the attempt, the passive control does not).
 #[test]
 fn a_sample_of_every_family_stays_solvable() {
@@ -107,10 +107,93 @@ fn a_sample_of_every_family_stays_solvable() {
     for fam in Fam::ALL {
         let claimed: Vec<u8> = (0..eras.len() as u8).filter(|e| fam.claims(&rules, &lab::lab(&rules, *e).unwrap().kinds)).collect();
         let e = claimed[claimed.len() / 2];
-        let kept = (0..4).filter(|i| suite::prove(&rules, fam, e, *i, suite::ATTEMPTS).0.attempt.is_some()).count();
+        let kept = (0..8).filter(|i| suite::prove(&rules, fam, e, *i, suite::ATTEMPTS).0.attempt.is_some()).count();
         if kept < 2 {
-            weak.push(format!("{} {}: {kept}/4", fam.name(), eras[e as usize]));
+            weak.push(format!("{} {}: {kept}/8", fam.name(), eras[e as usize]));
         }
     }
     assert!(weak.is_empty(), "families whose sample is not winnable: {weak:?}");
+}
+
+const ASSAULT: [Fam; 5] = [Fam::AssaultHeal, Fam::PromotionChoice, Fam::HillArchers, Fam::CityFire, Fam::PlannedAssault];
+
+/// The assault families (part 2): a scene is a function of its index, and the same player plays it to the same row.
+#[test]
+fn the_assault_scenes_are_deterministic() {
+    let rules = ClassicBench::rules();
+    let era = lab::era_index(&rules, "medieval").unwrap();
+    for fam in ASSAULT {
+        let (g1, s1) = families::build(&rules, fam, era, 1, 0).unwrap();
+        let (g2, s2) = families::build(&rules, fam, era, 1, 0).unwrap();
+        assert_eq!(tiles(&g1, &s1), tiles(&g2, &s2), "{}: the same index, the same scene", fam.name());
+        assert_eq!(s1.info, s2.info);
+        let a = play(&rules, g1, s1, "ref-planned", false).unwrap();
+        let b = play(&rules, g2, s2, "ref-planned", false).unwrap();
+        assert_eq!((a.win, a.rounds, &a.measures), (b.win, b.rounds, &b.measures), "{}", fam.name());
+    }
+}
+
+/// The assault win rules: the city taken wins, too many of ours lost loses, the round limit loses.
+#[test]
+fn the_assault_win_rules_decide_what_they_say() {
+    let rules = ClassicBench::rules();
+    let era = lab::era_index(&rules, "medieval").unwrap();
+    for fam in ASSAULT {
+        let (game, mut sc) = families::build(&rules, fam, era, 0, 0).unwrap();
+        assert_eq!(families::judge(&rules, &game, &mut sc.clone(), 1), None, "{}: the scene goes on", fam.name());
+        assert_eq!(families::judge(&rules, &game, &mut sc.clone(), fam.rounds()), Some(false), "{}: the limit loses", fam.name());
+        let mut g = game.clone();
+        for p in sc.mine.clone() {
+            g.debug_remove_unit(&rules, p.h);
+        }
+        assert_eq!(families::judge(&rules, &g, &mut sc.clone(), 1), Some(false), "{}: all lost", fam.name());
+        sc.taken = Some(1);
+        assert_eq!(families::judge(&rules, &game, &mut sc, 1), Some(true), "{}: the city taken wins", fam.name());
+    }
+}
+
+/// The "at any cost" assault win rules: the city taken by the deadline wins whatever was lost, a capture after it
+/// (the reinforcements landed, the peace) loses, the scene ends at N; N is drawn from the instance alone.
+#[test]
+fn the_any_cost_win_rules_decide_what_they_say() {
+    let rules = ClassicBench::rules();
+    let era = lab::era_index(&rules, "medieval").unwrap();
+    for (fam, lag) in [(Fam::AssaultReinforce, 1), (Fam::AssaultPeace, 0)] {
+        let (game, sc) = families::build(&rules, fam, era, 0, 0).unwrap();
+        let (_, again) = families::build(&rules, fam, era, 0, 1).unwrap();
+        assert_eq!(sc.rounds, again.rounds, "{}: N does not change with the attempt", fam.name());
+        let n = sc.rounds;
+        assert!(n <= fam.rounds() && n >= fam.rounds() - 2, "{}: N {n}", fam.name());
+        assert_eq!(sc.deadline, Some(n - lag), "{}", fam.name());
+        assert_eq!(sc.reinforce.is_empty(), fam == Fam::AssaultPeace, "{}", fam.name());
+        assert_eq!(families::judge(&rules, &game, &mut sc.clone(), n), Some(false), "{}: the limit loses", fam.name());
+        // All but one of ours lost: no loss cap.
+        let mut g = game.clone();
+        for p in sc.mine.iter().skip(1) {
+            g.debug_remove_unit(&rules, p.h);
+        }
+        let mut won = sc.clone();
+        won.taken = Some(n - lag);
+        assert_eq!(families::judge(&rules, &g, &mut won, n - lag), Some(true), "{}: taken by the deadline wins", fam.name());
+        let mut late = sc.clone();
+        late.taken = Some(n - lag + 1);
+        if lag > 0 {
+            assert_eq!(families::judge(&rules, &g, &mut late, n), Some(false), "{}: taken after the deadline loses", fam.name());
+        }
+    }
+}
+
+/// The citadel stands on the holders' land (its damage zone hurts only units next to a citadel an enemy at war
+/// owns); a citadel on neutral land damaged nobody.
+#[test]
+fn the_citadel_stands_on_the_holders_land() {
+    let rules = ClassicBench::rules();
+    let era = lab::era_index(&rules, "medieval").unwrap();
+    for i in 0..4 {
+        let (game, sc) = families::build(&rules, Fam::Citadel, era, i, 0).unwrap();
+        let pass = sc.hold.unwrap();
+        let map = game.view().auth.map();
+        assert_eq!(map.owner(pass).flatten(), Some(sc.enemy), "instance {i}: the pass tile is the holders'");
+        assert!(map.improvement(pass).flatten().is_some_and(|imp| rules.improvements[imp.0 as usize].nearby_enemy_damage > 0), "instance {i}: a citadel on the pass");
+    }
 }

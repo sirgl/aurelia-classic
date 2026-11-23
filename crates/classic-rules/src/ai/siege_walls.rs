@@ -1183,7 +1183,7 @@ fn plan_operation(mind: u64, sight: &AIObservation<'_>, brief: &TurnBrief, state
 /// path's turns at its movement, the enemy next to it, its wounds, the share
 /// of the path within an enemy's reach.
 fn awaited(sight: &AIObservation<'_>, brief: &TurnBrief, rules: &CompiledRuleset, unit: &OwnUnit, target: TileId, ring: i32) -> Awaited {
-    use crate::ai::planner_map::{find_path, turns_for, Blockers, KnownMap, MapScratch, PathOutcome, SearchStats};
+    use crate::ai::planner_map::turns_for;
     let dims = brief.dims;
     let distance = |a: TileId, b: TileId| dims.distance(a, b).unwrap_or(i32::MAX);
     let military = |k: crate::ids::UnitKindId| role_of(rules, k) == AiRole::Military;
@@ -1204,18 +1204,15 @@ fn awaited(sight: &AIObservation<'_>, brief: &TurnBrief, rules: &CompiledRuleset
     let reached = |t: TileId| foes.iter().any(|(f, r)| distance(*f, t) <= *r) || forts.iter().any(|c| distance(*c, t) <= CITY_ATTACK_RANGE);
     let movement = i32::from(rules.units[unit.kind.0 as usize].movement.max(1));
     let by_hex = |d: i32| ((d - ring).max(0) + movement - 1) / movement;
-    let map = KnownMap::of_kind(&sight.view, unit.kind);
-    let limit = crate::ai::planner::DecisionBudget::default().search();
-    let found = find_path(&map, unit.tile, target, &Blockers::new(Vec::new()), &mut MapScratch::default(), limit, &mut SearchStats::default());
-    let (turns, threat) = match found {
-        PathOutcome::Found { tiles, points } if tiles.len() > 1 => {
+    let (turns, threat) = match known_path(sight, unit, target) {
+        Some((tiles, points)) => {
             let at_ring = tiles.iter().position(|t| distance(*t, target) <= ring).unwrap_or(tiles.len() - 1);
             let way = &tiles[..=at_ring];
             let share = points as u64 * at_ring as u64 / (tiles.len() - 1) as u64;
             let threat = way.iter().filter(|t| reached(**t)).count() as f64 / way.len() as f64;
             (turns_for(share as u32, unit.moves_max), threat)
         }
-        _ => (by_hex(distance(unit.tile, target)).max(0) as u32, f64::from(u8::from(reached(unit.tile)))),
+        None => (by_hex(distance(unit.tile, target)).max(0) as u32, f64::from(u8::from(reached(unit.tile)))),
     };
     Awaited { turns, engaged, wounded: unit.hp < HEAL_BELOW_HP, threat }
 }
@@ -1245,16 +1242,27 @@ fn sees_from(pv: &crate::knowledge::view::PlayerView<'_>, rules: &CompiledRulese
 /// to the walls for a melee unit, its range for a shooter) at its moves a turn, as `awaited` counts a way; None when
 /// the player knows no path there.
 fn walk_turns(sight: &AIObservation<'_>, brief: &TurnBrief, unit: &OwnUnit, target: TileId, within: i32) -> Option<u32> {
-    use crate::ai::planner_map::{find_path, turns_for, Blockers, KnownMap, MapScratch, PathOutcome, SearchStats};
+    use crate::ai::planner_map::turns_for;
     let dims = brief.dims;
+    let (tiles, points) = known_path(sight, unit, target)?;
+    let at = tiles.iter().position(|t| dims.distance(*t, target).is_some_and(|d| d <= within))?;
+    let share = points as u64 * at as u64 / (tiles.len() - 1) as u64;
+    Some(turns_for(share as u32, unit.moves_max))
+}
+
+/// The unit's known path to `target` (more than the start tile) and its price in move points; None when the player
+/// knows no such path within the search budget. `target` is a city at war, which no unit enters (it attacks it), so the
+/// search is asked only when some step leads into the tile (`has_known_entry`): without one it would flood the known
+/// map for nothing, and a path never ends there.
+fn known_path(sight: &AIObservation<'_>, unit: &OwnUnit, target: TileId) -> Option<(Vec<TileId>, u32)> {
+    use crate::ai::planner_map::{find_path, has_known_entry, Blockers, KnownMap, MapScratch, PathOutcome, SearchStats};
     let map = KnownMap::of_kind(&sight.view, unit.kind);
+    if !has_known_entry(&map, target) {
+        return None;
+    }
     let limit = crate::ai::planner::DecisionBudget::default().search();
     match find_path(&map, unit.tile, target, &Blockers::new(Vec::new()), &mut MapScratch::default(), limit, &mut SearchStats::default()) {
-        PathOutcome::Found { tiles, points } if tiles.len() > 1 => {
-            let at = tiles.iter().position(|t| dims.distance(*t, target).is_some_and(|d| d <= within))?;
-            let share = points as u64 * at as u64 / (tiles.len() - 1) as u64;
-            Some(turns_for(share as u32, unit.moves_max))
-        }
+        PathOutcome::Found { tiles, points } if tiles.len() > 1 => Some((tiles, points)),
         _ => None,
     }
 }

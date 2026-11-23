@@ -37,6 +37,35 @@ use crate::rules::CompiledRuleset;
 use crate::world::player::PlayerKind;
 use crate::world::relations::{DealItem, DealOffer, PeaceRefusal};
 
+/// What a foreign city of `population` citizens brings when it becomes ours without the fight: its worth less the
+/// unrest of a conquered city (the deal's price of a city, and the war order's, `ordered_case`).
+fn seen_city_worth(prices: &Prices, stakes: &Stakes, population: u32) -> Centi {
+    let unrest = (5 + i64::from(population.max(1))) * prices.happiness * stakes.unrest / 100;
+    city_worth(prices, population, 0) - unrest
+}
+
+/// What a `net2` war order on `enemy` promises (`net2::orders`, CHAIN.md D8): the capture of the order rival's easiest
+/// city it still holds (`Net2Plan::order_eases`, the aim first) at its ease, with no army cost (the order's army is the
+/// war machine's to form). The war machine's price of the capture and the deal's price of the city each cross 0 at some
+/// small sizes (HD8 #1: a city of 1 citizen priced 2 947 by the one and below 0 by the other, of 2 citizens the other way
+/// round): the larger of the two is the city's worth to a war that is to take it. None without an order on it or a
+/// city of it we have seen.
+fn ordered_case(brief: &TurnBrief, state: &AiState, prices: &Prices, stakes: &Stakes, enemy: PlayerId) -> Option<WarCase> {
+    let eases = crate::ai::operations::with_net2(brief, crate::ai::net2::plan::Part::War, |p| p.war_on(enemy).map(|_| p.order_eases.clone()))??;
+    let mut best: Option<WarCase> = None;
+    for (tile, ease) in eases {
+        let Some(city) = state.seen_cities().iter().find(|c| c.tile == tile && c.owner == enemy) else { continue };
+        let puppet = city.population < crate::ai::combat::ANNEX_POPULATION;
+        let captured = crate::ai::operations::captured_gain(prices, stakes, city.population, prices.rounds_left, puppet);
+        let worth = captured.max(seen_city_worth(prices, stakes, city.population));
+        let case = WarCase { gain: (worth * ease / 1000).max(0), cost: 0 };
+        if best.is_none_or(|b| case.gain > b.gain) {
+            best = Some(case);
+        }
+    }
+    best
+}
+
 /// What going on with a war against one enemy promises the player.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct WarProspect {
@@ -49,9 +78,22 @@ pub struct WarProspect {
 impl WarProspect {
     pub fn of(brief: &TurnBrief, state: &AiState, rules: &CompiledRuleset, prices: &Prices, stakes: &Stakes, enemy: PlayerId, view: Option<&crate::knowledge::view::PlayerView<'_>>) -> Self {
         // An operation against the enemy, else the raid on its land that still pays.
-        let attack = running_case(brief, state, rules, prices, stakes, enemy)
+        let mut attack = running_case(brief, state, rules, prices, stakes, enemy)
             .or_else(|| view.and_then(|v| crate::ai::raid::running_case(brief, state, rules, prices, v, enemy)))
             .unwrap_or_default();
+        // THE ONE place a war's going on is priced (CHAIN.md D8, tac/runs/C1.md). With `TurnBrief::war_at_peace`
+        // (`Variant::values_war_at_peace`): an assault with no operation is the operation it is (`assault_case`), and a
+        // `net2` war order is worth at least what it promises (`ordered_case`: the order decides the war, the case only
+        // ranks, `operations::order_decides`), with no operation running or with one whose case is below it.
+        if brief.war_at_peace {
+            let assault = crate::ai::operations::assault_case(brief, state, rules, prices, stakes, enemy);
+            let ordered = ordered_case(brief, state, prices, stakes, enemy).filter(|_| crate::ai::net2::orders::PRICES_PEACE);
+            for case in [assault, ordered].into_iter().flatten() {
+                if case.value(stakes) > attack.value(stakes) {
+                    attack = case;
+                }
+            }
+        }
         Self {
             attack,
             defence: expected_loss(brief, state, rules, prices, enemy),
@@ -97,6 +139,21 @@ fn threatened<'b>(brief: &'b TurnBrief, state: &AiState, enemy: PlayerId) -> Opt
     nearest(units.collect()).or_else(|| nearest(cities.collect()))
 }
 
+/// The rounds from now in which the rules keep a flow from `from` running: no declaration of war passes while a
+/// peace treaty runs (`validate_declare_war`), and a war is what ends a running deal (no command cancels one,
+/// `systems/diplomacy`). The peace treaty is the one running, or the one the deal makes (`PEACE_DURATION` at the
+/// speed) when it holds the peace item.
+pub fn guaranteed_rounds(obs: &AIObservation<'_>, from: PlayerId, items: &[(PlayerId, DealItem)]) -> u32 {
+    let running = obs.relation(from).map_or(0, |r| r.peace_treaty_until.saturating_sub(obs.round));
+    let made = if items.iter().any(|(_, item)| *item == DealItem::Peace) { obs.speed.peace_rounds } else { 0 };
+    running.max(made)
+}
+
+/// A deal in which we pay now: our gold or one of our cities (what a break of the deal does not give back).
+fn pays_now(me: PlayerId, items: &[(PlayerId, DealItem)]) -> bool {
+    items.iter().any(|(giver, item)| *giver == me && matches!(item, DealItem::Gold(g) if *g > 0) || *giver == me && matches!(item, DealItem::City(_)))
+}
+
 /// A leader's side of the turn's deals: its prices and stakes, by which it
 /// values every deal.
 pub struct Negotiation<'i, 'o, 'a> {
@@ -124,9 +181,41 @@ impl<'i, 'o, 'a> Negotiation<'i, 'o, 'a> {
         &self.stakes
     }
 
+    /// The war with `enemy` as the player weighs it. A war `net2` wants peace in (`Net2Plan::peace_with`: no order
+    /// on it and no reason left) promises no attack: ending it costs nothing of ours, only the loss it still threatens.
     pub fn prospect(&self, enemy: PlayerId) -> WarProspect {
         let input = self.input;
-        WarProspect::of(input.brief, input.state, input.rules, &self.prices, &self.stakes, enemy, Some(&input.observation.view))
+        let mut prospect = WarProspect::of(input.brief, input.state, input.rules, &self.prices, &self.stakes, enemy, Some(&input.observation.view));
+        if input.brief.net2_for(crate::ai::net2::plan::Part::Peace).is_some_and(|p| p.makes_peace_with(enemy)) {
+            prospect.attack = WarCase::default();
+        }
+        prospect
+    }
+
+    /// `value` of an item that flows to us later (gold a turn, a resource, a neighbour's open borders), read by a
+    /// `net2` plan at the trust in the giver (§4.6, P4: the buyer who paid a sale that the seller then broke by war):
+    /// `trust`/1000 of it, nothing below `TRUST_MIN`. As today without a plan.
+    fn flows_later(&self, from: PlayerId, value: Centi) -> Centi {
+        match self.input.brief.net2_for(crate::ai::net2::plan::Part::Deals) {
+            Some(plan) if plan.trust(from) < crate::ai::net2::plan::TRUST_MIN => 0,
+            Some(plan) => value * plan.trust(from) / 1000,
+            None => value,
+        }
+    }
+
+    /// `flows_later` of a flow we pay for now (`prepaid`: our gold or a city in the same deal), read by a `net2` plan:
+    /// only the rounds the rules guarantee count (`guaranteed_rounds`), the rest at the plan's credit, which is 0
+    /// on these rules (design §4.6 completed, CHAIN.md D1/D2: the swindler of the first sale is a friend, trust 1000,
+    /// and declares war the next round; the rules end the flow at the war and keep the gold, `diplomacy/mod.rs:124`,
+    /// with no backstab memory). A flow exchanged for a flow (a luxury swap) is not prepaid: a break ends both.
+    /// As today without a plan.
+    fn prepaid_flow(&self, from: PlayerId, value: Centi, items: &[(PlayerId, DealItem)]) -> Centi {
+        let Some(plan) = self.input.brief.net2_for(crate::ai::net2::plan::Part::Deals) else { return value };
+        let rounds = self.input.observation.speed.deal_rounds.min(self.prices.rounds_left).max(1);
+        let sure = guaranteed_rounds(self.obs(), from, items).min(rounds);
+        let rest = rounds - sure;
+        let trusted = self.flows_later(from, value);
+        trusted * i64::from(sure) / i64::from(rounds) + trusted * i64::from(rest) / i64::from(rounds) * plan.credit(from) / 1000
     }
 
     /// `gold` in hundredths of score points: a gold now is the price of a
@@ -146,13 +235,15 @@ impl<'i, 'o, 'a> Negotiation<'i, 'o, 'a> {
     /// give for the deal's rounds (`resource`); peace by giving up
     /// the war's prospect; an embassy we receive by the capital it reveals
     /// (`found`) on top of the advisor's scale; the rest by the advisor's
-    /// gold scale (`diplomacy::item_value_priced`) at the price of gold. Peace
+    /// gold scale (`diplomacy::item_value_with`) at the price of gold. Peace
     /// counts once, however many sides give it.
     pub fn value(&self, other: PlayerId, items: &[(PlayerId, DealItem)]) -> Centi {
         let me = self.obs().player;
         // Peace with an aggressor (a nuclear strike, a conquest) costs more: `ai::infamy`.
         let aggressor = self.obs().relation(other).map_or(0, |r| crate::ai::infamy::peace_price(r.warmonger));
         let peace = if items.iter().any(|(_, item)| *item == DealItem::Peace) { -self.prospect(other).value(&self.stakes) - aggressor } else { 0 };
+        let prepaid = pays_now(me, items);
+        let later = |worth: Centi| if prepaid { self.prepaid_flow(other, worth, items) } else { self.flows_later(other, worth) };
         let terms: Centi = items
             .iter()
             .map(|(giver, item)| {
@@ -164,11 +255,23 @@ impl<'i, 'o, 'a> Negotiation<'i, 'o, 'a> {
                     DealItem::GoldPerTurn(gold) => {
                         // The game speed's deal (`DEAL_DURATION` at Standard).
                         let rounds = self.input.observation.speed.deal_rounds.min(self.prices.rounds_left);
-                        sign * self.gold(i64::from(gold) * i64::from(rounds))
+                        let worth = self.gold(i64::from(gold) * i64::from(rounds));
+                        if receiving {
+                            later(worth)
+                        } else {
+                            -worth
+                        }
                     }
                     // A city we cannot see is worth nothing we can tell; ours we always see.
                     DealItem::City(city) => sign * self.city(city).unwrap_or(0),
-                    DealItem::Resource { resource, amount } => self.resource(other, resource, amount, receiving),
+                    DealItem::Resource { resource, amount } => {
+                        let worth = self.resource(other, resource, amount, receiving);
+                        if receiving {
+                            later(worth)
+                        } else {
+                            worth
+                        }
+                    }
                     DealItem::Embassy if receiving => self.found(other) + self.scale(other, *item, receiving),
                     _ => self.scale(other, *item, receiving),
                 }
@@ -177,15 +280,16 @@ impl<'i, 'o, 'a> Negotiation<'i, 'o, 'a> {
         peace + terms
     }
 
-    /// An item by the advisor's gold scale (`diplomacy::item_value_priced`) at
+    /// An item by the advisor's gold scale (`diplomacy::item_value_with`) at
     /// the price of gold.
     fn scale(&self, other: PlayerId, item: DealItem, receiving: bool) -> Centi {
         let agreements = crate::ai::diplomacy::agreement_prices(self.input);
         // `strategist-x`: no friendship, research agreement, pact or open borders for the rival running away.
-        if crate::ai::diplomacy::helps(item) && crate::ai::diplomacy::contained(self.input.brief) == Some(other) {
+        if crate::ai::diplomacy::helps(item) && crate::ai::diplomacy::denied_item(self.input.brief, other, item) {
             return self.gold(crate::ai::diplomacy::REFUSED);
         }
-        self.gold(crate::ai::diplomacy::item_value_priced(self.obs(), self.input.rules, agreements, other, item, receiving))
+        let value = crate::ai::diplomacy::item_value_with(self.obs(), self.input.rules, agreements, self.input.brief.net2_for(crate::ai::net2::plan::Part::Deals), other, item, receiving);
+        self.gold(value)
     }
 
     /// What `amount` copies of `resource` received (`receiving`) from `other` or given to it for
@@ -229,7 +333,7 @@ impl<'i, 'o, 'a> Negotiation<'i, 'o, 'a> {
         }
         // `strategist-x`: no strategic copy for the rival running away (a part of its spaceship may
         // wait for it; Vox Populi's rule of no aluminium to a nation close to the spaceship, by class).
-        if !luxury && crate::ai::diplomacy::contained(self.input.brief) == Some(other) {
+        if !luxury && crate::ai::diplomacy::denied(self.input.brief, other) {
             return self.gold(crate::ai::diplomacy::REFUSED);
         }
         let lost = (amount - (free - 1).max(0)).clamp(0, amount);
@@ -288,9 +392,10 @@ impl<'i, 'o, 'a> Negotiation<'i, 'o, 'a> {
             return Some(city_worth(&self.prices, own.population, 0));
         }
         let seen = obs.visible_foreign_cities.iter().find(|c| c.handle == city)?;
-        let unrest = (5 + i64::from(seen.population.max(1))) * self.prices.happiness * self.stakes.unrest / 100;
-        Some(city_worth(&self.prices, seen.population, 0) - unrest)
+        Some(seen_city_worth(&self.prices, &self.stakes, seen.population))
     }
+
+
 
     pub fn accepts(&self, offer: &DealOffer) -> bool {
         self.value(offer.from, &offer.items) >= 0
@@ -374,6 +479,27 @@ pub fn answer_offers(input: &AdvisorInput<'_, '_>) -> Vec<Command> {
         .iter()
         .map(|offer| {
             let (accept, why) = negotiation.answer(offer);
+            crate::ai::tricks_trace::line(|| {
+                let prospect = negotiation.prospect(offer.from);
+                let order = input.brief.net2.as_ref().and_then(|p| p.war_on(offer.from)).map(|o| format!("{{\"kind\":\"{}\",\"value\":{},\"fighting\":{}}}", o.kind.name(), o.value, o.war_since().is_some()));
+                let trust = input.brief.net2.as_ref().map(|p| p.trust(offer.from));
+                let eases = input.brief.net2.as_ref().map(|p| format!("{:?}", p.order_eases)).unwrap_or_default();
+                let seen: Vec<(u32, u32)> = input.state.seen_cities().iter().filter(|c| c.owner == offer.from).map(|c| (c.tile.0, c.population)).collect();
+                format!(
+                    "{{\"ev\":\"answer\",\"r\":{},\"p\":{},\"from\":{},\"items\":\"{:?}\",\"accept\":{accept},\"value\":{},\"attack_gain\":{},\"attack_cost\":{},\"defence\":{},\"order\":{},\"trust\":{:?},\"peace_with\":{},\"eases\":\"{eases}\",\"seen\":\"{seen:?}\"}}",
+                    obs.round,
+                    obs.player.0,
+                    offer.from.0,
+                    offer.items,
+                    negotiation.value(offer.from, &offer.items),
+                    prospect.attack.gain,
+                    prospect.attack.cost,
+                    prospect.defence,
+                    order.unwrap_or_else(|| "null".to_owned()),
+                    trust,
+                    input.brief.net2.as_ref().is_some_and(|p| p.makes_peace_with(offer.from))
+                )
+            });
             Command::RespondDeal { player: obs.player, offer: offer.id, accept, why }
         })
         .collect()

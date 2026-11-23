@@ -156,6 +156,12 @@ pub trait BenchRules {
         crate::bench::play::SpaceProgress::default()
     }
 
+    /// Dev-only (`AURELIA_SPACE_TRACE`): the player's way to the spaceship now, one line (empty: the module
+    /// has none). Written to stderr each time it changes.
+    fn space_tick(_game: &GameState<Self::M>, _rules: &CompiledRuleset<Self::M>, _player: PlayerId) -> String {
+        String::new()
+    }
+
     /// The name of the player's leader (empty: the module has no leaders).
     fn leader(_game: &GameState<Self::M>, _rules: &CompiledRuleset<Self::M>, _player: PlayerId) -> String {
         String::new()
@@ -543,6 +549,72 @@ impl BenchRules for ClassicBench {
             parts: parts.iter().map(|(p, needed)| u32::from(victory.project_count(player, *p).min(*needed))).sum(),
             built,
         }
+    }
+
+    /// `t` the key technologies known (rocketry, robotics, satellites, advanced ballistics, particle physics,
+    /// nanotechnology), `e` the era, `a` the prerequisite projects done, `i` parts installed, `q` space items
+    /// queued / at the head of a queue, `w` the part units (kind letter + hexes to the capital), `c` the
+    /// capital's tile and whether it is the original one, `n` cities.
+    fn space_tick(game: &GameState<Self::M>, rules: &CompiledRuleset<Self::M>, player: PlayerId) -> String {
+        use kernel::ids::ProductionItem;
+        const KEY: [&str; 6] = ["rocketry", "robotics", "satellites", "advanced-ballistics", "particle-physics", "nanotechnology"];
+        let auth = game.view().auth;
+        let known = auth.players().techs_of(player);
+        let techs: String = KEY
+            .iter()
+            .map(|k| if known.iter().any(|t| rules.technologies.get(t.0 as usize).is_some_and(|d| d.key.rsplit('/').next() == Some(*k))) { '1' } else { '0' })
+            .collect();
+        let era = kernel::world::player::player_era(auth, rules, player);
+        let victory = auth.module().victory();
+        let prerequisites = classic_rules::ai::victory::prerequisite_projects(rules);
+        let apollo = !prerequisites.is_empty() && prerequisites.iter().all(|p| victory.project_count(player, *p) > 0);
+        let parts = classic_rules::world::victory::spaceship_parts(rules);
+        let installed: u32 = parts.iter().map(|(p, needed)| u32::from(victory.project_count(player, *p).min(*needed))).sum();
+        let kinds = classic_rules::ai::victory::part_kinds(rules);
+        let space_item = |item: &ProductionItem| match item {
+            ProductionItem::Unit(k) => kinds.iter().any(|(kind, _, _)| kind == k),
+            ProductionItem::Project(p) => prerequisites.contains(p),
+            ProductionItem::Building(_) => false,
+        };
+        let cities: Vec<_> = auth.cities().iter().map(|(_, c)| c).filter(|c| c.owner == player).collect();
+        let queued = cities.iter().flat_map(|c| c.queue.iter()).filter(|i| space_item(i)).count();
+        let heads = cities.iter().filter(|c| c.queue.first().is_some_and(&space_item)).count();
+        let capital = classic_rules::combat::city::capital_of(auth, rules, player).and_then(|c| auth.cities().get(c));
+        let dims = auth.map().dimensions;
+        let walking: Vec<String> = auth
+            .units()
+            .iter_cores()
+            .filter(|u| u.owner == player && kinds.iter().any(|(k, _, _)| *k == u.kind))
+            .map(|u| {
+                let key = rules.units.get(u.kind.0 as usize).map_or("", |d| d.key.as_str());
+                let letter = key.rsplit('/').next().unwrap_or("").trim_start_matches("ss-").chars().next().unwrap_or('?').to_ascii_uppercase();
+                let hexes = capital.and_then(|c| dims.distance(c.tile, u.tile)).map_or_else(|| "?".to_owned(), |d| d.to_string());
+                format!("{letter}{hexes}")
+            })
+            .collect();
+        // While a part waits outside: every unit on the capital's tile and on the tiles next to the waiting parts.
+        let short = |kind: kernel::ids::UnitKindId| rules.units.get(kind.0 as usize).map_or("?", |d| d.key.rsplit('/').next().unwrap_or("?"));
+        let mut crowd = String::new();
+        if let Some(c) = capital {
+            if walking.iter().any(|w| !w.ends_with('0') || w.len() > 2) {
+                let here: Vec<String> = auth.units().iter_cores().filter(|u| u.tile == c.tile && !kinds.iter().any(|(k, _, _)| *k == u.kind)).map(|u| format!("{}:{}", u.owner.0, short(u.kind))).collect();
+                // The civilians (no strength) within two tiles of the capital: who stands at its gate.
+                let near: Vec<String> = auth
+                    .units()
+                    .iter_cores()
+                    .filter(|u| rules.units.get(u.kind.0 as usize).is_some_and(|d| d.strength == 0) && !kinds.iter().any(|(k, _, _)| *k == u.kind))
+                    .filter_map(|u| dims.distance(c.tile, u.tile).filter(|d| (1..=2).contains(d)).map(|d| format!("{}:{}@{d}", u.owner.0, short(u.kind))))
+                    .collect();
+                crowd = format!(" k[{}] g[{}]", here.join(","), near.join(","));
+            }
+        }
+        let capital = capital.map_or_else(|| "none".to_owned(), |c| format!("{}:{}", c.tile.0, u8::from(c.original_capital && c.original_owner == player)));
+        format!(
+            "t{techs} e{era} a{} i{installed} q{queued}/{heads} w[{}] c{capital} n{}{crowd}",
+            u8::from(apollo),
+            walking.join(","),
+            cities.len()
+        )
     }
 
     /// The nation of the leader (its content key's name).

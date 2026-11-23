@@ -67,6 +67,8 @@ use kernel::ids::BuildingKindId;
 use serde::{Deserialize, Serialize};
 
 use super::act::{self, Aim, Nerve};
+use super::assault;
+use super::memory;
 use super::lab::{self, dist, Arm, Draw, Lab};
 use super::{Piece, Scene};
 
@@ -98,10 +100,22 @@ pub enum Fam {
     Harass,
     Snipe,
     Surrounded,
+    // Part 2: the planned assault (appended again: the older families keep their seeds).
+    AssaultHeal,
+    PromotionChoice,
+    HillArchers,
+    CityFire,
+    PlannedAssault,
+    // The memory trainers (`memory.rs`; appended again: the older families keep their seeds).
+    AmbushFog,
+    HuntFog,
+    // The "at any cost" assault trainers (`assault.rs`; appended again: the older families keep their seeds).
+    AssaultReinforce,
+    AssaultPeace,
 }
 
 impl Fam {
-    pub const ALL: [Fam; 25] = [
+    pub const ALL: [Fam; 34] = [
         Fam::Duel,
         Fam::Focus,
         Fam::Hold,
@@ -127,6 +141,15 @@ impl Fam {
         Fam::Harass,
         Fam::Snipe,
         Fam::Surrounded,
+        Fam::AssaultHeal,
+        Fam::PromotionChoice,
+        Fam::HillArchers,
+        Fam::CityFire,
+        Fam::PlannedAssault,
+        Fam::AmbushFog,
+        Fam::HuntFog,
+        Fam::AssaultReinforce,
+        Fam::AssaultPeace,
     ];
 
     pub fn name(self) -> &'static str {
@@ -156,6 +179,15 @@ impl Fam {
             Fam::Harass => "harass",
             Fam::Snipe => "snipe",
             Fam::Surrounded => "surrounded",
+            Fam::AssaultHeal => "assault-heal",
+            Fam::PromotionChoice => "promotion-choice",
+            Fam::HillArchers => "hill-archers",
+            Fam::CityFire => "city-fire",
+            Fam::PlannedAssault => "planned-assault",
+            Fam::AmbushFog => "ambush-fog",
+            Fam::HuntFog => "hunt-fog",
+            Fam::AssaultReinforce => "assault-reinforce",
+            Fam::AssaultPeace => "assault-peace",
         }
     }
 
@@ -175,6 +207,8 @@ impl Fam {
             Fam::Harass => 12,
             Fam::Snipe => 8,
             Fam::Surrounded => 4,
+            f if memory::is_memory(f) => memory::rounds(f),
+            f => assault::rounds(f),
         }
     }
 
@@ -204,6 +238,8 @@ impl Fam {
             Fam::Harass => &["ref-screen", "ref-fight"],
             Fam::Snipe => &["ref-snipe"],
             Fam::Surrounded => &["ref-break", "ref-flee"],
+            f if memory::is_memory(f) => memory::solvers(f),
+            f => assault::solvers(f),
         }
     }
 
@@ -236,6 +272,8 @@ impl Fam {
             Fam::Harass => &[("MO12", 'D')],
             Fam::Snipe => &[("MO7", 'U'), ("MT8", 'U'), ("E1", 'U'), ("M4", 'U'), ("CS4", 'U')],
             Fam::Surrounded => &[("MT4", 'D')],
+            f if memory::is_memory(f) => &[],
+            f => assault::tricks(f),
         }
     }
 
@@ -267,6 +305,8 @@ impl Fam {
             Fam::Harass => "slow melee and a ranged unit against a human's hit-and-run horse (keshik)",
             Fam::Snipe => "catch an escorted civilian (worker, Great General) of the enemy",
             Fam::Surrounded => "a strong unit of ours about to be surrounded: break out or survive",
+            f if memory::is_memory(f) => memory::task(f),
+            f => assault::task(f),
         }
     }
 
@@ -285,6 +325,8 @@ impl Fam {
             Fam::Bombard => k.by_arm.get(&Arm::NavalRanged).is_some_and(|v| v.iter().any(|x| lab::era_of(rules, *x) == Some(k.era))) || k.uniques.contains_key(&Arm::NavalRanged),
             Fam::Sink => (k.has(Arm::NavalMelee) || k.has(Arm::NavalRanged)) && embark_known(rules, k.era),
             Fam::Airstrike => k.has(Arm::Bomber),
+            // The assault families need the era's siege unit (a city of any era wears down the archers of the era before it).
+            f if assault::is_assault(f) => land && k.has(Arm::Siege),
             _ => land,
         }
     }
@@ -313,34 +355,34 @@ fn farm(rules: &CompiledRuleset, open: usize) -> Option<kernel::ids::Improvement
 // ---------------------------------------------------------------------------
 // Building helpers
 
-struct Painter<'a> {
-    rules: &'a CompiledRuleset,
-    lab: &'a Lab,
-    game: GameState,
-    d: Draw,
-    w: i64,
-    h: i64,
-    cx: i64,
-    cy: i64,
+pub(super) struct Painter<'a> {
+    pub(super) rules: &'a CompiledRuleset,
+    pub(super) lab: &'a Lab,
+    pub(super) game: GameState,
+    pub(super) d: Draw,
+    pub(super) w: i64,
+    pub(super) h: i64,
+    pub(super) cx: i64,
+    pub(super) cy: i64,
 }
 
 impl Painter<'_> {
-    fn xy(&self, t: TileId) -> (i64, i64) {
+    pub(super) fn xy(&self, t: TileId) -> (i64, i64) {
         (i64::from(t.0) % self.w, i64::from(t.0) / self.w)
     }
-    fn at(&self, dx: i64, dy: i64) -> Option<TileId> {
+    pub(super) fn at(&self, dx: i64, dy: i64) -> Option<TileId> {
         let (x, y) = (self.cx + dx, self.cy + dy);
         (x >= 0 && y >= 0 && x < self.w && y < self.h).then(|| TileId((y * self.w + x) as u32))
     }
-    fn standable(&self, t: TileId) -> bool {
+    pub(super) fn standable(&self, t: TileId) -> bool {
         crate::battle::standable(self.rules, &self.game, t)
     }
-    fn free(&self, t: TileId) -> bool {
+    pub(super) fn free(&self, t: TileId) -> bool {
         let auth = self.game.view().auth;
         self.standable(t) && auth.indexes().units_on(t).is_empty() && auth.indexes().city_on_tile(t).is_none()
     }
     /// `n` free land tiles within `r` of `anchor`, nearest first (ties drawn).
-    fn spots(&mut self, anchor: TileId, r: i32, n: usize) -> Result<Vec<TileId>, String> {
+    pub(super) fn spots(&mut self, anchor: TileId, r: i32, n: usize) -> Result<Vec<TileId>, String> {
         let mut v: Vec<(i32, u64, TileId)> = lab::tiles_within(&self.game, anchor, r).into_iter().filter(|t| self.free(*t)).map(|t| (dist(&self.game, t, anchor), 0, t)).collect();
         for x in &mut v {
             x.1 = self.d.next();
@@ -351,18 +393,18 @@ impl Painter<'_> {
         }
         Ok(v.into_iter().take(n).map(|x| x.2).collect())
     }
-    fn paint(&mut self, tiles: &[TileId], terrain: kernel::ids::TerrainId) {
+    pub(super) fn paint(&mut self, tiles: &[TileId], terrain: kernel::ids::TerrainId) {
         let p: Vec<(TileId, kernel::ids::TerrainId)> = tiles.iter().map(|t| (*t, terrain)).collect();
         self.game.debug_set_terrain_batch(self.rules, &p);
     }
-    fn cover(&mut self, tiles: &[TileId]) {
+    pub(super) fn cover(&mut self, tiles: &[TileId]) {
         if let Some(f) = self.lab.grounds.cover {
             let p: Vec<(TileId, kernel::ids::FeatureId)> = tiles.iter().map(|t| (*t, f)).collect();
             self.game.debug_set_feature_batch(self.rules, &p);
         }
     }
     /// Random hills and cover on `n` arena tiles away from `keep`.
-    fn clutter(&mut self, n: usize, keep: &[TileId]) {
+    pub(super) fn clutter(&mut self, n: usize, keep: &[TileId]) {
         let mut tiles: Vec<TileId> = lab::tiles_within(&self.game, self.lab.centre, lab::ARENA).into_iter().filter(|t| keep.iter().all(|k| dist(&self.game, *k, *t) > 0) && self.free(*t)).collect();
         self.d.shuffle(&mut tiles);
         let hills: Vec<TileId> = tiles.iter().take(n / 2).copied().collect();
@@ -371,13 +413,13 @@ impl Painter<'_> {
         self.paint(&hills, g);
         self.cover(&cover);
     }
-    fn put(&mut self, side: PlayerId, tile: TileId, kind: UnitKindId, role: &'static str) -> Piece {
+    pub(super) fn put(&mut self, side: PlayerId, tile: TileId, kind: UnitKindId, role: &'static str) -> Piece {
         let h = self.game.debug_spawn_unit(self.rules, side, tile, kind);
         let id = self.game.view().auth.units().get(h).expect("a spawned unit").core.id;
         Piece { h, id, kind, role }
     }
     /// A kind of `arm` with its fallbacks (an arm the era lacks).
-    fn kind(&mut self, arm: Arm) -> Option<UnitKindId> {
+    pub(super) fn kind(&mut self, arm: Arm) -> Option<UnitKindId> {
         let chain: &[Arm] = match arm {
             Arm::Mounted => &[Arm::Mounted, Arm::Melee],
             Arm::MountedRanged => &[Arm::MountedRanged, Arm::Ranged],
@@ -402,7 +444,7 @@ impl Painter<'_> {
         None
     }
     /// A unique kind of the era for `arm`, by rules id first (a trick names it), drawn with `pct`.
-    fn unique(&mut self, arm: Arm, key: Option<&str>, pct: u64) -> Option<UnitKindId> {
+    pub(super) fn unique(&mut self, arm: Arm, key: Option<&str>, pct: u64) -> Option<UnitKindId> {
         if !self.d.chance(pct) {
             return None;
         }
@@ -411,7 +453,7 @@ impl Painter<'_> {
         }
         self.lab.kinds.uniques.get(&arm).and_then(|v| self.d.pick(v))
     }
-    fn city(&mut self, side: PlayerId, tile: TileId, pop: u32, walls: bool) -> CityHandle {
+    pub(super) fn city(&mut self, side: PlayerId, tile: TileId, pop: u32, walls: bool) -> CityHandle {
         let c = self.game.debug_found_city(self.rules, side, tile);
         self.game.debug_set_population(self.rules, c, pop);
         if walls {
@@ -424,7 +466,7 @@ impl Painter<'_> {
 }
 
 /// The city defences of an era: the rules' walls and their successors known by the era.
-fn defences(rules: &CompiledRuleset, era: u8) -> Vec<BuildingKindId> {
+pub(super) fn defences(rules: &CompiledRuleset, era: u8) -> Vec<BuildingKindId> {
     let keys = ["core:building/walls", "core:building/castle", "core:building/arsenal", "core:building/military-base"];
     rules
         .buildings
@@ -436,7 +478,7 @@ fn defences(rules: &CompiledRuleset, era: u8) -> Vec<BuildingKindId> {
         .collect()
 }
 
-fn blank(fam: Fam, lab: &Lab, instance: usize, attempt: u32) -> Scene {
+pub(super) fn blank(fam: Fam, lab: &Lab, instance: usize, attempt: u32) -> Scene {
     Scene {
         fam,
         era: lab.era,
@@ -462,12 +504,16 @@ fn blank(fam: Fam, lab: &Lab, instance: usize, attempt: u32) -> Scene {
         start_round: 0,
         pillaged: Default::default(),
         taken: None,
+        cap_broken: None,
         founded: None,
         crossed: false,
         city_low: false,
         hold_lost: None,
         first_kill: None,
         kills_by: BTreeMap::new(),
+        track: Default::default(),
+        deadline: None,
+        reinforce: Vec::new(),
     }
 }
 
@@ -477,7 +523,7 @@ pub fn seed(fam: Fam, era: u8, instance: usize, attempt: u32) -> u64 {
     lab::mix(lab::mix(lab::mix((fam as u64) << 32 ^ u64::from(era)) ^ instance as u64) ^ u64::from(attempt) << 17)
 }
 
-fn kinds_label(rules: &CompiledRuleset, ps: &[Piece]) -> String {
+pub(super) fn kinds_label(rules: &CompiledRuleset, ps: &[Piece]) -> String {
     let mut m: BTreeMap<String, u32> = BTreeMap::new();
     for p in ps {
         *m.entry(rules.units[p.kind.0 as usize].name.clone()).or_default() += 1;
@@ -494,6 +540,16 @@ pub fn build(rules: &CompiledRuleset, fam: Fam, era: u8, instance: usize, attemp
     let dims = lab.game.view().auth.map().dimensions;
     let (w, h) = (i64::from(dims.width), i64::from(dims.height));
     let mut p = Painter { rules, lab: &lab, game: lab.game.clone(), d: Draw::new(seed(fam, era, instance, attempt)), w, h, cx: w / 2, cy: h / 2 };
+    if assault::is_assault(fam) {
+        let mut s = assault::build(&mut p, fam, &lab, instance, attempt)?;
+        s.info.insert("attempt".into(), attempt.to_string());
+        return Ok((p.game, s));
+    }
+    if memory::is_memory(fam) {
+        let mut s = memory::build(&mut p, fam, &lab, instance, attempt)?;
+        s.info.insert("attempt".into(), attempt.to_string());
+        return Ok((p.game, s));
+    }
     let mut s = blank(fam, &lab, instance, attempt);
     let (me, foe) = (lab.learner, lab.enemy);
     let c = lab.centre;
@@ -588,12 +644,26 @@ pub fn build(rules: &CompiledRuleset, fam: Fam, era: u8, instance: usize, attemp
                 def_pieces.push(piece);
             }
             if fam == Fam::Citadel {
-                let cit = citadel(rules).ok_or("no citadel")?;
-                p.game.debug_set_improvement_batch(rules, &[(pass, cit)]);
+                // Raised by the holders' side (`debug_raise_citadel` claims the land round it): the damage zone
+                // hurts only units next to a citadel on land an enemy at war owns (`citadel_damage`), so a citadel
+                // set on neutral land damaged nobody.
+                // The rules give the pass to a city of the holders within 5 tiles (`CITADEL_CITY_REACH`): a small
+                // town of theirs stands 5 tiles behind the pass, out of the attackers' way (and of its own strike).
+                citadel(rules).ok_or("no citadel")?;
+                let town = at(&p, def_side * 5, pass_dy)?;
+                p.game.debug_found_city(rules, def, town);
+                if !p.game.debug_raise_citadel(rules, def, pass) {
+                    return Err("no citadel to raise".into());
+                }
+                let owned = p.game.view().auth.map().owner(pass).flatten() == Some(def);
+                if !owned {
+                    return Err("the citadel's land is not the holders'".into());
+                }
             }
             let n_att = if fam == Fam::Hold { (def_pieces.len() * 3).div_ceil(2).max(3) } else { (def_pieces.len() * 2).max(3) };
             let anchor = at(&p, att_side * p.d.range(4, 5), pass_dy)?;
-            let arms = [Arm::Melee, Arm::Mounted, Arm::Ranged, Arm::Melee, Arm::Siege, Arm::Ranged];
+            // Against a citadel the army is mostly shooters (the zone hurts what stands next to the pass).
+            let arms = if fam == Fam::Citadel { [Arm::Ranged, Arm::Ranged, Arm::Melee, Arm::Siege, Arm::Ranged, Arm::Melee] } else { [Arm::Melee, Arm::Mounted, Arm::Ranged, Arm::Melee, Arm::Siege, Arm::Ranged] };
             let mut att_pieces = Vec::new();
             for (i, t) in p.spots(anchor, 2, n_att)?.into_iter().enumerate() {
                 let arm = if fam == Fam::Hold { [Arm::Melee, Arm::Mounted, Arm::Melee, Arm::Mounted][i % 4] } else { arms[i % arms.len()] };
@@ -1074,6 +1144,8 @@ pub fn build(rules: &CompiledRuleset, fam: Fam, era: u8, instance: usize, attemp
                 s.aim_enemy = Some(home_t);
             }
         }
+        Fam::AssaultHeal | Fam::PromotionChoice | Fam::HillArchers | Fam::CityFire | Fam::PlannedAssault | Fam::AssaultReinforce | Fam::AssaultPeace => unreachable!("built by assault::build"),
+        Fam::AmbushFog | Fam::HuntFog => unreachable!("built by memory::build"),
         Fam::Airstrike => {
             let home_t = at(&p, -3, 0)?;
             p.city(me, home_t, 4, false);
@@ -1108,7 +1180,7 @@ pub fn build(rules: &CompiledRuleset, fam: Fam, era: u8, instance: usize, attemp
     Ok((p.game, s))
 }
 
-fn civil_kind(rules: &CompiledRuleset) -> Option<UnitKindId> {
+pub(super) fn civil_kind(rules: &CompiledRuleset) -> Option<UnitKindId> {
     (0..rules.units.len())
         .map(|i| UnitKindId(i as u16))
         .filter(|&k| {
@@ -1163,6 +1235,14 @@ fn city_hp(rules: &CompiledRuleset, game: &GameState, t: TileId) -> Option<(i64,
 
 /// The learner's reference `name` plays the scene units of the learner's seat for this turn.
 pub fn reference_turn(rules: &CompiledRuleset, game: &mut GameState, scene: &mut Scene, name: &str) {
+    if let Some(f) = assault::flags(name) {
+        assault::turn(rules, game, scene, f);
+        return;
+    }
+    if memory::is_memory(scene.fam) && matches!(name, "ref-recall" | "ref-forget") {
+        memory::reference_turn(rules, game, scene, name);
+        return;
+    }
     let (me, foe) = (scene.learner, scene.enemy);
     let sc = scene.clone();
     let friends = handles(&sc.mine);
@@ -1203,7 +1283,9 @@ pub fn reference_turn(rules: &CompiledRuleset, game: &mut GameState, scene: &mut
             ("ref-choke", _) => {
                 let pass = sc.hold.unwrap_or(sc.centre);
                 let held = sc.theirs_alive(game).iter().any(|(_, f)| f.tile == pass);
-                let weak = !held || sc.theirs_alive(game).iter().any(|(_, f)| f.hp < kernel::world::unit::UNIT_MAX_HP * 6 / 10);
+                // Against a citadel the melee go in only for a kill (its zone hurts every unit next to the pass each turn).
+                let below = if sc.fam == Fam::Citadel { 3 } else { 6 };
+                let weak = !held || sc.theirs_alive(game).iter().any(|(_, f)| f.hp < kernel::world::unit::UNIT_MAX_HP * below / 10);
                 if ranged {
                     (Aim::Support, Nerve::Even, false)
                 } else if weak {
@@ -1295,7 +1377,7 @@ pub fn reference_turn(rules: &CompiledRuleset, game: &mut GameState, scene: &mut
                     if let Some((_, t)) = act::best_blow(game, rules, me, p.h, &foes_only(game), Nerve::Reckless) {
                         let _ = act::strike(game, rules, me, p.h, t);
                     }
-                    act::stand(game, p.h);
+                    act::stand(game, rules, p.h);
                     continue;
                 }
                 (Aim::Hold(c.tile), Nerve::Careful, false)
@@ -1366,7 +1448,7 @@ fn pillage_turn(rules: &CompiledRuleset, game: &mut GameState, side: PlayerId, p
     let auth = game.view().auth;
     let open: Vec<TileId> = improved.iter().copied().filter(|t| !auth.map().pillaged(*t) && matches!(auth.map().improvement(*t), Some(Some(_)))).collect();
     if open.contains(&c.tile) && act::try_cmd(game, rules, side, Command::Pillage { unit: p.h }) {
-        act::stand(game, p.h);
+        act::stand(game, rules, p.h);
         return;
     }
     let strike = classic_rules::combat::city::CITY_ATTACK_RANGE;
@@ -1378,12 +1460,20 @@ fn pillage_turn(rules: &CompiledRuleset, game: &mut GameState, side: PlayerId, p
             let _ = act::try_cmd(game, rules, side, Command::Pillage { unit: p.h });
         }
     }
-    act::stand(game, p.h);
+    act::stand(game, rules, p.h);
 }
 
 /// The scripted human of the enemy's seat (the defence scenes); the other families leave the
 /// enemy's units to its AI.
 pub fn enemy_turn(rules: &CompiledRuleset, game: &mut GameState, scene: &mut Scene) {
+    if assault::is_assault(scene.fam) {
+        assault::enemy_turn(rules, game, scene);
+        return;
+    }
+    if memory::is_memory(scene.fam) {
+        memory::enemy_turn(rules, game, scene);
+        return;
+    }
     let (me, foe) = (scene.enemy, scene.learner);
     let sc = scene.clone();
     let friends = handles(&sc.theirs);
@@ -1415,7 +1505,7 @@ pub fn enemy_turn(rules: &CompiledRuleset, game: &mut GameState, scene: &mut Sce
             for p in &sc.theirs {
                 let Some(c) = act::alive(game, p, me) else { continue };
                 if p.role == "bait" {
-                    act::stand(game, p.h);
+                    act::stand(game, rules, p.h);
                     continue;
                 }
                 let aim = if near || rel >= 4 { Aim::Close } else { Aim::Hold(c.tile) };
@@ -1454,7 +1544,7 @@ pub fn enemy_turn(rules: &CompiledRuleset, game: &mut GameState, scene: &mut Sce
                 // A kill when one is offered, else pillage.
                 if let Some((score, t)) = act::best_blow(game, rules, me, p.h, &ours(game), Nerve::Careful) {
                     if score >= 10_000 && act::strike(game, rules, me, p.h, t) {
-                        act::stand(game, p.h);
+                        act::stand(game, rules, p.h);
                         continue;
                     }
                 }
@@ -1488,13 +1578,13 @@ fn civilian_hunt(rules: &CompiledRuleset, game: &mut GameState, sc: &Scene, me: 
             continue;
         }
         if act::try_cmd(game, rules, me, Command::AttackUnit { attacker: p.h, defender: q.h }) {
-            act::stand(game, p.h);
+            act::stand(game, rules, p.h);
             return;
         }
         let near: Vec<TileId> = act::reachable(game, rules, me, p.h).into_iter().filter(|(x, left)| *left > 0 && dist(game, *x, *t) == 1 && act::free_for(game, rules, p.h, *x)).map(|(x, _)| x).collect();
         if let Some(&x) = near.iter().min_by_key(|x| x.0) {
             if act::try_cmd(game, rules, me, Command::MoveUnit { unit: p.h, destination: x }) && act::try_cmd(game, rules, me, Command::AttackUnit { attacker: p.h, defender: q.h }) {
-                act::stand(game, p.h);
+                act::stand(game, rules, p.h);
                 return;
             }
         }
@@ -1502,7 +1592,7 @@ fn civilian_hunt(rules: &CompiledRuleset, game: &mut GameState, sc: &Scene, me: 
     let targets = targets_of(sc, foe == sc.enemy, false);
     if let Some((_, t)) = act::best_blow(game, rules, me, p.h, &targets(game), Nerve::Careful) {
         if act::strike(game, rules, me, p.h, t) {
-            act::stand(game, p.h);
+            act::stand(game, rules, p.h);
             return;
         }
     }
@@ -1512,7 +1602,7 @@ fn civilian_hunt(rules: &CompiledRuleset, game: &mut GameState, sc: &Scene, me: 
     if let Some(goal) = goal {
         act::move_by(game, rules, me, p.h, |g, x, _| (cities.iter().any(|ct| dist(g, *ct, x) <= strike), dist(g, x, goal), x.0));
     }
-    act::stand(game, p.h);
+    act::stand(game, rules, p.h);
 }
 
 // ---------------------------------------------------------------------------
@@ -1564,6 +1654,7 @@ pub fn judge(rules: &CompiledRuleset, game: &GameState, sc: &mut Scene, rel: u32
     let n = sc.mine.len();
     let civ_ok = sc.mine.iter().filter(|p| p.role == "civilian").all(|p| act::alive(game, p, sc.learner).is_some());
     let v = match sc.fam {
+        Fam::AmbushFog | Fam::HuntFog => memory::judge(rules, game, sc, rel),
         Fam::Duel => {
             if combat_theirs == 0 && !mine.is_empty() {
                 Some(true)
@@ -1672,6 +1763,23 @@ pub fn judge(rules: &CompiledRuleset, game: &GameState, sc: &mut Scene, rel: u32
                 Some(false)
             } else if combat_theirs == 0 || limit {
                 Some(true)
+            } else {
+                None
+            }
+        }
+        f @ (Fam::AssaultHeal | Fam::PromotionChoice | Fam::HillArchers | Fam::CityFire | Fam::PlannedAssault | Fam::AssaultReinforce | Fam::AssaultPeace) => {
+            let cap = assault::loss_cap(f, sc.mine.len());
+            if lost > cap && sc.cap_broken.is_none() {
+                sc.cap_broken = Some(rel);
+            }
+            let broken = sc.cap_broken.is_some();
+            if broken && !play_on_past_cap() {
+                Some(false)
+            } else if let Some(t) = sc.taken {
+                // The "at any cost" families: a capture after the deadline (the reinforcements landed, the peace) loses.
+                Some(!broken && sc.deadline.is_none_or(|d| t <= d))
+            } else if limit || !mine.iter().any(|(p, _)| !act::is_civilian(rules, p.kind)) {
+                Some(false)
             } else {
                 None
             }
@@ -1794,6 +1902,12 @@ pub fn judge(rules: &CompiledRuleset, game: &GameState, sc: &mut Scene, rel: u32
     v
 }
 
+/// `ARMY_PLAY_ON_CAP=1`: an assault scene whose loss cap broke plays on to its capture or its round limit, so
+/// the capture rate is measured beside the win (the verdict stays a loss: the win rules do not change).
+fn play_on_past_cap() -> bool {
+    std::env::var("ARMY_PLAY_ON_CAP").is_ok_and(|v| v == "1")
+}
+
 fn cost(rules: &CompiledRuleset, k: UnitKindId) -> f64 {
     f64::from(rules.units[k.0 as usize].cost)
 }
@@ -1814,9 +1928,23 @@ pub fn measures(rules: &CompiledRuleset, game: &GameState, sc: &Scene, rel: u32)
     }
     if sc.target.is_some() {
         m.insert("taken".into(), sc.taken.map_or(-1.0, f64::from));
+        m.insert("cap_broken".into(), sc.cap_broken.map_or(-1.0, f64::from));
+        if let Some(d) = sc.deadline {
+            m.insert("deadline".into(), f64::from(d));
+        }
         if let Some((hp, max)) = sc.target.and_then(|t| city_hp(rules, game, t)) {
             m.insert("city_hp_share".into(), hp as f64 / max as f64);
         }
+    }
+    if assault::is_assault(sc.fam) {
+        let t = &sc.track;
+        m.insert("dmg_city".into(), t.dmg_enemy_turn as f64);
+        m.insert("dmg_own".into(), t.dmg_own_turn as f64);
+        m.insert("dmg_total".into(), (t.dmg_enemy_turn + t.dmg_own_turn) as f64);
+        m.insert("city_dealt".into(), t.city_dealt as f64);
+        m.insert("dealt_per_round".into(), t.city_dealt as f64 / f64::from(rel.max(1)));
+        m.insert("rested".into(), f64::from(t.rested));
+        m.insert("picks".into(), t.picks.len() as f64);
     }
     if sc.fam == Fam::Convoy {
         m.insert("founded".into(), sc.founded.map_or(-1.0, f64::from));

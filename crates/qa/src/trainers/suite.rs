@@ -63,10 +63,12 @@ struct Opts {
     instance: usize,
     attempt: u32,
     player: String,
+    /// Record the players' decisions for the army net into this file (`army_net::record`).
+    record: Option<PathBuf>,
 }
 
 fn opts(args: &[String]) -> Result<Opts, String> {
-    let mut o = Opts { out: PathBuf::from("trainers"), families: Fam::ALL.to_vec(), eras: None, instances: 100, from: 0, players: vec!["standard".to_owned()], jobs: 4, attempts: ATTEMPTS, kept: None, family: None, era: None, instance: 0, attempt: 0, player: "standard".to_owned() };
+    let mut o = Opts { out: PathBuf::from("trainers"), families: Fam::ALL.to_vec(), eras: None, instances: 100, from: 0, players: vec!["standard".to_owned()], jobs: 4, attempts: ATTEMPTS, kept: None, family: None, era: None, instance: 0, attempt: 0, player: "standard".to_owned(), record: None };
     let mut it = args.iter();
     while let Some(a) = it.next() {
         let mut v = || it.next().cloned().ok_or(format!("{a} needs a value"));
@@ -85,6 +87,10 @@ fn opts(args: &[String]) -> Result<Opts, String> {
             "--instance" => o.instance = v()?.parse().map_err(|e| format!("{e}"))?,
             "--attempt" => o.attempt = v()?.parse().map_err(|e| format!("{e}"))?,
             "--player" => o.player = v()?,
+            "--record" => o.record = Some(PathBuf::from(v()?)),
+            "--world" => lab::mode::WORLD.store(match v()?.as_str() { "small" => 0, "tiny" => 1, "duel" => 2, w => return Err(format!("--world small|tiny|duel, not {w}")) }, std::sync::atomic::Ordering::Relaxed),
+            "--fog" => lab::mode::FOG.store(match v()?.as_str() { "on" => 1, "off" => 0, w => return Err(format!("--fog on|off, not {w}")) }, std::sync::atomic::Ordering::Relaxed),
+            "--ai" => lab::mode::AI.store(match v()?.as_str() { "full" => 0, "combat" => 1, w => return Err(format!("--ai full|combat, not {w}")) }, std::sync::atomic::Ordering::Relaxed),
             other => return Err(format!("unknown option {other}")),
         }
     }
@@ -235,6 +241,10 @@ fn run(rules: &CompiledRuleset, o: &Opts) -> Result<(), String> {
     }
     let rows_out = Mutex::new(std::fs::OpenOptions::new().create(true).append(true).open(&rows_path).map_err(|e| e.to_string())?);
     let kept_out = Mutex::new(std::fs::OpenOptions::new().create(true).append(true).open(&kept_path).map_err(|e| e.to_string())?);
+    let record_out = match &o.record {
+        Some(path) => Some(Mutex::new(std::fs::OpenOptions::new().create(true).append(true).open(path).map_err(|e| e.to_string())?)),
+        None => None,
+    };
     let started = std::time::Instant::now();
     let count = std::sync::atomic::AtomicUsize::new(0);
     let write_row = |r: &Row| {
@@ -258,15 +268,22 @@ fn run(rules: &CompiledRuleset, o: &Opts) -> Result<(), String> {
             None => return,
         };
         let Some(a) = k.attempt else { return };
-        let todo: Vec<&String> = o.players.iter().filter(|p| !done_rows.contains(&(key.0.clone(), key.1.clone(), i, a, (*p).clone()))).collect();
+        // `solvers` stands for the family's references.
+        let players: Vec<String> = o.players.iter().flat_map(|p| if p == "solvers" { f.solvers().iter().map(|s| (*s).to_owned()).collect() } else { vec![p.clone()] }).collect();
+        let todo: Vec<&String> = players.iter().filter(|p| !done_rows.contains(&(key.0.clone(), key.1.clone(), i, a, (*p).clone()))).collect();
         if todo.is_empty() {
             return;
         }
         let Ok((game, scene)) = families::build(rules, f, e, i, a) else { return };
         for p in todo {
+            crate::army_net::record::want(record_out.is_some());
             match play(rules, game.clone(), scene.clone(), p, false) {
                 Ok(r) => write_row(&tag(r, "player")),
                 Err(err) => eprintln!("{} {p}: {err}", scene.label(rules)),
+            }
+            crate::army_net::record::want(false);
+            if let (Some(out), Some((bytes, _))) = (record_out.as_ref(), crate::army_net::record::take_last()) {
+                let _ = out.lock().unwrap().write_all(&bytes);
             }
         }
         let n = count.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1;
@@ -274,6 +291,10 @@ fn run(rules: &CompiledRuleset, o: &Opts) -> Result<(), String> {
             println!("{n} instances, {:.0} s", started.elapsed().as_secs_f64());
         }
     });
+    if std::env::var_os("TRAINERS_PROF").is_some() {
+        let p: Vec<u64> = crate::trainers::PROF.iter().map(|a| a.load(std::sync::atomic::Ordering::Relaxed) / 1000).collect();
+        eprintln!("prof ms: driver.step {} sample {} close_arena {}", p[0], p[1], p[2]);
+    }
     println!("done: {} instances in {:.0} s", count.load(std::sync::atomic::Ordering::Relaxed), started.elapsed().as_secs_f64());
     Ok(())
 }

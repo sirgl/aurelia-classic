@@ -35,11 +35,25 @@ pub fn is_civilian(rules: &CompiledRuleset, kind: UnitKindId) -> bool {
 }
 
 pub fn try_cmd(game: &mut GameState, rules: &CompiledRuleset, side: PlayerId, cmd: Command) -> bool {
-    game.accepts_order(rules, side, &cmd) && game.execute(rules, cmd).is_ok()
+    if !game.accepts_order(rules, side, &cmd) {
+        return false;
+    }
+    execute(game, rules, side, cmd)
+}
+
+/// Executes an accepted command; the army net's recorder sees it before and after (when it records).
+fn execute(game: &mut GameState, rules: &CompiledRuleset, side: PlayerId, cmd: Command) -> bool {
+    let pending = crate::army_net::record::before(game, rules, side, &cmd);
+    let fact = crate::army_net::observe::log_before(game, rules, side, &cmd);
+    let ok = game.execute(rules, cmd).is_ok();
+    crate::army_net::observe::log_after(game, rules, fact, ok);
+    crate::army_net::record::after(game, pending, ok);
+    ok
 }
 
 /// The unit's turn is over: the seat's mind plays the rest of the seat and must not move it.
-pub fn stand(game: &mut GameState, h: UnitHandle) {
+pub fn stand(game: &mut GameState, rules: &CompiledRuleset, h: UnitHandle) {
+    crate::army_net::record::done(game, rules, h);
     if let Some(core) = game.world_mut().units.get_mut_core(h) {
         core.moves_left = 0;
     }
@@ -80,7 +94,7 @@ pub fn attack_cmd(game: &GameState, rules: &CompiledRuleset, unit: UnitHandle, t
 pub fn strike(game: &mut GameState, rules: &CompiledRuleset, side: PlayerId, unit: UnitHandle, target: TileId) -> bool {
     let Some(cmd) = attack_cmd(game, rules, unit, target) else { return false };
     if game.accepts_order(rules, side, &cmd) {
-        return game.execute(rules, cmd).is_ok();
+        return execute(game, rules, side, cmd);
     }
     if matches!(cmd, Command::RangedAttack { .. }) && try_cmd(game, rules, side, Command::SetUpRangedAttack { unit }) {
         return try_cmd(game, rules, side, cmd);
@@ -343,7 +357,7 @@ pub fn unit_turn(game: &mut GameState, rules: &CompiledRuleset, side: PlayerId, 
             }
         }
     }
-    stand(game, unit);
+    stand(game, rules, unit);
     made
 }
 
@@ -358,7 +372,7 @@ pub fn passive_turn(game: &mut GameState, rules: &CompiledRuleset, side: PlayerI
             if fortify(game, rules, side, p.h) {
                 made += 1;
             }
-            stand(game, p.h);
+            stand(game, rules, p.h);
         }
     }
     made
@@ -391,7 +405,7 @@ pub fn random_turn(game: &mut GameState, rules: &CompiledRuleset, side: PlayerId
         if pick < options.len() && try_cmd(game, rules, side, options[pick].clone()) {
             made += 1;
         }
-        stand(game, p.h);
+        stand(game, rules, p.h);
     }
     made
 }

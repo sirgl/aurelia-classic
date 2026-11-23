@@ -380,6 +380,8 @@ pub struct TurnBrief {
     /// The science levers priced by what they do (`ai::science_levers`,
     /// `Variant::science_levers`).
     pub levers: crate::ai::science_levers::ScienceLevers,
+    /// `science-flow`: `net2`'s science-flow neurons play (`Variant::science_flow`; `Net2Plan::science`).
+    pub science_flow: bool,
     /// The spaceship is built where it is finished soonest
     /// (`victory::space_plan`, `Variant::space_finish`).
     pub space_finish: bool,
@@ -408,6 +410,9 @@ pub struct TurnBrief {
     pub field_craft: bool,
     /// `raid-war` (`Variant::raid_war`): `Standard` with the pillaging of `ai::raid_war`.
     pub raid_war: bool,
+    /// The war's going on is priced also without an operation (`Variant::values_war_at_peace`, `peace::WarProspect::of`):
+    /// an assault group's case and `net2`'s war order (work/nets/tricks/CHAIN.md D8; tac/runs/C1.md).
+    pub war_at_peace: bool,
     /// `landless` (`Variant::landless`): the goal of a player with units and no city (`ai::landless`).
     pub landless: bool,
     /// `landless-plan` (`Variant::landless_plan`): the same goal, given to the empire's strategist
@@ -488,6 +493,10 @@ pub struct TurnBrief {
     /// research, policies and the choice among the allocator's best orders follow it.
     /// None for the others.
     pub strategy: Option<std::sync::Arc<crate::ai::strategy_net::Plan>>,
+    /// The levers of `net2` (`ai::net2`) for the executors of the turn: the war order, peace wishes,
+    /// trust, guard, city-state share, embargo, escorts, generals and the site head's tall share. None
+    /// for every variant but `net2`'s, and every executor plays as before then (the design's §6.1).
+    pub net2: Option<crate::ai::net2::Net2Plan>,
     /// The unit net's turn (`ai::unit_net`, `Variant::unit_net`): the commander's
     /// operations, orders and plan; its tactician decides the units of a theatre.
     /// None for the others.
@@ -503,6 +512,13 @@ fn known_percent(view: &crate::knowledge::view::PlayerView<'_>) -> u32 {
 }
 
 impl TurnBrief {
+    /// The `net2` plan for a reader of `part`: None without a plan or when the seat does not play that part
+    /// (`net2::plan::Parts`), and the reader plays as `nets-x-site` then. For the readers that keep the plan;
+    /// the others read it through `operations::with_net2`, which also sees a test's plan.
+    pub fn net2_for(&self, part: crate::ai::net2::plan::Part) -> Option<&crate::ai::net2::Net2Plan> {
+        self.net2.as_ref().filter(|plan| plan.parts.plays(part))
+    }
+
     pub fn from_observation(obs: &AIObservation<'_>, rules: &CompiledRuleset) -> Self {
         let units: Vec<UnitBrief> = obs.own_units.iter().map(|u| unit_brief(rules, u)).collect();
         let military_power = units
@@ -570,6 +586,7 @@ impl TurnBrief {
             site_net: crate::ai::site_net::SiteNetPlay::Off,
             effects: crate::ai::effects::EffectChecks::NONE,
             levers: crate::ai::science_levers::ScienceLevers::NONE,
+            science_flow: false,
             space_finish: false,
             abilities: false,
             religion_fix: false,
@@ -580,6 +597,7 @@ impl TurnBrief {
             sharp: false,
             field_craft: false,
             raid_war: false,
+            war_at_peace: false,
             landless: false,
             landless_plan: false,
             landless_goal: None,
@@ -609,6 +627,7 @@ impl TurnBrief {
             trade_fit: false,
             unciv: crate::ai::unciv::UncivParts::NONE,
             strategy: None,
+            net2: None,
             #[cfg(feature = "experimental-ai")]
             unit_net: None,
         }

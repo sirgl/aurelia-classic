@@ -101,6 +101,10 @@ pub struct Pace {
     /// read 0): a ship built whole that the game did not end with was not installed.
     #[serde(default)]
     pub built: u32,
+    /// The round every part of the ship was first built at once (`built` reached the ship's parts; reports saved
+    /// before read None).
+    #[serde(default)]
+    pub built_round: Option<u32>,
 }
 
 impl Pace {
@@ -127,8 +131,11 @@ impl Pace {
         }
     }
 
-    /// After `round`: the spaceship as `BenchRules::spaceship` counts it.
-    pub(crate) fn spaceship(&mut self, round: u32, space: SpaceProgress) {
+    /// After `round`: the spaceship as `BenchRules::spaceship` counts it, of `needed` parts.
+    pub(crate) fn spaceship(&mut self, round: u32, space: SpaceProgress, needed: u32) {
+        if needed > 0 && space.built >= needed && self.built_round.is_none() {
+            self.built_round = Some(round);
+        }
         if space.project_done && self.space_project.is_none() {
             self.space_project = Some(round);
         }
@@ -388,6 +395,15 @@ impl MatchResult {
 /// suite's order whatever the threads did. Failed matches are reported by
 /// label.
 pub fn tournament<R: BenchRules>(suite: &Suite, matches: &[Match], pairing: &Pairing, jobs: usize) -> Result<Vec<MatchResult>, Vec<String>> {
+    let only = std::env::var(MATCH_FILTER_ENV).ok().filter(|t| !t.is_empty());
+    let kept: Vec<Match>;
+    let matches = match &only {
+        Some(text) => {
+            kept = matches.iter().copied().filter(|m| m.label().contains(text.as_str())).collect();
+            &kept[..]
+        }
+        None => matches,
+    };
     let next = AtomicUsize::new(0);
     let results: Mutex<Vec<Option<Result<MatchResult, String>>>> = Mutex::new(vec![None; matches.len()]);
     std::thread::scope(|scope| {
@@ -429,6 +445,9 @@ pub fn play_match<R: BenchRules>(rules: &CompiledRuleset<R::M>, suite: &Suite, g
     driver.record_journal();
     let mut log = MatchLog::new(&seats, R::OPENING_ROUNDS);
     log.landless = landless;
+    log.capital_trace = std::env::var_os(CAPITAL_TRACE_ENV).map(|_| label.clone());
+    log.space_trace = std::env::var_os(SPACE_TRACE_ENV).map(|_| label.clone());
+    log.space_last = vec![String::new(); log.seats.len()];
     if crate::bench::rival::enabled() {
         log.probe = Some(crate::bench::rival::RivalProbe::new(&seats));
     }
@@ -587,7 +606,27 @@ struct MatchLog {
     probe: Option<crate::bench::rival::RivalProbe>,
     /// The landless seat (`--landless-seat`): its player and its log.
     landless: Option<(PlayerId, crate::bench::landless::LandlessGame)>,
+    /// The match's label when `AURELIA_CAPITAL_TRACE` is set: every capture of an original capital is written to
+    /// stderr (`CAPITAL <label> ...`), so a lost capital can be found and its game played again alone
+    /// (`AURELIA_BENCH_MATCH`).
+    capital_trace: Option<String>,
+    /// The match's label when `AURELIA_SPACE_TRACE` is set: each seat's way to the spaceship
+    /// (`BenchRules::space_tick`) is written to stderr whenever it changes (`SPACE <label> ...`), and every
+    /// seat's end (`SPACEEND`), so a ship built and not finished can be followed.
+    space_trace: Option<String>,
+    /// The last line written per seat (`space_trace`).
+    space_last: Vec<String>,
 }
+
+/// Dev-only: `AURELIA_SPACE_TRACE` (any value) writes each seat's way to the spaceship to stderr.
+pub const SPACE_TRACE_ENV: &str = "AURELIA_SPACE_TRACE";
+
+/// Dev-only: `AURELIA_BENCH_MATCH=<text>` plays only the matches whose label (`Match::label`, e.g.
+/// `fractal/small/seed 1853017/odd`) contains the text: one game of a suite again, with its traces.
+pub const MATCH_FILTER_ENV: &str = "AURELIA_BENCH_MATCH";
+
+/// Dev-only: `AURELIA_CAPITAL_TRACE` (any value) writes every capture of an original capital to stderr.
+pub const CAPITAL_TRACE_ENV: &str = "AURELIA_CAPITAL_TRACE";
 
 impl MatchLog {
     fn new(seats: &[(PlayerId, Side)], opening: u32) -> Self {
@@ -615,7 +654,7 @@ impl MatchLog {
                 pace: Pace::default(),
             })
             .collect();
-        Self { seats, round_ms: Vec::new(), wars: Vec::new(), start_techs: Vec::new(), probe: None, landless: None }
+        Self { seats, round_ms: Vec::new(), wars: Vec::new(), start_techs: Vec::new(), probe: None, landless: None, capital_trace: None, space_trace: None, space_last: Vec::new() }
     }
 
     fn seat(&mut self, player: PlayerId) -> Option<&mut SeatResult> {
@@ -747,6 +786,13 @@ impl MatchLog {
         self.record(from, |r| r.cities_lost += 1);
         let capital = game.view().auth.cities().get(city).is_some_and(|c| c.original_capital && c.original_owner == from);
         if capital {
+            if let Some(label) = &self.capital_trace {
+                let side = |p: PlayerId| self.seats.iter().find(|s| s.player == p).map_or("other", |s| if s.side == Side::Candidate { "candidate" } else { "baseline" });
+                let war = self.wars.iter().find(|w| w.between(from, to)).map(|w| format!("declared by {} in round {}", w.declarer.0, w.since));
+                let size = game.view().auth.cities().get(city).map_or(0, |c| c.population);
+                let left = game.view().auth.cities().iter().filter(|(_, c)| c.owner == from).count();
+                eprintln!("CAPITAL {label} round {now} lost by {} ({}) to {} ({}) size {size} cities left {left} war {}", from.0, side(from), to.0, side(to), war.as_deref().unwrap_or("none"));
+            }
             self.record(from, |r| r.capitals_lost += 1);
             self.record(to, |r| {
                 r.capital_taken.get_or_insert(now);
@@ -781,10 +827,18 @@ impl MatchLog {
         let players = game.view().auth.players();
         let at_checkpoint = checkpoints.contains(&now);
         let mut out = Vec::new();
-        for (seat, start) in self.seats.iter_mut().zip(&self.start_techs) {
+        for (at, (seat, start)) in self.seats.iter_mut().zip(&self.start_techs).enumerate() {
             let techs = players.techs_of(seat.player).len().saturating_sub(*start);
             seat.pace.progress(now, techs, kernel::world::player::player_era(game.view().auth, rules, seat.player));
-            seat.pace.spaceship(now, R::spaceship(game, rules, seat.player));
+            seat.pace.spaceship(now, R::spaceship(game, rules, seat.player), R::spaceship_parts(rules));
+            if let Some(label) = &self.space_trace {
+                let tick = R::space_tick(game, rules, seat.player);
+                if self.space_last.get(at).is_some_and(|last| *last != tick) {
+                    let side = if seat.side == Side::Candidate { "candidate" } else { "baseline" };
+                    eprintln!("SPACE {label} r{now} p{} {side} {tick}", seat.player.0);
+                    self.space_last[at] = tick;
+                }
+            }
             if seat.eliminated.is_none() && !players.is_alive(seat.player) {
                 seat.eliminated = Some(now);
                 out.push(seat.player);
@@ -819,6 +873,27 @@ impl MatchLog {
             seat.combat.held = game.view().auth.cities().iter().filter(|(_, c)| c.owner == player && c.original_owner != player).count() as u32;
         }
         rank(&mut self.seats);
+        if let Some(label) = &self.space_trace {
+            let won = winner.map_or_else(|| "none".to_owned(), |(p, kind)| format!("{}:{kind}", p.0));
+            for seat in &self.seats {
+                let side = if seat.side == Side::Candidate { "candidate" } else { "baseline" };
+                let economy = R::economy(game, rules, seat.player);
+                eprintln!(
+                    "SPACEEND {label} seed {seed} rounds {} winner {won} p{} {side} {} elim {:?} built {} installed {} project {:?} eras {:?} gold {}+{}/turn science {}",
+                    round(game),
+                    seat.player.0,
+                    seat.leader,
+                    seat.eliminated,
+                    seat.pace.built,
+                    seat.pace.parts.len(),
+                    seat.pace.space_project,
+                    seat.pace.eras,
+                    economy.treasury,
+                    economy.gold,
+                    economy.science
+                );
+            }
+        }
         let landless = self.landless.take().map(|(player, mut log)| {
             if std::env::var_os("AURELIA_LANDLESS_TRACE").is_some() {
                 let c = self.seats.iter().find(|s| s.player == player).map(|s| (s.combat, s.founded, s.eliminated));

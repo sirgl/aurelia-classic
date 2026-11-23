@@ -5,7 +5,7 @@
 
 use classic_content::core::core_rules;
 use classic_rules::derived::resources::{
-    deposit_amount, production_resources, resource_ledger, strategic_combat_penalty,
+    compute_unit_resource_penalty, deposit_amount, production_resources, resource_ledger, strategic_combat_penalty,
     unit_resource_penalty, ResourceLedger,
 };
 use classic_rules::ids::{
@@ -195,6 +195,49 @@ fn a_deficit_weakens_the_units_that_need_the_resource() {
     assert_eq!(unit_resource_penalty(auth, &w.rules, P0, kind), expected);
     let warrior = w.unit("core:unit/warrior");
     assert_eq!(unit_resource_penalty(auth, &w.rules, P0, warrior), 0, "a warrior needs nothing");
+}
+
+/// The memoised penalty (`unit_resource_penalty`) against the computed one in a world where the
+/// answer is not always 0: one kind in real shortfall, one with enough, for two players, and across
+/// changes of the ledger inside one turn (a unit gained, a deposit gained).
+#[test]
+fn the_memoised_penalty_follows_a_real_shortfall_and_the_ledger() {
+    let mut w = World::new();
+    w.city(5, 5);
+    w.learn("core:tech/iron-working");
+    let at = w.tile(6, 5);
+    w.deposit(at, "core:resource/iron", "core:improvement/mine");
+    let iron = w.resource("core:resource/iron");
+    let total = w.ledger().total(iron);
+    let (sword, horse) = (w.unit("core:unit/swordsman"), w.unit("core:unit/horseman"));
+    let p1 = PlayerId(1);
+    // Enough iron for one swordsman; a horseman with no horses at all.
+    w.game.debug_spawn_unit(&w.rules, P0, at, sword);
+    w.game.debug_spawn_unit(&w.rules, P0, at, horse);
+    let both = |w: &World, player: PlayerId, kind: UnitKindId| {
+        let auth = w.game.view().auth;
+        let memo = (unit_resource_penalty(auth, &w.rules, player, kind), unit_resource_penalty(auth, &w.rules, player, kind));
+        let plain = compute_unit_resource_penalty(auth, &w.rules, player, kind);
+        assert_eq!(memo, (plain, plain), "memo against compute for {player:?} and {kind:?}");
+        plain
+    };
+    // The swordsman first: a memo keyed without the kind would answer the horseman with its 0.
+    assert_eq!(both(&w, P0, sword), 0, "one swordsman, iron enough");
+    assert_eq!(both(&w, P0, horse), -25, "a horseman, no horses");
+    assert_eq!(both(&w, PlayerId(1), horse), 0, "the other player owns no horseman");
+    assert_eq!(both(&w, p1, sword), 0);
+    // The ledger changes inside the turn: more swordsmen than iron.
+    for _ in 0..total {
+        w.game.debug_spawn_unit(&w.rules, P0, at, sword);
+    }
+    assert_eq!(both(&w, P0, sword), -25, "swordsmen beyond the iron");
+    assert_eq!(both(&w, P0, horse), -25);
+    // A second deposit: the shortfall closes.
+    let more = w.tile(5, 6);
+    w.deposit(more, "core:resource/iron", "core:improvement/mine");
+    assert!(w.ledger().available(iron) >= 0, "the second deposit covers the swordsmen");
+    assert_eq!(both(&w, P0, sword), 0, "iron enough again");
+    assert_eq!(both(&w, P0, horse), -25, "horses still missing");
 }
 
 #[test]
