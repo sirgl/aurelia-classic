@@ -1593,6 +1593,11 @@ fn needs_garrison(
     rules: &CompiledRuleset,
     city: &OwnCity,
 ) -> bool {
+    // `early-growth`: net2's garrison lets the city wait (`garrison_waits_at`), the one place the wait is read for the
+    // orders: a city that waits needs none, flat or held (`hold_short` reads it through `garrison_wanted_at`).
+    if empire.garrison_waits.contains(&city.tile) {
+        return false;
+    }
     let wanted =
         crate::ai::planner_units::garrison_wanted(obs.speed.standard_round(obs.round), &obs.relations, empire.strategy);
     wanted > 0 && (!garrisoned(obs, rules, city) || held_short(empire, city))
@@ -1635,9 +1640,8 @@ fn garrison_order(
     slot: &Slot<'_>,
 ) -> Option<Decision> {
     // `early-growth`: net2's garrison (`weights::GARRISON`) lets a quiet city below the mean production build its
-    // infrastructure first; a seen threat is `defence_orders`'.
-    let waits = empire.garrison_waits.contains(&slot.city.tile);
-    let needed = needs_garrison(obs, empire, rules, slot.city) && !slot.plans_military(rules) && !waits;
+    // infrastructure first (`needs_garrison`); a seen threat is `defence_orders`'.
+    let needed = needs_garrison(obs, empire, rules, slot.city) && !slot.plans_military(rules);
     if !needed || empire.military >= empire.military_cap {
         return None;
     }
