@@ -613,7 +613,10 @@ fn flee_tile(view: &UnitView<'_, '_>, tools: &mut PlanTools<'_>) -> Option<TileI
 /// `park`: a worker without a job waits in a city of its owner, the nearest
 /// one no other own civilian stands in (one civilian a tile), safe from
 /// capture and off the tiles of the other workers' jobs. It stays where it
-/// stands when none is free.
+/// stands when none is free. Never in the capital `net2`'s gate keeps for the
+/// spaceship's parts (`Net2Plan::capital_gate`): a worker parked there shuts
+/// the parts out, and the space plan's clearing walked it out only for it to
+/// park again in the same turn (Korea, pangaea 2201008, r317–r330).
 fn park(view: &UnitView<'_, '_>, tools: &mut PlanTools<'_>) -> Decision {
     let unit = view.local.unit;
     let actor = Actor::Unit(unit.id);
@@ -625,10 +628,12 @@ fn park(view: &UnitView<'_, '_>, tools: &mut PlanTools<'_>) -> Decision {
     let civilian = |kind| crate::world::stacking::stack_class(rules, kind);
     let mine = civilian(unit.kind);
     let taken = |tile: TileId| view.brief.units.iter().any(|u| u.id != unit.id && u.tile == tile && civilian(u.kind) == mine);
+    let kept = crate::ai::operations::with_net2(view.brief, crate::ai::net2::plan::Part::Economy, |p| p.capital_gate).flatten();
     let free = view
         .brief
         .cities
         .iter()
+        .filter(|c| Some(c.tile) != kept)
         .filter(|c| !taken(c.tile) && (dims.distance(c.tile, unit.tile).unwrap_or(i32::MAX) > 1 || can_stop(view, rules, c.tile)))
         .min_by_key(|c| (dims.distance(c.tile, unit.tile).unwrap_or(i32::MAX), c.id));
     match free {

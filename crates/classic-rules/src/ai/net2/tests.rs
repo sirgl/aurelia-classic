@@ -34,7 +34,7 @@ fn carried() -> [Milli; kc::N] {
 }
 
 fn inputs(seat: SeatInputs, rivals: Vec<RivalInputs>, cities: Vec<CityInputs>) -> Inputs {
-    Inputs { situation: situation(), seat, rivals, cities, pairs: vec![], aims: vec![], targets: vec![], space: vec![] }
+    Inputs { situation: situation(), seat, rivals, cities, pairs: vec![], aims: vec![], targets: vec![], space: vec![], capital: None }
 }
 
 fn pass_of(inputs: &Inputs, held: &CoreMemory, round: u32) -> Pass {
@@ -158,6 +158,22 @@ fn the_science_seat_researches_the_ships_way() {
     assert_eq!(level(950), 1000, "unit(−1000 + 1900 + 600)");
     assert_eq!(level(200), 0, "unit(−1000 + 400 + 600)");
     assert!(level(450) >= super::weights::gate::SPACE_RESEARCH.0, "−1000 + 900 + 600 = 500");
+}
+
+/// The capital kept for the parts (`weights::CAPITAL_GATE`): a part outside the capital opens it, none keeps it shut
+/// (Korea, pangaea 2201008: a worker parked in the capital shut the engine out from r317 to r330).
+#[test]
+fn a_part_outside_keeps_the_capital() {
+    use super::concepts::{fire, Frame};
+    use super::weights::{g, gate, CAPITAL_GATE};
+    let level = |out: Milli| {
+        let mut row = [0; g::N];
+        row[g::PART_OUT] = out;
+        fire(&CAPITAL_GATE, &Frame { g: &row, ..Frame::default() })
+    };
+    assert_eq!(level(1000), 1000, "unit(−500 + 1500)");
+    assert_eq!(level(0), 0, "unit(−500)");
+    assert!(level(1000) >= gate::CAPITAL_GATE.0 && level(0) < gate::CAPITAL_GATE.0);
 }
 
 #[test]
@@ -556,13 +572,14 @@ fn generated_line(rng: &mut Lcg) -> String {
         space_race: if seat_row[12] > 600 { 1000 } else { 0 },
         parts_short: seat_row[13],
         size_model: seat_row[14],
+        part_out: if seat_row[15] > 500 { 1000 } else { 0 },
         ..SeatInputs::default()
     };
     let rivals: Vec<RivalInputs> = (0..1 + rng.below(7)).map(|i| generated_rival(rng, 1 + i as u8)).collect();
     let cities = (0..1 + rng.below(6)).map(|i| generated_city(rng, 100 + i, &rivals)).collect();
     let held = generated_held(rng, &rivals, round);
     let targets = (0..rng.below(6)).map(|i| generated_target(rng, 500 + i as u32, &rivals)).collect();
-    let inputs = Inputs { situation, seat, rivals, cities, pairs: vec![], aims: vec![], targets, space: vec![] };
+    let inputs = Inputs { situation, seat, rivals, cities, pairs: vec![], aims: vec![], targets, space: vec![], capital: None };
     let spread = |rng: &mut Lcg| rng.below(6001) as Milli - 3000;
     let logits = Logits { concepts: k, style: [spread(rng), spread(rng), spread(rng)], aim: [spread(rng), spread(rng), spread(rng), spread(rng)], posture: [spread(rng), spread(rng), spread(rng), spread(rng)], style_margin: 1150 };
     let tempered = rng.below(2) == 0;
@@ -607,7 +624,7 @@ fn the_parity_fixture_is_the_integer_net() {
 #[test]
 fn the_weights_count() {
     let n = super::weights::count();
-    assert_eq!(n, 165, "net2's own hand weights (the 13 carried concepts and the carried logits are `strategy_net::weights`'s)");
+    assert_eq!(n, 168, "net2's own hand weights (the 13 carried concepts and the carried logits are `strategy_net::weights`'s)");
 }
 
 #[test]

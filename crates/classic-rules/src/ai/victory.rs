@@ -39,6 +39,11 @@ fn capital<'o>(obs: &'o AIObservation<'_>, rules: &CompiledRuleset) -> Option<&'
     obs.own_cities.iter().find(palace).or(obs.own_cities.first())
 }
 
+/// The capital's tile (`capital`): where the parts are installed.
+pub fn capital_tile(obs: &AIObservation<'_>, rules: &CompiledRuleset) -> Option<TileId> {
+    capital(obs, rules).map(|c| c.tile)
+}
+
 /// The projects the spaceship's parts need before a city may build them
 /// (their `required_project`: the Apollo Program of the classic rules), by
 /// id.
@@ -333,13 +338,23 @@ pub fn space_plan(obs: &AIObservation<'_>, rules: &CompiledRuleset) -> Vec<Space
         .collect()
 }
 
-fn is_part(rules: &CompiledRuleset, kind: UnitKindId) -> bool {
+pub fn is_part(rules: &CompiledRuleset, kind: UnitKindId) -> bool {
     rules.units.get(kind.0 as usize).is_some_and(|d| d.spaceship_project.is_some())
 }
 
 /// Parts in the capital are installed; the others march there.
 pub fn spaceship_orders(obs: &AIObservation<'_>, rules: &CompiledRuleset) -> Vec<Command> {
     spaceship_orders_with(obs, rules, false)
+}
+
+/// `spaceship_orders_with` under `net2`'s capital gate (`Net2Plan::capital_gate`, the capital's tile): the space
+/// plan's walk (`walked_orders`) with the capital's civilians walked out around the units in the way, off the tiles
+/// the parts step on this turn. Without the gate, `spaceship_orders_with`.
+pub fn spaceship_orders_gated(obs: &AIObservation<'_>, rules: &CompiledRuleset, around: bool, gate: Option<TileId>) -> Vec<Command> {
+    match gate {
+        Some(capital) => walked_orders(obs, rules, capital, Some(capital)),
+        None => spaceship_orders_with(obs, rules, around),
+    }
 }
 
 /// `spaceship_orders`; with `around` (variant `space-finish`) a part walks
@@ -350,7 +365,7 @@ pub fn spaceship_orders_with(obs: &AIObservation<'_>, rules: &CompiledRuleset, a
         return Vec::new();
     };
     if around {
-        return walked_orders(obs, rules, capital);
+        return walked_orders(obs, rules, capital, None);
     }
     let waiting = obs.own_units.iter().any(|u| is_part(rules, u.kind) && u.tile != capital);
     let mut out: Vec<Command> = Vec::new();
@@ -378,34 +393,128 @@ pub fn spaceship_orders_with(obs: &AIObservation<'_>, rules: &CompiledRuleset, a
 
 /// `spaceship_orders` with the parts walking around blockers: the capital
 /// cleared while a part waits outside, parts in it installed, the others
-/// walked (`walk_around`).
-fn walked_orders(obs: &AIObservation<'_>, rules: &CompiledRuleset, capital: TileId) -> Vec<Command> {
+/// walked (`walk_around`). `gate` (`spaceship_orders_gated`): the capital's
+/// civilians walk out on the AI's own path, off the tiles the parts step on,
+/// and a part next to the capital steps in after them.
+fn walked_orders(obs: &AIObservation<'_>, rules: &CompiledRuleset, capital: TileId, gate: Option<TileId>) -> Vec<Command> {
     let parts: Vec<_> = obs.own_units.iter().filter(|u| is_part(rules, u.kind)).collect();
-    let mut out: Vec<Command> = Vec::new();
-    if parts.iter().any(|u| u.tile != capital) {
-        out.extend(clear_capital(obs, rules, capital, Clearing::WIDE));
-    }
+    let waiting = parts.iter().any(|u| u.tile != capital);
+    let mut walks: Vec<Command> = Vec::new();
     let mut taken: Vec<TileId> = Vec::new();
+    let mut stepped: Vec<TileId> = Vec::new();
+    let mut entering: Vec<(crate::ids::UnitHandle, Vec<Command>)> = Vec::new();
+    let mut freed: Vec<TileId> = Vec::new();
+    let mut relief: Vec<Command> = Vec::new();
     for unit in parts {
         if unit.tile == capital {
-            out.push(Command::BuildSpaceshipPart { unit: unit.handle });
+            walks.push(Command::BuildSpaceshipPart { unit: unit.handle });
             continue;
         }
-        let steps: Vec<Command> = walk_around(obs, rules, unit, capital, &taken)
-            .into_iter()
-            .map(|tile| Command::MoveUnit { unit: unit.handle, destination: tile })
-            .collect();
+        let mut path = walk_around(obs, rules, unit, capital, &taken);
+        if gate.is_some() && path.is_empty() {
+            // No way to the capital around the civilians at its gate: one of them steps away first.
+            let avoid: Vec<TileId> = stepped.iter().chain(freed.iter()).copied().collect();
+            if let Some((ring, away)) = relieve_ring(obs, rules, capital, unit.tile, &avoid) {
+                let through = walk_around_freed(obs, rules, unit, capital, &taken, &[ring]);
+                if through.first() == Some(&ring) {
+                    freed.push(ring);
+                    stepped.extend(away.iter().filter_map(|c| match c { Command::MoveUnit { destination, .. } => Some(*destination), _ => None }));
+                    relief.extend(away);
+                    path = through;
+                }
+            }
+        }
+        let steps: Vec<Command> = path.iter().map(|tile| Command::MoveUnit { unit: unit.handle, destination: *tile }).collect();
         match steps.first() {
+            Some(_) if gate.is_some() && path.first().is_some_and(|t| freed.contains(t)) => {
+                if let Some(Command::MoveUnit { destination, .. }) = steps.last() {
+                    taken.push(*destination);
+                }
+                stepped.extend(path.iter().copied());
+                walks.extend(steps);
+            }
             Some(first) if obs.view.accepts(first) => {
                 if let Some(Command::MoveUnit { destination, .. }) = steps.last() {
                     taken.push(*destination);
                 }
-                out.extend(steps);
+                stepped.extend(path.iter().copied());
+                walks.extend(steps);
             }
-            _ => out.push(Command::MarchTo { unit: unit.handle, destination: capital }),
+            // The first step is the capital, held by a civilian the gate walks out first.
+            Some(_) if gate.is_some() && path.first() == Some(&capital) => {
+                stepped.extend(path.iter().copied());
+                entering.push((unit.handle, steps));
+            }
+            _ => walks.push(Command::MarchTo { unit: unit.handle, destination: capital }),
+        }
+    }
+    let mut out: Vec<Command> = relief;
+    if waiting {
+        match gate {
+            Some(_) => out.extend(walk_out(obs, rules, capital, &stepped)),
+            None => out.extend(clear_capital(obs, rules, capital, Clearing::WIDE)),
+        }
+    }
+    let cleared = out.iter().any(|c| matches!(c, Command::MoveUnit { unit, .. } | Command::MarchTo { unit, .. } if obs.own_units.iter().any(|u| u.handle == *unit && u.tile == capital)));
+    out.extend(walks);
+    for (unit, steps) in entering {
+        // One part enters a capital its civilians left (one civilian a tile); the others march.
+        if cleared && !out.iter().any(|c| matches!(c, Command::MoveUnit { destination, .. } if *destination == capital)) {
+            out.extend(steps);
+        } else {
+            out.push(Command::MarchTo { unit, destination: capital });
         }
     }
     out.retain(|c| !matches!(c, Command::BuildSpaceshipPart { .. } | Command::MarchTo { .. }) || obs.view.accepts(c));
+    out
+}
+
+/// The gate's clearing (`walked_orders`): every own civilian (not a part) in the capital with moves left walks to the
+/// nearest free tile of `Clearing::WIDE` on the AI's own path around the units in the way (`walk_around`), off the
+/// tiles the parts step on this turn (`stepped`) and off the tiles another civilian leaving takes. The rules' march
+/// does not go around units: a worker marched out of Denmark's capital stood still behind the two parts waiting at its
+/// gate (continents 2200002, r305–r312).
+fn walk_out(obs: &AIObservation<'_>, rules: &CompiledRuleset, capital: TileId, stepped: &[TileId]) -> Vec<Command> {
+    let civilian = |kind: UnitKindId| !matches!(role_of(rules, kind), AiRole::Military | AiRole::Naval);
+    let free = gate_tiles(obs, rules, capital);
+    let mut taken: Vec<TileId> = stepped.iter().copied().filter(|t| *t != capital).collect();
+    let mut out = Vec::new();
+    let blockers = obs.own_units.iter().filter(|u| u.tile == capital && civilian(u.kind) && !is_part(rules, u.kind) && u.moves_left > 0);
+    for blocker in blockers {
+        let walked = free.iter().filter(|t| !taken.contains(t)).find_map(|tile| {
+            let path = walk_around(obs, rules, blocker, *tile, &taken);
+            let first = path.first().map(|t| Command::MoveUnit { unit: blocker.handle, destination: *t });
+            first.is_some_and(|c| obs.view.accepts(&c)).then_some((*tile, path))
+        });
+        // No way around the units (every tile next to the capital holds a civilian): one tile of the gate is relieved
+        // and the civilian steps onto it, so the capital is free for a part.
+        let relief = if walked.is_none() { relieve_ring(obs, rules, capital, capital, &taken) } else { None };
+        match (walked, relief) {
+            (Some((tile, path)), _) => {
+                taken.push(tile);
+                taken.extend(path.iter().copied());
+                out.extend(path.into_iter().map(|t| Command::MoveUnit { unit: blocker.handle, destination: t }));
+            }
+            (None, Some((ring, away))) => {
+                taken.push(ring);
+                taken.extend(away.iter().filter_map(|c| match c { Command::MoveUnit { destination, .. } => Some(*destination), _ => None }));
+                out.extend(away);
+                out.push(Command::MoveUnit { unit: blocker.handle, destination: ring });
+            }
+            // Else the rules' march passes through them, as `clear_capital` orders it.
+            (None, None) => {
+                let march = free
+                    .iter()
+                    .filter(|t| !taken.contains(t))
+                    .map(|tile| (*tile, Command::MarchTo { unit: blocker.handle, destination: *tile }))
+                    .find(|(_, command)| obs.view.accepts(command));
+                if let Some((tile, command)) = march {
+                    taken.push(tile);
+                    out.push(command);
+                }
+            }
+        }
+    }
     out
 }
 
@@ -418,6 +527,12 @@ fn walked_orders(obs: &AIObservation<'_>, rules: &CompiledRuleset, capital: Tile
 /// warrior standing in the way (pace map pangaea, seed 6): the rules'
 /// march does not go around units.
 fn walk_around(obs: &AIObservation<'_>, rules: &CompiledRuleset, unit: &crate::knowledge::observation::OwnUnit, capital: TileId, taken: &[TileId]) -> Vec<TileId> {
+    walk_around_freed(obs, rules, unit, capital, taken, &[])
+}
+
+/// `walk_around` through the tiles `freed` as well: their own units walk away earlier this turn (the gate's
+/// clearing, `walked_orders`).
+fn walk_around_freed(obs: &AIObservation<'_>, rules: &CompiledRuleset, unit: &crate::knowledge::observation::OwnUnit, capital: TileId, taken: &[TileId], freed: &[TileId]) -> Vec<TileId> {
     use crate::ai::planner_map::{find_path, step_points, Blockers, KnownMap, MapScratch, PathOutcome, SearchLimit, SearchStats};
     let class = kernel::world::stacking::stack_class(rules, unit.kind);
     let kinds = obs.view.terrain_kinds();
@@ -429,6 +544,7 @@ fn walk_around(obs: &AIObservation<'_>, rules: &CompiledRuleset, unit: &crate::k
             .filter(|u| u.handle != unit.handle && (water(u.tile) || kernel::world::stacking::stack_class(rules, u.kind) == class))
             .map(|u| u.tile),
     );
+    blocked.retain(|t| !freed.contains(t));
     blocked.extend(taken.iter().copied());
     blocked.retain(|t| *t != capital);
     let map = KnownMap::of_unit(&obs.view, unit.handle);
@@ -461,6 +577,75 @@ fn clear_capital(obs: &AIObservation<'_>, rules: &CompiledRuleset, capital: Tile
         .own_units
         .iter()
         .filter(|u| u.tile == capital && civilian(u.kind) && !is_part(rules, u.kind) && u.moves_left > 0);
+    let mut tiles = free_tiles(obs, rules, capital, clearing).into_iter();
+    let mut out = Vec::new();
+    for blocker in blockers {
+        let command = tiles
+            .by_ref()
+            .map(|tile| Command::MarchTo { unit: blocker.handle, destination: tile })
+            .find(|command| obs.view.accepts(command));
+        out.extend(command);
+    }
+    out
+}
+
+/// The tiles a civilian leaving the capital or its gate may stop on under the gate (`walk_out`, `relieve_ring`):
+/// `free_tiles` of `Clearing::WIDE`, those off the tiles next to the capital first (a civilian parked at the gate
+/// shuts a part out as one parked inside: pangaea 2621017, a worker and four caravans around Morocco's capital kept
+/// the last booster two tiles off from r301 to a rival's science victory at r311), then the nearest.
+fn gate_tiles(obs: &AIObservation<'_>, rules: &CompiledRuleset, capital: TileId) -> Vec<TileId> {
+    let dims = obs.view.dimensions();
+    let mut tiles = free_tiles(obs, rules, capital, Clearing::WIDE);
+    tiles.sort_by_key(|t| {
+        let d = dims.distance(capital, *t).unwrap_or(i32::MAX);
+        (d < 2, d, t.0)
+    });
+    tiles
+}
+
+/// The gate's relief (`walked_orders`, `walk_out`) when no way leads past the civilians at the capital's gate: the
+/// tile next to the capital nearest `near` whose own units are all civilians that can move (not parts), and the
+/// single steps that take each of them to a free tile next to it and off the gate (`gate_tiles` two tiles or more
+/// from the capital), off `avoid`. A single step, not `walk_around`: the gate is full, there is no way around it.
+/// None: no such tile. Morocco, pangaea 2621017: four caravans and a worker around the capital kept the last
+/// booster two tiles off from r301 to a rival's science victory at r311.
+fn relieve_ring(obs: &AIObservation<'_>, rules: &CompiledRuleset, capital: TileId, near: TileId, avoid: &[TileId]) -> Option<(TileId, Vec<Command>)> {
+    let civilian = |kind: UnitKindId| !matches!(role_of(rules, kind), AiRole::Military | AiRole::Naval);
+    let dims = obs.view.dimensions();
+    let mut ring: Vec<TileId> = dims.neighbors(capital).into_iter().filter(|t| !avoid.contains(t)).collect();
+    ring.sort_by_key(|t| (dims.distance(near, *t).unwrap_or(i32::MAX), t.0));
+    let off_gate: Vec<TileId> = gate_tiles(obs, rules, capital).into_iter().filter(|t| dims.distance(capital, *t).is_some_and(|d| d >= 2)).collect();
+    for tile in ring {
+        let blockers: Vec<_> = obs.own_units.iter().filter(|u| u.tile == tile && civilian(u.kind)).collect();
+        let movable = blockers.iter().all(|u| !is_part(rules, u.kind) && u.moves_left > 0);
+        if blockers.is_empty() || !movable || obs.visible_foreign_units.iter().any(|u| u.tile == tile) {
+            continue;
+        }
+        let mut used: Vec<TileId> = Vec::new();
+        let mut out = Vec::new();
+        for blocker in &blockers {
+            let step = dims
+                .neighbors(tile)
+                .into_iter()
+                .filter(|t| off_gate.contains(t) && !avoid.contains(t) && !used.contains(t))
+                .map(|t| (t, Command::MoveUnit { unit: blocker.handle, destination: t }))
+                .find(|(_, c)| obs.view.accepts(c));
+            let Some((to, command)) = step else { break };
+            used.push(to);
+            out.push(command);
+        }
+        if out.len() == blockers.len() {
+            return Some((tile, out));
+        }
+    }
+    None
+}
+
+/// The tiles a civilian leaving the capital may stop on (`clear_capital`), the nearest first: own or unclaimed land
+/// (water too with `clearing.water`) within `clearing.radius`, no city, no own civilian (on water no own unit), no
+/// foreign unit seen.
+fn free_tiles(obs: &AIObservation<'_>, rules: &CompiledRuleset, capital: TileId, clearing: Clearing) -> Vec<TileId> {
+    let civilian = |kind: UnitKindId| !matches!(role_of(rules, kind), AiRole::Military | AiRole::Naval);
     let kinds = obs.view.terrain_kinds();
     let free = |tile: &TileId| {
         let known = obs.view.tile(*tile);
@@ -479,16 +664,7 @@ fn clear_capital(obs: &AIObservation<'_>, rules: &CompiledRuleset, capital: Tile
     let dims = obs.view.dimensions();
     let mut tiles: Vec<TileId> = crate::math::hex_disc(dims, capital, clearing.radius).filter(free).collect();
     tiles.sort_by_key(|t| (dims.distance(capital, *t).unwrap_or(i32::MAX), t.0));
-    let mut tiles = tiles.into_iter();
-    let mut out = Vec::new();
-    for blocker in blockers {
-        let command = tiles
-            .by_ref()
-            .map(|tile| Command::MarchTo { unit: blocker.handle, destination: tile })
-            .find(|command| obs.view.accepts(command));
-        out.extend(command);
-    }
-    out
+    tiles
 }
 
 /// Civilians leaving the capital go at most this far.
@@ -521,6 +697,7 @@ impl crate::ai::system::SystemAdvisor for VictoryAdvisor {
         &self,
         input: &crate::ai::system::AdvisorInput<'_, '_>,
     ) -> Vec<crate::ai::system::Proposal> {
-        crate::ai::combat::proposals(12, spaceship_orders_with(input.observation, input.rules, input.brief.space_finish))
+        let gate = crate::ai::operations::with_net2(input.brief, crate::ai::net2::plan::Part::Economy, |p| p.capital_gate).flatten();
+        crate::ai::combat::proposals(12, spaceship_orders_gated(input.observation, input.rules, input.brief.space_finish, gate))
     }
 }

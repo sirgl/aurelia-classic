@@ -329,6 +329,8 @@ def levers(W, turn, seat, qs, core, aggs, ys, ar):
     city_cap = fire(W.neurons["city_cap"], {"F": turn["f"], "K": turn["k"], "G": turn["g"], "A": aggs, "Y": ys}, ar)
     # The research on the spaceship's way (`weights::SPACE_RESEARCH`, the level; the lever is level >= its gate).
     space_research = fire(W.neurons["space_research"], {"F": turn["f"], "Y": ys}, ar)
+    # The capital kept for the spaceship's parts (`weights::CAPITAL_GATE`, the level; the lever is level >= its gate).
+    capital_gate = fire(W.neurons["capital_gate"], {"G": turn["g"]}, ar)
     # The war order's rival gets no help either (`levers::helped`, casebook E4).
     target = order["rival"] if order is not None else None
     deny = [r["id"] for r, q in zip(rivals, qs) if q[W.q["runaway"]] >= W.gates["deny_help"] or r["id"] == target]
@@ -340,7 +342,7 @@ def levers(W, turn, seat, qs, core, aggs, ys, ar):
     for r, q in zip(rivals, qs):
         if q[W.q["block"]] >= W.gates["block"] and q[W.q["block"]] > best:
             ballot, best = r["id"], q[W.q["block"]]
-    return {"peace": peace, "peace_with": peace_with, "deny_help": deny, "embargo": embargo, "ballot": ballot, "guard": guard, "military": military, "cs_gold_share": cs, "part_hold": part_hold, "city_cap": city_cap, "space_research": space_research}
+    return {"peace": peace, "peace_with": peace_with, "deny_help": deny, "embargo": embargo, "ballot": ballot, "guard": guard, "military": military, "cs_gold_share": cs, "part_hold": part_hold, "city_cap": city_cap, "space_research": space_research, "capital_gate": capital_gate}
 
 
 def forward(W: Weights, turn: dict, ar: Arith = FLOAT, teacher: dict | None = None) -> dict:
@@ -377,7 +379,7 @@ def deviation(a, b) -> float:
     return abs(float(a) - float(b))
 
 
-NEURONS = ("s", "ease", "q", "a", "tilt", "y", "peace", "guard", "military", "cs_gold_share", "part_hold", "city_cap", "space_research")
+NEURONS = ("s", "ease", "q", "a", "tilt", "y", "peace", "guard", "military", "cs_gold_share", "part_hold", "city_cap", "space_research", "capital_gate")
 DECISIONS = ("core", "peace_with", "deny_help", "embargo", "ballot")
 
 

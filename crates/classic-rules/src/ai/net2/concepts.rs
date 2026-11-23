@@ -97,6 +97,7 @@ impl SeatInputs {
             self.space_race,
             self.parts_short,
             self.size_model,
+            self.part_out,
         ]
     }
 }
@@ -189,6 +190,7 @@ mod tests {
             "part_hold" => &['K', 'G'],
             "city_cap" => &['F', 'K', 'G', 'A', 'Y'],
             "space_research" => &['F', 'Y'],
+            "capital_gate" => &['G'],
             _ => &['K', 'S', 'R', 'Q'],
         }
     }

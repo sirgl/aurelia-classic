@@ -70,6 +70,8 @@ pub struct SeatInputs {
     /// The new cities the rules' size model pays for a real tall seat (`tall_real::SizeModel::more`), 250 a city (4 → 1000;
     /// `weights::g::SIZE_MODEL`); 0 for another seat. Set after the intent (`net2::cap_cities`), read by `CITY_CAP` only.
     pub size_model: Milli,
+    /// A spaceship part of ours stands outside the capital (0/1000; `weights::g::PART_OUT`).
+    pub part_out: Milli,
 }
 
 /// One strategic resource the missing spaceship parts need (the hold's quantity, `Net2Plan::space_hold`).
@@ -283,6 +285,8 @@ pub struct Inputs {
     pub targets: Vec<TargetInputs>,
     /// The strategic resources the missing spaceship parts need, while the race is open (empty else).
     pub space: Vec<SpaceNeed>,
+    /// The capital's tile, where the parts are installed (`victory::capital_tile`; the tile `capital_gate` keeps).
+    pub capital: Option<crate::ids::TileId>,
 }
 
 /// The inputs of the site head for one candidate tile (§3.4, S1–S9). Points are the planner's site points.
@@ -708,6 +712,10 @@ pub struct Net2Plan {
     /// (`weights::SPACE_RESEARCH` at least `gate::SPACE_RESEARCH`; the research head, `strategy_net::heads::research`,
     /// reads it).
     pub space_research: bool,
+    /// The capital is kept for the spaceship's parts (`weights::CAPITAL_GATE` at least `gate::CAPITAL_GATE`): no own
+    /// civilian parks in it, and the civilians in it walk out around the units in the way (`planner_workers::park`,
+    /// `victory::walked_orders` read it). The capital's tile when kept, else None.
+    pub capital_gate: Option<crate::ids::TileId>,
 }
 
 /// The trust of a rival without a reading (a city-state, a stranger): a stranger is not yet a liar.

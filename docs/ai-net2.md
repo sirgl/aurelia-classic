@@ -4,7 +4,9 @@
 and takes the strategist's turn: the style, the aim and the posture (`strategy_net::intent_step` with `net2`'s tilt),
 the war orders and their aims, the deals, the peace answer, the city-state share, the congress ballot, the guard
 level of every city, the fleet, the city cap (`CITY_CAP`), the copies of a strategic resource held for the spaceship
-(`PART_HOLD`) and the research on the spaceship's way (`SPACE_RESEARCH`). Its site head values the settlers' sites.
+(`PART_HOLD`), the research on the spaceship's way (`SPACE_RESEARCH`) and the capital kept free for the spaceship's
+parts (`CAPITAL_GATE`: no own civilian parks in it or at its gate while a part is outside). Its site head values the
+settlers' sites.
 Every neuron is a hand-written weight with a one-line reason (`net2/weights.rs`). Where `net2` has no say, the seat
 plays the mind of `nets-x-site` (the standard of the fifteenth promotion).
 

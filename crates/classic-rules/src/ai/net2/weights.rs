@@ -117,8 +117,10 @@ pub mod g {
     pub const PARTS_SHORT: usize = 13;
     /// The new cities the rules' size model pays for a real tall seat, 250 a city (set after the intent; `CITY_CAP` only).
     pub const SIZE_MODEL: usize = 14;
-    pub const N: usize = 15;
-    pub const NAMES: [&str; N] = ["capital_lost", "cities_lost", "war_rounds", "war_gain", "unhappy_trend", "embark", "enemy_air", "gold_stock", "cs_allies", "cs_contested", "own_infamy", "ties_at_risk", "space_race", "parts_short", "size_model"];
+    /// A spaceship part of ours stands outside the capital, the tile it is installed on (0/1000).
+    pub const PART_OUT: usize = 15;
+    pub const N: usize = 16;
+    pub const NAMES: [&str; N] = ["capital_lost", "cities_lost", "war_rounds", "war_gain", "unhappy_trend", "embark", "enemy_air", "gold_stock", "cs_allies", "cs_contested", "own_infamy", "ties_at_risk", "space_race", "parts_short", "size_model", "part_out"];
 }
 
 /// A rival's inputs (`plan::RivalInputs` in order).
@@ -621,6 +623,26 @@ pub const SPACE_RESEARCH: Neuron = Neuron {
     ],
 };
 
+/// The capital is kept for the spaceship's parts (`Net2Plan::capital_gate`): no own civilian waits in it while a part
+/// is outside, and the civilians standing in it walk out around the units in the way (the executors
+/// `planner_workers::park` and `victory::walked_orders` only read the lever). Why (space-parts SPACE.md, P1 offsets
+/// 2200–2201 replayed with `AURELIA_SPACE_TRACE`): a part is a civilian and a tile holds one civilian; a jobless
+/// worker parked in the capital (`park`: the nearest city with no civilian), the space plan sent it out, and the
+/// worker's own turn parked it back in the same turn (Korea, pangaea 2201008: the engine 2 tiles off from r317 to the
+/// time victory at r330; Celts, continents 2201005: 18 rounds). Or the worker's march out was stopped by the waiting
+/// parts themselves (the rules' march does not go around units: Denmark, continents 2200002, a booster and the stasis
+/// chamber one tile off from r305 until a diplomatic victory at r312). 9 of the 29 ships built and not won stood still
+/// so (34 rounds), and 29 of the 140 ships that won (57 rounds). The executor walks the civilians off the tiles next
+/// to the capital as well (its gate): a worker sent to the nearest free tile parked at the gate and shut a part out
+/// as before (tuning offsets 2620–2621, Brazil pangaea 2620001, Morocco pangaea 2621017).
+pub const CAPITAL_GATE: Neuron = Neuron {
+    name: "capital_gate",
+    bias: -500,
+    why: "no part outside the capital, no gate: a city is where a jobless civilian is safe from capture",
+    join: UNIT,
+    terms: &[t(G(g::PART_OUT), 1500, "a part enters only a capital with no civilian in it, and the ship is the victory: the capital is the part's tile")],
+};
+
 /// The new cities a real tall seat founds (`Intent::more_cities` of a `tall_real` seat, thousandths of a city, rounded
 /// half up; the executors `tall_real::adjust` and `Prices::city_cap` only read the target). The rules' size model
 /// (`tall_real::SizeModel::more`) is one input among the land, the leader's tilt, the rivals and the mood. R4's case:
@@ -684,6 +706,7 @@ pub mod gate {
     pub const EMBARGO: (Milli, &str) = (600, "the embargo, the cheap brake, only on a clear runaway (W2, VP #8)");
     pub const BLOCK: (Milli, &str) = (500, "the ballot goes against a rival only when it would win the vote");
     pub const SPACE_RESEARCH: (Milli, &str) = (500, "the research keeps to the ship's way when the science aim and the way gone say so more likely than not");
+    pub const CAPITAL_GATE: (Milli, &str) = (500, "the capital is kept for the parts when a part outside it says so more likely than not");
     /// Ships escorting an `Overseas` order (`fleet::FLEET_SIZE`).
     pub const ESCORT_SHIPS: (u32, &str) = (2, "the landing needs ships that shell the coast (`fleet.rs` 1-10)");
     /// Standard rounds after a war order spent its budget without paying before another order on that rival.
@@ -704,7 +727,7 @@ pub mod site {
 /// Every neuron of `net2`'s own tables.
 pub fn neurons() -> Vec<&'static Neuron> {
     let mut out: Vec<&'static Neuron> = SEAT.iter().chain(RIVAL.iter()).collect();
-    out.extend([&PEACE, &GUARD, &MILITARY, &CS_SHARE, &EASE, &PART_HOLD, &CITY_CAP, &SPACE_RESEARCH]);
+    out.extend([&PEACE, &GUARD, &MILITARY, &CS_SHARE, &EASE, &PART_HOLD, &CITY_CAP, &SPACE_RESEARCH, &CAPITAL_GATE]);
     out
 }
 
@@ -714,5 +737,5 @@ pub fn count() -> usize {
     for neuron in neurons() {
         n += neuron.terms.len() + usize::from(matches!(neuron.join, Join::Sum(_)));
     }
-    n + TILT.len() + 10 + 5
+    n + TILT.len() + 11 + 5
 }

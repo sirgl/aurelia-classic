@@ -272,3 +272,36 @@ fn the_science_fit_follows_the_victory_the_rounds_and_the_technologies() {
     let obs = fresh.ai_observation(&rules, P0);
     assert!(!science_fits(&obs, &rules, ship + 5), "all technologies to find in five rounds");
 }
+
+/// `net2`'s capital gate (`Net2Plan::capital_gate`, `victory::spaceship_orders_gated`, space-parts SPACE.md): a jobless
+/// worker in the capital and two parts at its gate. The worker walks out on the AI's own path, off the tiles the parts
+/// step on, and a part steps into the capital after it in the same turn: every order is accepted when it is applied.
+#[test]
+fn the_gate_walks_the_worker_out_and_a_part_in() {
+    let (mut game, rules, capital, _weak) = space_age(12);
+    let at = game.view().auth.cities().get(capital).unwrap().tile;
+    let obs = game.ai_observation(&rules, P0);
+    let kinds = obs.view.terrain_kinds();
+    let dims = obs.view.dimensions();
+    let land: Vec<TileId> = dims
+        .neighbors(at)
+        .into_iter()
+        .filter(|t| obs.view.tile(*t).snapshot().is_some_and(|s| !kinds.is_water(s.terrain.0) && kinds.enter_cost(s.terrain).is_some()))
+        .collect();
+    drop(obs);
+    assert!(land.len() >= 3, "the capital has land around it");
+    let worker = UnitKindId(rules.units.iter().position(|u| u.key == "core:unit/worker").unwrap() as u16);
+    let walker = game.debug_spawn_unit(&rules, P0, at, worker);
+    let parts = [game.debug_spawn_unit(&rules, P0, land[0], part(&rules, 0)), game.debug_spawn_unit(&rules, P0, land[1], part(&rules, 1))];
+    let obs = game.ai_observation(&rules, P0);
+    let orders = classic_rules::ai::victory::spaceship_orders_gated(&obs, &rules, true, Some(at));
+    drop(obs);
+    for order in orders {
+        game.execute(&rules, order.clone()).unwrap_or_else(|e| panic!("{order:?}: {e:?}"));
+    }
+    let auth = game.view().auth;
+    let tile_of = |u| auth.units().get(u).unwrap().core.tile;
+    assert_ne!(tile_of(walker), at, "the worker left the capital");
+    assert!(!parts.iter().any(|p| tile_of(*p) == tile_of(walker)), "and stands on no part's tile");
+    assert!(parts.iter().any(|p| tile_of(*p) == at), "a part stands in the capital, to be installed next turn");
+}
