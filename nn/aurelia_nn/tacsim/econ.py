@@ -88,9 +88,9 @@ def gather_rows(table, idx):
     return mx.take(table, mx.where(idx < 0, n, idx), axis=0)
 
 
-def plot_yields(tb, nb, st):
+def plot_yields(tb, nb, st, finish=True):
     """[B, T, 6]: `finish_tile(plot_yields(...))` of every tile for its owner (the viewer on unowned
-    land). `st`: kind, mountain, water, lake, river, wonder (static, [B, T]); feature, resource,
+    land); `finish=False`: the plot yields before `finish_tile` (the city's tile effects come between). `st`: kind, mountain, water, lake, river, wonder (static, [B, T]); feature, resource,
     improvement, pillaged, owner, city ([B, T]); techs [B, P, NT] bool; viewer [B]."""
     B, T = st["kind"].shape
     nbm = mx.broadcast_to(nb[None], (B, T, 6))
@@ -148,6 +148,8 @@ def plot_yields(tb, nb, st):
     twin = twins * mx.take(tb.imp_twin, ii)
     iy = iy + mx.where(mx.arange(NY)[None, None, :] == 4, twin[..., None], 0)
     y = y + mx.where(has, iy, 0)
+    if not finish:
+        return y
     # `finish_tile`: the city centre's minimum, then every channel at least 0.
     y = mx.where(st["city"][..., None], mx.maximum(y, mx.array(CITY_MIN, dtype=I32)), y)
     return mx.maximum(y, 0)

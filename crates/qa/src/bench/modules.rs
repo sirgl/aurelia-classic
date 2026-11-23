@@ -261,6 +261,11 @@ pub trait MatchRecorder<R: BenchRules + ?Sized> {
     fn turn_start(&mut self, game: &GameState<R::M>, rules: &CompiledRuleset<R::M>, player: PlayerId, states: &kernel::ai::state::AiStates);
     /// At the end: the seats' minds (to take what they recorded).
     fn finish(self: Box<Self>, game: &GameState<R::M>, rules: &CompiledRuleset<R::M>, minds: &[&R::Mind]);
+    /// Before the driver ends `player`'s turn (the world after its commands).
+    fn before_end(&mut self, _game: &GameState<R::M>, _rules: &CompiledRuleset<R::M>, _player: PlayerId) {}
+    /// After the driver's end-turn step for `player` (the world after its end of turn when
+    /// the turn passed).
+    fn after_end(&mut self, _game: &GameState<R::M>, _rules: &CompiledRuleset<R::M>, _player: PlayerId) {}
 }
 
 /// The DAgger recorder of the classic bench (`AURELIA_NET_DAGGER=<dir>`):

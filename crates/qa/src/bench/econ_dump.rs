@@ -39,12 +39,25 @@ pub struct EconDump {
     name: String,
     seed: u64,
     started: bool,
+    /// `AURELIA_ECON_TURNS`: the end-turn lines too (`bench::econ_turns`).
+    turns: bool,
+    /// The dynamic planes as the game's last line left them (the turn lines carry the diff).
+    last: Option<Vec<[i32; 7]>>,
+    /// The ending player, its round and the world before its end of turn.
+    pending: Option<(PlayerId, u32, Value)>,
 }
 
 impl EconDump {
     pub fn new(name: &str, seed: u64) -> Option<Self> {
         sink()?;
-        Some(Self { name: name.to_owned(), seed, started: false })
+        Some(Self { name: name.to_owned(), seed, started: false, turns: super::econ_turns::enabled(), last: None, pending: None })
+    }
+
+    fn diff(&mut self, game: &GameState) -> Value {
+        let now = super::econ_turns::tile_planes(game.view().auth);
+        let d = super::econ_turns::tile_diff(self.last.as_deref(), &now);
+        self.last = Some(now);
+        json!(d)
     }
 
     fn write(&self, v: Value) {
@@ -148,11 +161,47 @@ impl MatchRecorder<ClassicBench> for EconDump {
             t["game"] = json!(self.name);
             t["seed"] = json!(self.seed);
             self.write(t);
+            if self.turns {
+                let mut e = super::econ_turns::rules_line(game, rules);
+                e["game"] = json!(self.name);
+                self.write(e);
+            }
             self.started = true;
         }
         let mut r = round_line(game, rules);
         r["game"] = json!(self.name);
+        if self.turns {
+            let planes = super::econ_turns::tile_planes(game.view().auth);
+            r["ocity"] = json!(planes.iter().map(|p| p[5]).collect::<Vec<_>>());
+            r["cityh"] = json!(planes.iter().map(|p| p[6]).collect::<Vec<_>>());
+            self.last = Some(planes);
+        }
         self.write(r);
+    }
+
+    fn before_end(&mut self, game: &GameState, rules: &CompiledRuleset, player: PlayerId) {
+        if !self.turns {
+            return;
+        }
+        let auth = game.view().auth;
+        let tiles = self.diff(game);
+        let state = super::econ_turns::player_state(auth, rules, player, true);
+        self.pending = Some((player, auth.turn().round, json!({"tiles": tiles, "state": state})));
+    }
+
+    fn after_end(&mut self, game: &GameState, rules: &CompiledRuleset, player: PlayerId) {
+        let auth = game.view().auth;
+        let passed = auth.active_player() != player || game.is_over();
+        let Some((p, round, _)) = self.pending.as_ref() else { return };
+        if *p != player || !passed {
+            return;
+        }
+        let round = *round;
+        let (_, _, pre) = self.pending.take().unwrap();
+        let tiles = self.diff(game);
+        let state = super::econ_turns::player_state(auth, rules, player, false);
+        self.write(json!({"t": "turn", "game": self.name, "round": round, "player": player.0, "pre": pre,
+                          "post": {"tiles": tiles, "state": state, "round": auth.turn().round, "over": game.is_over()}}));
     }
 
     fn turn_start(&mut self, _game: &GameState, _rules: &CompiledRuleset, _player: PlayerId, _states: &kernel::ai::state::AiStates) {}

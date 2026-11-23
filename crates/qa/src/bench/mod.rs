@@ -3,6 +3,7 @@
 
 pub mod diplo_probe;
 pub mod econ_dump;
+pub mod econ_turns;
 pub mod landless;
 pub mod modules;
 pub mod pace;

@@ -506,15 +506,22 @@ fn play_round<R: BenchRules>(
                 probe.turn_start::<R>(game, rules, game.view().auth.active_player());
             }
         }
+        let ending_player = game.view().auth.active_player();
         if ends_turn {
             if let Some(probe) = log.probe.as_mut() {
-                probe.before_end::<R>(game, rules, game.view().auth.active_player());
+                probe.before_end::<R>(game, rules, ending_player);
+            }
+            if let Some(r) = recorder.as_mut() {
+                r.before_end(game, rules, ending_player);
             }
         }
         let step_started = Instant::now();
         let outcome = driver.step(game, rules);
         if ends_turn {
             ending += step_started.elapsed();
+            if let Some(r) = recorder.as_mut() {
+                r.after_end(game, rules, ending_player);
+            }
         }
         match outcome {
             StepOutcome::Worked => {}
