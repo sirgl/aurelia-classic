@@ -6,7 +6,7 @@
 //! What THIS TEST holds by reading the sources of `classic-rules/src/ai`: no string literal is a content key
 //! (`namespace:kind/name`, or any key of the compiled core rules) or a content's display name (`Tithe`,
 //! `Tradition`) in non-test code, except the allow-list
-//! below, each with its reason. Test code (from the first `#[cfg(test)]` of a file) and comment lines are
+//! below, each with its reason. Test code (the item after a `#[cfg(test)]`) and comment lines are
 //! not scanned. `CONTENT_NAMES_ROOT` points the scan at another copy of the AI's sources (the guard's own
 //! proof on a scratch copy).
 
@@ -45,18 +45,40 @@ fn rust_files(dir: &Path, out: &mut Vec<PathBuf>) {
     out.sort();
 }
 
-/// The scanned lines of a file: numbered, without comments and test code.
+/// The scanned lines of a file: numbered, without comments and test code. Test code is the item after a
+/// `#[cfg(test)]` (a `mod readers;` line, or a block up to the closing brace at the attribute's own
+/// indent), not the rest of the file: what follows it is scanned.
 fn code_lines(text: &str) -> Vec<(usize, &str)> {
+    let lines: Vec<&str> = text.lines().collect();
+    let indent = |l: &str| l.len() - l.trim_start().len();
     let mut out = Vec::new();
-    for (i, line) in text.lines().enumerate() {
+    let mut i = 0;
+    while i < lines.len() {
+        let line = lines[i];
         let trimmed = line.trim_start();
         if trimmed.starts_with("#[cfg(test)]") {
-            break;
-        }
-        if trimmed.starts_with("//") {
+            let at = indent(line);
+            // Past the attributes to the item's first line.
+            let mut j = i + 1;
+            while j < lines.len() && lines[j].trim_start().starts_with("#[") {
+                j += 1;
+            }
+            let item = lines.get(j).copied().unwrap_or("");
+            if !item.contains('{') && item.trim_end().ends_with(';') {
+                i = j + 1;
+            } else {
+                i = j + 1;
+                while i < lines.len() && !(indent(lines[i]) == at && lines[i].trim_start().starts_with('}')) {
+                    i += 1;
+                }
+                i += 1;
+            }
             continue;
         }
-        out.push((i + 1, line));
+        if !trimmed.starts_with("//") {
+            out.push((i + 1, line));
+        }
+        i += 1;
     }
     out
 }
@@ -161,15 +183,16 @@ fn the_ai_names_no_content() {
 fn the_guard_finds_a_named_belief() {
     let dir = std::env::temp_dir().join(format!("ai-content-names-{}", std::process::id()));
     std::fs::create_dir_all(dir.join("books")).unwrap();
-    std::fs::write(dir.join("chooser.rs"), "fn f() -> &'static str {\n    \"core:belief/founder/tithe\"\n}\n// \"core:belief/founder/tithe\"\n#[cfg(test)]\nconst X: &str = \"core:unit/settler\";\n").unwrap();
+    std::fs::write(dir.join("chooser.rs"), "fn f() -> &'static str {\n    \"core:belief/founder/tithe\"\n}\n// \"core:belief/founder/tithe\"\n#[cfg(test)]\nconst X: &str = \"core:unit/settler\";\n#[cfg(test)]\nmod tests {\n    const Y: &str = \"core:unit/settler\";\n}\nconst AFTER: &str = \"core:unit/archer\";\n").unwrap();
     std::fs::write(dir.join("other.rs"), "const MOD: &str = \"mymod:building/hall\";\nconst WORD: &str = \"gold\";\n").unwrap();
     std::fs::write(dir.join("books/plan.rs"), "const S: &str = \"core:unit/settler\";\n").unwrap();
     let keys: BTreeSet<String> = ["core:belief/founder/tithe".to_owned()].into();
     let mut used = vec![false; ALLOWED.len()];
     let bad = named(&dir, &keys, &mut used);
     std::fs::remove_dir_all(&dir).ok();
-    assert_eq!(bad.len(), 2, "{bad:?}");
+    assert_eq!(bad.len(), 3, "{bad:?}");
     assert!(bad[0].starts_with("chooser.rs:2:"), "{bad:?}");
-    assert!(bad[1].starts_with("other.rs:1:"), "{bad:?}");
+    assert!(bad[1].starts_with("chooser.rs:11:"), "code after a test module is scanned: {bad:?}");
+    assert!(bad[2].starts_with("other.rs:1:"), "{bad:?}");
     assert!(used[0], "the books are allowed");
 }

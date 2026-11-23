@@ -123,14 +123,12 @@ fn our_following_cities_are_our_cities() {
     assert_eq!(e.second_condition, Condition::MinPopulation(5));
 }
 
-/// A belief that only lets the cities buy a building with faith is worth what the executors buy with it:
-/// none buys buildings with faith, so it is worth nothing (the fixed lists' first follower).
+/// A belief that makes a yield at a building needs the building: no shrine, no temple, no food.
 #[test]
-fn a_building_for_faith_nobody_buys_is_worth_nothing() {
+fn a_belief_on_a_building_is_worth_it_only_where_it_stands() {
     let rules = rules();
     let (m, b, p) = (model(&rules, 6, &[]), base(), plan());
     let head = Head::new(&m, &rules, &p, &b, reach(2, 12));
-    assert_eq!(head.worth(belief(&rules, "core:belief/follower/pagodas"), &[]).total(), 0);
     assert!(head.worth(belief(&rules, "core:belief/follower/feed-the-world"), &[]).total() == 0, "no shrine, no temple: no food");
     let temples = [building(&rules, "core:building/shrine"), building(&rules, "core:building/temple")];
     let m = model(&rules, 6, &temples);

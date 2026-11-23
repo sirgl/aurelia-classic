@@ -1114,10 +1114,6 @@ pub mod belief {
     /// the founding) and that grows the next prophet: a cut of their price saves that share.
     pub const MISSIONARY_FAITH: i64 = 50;
     pub const PROPHET_FAITH: i64 = 30;
-    /// Thousandths of the faith a turn an executor spends on what a belief unlocks for faith (buildings,
-    /// land units, great people): 0 — no executor buys them (`religion_fix` and `religion` buy missionaries
-    /// and inquisitors only); a belief that only unlocks such items is worth nothing until one does.
-    pub const FAITH_BUYS: Milli = 0;
     /// Percent of the rounds left a religion's effect gated on a technology not known yet holds (it comes
     /// about halfway through what is left).
     pub const LATER: i64 = 50;

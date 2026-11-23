@@ -19,8 +19,8 @@
 //!   retention): the foreign following cities it adds (`weights::belief::SPREAD`) at what one pays us — the
 //!   founder beliefs the religion holds, or takes with it (`per_city`); a cut of the missionaries' or the
 //!   prophets' faith: the faith it saves (`MISSIONARY_FAITH`, `PROPHET_FAITH`).
-//! - **Items for faith** (buildings, land units, great people): at what the executors spend on them
-//!   (`FAITH_BUYS`).
+//! - **Items for faith** (buildings, land units, great people): worth nothing, no executor buys them; a
+//!   faith-purchase executor adds its own valuation with it.
 //!
 //! Every price is the plan's (`Plan::mult` over the allocator's): the intent weighs the aims — a faith or
 //! a culture style, a war posture's combat — as it weighs a policy's. Pure over the model and the reach:
@@ -33,7 +33,7 @@ use super::weights::belief as w;
 use super::weights::pd;
 use super::{heads, Base, Plan};
 use crate::classic::effects::{ClassicCondition, ClassicCount, ClassicModifier, ClassicSelector, ClassicTrigger, ReligionAbility, ReligionStat};
-use crate::ids::{BeliefId, BuildingKindId};
+use crate::ids::BeliefId;
 use crate::knowledge::observation::AIObservation;
 use crate::rules::effects::{CompiledEffect, Condition, Count, EffectSet, Modifier, PerCount, Selector, Trigger};
 use crate::rules::stats::Stat;
@@ -283,12 +283,6 @@ impl<'a> Head<'a> {
                 _ => 0,
             },
             Modifier::Module(ClassicModifier::ModifyReligion { stat, percent }) => self.religion_number(stat, percent, reach, per_city),
-            Modifier::Module(ClassicModifier::UnlockFaithBuilding(b)) => self.faith_building(b, reach),
-            Modifier::Module(ClassicModifier::UnlockFaithUnits(_)) | Modifier::Module(ClassicModifier::GrantReligionAbility(ReligionAbility::FaithPurchaseAllGreatPeople)) => {
-                // The faith spent on the items at the faith price (a unit or a great person is about what its
-                // faith would buy otherwise).
-                self.base.faith * reach.faith * w::FAITH_BUYS / 1000 * self.mult[pd::FAITH] / 1000
-            }
             // A yield per world wonder of a following city.
             Modifier::AddYieldPerCount { yield_kind, amount, per } if per.count == Count::WorldWonders => {
                 let wonders: i64 = self.model.cities.iter().map(|c| i64::from(scale(per, amount, self.wonders_in(c)))).sum();
@@ -319,16 +313,6 @@ impl<'a> Head<'a> {
                 per_city * cities * per * percent.max(0) / 100 / 1000
             }
         }
-    }
-
-    /// A building our following cities may buy with faith: its worth in each own city that lacks it, for
-    /// as many as the faith the executors spend on it buys over the game.
-    fn faith_building(&self, b: BuildingKindId, reach: &Reach) -> i64 {
-        let Some(def) = self.rules.buildings.get(usize::from(b.0)) else { return 0 };
-        let cost = i64::from(def.module.faith_cost.unwrap_or(0)).max(1);
-        let afforded = reach.faith * self.base.rounds_left * w::FAITH_BUYS / 1000 / cost;
-        let lacking = self.model.cities.iter().enumerate().filter(|(_, c)| !c.buildings.contains(&b)).map(|(i, _)| i).take(afforded.max(0) as usize);
-        lacking.map(|i| self.valuer.building(b, Place::City(i))).sum::<i64>() * reach.own_share / 100
     }
 
     fn wonders_in(&self, city: &super::model::CityModel) -> i64 {
