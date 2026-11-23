@@ -349,11 +349,13 @@ fn r11_a_stack_at_the_border() {
     let stack = rival(&i, A).stack;
     assert!(stack > 500, "five against one: {stack}");
     assert_eq!(i.cities[0].stack_owner, Some(A));
-    // At war the stack is the war: the input is for peace.
+    // At war the stack is the attack itself: the input stays (work/nets/capitals: read at peace only, the menace and
+    // every lever answering it fell to 0 on the turn of the declaration).
     game.debug_force_war(&rules, US, A);
     advance(&mut game, &rules, 1);
     let i = read(&game, &rules, US, &mut state, &mut memory);
-    assert_eq!(rival(&i, A).stack, 0);
+    let at_war = rival(&i, A).stack;
+    assert!(at_war > 500, "the same five against one at war: {at_war}");
 }
 
 #[test]

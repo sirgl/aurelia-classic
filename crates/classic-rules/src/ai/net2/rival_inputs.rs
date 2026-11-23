@@ -106,8 +106,12 @@ pub fn read(obs: &AIObservation<'_>, brief: &TurnBrief, state: &AiState, rules: 
         if let Some(v) = obs.tourism.influence.iter().find(|v| v.other == r) {
             row.culture = share(i64::from(v.their_level.index()), i64::from(v.level.index()), 0);
         }
-        // R11: at peace, its military power inside our borders or near our cities, over ours there.
-        row.stack = if relation.at_war { 0 } else { stack(obs, brief, rules, &known, r) };
+        // R11: its military power inside our borders or near our cities, over ours there, at peace and at war. At war the
+        // stack is the attack itself: read at peace only, `menace` fell to 0 on the turn of the declaration, and with
+        // it the military price, the guard and the defence posture that answered the stack (work/nets/capitals: 6 of 6
+        // traced capitals lost at Standard speed, e.g. offset 3340 seed 3340001 r172→r173 menace 930 → 0, military
+        // tilt 744 → −94, the capital lost 10 rounds later).
+        row.stack = stack(obs, brief, rules, &known, r);
         // R12–R17.
         row.warmonger = i64::from(relation.warmonger).saturating_mul(1000).div_euclid(i64::from(crate::ai::diplomacy::DENOUNCE_WARMONGER)).clamp(0, 1000);
         row.betrayed = ramp(i64::from(memory.ties_of(r).map_or(0, |t| t.betrayals)), 0, 2);

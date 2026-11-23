@@ -378,7 +378,7 @@ pub const RIVAL: [Neuron; q::N] = [
         why: "a few units passing are no menace",
         join: UNIT,
         terms: &[
-            t(R(r::STACK), 1500, "a stack inside our borders at peace is the sneak attack (P3, MO3, B2)"),
+            t(R(r::STACK), 1500, "a stack inside our borders at peace is the sneak attack (P3, MO3, B2), and at war the attack itself (capitals: read at peace only, the menace fell to 0 on the declaration)"),
             t(Q(q::DISTRUST), 400, "distrust raises it"),
             t(R(r::FRIEND), 0, "read, no weight: a friend's stack inside our borders is the same sneak attack (HMO3 #1: 4–10 units two tiles from our city, menace 142–313 with −300); a friendship binds nothing in these rules"),
         ],
