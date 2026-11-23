@@ -331,6 +331,9 @@ fn play_on<P: kernel::ai::mind::AiMind<Classic>>(rules: &CompiledRuleset, mut ga
     let orders = crate::army_net::Orders::of_scene(rules, &game, &scene);
     if crate::army_net::record::wanted() {
         crate::army_net::record::start(orders.clone());
+        if seat == Seat::Net {
+            crate::army_net::record::mute();
+        }
     }
     let mut net_time = crate::army_net::seat::Timing::default();
     let mut rows_trace = Vec::new();
@@ -366,7 +369,7 @@ fn play_on<P: kernel::ai::mind::AiMind<Classic>>(rules: &CompiledRuleset, mut ga
                         act::random_turn(&mut game, rules, scene.learner, &scene.mine, &rnd);
                     }
                     Seat::Net => {
-                        let t = crate::army_net::seat::turn(rules, &mut game, &orders)?;
+                        let t = crate::army_net::seat::turn(rules, &mut game, &orders, &scene)?;
                         net_time.decisions += t.decisions;
                         net_time.observe_ns += t.observe_ns;
                         net_time.forward_ns += t.forward_ns;

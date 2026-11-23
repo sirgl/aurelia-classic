@@ -71,10 +71,24 @@ pub struct Counts {
     pub dropped: BTreeMap<String, u32>,
 }
 
+/// Whose commands become decisions.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Mode {
+    /// Every command of the army: the teacher plays the seat.
+    Teacher,
+    /// None: the net plays the seat (DAgger), its own commands are not labels.
+    Muted,
+    /// The first command of a teacher's turn played on a copy of the game (`probe`), then none.
+    Probe { taken: bool },
+}
+
 struct Recorder {
     orders: Orders,
     decisions: Vec<Decision>,
     counts: Counts,
+    mode: Mode,
+    /// The army's hit points when our turn of each round ended (the danger's start).
+    turn_end_hp: BTreeMap<u16, BTreeMap<EntityId, u16>>,
 }
 
 thread_local! {
@@ -97,7 +111,43 @@ pub fn active() -> bool {
 
 /// Starts recording the play of `orders.side`.
 pub fn start(orders: Orders) {
-    ACTIVE.with(|a| *a.borrow_mut() = Some(Recorder { orders, decisions: Vec::new(), counts: Counts::default() }));
+    ACTIVE.with(|a| *a.borrow_mut() = Some(Recorder { orders, decisions: Vec::new(), counts: Counts::default(), mode: Mode::Teacher, turn_end_hp: BTreeMap::new() }));
+}
+
+/// The net plays the seat: its commands are not recorded (DAgger).
+pub fn mute() {
+    with(|r| r.mode = Mode::Muted);
+}
+
+/// The next recordable decision (of a teacher's turn on a copy of the game) is kept, the rest dropped.
+pub fn probe() {
+    with(|r| r.mode = Mode::Probe { taken: false });
+}
+
+/// After a probe: whether it kept a decision; the recorder is muted again.
+pub fn probe_done() -> bool {
+    with(|r| {
+        let taken = r.mode == Mode::Probe { taken: true };
+        r.mode = Mode::Muted;
+        taken
+    })
+    .unwrap_or(false)
+}
+
+/// Whether a decision is kept now (and the probe's slot taken).
+fn keeps(r: &mut Recorder) -> bool {
+    match r.mode {
+        Mode::Teacher => true,
+        Mode::Muted | Mode::Probe { taken: true } => false,
+        Mode::Probe { taken: false } => {
+            r.mode = Mode::Probe { taken: true };
+            true
+        }
+    }
+}
+
+fn listens() -> bool {
+    with(|r| r.mode == Mode::Teacher || r.mode == Mode::Probe { taken: false }).unwrap_or(false)
 }
 
 fn with<R>(f: impl FnOnce(&mut Recorder) -> R) -> Option<R> {
@@ -126,6 +176,9 @@ fn ids_of(game: &GameState, orders: &Orders, tokens: &Tokens) -> Vec<Option<Enti
 /// Before a command of `side`: the moment as the net would see it, when the command is a unit's of
 /// the army. None when nothing is recorded.
 pub fn before(game: &GameState, rules: &CompiledRuleset, side: classic_rules::ids::PlayerId, command: &Command) -> Option<Pending> {
+    if !listens() {
+        return None;
+    }
     let orders = with(|r| r.orders.clone())?;
     if side != orders.side {
         return None;
@@ -168,6 +221,9 @@ pub fn after(game: &GameState, pending: Option<Pending>, ok: bool) {
         return;
     };
     with(|r| {
+        if !keeps(r) {
+            return;
+        }
         let round = game.view().auth.turn().round.saturating_sub(r.orders.start_round) as u16;
         r.decisions.push(Decision { tokens: p.tokens, candidates: p.candidates, pointer: p.pointer as i16, action: action as i16, round, ids: p.ids, hp: p.hp, end: false, danger: Vec::new() });
         r.counts.kept += 1;
@@ -199,6 +255,9 @@ fn label_of(game: &GameState, p: &Pending, cmd: &Command) -> Option<usize> {
 
 /// A reference ends the turn of an army unit (`act::stand`): the "done" action.
 pub fn done(game: &GameState, rules: &CompiledRuleset, unit: UnitHandle) {
+    if !listens() {
+        return;
+    }
     let Some(orders) = with(|r| r.orders.clone()) else { return };
     let Some(core) = game.view().auth.units().get(unit).map(|u| *u.core) else { return };
     if core.owner != orders.side || !orders.army.contains(&core.id) || game.view().auth.active_player() != orders.side {
@@ -211,8 +270,24 @@ pub fn done(game: &GameState, rules: &CompiledRuleset, unit: UnitHandle) {
     after(game, p, true);
 }
 
-/// The side ends its turn: the pointer's "end".
+/// The side ends its turn: the army's hit points for the danger, and (when a teacher plays) the
+/// pointer's "end".
 pub fn end_turn(game: &GameState, rules: &CompiledRuleset) {
+    let Some(orders) = with(|r| r.orders.clone()) else { return };
+    let hp = army_hp(game, &orders);
+    let teacher = with(|r| {
+        let round = game.view().auth.turn().round.saturating_sub(r.orders.start_round) as u16;
+        r.turn_end_hp.insert(round, hp);
+        r.mode == Mode::Teacher
+    });
+    if teacher == Some(true) {
+        push_end(game, rules);
+    }
+}
+
+/// The pointer's "end" at this moment, as a decision (a teacher ends its turn; a probe found nothing
+/// the army should do).
+pub fn push_end(game: &GameState, rules: &CompiledRuleset) {
     let Some(orders) = with(|r| r.orders.clone()) else { return };
     let tokens = observe::tokens(game, rules, &orders);
     let ids = ids_of(game, &orders, &tokens);
@@ -249,7 +324,7 @@ pub fn step<P: kernel::ai::mind::AiMind<Classic>>(driver: &mut AiDriver<Classic,
 /// Ends the recording: the play's bytes (header `meta`, then its decisions), and its counts.
 pub fn finish(mut meta: serde_json::Value) -> Option<(Vec<u8>, Counts)> {
     let mut rec = ACTIVE.with(|a| a.borrow_mut().take())?;
-    fill_danger(&mut rec.decisions);
+    fill_danger(&mut rec.decisions, &rec.turn_end_hp);
     meta["kept"] = serde_json::json!(rec.counts.kept);
     meta["ends"] = serde_json::json!(rec.counts.ends);
     meta["dropped"] = serde_json::json!(rec.counts.dropped);
@@ -267,18 +342,18 @@ pub fn finish(mut meta: serde_json::Value) -> Option<(Vec<u8>, Counts)> {
 
 /// The damage each army unit took between our end of round r and our first decision of round r + 1
 /// (all of it when the unit died), over 100; -1 when the play ended before.
-fn fill_danger(decisions: &mut [Decision]) {
+fn fill_danger(decisions: &mut [Decision], turn_end_hp: &BTreeMap<u16, BTreeMap<EntityId, u16>>) {
     let mut first: BTreeMap<u16, usize> = BTreeMap::new();
     for (i, d) in decisions.iter().enumerate() {
         first.entry(d.round).or_insert(i);
     }
     let mut danger: BTreeMap<(u16, EntityId), f32> = BTreeMap::new();
-    for d in decisions.iter().filter(|d| d.end) {
-        let Some(&next) = first.get(&(d.round + 1)) else { continue };
+    for (round, end) in turn_end_hp {
+        let Some(&next) = first.get(&(round + 1)) else { continue };
         let start = &decisions[next].hp;
-        for (id, hp) in &d.hp {
+        for (id, hp) in end {
             let now = start.get(id).copied().unwrap_or(0);
-            danger.insert((d.round, *id), f32::from(hp.saturating_sub(now)) / 100.0);
+            danger.insert((*round, *id), f32::from(hp.saturating_sub(now)) / 100.0);
         }
     }
     for d in decisions.iter_mut() {

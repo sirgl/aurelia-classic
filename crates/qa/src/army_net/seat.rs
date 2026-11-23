@@ -3,7 +3,13 @@
 //! looks again; when it ends, every army unit stands, so the seat's mind (`standard`) plays only the
 //! rest of the seat (the civilians, the home city). Greedy: the highest logit wins; ties by order.
 //! The weights come from `ARMY_NET` (a file of `army/export.py`), loaded once per process.
+//!
+//! DAgger (`ARMY_DAGGER=teachers.json` of `army/train.py`, with `suite --record`): before each of the
+//! net's decisions the family's best reference plays its turn on a copy of the game; its first decision
+//! (or "end" when it gives none) is recorded as the label of the moment the net is in, and the net's
+//! own choice is what the game applies.
 
+use std::collections::BTreeMap;
 use std::sync::OnceLock;
 use std::time::Instant;
 
@@ -12,7 +18,7 @@ use classic_rules::{CompiledRuleset, GameState};
 use super::model::Net;
 use super::observe::{self, Action};
 use super::Orders;
-use crate::trainers::act;
+use crate::trainers::{act, families, Scene};
 
 /// Decisions of one unit in one turn at most (a unit that keeps moving back and forth is stopped).
 const PER_UNIT: u32 = 6;
@@ -20,6 +26,46 @@ const PER_UNIT: u32 = 6;
 const PER_TURN: u32 = 96;
 
 static NET: OnceLock<Result<Net, String>> = OnceLock::new();
+static EXPERTS: OnceLock<Option<BTreeMap<String, String>>> = OnceLock::new();
+
+/// The DAgger expert of each family: the reference with the highest win rate on the training plays
+/// (`teachers.json`: `wins` = {"family/player": [won, played]}).
+fn experts() -> Option<&'static BTreeMap<String, String>> {
+    EXPERTS
+        .get_or_init(|| {
+            let path = std::env::var_os("ARMY_DAGGER")?;
+            let text = std::fs::read_to_string(path).ok()?;
+            let v: serde_json::Value = serde_json::from_str(&text).ok()?;
+            let mut best: BTreeMap<String, (f64, String)> = BTreeMap::new();
+            for (key, wn) in v["wins"].as_object()? {
+                let Some((fam, player)) = key.split_once('/') else { continue };
+                if !player.starts_with("ref-") {
+                    continue;
+                }
+                let rate = wn[0].as_f64().unwrap_or(0.0) / wn[1].as_f64().unwrap_or(1.0).max(1.0);
+                if best.get(fam).is_none_or(|b| rate > b.0 || (rate == b.0 && player < b.1.as_str())) {
+                    best.insert(fam.to_owned(), (rate, player.to_owned()));
+                }
+            }
+            Some(best.into_iter().map(|(f, (_, p))| (f, p)).collect())
+        })
+        .as_ref()
+}
+
+/// DAgger: the expert's label for this moment (`record::probe` on a copy of the game).
+fn probe(rules: &CompiledRuleset, game: &GameState, scene: &Scene) {
+    let Some(expert) = experts().and_then(|e| e.get(scene.fam.name())) else { return };
+    if !super::record::active() {
+        return;
+    }
+    let mut copy = game.clone();
+    let mut sc = scene.clone();
+    super::record::probe();
+    families::reference_turn(rules, &mut copy, &mut sc, expert);
+    if !super::record::probe_done() {
+        super::record::push_end(game, rules);
+    }
+}
 
 pub fn net() -> Result<&'static Net, String> {
     let loaded = NET.get_or_init(|| {
@@ -40,7 +86,7 @@ pub struct Timing {
 }
 
 /// One turn of the army: decisions until the net ends it.
-pub fn turn(rules: &CompiledRuleset, game: &mut GameState, orders: &Orders) -> Result<Timing, String> {
+pub fn turn(rules: &CompiledRuleset, game: &mut GameState, orders: &Orders, scene: &Scene) -> Result<Timing, String> {
     let net = net()?;
     let mut timing = Timing::default();
     let mut made: Vec<(kernel::ids::EntityId, u32)> = Vec::new();
@@ -57,6 +103,7 @@ pub fn turn(rules: &CompiledRuleset, game: &mut GameState, orders: &Orders) -> R
         if !tokens.selectable.iter().any(|s| *s) {
             break;
         }
+        probe(rules, game, scene);
         let t1 = Instant::now();
         let body = net.body(&tokens);
         let (logits, end) = net.pointer(&body, &tokens);

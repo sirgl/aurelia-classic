@@ -153,10 +153,16 @@ def evaluate(model, dev, bs):
     return {'loss': tot['loss'] / n, 'main': tot['main'] / n, 'acc_ptr': tot['acc_ptr'] / n, 'acc_act': tot['acc_act'] / max(n_act, 1), 'acc_both': tot['acc_both'] / n}
 
 
-def load(paths, keep=None):
+def load(paths, nth=1):
     flat = Flat()
+    seen = [0]
+
+    def keep(meta):
+        seen[0] += 1
+        return seen[0] % nth == 0
+
     for p in paths:
-        read_into(flat, p, keep)
+        read_into(flat, p, keep if nth > 1 else None)
     return flat
 
 
@@ -177,12 +183,16 @@ def main():
     ap.add_argument('--eval-every', type=int, default=1000)
     ap.add_argument('--seed', type=int, default=1)
     ap.add_argument('--init', default=None, help='start from these MLX weights')
+    ap.add_argument('--cpu', action='store_true', help='a smoke test on the CPU (no GPU lock needed)')
+    ap.add_argument('--every-nth-play', type=int, default=1, help='keep one play in N (smoke tests)')
     a = ap.parse_args()
+    if a.cpu:
+        mx.set_default_device(mx.cpu)
     os.makedirs(a.out, exist_ok=True)
     mx.random.seed(a.seed)
     t0 = time.time()
-    train = load(a.train)
-    hold = load(a.hold)
+    train = load(a.train, a.every_nth_play)
+    hold = load(a.hold, a.every_nth_play)
     best, table = best_teachers(train.plays)
     json.dump({'best': best, 'wins': table, 'lost_weight': a.lost_weight, 'best_factor': a.best_factor}, open(os.path.join(a.out, 'teachers.json'), 'w'), indent=1)
     tm = max(max(train.t), max(hold.t))
