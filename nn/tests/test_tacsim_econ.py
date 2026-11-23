@@ -9,7 +9,7 @@ Skipped without the dumps (they need the Rust build: `AURELIA_ECON_DUMP=FILE ai-
 import os
 import unittest
 
-from aurelia_nn.tacsim import city, econ, happy, parity, turn
+from aurelia_nn.tacsim import city, culture, econ, great, gpu, happy, ledger, parity, player, treasury, turn
 
 ECON = os.environ.get("TACSIM_ECON")
 WHOLE = os.environ.get("TACSIM_WHOLE")
@@ -53,6 +53,58 @@ class CityEconomyTest(unittest.TestCase):
         self.assertGreater(rep["turns"], 0)
         self.assertEqual(rep["report_ok"], rep["turns"], rep["examples"])
         self.assertEqual(rep["ga_ok"], rep["ga_turns"], rep["examples"])
+
+
+@unittest.skipUnless(TURNS, "TACSIM_TURNS not set")
+class EmpireTest(unittest.TestCase):
+    """The empire's subsystems on the first game of an `AURELIA_ECON_TURNS` dump (part 4 fields)."""
+
+    def test_player_stats(self):
+        n = ok = 0
+        for g, game in city.each_game(TURNS, 1):
+            model = city.Model(game["tables"], game["rules"])
+            prow = player.Rows(model.rows, model.er)
+            for t in player.prepare(game, game["turns"]):
+                mine, _ = player.stats_and_costs(prow, t)
+                rust = player.rust_stats(t["pre"]["state"]["rust"]["stats"])
+                n += 1
+                ok += int({k: v for k, v in mine.items() if v} == {k: v for k, v in rust.items() if v})
+        self.assertGreater(n, 0)
+        self.assertEqual(ok, n)
+
+    def test_resource_ledger(self):
+        rep = ledger.run(TURNS, limit_games=1)
+        self.assertGreater(rep["ledgers"], 0)
+        self.assertEqual(rep["ledgers_ok"], rep["ledgers"], rep["examples"])
+        self.assertEqual(rep["orders_ok"], rep["orders"], rep["examples"])
+
+    def test_upkeep_and_connections(self):
+        rep = treasury.run(TURNS, limit_games=1)
+        self.assertGreater(rep["worlds"], 0)
+        self.assertEqual(rep["ok"], rep["worlds"], rep["examples"])
+        self.assertEqual(rep.get("reached_ok"), rep.get("reached"))
+
+    def test_policies(self):
+        rep = culture.run(TURNS, limit_games=1)
+        self.assertEqual(rep["prices_ok"], rep["prices"], rep["examples"])
+        self.assertEqual(rep["adoptions_ok"], rep["adoptions"], rep["examples"])
+
+    def test_great_people(self):
+        rep = great.run(TURNS, limit_games=1)
+        self.assertEqual(rep["points_ok"], rep["cities"], rep["examples"])
+        self.assertEqual(rep["thresholds_ok"], rep["thresholds"])
+
+
+@unittest.skipUnless(TURNS, "TACSIM_TURNS not set")
+class DeviceStepTest(unittest.TestCase):
+    """The state resident on the device: one step from every dumped world of the first game."""
+
+    def test_device_step(self):
+        rep = gpu.run(TURNS, limit_games=1)
+        self.assertGreater(rep["cities"], 0)
+        # The parallel resolution within one empire leaves a handful of in-order cases (`gpu.py`).
+        self.assertGreaterEqual(rep["cities_ok"], rep["cities"] * 0.999, rep["examples"])
+        self.assertGreaterEqual(rep["worlds_ok"], rep["worlds"] * 0.99, rep["examples"])
 
 
 if __name__ == "__main__":

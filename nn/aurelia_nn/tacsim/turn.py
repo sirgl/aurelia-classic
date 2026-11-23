@@ -915,6 +915,7 @@ def tech_cost(er, game, t, tech):
 def compare(b, city_out, players_out, jobs_out, er, nu):
     """Per city and per player: the MLX state against the dump's `post`."""
     stats = {"cities": 0, "cities_ok": 0, "players": 0, "players_ok": 0, "job_tiles": 0, "job_tiles_ok": 0}
+    examples = []
     for ti, changed in jobs_out.items():
         post = b.turns[ti]["post_planes"]
         for tile, ch in changed.items():
@@ -927,7 +928,6 @@ def compare(b, city_out, players_out, jobs_out, er, nu):
                                  "post": [post[0][tile], post[2][tile]], "pre": [b.turns[ti]["pre_planes"][0][tile], b.turns[ti]["pre_planes"][2][tile]],
                                  "jobs": [j for j in st_["jobs"] if j[0] == tile], "rate": st_["work_rate"]})
     fields = {}
-    examples = []
     for ti, res in city_out:
         t = b.turns[ti]
         post = {c["h"]: c for c in t["post"]["state"]["cities"]}
@@ -990,8 +990,8 @@ def compare(b, city_out, players_out, jobs_out, er, nu):
                     cause = "other"
                 causes = stats.setdefault("treasury_causes", {})
                 causes[cause] = causes.get(cause, 0) + 1
-            if not tok and len([e for e in examples if "treasury" in e]) < 4:
-                examples.append({"round": t["round"], "player": t["player"], "treasury": [t["pre"]["state"]["treasury"], post["treasury"], pr["treasury"]],
+            if not tok and len([e for e in examples if "upkeep_pre_post" in e]) < 12:
+                examples.append({"round": t["round"], "player": t["player"], "cause": cause, "treasury": [t["pre"]["state"]["treasury"], post["treasury"], pr["treasury"]],
                                  "gold": pr["gold"], "upkeep_pre_post": [t["pre"]["state"]["upkeep"], post["upkeep"]], "income_pre": t["pre"]["state"]["income_gold"],
                                  "deals": t["pre"]["state"].get("gold_deals"), "post_round": t["post"].get("round")})
         if pr.get("culture") is not None and "culture" in post:
