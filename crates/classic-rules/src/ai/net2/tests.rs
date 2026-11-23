@@ -354,23 +354,6 @@ fn p3_a_stack_at_the_border_is_defence() {
     assert_eq!(after.plan.generals, Generals::Hold, "no order, no war: the generals stay home");
 }
 
-#[test]
-fn the_stack_that_declares_war_stays_a_menace() {
-    // work/nets/capitals, offset 3340 seed 3340001: the stack at our cities declares war. With R11 read at peace only
-    // the menace fell from 930 to 0 on that turn, the military tilt from 744 to −94, the guard to 0, and the capital
-    // fell 10 rounds later. R11 is read at war too: the answer to the stack holds across the declaration.
-    let peace = p3();
-    let mut war = p3();
-    war.rivals[0].at_war = 1000;
-    let (p, w) = (pass(&peace), pass(&war));
-    assert!(w.rivals[0].concepts[q::MENACE] >= p.rivals[0].concepts[q::MENACE], "the attack is no less a menace than the stack before it");
-    let (before, after_war) = (after(&peace, &p), after(&war, &w));
-    assert_eq!(after_war.plan.guard.iter().map(|g| g.level).collect::<Vec<_>>(), before.plan.guard.iter().map(|g| g.level).collect::<Vec<_>>());
-    let military = crate::ai::strategy_net::weights::pd::MILITARY;
-    assert!(after_war.price_tilt[military] >= before.price_tilt[military]);
-    assert!(levers::tilt(&w).posture[1] >= levers::tilt(&p).posture[1], "defence keeps its term");
-}
-
 // ---- the war order's timing (§3.3, §4.4) ----
 
 fn held(value: Milli, since: u32) -> CoreMemory {

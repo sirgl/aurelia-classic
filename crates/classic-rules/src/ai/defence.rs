@@ -190,62 +190,8 @@ pub fn watch(obs: &AIObservation<'_>, brief: &TurnBrief, state: &AiState, rules:
         dangers.push(Danger { city: city.tile, threat: near.threat, guard: near.guard, planned: near.own + defenders(brief, state, rules, city.tile), stake, attacker, level: crate::ai::operations::with_net2(brief, crate::ai::net2::plan::Part::Guard, |plan| plan.guard_of(city.id)).unwrap_or(0) });
     }
     dangers.sort_by_key(|d| (Reverse(d.loss(d.guard)), d.city));
-    capital_trace(obs, brief, state, &dangers);
     let defender = if dangers.is_empty() { None } else { Arsenal::of(brief, rules).melee };
     Watch { dangers, defender }
-}
-
-/// Scratch trace of the original capital in danger (`CAPITAL_WATCH_TRACE=<file>`, work/nets/capitals): one JSON line
-/// a turn with the watch's reading and the tasks of the own military units within `THREAT_RADIUS`. It decides
-/// nothing: without the variable it writes nothing.
-fn capital_trace(obs: &AIObservation<'_>, brief: &TurnBrief, state: &AiState, dangers: &[Danger]) {
-    let Some(path) = std::env::var_os("CAPITAL_WATCH_TRACE") else { return };
-    let me = obs.player;
-    let Some(tile) = obs.public.capitals.iter().find(|c| c.founder == me && c.holder == me).and_then(|c| c.tile) else { return };
-    let Some(d) = dangers.iter().find(|d| d.city == tile) else { return };
-    let near = |t: TileId| brief.dims.distance(t, tile).is_some_and(|x| x <= THREAT_RADIUS);
-    let mut tasks = [0u32; 6];
-    let mut away = [0u32; 6];
-    for u in brief.units.iter().filter(|u| u.role == AiRole::Military) {
-        let k = match state.task_of(u.id).map(|t| t.task) {
-            Some(UnitTask::Defend { .. }) => 0,
-            Some(UnitTask::Operation { .. }) => 1,
-            Some(UnitTask::Assault { .. }) => 2,
-            Some(UnitTask::Raid { .. }) => 3,
-            Some(UnitTask::Heal { .. }) => 4,
-            _ => 5,
-        };
-        if near(u.tile) {
-            tasks[k] += 1;
-        } else {
-            away[k] += 1;
-        }
-    }
-    let war = d.attacker.and_then(|a| obs.relation(a)).is_some_and(|r| r.at_war);
-    let pop = obs.own_cities.iter().find(|c| c.tile == tile).map_or(0, |c| c.population);
-    let hp = obs.own_cities.iter().find(|c| c.tile == tile).map_or(0, |c| c.hp);
-    let queue = obs.own_cities.iter().find(|c| c.tile == tile).map(|c| format!("{:?}", c.queue.first())).unwrap_or_default();
-    let production = obs.own_cities.iter().find(|c| c.tile == tile).map_or(0, |c| c.production);
-    let line = format!(
-        "{{\"r\":{},\"p\":{},\"threat\":{},\"guard\":{},\"planned\":{},\"level\":{},\"stake\":{},\"attacker\":{},\"war\":{war},\"strategy\":\"{:?}\",\"pop\":{pop},\"hp\":{hp},\"near\":{:?},\"away\":{:?},\"ops\":{},\"queue\":\"{queue}\",\"prod\":{production},\"gold\":{}}}",
-        obs.round,
-        me.0,
-        d.threat,
-        d.guard,
-        d.planned,
-        d.level,
-        d.stake,
-        d.attacker.map_or(-1, |a| i32::from(a.0)),
-        state.strategy.current,
-        tasks,
-        away,
-        state.operations().len(),
-        obs.economy.treasury
-    );
-    use std::io::Write as _;
-    if let Ok(mut file) = std::fs::OpenOptions::new().create(true).append(true).open(path) {
-        let _ = writeln!(file, "{line}");
-    }
 }
 
 /// An own city with hostile power within `THREAT_RADIUS`: the one rule of the threat that `watch` values and

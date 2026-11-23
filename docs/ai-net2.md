@@ -60,15 +60,15 @@ The results are in `work/nets/promote-net2/PROMOTE.md`.
 ## The stack that declares war stays a menace (lane `capitals`, 23 November)
 
 The promotion's P2 failed by capitals lost at Standard speed (8 against 5, 1.6×). Six capitals lost by `standard` were
-traced (`work/nets/capitals`, `NET2_TRACE` and the scratch `CAPITAL_WATCH_TRACE` of `defence::watch`). In each the
+traced (`work/nets/capitals`, `NET2_TRACE` and a scratch trace of `defence::watch`, not kept). In each the
 rival's army stood at our cities at peace, `menace` read it (R11), and on the turn the rival declared war R11 was set to
 0: it was read at peace only. With it the military price's tilt (800 · max menace), the guard (1200 · the stack's
 menace) and the defence posture's term (1500 · max menace) fell to 0, and war weariness pushed the tilt below zero.
 Case: offset 3340, seed 3340001 (even), seat 4: r172 menace 930, tilt +744, guard 916; r173 (war) menace 0, tilt −94,
-guard 0; the capital fell at r183. The fix reads R11 at war as well (`rival_inputs::of`); no weight changed. Guards:
+guard 0; the capital fell at r183. The fix reads R11 at war as well (`rival_inputs::read`); no weight changed. Guards:
 `ai_net2_inputs::r11_a_stack_at_the_border` (the stack stays above 500 at war) and
-`net2::tests::the_stack_that_declares_war_stays_a_menace` (menace, guard, military tilt and defence term hold across
-the declaration).
+`ai_net2_inputs::the_stack_that_declares_war_stays_a_menace` (read from the game, the menace, the max menace and the
+defence term hold across the declaration; it fails with R11 read at peace only).
 
 Whole games, `standard` against `pre-net2`, Standard speed (gates in `work/nets/capitals/GATES.md`, written before the
 acceptance run):
