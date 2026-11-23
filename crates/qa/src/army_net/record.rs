@@ -119,6 +119,11 @@ pub fn mute() {
     with(|r| r.mode = Mode::Muted);
 }
 
+/// Every recordable decision is kept (a teacher's whole turn, played on a copy of the game).
+pub fn teach() {
+    with(|r| r.mode = Mode::Teacher);
+}
+
 /// The next recordable decision (of a teacher's turn on a copy of the game) is kept, the rest dropped.
 pub fn probe() {
     with(|r| r.mode = Mode::Probe { taken: false });

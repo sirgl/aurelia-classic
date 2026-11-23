@@ -21,6 +21,7 @@ from .export import export
 from .model import ENCODER, ArmyNet, map_planes
 
 C_CAP = 128
+SIEGE = {'siege', 'ram', 'assault-heal', 'city-fire', 'hill-archers', 'planned-assault', 'promotion-choice', 'rush'}
 
 
 class Device:
@@ -137,6 +138,8 @@ def best_teachers(plays):
     """family -> the player with the highest win rate on these plays (ties: the reference first)."""
     wins = collections.defaultdict(lambda: [0, 0])
     for m in plays:
+        if m['player'] == 'army-net':
+            continue
         k = (m['family'], m['player'])
         wins[k][0] += m['win']
         wins[k][1] += 1
@@ -148,10 +151,16 @@ def best_teachers(plays):
     return best, {f'{f}/{p}': [w, n] for (f, p), (w, n) in wins.items()}
 
 
-def decision_weights(flat, best, lost_weight, best_factor):
+def decision_weights(flat, best, lost_weight, best_factor, dagger_weight=2.0):
+    """A teacher's decision: 1 in a won play, `lost_weight` in a lost one, x `best_factor` for the family's best
+    teacher. A DAgger label (the best reference's choice at the net's own moment, player `army-net`):
+    `dagger_weight`, whatever the net's play came to."""
     out = []
     for p in flat.play:
         m = flat.plays[p]
+        if m['player'] == 'army-net':
+            out.append(dagger_weight)
+            continue
         w = 1.0 if m['win'] else lost_weight
         if best.get(m['family'], (None,))[0] == m['player']:
             w *= best_factor
@@ -200,16 +209,21 @@ def evaluate_f32(model, dev, bs):
     return ev, {f: fam_hit[f] / fam_n[f] for f in sorted(fam_n)}
 
 
-def load(paths, nth=1):
+def load(paths, nth=1, skip=None):
+    """The plays of `paths` (one in `nth`); `skip` = {path: families} leaves out those families' plays of a file."""
     flat = Flat()
     seen = [0]
-
-    def keep(meta):
-        seen[0] += 1
-        return seen[0] % nth == 0
-
+    skip = skip or {}
     for p in paths:
-        read_into(flat, p, keep if nth > 1 else None)
+        drop = skip.get(p, set())
+
+        def keep(meta, drop=drop):
+            if meta['family'] in drop:
+                return False
+            seen[0] += 1
+            return seen[0] % nth == 0
+
+        read_into(flat, p, keep if nth > 1 or drop else None)
     return flat
 
 
@@ -228,6 +242,9 @@ def main():
     ap.add_argument('--map', action='store_true', help='variant B: the hex-conv map encoder')
     ap.add_argument('--enc-f32', action='store_true', help='B: train the encoder in f32 (default: bfloat16 compute, f32 weights)')
     ap.add_argument('--lost-weight', type=float, default=0.1)
+    ap.add_argument('--up', default='', help='families whose decisions weigh --up-factor times more (comma list; "siege" = the siege set)')
+    ap.add_argument('--up-factor', type=float, default=2.0)
+    ap.add_argument('--skip', nargs='*', default=[], help='PATH=fam,fam: leave out those families of that train file ("siege" = the siege set)')
     ap.add_argument('--best-factor', type=float, default=2.0)
     ap.add_argument('--eval-every', type=int, default=1000)
     ap.add_argument('--log-every', type=int, default=200, help='a train-loss point of the curve every N steps')
@@ -243,14 +260,27 @@ def main():
     os.makedirs(a.out, exist_ok=True)
     mx.random.seed(a.seed)
     t0 = time.time()
-    train = load(a.train, a.every_nth_play)
+    skip = {}
+    for spec in a.skip:
+        path, fams = spec.split('=', 1)
+        out = set()
+        for f in fams.split(','):
+            out |= SIEGE if f == 'siege' else {f}
+        skip[path] = out
+    train = load(a.train, a.every_nth_play, skip)
     hold = load(a.hold, a.every_nth_play)
     best, table = best_teachers(train.plays)
     json.dump({'best': best, 'wins': table, 'lost_weight': a.lost_weight, 'best_factor': a.best_factor}, open(os.path.join(a.out, 'teachers.json'), 'w'), indent=1)
     tm = max(max(train.t), max(hold.t))
     cm = min(C_CAP, max(max(train.c), max(hold.c)))
     print(f'loaded {len(train)} train / {len(hold)} held-out decisions from {len(train.plays)} / {len(hold.plays)} plays in {time.time() - t0:.0f} s; T {tm} C {cm}', flush=True)
-    dev = Device(train, decision_weights(train, best, a.lost_weight, a.best_factor), tm, cm)
+    up = set()
+    for f in filter(None, a.up.split(',')):
+        up |= SIEGE if f == 'siege' else {f}
+    weights = decision_weights(train, best, a.lost_weight, a.best_factor)
+    if up:
+        weights = [w * (a.up_factor if train.plays[p]['family'] in up else 1.0) for w, p in zip(weights, train.play)]
+    dev = Device(train, weights, tm, cm)
     hdev = Device(hold, decision_weights(hold, best, a.lost_weight, a.best_factor), tm, cm)
     promos = max(400, int(mx.max(dev.promo).item()) + 1)
     model = ArmyNet(d=a.d, heads=a.heads, layers=a.layers, ff=a.ff, promos=promos, map_ch=a.d if a.map else 0)
@@ -299,8 +329,8 @@ def main():
               'epochs': a.epochs, 'steps': steps, 'd': a.d, 'layers': a.layers, 'heads': a.heads, 'ff': a.ff, 'map_ch': a.d if a.map else 0,
               'promos': promos, 'T': tm, 'C': cm, 'parameters': n_params,
               'losses': {'pointer_ce': 1.0, 'action_ce': 1.0, 'value_bce_win': 0.5, 'value_mse_lost_share': 0.5, 'danger_mse': 0.5},
-              'decision_weight': {'won_play': 1.0, 'lost_play': a.lost_weight, 'best_teacher_factor': a.best_factor}, 'best_teachers': best,
-              'seed': a.seed, 'init': a.init, 'target_dps': 5000 if a.map else 20000, 'encoder_compute': str(ENCODER['dtype']) if a.map else None,
+              'decision_weight': {'won_play': 1.0, 'lost_play': a.lost_weight, 'best_teacher_factor': a.best_factor, 'dagger_label': 2.0, 'up_families': sorted(up), 'up_factor': a.up_factor if up else 1.0}, 'best_teachers': best,
+              'seed': a.seed, 'init': a.init, 'skip': {k: sorted(v) for k, v in skip.items()}, 'target_dps': 5000 if a.map else 20000, 'encoder_compute': str(ENCODER['dtype']) if a.map else None,
               'batching': 'decisions bucketed by padded shape T in (8, 12, 16, 24) x C in (1, 16, 32, 64, 128); batches drawn within a bucket, buckets shuffled',
               'time_split_method': 'data, forward+backward (loss_and_grads), update timed every step (each stage evaluated); forward timed on one batch at each curve point and subtracted', 'device': str(mx.default_device()), 'eval_every_steps': a.eval_every, 'log_every_steps': a.log_every,
               'train': data_facts(train, a.train), 'hold': data_facts(hold, a.hold)}

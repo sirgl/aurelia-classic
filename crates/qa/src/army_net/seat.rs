@@ -52,14 +52,43 @@ fn experts() -> Option<&'static BTreeMap<String, String>> {
         .as_ref()
 }
 
-/// DAgger: the expert's label for this moment (`record::probe` on a copy of the game).
-fn probe(rules: &CompiledRuleset, game: &GameState, scene: &Scene) {
+/// The families whose expert plans the whole turn (the staged assault: go only when every shooter can
+/// arrive; the siege's wait until the city is at half): a probe in the middle of the net's turn asks such a
+/// planner about a turn it did not plan (half the army has moved), and its answer is "wait". There the
+/// probe is per TURN: at the start of each of the net's turns the expert plays the whole turn on a copy, and
+/// every decision of it is a label (`ARMY_DAGGER_TURN`, comma list; default: the siege set).
+fn turn_probed(scene: &Scene) -> bool {
+    let list = std::env::var("ARMY_DAGGER_TURN").unwrap_or_else(|_| "siege,ram,assault-heal,city-fire,hill-archers,planned-assault,promotion-choice,rush".to_owned());
+    list.split(',').any(|f| f == scene.fam.name())
+}
+
+/// The families DAgger records (`ARMY_DAGGER_FAMILIES`, comma list; default: all).
+fn dagger_family(scene: &Scene) -> bool {
+    match std::env::var("ARMY_DAGGER_FAMILIES") {
+        Ok(list) => list.split(',').any(|f| f == scene.fam.name()),
+        Err(_) => true,
+    }
+}
+
+/// DAgger: the expert's label for this moment (`record::probe` on a copy of the game), or, for a turn-planned
+/// family at the turn's first decision, the expert's whole turn from here.
+fn probe(rules: &CompiledRuleset, game: &GameState, scene: &Scene, first_of_turn: bool) {
     let Some(expert) = experts().and_then(|e| e.get(scene.fam.name())) else { return };
-    if !super::record::active() {
+    if !super::record::active() || !dagger_family(scene) {
         return;
     }
     let mut copy = game.clone();
     let mut sc = scene.clone();
+    if turn_probed(scene) {
+        if !first_of_turn {
+            return;
+        }
+        super::record::teach();
+        families::reference_turn(rules, &mut copy, &mut sc, expert);
+        super::record::push_end(&copy, rules);
+        super::record::mute();
+        return;
+    }
     super::record::probe();
     families::reference_turn(rules, &mut copy, &mut sc, expert);
     if !super::record::probe_done() {
@@ -96,7 +125,7 @@ pub fn turn(rules: &CompiledRuleset, game: &mut GameState, orders: &Orders, scen
     let mut timing = Timing::default();
     let mut made: Vec<(kernel::ids::EntityId, u32)> = Vec::new();
     let mut map: Option<super::model::MapState> = None;
-    for _ in 0..PER_TURN {
+    for step in 0..PER_TURN {
         let t0 = Instant::now();
         let mut tokens = observe::tokens(game, rules, orders);
         // A unit stopped by the limit is not offered again.
@@ -109,7 +138,9 @@ pub fn turn(rules: &CompiledRuleset, game: &mut GameState, orders: &Orders, scen
         if !tokens.selectable.iter().any(|s| *s) {
             break;
         }
-        probe(rules, game, scene);
+        let t_obs = Instant::now();
+        probe(rules, game, scene, step == 0);
+        let t_map = Instant::now();
         if net.has_map() {
             let planes = super::model::planes(&orders.statics, &tokens);
             let tm = Instant::now();
@@ -130,7 +161,9 @@ pub fn turn(rules: &CompiledRuleset, game: &mut GameState, orders: &Orders, scen
         let (logits, end) = net.pointer(&body, &tokens);
         let t2 = Instant::now();
         let pick = logits.iter().enumerate().filter_map(|(i, l)| l.map(|l| (i, l))).fold(None::<(usize, f32)>, |best, (i, l)| if best.is_none_or(|b| l > b.1) { Some((i, l)) } else { best });
-        timing.observe_ns += (t1 - t0).as_nanos() as u64;
+        // The observation without the DAgger probe and the map encoder (timed on their own).
+        timing.observe_ns += (t_obs - t0).as_nanos() as u64;
+        let _ = t_map;
         timing.forward_ns += (t2 - t1).as_nanos() as u64;
         let Some((at, best)) = pick else { break };
         if end >= best {
