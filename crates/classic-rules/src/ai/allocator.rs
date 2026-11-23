@@ -82,6 +82,9 @@ pub struct Allocator {
     /// The gold kept for the alliance of a rival that would win the World Leader vote
     /// (`city_states::guard_chest`, `vote-guard`); only the gifts that take it may spend it.
     guard_chest: u32,
+    /// `early-growth`: gold the tiles and the gifts leave for a growth purchase (`Net2Plan::growth`'s chest,
+    /// `net2::weights::BUY_CHEST`); 0 for every other variant. The queue heads may spend it.
+    growth_chest: u32,
     personality: Personality,
     /// A trade unit worth building, priced (`PriceModel::Uses`).
     trade: Option<TradeProspect>,
@@ -143,10 +146,13 @@ impl Allocator {
             empire,
             prices,
             cities: obs.own_cities.len() as i32,
-            jobs: if brief.effects.demand { finder_jobs(obs, brief, state, rules) } else { open_jobs(obs) },
+            // `early-growth`: at least net2's jobs ahead (`Growth::jobs_ahead`): the worked tiles alone held the first
+            // worker out of the options (0 jobs in 34 of 74 decisions before it, look 3610–3611).
+            jobs: (if brief.effects.demand { finder_jobs(obs, brief, state, rules) } else { open_jobs(obs) }).max(crate::ai::operations::with_net2(brief, crate::ai::net2::plan::Part::Economy, |plan| plan.growth.jobs_ahead).unwrap_or(0)),
             may_settle: may_settle(obs, brief, state, prices.model),
             war_chest: war_chest(obs, state) + state.war_plan.map_or(0, |plan| plan.chest) + brief.net2.as_ref().map_or(0, |plan| plan.science.chest),
             guard_chest: crate::ai::city_states::guard_chest(obs, &prices),
+            growth_chest: crate::ai::operations::with_net2(brief, crate::ai::net2::plan::Part::Economy, |plan| plan.growth.chest).unwrap_or(0),
             personality: brief.personality,
             sea: brief.sea_jobs.clone(),
             trade: match prices.model {
@@ -233,6 +239,13 @@ impl Allocator {
         };
         if let Some(seen) = seen {
             probe::record(obs, slot.city, &self.prices, seen, picked.map(|p| p.0));
+        }
+        if crate::ai::strategy_net::trace::enabled() && obs.round <= 60 {
+            let mut top: Vec<&(i64, ProductionItem, Reason)> = options.iter().collect();
+            top.sort_by_key(|o| std::cmp::Reverse(o.0));
+            let name = |item: ProductionItem| crate::ai::strategy_net::trace::item_name(rules, item);
+            let list: Vec<String> = top.iter().take(6).map(|o| format!("{}:{}", name(o.1), o.0)).collect();
+            crate::ai::strategy_net::trace::push(format!("r{} p{} ALLOC city {} pop {} prod {} jobs {} worker {}: {} → {}", obs.round, obs.player.0, slot.city.id.0, slot.city.population, slot.city.income.production, self.jobs, self.worker(obs, empire, empire.workers, 0), list.join(" "), picked.map_or("-".to_owned(), |p| name(p.0))));
         }
         let (item, reason) = picked?;
         self.take(empire, rules, item);
@@ -398,6 +411,9 @@ impl Allocator {
         }
         offers.sort_by_key(|o| (std::cmp::Reverse(o.ratio()), o.price, o.tie));
         let hurry_limit = obs.own_cities.len().div_ceil(3);
+        if crate::ai::strategy_net::trace::enabled() {
+            gold_trace(obs, rules, &offers, reserve, self.guard_chest + self.growth_chest, spendable, self.least_ratio(), hurry_limit);
+        }
         let (mut hurries, mut tiles, mut gifts) = (0, 0, 0);
         let mut income = obs.economy.income.gold;
         let mut out = Vec::new();
@@ -408,6 +424,13 @@ impl Allocator {
                 _ => (hurries < hurry_limit, Reason::Hurry),
             };
             let purse = if offer.guard { guard_room } else { spendable };
+            // `early-growth`: only a growth item at a queue's head spends the growth chest (`BUY_CHEST`); the tiles, the
+            // gifts and the other heads leave it.
+            let growth = match offer.command {
+                Command::HurryProduction { city, .. } => obs.own_cities.iter().find(|c| c.handle == city).and_then(|c| c.queue.first()).is_some_and(|item| crate::ai::net2::growth::growth_item(rules, *item)),
+                _ => false,
+            };
+            let purse = if growth { purse } else { purse.saturating_sub(self.growth_chest) };
             if !room || offer.price > purse || income - offer.upkeep < 0 || offer.ratio() <= self.least_ratio() {
                 continue;
             }
@@ -595,6 +618,43 @@ fn trade_prospect(obs: &AIObservation<'_>, rules: &CompiledRuleset, prices: &Pri
     };
     let value = obs.view.trade_prospects(city.handle, kind).iter().map(worth).max()?;
     (value > 0).then_some(TradeProspect { city: city.id, kind, value })
+}
+
+/// The gold's offers of a turn for the strategist's trace (`strategy_net::trace`; `ai-science-pace --early`): the
+/// treasury, the reserves, the least ratio, the hurry limit and the best offers of each kind with their price, value
+/// and ratio. It decides nothing.
+#[allow(clippy::too_many_arguments)]
+fn gold_trace(obs: &AIObservation<'_>, rules: &CompiledRuleset, offers: &[Offer], reserve: u32, chest: u32, spendable: u32, least: i64, limit: usize) {
+    let short = |key: &str| key.rsplit('/').next().unwrap_or(key).to_owned();
+    let mut parts = Vec::new();
+    let (mut hurries, mut tiles) = (0, 0);
+    for o in offers {
+        let what = match o.command {
+            Command::PurchaseTile { .. } if tiles < 3 => {
+                tiles += 1;
+                "tile".to_owned()
+            }
+            Command::HurryProduction { city, .. } if hurries < 4 => {
+                hurries += 1;
+                let head = obs.own_cities.iter().find(|c| c.handle == city).and_then(|c| c.queue.first().copied());
+                match head {
+                    Some(ProductionItem::Building(b)) => rules.buildings.get(usize::from(b.0)).map_or("?".to_owned(), |d| short(&d.key)),
+                    Some(ProductionItem::Unit(k)) => rules.units.get(k.0 as usize).map_or("?".to_owned(), |d| short(&d.key)),
+                    _ => "?".to_owned(),
+                }
+            }
+            _ => continue,
+        };
+        parts.push(format!("{what}:{}:{}:{}", o.price, o.value, o.ratio()));
+    }
+    crate::ai::strategy_net::trace::push(format!(
+        "r{} p{} GOLD treasury {} income {} reserve {reserve} chest {chest} spendable {spendable} least {least} limit {limit} | {}",
+        obs.round,
+        obs.player.0,
+        obs.economy.treasury,
+        obs.economy.income.gold,
+        parts.join(" ")
+    ));
 }
 
 /// Fixed-point scale of value per gold.

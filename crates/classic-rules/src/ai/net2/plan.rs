@@ -325,6 +325,11 @@ pub struct SiteInputs {
     pub tall: Milli,
     /// S10 (offence addendum §2.5): kinds we lack in the site's radius within 3 of a rival's border, / 2.
     pub claim: Milli,
+    /// S11 (`early-growth`): the land score of the site's tiles within the work radius of an own city (their
+    /// `tile_score`, the radius weight of the land score), points; 0 when `Growth::shared` is 0.
+    pub shared: i64,
+    /// S12: `Growth::shared`, the weight of S11 (thousandths).
+    pub shared_weight: Milli,
 }
 
 // ---- the outputs (design §4.4–§4.7) ----
@@ -732,6 +737,30 @@ pub struct Net2Plan {
     pub capital_gate: Option<crate::ids::TileId>,
     /// `science-flow`'s levers (`net2::science`; all off for every other variant).
     pub science: Science,
+    /// `early-growth`'s levers (`net2::growth`; all off for every other variant).
+    pub growth: Growth,
+}
+
+/// The early growth's levers (`weights::GARRISON`, `weights::BUY_CHEST`, `weights::site::SHARED`), read by the city
+/// planner's garrison, the allocator's gold and the site head. Off (empty, zeros) unless the seat plays `early-growth`
+/// (`TurnBrief::early_growth`).
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Growth {
+    /// The garrison lever plays (`early-growth`): only the cities in `garrisons` build their flat garrison.
+    pub plays: bool,
+    /// Own cities whose garrison is built (`weights::GARRISON` at least `gate::GARRISON`). A city not read (founded
+    /// after the plan) waits for the next turn's reading: `planner_cities::garrison_order` orders none there; a
+    /// threat is the defence watch's (`defence_orders`).
+    pub garrisons: Vec<EntityId>,
+    /// Gold the tiles and the gifts leave for a growth purchase (`weights::BUY_CHEST` × the hurry price of the cheapest
+    /// growth item heading a queue; `allocator::spend_gold`).
+    pub chest: u32,
+    /// The site head's weight of the land a site shares with an own city (`weights::site::SHARED`, thousandths of
+    /// the land score's weight of those tiles); 0: no term.
+    pub shared: Milli,
+    /// The jobs the workers have ahead (`net2::growth::jobs_ahead`): the tiles the cities work now and will work next
+    /// with a job the known technologies allow; the allocator's worker counts at least these (0: its own count).
+    pub jobs_ahead: u32,
 }
 
 /// The science flow's levers (`weights::SCIENTISTS`, `weights::AGREEMENT`), read by the citizens' executor, the diplomacy
@@ -823,6 +852,11 @@ impl Net2Plan {
     }
 
     /// `guard[c]` (0 for a city without a reading).
+    /// `early-growth`: the city's garrison waits (`Growth::garrisons`).
+    pub fn garrison_waits(&self, city: EntityId) -> bool {
+        self.growth.plays && !self.growth.garrisons.contains(&city)
+    }
+
     pub fn guard_of(&self, city: EntityId) -> Milli {
         match self.guard.iter().find(|g| g.city == city) {
             Some(g) => g.level,

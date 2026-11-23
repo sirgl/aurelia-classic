@@ -1139,7 +1139,7 @@ fn early_seen_now(game: &GameState<Classic>, rules: &CompiledRuleset, player: Pl
 /// `--early`: a strategist's trace line of `player` worth the look.
 fn early_kept(line: &str, player: u8) -> bool {
     let tag = format!(" p{player} ");
-    line.contains(&tag) && ["TALLR", "CAP", "BUILD", "REVIEW", "GOALMISS", "FIT", "OPEN"].iter().any(|k| line.contains(&format!("{tag}{k}")))
+    line.contains(&tag) && ["TALLR", "CAP", "BUILD", "REVIEW", "GOALMISS", "FIT", "OPEN", "GOLD", "DEF", "GARR", "ALLOC"].iter().any(|k| line.contains(&format!("{tag}{k}")))
 }
 
 /// `--early`: a living seat now.
@@ -1180,7 +1180,7 @@ fn early_line(game: &GameState<Classic>, rules: &CompiledRuleset, script: &str, 
     let income = player_income(auth, rules, player);
     // Happiness by source, and the luxury deposits inside our borders: kinds not yet connected, tiles of them.
     let h = classic_rules::derived::happiness::player_happiness(auth, rules, player);
-    let (mut open_kinds, mut open_tiles) = (std::collections::BTreeSet::new(), 0u32);
+    let (mut open_kinds, mut open_tiles, mut ready_kinds) = (std::collections::BTreeSet::new(), 0u32, std::collections::BTreeSet::new());
     {
         use classic_rules::rules::content::ResourceClass;
         let ledger = classic_rules::derived::resources::resource_ledger(auth, rules, player);
@@ -1197,6 +1197,11 @@ fn early_line(game: &GameState<Classic>, rules: &CompiledRuleset, script: &str, 
             if def.class == Some(ResourceClass::Luxury) && !improved && ledger.total(resource) == 0 {
                 open_kinds.insert(resource.0);
                 open_tiles += 1;
+                // The kinds whose improvement the player's technologies already allow.
+                let techs = auth.players().techs_of(player);
+                if def.improvements.iter().any(|i| rules.improvements.get(i.0 as usize).is_some_and(|d| d.required_tech.is_none_or(|t| techs.contains(&t)))) {
+                    ready_kinds.insert(resource.0);
+                }
             }
         }
     }
@@ -1204,7 +1209,7 @@ fn early_line(game: &GameState<Classic>, rules: &CompiledRuleset, script: &str, 
     let ai: Vec<String> = ai.iter().map(|l| quote(l.split(" | f[").next().unwrap_or(l))).collect();
     let cmds: Vec<String> = commands.iter().map(|c| quote(c)).collect();
     format!(
-        "{{\"g\":\"{script}/{seed}\",\"p\":{},\"r\":{now},\"cities\":{},\"pop\":{pop},\"food\":{food},\"prod\":{prod},\"sci\":{},\"gold\":{},\"treasury\":{},\"excess\":{},\"settlers\":{settlers},\"workers\":{workers},\"mil\":{military},\"libs\":{libs},\"wonders\":{wonders},\"techs\":{},\"happy\":{happy},\"lux_open\":[{},{open_tiles}],\"c\":[{}],\"cmd\":[{}],\"ai\":[{}],\"imp\":[{}],\"newtech\":[{}],\"w\":[{}],\"settler_ids\":[{}]}}",
+        "{{\"g\":\"{script}/{seed}\",\"p\":{},\"r\":{now},\"cities\":{},\"pop\":{pop},\"food\":{food},\"prod\":{prod},\"sci\":{},\"gold\":{},\"treasury\":{},\"excess\":{},\"settlers\":{settlers},\"workers\":{workers},\"mil\":{military},\"libs\":{libs},\"wonders\":{wonders},\"techs\":{},\"happy\":{happy},\"lux_open\":[{},{open_tiles},{}],\"c\":[{}],\"cmd\":[{}],\"ai\":[{}],\"imp\":[{}],\"newtech\":[{}],\"w\":[{}],\"settler_ids\":[{}]}}",
         player.0,
         cities.len(),
         income.science,
@@ -1213,6 +1218,7 @@ fn early_line(game: &GameState<Classic>, rules: &CompiledRuleset, script: &str, 
         classic_rules::derived::happiness::excess_snapshot(auth, player),
         auth.players().techs_of(player).len(),
         open_kinds.len(),
+        ready_kinds.len(),
         cities.join(","),
         cmds.join(","),
         ai.join(","),

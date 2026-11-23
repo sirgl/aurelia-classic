@@ -26,6 +26,7 @@ pub mod orders;
 pub mod plan;
 pub mod rival_inputs;
 pub mod science;
+pub mod growth;
 pub mod site_head;
 pub mod trace;
 pub mod weights;
@@ -85,6 +86,11 @@ pub fn think(obs: &AIObservation<'_>, brief: &TurnBrief, state: &mut AiState, ru
     // `science-flow`: the science flow's levers (`science`); every other variant keeps them off.
     if brief.science_flow {
         levers.science = science::plan(obs, rules, &pass, &intent, &inputs, &mut own.science);
+    }
+    // `early-growth`: the young cities' garrisons, the growth purchases' gold, the shared land of a site (`growth`);
+    // every other variant keeps them off.
+    if brief.early_growth {
+        levers.growth = growth::plan(obs, brief, state, rules, &pass, &inputs);
     }
     read_soldiers(&mut levers, &own.inputs);
     // The offence whose inputs the pass has (`offence`; the driver clears it for `net2-defence`).

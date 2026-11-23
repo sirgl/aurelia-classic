@@ -764,6 +764,74 @@ pub const WORKER_TILT: Neuron = Neuron {
     terms: &[t(G(g::LUX_OPEN), 4000, "a luxury kind waiting lifts the price by 2 (×1 → ×3): its connection is a city's happiness, which the worked-tile value does not see")],
 };
 
+/// The early growth's garrison row of one own city (`net2::growth::garrison_row`), read by `GARRISON` through `Src::C`
+/// (its own frame: `GUARD`'s `c` row is not read here).
+pub mod gc {
+    /// The city's production is below the mean of the empire's cities (0/1000; Unciv's `cityIsOverAverageProduction`).
+    pub const LOW_PRODUCTION: usize = 0;
+    /// A barbarian camp the player knows within `camps::CAMP_REACH` of the city (0/1000).
+    pub const CAMP_NEAR: usize = 1;
+    /// `c::STACK_MENACE`: the menace of the owner of the strongest stack near the city.
+    pub const STACK_MENACE: usize = 2;
+    /// `c::DANGER`: the defence watch sees the city in danger (0/1000).
+    pub const DANGER: usize = 3;
+    /// `c::DISTRUST_NEAR`: the largest distrust of the rivals with a city within 8 tiles.
+    pub const DISTRUST_NEAR: usize = 4;
+    /// At war with a major (0/1000).
+    pub const AT_WAR: usize = 5;
+    pub const N: usize = 6;
+}
+
+/// The early growth's purchase row of the seat (`net2::growth::buy_row`), read by `BUY_CHEST` through `Src::C`.
+pub mod gb {
+    /// A growth item heads a queue with `gate::CHEST_TURNS` or more turns left (0/1000): a worker, a settler, or a
+    /// building whose effects yield science.
+    pub const WAITING: usize = 0;
+    /// At war with a major (0/1000).
+    pub const AT_WAR: usize = 1;
+    pub const N: usize = 2;
+}
+
+/// Whether a city builds its flat garrison (`planner_cities::garrison_order`: one military unit in every city from
+/// the first contact), 0…1000, at least `gate::GARRISON` to build it. Why (look 3610–3614, `early-growth` round 1):
+/// in the non-capital cities after Writing and before their library, 47 % of the city-rounds built a military unit
+/// or a scout, 79 % of those the flat garrison, ordered at founding (median pop 1, 3 hammers: a spearman is 12
+/// rounds); the library came 34 rounds after the founding or Writing and 18 % had none by r135. The defence watch,
+/// which answers a seen threat (507 of 554 of its orders were against barbarians), stays as it is.
+pub const GARRISON: Neuron = Neuron {
+    name: "garrison",
+    bias: 1000,
+    why: "a city keeps today's garrison: one unit from the first contact",
+    join: UNIT,
+    terms: &[
+        t(C(gc::LOW_PRODUCTION), -1000, "a city below the empire's mean production builds its infrastructure first (Unciv `addMilitaryUnitChoice`: no military unit at peace below the average production); the stronger cities and the watch hold it"),
+        t(C(gc::CAMP_NEAR), 1000, "a camp within reach spawns raiders every few rounds (`camps::LOSS_PER_CAMP_ROUND`): the garrison stays"),
+        t(C(gc::STACK_MENACE), 1000, "a rival's stack near the city"),
+        t(C(gc::DANGER), 1000, "the watch sees a threat: the city is not left empty"),
+        t(C(gc::DISTRUST_NEAR), 700, "a distrusted neighbour within 8 tiles (above 715 distrust the garrison stays)"),
+        t(C(gc::AT_WAR), 1000, "at war with a major every city keeps its garrison"),
+        t(S(s::CAPITAL_FALL), 1000, "after a fall the rest must hold"),
+    ],
+};
+
+/// The share of the hurry price of the cheapest growth item heading a queue that the tiles and the gifts leave in
+/// the treasury (`Growth::chest`), 0…1000. Why (look 3610–3614 with the gold trace): by r135 the seats bought 2533
+/// tiles (21 a seat, 54 gold each) and 4 libraries; a library's hurry offer was worth more a gold than the tiles'
+/// (ratio median 1853 against 1195) and above the least ratio, but its price (300) was above the spendable gold in
+/// 3706 of 4591 offers: the tiles took the gold (spendable median 40 above a reserve of 105–130) every turn before
+/// it reached a library, a worker (220) or a settler.
+pub const BUY_CHEST: Neuron = Neuron {
+    name: "buy_chest",
+    bias: 0,
+    why: "no chest without a growth item waiting: the tiles keep the gold",
+    join: UNIT,
+    terms: &[
+        t(C(gb::WAITING), 1000, "a library, a worker or a settler at a queue's head: the gold waits for it, the tiles after"),
+        t(C(gb::AT_WAR), -1000, "at war the gold is the defenders' (`defence::affordable_now`)"),
+        t(S(s::CAPITAL_FALL), -1000, "after a fall the gold holds the rest"),
+    ],
+};
+
 // ---- the offence addendum (work/new-net-offence-addendum-2026-11-22.md §3): declared, not yet built ----
 
 /// The offence is off: `net2` plays as the addendum's control `net2-defence` (every `Offence` field and
@@ -808,6 +876,12 @@ pub mod gate {
     pub const CHEST_WAIT_ROUNDS: (u32, &str) = (20, "four proposal intervals: past them a partner's refusal is not its gold, which a few rounds of its income bring");
     /// Food a turn a city keeps when it takes a science specialist (`citizens::science_specialist_commands`).
     pub const SCIENTIST_FOOD: (i32, &str) = (2, "two food a turn: the city still grows, slower, and never starves for a slot");
+    /// A city's flat garrison is built from this `weights::GARRISON` level.
+    pub const GARRISON: (Milli, &str) = (500, "the garrison when the threats outweigh the low production");
+    /// Citizens beyond the city's own whose tiles the workers' jobs ahead count (`Growth::jobs_ahead`).
+    pub const JOBS_AHEAD: (u32, &str) = (2, "the tiles the city works next: a worker's first jobs are done in about the rounds two citizens take to grow");
+    /// Turns a growth item still needs for the chest to wait for it (`weights::gb::WAITING`).
+    pub const CHEST_TURNS: (u32, &str) = (4, "an item done in a few turns comes without the gold: the gold waits for the heads it saves the most rounds on");
     /// The cities of the opening a real tall seat founds while content (`weights::g::OPENING`).
     pub const OPENING_CITIES: (u32, &str) = (4, "a strong player expands to about four good cities early and grows them (Tradition: few strong cities); the strategist's own floor (`strategy_net::weights::CITY_FLOOR`) is four as well, and the size model replaced it for a real tall seat");
     /// Ships escorting an `Overseas` order (`fleet::FLEET_SIZE`).
@@ -824,6 +898,8 @@ pub mod site {
     pub const GAP: (i64, &str) = (30, "`RIVAL_PENALTY`: the forward city is the one the next war takes first; up to twice next to a menacing rival");
     pub const ARMY: (i64, &str) = (60, "`ARMY_PENALTY`: an army 4–6 tiles off reaches the settler in a turn or two");
     pub const TRAVEL: (i64, &str) = (40, "`TRAVEL_COST` 30 + `NET_TRAVEL_RISK` 10");
+    /// S12 of `early-growth` (`Growth::shared`), thousandths of S11.
+    pub const SHARED: (i64, &str) = (333, "a third of the land a site shares with an own city: the older city works those tiles first and the new one shares them; a third puts the best spacing at 4–5 tiles, Unciv's (`getDistanceToCityModifier`: 3 → −25, 4 → +6, 5 → +8), where 263 of 394 cities of the look were founded 3 tiles from their nearest own city");
     pub const FILL: (i64, &str) = (0, "read, no weight: a gap inside our land stays ours, the outward site is the one a rival takes; at 25 the term chose a gap over a better outward site in 242 of 5633 settler decisions, mostly at 2-5 cities, and without the head net2 took +4.1, +4.2 and +2.1 points (GAP.md)");
 }
 
@@ -840,6 +916,12 @@ pub fn count() -> usize {
     for neuron in neurons() {
         n += neuron.terms.len() + usize::from(matches!(neuron.join, Join::Sum(_)));
     }
-    // The gates read by `neurons()`' levers (11) and the opening's (`gate::OPENING_CITIES`), the site head (5).
-    n + TILT.len() + 12 + 5
+    // `early-growth`'s own neurons (read outside `neurons()`).
+    for neuron in [&EXPANSION_TILT, &WORKER_TILT, &GARRISON, &BUY_CHEST] {
+        n += usize::from(neuron.bias != 0);
+        n += neuron.terms.len();
+    }
+    // The gates read by `neurons()`' levers (11), the opening's (`gate::OPENING_CITIES`) and the growth's
+    // (`gate::GARRISON`, `CHEST_TURNS`, `JOBS_AHEAD`), the site head (5) and its shared land (`site::SHARED`).
+    n + TILT.len() + 15 + 6
 }
