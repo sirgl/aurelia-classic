@@ -61,6 +61,8 @@ pub struct Candidate {
     pub feat: [f32; F_ACT],
     /// Promotion id + 1 (0: not a promotion).
     pub promo: u16,
+    /// The window index of the candidate's tile (its destination, its target, the unit's own); -1 outside.
+    pub pos: i16,
     pub action: Action,
 }
 
@@ -75,6 +77,8 @@ pub struct Tokens {
     /// The unit of each token (None: the objective, a city).
     pub unit: Vec<Option<UnitHandle>>,
     pub tile: Vec<TileId>,
+    /// The window index of each token's tile; -1 outside the window.
+    pub pos: Vec<i16>,
 }
 
 impl Tokens {
@@ -240,7 +244,7 @@ pub fn tokens(game: &GameState, rules: &CompiledRuleset, orders: &Orders) -> Tok
     let auth = game.view().auth;
     let round = auth.turn().round;
     let (ox, oy) = col_row(game, orders.tile);
-    let mut t = Tokens { feat: Vec::new(), dist: Vec::new(), selectable: Vec::new(), unit: Vec::new(), tile: Vec::new() };
+    let mut t = Tokens { feat: Vec::new(), dist: Vec::new(), selectable: Vec::new(), unit: Vec::new(), tile: Vec::new(), pos: Vec::new() };
     // The objective.
     let mut f = [0f32; F_TOK];
     f[TOK_OBJECTIVE] = 1.0;
@@ -308,6 +312,7 @@ pub fn tokens(game: &GameState, rules: &CompiledRuleset, orders: &Orders) -> Tok
     for f in t.feat.iter_mut() {
         round_all(f);
     }
+    t.pos = t.tile.iter().map(|x| pos_of(orders, *x)).collect();
     let n = t.len();
     t.dist = vec![0; n * n];
     for i in 0..n {
@@ -362,13 +367,17 @@ fn unit_features(game: &GameState, rules: &CompiledRuleset, orders: &Orders, fie
     }
 }
 
+fn pos_of(orders: &Orders, t: TileId) -> i16 {
+    orders.window.index(t).map_or(-1, |i| i as i16)
+}
+
 /// The legal actions of our unit `unit` now, with their features; "done" first.
 pub fn candidates(game: &GameState, rules: &CompiledRuleset, orders: &Orders, unit: UnitHandle) -> Vec<Candidate> {
     let mut out = Vec::new();
     let Some(me) = act::core_of(game, unit) else { return out };
     let field = Field::gather(game, rules, orders);
     let here = Spot::of(game, rules, orders, &field, &me, me.tile);
-    let mut done = Candidate { feat: [0.0; F_ACT], promo: 0, action: Action::Done };
+    let mut done = Candidate { feat: [0.0; F_ACT], promo: 0, pos: pos_of(orders, me.tile), action: Action::Done };
     done.feat[Kind::Done as usize] = 1.0;
     here.write(&here, &mut done.feat);
     out.push(done);
@@ -482,10 +491,12 @@ fn candidate(game: &GameState, rules: &CompiledRuleset, orders: &Orders, field: 
     let mut f = [0f32; F_ACT];
     f[kind as usize] = 1.0;
     let mut promo = 0u16;
+    let mut subject = here.tile;
     match &cmd {
         Command::MoveUnit { destination, .. } => {
             let spot = Spot::of(game, rules, orders, field, me, *destination);
             spot.write(here, &mut f);
+            subject = *destination;
             let left = reach.iter().find(|(t, _)| t == destination).map_or(0, |(_, l)| *l);
             f[27] = if me.moves_max > 0 { f32::from(left) / f32::from(me.moves_max) } else { 0.0 };
             let (blow, count) = blows_from(game, rules, field, me, *destination);
@@ -498,13 +509,14 @@ fn candidate(game: &GameState, rules: &CompiledRuleset, orders: &Orders, field: 
         }
         Command::AttackUnit { .. } | Command::AttackCity { .. } | Command::RangedAttack { .. } | Command::AirSweep { .. } => {
             let t = target_tile(game, &cmd)?;
+            subject = t;
             let spot = Spot::of(game, rules, orders, field, me, t);
             spot.write(here, &mut f);
             strike_features(game, rules, orders, me, t, &mut f);
         }
         _ => here.write(here, &mut f),
     }
-    Some(Candidate { feat: f, promo, action: Action::Command(cmd) })
+    Some(Candidate { feat: f, promo, pos: pos_of(orders, subject), action: Action::Command(cmd) })
 }
 
 fn field_unit(game: &GameState, me: &UnitCore) -> Option<UnitHandle> {

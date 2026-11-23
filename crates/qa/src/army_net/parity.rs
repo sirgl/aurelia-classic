@@ -14,6 +14,10 @@ use super::record::{DECISION_MAGIC, PLAY_MAGIC};
 
 /// One recorded decision, as the net reads it.
 pub struct Recorded {
+    /// The play's static planes (shared by its decisions).
+    pub statics: std::rc::Rc<Vec<f32>>,
+    pub play: usize,
+    pub round: u16,
     pub tokens: Tokens,
     pub candidates: Vec<Candidate>,
     pub pointer: i16,
@@ -54,6 +58,8 @@ pub fn read(bytes: &[u8], limit: usize) -> Result<Vec<Recorded>, String> {
         }
         let jl = r.u32()? as usize;
         r.take(jl)?;
+        let statics = std::rc::Rc::new(r.f16s(super::W * super::W * super::S_CH)?);
+        let play = out.last().map_or(0, |d: &Recorded| d.play + 1);
         let n = r.u32()?;
         for _ in 0..n {
             if r.u32()? != DECISION_MAGIC {
@@ -63,7 +69,7 @@ pub fn read(bytes: &[u8], limit: usize) -> Result<Vec<Recorded>, String> {
             let c = r.u16()? as usize;
             let pointer = r.u16()? as i16;
             let action = r.u16()? as i16;
-            let _round = r.u16()?;
+            let round = r.u16()?;
             let _zero = r.u16()?;
             let tf = r.f16s(t * F_TOK)?;
             let dist = r.take(t * t)?.to_vec();
@@ -71,11 +77,13 @@ pub fn read(bytes: &[u8], limit: usize) -> Result<Vec<Recorded>, String> {
             let _danger = r.f16s(t)?;
             let cf = r.f16s(c * F_ACT)?;
             let promos: Vec<u16> = (0..c).map(|_| r.u16()).collect::<Result<_, _>>()?;
+            let pos: Vec<i16> = (0..t).map(|_| r.u16().map(|x| x as i16)).collect::<Result<_, _>>()?;
+            let cpos: Vec<i16> = (0..c).map(|_| r.u16().map(|x| x as i16)).collect::<Result<_, _>>()?;
             let feat: Vec<[f32; F_TOK]> = tf.chunks_exact(F_TOK).map(|x| x.try_into().expect("chunks of F_TOK")).collect();
-            let tokens = Tokens { feat, dist, selectable, unit: vec![None; t], tile: vec![TileId(0); t] };
-            let candidates = cf.chunks_exact(F_ACT).zip(promos).map(|(x, promo)| Candidate { feat: x.try_into().expect("chunks of F_ACT"), promo, action: Action::Done }).collect();
+            let tokens = Tokens { feat, dist, selectable, unit: vec![None; t], tile: vec![TileId(0); t], pos };
+            let candidates = cf.chunks_exact(F_ACT).zip(promos).zip(cpos).map(|((x, promo), pos)| Candidate { feat: x.try_into().expect("chunks of F_ACT"), promo, pos, action: Action::Done }).collect();
             if out.len() < limit {
-                out.push(Recorded { tokens, candidates, pointer, action });
+                out.push(Recorded { statics: statics.clone(), play, round, tokens, candidates, pointer, action });
             }
         }
     }
@@ -103,12 +111,38 @@ pub fn main(args: &[String]) -> Result<(), String> {
     let decisions = read(&bytes, limit)?;
     let mut file = std::io::BufWriter::new(std::fs::File::create(out.ok_or("--out")?).map_err(|e| e.to_string())?);
     let mut forward_ns = 0u128;
+    let mut encode_ns = 0u128;
+    let mut update_ns = 0u128;
+    let mut updates = 0u64;
+    let mut update_worst = 0f32;
     let mut unit_decisions = 0u64;
+    // Variant B: the map of the previous decision of the same play and round, updated incrementally, is
+    // checked against the map encoded whole.
+    let mut prev: Option<(usize, u16, super::model::MapState)> = None;
     for d in &decisions {
+        let map = if net.has_map() {
+            let planes = super::model::planes(&d.statics, &d.tokens);
+            let te = Instant::now();
+            let full = net.map_full(planes.clone());
+            encode_ns += te.elapsed().as_nanos();
+            if let (Some((p, r, mut st)), Some(f)) = (prev.take(), full.as_ref()) {
+                if p == d.play && r == d.round {
+                    let tu = Instant::now();
+                    net.map_update(&mut st, planes);
+                    update_ns += tu.elapsed().as_nanos();
+                    updates += 1;
+                    update_worst = update_worst.max(st.max_abs_diff(f));
+                }
+            }
+            prev = full.clone().map(|f| (d.play, d.round, f));
+            full
+        } else {
+            None
+        };
         let t0 = Instant::now();
-        let body = net.body(&d.tokens);
+        let body = net.body(&d.tokens, map.as_ref());
         let (ptr, end) = net.pointer(&body, &d.tokens);
-        let acts = if d.pointer >= 0 { net.actions(&body, d.pointer as usize, &d.candidates) } else { Vec::new() };
+        let acts = if d.pointer >= 0 { net.actions(&body, d.pointer as usize, &d.candidates, map.as_ref()) } else { Vec::new() };
         forward_ns += t0.elapsed().as_nanos();
         if d.pointer >= 0 {
             unit_decisions += 1;
@@ -118,5 +152,8 @@ pub fn main(args: &[String]) -> Result<(), String> {
     }
     let n = decisions.len().max(1) as f64;
     println!("{} decisions ({} with a unit), forward {:.1} us per decision (body + pointer + its unit's scorer), one thread", decisions.len(), unit_decisions, forward_ns as f64 / 1000.0 / n);
+    if net.has_map() {
+        println!("map: whole encode {:.2} ms; incremental update {:.2} ms mean over {updates} consecutive decisions, max |incremental - whole| {update_worst:e}", encode_ns as f64 / 1e6 / n, update_ns as f64 / 1e6 / updates.max(1) as f64);
+    }
     Ok(())
 }

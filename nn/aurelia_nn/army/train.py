@@ -16,9 +16,9 @@ import mlx.core as mx
 import mlx.nn as nn
 import mlx.optimizers as optim
 
-from .data import F_ACT, F_TOK, Flat, read_into
+from .data import F_ACT, F_TOK, S_CH, W, Flat, read_into
 from .export import export
-from .model import ArmyNet
+from .model import ArmyNet, map_planes
 
 C_CAP = 128
 
@@ -36,6 +36,10 @@ class Device:
         self.danger = u16(flat.danger).view(mx.float16)
         self.cand = u16(flat.cand).view(mx.float16).reshape(-1, F_ACT) if len(flat.cand) else mx.zeros((1, F_ACT), mx.float16)
         self.promo = u16(flat.promo) if len(flat.promo) else mx.zeros((1,), mx.uint16)
+        self.pos = u16(flat.pos).view(mx.int16)
+        self.cpos = u16(flat.cpos).view(mx.int16) if len(flat.cpos) else mx.zeros((1,), mx.int16)
+        self.statics = u16(flat.statics).view(mx.float16).reshape(-1, W * W, S_CH)
+        self.play = mx.array(list(flat.play), mx.int32)
         i32 = lambda a: mx.array(list(a), mx.int32)
         self.t = i32(flat.t)
         self.c = i32(flat.c)
@@ -76,20 +80,28 @@ class Device:
         ci = mx.minimum(self.cand_off[idx][:, None] + mx.minimum(arc[None, :], mx.maximum(c[:, None] - 1, 0)), self.n_cand - 1)
         cand = mx.where(cmask[..., None], self.cand[ci].astype(mx.float32), 0.0)
         promo = mx.where(cmask, self.promo[ci].astype(mx.int32), 0)
+        pos = mx.where(tmask, self.pos[ti].astype(mx.int32), -1)
+        cpos = mx.where(cmask, self.cpos[ci].astype(mx.int32), -1)
         ptr = self.ptr[idx]
         ptr_label = mx.where(ptr >= 0, ptr, tm)
         unit = mx.maximum(ptr, 0)
         act = self.act[idx]
-        return {'tok': tok, 'dist': dist, 'tmask': tmask, 'sel': sel, 'danger': danger, 'cand': cand, 'promo': promo, 'cmask': cmask,
+        return {'pos': pos, 'cpos': cpos, 'statics': self.statics[self.play[idx]].astype(mx.float32), 'tok': tok, 'dist': dist, 'tmask': tmask, 'sel': sel, 'danger': danger, 'cand': cand, 'promo': promo, 'cmask': cmask,
                 'ptr': ptr_label, 'unit': unit, 'act': mx.maximum(act, 0), 'has_act': (act >= 0).astype(mx.float32),
                 'w': self.w[idx], 'win': self.win[idx], 'lost': self.lost[idx]}
 
 
-def losses(model, b):
-    h = model.body(b['tok'], b['dist'], b['tmask'])
+def forward(model, b):
+    m = model.encode(map_planes(b['statics'], b['tok'], b['pos'])) if model.has_map else None
+    h = model.body(b['tok'], b['dist'], b['tmask'], m, b['pos'])
     pl = model.pointer_logits(h, b['sel'])
+    al = model.action_logits(h, b['unit'], b['cand'], b['promo'], b['cmask'], m, b['cpos'])
+    return h, pl, al
+
+
+def losses(model, b):
+    h, pl, al = forward(model, b)
     ce_ptr = mx.logsumexp(pl, axis=1) - mx.take_along_axis(pl, b['ptr'][:, None], axis=1)[:, 0]
-    al = model.action_logits(h, b['unit'], b['cand'], b['promo'], b['cmask'])
     ce_act = (mx.logsumexp(al, axis=1) - mx.take_along_axis(al, b['act'][:, None], axis=1)[:, 0]) * b['has_act']
     v = model.value(h)
     bce = nn.losses.binary_cross_entropy(v[:, 0], b['win'], with_logits=True, reduction='none')
@@ -178,6 +190,7 @@ def main():
     ap.add_argument('--layers', type=int, default=3)
     ap.add_argument('--heads', type=int, default=4)
     ap.add_argument('--ff', type=int, default=128)
+    ap.add_argument('--map', action='store_true', help='variant B: the hex-conv map encoder')
     ap.add_argument('--lost-weight', type=float, default=0.1)
     ap.add_argument('--best-factor', type=float, default=2.0)
     ap.add_argument('--eval-every', type=int, default=1000)
@@ -201,7 +214,7 @@ def main():
     dev = Device(train, decision_weights(train, best, a.lost_weight, a.best_factor), tm, cm)
     hdev = Device(hold, decision_weights(hold, best, a.lost_weight, a.best_factor), tm, cm)
     promos = max(400, int(mx.max(dev.promo).item()) + 1)
-    model = ArmyNet(d=a.d, heads=a.heads, layers=a.layers, ff=a.ff, promos=promos)
+    model = ArmyNet(d=a.d, heads=a.heads, layers=a.layers, ff=a.ff, promos=promos, map_ch=a.d if a.map else 0)
     if a.init:
         model.load_weights(a.init)
     mx.eval(model.parameters())

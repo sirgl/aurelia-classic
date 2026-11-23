@@ -10,7 +10,7 @@ import mlx.core as mx
 
 from .data import read_into, Flat
 from .model import ArmyNet
-from .train import Device
+from .train import Device, forward
 
 
 def main():
@@ -29,7 +29,7 @@ def main():
     layers = len({k.split('.')[1] for k in w if k.startswith('layers.')})
     heads = w['layers.0.dist_bias'].shape[0]
     ff = w['layers.0.f1.weight'].shape[0]
-    model = ArmyNet(d=d, heads=heads, layers=layers, ff=ff, promos=promos)
+    model = ArmyNet(d=d, heads=heads, layers=layers, ff=ff, promos=promos, map_ch=d if 'm_in.weight' in w else 0)
     model.load_weights(a.weights)
     tm = max(flat.t[:n])
     cm = max(1, max(flat.c[:n]))
@@ -39,9 +39,7 @@ def main():
     for s in range(0, n, 256):
         idx = mx.arange(s, min(s + 256, n))
         b = dev.batch(idx)
-        h = model.body(b['tok'], b['dist'], b['tmask'])
-        pl = model.pointer_logits(h, b['sel'])
-        al = model.action_logits(h, b['unit'], b['cand'], b['promo'], b['cmask'])
+        h, pl, al = forward(model, b)
         mx.eval(pl, al)
         pl = pl.tolist()
         al = al.tolist()

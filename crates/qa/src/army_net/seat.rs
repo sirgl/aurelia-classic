@@ -81,8 +81,13 @@ pub struct Timing {
     pub decisions: u64,
     /// Building the tokens and the candidates.
     pub observe_ns: u64,
-    /// The net's forward passes.
+    /// The net's forward passes (variant B: without the map encoder's work).
     pub forward_ns: u64,
+    /// Variant B: the map encoded whole at the start of the turn, and its incremental updates.
+    pub encode_ns: u64,
+    pub update_ns: u64,
+    pub updates: u64,
+    pub turns: u64,
 }
 
 /// One turn of the army: decisions until the net ends it.
@@ -90,6 +95,7 @@ pub fn turn(rules: &CompiledRuleset, game: &mut GameState, orders: &Orders, scen
     let net = net()?;
     let mut timing = Timing::default();
     let mut made: Vec<(kernel::ids::EntityId, u32)> = Vec::new();
+    let mut map: Option<super::model::MapState> = None;
     for _ in 0..PER_TURN {
         let t0 = Instant::now();
         let mut tokens = observe::tokens(game, rules, orders);
@@ -104,8 +110,23 @@ pub fn turn(rules: &CompiledRuleset, game: &mut GameState, orders: &Orders, scen
             break;
         }
         probe(rules, game, scene);
+        if net.has_map() {
+            let planes = super::model::planes(&orders.statics, &tokens);
+            let tm = Instant::now();
+            match map.as_mut() {
+                None => {
+                    map = net.map_full(planes);
+                    timing.encode_ns += tm.elapsed().as_nanos() as u64;
+                }
+                Some(st) => {
+                    net.map_update(st, planes);
+                    timing.update_ns += tm.elapsed().as_nanos() as u64;
+                    timing.updates += 1;
+                }
+            }
+        }
         let t1 = Instant::now();
-        let body = net.body(&tokens);
+        let body = net.body(&tokens, map.as_ref());
         let (logits, end) = net.pointer(&body, &tokens);
         let t2 = Instant::now();
         let pick = logits.iter().enumerate().filter_map(|(i, l)| l.map(|l| (i, l))).fold(None::<(usize, f32)>, |best, (i, l)| if best.is_none_or(|b| l > b.1) { Some((i, l)) } else { best });
@@ -121,7 +142,7 @@ pub fn turn(rules: &CompiledRuleset, game: &mut GameState, orders: &Orders, scen
         let t3 = Instant::now();
         let candidates = observe::candidates(game, rules, orders, unit);
         let t4 = Instant::now();
-        let scores = net.actions(&body, at, &candidates);
+        let scores = net.actions(&body, at, &candidates, map.as_ref());
         let t5 = Instant::now();
         timing.observe_ns += (t4 - t3).as_nanos() as u64;
         timing.forward_ns += (t5 - t4).as_nanos() as u64;

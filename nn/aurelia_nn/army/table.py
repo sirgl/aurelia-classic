@@ -65,7 +65,7 @@ def main():
                     'best': best[0], 'best_rate': best[1][0], 'net_share': share, 'pass': share is not None and share >= 0.9 and n >= 10})
     eligible = [r for r in out if r['n'] >= 10 and r['best_rate'] > 0]
     passed = [r for r in eligible if r['pass']]
-    summary = {'families': len(eligible), 'passed': len(passed), 'gate_win': len(passed) * 2 >= len(eligible)}
+    summary = {'families': len(eligible), 'passed': len(passed), 'gate_win': len(eligible) > 0 and len(passed) * 2 >= len(eligible)}
     json.dump({'rows': out, 'summary': summary}, open(a.out, 'w'), indent=1)
     for r in out:
         print(f"{r['family']:18} n={r['n']:4} net={r['rates'].get('army-net', 0):.2f} std={r['rates'].get('standard', 0):.2f} tac2={r['rates'].get('tac2', float('nan')):.2f} unciv={r['rates'].get('unciv', 0):.2f} best={r['best']}:{r['best_rate']:.2f} share={r['net_share'] if r['net_share'] is None else round(r['net_share'], 2)} {'PASS' if r['pass'] else ''}")

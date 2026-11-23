@@ -373,6 +373,10 @@ fn play_on<P: kernel::ai::mind::AiMind<Classic>>(rules: &CompiledRuleset, mut ga
                         net_time.decisions += t.decisions;
                         net_time.observe_ns += t.observe_ns;
                         net_time.forward_ns += t.forward_ns;
+                        net_time.encode_ns += t.encode_ns;
+                        net_time.update_ns += t.update_ns;
+                        net_time.updates += t.updates;
+                        net_time.turns += 1;
                     }
                 }
             }
@@ -415,6 +419,10 @@ fn play_on<P: kernel::ai::mind::AiMind<Classic>>(rules: &CompiledRuleset, mut ga
         measures.insert("net_decisions".into(), net_time.decisions as f64);
         measures.insert("net_observe_us".into(), net_time.observe_ns as f64 / 1000.0);
         measures.insert("net_forward_us".into(), net_time.forward_ns as f64 / 1000.0);
+        measures.insert("net_encode_us".into(), net_time.encode_ns as f64 / 1000.0);
+        measures.insert("net_update_us".into(), net_time.update_ns as f64 / 1000.0);
+        measures.insert("net_updates".into(), net_time.updates as f64);
+        measures.insert("net_turns".into(), net_time.turns as f64);
     }
     Ok(Row { family: scene.fam.name().to_owned(), era: lab::era_names(rules).get(scene.era as usize).cloned().unwrap_or_default(), instance: scene.instance, attempt: scene.attempt, player: player.to_owned(), win, rounds: rel, measures, info: scene.info.clone(), trace: rows_trace })
 }

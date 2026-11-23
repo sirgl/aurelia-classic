@@ -13,10 +13,10 @@
 //!
 //! The format (little-endian), one play after another:
 //! `"ARMP" u32 | json_len u32 | json (the play's row: family, era, instance, attempt, player, win,
-//! measures; the counts) | n u32 | n decisions`; a decision:
+//! measures; the counts) | W × W × S_CH f16 static planes | n u32 | n decisions`; a decision:
 //! `"ARMD" u32 | T u16 | C u16 | pointer i16 (-1: end) | action i16 (-1: none) | round u16 | 0 u16 |
 //! T × F_TOK f16 | T × T u8 distances | T u8 selectable | T f16 danger (-1: unknown) |
-//! C × F_ACT f16 | C u16 promotion + 1`.
+//! C × F_ACT f16 | C u16 promotion + 1 | T i16 window index | C i16 window index`.
 
 use std::cell::RefCell;
 use std::collections::BTreeMap;
@@ -333,6 +333,9 @@ pub fn finish(mut meta: serde_json::Value) -> Option<(Vec<u8>, Counts)> {
     put_u32(&mut out, PLAY_MAGIC);
     put_u32(&mut out, json.len() as u32);
     out.extend_from_slice(&json);
+    for x in &rec.orders.statics {
+        put_u16(&mut out, f32_to_f16(*x));
+    }
     put_u32(&mut out, rec.decisions.len() as u32);
     for d in &rec.decisions {
         write_decision(&mut out, d);
@@ -395,6 +398,12 @@ fn write_decision(out: &mut Vec<u8>, d: &Decision) {
     }
     for c in &d.candidates {
         put_u16(out, c.promo);
+    }
+    for p in &d.tokens.pos {
+        out.extend_from_slice(&p.to_le_bytes());
+    }
+    for c in &d.candidates {
+        out.extend_from_slice(&c.pos.to_le_bytes());
     }
 }
 

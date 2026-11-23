@@ -15,6 +15,8 @@ from array import array
 
 F_TOK = 48
 F_ACT = 40
+W = 24
+S_CH = 16
 PLAY = struct.unpack('<I', b'ARMP')[0]
 DEC = struct.unpack('<I', b'ARMD')[0]
 
@@ -27,6 +29,9 @@ class Flat:
         self.danger = bytearray()
         self.cand = bytearray()
         self.promo = bytearray()
+        self.pos = bytearray()
+        self.cpos = bytearray()
+        self.statics = bytearray()
         # Per decision.
         self.t = array('H')
         self.c = array('H')
@@ -56,6 +61,8 @@ def read_into(flat, path, keep=None):
         at += 8
         meta = json.loads(bytes(buf[at:at + jl]))
         at += jl
+        st = buf[at:at + 2 * W * W * S_CH]
+        at += 2 * W * W * S_CH
         (n,) = struct.unpack_from('<I', buf, at)
         at += 4
         take = keep is None or keep(meta)
@@ -64,11 +71,12 @@ def read_into(flat, path, keep=None):
             meta['count'] = 0
             pid = len(flat.plays)
             flat.plays.append(meta)
+            flat.statics += st
         for _ in range(n):
             magic, t, c, ptr, act, rnd, _z = struct.unpack_from('<IHHhhHH', buf, at)
             assert magic == DEC, f'{path}: bad decision magic at {at}'
             at += 16
-            sizes = (2 * t * F_TOK, t * t, t, 2 * t, 2 * c * F_ACT, 2 * c)
+            sizes = (2 * t * F_TOK, t * t, t, 2 * t, 2 * c * F_ACT, 2 * c, 2 * t, 2 * c)
             if not take:
                 at += sum(sizes)
                 continue
@@ -81,7 +89,7 @@ def read_into(flat, path, keep=None):
             flat.act.append(act)
             flat.round.append(rnd)
             flat.play.append(pid)
-            for dst, size in zip((flat.tok, flat.dist, flat.sel, flat.danger, flat.cand, flat.promo), sizes):
+            for dst, size in zip((flat.tok, flat.dist, flat.sel, flat.danger, flat.cand, flat.promo, flat.pos, flat.cpos), sizes):
                 dst += buf[at:at + size]
                 at += size
             meta['count'] += 1
