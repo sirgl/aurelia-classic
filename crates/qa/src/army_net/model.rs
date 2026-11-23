@@ -448,6 +448,8 @@ struct Memory {
     gp: Gru,
     /// `[plan][theta, kappa, w_event]`.
     hyst: Vec<f32>,
+    /// The plan token's readouts `aux_p` [[stage scale, shift], [engaged scale, shift]] (None: not exported).
+    aux_p: Option<[f32; 4]>,
 }
 
 /// The memory of one play (variant M): every army slot's u, the plan tokens, the slots seen at the last update.
@@ -558,7 +560,8 @@ impl Net {
             };
             let gu = Gru { wx: mat("gu_wx", "gu_bx")?, wh: mat("gu_wh", "gu_bh")?, h: U_DIM };
             let gp = Gru { wx: mat("gp_wx", "gp_bx")?, wh: mat("gp_wh", "gp_bh")?, h: c.d };
-            Some(Memory { um: dense("um")?, plan0: raw("plan0")?, plan_bias: raw("plan_bias")?, gu, pq: dense("pq")?, pk: dense("pk")?, gp, hyst: raw("hyst")? })
+            let aux_p = t.get("aux_p").filter(|(s, _)| s.as_slice() == [2, 2]).map(|(_, v)| [v[0], v[1], v[2], v[3]]);
+            Some(Memory { um: dense("um")?, plan0: raw("plan0")?, plan_bias: raw("plan_bias")?, gu, pq: dense("pq")?, pk: dense("pk")?, gp, hyst: raw("hyst")?, aux_p })
         } else {
             None
         };
@@ -783,6 +786,16 @@ impl Net {
         ns.free = fr;
         ns.written = written;
         ns
+    }
+
+    /// The plan's own stage and engaged (the aux readouts on P_0; the diagnosis of the stage per round), None
+    /// without memory or readouts.
+    pub fn plan_stage(&self, state: &MemoryState) -> Option<(usize, bool)> {
+        let a = self.mem.as_ref()?.aux_p?;
+        let p0 = &state.p[..self.config.d];
+        let st: Vec<f32> = (0..STAGES).map(|k| a[0] * p0[k] + a[1]).collect();
+        let s = st.iter().enumerate().fold((0usize, f32::NEG_INFINITY), |b, (i, x)| if *x > b.1 { (i, *x) } else { b }).0;
+        Some((s, a[2] * p0[P_ENGAGED_N] + a[3] > 0.0))
     }
 
     pub fn has_memory(&self) -> bool {
