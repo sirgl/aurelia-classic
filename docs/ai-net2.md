@@ -196,7 +196,9 @@ The promotion's gates (written first, in `GATES.md`; offsets 7310–7311 were us
 The game without the feature plays the promoted mind: `ai_experimental_off` is pinned on the feature-on game of
 `early-growth` (120 rounds: `132f3b49a3027bde`; the city-states case runs 380 rounds, since its games end by science
 before round 420). The garrison's wait is read once for the city's orders (`planner_cities::needs_garrison`): the
-cleanup of the review changes no hash.
+cleanup of the review changes no hash. One trace changes with it: `fill_queue` no longer records the refusal
+`ArmyCapReached` for a city that waits for its garrison (that city needs no garrison, so the army cap does not
+block it); the refusal is a trace only and enters no state.
 
 ## The beliefs by their effects (part `beliefs`, 23 November)
 
