@@ -10,6 +10,7 @@
 //! - `model`: the forward pass in f32 on the CPU, weights exported from MLX (`army/export.py`).
 //! - `seat`: the player `army-net` of `ai-exam suite`.
 
+pub mod map_conv;
 pub mod model;
 pub mod observe;
 pub mod parity;

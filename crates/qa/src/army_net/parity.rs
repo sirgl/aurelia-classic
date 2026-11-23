@@ -121,6 +121,8 @@ pub fn main(args: &[String]) -> Result<(), String> {
     let mut weights = None;
     let mut out = None;
     let mut limit = usize::MAX;
+    // Variant B: also encode every decision with the scalar encoder the kernels replaced, and compare.
+    let mut map_reference = false;
     let mut it = args.iter();
     while let Some(a) = it.next() {
         let mut v = || it.next().cloned().ok_or(format!("{a} needs a value"));
@@ -129,6 +131,7 @@ pub fn main(args: &[String]) -> Result<(), String> {
             "--weights" => weights = Some(v()?),
             "--out" => out = Some(v()?),
             "--limit" => limit = v()?.parse().map_err(|e| format!("{e}"))?,
+            "--map-reference" => map_reference = true,
             other => return Err(format!("unknown option {other}")),
         }
     }
@@ -141,6 +144,11 @@ pub fn main(args: &[String]) -> Result<(), String> {
     let mut update_ns = 0u128;
     let mut updates = 0u64;
     let mut update_worst = 0f32;
+    let mut update_rel = 0f32;
+    let mut update_exact = 0u64;
+    let mut reference_rel = 0f32;
+    let mut encode_each: Vec<u64> = Vec::new();
+    let mut update_each: Vec<u64> = Vec::new();
     let mut unit_decisions = 0u64;
     // Variant B: the map of the previous decision of the same play and round, updated incrementally, is
     // checked against the map encoded whole.
@@ -169,14 +177,25 @@ pub fn main(args: &[String]) -> Result<(), String> {
             let planes = super::model::planes(&d.statics, &d.tokens);
             let te = Instant::now();
             let full = net.map_full(planes.clone());
-            encode_ns += te.elapsed().as_nanos();
+            let ns = te.elapsed().as_nanos();
+            encode_ns += ns;
+            encode_each.push(ns as u64);
+            if let (true, Some(f)) = (map_reference, full.as_ref()) {
+                if let Some(r) = net.map_reference(planes.clone()) {
+                    reference_rel = reference_rel.max(f.max_rel_diff(&r));
+                }
+            }
             if let (Some((p, r, mut st)), Some(f)) = (prev.take(), full.as_ref()) {
                 if p == d.play && r == d.round {
                     let tu = Instant::now();
                     net.map_update(&mut st, planes);
-                    update_ns += tu.elapsed().as_nanos();
+                    let ns = tu.elapsed().as_nanos();
+                    update_ns += ns;
+                    update_each.push(ns as u64);
                     updates += 1;
                     update_worst = update_worst.max(st.max_abs_diff(f));
+                    update_rel = update_rel.max(st.max_rel_diff(f));
+                    update_exact += u64::from(st.stages == f.stages);
                 }
             }
             prev = full.clone().map(|f| (d.play, d.round, f));
@@ -212,6 +231,14 @@ pub fn main(args: &[String]) -> Result<(), String> {
     }
     if net.has_map() {
         println!("map: whole encode {:.2} ms; incremental update {:.2} ms mean over {updates} consecutive decisions, max |incremental - whole| {update_worst:e}", encode_ns as f64 / 1e6 / n, update_ns as f64 / 1e6 / updates.max(1) as f64);
+        let q = |v: &mut Vec<u64>, f: f64| -> f64 {
+            v.sort_unstable();
+            v.get(((v.len() as f64 - 1.0) * f).round() as usize).map_or(0.0, |x| *x as f64 / 1e6)
+        };
+        println!("map: whole encode ms p50 {:.3} p95 {:.3}; update ms p50 {:.3} p95 {:.3}; update relative to whole {update_rel:e}, bit-equal {update_exact} of {updates}", q(&mut encode_each, 0.5), q(&mut encode_each, 0.95), q(&mut update_each, 0.5), q(&mut update_each, 0.95));
+        if map_reference {
+            println!("map: whole encode relative to the scalar encoder (max over stages and decisions) {reference_rel:e}");
+        }
     }
     Ok(())
 }
