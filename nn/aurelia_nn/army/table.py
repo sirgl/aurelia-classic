@@ -27,7 +27,8 @@ def main():
         k = json.loads(l)
         if k['attempt'] is not None and a.lo <= k['instance'] < a.hi:
             kept[(k['family'], k['era'], k['instance'])] = k['attempt']
-    res = collections.defaultdict(lambda: collections.defaultdict(lambda: [0, 0]))
+    # Per family and player: wins, plays, captures (the target city taken, whatever the losses), units lost.
+    res = collections.defaultdict(lambda: collections.defaultdict(lambda: [0, 0, 0, 0.0]))
     ctx = {}
 
     def add(r, name):
@@ -43,6 +44,9 @@ def main():
         cell = res[fam][name]
         cell[0] += bool(r['win'])
         cell[1] += 1
+        m = r.get('measures', {})
+        cell[2] += m.get('taken', -1) >= 0
+        cell[3] += m.get('lost', 0.0)
 
     for path in a.rows:
         for l in open(path):
@@ -66,7 +70,9 @@ def main():
     out = []
     for fam in sorted(res):
         cells = res[fam]
-        rate = {p: (w / n if n else 0.0, n) for p, (w, n) in cells.items()}
+        rate = {p: (c[0] / c[1] if c[1] else 0.0, c[1]) for p, c in cells.items()}
+        capture = {p: c[2] / c[1] for p, c in cells.items() if c[1]}
+        losses = {p: c[3] / c[1] for p, c in cells.items() if c[1]}
         teachers = {p: v for p, v in rate.items() if p.startswith('ref-') or p == 'unciv'}
         best = max(teachers.items(), key=lambda x: (x[1][0], x[0] != 'unciv')) if teachers else (None, (0.0, 0))
         n = max((rate.get(v, (0, 0))[1] for v in variants), default=0)
@@ -77,7 +83,7 @@ def main():
             net = rate.get(v, (0.0, 0))[0]
             shares[v] = net / best[1][0] if best[1][0] > 0 else None
             passes[v] = shares[v] is not None and shares[v] >= 0.9 and rate.get(v, (0, 0))[1] >= 10
-        out.append({'family': fam, 'n': n, 'rates': {p: v[0] for p, v in rate.items()}, 'counts': {p: cells[p] for p in cells},
+        out.append({'family': fam, 'n': n, 'rates': {p: v[0] for p, v in rate.items()}, 'counts': {p: cells[p] for p in cells}, 'capture': capture, 'losses': losses,
                     'best': best[0], 'best_rate': best[1][0], 'share': shares, 'pass': passes})
     eligible = [r for r in out if r['n'] >= 10 and r['best_rate'] > 0]
     summary = {'families': len(eligible), 'variants': variants}
