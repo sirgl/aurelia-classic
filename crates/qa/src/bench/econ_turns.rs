@@ -84,6 +84,10 @@ pub fn rules_line(game: &GameState, rules: &CompiledRuleset) -> Value {
     }
     for (i, d) in rules.module.beliefs.iter().enumerate() {
         effect_rows(&mut effects, "belief", i, &d.effects);
+        // The religion's numbers (`ModifyReligion`, `GrantReligionAbility`): the "module" bucket.
+        for e in d.effects.passive_module.iter() {
+            effects.push(json!(["belief", i, "module", format!("{e:?}")]));
+        }
     }
     let era_index = |e: Option<classic_rules::rules::content::EraId>| e.and_then(|e| rules.eras.get(e.0 as usize)).map_or(-1, |d| i32::from(d.index));
     let buildings: Vec<Value> = rules
@@ -97,20 +101,23 @@ pub fn rules_line(game: &GameState, rules: &CompiledRuleset) -> Value {
                    "nation": d.nation, "replaces": d.replaces.map(|b| b.0), "unbuildable": d.unbuildable,
                    "obsolete": d.obsolete_tech.map(|t| t.0), "maintenance": d.maintenance, "hurry": d.hurry_cost_modifier,
                    "consumes": d.consumes_resources.iter().map(|(r, n)| json!([r.0, n])).collect::<Vec<_>>(),
-                   "placement": dbg(&d.placement), "water_routes": d.placement.allows_water_routes})
+                   "placement": dbg(&d.placement), "water_routes": d.placement.allows_water_routes,
+                   "abilities": d.module.abilities.iter().map(|a| format!("{a:?}")).collect::<Vec<_>>()})
         })
         .collect();
     let units: Vec<Value> = rules
         .units
         .iter()
-        .map(|d| {
+        .enumerate()
+        .map(|(i, d)| {
             json!({"name": d.name, "cost": d.cost, "founder": d.founder, "food": kernel::rules::rows::UnitExtension::built_with_food(&d.module),
                    "purchase_only": kernel::rules::rows::UnitExtension::purchase_only(&d.module), "role": dbg(&d.role), "domain": dbg(&d.domain),
                    "class": d.class, "tech": d.required_tech.map(|t| t.0), "obsolete": d.obsolete_tech.map(|t| t.0), "unbuildable": d.unbuildable,
                    "resources": d.required_resources.iter().map(|(r, n)| json!([r.0, n])).collect::<Vec<_>>(),
                    "requires": d.requires_buildings.iter().map(|b| b.0).collect::<Vec<_>>(), "nation": d.nation,
                    "replaces": d.replaces.map(|u| u.0), "era": era_index(d.era), "strength": d.strength,
-                   "no_maintenance": d.module.economy.no_maintenance})
+                   "no_maintenance": d.module.economy.no_maintenance, "trade": d.module.economy.trade,
+                   "civilian": rules.is_civilian(classic_rules::ids::UnitKindId(i as u16))})
         })
         .collect();
     let specialists: Vec<Value> = rules
@@ -169,7 +176,31 @@ pub fn rules_line(game: &GameState, rules: &CompiledRuleset) -> Value {
         .iter()
         .map(|d| json!({"kind": dbg(&d.kind), "kind_index": d.kind.index(), "unit": d.unit.0, "specialist": d.specialist.map(|s| s.0), "source": dbg(&d.points_source)}))
         .collect();
+    // Religion, trade routes and city-states (part 5): the beliefs' categories, the city-state types
+    // with their bonuses, each seat's type, the speed's pressure and faith numbers.
+    let beliefs: Vec<Value> = rules.module.beliefs.iter().map(|d| json!({"category": dbg(&d.category)})).collect();
+    let cs_types: Vec<Value> = rules
+        .module
+        .city_state_types
+        .iter()
+        .map(|t| {
+            json!({"friends": t.friends_threshold, "allies": t.allies_threshold,
+                   "bonuses": t.bonuses.iter().map(|b| json!([dbg(&b.level), dbg(&b.kind), era_index(b.era), b.amount])).collect::<Vec<_>>()})
+        })
+        .collect();
+    let cs_seats: Vec<i32> = (0..players.count())
+        .map(|p| match players.kind_of(PlayerId(p as u8)) {
+            kernel::world::player::PlayerKind::Module(classic_rules::world::player::ClassicKind::CityState(id)) => {
+                rules.module.city_states.get(id.0 as usize).map_or(-1, |d| i32::from(d.city_state_type.0))
+            }
+            _ => -1,
+        })
+        .collect();
+    let religion_rules = json!({"adjacent": classic_rules::derived::religion::adjacent_city_pressure(&settings.speed(rules)),
+                                "max_religions": classic_rules::classic::world_size::max_religions(classic_rules::classic::world_size::major_count(auth)),
+                                "faith_percent": settings.speed(rules).faith_percent, "pace_percent": settings.speed_values().pace_percent});
     json!({"t": "econ_rules", "effects": effects, "terrain": terrain, "policies": policies, "branches": branches, "great_people": great_people,
+           "beliefs": beliefs, "cs_types": cs_types, "cs_seats": cs_seats, "religion_rules": religion_rules,
            "max_rounds": settings.speed(rules).max_rounds(), "policy_per_city": classic_rules::classic::world_size::policy_cost_per_city(size),
            "heritage_per_wonder": classic_rules::world::congress::HERITAGE_CULTURE_PER_WONDER, "boost_percent": classic_rules::world::congress::BOOST_PERCENT,
            "terrain_codes": rules.terrains.iter().map(|d| d.map_code.map_or(-1, i32::from)).collect::<Vec<_>>(), "buildings": buildings, "units": units, "specialists": specialists,
@@ -267,6 +298,229 @@ fn city_inputs(auth: Auth<'_>, rules: &CompiledRuleset, core: &kernel::world::ci
            "beliefs_tile": effects_list(&beliefs_tile), "timed": effects_list(&timed), "landmarks": landmarks,
            "wonder_res": wonder_res, "connected": core.capital_connection == kernel::world::city::CapitalConnection::Connected,
            "garrison": kernel::world::city::garrison(auth, rules, core).is_some()})
+}
+
+/// A creed as one number: 0 atheism, 1 the owner's pantheon, 2 + id a founded religion.
+fn creed_code(c: classic_rules::world::religion::Creed) -> i32 {
+    use classic_rules::world::religion::Creed;
+    match c {
+        Creed::Atheism => 0,
+        Creed::Pantheon => 1,
+        Creed::Religion(r) => 2 + i32::from(r.0),
+    }
+}
+
+fn route_yields(y: &classic_rules::world::trade::RouteYields) -> Value {
+    json!([y.gold, y.science, y.food, y.production])
+}
+
+/// The whole world's religion, trade routes and city-states (part 5: the MLX state of those
+/// subsystems; the same for every player's line of one moment).
+fn world_block(auth: Auth<'_>, rules: &CompiledRuleset) -> Value {
+    use classic_rules::world::player::ClassicPlayers;
+    let rel = auth.module().religion();
+    let cities: Vec<Value> = auth
+        .cities()
+        .iter()
+        .map(|(h, core)| {
+            let f = rel.city(h);
+            let majority = classic_rules::derived::religion::majority(f, core.population).map_or(-1, creed_code);
+            // The buildings with a pressure ability (Grand Temple): the city's pressure percent's sources.
+            let pressing: Vec<u16> = core
+                .buildings
+                .iter()
+                .filter(|b| {
+                    rules.buildings.get(b.0 as usize).is_some_and(|d| {
+                        d.module.abilities.iter().any(|a| matches!(a, classic_rules::rules::content::BuildingAbility::ReligiousPressure(_)))
+                    })
+                })
+                .map(|b| b.0)
+                .collect();
+            json!([h.index, core.owner.0, core.tile.0, core.population,
+                   f.pressure.iter().map(|p| json!([creed_code(p.creed), p.amount])).collect::<Vec<_>>(),
+                   f.population, f.adoption_bonus == classic_rules::world::religion::AdoptionBonus::Paid, majority,
+                   kernel::world::city::is_capital(rules, core), pressing])
+        })
+        .collect();
+    let religions: Vec<Value> = rel
+        .religions()
+        .iter()
+        .map(|r| {
+            let m = classic_rules::classic::religion_effects::religion_modifiers(auth, rules, r.religion);
+            json!([r.religion.0, r.founder.0, r.holy_city.index, r.beliefs.iter().map(|b| b.0).collect::<Vec<_>>(), r.enhanced,
+                   m.percent.to_vec(), m.prophet_cost, m.abilities.to_vec()])
+        })
+        .collect();
+    let n = auth.players().count();
+    let faith: Vec<Value> = (0..n)
+        .map(|p| {
+            let f = rel.player(PlayerId(p as u8));
+            json!([f.faith, f.pantheon.map_or(-1, |b| i32::from(b.0)), f.religion.map_or(-1, |r| i32::from(r.0)), f.prophets])
+        })
+        .collect();
+    // Every player's numbers the other players' subsystems read: its era (player and content), its
+    // pressure percent along routes, its spies' pressure, its city-state stats, its kind.
+    let seats: Vec<Value> = (0..n)
+        .map(|p| {
+            use classic_rules::rules::stats::{ClassicStat, EspionageStat, Stat, TradeStat};
+            let pid = PlayerId(p as u8);
+            let pm = kernel::effects::player::player_modifiers(auth, rules, pid);
+            json!([kernel::world::player::player_era(auth, rules, pid),
+                   classic_rules::combat::city::current_era(auth, rules, pid).map_or(0, |e| e.index),
+                   pm.stats.get(Stat::Module(ClassicStat::Trade(TradeStat::ReligiousPressurePercent))),
+                   pm.stats.get(Stat::Module(ClassicStat::Espionage(EspionageStat::SpyPressure))),
+                   pm.module.city_state.to_vec(), auth.players().is_major(pid), auth.players().is_city_state(pid), auth.players().is_alive(pid)])
+        })
+        .collect();
+    let spies: Vec<Value> = (0..n)
+        .flat_map(|p| {
+            auth.module().espionage().spies_of(PlayerId(p as u8)).iter().filter_map(move |s| s.city.map(|c| json!([p, c.index]))).collect::<Vec<_>>()
+        })
+        .collect();
+    let routes: Vec<Value> = auth
+        .module()
+        .trade()
+        .routes()
+        .iter()
+        .map(|r| {
+            json!([r.owner.0, r.origin.index, r.destination.index, dbg(&r.domain), r.kind.code(), r.unit_kind.0,
+                   r.path.iter().map(|t| t.0).collect::<Vec<_>>(), r.position, r.forward, r.circuits_done, r.circuits_total,
+                   route_yields(&r.origin_yields), route_yields(&r.destination_yields)])
+        })
+        .collect();
+    let cs = auth.module().city_states();
+    let mut standings = Vec::new();
+    let mut minors = Vec::new();
+    for c in 0..n {
+        let csid = PlayerId(c as u8);
+        if !auth.players().is_city_state(csid) {
+            continue;
+        }
+        let m = cs.minor(csid);
+        minors.push(json!([c, m.ally.map_or(-1, |a| i32::from(a.0)), m.allied_since, dbg(&m.personality), m.global_countdown,
+                           auth.players().is_alive(csid)]));
+        for p in 0..n {
+            let major = PlayerId(p as u8);
+            if !auth.players().is_major(major) {
+                continue;
+            }
+            let s = cs.standing(csid, major);
+            standings.push(json!([c, p, s.influence, s.ever_friends, s.pledged.is_some(), s.wary, s.spawn_counter, s.contacted, s.quest_countdown,
+                                  classic_rules::world::city_states::resting_point(auth, rules, csid, major),
+                                  classic_rules::world::city_states::is_friends(auth, rules, csid, major),
+                                  auth.diplomacy().at_war(csid, major)]));
+        }
+    }
+    let majors: Vec<Value> = (0..n)
+        .filter(|p| auth.players().is_major(PlayerId(*p as u8)))
+        .map(|p| {
+            let r = cs.major(PlayerId(p as u8));
+            json!([p, r.minors_attacked, r.gold_gifted, r.ally_great_person_turns])
+        })
+        .collect();
+    let quests: Vec<Value> = cs.quests().iter().map(|q| json!([q.city_state.0, q.major.0, dbg(&q.kind), q.start, q.end])).collect();
+    json!({"religion": {"cities": cities, "religions": religions, "players": faith, "pantheons": rel.pantheons(), "rng": rel.prophet_rng().state(),
+                        "left": classic_rules::derived::religion::religions_left(auth), "spies": spies},
+           "seats": seats,
+           "routes": routes,
+           "cs": {"standings": standings, "minors": minors, "majors": majors, "quests": quests}})
+}
+
+/// The player's numbers of part 5's subsystems: the city-state stats and bonuses it reads, its next
+/// prophet's price, the terms of every route at either end (the other end's city and owner as inputs:
+/// in a whole-game run they are that player's own state), the route tiles an enemy stands on, the
+/// intruders on a city-state's land.
+fn player_extras(auth: Auth<'_>, rules: &CompiledRuleset, p: PlayerId) -> Value {
+    use classic_rules::rules::content::CityStateBonusKind as BK;
+    use classic_rules::rules::stats::{ClassicStat, Stat, TradeDomain, TradeStat};
+    use classic_rules::world::player::ClassicPlayers;
+    let pm = kernel::effects::player::player_modifiers(auth, rules, p);
+    let kinds = [BK::CapitalFood, BK::AllCitiesFood, BK::Culture, BK::Faith, BK::Happiness];
+    let bonus: Vec<i32> = kinds.iter().map(|k| classic_rules::world::city_states::player_bonus(auth, rules, p, *k)).collect();
+    let tstat = |stats: &classic_rules::rules::stats::StatTotals, s: TradeStat| stats.get(Stat::Module(ClassicStat::Trade(s)));
+    let city_terms = |h: kernel::ids::CityHandle| -> Value {
+        let Some(core) = auth.cities().get(h) else { return Value::Null };
+        let gold = kernel::derived::yields::city_breakdown(auth, rules, core).rates.gold;
+        let trade = classic_rules::derived::trade::city_trade_yields(auth, h).gold as i32;
+        let mut res: Vec<u16> = classic_rules::derived::resources::city_resources(auth, rules, h)
+            .into_iter()
+            .filter(|r| {
+                let class = rules.resources.get(r.0 as usize).and_then(|d| d.class);
+                matches!(class, Some(classic_rules::rules::content::ResourceClass::Luxury | classic_rules::rules::content::ResourceClass::Strategic))
+            })
+            .map(|r| r.0)
+            .collect();
+        res.sort_unstable();
+        res.dedup();
+        let cm = kernel::effects::city::city_modifiers(auth, rules, core);
+        let owner = core.owner;
+        let om = kernel::effects::player::player_modifiers(auth, rules, owner);
+        json!({"owner": owner.0, "pop": core.population, "gold_wo": (gold - trade).max(0) * 100, "res": res,
+               "city": [tstat(&cm.stats, TradeStat::RouteGold(TradeDomain::Land)), tstat(&cm.stats, TradeStat::RouteGold(TradeDomain::Sea)),
+                        tstat(&cm.stats, TradeStat::TargetGold), tstat(&cm.stats, TradeStat::RecipientGold)],
+               "player": [tstat(&om.stats, TradeStat::RouteGold(TradeDomain::Land)), tstat(&om.stats, TradeStat::RouteGold(TradeDomain::Sea)),
+                          tstat(&om.stats, TradeStat::CityStateRouteGold), tstat(&om.stats, TradeStat::SharedIdeologyRouteGold),
+                          tstat(&om.stats, TradeStat::IncomingRouteGold), tstat(&om.stats, TradeStat::ResourceGoldPercent),
+                          tstat(&om.stats, TradeStat::InternalPercent)],
+               "era": kernel::world::player::player_era(auth, rules, owner), "major": auth.players().is_major(owner),
+               "city_state": auth.players().is_city_state(owner), "ideology": auth.module().culture().of(owner).ideology.map(|b| b.0)})
+    };
+    let mut routes = Vec::new();
+    for (i, r) in auth.module().trade().routes().iter().enumerate() {
+        let dest_owner = auth.cities().get(r.destination).map(|c| c.owner);
+        if r.owner != p && dest_owner != Some(p) {
+            continue;
+        }
+        let (o, d) = classic_rules::derived::trade::route_values(auth, rules, r);
+        let influence = match dest_owner {
+            Some(to) if auth.players().is_major(r.owner) && auth.players().is_major(to) => {
+                classic_rules::derived::tourism::trade_route_science_bonus(classic_rules::derived::tourism::influence_level(auth, r.owner, to))
+            }
+            _ => 0,
+        };
+        let enemies: Vec<Value> = if r.owner == p {
+            r.path
+                .iter()
+                .enumerate()
+                .filter_map(|(k, t)| classic_rules::derived::trade::enemy_on(auth, rules, *t, r.owner).map(|e| json!([k, e.0])))
+                .collect()
+        } else {
+            Vec::new()
+        };
+        routes.push(json!({"i": i, "origin": city_terms(r.origin), "destination": city_terms(r.destination), "influence": influence,
+                           "values": [route_yields(&o), route_yields(&d)], "enemies": enemies}));
+    }
+    let intruders: Vec<Value> = if auth.players().is_city_state(p) {
+        (0..auth.players().count())
+            .filter(|m| auth.players().is_major(PlayerId(*m as u8)))
+            .map(|m| {
+                let major = PlayerId(m as u8);
+                let n = auth
+                    .indexes()
+                    .units_of(major)
+                    .iter()
+                    .filter_map(|u| auth.units().get(*u))
+                    .filter(|u| !rules.is_civilian(u.core.kind))
+                    .filter(|u| auth.map().owner(u.core.tile).flatten() == Some(p))
+                    .count();
+                let afraid = classic_rules::world::city_states::bully_score(auth, rules, p, major, false) >= 0;
+                json!([m, n, afraid, classic_rules::derived::tourism::trade_connected(auth, major, p)])
+            })
+            .collect()
+    } else {
+        Vec::new()
+    };
+    let faith_cities: i64 = auth
+        .indexes()
+        .cities_of(p)
+        .iter()
+        .filter_map(|h| auth.cities().get(*h))
+        .map(|c| i64::from(kernel::derived::yields::city_breakdown(auth, rules, c).rates.module.max(0)))
+        .sum();
+    json!({"cs_stats": pm.module.city_state.to_vec(), "cs_bonus": bonus,
+           "prophet_cost": classic_rules::derived::religion::prophet_cost(auth, rules, p),
+           "faith_cities": faith_cities, "routes": routes, "intruders": intruders,
+           "trade_stats": [tstat(&pm.stats, TradeStat::ReligiousPressurePercent)]})
 }
 
 /// One player's cities and empire.
@@ -414,6 +668,8 @@ pub fn player_state(auth: Auth<'_>, rules: &CompiledRuleset, p: PlayerId, answer
     s["gp"] = json!({"threshold": rules.module.great_people.iter().map(|d| classic_rules::derived::great_people::great_person_threshold(auth, rules, p, d.kind)).collect::<Vec<_>>(),
                      "friends": gp_friends, "funding": gp_funding});
     s["income_gold"] = json!(classic_rules::derived::income::player_income(auth, rules, p).gold);
+    s["world"] = world_block(auth, rules);
+    s["extra"] = player_extras(auth, rules, p);
     s["round"] = json!(auth.turn().round);
     // The cities a route network (or two harbors on one sea) links to the capital, computed on this
     // world (`derived::connections`): the connection gold's answer.
