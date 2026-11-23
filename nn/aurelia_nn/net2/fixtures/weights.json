@@ -26,7 +26,8 @@
     "ease": {"bias": -2200, "join": "unit", "terms": [{"src": ["T", 0], "shape": ["not"], "w": 1000}, {"src": ["T", 1], "shape": ["not"], "w": 800}, {"src": ["T", 2], "shape": ["plain"], "w": 1000}, {"src": ["T", 3], "shape": ["not"], "w": 600}]},
     "part_hold": {"bias": -500, "join": "unit", "terms": [{"src": ["G", 12], "shape": ["plain"], "w": 1500}, {"src": ["G", 13], "shape": ["plain"], "w": 300}, {"src": ["K", 3], "shape": ["plain"], "w": -600}]},
     "city_cap": {"bias": 0, "join": "linear", "terms": [{"src": ["G", 14], "shape": ["plain"], "w": 4000}, {"src": ["Y", 2], "shape": ["times", ["F", 3]], "w": 3000}, {"src": ["Y", 1], "shape": ["times", ["F", 3]], "w": 0}, {"src": ["F", 15], "shape": ["above", 375], "w": -4000}, {"src": ["F", 23], "shape": ["below", 500], "w": -8000}, {"src": ["K", 10], "shape": ["plain"], "w": -6000}, {"src": ["A", 2], "shape": ["plain"], "w": -2000}, {"src": ["F", 14], "shape": ["above", 600], "w": -5000}]},
-    "space_research": {"bias": -1000, "join": "unit", "terms": [{"src": ["Y", 3], "shape": ["plain"], "w": 2000}, {"src": ["F", 50], "shape": ["plain"], "w": 1000}]}
+    "space_research": {"bias": -1000, "join": "unit", "terms": [{"src": ["Y", 3], "shape": ["plain"], "w": 2000}, {"src": ["F", 50], "shape": ["plain"], "w": 1000}]},
+    "capital_gate": {"bias": -500, "join": "unit", "terms": [{"src": ["G", 15], "shape": ["plain"], "w": 1500}]}
   },
   "seat": ["war_weary", "capital_fall", "city_state_room", "air_need", "infamy_cost", "late"],
   "rival": ["weak", "reach", "distrust", "menace", "runaway", "prey", "spoiler", "retake", "duty", "grabber", "border", "war_value", "block"],
@@ -43,7 +44,7 @@
     {"table": "posture", "at": 2, "term": {"src": ["A", 5], "shape": ["plain"], "w": -3000}},
     {"table": "posture", "at": 3, "term": {"src": ["A", 5], "shape": ["plain"], "w": -3000}}
   ],
-  "gates": {"war_start": 550, "war_keep": 350, "peace": 500, "deny_help": 500, "embargo": 600, "block": 500, "space_research": 500},
-  "names": {"g": ["capital_lost", "cities_lost", "war_rounds", "war_gain", "unhappy_trend", "embark", "enemy_air", "gold_stock", "cs_allies", "cs_contested", "own_infamy", "ties_at_risk", "space_race", "parts_short", "size_model"], "r": ["near", "land", "sea", "soldiers", "seen_army", "open_cities", "tree", "lead", "pace", "culture", "stack", "warmonger", "betrayed", "denounced_us", "friend", "pact", "at_war", "war_rounds", "holds_capital", "holds_cities", "grab", "ally_hit", "local", "score", "retake_case", "captured_recent", "soft", "operating", "alone", "cs_held"], "a": ["one", "max_prey", "max_menace", "order_at_peace", "order_at_war", "no_order", "order_value"], "t": ["size", "garrison", "near", "walls"], "at_war_feature": 20},
+  "gates": {"war_start": 550, "war_keep": 350, "peace": 500, "deny_help": 500, "embargo": 600, "block": 500, "space_research": 500, "capital_gate": 500},
+  "names": {"g": ["capital_lost", "cities_lost", "war_rounds", "war_gain", "unhappy_trend", "embark", "enemy_air", "gold_stock", "cs_allies", "cs_contested", "own_infamy", "ties_at_risk", "space_race", "parts_short", "size_model", "part_out"], "r": ["near", "land", "sea", "soldiers", "seen_army", "open_cities", "tree", "lead", "pace", "culture", "stack", "warmonger", "betrayed", "denounced_us", "friend", "pact", "at_war", "war_rounds", "holds_capital", "holds_cities", "grab", "ally_hit", "local", "score", "retake_case", "captured_recent", "soft", "operating", "alone", "cs_held", "chest_wait"], "a": ["one", "max_prey", "max_menace", "order_at_peace", "order_at_war", "no_order", "order_value"], "t": ["size", "garrison", "near", "walls"], "at_war_feature": 20},
   "site": {"bound": 169, "gap": 30, "army": 60, "travel": 40, "fill": 0}
 }

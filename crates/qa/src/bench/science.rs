@@ -19,6 +19,11 @@ use crate::bench::suite::Side;
 /// last round, then the last round).
 pub const BY_ROUNDS: [u32; 3] = [300, 400, 500];
 
+/// A ship whose last part was built this many rounds before the game ended or fewer is counted late
+/// (`ScienceSummary::built_late`): the part is installed at the start of the owner's next turn and a part built away
+/// from the capital walks there, so the game ended before the ship could be finished, not because a part stood still.
+pub const LATE_ROUNDS: u32 = 3;
+
 /// The science victory of one side's seats over a tournament.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct ScienceSummary {
@@ -28,6 +33,11 @@ pub struct ScienceSummary {
     pub victories: Vec<(u32, BlockEstimate)>,
     /// The round of the side's science victories, and the earliest.
     pub victory_round: BlockEstimate,
+    /// The median round of the side's science victories (the middle two's mean), and their count.
+    #[serde(default)]
+    pub median_round: Option<f64>,
+    #[serde(default)]
+    pub won: u32,
     pub earliest: Option<u32>,
     /// Per checkpoint (then the end): technologies and science a turn, the
     /// side's seats' mean and each game's best seat of the side.
@@ -46,6 +56,15 @@ pub struct ScienceSummary {
     /// not installed by the end (and the seats of the side).
     pub built_lost: u32,
     pub seats: u32,
+    /// `built_lost` split, in this order: a seat of the same side won the game (the side's victory, by any kind);
+    /// every part built in the last `LATE_ROUNDS` rounds; built earlier and still not installed by the end (a part
+    /// that stood still, or was lost: the install's failure). Reports saved before read zeros.
+    #[serde(default)]
+    pub built_side_won: u32,
+    #[serde(default)]
+    pub built_late: u32,
+    #[serde(default)]
+    pub built_waited: u32,
 }
 
 /// Technologies and science a turn at one checkpoint (None: the end).
@@ -100,6 +119,7 @@ impl ScienceSummary {
         let progress = points.iter().enumerate().map(|(at, round)| science_at(side, &games, at, *round)).collect();
         let (mut project, mut project_round, mut parts, mut complete) = (Blocks::default(), Blocks::default(), Blocks::default(), Blocks::default());
         let (mut built_lost, mut seats_counted) = (0u32, 0u32);
+        let (mut built_side_won, mut built_late, mut built_waited) = (0u32, 0u32, 0u32);
         let parts_needed = games.iter().map(|r| r.space_parts).max().unwrap_or(0);
         for r in &games {
             let seats = r.seats.iter().filter(|s| s.side == side);
@@ -113,14 +133,25 @@ impl ScienceSummary {
                 let won_it = r.winner().is_some_and(|w| w.player == seat.player && w.victory == Some("science"));
                 if r.space_parts > 0 && seat.pace.built >= r.space_parts && !won_it {
                     built_lost += 1;
+                    let side_won = r.winner().is_some_and(|w| w.side == side);
+                    let late = seat.pace.built_round.is_some_and(|at| at + LATE_ROUNDS >= r.rounds);
+                    match (side_won, late) {
+                        (true, _) => built_side_won += 1,
+                        (false, true) => built_late += 1,
+                        (false, false) => built_waited += 1,
+                    }
                 }
             }
             let done = r.space_parts > 0 && seats.clone().any(|s| s.pace.parts.len() as u32 >= r.space_parts);
             complete.add(r.seed, f64::from(u8::from(done)));
         }
+        let mut rounds: Vec<u32> = games.iter().filter_map(|r| won(r)).collect();
+        rounds.sort_unstable();
         Self {
             victories,
             victory_round: victory_round.estimate(),
+            median_round: median(&rounds),
+            won: rounds.len() as u32,
             earliest: games.iter().filter_map(|r| won(r)).min(),
             progress,
             project: project.estimate(),
@@ -130,6 +161,9 @@ impl ScienceSummary {
             parts_needed,
             built_lost,
             seats: seats_counted,
+            built_side_won,
+            built_late,
+            built_waited,
         }
     }
 
@@ -141,9 +175,11 @@ impl ScienceSummary {
         let earliest = self.earliest.map_or_else(|| "—".to_owned(), |r| r.to_string());
         let _ = writeln!(
             out,
-            "{variant}: science victories {}; their round {} (earliest {earliest})\n",
+            "{variant}: science victories {}; their round {} (earliest {earliest}; {} victories, median round {})\n",
             by.join(", "),
-            interval(&self.victory_round)
+            interval(&self.victory_round),
+            self.won,
+            self.median_round.map_or_else(|| "—".to_owned(), |m| format!("{m:.1}"))
         );
         let _ = writeln!(out, "| {variant}: science | techs (mean) | techs (best seat) | science a turn (mean) | science a turn (best seat) |");
         let _ = writeln!(out, "|---|---:|---:|---:|---:|");
@@ -163,7 +199,11 @@ impl ScienceSummary {
                 self.parts_needed,
                 share(&self.complete)
             );
-            let _ = writeln!(out, "{variant}: seats with every part built and no science victory (built, not installed by the end): {} of {}\n", self.built_lost, self.seats);
+            let _ = writeln!(
+                out,
+                "{variant}: seats with every part built and no science victory (built, not installed by the end): {} of {} — a seat of the same side won the game: {}; the last part built in the last {LATE_ROUNDS} rounds: {}; built earlier and not installed: {}\n",
+                self.built_lost, self.seats, self.built_side_won, self.built_late, self.built_waited
+            );
         } else {
             out.push('\n');
         }
@@ -264,5 +304,35 @@ mod tests {
         let by: Vec<(u32, f64)> = b.victories.iter().map(|(r, e)| (*r, e.mean)).collect();
         assert_eq!(by, vec![(300, 0.0), (320, 0.0)]);
         assert_eq!(b.earliest, Some(450));
+    }
+
+    /// A seat with every part built and no science victory counts once, in the first class that holds: its side won
+    /// the game, its last part came in the last `LATE_ROUNDS` rounds, or the ship waited built (space-parts SPACE.md).
+    #[test]
+    fn a_ship_built_and_not_won_counts_by_its_class() {
+        let built = |mut r: MatchResult, at: usize, round: u32| {
+            r.seats[at].pace.built = 6;
+            r.seats[at].pace.built_round = Some(round);
+            r
+        };
+        let late = built(game(1, 330, None, [5, 0]), 0, 330 - LATE_ROUNDS);
+        let waited = built(game(2, 330, None, [5, 0]), 0, 330 - LATE_ROUNDS - 1);
+        let mut side = game(3, 320, Some(Side::Candidate), [6, 0]);
+        let mut mate = side.seats[0].clone();
+        (mate.player, mate.victory) = (PlayerId(2), None);
+        side.seats.push(mate);
+        let side = built(side, 2, 300);
+        let s = ScienceSummary::of(Side::Candidate, &[late, waited, side], 330, &[]);
+        assert_eq!((s.built_lost, s.built_side_won, s.built_late, s.built_waited), (3, 1, 1, 1));
+    }
+}
+
+/// The median of sorted rounds (the mean of the middle two of an even count); none of none.
+fn median(sorted: &[u32]) -> Option<f64> {
+    let n = sorted.len();
+    match n {
+        0 => None,
+        _ if n % 2 == 1 => Some(f64::from(sorted[n / 2])),
+        _ => Some((f64::from(sorted[n / 2 - 1]) + f64::from(sorted[n / 2])) / 2.0),
     }
 }

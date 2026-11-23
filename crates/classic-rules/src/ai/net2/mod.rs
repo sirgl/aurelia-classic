@@ -24,7 +24,10 @@ pub mod memory;
 pub mod offence;
 pub mod orders;
 pub mod plan;
+#[cfg(test)]
+mod readers;
 pub mod rival_inputs;
+pub mod science;
 pub mod site_head;
 pub mod trace;
 pub mod weights;
@@ -56,6 +59,10 @@ pub fn think(obs: &AIObservation<'_>, brief: &TurnBrief, state: &mut AiState, ru
         let _span = prof::span("net2/inputs");
         inputs::read(obs, brief, state, rules, &situation.features, &situation.rivals, &mut own.inputs)
     };
+    // `science-flow`: how long our gold waited for each partner's agreement (`r::CHEST_WAIT`); 0 for every other variant.
+    if brief.science_flow {
+        science::read_waits(&own.science, obs, &mut inputs.rivals);
+    }
     let net = net_of(brief, parts);
     let carried = strategy_net::concepts_net(&situation.features, net);
     let pass = levers::before_intent(&inputs, &carried, &own.core, obs.round, obs.speed.pace_percent, parts);
@@ -71,10 +78,14 @@ pub fn think(obs: &AIObservation<'_>, brief: &TurnBrief, state: &mut AiState, ru
     }
     space_trace(obs.player.0, obs.round, &inputs, after.part_hold);
     let mut levers = after.plan;
+    // `science-flow`: the science flow's levers (`science`); every other variant keeps them off.
+    if brief.science_flow {
+        levers.science = science::plan(obs, rules, &pass, &intent, &inputs, &mut own.science);
+    }
     read_soldiers(&mut levers, &own.inputs);
     // The offence whose inputs the pass has (`offence`; the driver clears it for `net2-defence`).
     offence::apply(&mut levers, &pass);
-    memory.net2 = Some(plan::Memory2 { core: pass.core.clone(), inputs: own.inputs });
+    memory.net2 = Some(plan::Memory2 { core: pass.core.clone(), inputs: own.inputs, science: own.science });
     let _plan_span = prof::span("net2/plan_with_intent");
     let price_tilt = if parts.plays(Part::Economy) { after.price_tilt } else { [0; pd::N] };
     let strategy = strategy_net::plan_with_intent(seat, state, memory, &situation, intent, &price_tilt, Wishes::default());

@@ -97,6 +97,7 @@ impl SeatInputs {
             self.space_race,
             self.parts_short,
             self.size_model,
+            self.part_out,
         ]
     }
 }
@@ -135,6 +136,7 @@ impl RivalInputs {
             self.operating,
             self.alone,
             self.cs_held,
+            self.chest_wait,
         ]
     }
 }
@@ -189,6 +191,7 @@ mod tests {
             "part_hold" => &['K', 'G'],
             "city_cap" => &['F', 'K', 'G', 'A', 'Y'],
             "space_research" => &['F', 'Y'],
+            "capital_gate" => &['G'],
             _ => &['K', 'S', 'R', 'Q'],
         }
     }

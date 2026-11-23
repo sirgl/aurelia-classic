@@ -117,8 +117,10 @@ pub mod g {
     pub const PARTS_SHORT: usize = 13;
     /// The new cities the rules' size model pays for a real tall seat, 250 a city (set after the intent; `CITY_CAP` only).
     pub const SIZE_MODEL: usize = 14;
-    pub const N: usize = 15;
-    pub const NAMES: [&str; N] = ["capital_lost", "cities_lost", "war_rounds", "war_gain", "unhappy_trend", "embark", "enemy_air", "gold_stock", "cs_allies", "cs_contested", "own_infamy", "ties_at_risk", "space_race", "parts_short", "size_model"];
+    /// A spaceship part of ours stands outside the capital, the tile it is installed on (0/1000).
+    pub const PART_OUT: usize = 15;
+    pub const N: usize = 16;
+    pub const NAMES: [&str; N] = ["capital_lost", "cities_lost", "war_rounds", "war_gain", "unhappy_trend", "embark", "enemy_air", "gold_stock", "cs_allies", "cs_contested", "own_infamy", "ties_at_risk", "space_race", "parts_short", "size_model", "part_out"];
 }
 
 /// A rival's inputs (`plan::RivalInputs` in order).
@@ -157,10 +159,14 @@ pub mod r {
     pub const ALONE: usize = 28;
     /// The city-states allied to it, / 3 (R31).
     pub const CS_HELD: usize = 29;
-    pub const N: usize = 30;
+    /// `science-flow`: the rounds our gold has waited for its research agreement unsigned, over
+    /// `gate::CHEST_WAIT_ROUNDS` (`science::read_waits`; 0 for every other variant).
+    pub const CHEST_WAIT: usize = 30;
+    pub const N: usize = 31;
     pub const NAMES: [&str; N] = [
         "near", "land", "sea", "soldiers", "seen_army", "open_cities", "tree", "lead", "pace", "culture", "stack", "warmonger", "betrayed", "denounced_us", "friend", "pact", "at_war",
         "war_rounds", "holds_capital", "holds_cities", "grab", "ally_hit", "local", "score", "retake_case", "captured_recent", "soft", "operating", "alone", "cs_held",
+        "chest_wait",
     ];
 }
 
@@ -378,7 +384,7 @@ pub const RIVAL: [Neuron; q::N] = [
         why: "a few units passing are no menace",
         join: UNIT,
         terms: &[
-            t(R(r::STACK), 1500, "a stack inside our borders at peace is the sneak attack (P3, MO3, B2)"),
+            t(R(r::STACK), 1500, "a stack inside our borders at peace is the sneak attack (P3, MO3, B2), and at war the attack itself (capitals: read at peace only, the menace fell to 0 on the declaration)"),
             t(Q(q::DISTRUST), 400, "distrust raises it"),
             t(R(r::FRIEND), 0, "read, no weight: a friend's stack inside our borders is the same sneak attack (HMO3 #1: 4–10 units two tiles from our city, menace 142–313 with −300); a friendship binds nothing in these rules"),
         ],
@@ -621,6 +627,26 @@ pub const SPACE_RESEARCH: Neuron = Neuron {
     ],
 };
 
+/// The capital is kept for the spaceship's parts (`Net2Plan::capital_gate`): no own civilian waits in it while a part
+/// is outside, and the civilians standing in it walk out around the units in the way (the executors
+/// `planner_workers::park` and `victory::walked_orders` only read the lever). Why (space-parts SPACE.md, P1 offsets
+/// 2200–2201 replayed with `AURELIA_SPACE_TRACE`): a part is a civilian and a tile holds one civilian; a jobless
+/// worker parked in the capital (`park`: the nearest city with no civilian), the space plan sent it out, and the
+/// worker's own turn parked it back in the same turn (Korea, pangaea 2201008: the engine 2 tiles off from r317 to the
+/// time victory at r330; Celts, continents 2201005: 18 rounds). Or the worker's march out was stopped by the waiting
+/// parts themselves (the rules' march does not go around units: Denmark, continents 2200002, a booster and the stasis
+/// chamber one tile off from r305 until a diplomatic victory at r312). 9 of the 29 ships built and not won stood still
+/// so (34 rounds), and 29 of the 140 ships that won (57 rounds). The executor walks the civilians off the tiles next
+/// to the capital as well (its gate): a worker sent to the nearest free tile parked at the gate and shut a part out
+/// as before (tuning offsets 2620–2621, Brazil pangaea 2620001, Morocco pangaea 2621017).
+pub const CAPITAL_GATE: Neuron = Neuron {
+    name: "capital_gate",
+    bias: -500,
+    why: "no part outside the capital, no gate: a city is where a jobless civilian is safe from capture",
+    join: UNIT,
+    terms: &[t(G(g::PART_OUT), 1500, "a part enters only a capital with no civilian in it, and the ship is the victory: the capital is the part's tile")],
+};
+
 /// The new cities a real tall seat founds (`Intent::more_cities` of a `tall_real` seat, thousandths of a city, rounded
 /// half up; the executors `tall_real::adjust` and `Prices::city_cap` only read the target). The rules' size model
 /// (`tall_real::SizeModel::more`) is one input among the land, the leader's tilt, the rivals and the mood. R4's case:
@@ -645,6 +671,55 @@ pub const CITY_CAP: Neuron = Neuron {
         t(K(kc::HAPPINESS_CRISIS), -6000, "in a crisis the rules cut growth: no city (`CITY_CRISIS`)"),
         t(A(a::MAX_MENACE), -2000, "rivals' pressure: a stack at our border takes the settler and the young city first (MO8)"),
         ts(F(fe::PROGRESS), Shape::Above(600), -5000, "late a new city has no rounds to grow its citizens: the model's horizon refused every city in 1326 of 3178 turns of r198–263 (R4 traces); the tilt's founding stops too (−1.6 cities at 93 % of the game)"),
+    ],
+};
+
+// ---- the science flow (work/nets/science-flow/SCIENCE-FLOW.md): played by `science-flow` only (`TurnBrief::science_flow`) ----
+
+/// The share of its science specialists' slots a seat fills (`Science::scientists`; the executor
+/// `citizens::science_specialist_commands` keeps each city's food at `gate::SCIENTIST_FOOD`). Why (the look, 80 self-play
+/// games of `standard`, Quick): the science winners entered the Modern era with 2 scientists in 11 slots and 25 food a
+/// turn to spare, the Atomic era with 9 in 16; small-continents 1 p4 went from 185 to 376 beakers when its cities took 9
+/// scientists (r170→r180) and back to 341 when they left them for food tiles (r210, food +100). A scientist is 3 beakers,
+/// 2 more with Secularism (taken by every seat at r~160), times the city's science percents, and 3 points of a great
+/// scientist; the rules' default weights rank it level with a 3-food tile.
+pub const SCIENTISTS: Neuron = Neuron {
+    name: "scientists",
+    bias: -900,
+    why: "early the citizens stay on the tiles: a growing citizen is a beaker and more (ai-growth.md); the level only adds slots to what the rules' weights fill themselves",
+    join: UNIT,
+    terms: &[
+        ts(F(fe::PROGRESS), Shape::Above(300), 2500, "the later the game, the fewer rounds a new citizen pays back its food (0.6 of the game: +750, 0.75: +1125); a human fills the slots of the universities and schools late whatever its aim"),
+        t(Y(y::AIM_SCIENCE), 600, "the science aim: the ship is beakers, and a filled slot is beakers now and great scientists later (sf1: the aim's share is 0.35 at the median mid-game, so the aim tilts and does not gate)"),
+        t(F(fe::AT_WAR), -500, "at war the cities work the hammers"),
+    ],
+};
+
+/// A research agreement with one rival pays our race (`Science::ties`): the friendship and the agreement with it are
+/// proposed and taken though it runs away (`Net2Plan::denies_item`), the ladder to it is offered at the level's cadence
+/// (`science::cadence`: every round at 1000, the diplomacy's own `PROPOSAL_INTERVAL` at the gate), and the gold it costs is
+/// kept (`Science::chest`) until the partner lets it wait too long (`r::CHEST_WAIT`). Why (the look): at the Modern
+/// era a seat met 3.45 majors and had 0.38 agreements; of its 1.55 friends 1.17 had none: 0.36 our gold short (the allocator spent it; treasury 425 and +121 a turn at the Modern era),
+/// 0.26 theirs, 0.58 nothing in the rules; and the runaway, whom `net2` denies every help (`gate::DENY_HELP`), is the
+/// partner with the most science (`net2-no-deals`, the denial off: 0.75 agreements at the Modern era, 1.06 at r300
+/// against 0.41, 42 science victories in 80 self-play games against 29). The rules pay min(both sciences over the deal)
+/// / 3 × 50 % at its end: with a partner as fast as us, a sixth of our science a turn for ~280 gold at Quick, 4 beakers
+/// a gold, where a bought building is about one. Equal beakers to both shorten a faster rival's lead in rounds: for a
+/// seat that races the runaway it is a good partner; for one that does not race it, the beakers are its victory.
+pub const AGREEMENT: Neuron = Neuron {
+    name: "agreement",
+    bias: 600,
+    why: "an agreement is 4 beakers a gold: a seat at peace signs one with every friend, as a human does",
+    join: UNIT,
+    terms: &[
+        t(Y(y::AIM_SCIENCE), 400, "the science aim: the beakers are the victory it plays for"),
+        ts(R(r::PACE), Shape::Below(500), -1200, "a slower partner pays a smaller pool (the smaller science): at a quarter less −300"),
+        t(Q(q::DISTRUST), -1000, "a distrusted rival breaks the friendship or comes with an army (D12)"),
+        t(Q(q::MENACE), -600, "its army at our border: a friendship feeds the sneak attack"),
+        t(R(r::AT_WAR), -2000, "no deal in a war"),
+        t(Q(q::RUNAWAY), -800, "the runaway wins with the beakers: a seat that does not race it gives it none (`gate::DENY_HELP`)"),
+        ts(Q(q::RUNAWAY), Shape::Times(Y(y::AIM_SCIENCE)), 800, "a seat that races it gains as many beakers and shortens its lead in rounds: the denial lifts with the aim"),
+        t(R(r::CHEST_WAIT), -600, "a partner that let our gold wait this long does not sign (0.26 of the friends without an agreement lacked their own gold, which a few rounds of income bring): a level friend (740) frees the chest after 8 rounds, about three offers at its cadence; a sure tie (1000) after 17"),
     ],
 };
 
@@ -684,6 +759,14 @@ pub mod gate {
     pub const EMBARGO: (Milli, &str) = (600, "the embargo, the cheap brake, only on a clear runaway (W2, VP #8)");
     pub const BLOCK: (Milli, &str) = (500, "the ballot goes against a rival only when it would win the vote");
     pub const SPACE_RESEARCH: (Milli, &str) = (500, "the research keeps to the ship's way when the science aim and the way gone say so more likely than not");
+    pub const CAPITAL_GATE: (Milli, &str) = (500, "the capital is kept for the parts when a part outside it says so more likely than not");
+    pub const AGREEMENT: (Milli, &str) = (500, "a tie when the agreement pays more likely than not (`weights::AGREEMENT`)");
+    /// The rounds between two offers of a tie's ladder at the gate (`science::cadence`; 1 at a level of 1000).
+    pub const LADDER_ROUNDS: (u32, &str) = (5, "a tie at the gate asks no more often than any deal (`diplomacy::PROPOSAL_INTERVAL`); a sure one asks every round, so an agreement ended or a friendship made waits no interval for the next step (the look: 0.58 of a friend a turn without an agreement nothing in the rules blocked)");
+    /// The Standard rounds of an unsigned chest at which `r::CHEST_WAIT` is full (`science::read_waits`).
+    pub const CHEST_WAIT_ROUNDS: (u32, &str) = (20, "four proposal intervals: past them a partner's refusal is not its gold, which a few rounds of its income bring");
+    /// Food a turn a city keeps when it takes a science specialist (`citizens::science_specialist_commands`).
+    pub const SCIENTIST_FOOD: (i32, &str) = (2, "two food a turn: the city still grows, slower, and never starves for a slot");
     /// Ships escorting an `Overseas` order (`fleet::FLEET_SIZE`).
     pub const ESCORT_SHIPS: (u32, &str) = (2, "the landing needs ships that shell the coast (`fleet.rs` 1-10)");
     /// Standard rounds after a war order spent its budget without paying before another order on that rival.
@@ -704,7 +787,7 @@ pub mod site {
 /// Every neuron of `net2`'s own tables.
 pub fn neurons() -> Vec<&'static Neuron> {
     let mut out: Vec<&'static Neuron> = SEAT.iter().chain(RIVAL.iter()).collect();
-    out.extend([&PEACE, &GUARD, &MILITARY, &CS_SHARE, &EASE, &PART_HOLD, &CITY_CAP, &SPACE_RESEARCH]);
+    out.extend([&PEACE, &GUARD, &MILITARY, &CS_SHARE, &EASE, &PART_HOLD, &CITY_CAP, &SPACE_RESEARCH, &CAPITAL_GATE]);
     out
 }
 
@@ -714,5 +797,5 @@ pub fn count() -> usize {
     for neuron in neurons() {
         n += neuron.terms.len() + usize::from(matches!(neuron.join, Join::Sum(_)));
     }
-    n + TILT.len() + 10 + 5
+    n + TILT.len() + 11 + 5
 }
