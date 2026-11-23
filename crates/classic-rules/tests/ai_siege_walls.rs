@@ -290,3 +290,36 @@ fn the_strike_is_chosen_by_its_expected_value() {
     let heal = simulate(&healed, &later, 4, STRIKE_WINDOW);
     assert!(press.value > heal.value, "press {press:?} against heal {heal:?}");
 }
+
+/// The siege planner asks for a path to a city at war only when some known step leads into its tile
+/// (`planner_map::has_known_entry`): where none does, a search never ends on the tile, so skipping it
+/// changes no answer. Checked on every tile of the scene for every unit of the army, the walled city
+/// included, against the search itself.
+#[test]
+fn a_tile_no_known_step_leads_into_is_never_the_end_of_a_path() {
+    use classic_rules::ai::planner_map::{find_path, has_known_entry, Blockers, KnownMap, MapScratch, PathOutcome, SearchLimit, SearchStats};
+    let rules = compile_rules(core_rules()).unwrap();
+    let (game, target) = scene(&rules);
+    let view = game.player_view(&rules, AI);
+    let auth = game.view().auth;
+    let army: Vec<_> = auth.indexes().units_of(AI).iter().filter_map(|h| auth.units().get(*h)).map(|u| (u.core.tile, u.core.kind)).collect();
+    assert_eq!(army.len(), 8);
+    let limit = SearchLimit { max_nodes: 3000 };
+    let mut scratch = MapScratch::default();
+    let (mut closed, mut open) = (0, 0);
+    for (from, kind) in army {
+        let map = KnownMap::of_kind(&view, kind);
+        assert!(!has_known_entry(&map, target), "no unit enters a city at war");
+        for t in 0..auth.map().dimensions.tile_count() as u32 {
+            let to = TileId(t);
+            if has_known_entry(&map, to) {
+                open += 1;
+                continue;
+            }
+            closed += 1;
+            let found = find_path(&map, from, to, &Blockers::default(), &mut scratch, limit, &mut SearchStats::default());
+            assert!(!matches!(found, PathOutcome::Found { ref tiles, .. } if tiles.len() > 1), "a path ends on {to:?} that no step enters");
+        }
+    }
+    assert!(open > 0 && closed > 0, "both cases are met: {open} open, {closed} closed");
+}
