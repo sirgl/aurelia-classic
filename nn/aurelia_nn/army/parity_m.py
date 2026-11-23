@@ -26,10 +26,18 @@ def main():
     rust = [json.loads(l) for l in open(a.rust)]
     flat = read_into(Flat(), a.plays)
     w = mx.load(a.weights)
-    model = (MHNet if 'h1.weight' in w else MemNet)(promos=w['promo'].shape[0] - 1)
+    is_mn = 'n1.weight' in w
+    if is_mn:
+        from . import train_mn as TN
+        from .model_mn import MNNet
+        import aurelia_nn.army.train_m as TM
+        TM.DeviceM.__init__ = TN._host_slots
+        model = MNNet(promos=w['promo'].shape[0] - 1)
+    else:
+        model = (MHNet if 'h1.weight' in w else MemNet)(promos=w['promo'].shape[0] - 1)
     model.load_weights(a.weights)
     tm = max(flat.t)
-    dev = DeviceM(flat, [1.0] * len(flat), tm, 128)
+    dev = (TN.DeviceMN if is_mn else DeviceM)(flat, [1.0] * len(flat), tm, 128)
     P = dev.plays
     plays = [p for p in range(min(a.plays_limit, len(flat.plays))) if P.first[p] + P.count[p] <= len(rust)]
     worst_p = worst_a = 0.0
@@ -39,12 +47,21 @@ def main():
         ms = P.ms[p]
         um, pm, alive = model.initial(1)
         Us, Ps = [um], [pm]
+        ns = model.initial_notes(1) if is_mn else None
+        NS = [ns]
         def hplan(b, k):
             return mx.stack([Ps[max(k - a, 0)][0, 0] for a in b['hage'][0].tolist()])[None]
 
         for k, i in enumerate(ms):
             b = dev.batch_m(mx.array([i], mx.int32), tm, 1)
             b['hplan'] = hplan(b, k)
+            if is_mn:
+                b['n_teacher'] = mx.zeros((1,), mx.int32)  # the net's own notes, as in play
+                um, pm, alive, ns, _, _ = TN.unroll_one_mn(model, b, mx.array([True]), mx.array([False]), um, pm, alive, ns, None)
+                Us.append(um)
+                Ps.append(pm)
+                NS.append(ns)
+                continue
             hf = body_any(model, b, um, pm)
             if isinstance(model, MHNet):
                 um, pm, alive, _ = model.step_mh(hf, b['tok'], b['slot'], b['tmask'], um, pm, alive, b['hist'], b['hmask'])
@@ -60,7 +77,7 @@ def main():
             b = dev.batch_m(mx.array([i], mx.int32), tm, cg)
             k = P.turn[i]
             b['hplan'] = hplan(b, k)
-            hf = body_any(model, b, Us[k], Ps[k])
+            hf = model.body_mn(b['tok'], b['dist'], b['tmask'], b['slot'], Us[k], Ps[k], b['hist'], b['hmask'], b['hslot'], b['hplan'], NS[k]) if is_mn else body_any(model, b, Us[k], Ps[k])
             h = hf[:, :tm]
             pl = model.pointer_logits(h, b['sel'])[0].tolist()
             t = flat.t[i]

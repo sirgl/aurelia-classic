@@ -428,7 +428,12 @@ fn play_on<P: kernel::ai::mind::AiMind<Classic>>(rules: &CompiledRuleset, mut ga
         let rel = game.view().auth.turn().round.saturating_sub(round0);
         verdict = families::judge(rules, &game, &mut scene, rel);
         if trace {
-            rows_trace.push(families::line(rules, &game, &scene, rel));
+            let mut l = families::line(rules, &game, &scene, rel);
+            let notes = crate::army_net::seat::take_notes();
+            if !notes.is_empty() {
+                l.push_str(&format!(" | notes: {}", notes.join(" ; ")));
+            }
+            rows_trace.push(l);
         }
         if verdict.is_none() && scene.hunt {
             hunt(&mut driver, &game, &scene);
@@ -438,6 +443,7 @@ fn play_on<P: kernel::ai::mind::AiMind<Classic>>(rules: &CompiledRuleset, mut ga
     let win = verdict.unwrap_or(false);
     if assault::is_assault(scene.fam) {
         scene.info.insert("picks".into(), scene.track.picks.join("; "));
+        scene.info.insert("city_strikes".into(), crate::army_net::observe::city_strikes(round0));
     }
     let mut measures = families::measures(rules, &game, &scene, rel);
     // Times are not measures of the play (they differ from run to run): they go to `info`.
@@ -449,6 +455,7 @@ fn play_on<P: kernel::ai::mind::AiMind<Classic>>(rules: &CompiledRuleset, mut ga
         measures.insert("net_turns".into(), net_time.turns as f64);
         info.insert("net_observe_us".into(), (net_time.observe_ns / 1000).to_string());
         info.insert("net_forward_us".into(), (net_time.forward_ns / 1000).to_string());
+        info.insert("net_memory_us".into(), (crate::army_net::seat::memory_ns() / 1000).to_string());
         info.insert("net_encode_us".into(), (net_time.encode_ns / 1000).to_string());
         info.insert("net_update_us".into(), (net_time.update_ns / 1000).to_string());
     }

@@ -280,6 +280,91 @@ pub struct Net {
     mem: Option<Memory>,
     /// Variant MH (None: no history).
     hist: Option<HistW>,
+    /// Variant MN (None: no notes).
+    notes: Option<NoteW>,
+}
+
+/// Variant MN's note weights (`army/model_mn.py`).
+#[derive(Debug, Clone)]
+struct NoteW {
+    n1: Dense,
+    n2: Dense,
+    pull: Dense,
+    ret: Dense,
+    reason: Dense,
+    free: Dense,
+    /// The plan's stage readout (scale, shift), `aux_p[0]`.
+    stage_scale: f32,
+    stage_shift: f32,
+}
+
+pub const NOTE_KINDS: [&str; 5] = ["PLAN", "PLAN_CHANGE", "WAIT_STAGE", "PULL_BACK_HEAL", "RETURN"];
+pub const REASONS: [&str; 4] = ["losses", "city stronger", "advance", "other"];
+pub const STAGE_NAMES: [&str; 6] = ["gather", "march", "stage", "assault", "heal-rotate", "withdraw"];
+const STAGES: usize = 6;
+const FREE: usize = 8;
+const F_NOTE: usize = 5 + STAGES + 4 + 2 + FREE;
+const STAGE_WAIT: usize = 2;
+const STAGE_HEAL: usize = 4;
+const CHANGE_SPAN: f32 = 2.0;
+const AGE_NONE: f32 = 99.0;
+const P_WAITED: usize = 11;
+
+/// Variant MN's note stream of a play (`MNNet.initial_notes`).
+#[derive(Debug, Clone)]
+pub struct NoteState {
+    pub stage: [f32; STAGES],
+    pub waited: f32,
+    pub free: [f32; FREE],
+    pub change_age: f32,
+    pub reason: [f32; 4],
+    pub pull: [f32; SLOTS],
+    pub pull_age: [f32; SLOTS],
+    /// The notes written at the last turn's end, for the trace (`PLAN(city, assault)`, ...).
+    pub written: Vec<String>,
+}
+
+impl NoteState {
+    fn new() -> NoteState {
+        NoteState { stage: [0.0; STAGES], waited: 0.0, free: [0.0; FREE], change_age: AGE_NONE, reason: [0.0; 4], pull: [0.0; SLOTS], pull_age: [0.0; SLOTS], written: Vec::new() }
+    }
+
+    /// The note tokens in force (`MNNet.note_tokens`, the masked ones left out): numbers and the unit's slot.
+    fn tokens(&self) -> Vec<([f32; F_NOTE], i16)> {
+        let tok = |kind: usize, stage: Option<&[f32; STAGES]>, reason: Option<&[f32; 4]>, waited: f32, age: f32, free: Option<&[f32; FREE]>| {
+            let mut f = [0f32; F_NOTE];
+            f[kind] = 1.0;
+            if let Some(st) = stage {
+                f[5..5 + STAGES].copy_from_slice(st);
+            }
+            if let Some(r) = reason {
+                f[11..15].copy_from_slice(r);
+            }
+            f[15] = waited * 0.1;
+            f[16] = age / 3.0;
+            if let Some(fr) = free {
+                f[17..].copy_from_slice(fr);
+            }
+            f
+        };
+        let has_plan = self.stage.iter().sum::<f32>() > 0.0;
+        let mut out = Vec::new();
+        if has_plan {
+            out.push((tok(0, Some(&self.stage), None, 0.0, 0.0, Some(&self.free)), -1));
+        }
+        if self.change_age < CHANGE_SPAN {
+            out.push((tok(1, Some(&self.stage), Some(&self.reason), 0.0, self.change_age.min(9.0), None), -1));
+        }
+        if has_plan && self.stage[STAGE_WAIT] > 0.5 {
+            out.push((tok(2, None, None, self.waited, 0.0, None), -1));
+        }
+        for s in 0..SLOTS {
+            if self.pull[s] > 0.5 {
+                out.push((tok(3, None, None, 0.0, self.pull_age[s].min(9.0), None), s as i16));
+            }
+        }
+        out
+    }
 }
 
 /// Variant MH's history weights (`army/model_mh.py`).
@@ -362,6 +447,8 @@ pub struct MemoryState {
     pub alive: [f32; SLOTS],
     /// The operation plan token P_0 in force in each turn so far (MH: a history token adds the plan of its turn).
     pub p0_turns: Vec<Vec<f32>>,
+    /// Variant MN: the note stream.
+    pub notes: Option<NoteState>,
 }
 
 impl MemoryState {
@@ -468,6 +555,12 @@ impl Net {
         } else {
             None
         };
+        let notes = if t.contains_key("n1.weight") {
+            let aux = get("aux_p")?.1.clone();
+            Some(NoteW { n1: dense("n1")?, n2: dense("n2")?, pull: dense("pull")?, ret: dense("ret")?, reason: dense("reason")?, free: dense("free")?, stage_scale: aux[0], stage_shift: aux[1] })
+        } else {
+            None
+        };
         let hist = if t.contains_key("h1.weight") {
             let raw = |name: &str| -> Result<Vec<f32>, String> { Ok(get(name)?.1.clone()) };
             Some(HistW { h1: dense("h1")?, h2: dense("h2")?, hp: dense("hp")?, hist_bias: raw("hist_bias")?, same_bias: raw("same_bias")?, stall: raw("stall")? })
@@ -475,6 +568,7 @@ impl Net {
             None
         };
         Ok(Net {
+            notes,
             hist,
             mem,
             map,
@@ -499,6 +593,78 @@ impl Net {
         self.map.is_some()
     }
 
+    /// MN at our turn's end (after the memory's update): the heads and the stream (`MNNet.note_heads`, `write_notes`).
+    #[allow(clippy::too_many_arguments)]
+    fn write_notes(&self, nw: &NoteW, mut ns: NoteState, body: &Body, tokens: &Tokens, slots: &[i16], p_old0: &[f32], state: &MemoryState, event: f32) -> NoteState {
+        let d = self.config.d;
+        let argmax = |v: &[f32]| v.iter().enumerate().fold((0usize, f32::NEG_INFINITY), |b, (i, x)| if *x > b.1 { (i, *x) } else { b }).0;
+        let stage_of = |p: &[f32]| -> Vec<f32> { (0..STAGES).map(|k| nw.stage_scale * p[k] + nw.stage_shift).collect() };
+        let new = argmax(&stage_of(&state.p[..d]));
+        let old = argmax(&stage_of(p_old0));
+        let ind = [event, if new == STAGE_HEAL { 1.0 } else { 0.0 }, if new > old { 1.0 } else { 0.0 }, 0.0];
+        let mut rl = [0f32; 4];
+        nw.reason.apply(&ind, &mut rl);
+        let reason = argmax(&rl);
+        let mut pull = [0f32; SLOTS];
+        let mut ret = [0f32; SLOTS];
+        let mut x = vec![0.0; d + F_TOK + U_DIM];
+        let mut y = [0f32; 1];
+        let mut written = Vec::new();
+        for i in 0..body.n {
+            let Ok(s) = usize::try_from(slots[i]) else { continue };
+            if s >= SLOTS {
+                continue;
+            }
+            x[..d].copy_from_slice(&body.h[i * d..(i + 1) * d]);
+            x[d..d + F_TOK].copy_from_slice(&tokens.feat[i]);
+            x[d + F_TOK..].copy_from_slice(&state.u[s * U_DIM..(s + 1) * U_DIM]);
+            nw.pull.apply(&x, &mut y);
+            if y[0] > 0.0 {
+                pull[s] = 1.0;
+            }
+            nw.ret.apply(&x, &mut y);
+            if y[0] > 0.0 {
+                ret[s] = 1.0;
+            }
+        }
+        let mut stage = [0f32; STAGES];
+        stage[new] = 1.0;
+        let had = ns.stage.iter().sum::<f32>() > 0.0;
+        let changed = had && argmax(&ns.stage) != new;
+        written.push(format!("PLAN(objective, {})", STAGE_NAMES[new]));
+        ns.change_age = if changed { 0.0 } else { ns.change_age + 1.0 };
+        if changed {
+            ns.reason = [0.0; 4];
+            ns.reason[reason] = 1.0;
+            written.push(format!("PLAN_CHANGE({})", REASONS[reason]));
+        }
+        for s in 0..SLOTS {
+            let was = ns.pull[s] > 0.5;
+            let now = (ns.pull[s].max(pull[s])) * (1.0 - ret[s]);
+            ns.pull_age[s] = if now > 0.5 { if was { ns.pull_age[s] + 1.0 } else { 0.0 } } else { 0.0 };
+            if now > 0.5 && !was {
+                written.push(format!("PULL_BACK_HEAL(slot {s})"));
+            }
+            if was && now < 0.5 {
+                written.push(format!("RETURN(slot {s})"));
+            }
+            ns.pull[s] = now;
+        }
+        ns.stage = stage;
+        ns.waited = (state.p[P_WAITED] * 10.0).max(0.0);
+        if new == STAGE_WAIT {
+            written.push(format!("WAIT_STAGE({:.0})", ns.waited));
+        }
+        let mut fr = [0f32; FREE];
+        nw.free.apply(&state.p[..d], &mut fr);
+        for v in fr.iter_mut() {
+            *v = v.tanh();
+        }
+        ns.free = fr;
+        ns.written = written;
+        ns
+    }
+
     pub fn has_memory(&self) -> bool {
         self.mem.is_some()
     }
@@ -506,7 +672,7 @@ impl Net {
     /// Variant M: the memory at a play's start (None: no memory).
     pub fn initial_memory(&self) -> Option<MemoryState> {
         let m = self.mem.as_ref()?;
-        Some(MemoryState { u: vec![0.0; SLOTS * U_DIM], p: m.plan0.clone(), alive: [0.0; SLOTS], p0_turns: Vec::new() })
+        Some(MemoryState { u: vec![0.0; SLOTS * U_DIM], p: m.plan0.clone(), alive: [0.0; SLOTS], p0_turns: Vec::new(), notes: self.notes.as_ref().map(|_| NoteState::new()) })
     }
 
     /// Variant M at our turn's end: `body` is this moment's body (read with `state`); every army token updates its
@@ -531,6 +697,7 @@ impl Net {
         for (s, u) in news {
             state.u[s * U_DIM..(s + 1) * U_DIM].copy_from_slice(&u);
         }
+        let p_old0: Vec<f32> = state.p[..d].to_vec();
         let event = cover.iter().zip(&state.alive).map(|(c, a)| a * (1.0 - c)).sum::<f32>().min(1.0);
         // MH: the progress numbers (the objective city's share now, dealt to it, taken, lost over the window).
         let progress = self.hist.as_ref().map(|_| {
@@ -592,6 +759,9 @@ impl Net {
                 state.p[k * d + i] = pk[i] + c * (pn[i] - pk[i]);
             }
         }
+        if let (Some(nw), Some(ns)) = (self.notes.as_ref(), state.notes.clone()) {
+            state.notes = Some(self.write_notes(nw, ns, body, tokens, slots, &p_old0, state, event));
+        }
         state.alive = cover;
     }
 
@@ -621,7 +791,8 @@ impl Net {
     }
 
     fn recompute(&self, enc: &Encoder, st: &mut MapState, dirty0: &[bool]) {
-        let d = self.config.d;
+        // The encoder's channels (MB: fewer than d).
+        let d = enc.input.n_out;
         let mut tiles = 0;
         for t in 0..TILES {
             if dirty0[t] {
@@ -709,20 +880,33 @@ impl Net {
             }
             qslots = (0..n).map(|i| mi.slots[i]).chain(std::iter::repeat(-1).take(plans)).collect();
         }
+        let mut hslots: Vec<i16> = tokens.hist_slot.clone();
+        if let (Some(nw), Some(mi)) = (self.notes.as_ref(), mem) {
+            let mut e1 = vec![0.0; d];
+            let mut y = vec![0.0; d];
+            for (f, s) in mi.state.notes.as_ref().map(|n| n.tokens()).unwrap_or_default() {
+                nw.n1.apply(&f, &mut e1);
+                relu(&mut e1);
+                nw.n2.apply(&e1, &mut y);
+                he.extend_from_slice(&y);
+                hslots.push(s);
+            }
+        }
         if let (Some(enc), Some(st)) = (self.map.as_ref(), map) {
             let m = st.out();
+            let mc = enc.input.n_out;
             let mut y = vec![0.0; d];
             for i in 0..n {
                 let Ok(p) = usize::try_from(tokens.pos[i]) else { continue };
-                enc.tok.apply(&m[p * d..(p + 1) * d], &mut y);
+                enc.tok.apply(&m[p * mc..(p + 1) * mc], &mut y);
                 for c in 0..d {
                     h[i * d + c] += y[c];
                 }
             }
-            let mut mean = vec![0.0; d];
+            let mut mean = vec![0.0; mc];
             for t in 0..TILES {
-                for c in 0..d {
-                    mean[c] += m[t * d + c];
+                for c in 0..mc {
+                    mean[c] += m[t * mc + c];
                 }
             }
             for v in mean.iter_mut() {
@@ -735,7 +919,7 @@ impl Net {
         }
         let total = n + plans;
         let mut a = vec![0.0; total * d];
-        let hist_in = if he.is_empty() { None } else { Some((he.as_slice(), tokens.hist_slot.as_slice(), qslots.as_slice())) };
+        let hist_in = if he.is_empty() { None } else { Some((he.as_slice(), hslots.as_slice(), qslots.as_slice())) };
         for (li, layer) in self.layers.iter().enumerate() {
             self.attend(layer, li, &tokens.dist, n, total, &mut h, &mut a, hist_in);
             self.feed(layer, total, &mut h, &mut a);
@@ -863,7 +1047,8 @@ impl Net {
             if let (Some(enc), Some(st), Ok(pos)) = (self.map.as_ref(), map, usize::try_from(cand.pos)) {
                 let m = st.out();
                 let mut y = vec![0.0; d];
-                enc.cand.apply(&m[pos * d..(pos + 1) * d], &mut y);
+                let mc = enc.input.n_out;
+                enc.cand.apply(&m[pos * mc..(pos + 1) * mc], &mut y);
                 for i in 0..d {
                     c1[i] += y[i];
                 }

@@ -61,7 +61,7 @@ class MHNet(MemNet):
     def hist_embed(self, hist, hplan):
         return self.h2(nn.relu(self.h1(hist))) + self.hp(hplan)
 
-    def body_mh(self, tok, dist, tmask, slot, um, pm, hist, hmask, hslot, hplan):
+    def body_mh(self, tok, dist, tmask, slot, um, pm, hist, hmask, hslot, hplan, extra=None):
         b, t, _ = tok.shape
         h = self.e2(nn.relu(self.e1(tok)))
         has = slot >= 0
@@ -73,8 +73,14 @@ class MHNet(MemNet):
         pair_plan = is_plan[:, None] | is_plan[None, :]
         dpad = mx.pad(dist, [(0, 0), (0, PLANS), (0, PLANS)])
         qslot = mx.concatenate([slot, mx.full((b, PLANS), -1, dtype=slot.dtype)], axis=1)
-        same = (qslot[:, :, None] == hslot[:, None, :]) & (hslot[:, None, :] >= 0)  # [B, T+P, H]
         he = self.hist_embed(hist, hplan)
+        if extra is not None:
+            # MN: the notes join the history's keys and values.
+            ne, nmask, nslot = extra
+            he = mx.concatenate([he, ne], axis=1)
+            hmask = mx.concatenate([hmask, nmask], axis=1)
+            hslot = mx.concatenate([hslot, nslot.astype(hslot.dtype)], axis=1)
+        same = (qslot[:, :, None] == hslot[:, None, :]) & (hslot[:, None, :] >= 0)  # [B, T+P, H]
         for li, layer in enumerate(self.layers):
             x = self.layer_mh(layer, x, dpad, mask, pair_plan, self.plan_bias[li], he, hmask, same, self.hist_bias[li], self.same_bias[li])
         return self.norm(x)

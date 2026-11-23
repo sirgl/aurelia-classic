@@ -27,6 +27,7 @@ from .model_m import AIMS, P_ENGAGED, P_ETA, P_STAGE, P_TURNS, P_WAITED, PLANS, 
 from .train import Device, best_teachers, decision_weights, load
 from .data import F_HIST
 from .model_mh import H_MAX, MHNet
+from .model_mb import MBNet
 
 u16 = lambda b: mx.array(memoryview(b).cast('H'))
 
@@ -42,14 +43,19 @@ class Plays:
         self.first = [m['first'] for m in flat.plays]
         self.count = [m['count'] for m in flat.plays]
         self.ms = []   # per play: the decision indices of its memory states
+        self.fd = []   # per play: the first decision of each turn (MB: the turn's map is encoded from it)
         self.turn = [0] * len(flat)  # per decision: memory states before it in its play
         for p, (f, c) in enumerate(zip(self.first, self.count)):
             seen = []
+            fd = []
             for i in range(f, f + c):
                 self.turn[i] = len(seen)
+                if len(fd) == len(seen):
+                    fd.append(i)
                 if flat.flags[i] & MEMORY_STATE:
                     seen.append(i)
             self.ms.append(seen)
+            self.fd.append(fd)
         # Auxiliary targets of the memory states (host side): turns in the stage, expected turns to the capture.
         self.turns_in_stage = {}
         self.eta = {}
@@ -115,8 +121,40 @@ class DeviceM(Device):
         return b
 
 
+def turn_maps(model, dev, plan, tm):
+    """MB: every turn's map of the step's plays, [R + 1, B, W*W, C], from each turn's first moment."""
+    fds = plan[4]
+    out = []
+    enc = compiled_fn(model, 'encode', lambda st, tok, pos: model.encode_turn(st, tok, pos))
+    for k in range(len(fds)):
+        idx = mx.maximum(mx.array(fds[k], mx.int32), 0)
+        full = dev.batch_m(idx, tm, 1)
+        out.append(enc(full['statics'], full['tok'], full['pos']))
+    return mx.stack(out)
+
+
+def map_feats(b, Ms, tt, cc):
+    """The map at the tokens' and candidates' tiles of decisions (turn tt, play column cc), and its mean."""
+    tt2, cc2 = tt[:, None], cc[:, None]
+    b['gtok'] = Ms[tt2, cc2, mx.maximum(b['pos'], 0)]
+    b['tok_ok'] = b['pos'] >= 0
+    b['mmean'] = mx.mean(Ms[tt, cc], axis=1)
+    if 'cpos' in b:
+        b['gcand'] = Ms[tt2, cc2, mx.maximum(b['cpos'], 0)]
+        b['cand_ok'] = b['cpos'] >= 0
+
+
+def compiled_fn(model, name, fn):
+    key = (id(model), name)
+    if key not in COMPILED:
+        COMPILED[key] = mx.compile(fn, inputs=[model.state])
+    return COMPILED[key]
+
+
 def body_any(model, b, um, pm):
-    """M's body, or MH's with the history (b['hplan']: P_0 of each history token's turn)."""
+    """M's body, or MH's with the history (b['hplan']: P_0 of each history token's turn), or MB's with the map."""
+    if isinstance(model, MBNet):
+        return model.body_mbg(b['tok'], b['dist'], b['tmask'], b['slot'], um, pm, b['gtok'], b['tok_ok'], b['mmean'])
     if isinstance(model, MHNet):
         return model.body_mh(b['tok'], b['dist'], b['tmask'], b['slot'], um, pm, b['hist'], b['hmask'], b['hslot'], b['hplan'])
     return model.body_m(b['tok'], b['dist'], b['tmask'], b['slot'], um, pm)
@@ -128,7 +166,10 @@ def decision_losses(model, b, um, pm):
     t = b['tok'].shape[1]
     h = hfull[:, :t]
     pl = model.pointer_logits(h, b['sel'])
-    al = model.action_logits(h, b['unit'], b['cand'], b['promo'], b['cmask'])
+    if isinstance(model, MBNet):
+        al = model.action_logits_g(h, b['unit'], b['cand'], b['promo'], b['cmask'], b['gcand'], b['cand_ok'])
+    else:
+        al = model.action_logits(h, b['unit'], b['cand'], b['promo'], b['cmask'])
     ce_ptr = mx.logsumexp(pl, axis=1) - mx.take_along_axis(pl, b['ptr'][:, None], axis=1)[:, 0]
     ce_act = (mx.logsumexp(al, axis=1) - mx.take_along_axis(al, b['act'][:, None], axis=1)[:, 0]) * b['has_act']
     v = model.value(h)
@@ -221,7 +262,11 @@ def plan_batch(dev, plays, L, drop, rng, tm, train=True):
             g[0].append(i)
             g[1].append(col)
             g[2].append(P.turn[i])
-    return R, ms, reset, dict(groups)
+    fds = [[-1] * len(plays) for _ in range(R + 1)]
+    for col, p in enumerate(plays):
+        for k, i in enumerate(P.fd[p][:R + 1]):
+            fds[k][col] = i
+    return R, ms, reset, dict(groups), fds
 
 
 AUX_KEYS = ('aux_unit', 'aux_plan', 'aux_target', 'stage_acc', 'known')
@@ -287,8 +332,9 @@ def compiled(model, name, with_aux=True):
 
 def run_step(model, dev, plan, tm, aux_w, with_aux=True, compile_=True):
     """The loss of one step's plays (and its parts)."""
-    R, ms, reset, groups = plan
+    R, ms, reset, groups = plan[:4]
     B = len(reset)
+    Ms = turn_maps(model, dev, plan, tm) if isinstance(model, MBNet) else None
     um, pm, alive = model.initial(B)
     Us, Ps = [um], [pm]
     aux_tot = mx.array(0.0)
@@ -301,6 +347,10 @@ def run_step(model, dev, plan, tm, aux_w, with_aux=True, compile_=True):
         valid = idx >= 0
         full = dev.batch_m(mx.maximum(idx, 0), tm, 1)
         b = {k: full[k] for k in UNROLL_KEYS}
+        if Ms is not None:
+            b['pos'] = full['pos']
+            map_feats(b, Ms, mx.full((B,), r, mx.int32), mx.arange(B))
+            del b['pos']
         hist_mask(b)
         # P_0 of each history token's turn (age 0: this turn's plan, pm).
         p0s = mx.stack([P[:, 0] for P in Ps[::-1][:4]] + [Ps[0][:, 0]] * max(0, 4 - len(Ps)), axis=1)  # [B, 4, d], age 0..3
@@ -329,6 +379,11 @@ def run_step(model, dev, plan, tm, aux_w, with_aux=True, compile_=True):
         cc = mx.array(cols + [cols[0]] * pad, mx.int32)
         P0 = Ps[:, :, 0]  # [R + 1, B, d]
         b['hplan'] = P0[mx.maximum(tt[:, None] - full['hage'], 0), cc[:, None]]
+        if Ms is not None:
+            b['pos'] = full['pos']
+            b['cpos'] = full['cpos']
+            map_feats(b, Ms, tt, cc)
+            del b['pos'], b['cpos']
         out = dec(b, Us[tt, cc], Ps[tt, cc])
         for k, v in zip(('main', 'val', 'w', 'dsum', 'dn'), out[:5]):
             tot[k] = tot[k] + v
@@ -400,6 +455,12 @@ def main():
     ap.add_argument('--init', default=None)
     ap.add_argument('--max-minutes', type=float, default=18.0, help='stop (and evaluate, export) after this long: one GPU job <= 20 min')
     ap.add_argument('--cpu', action='store_true')
+    ap.add_argument('--d', type=int, default=64)
+    ap.add_argument('--layers', type=int, default=3)
+    ap.add_argument('--heads', type=int, default=4)
+    ap.add_argument('--skip', nargs='*', default=[], help='PATH=fam,fam: leave out those families of that train file ("siege" = the siege set)')
+    ap.add_argument('--map', action='store_true', help='variant MB: the map encoder once per turn')
+    ap.add_argument('--map-ch', type=int, default=32)
     ap.add_argument('--history', action='store_true', help='variant MH: the history window of facts, linked to the plan')
     ap.add_argument('--every-nth-play', type=int, default=1)
     a = ap.parse_args()
@@ -410,7 +471,14 @@ def main():
     mx.random.seed(a.seed)
     rng = random.Random(a.seed)
     t0 = time.time()
-    train = load(a.train, a.every_nth_play)
+    skip = {}
+    for spec in a.skip:
+        path, fams = spec.split('=', 1)
+        out = set()
+        for f in fams.split(','):
+            out |= SIEGE if f == 'siege' else {f}
+        skip[path] = out
+    train = load(a.train, a.every_nth_play, skip)
     hold = load(a.hold, a.every_nth_play)
     best, table = best_teachers(train.plays)
     json.dump({'best': best, 'wins': table, 'lost_weight': a.lost_weight, 'best_factor': a.best_factor}, open(os.path.join(a.out, 'teachers.json'), 'w'), indent=1)
@@ -427,8 +495,16 @@ def main():
     dev = DeviceM(train, weights, tm, cm)
     hw = [0.0 if pt < -1 else w for w, pt in zip(decision_weights(hold, best, a.lost_weight, a.best_factor), hold.ptr)]
     hdev = DeviceM(hold, hw, tm, cm)
+    # The flat byte buffers are on the device now: free the host copies (RAM: the device arrays and the per-decision
+    # lists stay, about half of what both took).
+    for fl in (train, hold):
+        for k in ('tok', 'dist', 'sel', 'danger', 'cand', 'promo', 'pos', 'cpos', 'slot', 'hist', 'hist_slot', 'hist_age', 'statics'):
+            setattr(fl, k, bytearray())
+    import gc
+    gc.collect()
     promos = max(400, int(mx.max(dev.promo).item()) + 1)
-    model = MHNet(promos=promos) if a.history else MemNet(promos=promos)
+    shape = dict(d=a.d, heads=a.heads, layers=a.layers, ff=2 * a.d, promos=promos)
+    model = MBNet(map_ch=a.map_ch, **shape) if a.map else (MHNet(**shape) if a.history else MemNet(**shape))
     model.hand_init()
     if a.init:
         # A net without memory (A / AH) starts the shared parts; an M net everything; an M net starts MH's shared

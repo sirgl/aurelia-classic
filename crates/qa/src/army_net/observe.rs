@@ -305,6 +305,52 @@ fn note_enemy_events(game: &GameState, rules: &CompiledRuleset, round: u32) {
     HISTORY.with(|h| h.borrow_mut().events.extend(events));
 }
 
+/// The facts of one round of ours: whether our army struck a city, which army slots moved.
+pub struct RoundFacts {
+    pub city_struck: bool,
+    pub moved_slots: Vec<i16>,
+    pub struck_slots: Vec<i16>,
+}
+
+pub fn facts_of_round(round: u32) -> RoundFacts {
+    HISTORY.with(|h| {
+        let h = h.borrow();
+        let mut f = RoundFacts { city_struck: false, moved_slots: Vec::new(), struck_slots: Vec::new() };
+        for e in h.events.iter().filter(|e| e.round == round && e.slot >= 0) {
+            if e.f[2] > 0.5 || (e.f[3] > 0.5 && e.f[19] > 0.5) {
+                f.city_struck = true;
+            }
+            if (e.f[1] > 0.5 || e.f[2] > 0.5 || e.f[3] > 0.5) && !f.struck_slots.contains(&e.slot) {
+                f.struck_slots.push(e.slot);
+            }
+            if e.f[HK_MOVE] > 0.5 && e.f[18] > 0.0 && !f.moved_slots.contains(&e.slot) {
+                f.moved_slots.push(e.slot);
+            }
+        }
+        f
+    })
+}
+
+/// No history (the ablation).
+pub fn mask_history(t: &mut Tokens) {
+    t.hist.clear();
+    t.hist_slot.clear();
+    t.hist_age.clear();
+}
+
+/// Our strikes on a city, by round (relative to `start`), from the facts of the play: "r:n;...".
+pub fn city_strikes(start: u32) -> String {
+    HISTORY.with(|h| {
+        let mut by: std::collections::BTreeMap<u32, u32> = std::collections::BTreeMap::new();
+        for e in &h.borrow().events {
+            if e.f[2] > 0.5 || (e.f[3] > 0.5 && e.f[19] > 0.5) {
+                *by.entry(e.round.saturating_sub(start)).or_default() += 1;
+            }
+        }
+        by.iter().map(|(r, n)| format!("{r}:{n}")).collect::<Vec<_>>().join(";")
+    })
+}
+
 /// The history tokens now: this turn's and the last `H_TURNS` turns' facts, the most recent first, at most `H_MAX`.
 fn history_tokens(round: u32) -> (Vec<[f32; F_HIST]>, Vec<i16>, Vec<u8>) {
     HISTORY.with(|h| {

@@ -149,11 +149,23 @@ pub fn main(args: &[String]) -> Result<(), String> {
     let mut memory: Option<(usize, super::model::MemoryState)> = None;
     let mut memory_ns = 0u128;
     let mut memory_steps = 0u64;
+    // MB: the map of each turn, encoded at the turn's first decision (play, memory states before it).
+    let mut turn_map: Option<(usize, usize, super::model::MapState)> = None;
+    let mut turn_of = 0usize;
     for d in &decisions {
         if net.has_memory() && memory.as_ref().is_none_or(|(p, _)| *p != d.play) {
             memory = net.initial_memory().map(|m| (d.play, m));
+            turn_of = 0;
         }
-        let map = if net.has_map() {
+        let map = if net.has_map() && net.has_memory() {
+            if turn_map.as_ref().is_none_or(|(p, k, _)| *p != d.play || *k != turn_of) {
+                let planes = super::model::planes(&d.statics, &d.tokens);
+                let te = Instant::now();
+                turn_map = net.map_full(planes).map(|m| (d.play, turn_of, m));
+                encode_ns += te.elapsed().as_nanos();
+            }
+            turn_map.as_ref().map(|(_, _, m)| m.clone())
+        } else if net.has_map() {
             let planes = super::model::planes(&d.statics, &d.tokens);
             let te = Instant::now();
             let full = net.map_full(planes.clone());
@@ -184,6 +196,7 @@ pub fn main(args: &[String]) -> Result<(), String> {
                 net.memory_step(&body, &d.tokens, &d.slots, m);
                 memory_ns += tm.elapsed().as_nanos();
                 memory_steps += 1;
+                turn_of += 1;
             }
         }
         if d.pointer >= 0 {

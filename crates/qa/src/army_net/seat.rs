@@ -37,7 +37,9 @@ thread_local! {
 /// A new play: the expert's memory starts empty, and so does the net's (variant M).
 pub fn reset_expert() {
     EXPERT_TRACK.with(|t| *t.borrow_mut() = None);
+    EXPERT_REAL.with(|r| *r.borrow_mut() = false);
     MEMORY.with(|m| *m.borrow_mut() = None);
+    NOTES.with(|n| n.borrow_mut().clear());
 }
 
 /// Variant M's memory of the play on this thread: the orders and scene it plays, the memory state.
@@ -45,6 +47,31 @@ struct MemoryRun {
     orders: Orders,
     scene: Scene,
     state: super::model::MemoryState,
+    /// Time in the memory's turn-end updates (the tokens, the body, the step).
+    memory_ns: u64,
+    /// MB: the map of the turn (the memory state reads it).
+    map: Option<super::model::MapState>,
+}
+
+thread_local! {
+    /// MN: the notes the net wrote, a line per turn, for the trace.
+    static NOTES: std::cell::RefCell<Vec<String>> = const { std::cell::RefCell::new(Vec::new()) };
+}
+
+/// The notes written since the last call (for the play's trace).
+pub fn take_notes() -> Vec<String> {
+    NOTES.with(|n| std::mem::take(&mut *n.borrow_mut()))
+}
+
+/// The time the memory's updates took in this thread's play (ns).
+pub fn memory_ns() -> u64 {
+    MEMORY.with(|m| m.borrow().as_ref().map_or(0, |r| r.memory_ns))
+}
+
+/// The history masked every decision (`ARMY_NET_NO_FACTS=1`: the ablation of MH's proof (a)).
+fn history_masked() -> bool {
+    static NO: OnceLock<bool> = OnceLock::new();
+    *NO.get_or_init(|| std::env::var_os("ARMY_NET_NO_FACTS").is_some())
 }
 
 thread_local! {
@@ -152,7 +179,7 @@ pub fn restore_memory(id: &str, bytes: &[u8], orders: &Orders, scene: &Scene) ->
         Some(())
     })()
     .is_some();
-    MEMORY.with(|m| *m.borrow_mut() = net.initial_memory().map(|fresh| MemoryRun { orders: orders.clone(), scene: scene.clone(), state: if ok { state.clone() } else { fresh } }));
+    MEMORY.with(|m| *m.borrow_mut() = net.initial_memory().map(|fresh| MemoryRun { orders: orders.clone(), scene: scene.clone(), state: if ok { state.clone() } else { fresh }, memory_ns: 0, map: None }));
     ok
 }
 
@@ -192,7 +219,11 @@ pub fn turn_end(game: &GameState, rules: &CompiledRuleset) {
     MEMORY.with(|m| {
         let mut m = m.borrow_mut();
         let Some(run) = m.as_mut() else { return };
-        let tokens = observe::tokens(game, rules, &run.orders);
+        let t_mem = Instant::now();
+        let mut tokens = observe::tokens(game, rules, &run.orders);
+        if history_masked() {
+            observe::mask_history(&mut tokens);
+        }
         let slots = super::record::slots_of(game, &run.orders, &tokens);
         if super::record::active() {
             let track = EXPERT_TRACK.with(|t| t.borrow().as_ref().map(|t| teacher_state(game, &run.scene, &run.orders, t))).unwrap_or(super::record::NO_TRACK);
@@ -201,10 +232,15 @@ pub fn turn_end(game: &GameState, rules: &CompiledRuleset) {
         if memory_zeroed() {
             return;
         }
-        let body = net.body(&tokens, None, Some(&super::model::MemIn { state: &run.state, slots: &slots }));
+        let body = net.body(&tokens, run.map.as_ref(), Some(&super::model::MemIn { state: &run.state, slots: &slots }));
         let mut state = run.state.clone();
         net.memory_step(&body, &tokens, &slots, &mut state);
+        if let Some(ns) = state.notes.as_ref() {
+            let round = game.view().auth.turn().round.saturating_sub(run.orders.start_round);
+            NOTES.with(|n| n.borrow_mut().push(format!("r{round} {}", ns.written.join(" · "))));
+        }
         run.state = state;
+        run.memory_ns += t_mem.elapsed().as_nanos() as u64;
     });
 }
 static EXPERTS: OnceLock<Option<BTreeMap<String, String>>> = OnceLock::new();
@@ -280,7 +316,7 @@ fn probe_with(rules: &CompiledRuleset, game: &GameState, scene: &Scene, expert: 
     let mut copy = game.clone();
     let mut sc = scene.clone();
     if let Some(track) = EXPERT_TRACK.with(|t| t.borrow().clone()) {
-        sc.track = track;
+        sc.track = if first_of_turn && !no_reconcile() { reconciled(rules, game, scene, track) } else { track };
     }
     if turn_probed(scene) {
         if !first_of_turn {
@@ -306,6 +342,53 @@ fn probe_with(rules: &CompiledRuleset, game: &GameState, scene: &Scene, expert: 
     if first_of_turn {
         EXPERT_TRACK.with(|t| *t.borrow_mut() = Some(sc.track));
     }
+}
+
+/// The expert's memory was written on its copy of our last turn; the net then played that turn its own way. Its
+/// commitments hold only where the real turn carried them out (the cause of DAgger's passive assault: the expert
+/// believed it had gone in, `engaged`, in half of its engaged turns while the city was untouched, and kept units
+/// "resting" that the net had sent on): `engaged` only once our army has struck the city in a real turn; a unit
+/// stays resting only if in the real turn it struck nothing and ended out of the city's strike. `ARMY_DAGGER_NO_RECONCILE=1`: the old carry.
+fn reconciled(rules: &CompiledRuleset, game: &GameState, scene: &Scene, mut track: crate::trainers::assault::Track) -> crate::trainers::assault::Track {
+    let round = game.view().auth.turn().round;
+    let Some(prev) = round.checked_sub(1) else { return track };
+    let facts = super::observe::facts_of_round(prev);
+    let real_engaged = EXPERT_REAL.with(|r| {
+        let mut r = r.borrow_mut();
+        *r |= facts.city_struck;
+        *r
+    });
+    if track.engaged && !real_engaged {
+        track.engaged = false;
+    }
+    // A slot is the unit's index in the army (`Orders::army`: the scene's military pieces, in order).
+    let army: Vec<kernel::ids::EntityId> = scene.mine.iter().filter(|p| super::in_army(rules, p.kind)).map(|p| p.id).collect();
+    let struck: Vec<kernel::ids::EntityId> = facts.struck_slots.iter().filter_map(|s| army.get(*s as usize).copied()).collect();
+    let city = scene.target.unwrap_or(scene.centre);
+    let in_fire = |id: &kernel::ids::EntityId| scene.mine.iter().find(|p| p.id == *id).and_then(|p| act::alive(game, p, scene.learner)).is_some_and(|c| crate::trainers::lab::dist(game, c.tile, city) <= classic_rules::combat::city::CITY_ATTACK_RANGE);
+    track.resting.retain(|id| !struck.contains(id) && !in_fire(id));
+    track
+}
+
+/// The turns the expert drives (β-mixing): a hash of the scene and the round against ARMY_DAGGER_BETA (default 0).
+fn beta_turn(game: &GameState, scene: &Scene) -> bool {
+    static BETA: OnceLock<f64> = OnceLock::new();
+    let beta = *BETA.get_or_init(|| std::env::var("ARMY_DAGGER_BETA").ok().and_then(|v| v.parse().ok()).unwrap_or(0.0));
+    if beta <= 0.0 {
+        return false;
+    }
+    let h = crate::trainers::lab::mix((scene.instance as u64) << 20 ^ u64::from(game.view().auth.turn().round) << 4 ^ scene.fam as u64 ^ u64::from(scene.era) << 40);
+    (h % 10_000) as f64 / 10_000.0 < beta
+}
+
+fn no_reconcile() -> bool {
+    static NO: OnceLock<bool> = OnceLock::new();
+    *NO.get_or_init(|| std::env::var_os("ARMY_DAGGER_NO_RECONCILE").is_some())
+}
+
+thread_local! {
+    /// Whether our army has struck the city in a real turn of this play (for `reconciled`).
+    static EXPERT_REAL: std::cell::RefCell<bool> = const { std::cell::RefCell::new(false) };
 }
 
 pub fn net() -> Result<&'static Net, String> {
@@ -338,7 +421,7 @@ pub fn turn(rules: &CompiledRuleset, game: &mut GameState, orders: &Orders, scen
         MEMORY.with(|m| {
             let mut m = m.borrow_mut();
             if m.is_none() {
-                *m = net.initial_memory().map(|state| MemoryRun { orders: orders.clone(), scene: scene.clone(), state });
+                *m = net.initial_memory().map(|state| MemoryRun { orders: orders.clone(), scene: scene.clone(), state, memory_ns: 0, map: None });
             }
         });
     }
@@ -349,6 +432,9 @@ pub fn turn(rules: &CompiledRuleset, game: &mut GameState, orders: &Orders, scen
     for step in 0..PER_TURN {
         let t0 = Instant::now();
         let mut tokens = observe::tokens(game, rules, orders);
+        if history_masked() {
+            observe::mask_history(&mut tokens);
+        }
         // A unit stopped by the limit is not offered again.
         for i in 0..tokens.len() {
             let id = tokens.unit[i].and_then(|h| act::core_of(game, h)).map(|c| c.id);
@@ -360,7 +446,21 @@ pub fn turn(rules: &CompiledRuleset, game: &mut GameState, orders: &Orders, scen
             break;
         }
         let t_obs = Instant::now();
+        // β-mixing (DAgger's own rule): in a turn-planned family the expert drives the real turn with probability
+        // ARMY_DAGGER_BETA (its plan forms; the net's later turns start from states the plan reaches).
+        let pre_track = EXPERT_TRACK.with(|t| t.borrow().clone());
         probe(rules, game, scene, step == 0);
+        if step == 0 && super::record::active() && turn_probed(scene) && beta_turn(game, scene) {
+            if let Some(expert) = experts().and_then(|e| e.get(scene.fam.name())) {
+                let mut sc = scene.clone();
+                if let Some(t) = pre_track {
+                    sc.track = if no_reconcile() { t } else { reconciled(rules, game, scene, t) };
+                }
+                families::reference_turn(rules, game, &mut sc, expert);
+                EXPERT_TRACK.with(|t| *t.borrow_mut() = Some(sc.track));
+                break;
+            }
+        }
         let t_map = Instant::now();
         if net.has_map() {
             let planes = super::model::planes(&orders.statics, &tokens);
@@ -370,6 +470,8 @@ pub fn turn(rules: &CompiledRuleset, game: &mut GameState, orders: &Orders, scen
                     map = net.map_full(planes);
                     timing.encode_ns += tm.elapsed().as_nanos() as u64;
                 }
+                // MB (a net with memory): the map once per turn, from the turn's first moment.
+                Some(_) if net.has_memory() => {}
                 Some(st) => {
                     net.map_update(st, planes);
                     timing.update_ns += tm.elapsed().as_nanos() as u64;
@@ -425,6 +527,13 @@ pub fn turn(rules: &CompiledRuleset, game: &mut GameState, orders: &Orders, scen
         if !acted {
             act::stand(game, rules, unit);
         }
+    }
+    if map.is_some() {
+        MEMORY.with(|m| {
+            if let Some(run) = m.borrow_mut().as_mut() {
+                run.map = map.clone();
+            }
+        });
     }
     // The end: the army stands; the seat's mind plays only what is not the army's.
     let auth = game.view().auth;
