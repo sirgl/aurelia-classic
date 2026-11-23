@@ -114,7 +114,9 @@ fn the_game_without_the_feature_plays_net2() {
 /// gives `CITY_STATES_OLD_STANDARD` there (d7a7a2695f354aa9, 124 gifts, 14 votes), the pin before.
 /// Re-pinned for R11 at war (`ai/capitals`, 23 November: a rival's stack at our cities stays a menace once it
 /// declares war): 169 gifts, 14 votes, equal with the feature on; main's 5770513fcf624657 before.
-const CITY_STATES_NET2: u64 = 0x495b_1121_a057_0cd5;
+/// Re-pinned for the belief head (`ai/beliefs`, 23 November: `net2`'s part `Beliefs` chooses the beliefs by their
+/// effects): 212 gifts, 19 votes; 495b1121a0570cd5 before.
+const CITY_STATES_NET2: u64 = 0xd707_68d4_8fa0_75b3;
 /// The same case played by the old `standard` (now `pre-net2`), same source.
 const CITY_STATES_OLD_STANDARD: u64 = 0xd7a7_a269_5f35_4aa9;
 const CITY_STATES_ROUNDS: usize = 420;

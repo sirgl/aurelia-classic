@@ -228,6 +228,19 @@ pub fn policy(player: u8, round: u32, command: &Command, rules: &CompiledRuleset
     push(format!("r{round} p{player} POLICY {text}"));
 }
 
+/// A belief decision of the belief head (`beliefs`): the slot, the head's pick, the fixed lists' pick
+/// (`ai::belief_lists`) and every candidate's worth (cities + religion, centi-points).
+pub fn belief(player: u8, round: u32, slot: &str, head: Option<crate::ids::BeliefId>, list: Option<crate::ids::BeliefId>, scored: &[(crate::ids::BeliefId, super::beliefs::Worth)], rules: &CompiledRuleset) {
+    if !enabled() {
+        return;
+    }
+    let name = |b: Option<crate::ids::BeliefId>| b.and_then(|b| rules.module.beliefs.get(usize::from(b.0))).map_or("-", |d| short(&d.key)).to_owned();
+    let mut ranked: Vec<&(crate::ids::BeliefId, super::beliefs::Worth)> = scored.iter().collect();
+    ranked.sort_by_key(|(b, v)| (std::cmp::Reverse(v.total()), b.0));
+    let all: Vec<String> = ranked.iter().map(|(b, v)| format!("{}={}+{}", name(Some(*b)), v.cities, v.religion)).collect();
+    push(format!("r{round} p{player} BELIEF {slot} head {} list {} | {}", name(head), name(list), all.join(" ")));
+}
+
 /// A goal wonder of a city the allocator does not offer it.
 pub fn missing(player: u8, round: u32, city: u64, building: crate::ids::BuildingKindId, rules: &CompiledRuleset) {
     if !enabled() {
