@@ -44,7 +44,9 @@ pub fn try_cmd(game: &mut GameState, rules: &CompiledRuleset, side: PlayerId, cm
 /// Executes an accepted command; the army net's recorder sees it before and after (when it records).
 fn execute(game: &mut GameState, rules: &CompiledRuleset, side: PlayerId, cmd: Command) -> bool {
     let pending = crate::army_net::record::before(game, rules, side, &cmd);
+    let fact = crate::army_net::observe::log_before(game, rules, side, &cmd);
     let ok = game.execute(rules, cmd).is_ok();
+    crate::army_net::observe::log_after(game, rules, fact, ok);
     crate::army_net::record::after(game, pending, ok);
     ok
 }

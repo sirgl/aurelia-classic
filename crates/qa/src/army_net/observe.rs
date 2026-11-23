@@ -79,6 +79,10 @@ pub struct Tokens {
     pub tile: Vec<TileId>,
     /// The window index of each token's tile; -1 outside the window.
     pub pos: Vec<i16>,
+    /// Variant MH: the history tokens (`F_HIST` numbers), the army slot of each (-1: an enemy's), its age in turns.
+    pub hist: Vec<[f32; F_HIST]>,
+    pub hist_slot: Vec<i16>,
+    pub hist_age: Vec<u8>,
 }
 
 impl Tokens {
@@ -96,12 +100,230 @@ impl Tokens {
 /// What the tokens remember between our turns of one play: every unit's tile and hit points at the start of
 /// our previous turn and of this one (numbers 46 and 47 of a unit's token: the hit points gained since our
 /// previous turn began, whether it has left the tile it stood on then). A reference's commitments (a unit
-/// resting to heal, the assault engaged) leave these traces; the net sees no other memory.
+/// resting to heal, the assault engaged) leave these traces.
+///
+/// Variant MH's history (M-HANDOFF.md, addition 3): the FACTS of the last turns, written by the game: every
+/// command of an army unit with its outcome (`log_before` / `log_after`, from `act::execute` and `record::step`),
+/// and at our turn's start the enemy's events since our last turn's end (`note_turn_end`): our units hit, foes that
+/// came into or went out of sight. The tokens carry the events of this turn and the last `H_TURNS` (`Tokens::hist`).
 #[derive(Default)]
 struct History {
     round: Option<u32>,
     prev: std::collections::BTreeMap<kernel::ids::EntityId, (TileId, u16)>,
     this: std::collections::BTreeMap<kernel::ids::EntityId, (TileId, u16)>,
+    orders: Option<Orders>,
+    events: Vec<Event>,
+    /// Our army (tile, hp) and the foes seen (tile) at our last turn's end, and its round.
+    end: Option<(u32, std::collections::BTreeMap<kernel::ids::EntityId, (TileId, u16)>, std::collections::BTreeMap<kernel::ids::EntityId, TileId>)>,
+    paused: bool,
+}
+
+/// A history token's numbers: the kind (own: move, strike a unit, strike a city, ranged, fortify / set up,
+/// promote / pillage / other; enemy: our unit hit, a foe came into sight, went out of it), age / 3, the subject tile
+/// against the objective (dq, dr / 12, distance / 12), dealt / 100, taken / 100, a kill, died or captured, moved / 5,
+/// on a city (a strike at a city; a hit in a city's fire).
+pub const F_HIST: usize = 20;
+pub const H_MAX: usize = 32;
+pub const H_TURNS: u32 = 3;
+const HK_MOVE: usize = 0;
+const HK_HIT: usize = 7;
+const HK_SEEN: usize = 8;
+const HK_GONE: usize = 9;
+
+#[derive(Debug, Clone)]
+struct Event {
+    round: u32,
+    slot: i16,
+    f: [f32; F_HIST],
+}
+
+/// What a command was before it ran (for its outcome).
+pub struct Pre {
+    unit: UnitHandle,
+    id: kernel::ids::EntityId,
+    slot: i16,
+    kind: usize,
+    hp: u16,
+    tile: TileId,
+    target: Option<TileId>,
+    target_hp: Option<i64>,
+    target_city: bool,
+}
+
+/// The orders of the play the history belongs to (its army's slots, its objective).
+pub fn set_history_orders(orders: &Orders) {
+    HISTORY.with(|h| h.borrow_mut().orders = Some(orders.clone()));
+}
+
+/// The DAgger probe plays on a copy of the game: its commands are no facts of the play.
+pub fn pause_history(on: bool) {
+    HISTORY.with(|h| h.borrow_mut().paused = on);
+}
+
+fn hp_at(game: &GameState, rules: &CompiledRuleset, t: TileId, side: PlayerId) -> Option<(i64, bool)> {
+    let auth = game.view().auth;
+    if let Some(c) = auth.indexes().city_on_tile(t).and_then(|c| auth.cities().get(c)) {
+        return Some((i64::from(hit_points(auth, rules, c)), true));
+    }
+    auth.indexes().units_on(t).iter().filter_map(|h| auth.units().get(*h)).find(|u| u.core.owner != side).map(|u| (i64::from(u.core.hp), false))
+}
+
+/// Before a command of `side`: what the history needs to tell its outcome (None: not an army unit's, or paused).
+pub fn log_before(game: &GameState, rules: &CompiledRuleset, side: PlayerId, cmd: &Command) -> Option<Pre> {
+    let orders = HISTORY.with(|h| {
+        let h = h.borrow();
+        if h.paused {
+            None
+        } else {
+            h.orders.clone()
+        }
+    })?;
+    if side != orders.side {
+        return None;
+    }
+    let unit = classic_rules::knowledge::actions::acting_unit(cmd)?;
+    let core = *game.view().auth.units().get(unit)?.core;
+    let slot = orders.army.iter().position(|a| *a == core.id)? as i16;
+    let kind = match cmd {
+        Command::MoveUnit { .. } | Command::MarchTo { .. } => HK_MOVE,
+        Command::AttackUnit { .. } => 1,
+        Command::AttackCity { .. } => 2,
+        Command::RangedAttack { .. } => 3,
+        Command::Fortify { .. } | Command::SetUpRangedAttack { .. } => 4,
+        _ => 5,
+    };
+    let target = target_tile(game, cmd);
+    let (target_hp, target_city) = match target.and_then(|t| hp_at(game, rules, t, side)) {
+        Some((hp, city)) => (Some(hp), city),
+        None => (None, false),
+    };
+    Some(Pre { unit, id: core.id, slot, kind, hp: core.hp, tile: core.tile, target, target_hp, target_city })
+}
+
+/// After the command: its outcome becomes a fact of this round.
+pub fn log_after(game: &GameState, rules: &CompiledRuleset, pre: Option<Pre>, ok: bool) {
+    let Some(p) = pre else { return };
+    if !ok {
+        return;
+    }
+    let Some(orders) = HISTORY.with(|h| h.borrow().orders.clone()) else { return };
+    let auth = game.view().auth;
+    let now = auth.units().get(p.unit).filter(|u| u.core.id == p.id).map(|u| *u.core);
+    let mut f = [0f32; F_HIST];
+    f[p.kind] = 1.0;
+    let subject = p.target.or(now.map(|c| c.tile)).unwrap_or(p.tile);
+    subject_numbers(game, &orders, subject, &mut f);
+    if let (Some(t), Some(before)) = (p.target, p.target_hp) {
+        let after = hp_at(game, rules, t, orders.side).filter(|(_, city)| *city == p.target_city).map_or(0, |x| x.0);
+        f[14] = (before - after).max(0) as f32 / 100.0;
+        f[16] = if after == 0 || (p.target_city && auth.indexes().city_on_tile(t).and_then(|c| auth.cities().get(c)).is_some_and(|c| c.owner == orders.side)) { 1.0 } else { 0.0 };
+    }
+    f[15] = f32::from(p.hp.saturating_sub(now.map_or(0, |c| c.hp))) / 100.0;
+    f[17] = if now.is_none() { 1.0 } else { 0.0 };
+    f[18] = now.map_or(0, |c| dist(game, c.tile, p.tile)) as f32 / 5.0;
+    f[19] = if p.target_city { 1.0 } else { 0.0 };
+    let round = auth.turn().round;
+    HISTORY.with(|h| h.borrow_mut().events.push(Event { round, slot: p.slot, f }));
+}
+
+fn subject_numbers(game: &GameState, orders: &Orders, t: TileId, f: &mut [f32; F_HIST]) {
+    let (ox, oy) = col_row(game, orders.tile);
+    let (x, y) = col_row(game, t);
+    f[11] = (x - ox) / 12.0;
+    f[12] = (y - oy) / 12.0;
+    f[13] = dist(game, t, orders.tile) as f32 / 12.0;
+}
+
+/// The foes the side sees (all of them where the play is not in the fog).
+fn foes_seen(game: &GameState, rules: &CompiledRuleset, orders: &Orders) -> std::collections::BTreeMap<kernel::ids::EntityId, TileId> {
+    let auth = game.view().auth;
+    let view = game.player_view(rules, orders.side);
+    auth.indexes().units_of(orders.foe).iter().filter_map(|h| auth.units().get(*h)).map(|u| *u.core).filter(|c| !orders.fog || view.sees_unit(c)).map(|c| (c.id, c.tile)).collect()
+}
+
+fn army_now(game: &GameState, orders: &Orders) -> std::collections::BTreeMap<kernel::ids::EntityId, (TileId, u16)> {
+    let auth = game.view().auth;
+    auth.indexes().units_of(orders.side).iter().filter_map(|h| auth.units().get(*h)).filter(|u| orders.army.contains(&u.core.id)).map(|u| (u.core.id, (u.core.tile, u.core.hp))).collect()
+}
+
+/// Our turn ends: what the enemy's events will be told against.
+pub fn note_turn_end(game: &GameState, rules: &CompiledRuleset) {
+    let Some(orders) = HISTORY.with(|h| h.borrow().orders.clone()) else { return };
+    let snap = (game.view().auth.turn().round, army_now(game, &orders), foes_seen(game, rules, &orders));
+    HISTORY.with(|h| h.borrow_mut().end = Some(snap));
+}
+
+/// The enemy's events since our last turn's end (at the first look of our turn).
+fn note_enemy_events(game: &GameState, rules: &CompiledRuleset, round: u32) {
+    let Some((orders, end)) = HISTORY.with(|h| {
+        let mut h = h.borrow_mut();
+        let o = h.orders.clone()?;
+        Some((o, h.end.take()?))
+    }) else {
+        return;
+    };
+    let (_, army, seen) = end;
+    let now_army = army_now(game, &orders);
+    let now_seen = foes_seen(game, rules, &orders);
+    let foe_cities: Vec<TileId> = {
+        let auth = game.view().auth;
+        auth.indexes().cities_of(orders.foe).iter().filter_map(|c| auth.cities().get(*c)).map(|c| c.tile).collect()
+    };
+    let mut events = Vec::new();
+    for (id, (tile, hp)) in &army {
+        let after = now_army.get(id);
+        let lost = hp.saturating_sub(after.map_or(0, |x| x.1));
+        if lost == 0 {
+            continue;
+        }
+        let mut f = [0f32; F_HIST];
+        f[HK_HIT] = 1.0;
+        let t = after.map_or(*tile, |x| x.0);
+        subject_numbers(game, &orders, t, &mut f);
+        f[15] = f32::from(lost) / 100.0;
+        f[17] = if after.is_none() { 1.0 } else { 0.0 };
+        f[19] = if foe_cities.iter().any(|c| dist(game, *c, t) <= CITY_ATTACK_RANGE) { 1.0 } else { 0.0 };
+        let slot = orders.army.iter().position(|a| a == id).map_or(-1, |s| s as i16);
+        events.push(Event { round, slot, f });
+    }
+    for (id, t) in &now_seen {
+        if !seen.contains_key(id) {
+            let mut f = [0f32; F_HIST];
+            f[HK_SEEN] = 1.0;
+            subject_numbers(game, &orders, *t, &mut f);
+            events.push(Event { round, slot: -1, f });
+        }
+    }
+    for (id, t) in &seen {
+        if !now_seen.contains_key(id) {
+            let mut f = [0f32; F_HIST];
+            f[HK_GONE] = 1.0;
+            subject_numbers(game, &orders, *t, &mut f);
+            events.push(Event { round, slot: -1, f });
+        }
+    }
+    HISTORY.with(|h| h.borrow_mut().events.extend(events));
+}
+
+/// The history tokens now: this turn's and the last `H_TURNS` turns' facts, the most recent first, at most `H_MAX`.
+fn history_tokens(round: u32) -> (Vec<[f32; F_HIST]>, Vec<i16>, Vec<u8>) {
+    HISTORY.with(|h| {
+        let h = h.borrow();
+        let mut out = (Vec::new(), Vec::new(), Vec::new());
+        for e in h.events.iter().rev() {
+            let age = round.saturating_sub(e.round);
+            if age > H_TURNS || out.0.len() >= H_MAX {
+                break;
+            }
+            let mut f = e.f;
+            f[10] = age as f32 / 3.0;
+            round_all(&mut f);
+            out.0.push(f);
+            out.1.push(e.slot);
+            out.2.push(age as u8);
+        }
+        out
+    })
 }
 
 thread_local! {
@@ -125,6 +347,14 @@ fn remember_turn_start(game: &GameState, field: &Field, round: u32) {
         h.round = Some(round);
         let _ = game;
     });
+}
+
+/// The first look of a round (the history's enemy events).
+fn first_look(game: &GameState, rules: &CompiledRuleset, round: u32) {
+    let new = HISTORY.with(|h| h.borrow().round != Some(round));
+    if new {
+        note_enemy_events(game, rules, round);
+    }
 }
 
 /// Nets trained before the history numbers existed read zeros there (`ARMY_NET_NO_HISTORY=1`).
@@ -297,9 +527,11 @@ pub fn tokens(game: &GameState, rules: &CompiledRuleset, orders: &Orders) -> Tok
     let field = Field::gather(game, rules, orders);
     let auth = game.view().auth;
     let round = auth.turn().round;
+    first_look(game, rules, round);
     remember_turn_start(game, &field, round);
     let (ox, oy) = col_row(game, orders.tile);
-    let mut t = Tokens { feat: Vec::new(), dist: Vec::new(), selectable: Vec::new(), unit: Vec::new(), tile: Vec::new(), pos: Vec::new() };
+    let (hist, hist_slot, hist_age) = history_tokens(round);
+    let mut t = Tokens { feat: Vec::new(), dist: Vec::new(), selectable: Vec::new(), unit: Vec::new(), tile: Vec::new(), pos: Vec::new(), hist, hist_slot, hist_age };
     // The objective.
     let mut f = [0f32; F_TOK];
     f[TOK_OBJECTIVE] = 1.0;

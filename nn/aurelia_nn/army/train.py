@@ -156,8 +156,12 @@ def decision_weights(flat, best, lost_weight, best_factor, dagger_weight=2.0):
     teacher. A DAgger label (the best reference's choice at the net's own moment, player `army-net`):
     `dagger_weight`, whatever the net's play came to."""
     out = []
-    for p in flat.play:
+    for i, p in enumerate(flat.play):
         m = flat.plays[p]
+        if flat.ptr[i] < -1:
+            # A memory state of the net's own play (record v3): no label.
+            out.append(0.0)
+            continue
         if m['player'] == 'army-net':
             out.append(dagger_weight)
             continue

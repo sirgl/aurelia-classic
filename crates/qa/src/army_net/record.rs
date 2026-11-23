@@ -17,7 +17,8 @@
 //! `"ARMD" u32 | T u16 | C u16 | pointer i16 (-1: end, -2: none) | action i16 (-1: none) | round u16 |
 //! flags u16 | T × F_TOK f16 | T × T u8 distances | T u8 selectable | T f16 danger (-1: unknown) |
 //! C × F_ACT f16 | C u16 promotion + 1 | T i16 window index | C i16 window index | T i16 army slot (-1: none) |
-//! TRACK i16 the teacher's own state`. Version 2 (`"ARMP"`) had no slots and no track, and 0 for the flags.
+//! TRACK i16 the teacher's own state | H u16 | H × F_HIST f16 history tokens | H i16 their army slot | H u8 their
+//! age` (version 4, `"ARM4"`; version 3 ends at the track). Version 2 (`"ARMP"`) had no slots and no track, and 0 for the flags.
 //!
 //! Variant M's memory (M-HANDOFF.md) updates at our turn's end: the decision there has the flag
 //! `MEMORY_STATE`. A teacher's play: its end of the turn. The net's own play (DAgger): an unlabelled decision
@@ -41,6 +42,8 @@ use super::Orders;
 
 pub const PLAY_MAGIC: u32 = u32::from_le_bytes(*b"ARMP");
 pub const PLAY_MAGIC3: u32 = u32::from_le_bytes(*b"ARM3");
+/// Version 4: v3 and the history tokens (variant MH).
+pub const PLAY_MAGIC4: u32 = u32::from_le_bytes(*b"ARM4");
 /// A decision's flag: our turn ends here, the memory updates.
 pub const MEMORY_STATE: u16 = 1;
 /// The teacher's state numbers of a decision: engaged, waited, stage, resting slots (bits).
@@ -358,12 +361,15 @@ pub fn step<P: kernel::ai::mind::AiMind<Classic>>(driver: &mut AiDriver<Classic,
         Advance::Command(command) => {
             let side = game.view().auth.active_player();
             let pending = before(game, rules, side, &command);
+            let fact = observe::log_before(game, rules, side, &command);
             let result = game.execute(rules, command);
+            observe::log_after(game, rules, fact, result.is_ok());
             after(game, pending, result.is_ok());
             driver.executed(result)
         }
         Advance::EndTurn(command) => {
             super::seat::turn_end(game, rules);
+            observe::note_turn_end(game, rules);
             end_turn(game, rules);
             let result = game.execute(rules, command);
             driver.executed(result)
@@ -380,7 +386,7 @@ pub fn finish(mut meta: serde_json::Value) -> Option<(Vec<u8>, Counts)> {
     meta["dropped"] = serde_json::json!(rec.counts.dropped);
     let json = serde_json::to_vec(&meta).ok()?;
     let mut out = Vec::new();
-    put_u32(&mut out, PLAY_MAGIC3);
+    put_u32(&mut out, PLAY_MAGIC4);
     put_u32(&mut out, json.len() as u32);
     out.extend_from_slice(&json);
     for x in &rec.orders.statics {
@@ -462,6 +468,16 @@ fn write_decision(out: &mut Vec<u8>, d: &Decision, orders: &Orders) {
     for x in &d.track {
         out.extend_from_slice(&x.to_le_bytes());
     }
+    put_u16(out, d.tokens.hist.len() as u16);
+    for f in &d.tokens.hist {
+        for x in f {
+            put_u16(out, f32_to_f16(*x));
+        }
+    }
+    for s in &d.tokens.hist_slot {
+        out.extend_from_slice(&s.to_le_bytes());
+    }
+    out.extend_from_slice(&d.tokens.hist_age);
 }
 
 thread_local! {

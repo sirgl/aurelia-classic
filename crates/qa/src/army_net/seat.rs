@@ -287,14 +287,18 @@ fn probe_with(rules: &CompiledRuleset, game: &GameState, scene: &Scene, expert: 
             return;
         }
         super::record::teach();
+        super::observe::pause_history(true);
         families::reference_turn(rules, &mut copy, &mut sc, expert);
+        super::observe::pause_history(false);
         super::record::push_end(&copy, rules);
         super::record::mute();
         EXPERT_TRACK.with(|t| *t.borrow_mut() = Some(sc.track));
         return;
     }
     super::record::probe();
+    super::observe::pause_history(true);
     families::reference_turn(rules, &mut copy, &mut sc, expert);
+    super::observe::pause_history(false);
     if !super::record::probe_done() {
         super::record::push_end(game, rules);
     }

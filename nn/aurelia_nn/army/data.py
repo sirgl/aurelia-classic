@@ -23,6 +23,8 @@ S_CH = 16
 TRACK = 4
 PLAY = struct.unpack('<I', b'ARMP')[0]
 PLAY3 = struct.unpack('<I', b'ARM3')[0]
+PLAY4 = struct.unpack('<I', b'ARM4')[0]
+F_HIST = 20
 DEC = struct.unpack('<I', b'ARMD')[0]
 # Flags of a decision.
 MEMORY_STATE = 1
@@ -39,6 +41,9 @@ class Flat:
         self.pos = bytearray()
         self.cpos = bytearray()
         self.slot = bytearray()
+        self.hist = bytearray()
+        self.hist_slot = bytearray()
+        self.hist_age = bytearray()
         self.statics = bytearray()
         # Per decision.
         self.t = array('H')
@@ -51,6 +56,8 @@ class Flat:
         self.round = array('H')
         self.flags = array('H')
         self.track = array('h')
+        self.h = array('H')
+        self.hist_off = array('I')
         self.play = array('I')
         # Per play.
         self.plays = []
@@ -67,8 +74,9 @@ def read_into(flat, path, keep=None):
     n_buf = len(buf)
     while at < n_buf:
         magic, jl = struct.unpack_from('<II', buf, at)
-        assert magic in (PLAY, PLAY3), f'{path}: bad play magic at {at}'
-        v3 = magic == PLAY3
+        assert magic in (PLAY, PLAY3, PLAY4), f'{path}: bad play magic at {at}'
+        v4 = magic == PLAY4
+        v3 = magic == PLAY3 or v4
         at += 8
         meta = json.loads(bytes(buf[at:at + jl]))
         at += jl
@@ -92,6 +100,9 @@ def read_into(flat, path, keep=None):
             extra = 2 * t + 2 * TRACK if v3 else 0
             if not take:
                 at += sum(sizes) + extra
+                if v4:
+                    (h,) = struct.unpack_from('<H', buf, at)
+                    at += 2 + h * (2 * F_HIST + 3)
                 continue
             flat.t.append(t)
             flat.c.append(c)
@@ -114,6 +125,19 @@ def read_into(flat, path, keep=None):
             else:
                 flat.slot += b'\xff\xff' * t
                 flat.track.extend([-1] * TRACK)
+            flat.hist_off.append(len(flat.hist_age))
+            if v4:
+                (h,) = struct.unpack_from('<H', buf, at)
+                at += 2
+                flat.hist += buf[at:at + 2 * h * F_HIST]
+                at += 2 * h * F_HIST
+                flat.hist_slot += buf[at:at + 2 * h]
+                at += 2 * h
+                flat.hist_age += buf[at:at + h]
+                at += h
+                flat.h.append(h)
+            else:
+                flat.h.append(0)
             meta['count'] += 1
     return flat
 

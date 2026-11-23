@@ -3,16 +3,20 @@
 //! cities see (the rules' sight: units 2, cities 3, hills, mountains and forests shut the line), and the army
 //! net's tokens hold only the foes our side sees (`army_net::Orders::fog`).
 //!
-//! WIN RULES (fixed before the first run; "lost" = our scene units dead or captured):
+//! WIN RULES (fixed before the first run; "lost" = our scene units dead or captured; version 2, after the first
+//! measurement: a net with no learned memory trained on the same data won both, because the army could still
+//! choose while the foe was in sight and its position then carried the choice; now the army comes down a
+//! one-tile corridor and leaves it only after the foe is out of sight):
 //! - ambush-fog: two routes round a mountain block lead from our corridor to our refuge city. At the start a
 //!   strong stack of the enemy (3 of the era's strongest melee and mounted) stands at the mouth of one of
 //!   them, in sight of our outpost city at the fork; from its second turn it walks into the forest at the
 //!   far end of that route, out of sight, and waits there: it strikes any of ours that comes within three
-//!   tiles. WIN: within 14 rounds every unit of ours alive stands within 2 tiles of the refuge at a round's
+//!   tiles. Our army starts 12-15 tiles down the corridor. WIN: within 18 rounds every unit of ours alive stands within 2 tiles of the refuge at a round's
 //!   end with at most 1 of ours lost. Which route is safe is seen only at the start.
 //! - hunt-fog: an enemy worker stands next to our outpost city at the start; from its second turn it walks to
 //!   a forest 6 tiles north or south (seen for its first step, then out of sight) and stays there. Our three
-//!   melee start 7 tiles west. WIN: the worker captured or killed within 10 rounds. Where it went is seen
+//!   melee start 13-15 tiles west in a corridor that ends 3 tiles before the city. WIN: the worker captured or
+//!   killed within 12 rounds. Where it went is seen
 //!   only in its first steps; the two forests are 12 tiles apart, so a wrong guess costs the time.
 //!
 //! THE REFERENCES: `ref-recall` keeps the foes it saw (`Track::seen`: the last tile and round of each) and
@@ -35,8 +39,8 @@ pub fn is_memory(f: Fam) -> bool {
 
 pub fn rounds(f: Fam) -> u32 {
     match f {
-        Fam::AmbushFog => 14,
-        _ => 10,
+        Fam::AmbushFog => 18,
+        _ => 12,
     }
 }
 
@@ -115,7 +119,7 @@ pub(super) fn build(p: &mut Painter, fam: Fam, lab: &Lab, instance: usize, attem
                     }
                 }
             }
-            for q in -10..=-4 {
+            for q in -17..=-4 {
                 wall.push(at(p, (q, 1))?);
                 wall.push(at(p, mirror(q, 1, -1))?);
             }
@@ -140,7 +144,7 @@ pub(super) fn build(p: &mut Painter, fam: Fam, lab: &Lab, instance: usize, attem
             p.city(me, refuge, 3, false);
             s.refuge = Some(refuge);
             let arms = [Arm::Melee, Arm::Ranged, Arm::Mounted, Arm::Melee];
-            for (i, q) in [-6, -7, -8, -9].into_iter().enumerate() {
+            for (i, q) in [-12, -13, -14, -15].into_iter().enumerate() {
                 let k = p.kind(arms[i]).ok_or("no kind")?;
                 let role = if act::range_of(rules, k).is_some() { "ranged" } else { "army" };
                 let piece = p.put(me, at(p, (q, 0))?, k, role);
@@ -163,6 +167,15 @@ pub(super) fn build(p: &mut Painter, fam: Fam, lab: &Lab, instance: usize, attem
         Fam::HuntFog => {
             let outpost = at(p, (0, 0))?;
             p.city(me, outpost, 1, false);
+            // The hunters come down a corridor (rows r = 1 and its mirror walled, q -17..-3): until they leave it
+            // where they stand tells nothing of the worker's way.
+            let mountain = lab.grounds.mountain.ok_or("no impassable terrain")?;
+            let mut wall = Vec::new();
+            for q in -17..=-3 {
+                wall.push(at(p, (q, 1))?);
+                wall.push(at(p, mirror(q, 1, -1))?);
+            }
+            p.paint(&wall, mountain);
             let mut forest = Vec::new();
             for sd in [1, -1] {
                 let h = mirror(HIDE_PREY.0, HIDE_PREY.1, sd);
@@ -178,7 +191,7 @@ pub(super) fn build(p: &mut Painter, fam: Fam, lab: &Lab, instance: usize, attem
             let civ = super::families::civil_kind(rules).ok_or("no worker")?;
             let prey = p.put(foe, at(p, PREY_START)?, civ, "civilian");
             s.theirs.push(prey);
-            for t in p.spots(at(p, (-7, 0))?, 1, 3)? {
+            for t in [at(p, (-13, 0))?, at(p, (-14, 0))?, at(p, (-15, 0))?] {
                 let k = p.kind(Arm::Melee).ok_or("no melee")?;
                 let piece = p.put(me, t, k, "hunter");
                 s.mine.push(piece);

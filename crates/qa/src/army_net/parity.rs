@@ -10,7 +10,7 @@ use classic_rules::ids::TileId;
 
 use super::model::Net;
 use super::observe::{f16_to_f32, Action, Candidate, Tokens, F_ACT, F_TOK};
-use super::record::{DECISION_MAGIC, MEMORY_STATE, PLAY_MAGIC, PLAY_MAGIC3, TRACK};
+use super::record::{DECISION_MAGIC, MEMORY_STATE, PLAY_MAGIC, PLAY_MAGIC3, PLAY_MAGIC4, TRACK};
 
 /// One recorded decision, as the net reads it.
 pub struct Recorded {
@@ -58,10 +58,11 @@ pub fn read(bytes: &[u8], limit: usize) -> Result<Vec<Recorded>, String> {
     let mut out = Vec::new();
     while r.at < bytes.len() && out.len() < limit {
         let magic = r.u32()?;
-        if magic != PLAY_MAGIC && magic != PLAY_MAGIC3 {
+        if magic != PLAY_MAGIC && magic != PLAY_MAGIC3 && magic != PLAY_MAGIC4 {
             return Err(format!("no play at {}", r.at - 4));
         }
-        let v3 = magic == PLAY_MAGIC3;
+        let v4 = magic == PLAY_MAGIC4;
+        let v3 = magic == PLAY_MAGIC3 || v4;
         let jl = r.u32()? as usize;
         r.take(jl)?;
         let statics = std::rc::Rc::new(r.f16s(super::W * super::W * super::S_CH)?);
@@ -96,8 +97,16 @@ pub fn read(bytes: &[u8], limit: usize) -> Result<Vec<Recorded>, String> {
                 (vec![-1; t], [-1; TRACK])
             };
             let flags = if v3 { flags } else { 0 };
+            let (mut hist, mut hist_slot, mut hist_age) = (Vec::new(), Vec::new(), Vec::new());
+            if v4 {
+                let h = r.u16()? as usize;
+                let hf = r.f16s(h * super::observe::F_HIST)?;
+                hist = hf.chunks_exact(super::observe::F_HIST).map(|x| x.try_into().expect("chunks of F_HIST")).collect();
+                hist_slot = (0..h).map(|_| r.u16().map(|x| x as i16)).collect::<Result<_, _>>()?;
+                hist_age = r.take(h)?.to_vec();
+            }
             let feat: Vec<[f32; F_TOK]> = tf.chunks_exact(F_TOK).map(|x| x.try_into().expect("chunks of F_TOK")).collect();
-            let tokens = Tokens { feat, dist, selectable, unit: vec![None; t], tile: vec![TileId(0); t], pos };
+            let tokens = Tokens { feat, dist, selectable, unit: vec![None; t], tile: vec![TileId(0); t], pos, hist, hist_slot, hist_age };
             let candidates = cf.chunks_exact(F_ACT).zip(promos).zip(cpos).map(|((x, promo), pos)| Candidate { feat: x.try_into().expect("chunks of F_ACT"), promo, pos, action: Action::Done }).collect();
             if out.len() < limit {
                 out.push(Recorded { statics: statics.clone(), play, round, tokens, candidates, pointer, action, flags, slots, track });

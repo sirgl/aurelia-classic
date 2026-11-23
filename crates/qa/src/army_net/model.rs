@@ -278,7 +278,26 @@ pub struct Net {
     map: Option<Encoder>,
     /// Variant M (None: no memory).
     mem: Option<Memory>,
+    /// Variant MH (None: no history).
+    hist: Option<HistW>,
 }
+
+/// Variant MH's history weights (`army/model_mh.py`).
+#[derive(Debug, Clone)]
+struct HistW {
+    h1: Dense,
+    h2: Dense,
+    hp: Dense,
+    /// `[layer][head]`: a history key's bias, and the bias of a key of the query's own unit.
+    hist_bias: Vec<f32>,
+    same_bias: Vec<f32>,
+    /// `[plan][theta_p, w_p]`.
+    stall: Vec<f32>,
+}
+
+/// The plan's named dimensions MH reads (`model_m.py`, `model_mh.py`).
+const P_ENGAGED: usize = 10;
+const P_CITY0: usize = 12;
 
 /// The token states after the body (`[T + plans][d]`: the tokens, then variant M's plan tokens).
 pub struct Body {
@@ -341,6 +360,21 @@ pub struct MemoryState {
     pub u: Vec<f32>,
     pub p: Vec<f32>,
     pub alive: [f32; SLOTS],
+    /// The operation plan token P_0 in force in each turn so far (MH: a history token adds the plan of its turn).
+    pub p0_turns: Vec<Vec<f32>>,
+}
+
+impl MemoryState {
+    /// P_0 of the turn `age` turns before this one (this turn's: the plan now), clamped at the play's start.
+    fn p0_at(&self, age: u8, d: usize) -> &[f32] {
+        let k = self.p0_turns.len();
+        let j = k.saturating_sub(usize::from(age));
+        if j >= k {
+            &self.p[..d]
+        } else {
+            &self.p0_turns[j]
+        }
+    }
 }
 
 /// What variant M's body reads besides the tokens: the memory and each token's slot (-1 none).
@@ -434,7 +468,14 @@ impl Net {
         } else {
             None
         };
+        let hist = if t.contains_key("h1.weight") {
+            let raw = |name: &str| -> Result<Vec<f32>, String> { Ok(get(name)?.1.clone()) };
+            Some(HistW { h1: dense("h1")?, h2: dense("h2")?, hp: dense("hp")?, hist_bias: raw("hist_bias")?, same_bias: raw("same_bias")?, stall: raw("stall")? })
+        } else {
+            None
+        };
         Ok(Net {
+            hist,
             mem,
             map,
             e1: dense("e1")?,
@@ -465,7 +506,7 @@ impl Net {
     /// Variant M: the memory at a play's start (None: no memory).
     pub fn initial_memory(&self) -> Option<MemoryState> {
         let m = self.mem.as_ref()?;
-        Some(MemoryState { u: vec![0.0; SLOTS * U_DIM], p: m.plan0.clone(), alive: [0.0; SLOTS] })
+        Some(MemoryState { u: vec![0.0; SLOTS * U_DIM], p: m.plan0.clone(), alive: [0.0; SLOTS], p0_turns: Vec::new() })
     }
 
     /// Variant M at our turn's end: `body` is this moment's body (read with `state`); every army token updates its
@@ -491,6 +532,19 @@ impl Net {
             state.u[s * U_DIM..(s + 1) * U_DIM].copy_from_slice(&u);
         }
         let event = cover.iter().zip(&state.alive).map(|(c, a)| a * (1.0 - c)).sum::<f32>().min(1.0);
+        // MH: the progress numbers (the objective city's share now, dealt to it, taken, lost over the window).
+        let progress = self.hist.as_ref().map(|_| {
+            let city = (0..n).find(|i| tokens.feat[*i][43] > 0.5 && tokens.feat[*i][3] > 0.5).map_or(1.0, |i| tokens.feat[i][7]);
+            let (mut dealt, mut taken, mut lost) = (0f32, 0f32, 0f32);
+            for f in &tokens.hist {
+                dealt += f[14] * f[19];
+                taken += f[15];
+                lost += f[17];
+            }
+            [city, dealt, taken, lost]
+        });
+        state.p0_turns.push(state.p[..d].to_vec());
+        let mut x = vec![0.0; d + F_TOK + progress.map_or(0, |p| p.len())];
         let keys = m.pk.rows(&body.h[..n * d], n);
         let scale = 1.0 / (d as f32).sqrt();
         let mut q = vec![0.0; d];
@@ -516,13 +570,24 @@ impl Net {
                 }
             }
             x[..d].copy_from_slice(&pooled);
-            x[d..].copy_from_slice(&tokens.feat[0]);
+            x[d..d + F_TOK].copy_from_slice(&tokens.feat[0]);
+            if let Some(p) = progress {
+                x[d + F_TOK..].copy_from_slice(&p);
+            }
             let pn = m.gp.step(&x, &pk);
             let diff = pn.iter().zip(&pk).map(|(a, b)| (a - b) * (a - b)).sum::<f32>();
             let norm = pk.iter().map(|a| a * a).sum::<f32>();
             let delta = (diff + 1e-12).sqrt() / ((norm + 1e-12).sqrt() + 1e-3);
             let (theta, kappa, we) = (m.hyst[k * 3], m.hyst[k * 3 + 1], m.hyst[k * 3 + 2]);
-            let c = 1.0 / (1.0 + (-(kappa * (delta - theta) + we * event)).exp());
+            let stall = match (self.hist.as_ref(), progress) {
+                (Some(hw), Some(p)) => {
+                    let (tp, wp) = (hw.stall[k * 2], hw.stall[k * 2 + 1]);
+                    let eng = 1.0 / (1.0 + (-3.0 * pk[P_ENGAGED]).exp());
+                    wp * eng * (tp - (pk[P_CITY0] - p[0].tanh())).max(0.0)
+                }
+                _ => 0.0,
+            };
+            let c = 1.0 / (1.0 + (-(kappa * (delta - theta) + we * event + stall)).exp());
             for i in 0..d {
                 state.p[k * d + i] = pk[i] + c * (pn[i] - pk[i]);
             }
@@ -628,6 +693,22 @@ impl Net {
             h.extend_from_slice(&mi.state.p);
             plans = PLANS;
         }
+        // Variant MH: the history's embedding (with the plan of each fact's turn), read as keys and values.
+        let mut he: Vec<f32> = Vec::new();
+        let mut qslots: Vec<i16> = Vec::new();
+        if let (Some(hw), Some(mi)) = (self.hist.as_ref(), mem) {
+            let mut e1 = vec![0.0; d];
+            let mut y = vec![0.0; d];
+            let mut z = vec![0.0; d];
+            for (k, f) in tokens.hist.iter().enumerate() {
+                hw.h1.apply(f, &mut e1);
+                relu(&mut e1);
+                hw.h2.apply(&e1, &mut y);
+                hw.hp.apply(mi.state.p0_at(tokens.hist_age[k], d), &mut z);
+                he.extend(y.iter().zip(&z).map(|(a, b)| a + b));
+            }
+            qslots = (0..n).map(|i| mi.slots[i]).chain(std::iter::repeat(-1).take(plans)).collect();
+        }
         if let (Some(enc), Some(st)) = (self.map.as_ref(), map) {
             let m = st.out();
             let mut y = vec![0.0; d];
@@ -654,8 +735,9 @@ impl Net {
         }
         let total = n + plans;
         let mut a = vec![0.0; total * d];
+        let hist_in = if he.is_empty() { None } else { Some((he.as_slice(), tokens.hist_slot.as_slice(), qslots.as_slice())) };
         for (li, layer) in self.layers.iter().enumerate() {
-            self.attend(layer, li, &tokens.dist, n, total, &mut h, &mut a);
+            self.attend(layer, li, &tokens.dist, n, total, &mut h, &mut a, hist_in);
             self.feed(layer, total, &mut h, &mut a);
         }
         let mut out = vec![0.0; total * d];
@@ -666,7 +748,8 @@ impl Net {
     }
 
     #[allow(clippy::too_many_arguments)]
-    fn attend(&self, layer: &Layer, li: usize, dist: &[u8], n: usize, total: usize, h: &mut [f32], a: &mut [f32]) {
+    #[allow(clippy::too_many_arguments)]
+    fn attend(&self, layer: &Layer, li: usize, dist: &[u8], n: usize, total: usize, h: &mut [f32], a: &mut [f32], hist: Option<(&[f32], &[i16], &[i16])>) {
         let d = self.config.d;
         let heads = self.config.heads;
         let dh = d / heads;
@@ -680,9 +763,21 @@ impl Net {
         let q = layer.q.rows(a, n);
         let k = layer.k.rows(a, n);
         let v = layer.v.rows(a, n);
+        // MH: the history's keys and values (the layer's norm1, k and v on the history's embedding).
+        let (nh, kh, vh, hb, sb) = match (hist, self.hist.as_ref()) {
+            (Some((he, _, _)), Some(hw)) => {
+                let nh = he.len() / d;
+                let mut ah = vec![0.0; he.len()];
+                for j in 0..nh {
+                    layer.norm1.apply(&he[j * d..(j + 1) * d], &mut ah[j * d..(j + 1) * d]);
+                }
+                (nh, layer.k.rows(&ah, nh), layer.v.rows(&ah, nh), &hw.hist_bias[li * heads..(li + 1) * heads], &hw.same_bias[li * heads..(li + 1) * heads])
+            }
+            _ => (0, Vec::new(), Vec::new(), &[][..], &[][..]),
+        };
         let scale = 1.0 / (dh as f32).sqrt();
         let mut ctx = vec![0.0; n * d];
-        let mut s = vec![0.0; n];
+        let mut s = vec![0.0; n + nh];
         for hd in 0..heads {
             for i in 0..n {
                 let qi = &q[i * d + hd * dh..i * d + hd * dh + dh];
@@ -693,15 +788,23 @@ impl Net {
                     s[j] = dot(qi, kj) * scale + bias;
                     max = max.max(s[j]);
                 }
+                if let Some((_, hslot, qslot)) = hist {
+                    for j in 0..nh {
+                        let kj = &kh[j * d + hd * dh..j * d + hd * dh + dh];
+                        let same = hslot[j] >= 0 && qslot[i] == hslot[j];
+                        s[n + j] = dot(qi, kj) * scale + hb[hd] + if same { sb[hd] } else { 0.0 };
+                        max = max.max(s[n + j]);
+                    }
+                }
                 let mut sum = 0.0;
-                for x in s.iter_mut().take(n) {
+                for x in s.iter_mut().take(n + nh) {
                     *x = (*x - max).exp();
                     sum += *x;
                 }
                 let out = &mut ctx[i * d + hd * dh..i * d + hd * dh + dh];
-                for j in 0..n {
+                for j in 0..n + nh {
                     let w = s[j] / sum;
-                    let vj = &v[j * d + hd * dh..j * d + hd * dh + dh];
+                    let vj = if j < n { &v[j * d + hd * dh..j * d + hd * dh + dh] } else { &vh[(j - n) * d + hd * dh..(j - n) * d + hd * dh + dh] };
                     for c in 0..dh {
                         out[c] += w * vj[c];
                     }

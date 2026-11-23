@@ -25,6 +25,10 @@ from .data import MEMORY_STATE, TRACK
 from .export import export
 from .model_m import AIMS, P_ENGAGED, P_ETA, P_STAGE, P_TURNS, P_WAITED, PLANS, SLOTS, STAGES, U_ENGAGED, U_RESTING, U_WAITED, MemNet
 from .train import Device, best_teachers, decision_weights, load
+from .data import F_HIST
+from .model_mh import H_MAX, MHNet
+
+u16 = lambda b: mx.array(memoryview(b).cast('H'))
 
 ASSAULT = {'assault-heal', 'promotion-choice', 'hill-archers', 'city-fire', 'planned-assault'}
 C_GROUPS = (16, 48, 128)
@@ -79,6 +83,14 @@ class DeviceM(Device):
         self.tis = mx.array(tis, mx.float32)
         self.eta = mx.array(eta, mx.float32)
         self.ptr_list = list(flat.ptr)
+        # Variant MH: the history tokens (record v4).
+        self.has_hist = len(flat.hist_age) > 0
+        self.h = mx.array(list(flat.h), mx.int32)
+        self.hist_off = mx.array(list(flat.hist_off), mx.int32)
+        self.hist = u16(flat.hist).view(mx.float16).reshape(-1, F_HIST) if self.has_hist else mx.zeros((1, F_HIST), mx.float16)
+        self.hist_slot = mx.array(memoryview(flat.hist_slot).cast('h')) if self.has_hist else mx.zeros((1,), mx.int16)
+        self.hist_age = mx.array(memoryview(flat.hist_age).cast('B')) if self.has_hist else mx.zeros((1,), mx.uint8)
+        self.n_hist = self.hist.shape[0]
         self.flags_list = list(flat.flags)
         self.round_list = list(flat.round)
 
@@ -92,12 +104,27 @@ class DeviceM(Device):
         b['track'] = self.track[idx]
         b['tis'] = self.tis[idx]
         b['eta'] = self.eta[idx]
+        h = self.h[idx]
+        ah = mx.arange(H_MAX)
+        hmask = ah[None, :] < h[:, None]
+        hi = mx.minimum(self.hist_off[idx][:, None] + mx.minimum(ah[None, :], mx.maximum(h[:, None] - 1, 0)), self.n_hist - 1)
+        b['hist'] = mx.where(hmask[..., None], self.hist[hi].astype(mx.float32), 0.0)
+        b['hmask'] = hmask
+        b['hslot'] = mx.where(hmask, self.hist_slot[hi].astype(mx.int32), -1)
+        b['hage'] = mx.where(hmask, self.hist_age[hi].astype(mx.int32), 0)
         return b
+
+
+def body_any(model, b, um, pm):
+    """M's body, or MH's with the history (b['hplan']: P_0 of each history token's turn)."""
+    if isinstance(model, MHNet):
+        return model.body_mh(b['tok'], b['dist'], b['tmask'], b['slot'], um, pm, b['hist'], b['hmask'], b['hslot'], b['hplan'])
+    return model.body_m(b['tok'], b['dist'], b['tmask'], b['slot'], um, pm)
 
 
 def decision_losses(model, b, um, pm):
     """The losses of `train.py` on decisions read with their memory (um [N, S, U], pm [N, P, d])."""
-    hfull = model.body_m(b['tok'], b['dist'], b['tmask'], b['slot'], um, pm)
+    hfull = body_any(model, b, um, pm)
     t = b['tok'].shape[1]
     h = hfull[:, :t]
     pl = model.pointer_logits(h, b['sel'])
@@ -198,16 +225,26 @@ def plan_batch(dev, plays, L, drop, rng, tm, train=True):
 
 
 AUX_KEYS = ('aux_unit', 'aux_plan', 'aux_target', 'stage_acc', 'known')
-UNROLL_KEYS = ('tok', 'dist', 'tmask', 'slot', 'track', 'tis', 'eta')
-DEC_KEYS = ('tok', 'dist', 'tmask', 'slot', 'sel', 'unit', 'cand', 'promo', 'cmask', 'ptr', 'act', 'has_act', 'win', 'lost', 'danger', 'w')
+UNROLL_KEYS = ('tok', 'dist', 'tmask', 'slot', 'track', 'tis', 'eta', 'hist', 'hmask', 'hslot')
+DEC_KEYS = ('tok', 'dist', 'tmask', 'slot', 'sel', 'unit', 'cand', 'promo', 'cmask', 'ptr', 'act', 'has_act', 'win', 'lost', 'danger', 'w', 'hist', 'hmask', 'hslot')
+# History ablation (proof (a) of MH): the history masked everywhere.
+ABLATE = {'history': False}
+
+
+def hist_mask(b):
+    if ABLATE['history']:
+        b['hmask'] = mx.zeros(b['hmask'].shape, dtype=mx.bool_)
 # Decision groups are padded to a multiple of this (rows of weight 0), so the compiled forward sees few shapes.
 PAD = 256
 
 
 def unroll_one(model, b, valid, rs, um, pm, alive, with_aux):
     """One turn of the memory unroll on the memory states `b` (valid: the play has this turn; rs: reset after it)."""
-    hfull = model.body_m(b['tok'], b['dist'], b['tmask'], b['slot'], um, pm)
-    um2, pm2, al2, lg = model.step(hfull, b['tok'], b['slot'], b['tmask'], um, pm, alive)
+    hfull = body_any(model, b, um, pm)
+    if isinstance(model, MHNet):
+        um2, pm2, al2, lg = model.step_mh(hfull, b['tok'], b['slot'], b['tmask'], um, pm, alive, b['hist'], b['hmask'])
+    else:
+        um2, pm2, al2, lg = model.step(hfull, b['tok'], b['slot'], b['tmask'], um, pm, alive)
     if with_aux:
         bb = dict(b)
         bb['track'] = mx.where(valid[:, None], b['track'], -1)
@@ -264,6 +301,10 @@ def run_step(model, dev, plan, tm, aux_w, with_aux=True, compile_=True):
         valid = idx >= 0
         full = dev.batch_m(mx.maximum(idx, 0), tm, 1)
         b = {k: full[k] for k in UNROLL_KEYS}
+        hist_mask(b)
+        # P_0 of each history token's turn (age 0: this turn's plan, pm).
+        p0s = mx.stack([P[:, 0] for P in Ps[::-1][:4]] + [Ps[0][:, 0]] * max(0, 4 - len(Ps)), axis=1)  # [B, 4, d], age 0..3
+        b['hplan'] = p0s[mx.arange(B)[:, None], mx.minimum(full['hage'], 3)]
         um, pm, alive, a, parts = unroll(b, valid, reset_a == r + 1, um, pm, alive)
         aux_tot = aux_tot + a / R
         for k, v in zip(AUX_KEYS, parts):
@@ -280,11 +321,14 @@ def run_step(model, dev, plan, tm, aux_w, with_aux=True, compile_=True):
         idx = mx.array(ids + [ids[0]] * pad, mx.int32)
         full = dev.batch_m(idx, tg, cg)
         b = {k: full[k] for k in DEC_KEYS}
+        hist_mask(b)
         live = mx.arange(n + pad) < n
         b['w'] = mx.where(live, b['w'], 0.0)
         b['danger'] = mx.where(live[:, None], b['danger'], -1.0)
         tt = mx.array(turns + [turns[0]] * pad, mx.int32)
         cc = mx.array(cols + [cols[0]] * pad, mx.int32)
+        P0 = Ps[:, :, 0]  # [R + 1, B, d]
+        b['hplan'] = P0[mx.maximum(tt[:, None] - full['hage'], 0), cc[:, None]]
         out = dec(b, Us[tt, cc], Ps[tt, cc])
         for k, v in zip(('main', 'val', 'w', 'dsum', 'dn'), out[:5]):
             tot[k] = tot[k] + v
@@ -356,6 +400,7 @@ def main():
     ap.add_argument('--init', default=None)
     ap.add_argument('--max-minutes', type=float, default=18.0, help='stop (and evaluate, export) after this long: one GPU job <= 20 min')
     ap.add_argument('--cpu', action='store_true')
+    ap.add_argument('--history', action='store_true', help='variant MH: the history window of facts, linked to the plan')
     ap.add_argument('--every-nth-play', type=int, default=1)
     a = ap.parse_args()
     from .train import SIEGE
@@ -383,11 +428,14 @@ def main():
     hw = [0.0 if pt < -1 else w for w, pt in zip(decision_weights(hold, best, a.lost_weight, a.best_factor), hold.ptr)]
     hdev = DeviceM(hold, hw, tm, cm)
     promos = max(400, int(mx.max(dev.promo).item()) + 1)
-    model = MemNet(promos=promos)
+    model = MHNet(promos=promos) if a.history else MemNet(promos=promos)
     model.hand_init()
     if a.init:
-        # A net without memory (A / AH) starts the shared parts; an M net starts everything.
-        model.load_weights(a.init, strict=False)
+        # A net without memory (A / AH) starts the shared parts; an M net everything; an M net starts MH's shared
+        # parts (a tensor of another shape, the plan's GRU input, stays as drawn).
+        own = dict(nn.utils.tree_flatten(model.parameters()))
+        init = {k: v for k, v in mx.load(a.init).items() if k in own and own[k].shape == v.shape}
+        model.load_weights(list(init.items()), strict=False)
     mx.eval(model.parameters())
     n_params = sum(v.size for _, v in nn.utils.tree_flatten(model.parameters()))
     labelled = sum(1 for x in train.ptr if x >= -1)

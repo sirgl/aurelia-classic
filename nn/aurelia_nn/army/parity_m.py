@@ -12,7 +12,8 @@ import mlx.core as mx
 
 from .data import Flat, read_into
 from .model_m import MemNet
-from .train_m import DeviceM, C_GROUPS
+from .model_mh import MHNet
+from .train_m import DeviceM, C_GROUPS, body_any
 
 
 def main():
@@ -25,7 +26,7 @@ def main():
     rust = [json.loads(l) for l in open(a.rust)]
     flat = read_into(Flat(), a.plays)
     w = mx.load(a.weights)
-    model = MemNet(promos=w['promo'].shape[0] - 1)
+    model = (MHNet if 'h1.weight' in w else MemNet)(promos=w['promo'].shape[0] - 1)
     model.load_weights(a.weights)
     tm = max(flat.t)
     dev = DeviceM(flat, [1.0] * len(flat), tm, 128)
@@ -38,10 +39,17 @@ def main():
         ms = P.ms[p]
         um, pm, alive = model.initial(1)
         Us, Ps = [um], [pm]
-        for i in ms:
+        def hplan(b, k):
+            return mx.stack([Ps[max(k - a, 0)][0, 0] for a in b['hage'][0].tolist()])[None]
+
+        for k, i in enumerate(ms):
             b = dev.batch_m(mx.array([i], mx.int32), tm, 1)
-            hf = model.body_m(b['tok'], b['dist'], b['tmask'], b['slot'], um, pm)
-            um, pm, alive, _ = model.step(hf, b['tok'], b['slot'], b['tmask'], um, pm, alive)
+            b['hplan'] = hplan(b, k)
+            hf = body_any(model, b, um, pm)
+            if isinstance(model, MHNet):
+                um, pm, alive, _ = model.step_mh(hf, b['tok'], b['slot'], b['tmask'], um, pm, alive, b['hist'], b['hmask'])
+            else:
+                um, pm, alive, _ = model.step(hf, b['tok'], b['slot'], b['tmask'], um, pm, alive)
             Us.append(um)
             Ps.append(pm)
         turns += len(ms)
@@ -51,7 +59,8 @@ def main():
             cg = next(x for x in C_GROUPS if c <= x)
             b = dev.batch_m(mx.array([i], mx.int32), tm, cg)
             k = P.turn[i]
-            hf = model.body_m(b['tok'], b['dist'], b['tmask'], b['slot'], Us[k], Ps[k])
+            b['hplan'] = hplan(b, k)
+            hf = body_any(model, b, Us[k], Ps[k])
             h = hf[:, :tm]
             pl = model.pointer_logits(h, b['sel'])[0].tolist()
             t = flat.t[i]
