@@ -101,6 +101,10 @@ pub struct Pace {
     /// read 0): a ship built whole that the game did not end with was not installed.
     #[serde(default)]
     pub built: u32,
+    /// The round every part of the ship was first built at once (`built` reached the ship's parts; reports saved
+    /// before read None).
+    #[serde(default)]
+    pub built_round: Option<u32>,
 }
 
 impl Pace {
@@ -127,8 +131,11 @@ impl Pace {
         }
     }
 
-    /// After `round`: the spaceship as `BenchRules::spaceship` counts it.
-    pub(crate) fn spaceship(&mut self, round: u32, space: SpaceProgress) {
+    /// After `round`: the spaceship as `BenchRules::spaceship` counts it, of `needed` parts.
+    pub(crate) fn spaceship(&mut self, round: u32, space: SpaceProgress, needed: u32) {
+        if needed > 0 && space.built >= needed && self.built_round.is_none() {
+            self.built_round = Some(round);
+        }
         if space.project_done && self.space_project.is_none() {
             self.space_project = Some(round);
         }
@@ -439,6 +446,8 @@ pub fn play_match<R: BenchRules>(rules: &CompiledRuleset<R::M>, suite: &Suite, g
     let mut log = MatchLog::new(&seats, R::OPENING_ROUNDS);
     log.landless = landless;
     log.capital_trace = std::env::var_os(CAPITAL_TRACE_ENV).map(|_| label.clone());
+    log.space_trace = std::env::var_os(SPACE_TRACE_ENV).map(|_| label.clone());
+    log.space_last = vec![String::new(); log.seats.len()];
     if crate::bench::rival::enabled() {
         log.probe = Some(crate::bench::rival::RivalProbe::new(&seats));
     }
@@ -594,7 +603,16 @@ struct MatchLog {
     /// stderr (`CAPITAL <label> ...`), so a lost capital can be found and its game played again alone
     /// (`AURELIA_BENCH_MATCH`).
     capital_trace: Option<String>,
+    /// The match's label when `AURELIA_SPACE_TRACE` is set: each seat's way to the spaceship
+    /// (`BenchRules::space_tick`) is written to stderr whenever it changes (`SPACE <label> ...`), and every
+    /// seat's end (`SPACEEND`), so a ship built and not finished can be followed.
+    space_trace: Option<String>,
+    /// The last line written per seat (`space_trace`).
+    space_last: Vec<String>,
 }
+
+/// Dev-only: `AURELIA_SPACE_TRACE` (any value) writes each seat's way to the spaceship to stderr.
+pub const SPACE_TRACE_ENV: &str = "AURELIA_SPACE_TRACE";
 
 /// Dev-only: `AURELIA_BENCH_MATCH=<text>` plays only the matches whose label (`Match::label`, e.g.
 /// `fractal/small/seed 1853017/odd`) contains the text: one game of a suite again, with its traces.
@@ -629,7 +647,7 @@ impl MatchLog {
                 pace: Pace::default(),
             })
             .collect();
-        Self { seats, round_ms: Vec::new(), wars: Vec::new(), start_techs: Vec::new(), probe: None, landless: None, capital_trace: None }
+        Self { seats, round_ms: Vec::new(), wars: Vec::new(), start_techs: Vec::new(), probe: None, landless: None, capital_trace: None, space_trace: None, space_last: Vec::new() }
     }
 
     fn seat(&mut self, player: PlayerId) -> Option<&mut SeatResult> {
@@ -802,10 +820,18 @@ impl MatchLog {
         let players = game.view().auth.players();
         let at_checkpoint = checkpoints.contains(&now);
         let mut out = Vec::new();
-        for (seat, start) in self.seats.iter_mut().zip(&self.start_techs) {
+        for (at, (seat, start)) in self.seats.iter_mut().zip(&self.start_techs).enumerate() {
             let techs = players.techs_of(seat.player).len().saturating_sub(*start);
             seat.pace.progress(now, techs, kernel::world::player::player_era(game.view().auth, rules, seat.player));
-            seat.pace.spaceship(now, R::spaceship(game, rules, seat.player));
+            seat.pace.spaceship(now, R::spaceship(game, rules, seat.player), R::spaceship_parts(rules));
+            if let Some(label) = &self.space_trace {
+                let tick = R::space_tick(game, rules, seat.player);
+                if self.space_last.get(at).is_some_and(|last| *last != tick) {
+                    let side = if seat.side == Side::Candidate { "candidate" } else { "baseline" };
+                    eprintln!("SPACE {label} r{now} p{} {side} {tick}", seat.player.0);
+                    self.space_last[at] = tick;
+                }
+            }
             if seat.eliminated.is_none() && !players.is_alive(seat.player) {
                 seat.eliminated = Some(now);
                 out.push(seat.player);
@@ -840,6 +866,27 @@ impl MatchLog {
             seat.combat.held = game.view().auth.cities().iter().filter(|(_, c)| c.owner == player && c.original_owner != player).count() as u32;
         }
         rank(&mut self.seats);
+        if let Some(label) = &self.space_trace {
+            let won = winner.map_or_else(|| "none".to_owned(), |(p, kind)| format!("{}:{kind}", p.0));
+            for seat in &self.seats {
+                let side = if seat.side == Side::Candidate { "candidate" } else { "baseline" };
+                let economy = R::economy(game, rules, seat.player);
+                eprintln!(
+                    "SPACEEND {label} seed {seed} rounds {} winner {won} p{} {side} {} elim {:?} built {} installed {} project {:?} eras {:?} gold {}+{}/turn science {}",
+                    round(game),
+                    seat.player.0,
+                    seat.leader,
+                    seat.eliminated,
+                    seat.pace.built,
+                    seat.pace.parts.len(),
+                    seat.pace.space_project,
+                    seat.pace.eras,
+                    economy.treasury,
+                    economy.gold,
+                    economy.science
+                );
+            }
+        }
         let landless = self.landless.take().map(|(player, mut log)| {
             if std::env::var_os("AURELIA_LANDLESS_TRACE").is_some() {
                 let c = self.seats.iter().find(|s| s.player == player).map(|s| (s.combat, s.founded, s.eliminated));
