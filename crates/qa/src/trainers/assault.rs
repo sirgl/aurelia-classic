@@ -75,8 +75,16 @@ pub struct Track {
     pub rested: u32,
     pub resting: BTreeSet<EntityId>,
     pub engaged: bool,
-    waited: u32,
+    pub waited: u32,
     pub picks: Vec<String>,
+}
+
+impl Track {
+    /// The track without the planner's commitments (engaged, waited, resting): what the scene of a seat the
+    /// planner does not play holds (the army net's), the samples of the play kept.
+    pub fn without_commitments(&self) -> Track {
+        Track { engaged: false, waited: 0, resting: BTreeSet::new(), ..self.clone() }
+    }
 }
 
 pub fn is_assault(f: Fam) -> bool {

@@ -94,10 +94,15 @@ fn probe(rules: &CompiledRuleset, game: &GameState, scene: &Scene, first_of_turn
 
 /// The guard of the probe (`tests/army_net.rs`, player `probe:<reference>`): the reference plays the real
 /// game itself, muted, and before each of its turns the probe plays the same turn on a copy, recorded. When
-/// the probe is right its labels are the reference's own.
+/// the probe is right its labels are the reference's own. The probe is given the scene the net's seat holds:
+/// the reference's commitments (engaged, waited, resting) are not in it, because the net plays the real game
+/// and the real scene's track never gets them; the probe must carry them itself (`EXPERT_TRACK`). Without
+/// this the guard passed on code that dropped them (the real scene handed them to the copy).
 pub fn probe_and_play(rules: &CompiledRuleset, game: &mut GameState, scene: &mut Scene, expert: &str) {
     if super::record::active() {
-        probe_with(rules, game, scene, expert, true);
+        let mut blind = scene.clone();
+        blind.track = scene.track.without_commitments();
+        probe_with(rules, game, &blind, expert, true);
     }
     families::reference_turn(rules, game, scene, expert);
 }
