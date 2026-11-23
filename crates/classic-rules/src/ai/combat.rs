@@ -402,17 +402,35 @@ pub struct Exposure<'t, 'v, 'a> {
     source: Source,
     pub unit: OwnUnit,
     pub worth: i32,
+    /// The answers given, by the place asked: the threats and the unit do not change in the life of an
+    /// exposure, and the search asks the same place again for each of its candidates.
+    asked: std::cell::RefCell<std::collections::HashMap<(TileId, u16, bool), Vec<(Vec<(TileId, u16)>, Danger)>>>,
 }
 
 impl<'t, 'v, 'a> Exposure<'t, 'v, 'a> {
     pub fn of(threats: &'t Threats<'v, 'a>, rules: &'a CompiledRuleset, source: Source, unit: &OwnUnit) -> Self {
         let worth = worth(&KindStats::of(rules, unit.kind), unit.level);
-        Self { threats, rules, source, unit: *unit, worth }
+        Self { threats, rules, source, unit: *unit, worth, asked: Default::default() }
     }
 
     /// The danger of the unit ending its turn on `tile` with `hp`, after a
     /// strike there or not; `hurt` the enemies the strike changed (0: gone).
     pub fn danger(&self, tile: TileId, hp: u16, struck: bool, hurt: &[(TileId, u16)]) -> Danger {
+        let key = (tile, hp, struck);
+        let held = self.asked.borrow().get(&key).and_then(|v| v.iter().find(|(h, _)| h.as_slice() == hurt).map(|(_, d)| *d));
+        if let Some(danger) = held {
+            if crate::ai::memo_check::on() {
+                let fresh = self.danger_fresh(tile, hp, struck, hurt);
+                crate::ai::memo_check::compare("Exposure::danger", &danger, &fresh, fresh.damage == 0 && fresh.death_permille == 0);
+            }
+            return danger;
+        }
+        let danger = self.danger_fresh(tile, hp, struck, hurt);
+        self.asked.borrow_mut().entry(key).or_default().push((hurt.to_vec(), danger));
+        danger
+    }
+
+    fn danger_fresh(&self, tile: TileId, hp: u16, struck: bool, hurt: &[(TileId, u16)]) -> Danger {
         let end = danger::after(&self.unit, tile, hp, struck);
         let posture = self.threats.posture_with(&self.unit, tile);
         let place = Place { tile, posture: &posture, hurt };

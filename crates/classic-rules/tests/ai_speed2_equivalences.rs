@@ -10,13 +10,13 @@
 use classic_content::core::core_rules;
 use classic_rules::ai::planner::TurnBrief;
 use classic_rules::ai::planner_map::{step_points, KnownMap, StepsFrom};
-use classic_rules::ai::planner_workers::offer_memo_and_fresh;
+use classic_rules::ai::planner_workers::{offer_key, offer_memo_and_fresh};
 use classic_rules::ai::state::{Strategy, WorkerJob};
 use classic_rules::ai::{AiDriver, AiSettings};
 use classic_rules::ids::{PlayerId, TileId};
 use classic_rules::knowledge::observation::{public_screens, AIObservation};
 use classic_rules::scenario::{generate_new_game, ScenarioConfig};
-use classic_rules::{compile_rules, CompiledRuleset, GameState};
+use classic_rules::{compile_rules, ClassicGame, CompiledRuleset, GameState};
 
 const STRATEGIES: [Strategy; 3] = [Strategy::Expand, Strategy::Defend, Strategy::Stabilize];
 
@@ -89,7 +89,7 @@ fn compare_offers(game: &GameState, rules: &CompiledRuleset, tiles_of: &dyn Fn(&
 fn the_offer_memo_answers_as_the_job_finder_does_along_ai_games_and_after_changes_beside_the_tiles() {
     let rules = compile_rules(core_rules()).unwrap();
     let mut seen = Seen::default();
-    let mut forced_flips = 0;
+    let mut keyed = [0usize; 3];
     for seed in [3, 11] {
         let (mut game, mut driver) = ai_game(&rules, seed);
         for round in (10..=130).step_by(10) {
@@ -117,13 +117,6 @@ fn the_offer_memo_answers_as_the_job_finder_does_along_ai_games_and_after_change
             .max_by_key(|(_, t)| t.len())
             .unwrap();
         assert!(own.len() > 20, "a player holds land to change beside");
-        if std::env::var("DIAG").is_ok() {
-            let (obs, _) = AIObservation::for_player(game.view().auth, game.view().derived, &rules, who);
-            let brief = TurnBrief::from_observation(&obs, &rules);
-            let some = own.iter().filter(|t| offer_memo_and_fresh(&obs.view, &rules, &brief, Strategy::Expand, **t).1.is_some()).count();
-            eprintln!("DIAG own {} with an offer {} techs {}", own.len(), some, brief.techs.len());
-            for t in own.iter().take(5) { let s = obs.view.tile(*t).snapshot().copied().unwrap(); eprintln!("DIAG {t:?} {s:?}"); }
-        }
         let dims = game.view().auth.map().dimensions;
         let twin: Vec<_> = (0..rules.improvements.len()).filter(|i| rules.improvements[*i].placement.no_two_adjacent).map(|i| classic_rules::ids::ImprovementId(i as u16)).collect();
         let fresh_features: Vec<_> = (0..rules.features.len()).filter(|i| rules.features[*i].fresh_water).map(|i| classic_rules::ids::FeatureId(i as u16)).collect();
@@ -131,38 +124,39 @@ fn the_offer_memo_answers_as_the_job_finder_does_along_ai_games_and_after_change
         assert!(!twin.is_empty() && !fresh_features.is_empty() && !luxuries.is_empty(), "the rules have what the changes use");
         let only = |tile: TileId| move |_: &AIObservation<'_>| vec![tile];
         for tile in own {
-            let before = |game: &GameState| -> [Option<_>; 3] {
+            let key = |game: &GameState| {
                 let (obs, _) = AIObservation::for_player(game.view().auth, game.view().derived, &rules, who);
-                let brief = TurnBrief::from_observation(&obs, &rules);
-                STRATEGIES.map(|st| offer_memo_and_fresh(&obs.view, &rules, &brief, st, tile).1)
+                offer_key(&obs.view, tile)
             };
             for near in dims.neighbors(tile) {
-                let was = before(&game);
+                let was = key(&game);
                 for kind in twin.iter() {
                     game.debug_set_improvement_batch(&rules, &[(near, *kind)]);
                     game.debug_reveal(who, &[near]);
                     assert_eq!(compare_offers(&game, &rules, &only(tile), &mut seen, "a twin improvement beside"), 0);
                 }
+                let after_improvement = key(&game);
                 game.debug_set_feature_batch(&rules, &[(near, fresh_features[0])]);
                 game.debug_reveal(who, &[near]);
                 assert_eq!(compare_offers(&game, &rules, &only(tile), &mut seen, "a feature with fresh water beside"), 0);
+                let after_feature = key(&game);
                 game.debug_set_resource_batch(&rules, &[(near, luxuries[0])]);
                 game.debug_reveal(who, &[near]);
                 assert_eq!(compare_offers(&game, &rules, &only(tile), &mut seen, "a luxury beside"), 0);
-                forced_flips += usize::from(before(&game) != was);
-                if std::env::var("DIAG").is_ok() {
-                    let (obs, _) = AIObservation::for_player(game.view().auth, game.view().derived, &rules, who);
-                    let sn = obs.view.tile(near).snapshot().copied();
-                    eprintln!("DIAG {tile:?} near {near:?} imp {:?} feat {:?} res {:?} was {was:?}", sn.and_then(|s| s.improvement), sn.and_then(|s| s.feature), sn.and_then(|s| s.resource));
-                }
+                let after_resource = key(&game);
+                // What the memo keys an offer by sees each change beside the tile (when the change is one: the
+                // neighbour may already hold it).
+                keyed[0] += usize::from(after_improvement != was);
+                keyed[1] += usize::from(after_feature != after_improvement);
+                keyed[2] += usize::from(after_resource != after_feature);
             }
         }
     }
-    eprintln!("{seen:?}, offers changed by a change beside the tile: {forced_flips}");
+    eprintln!("{seen:?}, keys changed by a change beside the tile: {keyed:?}");
     assert!(seen.compared > 1000, "{seen:?}");
     assert!(seen.improvements > 200 && seen.gains_over_zero > 200, "real offers were compared: {seen:?}");
     assert!(seen.chops > 0, "offers to chop a feature were compared: {seen:?}");
-    assert!(forced_flips > 0, "a change beside a tile changes its offer, so the keys of the neighbours are read");
+    assert!(keyed.iter().all(|k| *k > 50), "a change beside a tile changes the key of its offer: {keyed:?}");
 }
 
 /// `StepsFrom` prices a step as `step_points` does: for the tiles of real maps, every neighbour, a land mover, a
@@ -280,4 +274,137 @@ fn the_cell_runs_with_shared_base_choices_equal_the_runs_made_apart() {
     }
     assert!(runs > 100 && valued > 100 && grown > 10, "real runs were compared ({runs}, {valued}, {grown})");
     assert!(moods.len() >= 3, "the moods differ: {moods:?}");
+}
+
+/// Open grassland, a city for each of two sides, at war, with soldiers of both standing near each other: the
+/// units the AI decides on have enemies in sight.
+fn war_game(rules: &CompiledRuleset, seed: u64) -> GameState {
+    use classic_rules::ids::{TerrainId, UnitKindId};
+    use classic_rules::math::HexCoord;
+    use classic_rules::world::state::GameConfig;
+    let (us, them) = (PlayerId(0), PlayerId(1));
+    let mut game = GameState::new(rules, GameConfig { players: 2, width: 30, height: 20, rng_seed: seed });
+    let dims = game.view().auth.map().dimensions;
+    let land: Vec<(TileId, TerrainId)> = (0..dims.tile_count() as u32).map(|t| (TileId(t), TerrainId(1))).collect();
+    game.debug_set_terrain_batch(rules, &land);
+    let tiles: Vec<TileId> = land.iter().map(|(t, _)| *t).collect();
+    game.debug_clear_features(rules, &tiles);
+    game.debug_set_river_edges(rules, &[]);
+    let at = |game: &GameState, q: i32, r: i32| game.view().auth.map().dimensions.to_tile(HexCoord { q, r }).unwrap();
+    let (a, b) = (at(&game, 6, 10), at(&game, 22, 10));
+    game.debug_found_city(rules, us, a);
+    game.debug_found_city(rules, them, b);
+    game.debug_meet(us, them);
+    game.debug_force_war(rules, us, them);
+    let kind = |key: &str| UnitKindId(rules.units.iter().position(|u| u.key == format!("core:unit/{key}")).unwrap() as u16);
+    for (i, key) in ["swordsman", "archer", "swordsman", "spearman", "archer"].into_iter().enumerate() {
+        let (qa, qb, r) = (11 + (i as i32 % 3), 15 - (i as i32 % 3), 8 + i as i32);
+        game.debug_spawn_unit(rules, us, at(&game, qa, r), kind(key));
+        game.debug_spawn_unit(rules, them, at(&game, qb, r), kind(key));
+    }
+    game
+}
+
+/// The dangers an exposure remembers are the dangers computed afresh: with the memo check on (`memo_check`) every
+/// answer taken from the memo is compared with a fresh one while AI armies fight. A guard that compared nothing
+/// or only zeros proves nothing, so the counts are asserted.
+#[test]
+fn the_exposure_answers_from_its_memory_as_it_computes_them() {
+    use classic_rules::ai::memo_check;
+    let rules = compile_rules(core_rules()).unwrap();
+    memo_check::set(true);
+    for seed in [3, 11, 21] {
+        let mut game = war_game(&rules, seed);
+        let mut driver = AiDriver::new(AiSettings::for_rules(&rules, rules.default_difficulty()), Vec::new());
+        play_to(&mut game, &mut driver, &rules, 40);
+    }
+    memo_check::set(false);
+    let (compared, not_zero) = memo_check::counts();
+    assert!(compared > 100 && not_zero > 30, "real dangers were compared ({compared}, {not_zero})");
+}
+
+/// The facts read through the one-tile cache are the facts of the view itself, fact by fact, over every tile
+/// of the maps of AI games, asked in the order a rule asks them (all of one tile, then the next) and in a
+/// crossing one (two tiles by turns), for every player.
+#[test]
+fn the_one_tile_facts_answer_as_the_view_does() {
+    use classic_rules::world::facts::{OneTileFacts, TileFacts};
+    let rules = compile_rules(core_rules()).unwrap();
+    let (mut asked, mut visible_resources, mut improved, mut owned, mut coastal, mut rivers, mut water) = (0, 0, 0, 0, 0, 0, 0);
+    let (mut game, mut driver) = ai_game(&rules, 7);
+    for round in [60, 150] {
+        play_to(&mut game, &mut driver, &rules, round);
+        let auth = game.view().auth;
+        for p in 0..auth.players().count() {
+            let (obs, _) = AIObservation::for_player(auth, game.view().derived, &rules, PlayerId(p as u8));
+            let view = obs.view;
+            let facts = OneTileFacts::new(&view);
+            let count = view.tile_count() as u32;
+            let same = |tile: TileId| {
+                assert_eq!(facts.terrain(tile), view.terrain(tile));
+                assert_eq!(facts.feature(tile), view.feature(tile));
+                assert_eq!(facts.natural_wonder(tile), view.natural_wonder(tile));
+                assert_eq!(facts.resource(tile), view.resource(tile));
+                assert_eq!(facts.improvement(tile), view.improvement(tile));
+                assert_eq!(facts.pillaged(tile), view.pillaged(tile));
+                assert_eq!(facts.owner(tile), view.owner(tile));
+                assert_eq!(facts.city(tile), view.city(tile));
+                assert_eq!(facts.river(tile), view.river(tile));
+                assert_eq!(facts.lake(tile), view.lake(tile));
+                assert_eq!(facts.coastal_land(tile), view.coastal_land(tile));
+                assert_eq!(facts.is_water(tile), view.is_water(tile));
+            };
+            for t in (0..count).map(TileId) {
+                same(t);
+                asked += 1;
+                visible_resources += usize::from(view.resource(t).is_some());
+                improved += usize::from(view.improvement(t).is_some());
+                owned += usize::from(view.owner(t).is_some());
+                coastal += usize::from(view.coastal_land(t));
+                rivers += usize::from(view.river(t));
+                water += usize::from(view.is_water(t));
+            }
+            for t in (0..count.saturating_sub(1)).map(TileId) {
+                // Crossing: the cached tile changes at every ask.
+                assert_eq!(facts.improvement(t), view.improvement(t));
+                assert_eq!(facts.owner(TileId(t.0 + 1)), view.owner(TileId(t.0 + 1)));
+                assert_eq!(facts.improvement(t), view.improvement(t));
+                assert_eq!(facts.terrain(TileId(t.0 + 1)), view.terrain(TileId(t.0 + 1)));
+            }
+            // Outside the map: nothing is known.
+            assert_eq!(facts.terrain(TileId(count + 5)), view.terrain(TileId(count + 5)));
+        }
+    }
+    assert!(asked > 1000 && visible_resources > 20 && improved > 5 && owned > 50 && coastal > 50 && rivers > 5 && water > 50, "real facts were compared ({asked} {visible_resources} {improved} {owned} {coastal} {rivers} {water})");
+}
+
+/// The owner-level unit modifiers taken from the effect memo are those computed from the sources, for every
+/// player of AI games in the memo's verify mode (a hit is recomputed and asserted equal there), and they are
+/// not the empty set: the nations have policies, technologies and buildings that change units.
+#[test]
+fn the_owner_part_of_unit_modifiers_from_the_memo_is_the_one_from_the_sources() {
+    use classic_rules::effects::memo::MemoMode;
+    use classic_rules::effects::unit::{owner_unit_modifiers, owner_unit_modifiers_fresh, UnitModifiers};
+    let rules = compile_rules(core_rules()).unwrap();
+    let (mut game, mut driver) = ai_game(&rules, 13);
+    game.set_memo_mode(MemoMode::Verify);
+    let (mut compared, mut not_empty, mut combat, mut deferred) = (0, 0, 0, 0);
+    for round in [25, 70, 120] {
+        play_to(&mut game, &mut driver, &rules, round);
+        let auth = game.view().auth;
+        let hits_before = auth.memo().stats().hits;
+        for p in 0..auth.players().count() {
+            let owner = PlayerId(p as u8);
+            let (first, second) = (owner_unit_modifiers(auth, &rules, owner), owner_unit_modifiers(auth, &rules, owner));
+            let fresh = owner_unit_modifiers_fresh(auth, &rules, owner);
+            assert_eq!(first, fresh, "round {round} player {p}");
+            assert_eq!(second, fresh, "round {round} player {p}");
+            compared += 1;
+            not_empty += usize::from(fresh != UnitModifiers::default());
+            combat += usize::from(fresh.combat.iter().any(|c| *c != 0));
+            deferred += fresh.deferred.len();
+        }
+        assert!(auth.memo().stats().hits > hits_before, "the second ask is answered from the memo");
+    }
+    assert!(compared >= 12 && not_empty >= 6 && combat + deferred > 0, "real modifiers were compared ({compared} {not_empty} {combat} {deferred})");
 }

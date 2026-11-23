@@ -268,7 +268,7 @@ struct JobOffer {
 /// What `best_job` reads of the world for one tile: the known tile and its neighbours, the
 /// pillage of the tile and the static geography the site rule asks (the coast of the tile, a
 /// neighbour's lake for fresh water). The offer is a function of this, the weights and the `Ctx`.
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 struct Around {
     snapshots: [Option<TileSnapshot>; 7],
     pillaged: bool,
@@ -368,6 +368,17 @@ fn best_job_memo(view: &PlayerView<'_>, rules: &CompiledRuleset, brief: &TurnBri
         memo.offers.insert((tile, *w), (around, offer));
     });
     offer
+}
+
+/// What the memo keys a tile's offer by (what `best_job` reads around it), for the guard to see that a change
+/// beside the tile changes the key.
+#[doc(hidden)]
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct OfferKey(Around);
+
+#[doc(hidden)]
+pub fn offer_key(view: &PlayerView<'_>, tile: TileId) -> OfferKey {
+    OfferKey(Around::of(view, tile))
 }
 
 /// The guard's view of the memo: the offer on `tile` as the memo answers and as `best_job` computes it

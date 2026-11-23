@@ -80,6 +80,7 @@ pub mod happiness;
 pub mod improvements;
 pub mod infamy;
 pub mod legal;
+pub mod memo_check;
 pub mod net;
 pub mod net2;
 #[cfg(feature = "experimental-ai")]

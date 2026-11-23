@@ -669,13 +669,15 @@ impl Prices {
         use crate::ai::territory::{effect_meets, territory};
         let ctx = territory_context(obs, rules, city);
         let land = territory(&obs.view, city.tile, crate::world::city::CITY_WORK_RADIUS, obs.player);
+        // The facts of a tile are asked one after another: its snapshot is built once.
+        let facts = crate::world::facts::OneTileFacts::new(&obs.view);
         let (mut worked, mut other, mut open) = (0i64, 0i64, 0i64);
         for tile in &land {
             let works = city.worked.contains(tile);
             if !works {
                 open += 1;
             }
-            match effect_meets(&obs.view, *tile, effect, &ctx)? {
+            match effect_meets(&facts, *tile, effect, &ctx)? {
                 true if works => worked += 1,
                 true => other += 1,
                 false => {}
