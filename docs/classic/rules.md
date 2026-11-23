@@ -8,7 +8,7 @@
 
 ## Summary
 
-Rule constants: 519 (AI constants: 1126; 14 constants of engine plumbing in `platform/crates/kernel/src/persistence/`, `platform/crates/kernel/src/test_module.rs`, `platform/crates/kernel/src/math.rs`, `platform/crates/kernel/src/module.rs`, `classic/crates/classic-rules/src/save_codec.rs`, `classic/crates/classic-rules/src/fixtures.rs` are not listed).
+Rule constants: 519 (AI constants: 1134; 14 constants of engine plumbing in `platform/crates/kernel/src/persistence/`, `platform/crates/kernel/src/test_module.rs`, `platform/crates/kernel/src/math.rs`, `platform/crates/kernel/src/module.rs`, `classic/crates/classic-rules/src/save_codec.rs`, `classic/crates/classic-rules/src/fixtures.rs` are not listed).
 
 | Source | Rule constants | AI constants |
 |---|---|---|
@@ -17,8 +17,8 @@ Rule constants: 519 (AI constants: 1126; 14 constants of engine plumbing in `pla
 | own formula (expansion-only system; Unciv has no equivalent) | 0 | 0 |
 | own value | 16 | 4 |
 | own value (unverified) | 17 | 4 |
-| own value (source not recorded) | 147 | 1107 |
-| total | 519 | 1126 |
+| own value (source not recorded) | 147 | 1115 |
+| total | 519 | 1134 |
 
 Sections:
 
@@ -2071,7 +2071,7 @@ Tuning numbers of the computer players (`classic/crates/classic-rules/src/ai`). 
 
 ### `weights.rs`
 
-459 constants (own value 2, own value (source not recorded) 457). Files: `classic/crates/classic-rules/src/ai/net2/weights.rs`, `classic/crates/classic-rules/src/ai/net_e2e/v2/weights.rs`, `classic/crates/classic-rules/src/ai/strategy_net/weights.rs`, `classic/crates/classic-rules/src/ai/unit_net/weights.rs`.
+467 constants (own value 2, own value (source not recorded) 465). Files: `classic/crates/classic-rules/src/ai/net2/weights.rs`, `classic/crates/classic-rules/src/ai/net_e2e/v2/weights.rs`, `classic/crates/classic-rules/src/ai/strategy_net/weights.rs`, `classic/crates/classic-rules/src/ai/unit_net/weights.rs`.
 
 | Name | Value | Meaning | Source | File |
 |---|---|---|---|---|
@@ -2168,7 +2168,9 @@ Tuning numbers of the computer players (`classic/crates/classic-rules/src/ai`). 
 | `DANGER` | `1` |  | own value (source not recorded) | `weights.rs` |
 | `DISTRUST_NEAR` | `2` | The largest distrust of the rivals with a city within 8 tiles. | own value (source not recorded) | `weights.rs` |
 | `YOUNG` | `3` |  | own value (source not recorded) | `weights.rs` |
-| `N` | `4` |  | own value (source not recorded) | `weights.rs` |
+| `CAPITAL` | `4` | `layout-defence`: the city holds our palace (0/1000; `hold::rows`, 0 for every other variant). | own value (source not recorded) | `weights.rs` |
+| `FRONT` | `5` | `layout-defence`: the largest `FRONT` of a rival on the city (`hold::rows`, 0 for every other variant). | own value (source not recorded) | `weights.rs` |
+| `N` | `6` |  | own value (source not recorded) | `weights.rs` |
 | `SIZE` | `0` |  | own value (source not recorded) | `weights.rs` |
 | `GARRISON` | `1` |  | own value (source not recorded) | `weights.rs` |
 | `NEAR` | `2` |  | own value (source not recorded) | `weights.rs` |
@@ -2189,6 +2191,8 @@ Tuning numbers of the computer players (`classic/crates/classic-rules/src/ai`). 
 | `CITY_CAP` | `Neuron { name: "city_cap", bias: 0, why: "the model's count unless a reason moves it",...` | The new cities a real tall seat founds (`Intent::more_cities` of a `tall_real` seat, thousandths of a city, rounded half up; the executors `tall_real::adjust` and `Prices::city_cap` only read the target). | own value (source not recorded) | `weights.rs` |
 | `SCIENTISTS` | `Neuron { name: "scientists", bias: -900, why: "early the citizens stay on the tiles: a...` | The share of its science specialists' slots a seat fills (`Science::scientists`; the executor `citizens::science_specialist_commands` keeps each city's food at `gate::SCIENTIST_FOOD`). | own value (source not recorded) | `weights.rs` |
 | `AGREEMENT` | `Neuron { name: "agreement", bias: 600, why: "an agreement is 4 beakers a gold: a seat a...` | A research agreement with one rival pays our race (`Science::ties`): the friendship and the agreement with it are proposed and taken though it runs away (`Net2Plan::denies_item`), the ladder to it is offered at the level's cadence (`science::cadence`: every round at 1000, the diplomacy's own `PROPOSAL_INTERVAL` at the gate), and the gold it costs is kept (`Science::chest`) until the partner lets it wait too long (`r::CHEST_WAIT`). | own value (source not recorded) | `weights.rs` |
+| `FRONT` | `Neuron { name: "front", bias: -600, why: "a neighbour at peace with an army below ours...` | The front one rival makes on one own city before its army is in sight (`hold::rows`): the rival's inputs with R1 `near` read from this city (its nearest known city to this one, 1000 at 5 tiles, 0 at 15) and its concepts. | own value (source not recorded) | `weights.rs` |
+| `HOLD` | `Neuron { name: "hold", bias: -300, why: "an interior city at peace keeps the standing g...` | The hold of one own city (`Net2Plan::hold`): how many holders it keeps beyond the standing garrison (`gate::HOLD_ONE`, `HOLD_TWO`, `HOLD_THREE`). | own value (source not recorded) | `weights.rs` |
 | `OFFENCE` | `false` | The offence is off: `net2` plays as the addendum's control `net2-defence` (every `Offence` field and the `WarOrder` aim, opening and raid at their defaults). | own value (source not recorded) | `weights.rs` |
 | `OFFENCE_SEAT` | `[ declared("isolation", "unit(1000 − 1200·max reach − 600·max menace − 400·max(runaway·...` | The offence's seat concepts (addendum §3.1) not built yet: no terms, each fires 0; not in `neurons()` (`infamy_cost` is built: `SEAT`). | own value (source not recorded) | `weights.rs` |
 | `OFFENCE_RIVAL` | `[ declared("brake", "unit(−200 + 1200·runaway − 1000·spoiler): a runaway we cannot beat...` | The offence's rival (and pair) concepts (addendum §3.2): no terms yet, each fires 0; not in `neurons()`. | own value (source not recorded) | `weights.rs` |
@@ -2204,6 +2208,10 @@ Tuning numbers of the computer players (`classic/crates/classic-rules/src/ai`). 
 | `LADDER_ROUNDS` | `(5, "a tie at the gate asks no more often than any deal (`diplomacy::PROPOSAL_INTERVAL`...` | The rounds between two offers of a tie's ladder at the gate (`science::cadence`; 1 at a level of 1000). | own value (source not recorded) | `weights.rs` |
 | `CHEST_WAIT_ROUNDS` | `(20, "four proposal intervals: past them a partner's refusal is not its gold, which a f...` | The Standard rounds of an unsigned chest at which `r::CHEST_WAIT` is full (`science::read_waits`). | own value (source not recorded) | `weights.rs` |
 | `SCIENTIST_FOOD` | `(2, "two food a turn: the city still grows, slower, and never starves for a slot")` | Food a turn a city keeps when it takes a science specialist (`citizens::science_specialist_commands`). | own value (source not recorded) | `weights.rs` |
+| `HOLD_ONE` | `(500, "one more holder when the hold says so more likely than not")` | `layout-defence`: the hold level from which a city keeps one holder beyond the standing garrison (`weights::HOLD`). | own value (source not recorded) | `weights.rs` |
+| `STACK_WHOLE` | `(500, "a stack larger than our units where it stands is the war before its declaration:...` | `layout-defence`: the menace of a rival at peace from which the defence counts its army near our cities whole (`Hold::whole`, `defence::hostility`), not at a stranger's half. | own value (source not recorded) | `weights.rs` |
+| `HOLD_TWO` | `(850, "two more only on a clear front: the capital at war with a near land rival, or a...` | `layout-defence`: the hold level from which a city keeps two. | own value (source not recorded) | `weights.rs` |
+| `HOLD_THREE` | `(1000, "three more only at the top: a city in the watch on the front of a war (the trac...` | `layout-defence`: the hold level at which a city keeps three (the top of the level). | own value (source not recorded) | `weights.rs` |
 | `ESCORT_SHIPS` | `(2, "the landing needs ships that shell the coast (`fleet.rs` 1-10)")` | Ships escorting an `Overseas` order (`fleet::FLEET_SIZE`). | own value (source not recorded) | `weights.rs` |
 | `SPENT_ROUNDS` | `(20, "the war that did not pay ends, and is not restarted at once")` | Standard rounds after a war order spent its budget without paying before another order on that rival. | own value (source not recorded) | `weights.rs` |
 | `PREPARE_ROUNDS` | `(30, "the war machine's `FORM_LIMIT`: an army that has not marched by then does not")` | Standard rounds a war order may wait for its army at peace before it is spent. | own value (source not recorded) | `weights.rs` |
