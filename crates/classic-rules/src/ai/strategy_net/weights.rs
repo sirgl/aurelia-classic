@@ -1073,6 +1073,55 @@ pub mod effect {
     pub const UNKNOWN: i64 = 0;
 }
 
+// ---- the belief head (`beliefs`): how far a religion reaches and what its
+// numbers buy; measured on the standard suite at Quick (base ded99cb, 40
+// games, 123 religions founded of 200 seats) ----
+
+pub mod belief {
+    use super::super::Milli;
+    use crate::classic::effects::ReligionStat;
+
+    /// Percent of its own cities that follow a religion its founder holds: 4.9 of 5.9 at the end of the
+    /// measured games (83 %); the holy city's pressure turns the rest.
+    pub const OWN_SHARE: i64 = 83;
+    /// Foreign cities a religion's majority holds, on average over the rounds after its founding: about 4 at
+    /// the end (27 foreign followers at ~6 a city), grown from none.
+    pub const FOREIGN_CITIES: i64 = 2;
+    /// Followers of a following foreign city (27 foreign followers over ~4.5 cities).
+    pub const CITY_FOLLOWERS: i64 = 6;
+    /// Spreads a religion makes per foreign city it holds (a city turns after about two: the missionaries'
+    /// pressure against its own creed's).
+    pub const SPREADS_PER_CITY: i64 = 2;
+    /// Great people an empire expends over the game (its prophets, a few great works and academies).
+    pub const PEOPLE_EXPENDED: i64 = 4;
+    /// Foreign following cities a number of the religion adds per +100 % of it, thousandths of a city: the
+    /// pressure out of every city and its distance turn the neighbours' cities in reach (about one and a half,
+    /// one); the missionaries' strength the two missionaries the AI keeps out (`religion::MISSIONARIES_WANTED`)
+    /// each turn a second city; a prophet spreads rarely once the religion is enhanced; a friendly
+    /// city-state's pressure counts per city-state met, a tenth of one each (the AI is a friend or an ally of
+    /// about one in five it met, 0–1 allies a seat in the measured games, and half of those turn); the
+    /// erosion of other creeds as much as the pressure; the retention keeps as many own cities as it would win.
+    pub const SPREAD: [(ReligionStat, Milli); 7] = [
+        (ReligionStat::PressureOut, 1500),
+        (ReligionStat::SpreadDistance, 1000),
+        (ReligionStat::MissionaryStrength, 2000),
+        (ReligionStat::ProphetStrength, 300),
+        (ReligionStat::FriendlyCityStatePressure, 100),
+        (ReligionStat::OtherReligionErosion, 1500),
+        (ReligionStat::PressureRetention, 1000),
+    ];
+    /// Percent of the faith a turn that buys missionaries and inquisitors (`religion_fix`'s purchases, after
+    /// the founding) and that grows the next prophet: a cut of their price saves that share.
+    pub const MISSIONARY_FAITH: i64 = 50;
+    pub const PROPHET_FAITH: i64 = 30;
+    /// Percent of the rounds left a religion's effect gated on a technology not known yet holds (it comes
+    /// about halfway through what is left).
+    pub const LATER: i64 = 50;
+
+    /// The count of these weights (`weights::count`).
+    pub const COUNT: usize = 9 + SPREAD.len();
+}
+
 /// Every hand weight, counted: the concepts' and the intent's terms and
 /// biases, the price rows, the city and horizon rows, the classifier's and
 /// the heads' constants.
@@ -1087,5 +1136,5 @@ pub fn count() -> usize {
     // The lock (margin, two rounds, two survival bounds) and the branch fit.
     let lock = 5;
     let fit = branch::FIT.len() + 4;
-    neurons + PRICE_ROWS.len() + cities + horizon + goals + heads + classifier + cell + 2 + lock + fit
+    neurons + PRICE_ROWS.len() + cities + horizon + goals + heads + classifier + cell + 2 + lock + fit + belief::COUNT
 }

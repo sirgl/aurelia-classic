@@ -104,3 +104,37 @@ them off (`TurnBrief::science_flow`; the input is 0 and the memory writes no byt
 The chest is released by the net: `r::CHEST_WAIT` (the rounds the chest held a partner's gold unsigned, over
 `gate::CHEST_WAIT_ROUNDS`) lowers `AGREEMENT` until the rival is no tie. The look, the measurements and the gates are in
 `work/nets/science-flow/SCIENCE-FLOW.md`.
+
+## The beliefs by their effects (part `beliefs`, 23 November)
+
+Before, the religion's founder, follower and enhancer beliefs came from three fixed lists of content keys
+(`ai::belief_lists`, now frozen for the seats without the part) and the reformation belief was the first free one of
+the table. The lists' first follower beliefs only let the cities buy a building with faith, which no executor does (the
+faith buys missionaries and inquisitors only): in 12 traced games every religion took one of them.
+
+The belief head (`strategy_net::beliefs`) values every free belief by its declared effects at the strategy plan's
+prices, as the policy head values a policy: the effects on following cities as the cell's run and the classifier's
+value in our cities (our following cities are our cities, the holy city the capital, a gate on followers a gate on
+citizens), times the share of our cities that follow; the founder's per following city and per follower by the
+religion's reach (ours now, abroad as the rivals' religions reach, at least the priors); a number of the religion by
+the foreign cities it adds at what one pays us; items for faith by what the executors buy. The weights and their
+reasons are `strategy_net::weights::belief` (measured on 40 standard-suite games of the base: 83 % of a founder's own
+cities follow, ~27 foreign followers in ~4.5 foreign cities at the end). `net2-no-beliefs` plays the lists.
+
+Measured (`work/nets/beliefs/GATES.md`): 400 Quick pace games, offsets 3910-3911, `standard` against
+`net2-no-beliefs` (hash = the base `standard`'s ded99cb94d6e55fc): victory-weighted share 48.8 % (52.0 / 45.7), real
+victories 129 / 138; religions founded 61 % / 60 % of the seats, faith a turn at the end 18.3 / 16.1, followers of a
+religion 147 / 160; AI ms p50 1.00×. Hashes then: `standard` d81486aa82df06e7, `pre-net2` 380c45a20e751d31.
+
+A guard (`tests/ai_content_names.rs`) fails when a content key or a content's display name is written in the AI's
+code outside the scripted probes and the frozen lists.
+
+## The ideology by its tenets (part `ideology`, 23 November)
+
+The policy head took the ideology the rules' roles name for the plan (`roles.ai_ideologies`: Order wide, Autocracy at
+war, Freedom at peace) and valued the tenets only when that one was not offered. With the part `ideology` it takes the
+ideology whose tenets are worth most at the plan's prices (`Culture::by_tenets`); `net2-no-ideology` plays the named
+one. In 12 traced Quick pace games the two disagree in 48 of 72 choices (the roles' Freedom against the tenets' Order
+25 times, Autocracy 18). 400 Quick pace games, offsets 3920-3921, `standard` against `net2-no-ideology` (= the
+beliefs build's `standard`): victory-weighted share 54.7 % (55.3 / 54.1), real victories 154 / 123. Hash `standard`
+cf535f70eb6b37bf; `net2-no-ideology` d81486aa82df06e7.

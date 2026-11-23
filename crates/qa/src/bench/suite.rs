@@ -27,6 +27,9 @@ pub struct Suite {
     pub speed: String,
 }
 
+/// The early stage the tournament report adds to every suite (`Suite::with_stage`).
+pub const FLOW_STAGE: u32 = 40;
+
 /// Seeds of an independent suite of the same shape are `SEED_STRIDE`
 /// apart (`--seed-offset`).
 pub const SEED_STRIDE: u64 = 1000;
@@ -103,6 +106,17 @@ impl Suite {
         self.rounds = speed.game_round(self.rounds);
         for c in &mut self.checkpoints {
             *c = speed.game_round(*c);
+        }
+        self
+    }
+
+    /// The suite with one more checkpoint at `round` (the bench's early
+    /// stage of the flows; its own round, not moved by the speed), when
+    /// the suite runs past it and has none there.
+    pub fn with_stage(mut self, round: u32) -> Self {
+        if round < self.rounds && !self.checkpoints.contains(&round) {
+            self.checkpoints.push(round);
+            self.checkpoints.sort_unstable();
         }
         self
     }
@@ -188,5 +202,19 @@ pub struct Match {
 impl Match {
     pub fn label(&self) -> String {
         format!("{}/{}/seed {}/{}", self.map.script, self.map.size, self.seed, self.seating.name())
+    }
+}
+
+#[cfg(test)]
+mod stage_tests {
+    use super::*;
+
+    #[test]
+    fn the_early_stage_joins_the_checkpoints_once() {
+        let suite = Suite::named("standard").unwrap().with_stage(FLOW_STAGE);
+        assert_eq!(suite.checkpoints, [40, 100, 200]);
+        assert_eq!(suite.clone().with_stage(FLOW_STAGE).checkpoints, [40, 100, 200]);
+        assert_eq!(Suite::named("smoke").unwrap().with_stage(FLOW_STAGE).checkpoints, [35, 40]);
+        assert_eq!(Suite::named("smoke").unwrap().with_stage(70).checkpoints, [35], "a stage at the last round adds nothing");
     }
 }

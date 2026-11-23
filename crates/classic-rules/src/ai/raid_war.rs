@@ -58,7 +58,7 @@ fn city_covered(view: &UnitView<'_, '_>, state: &AiState, city: crate::ids::Tile
         return false;
     }
     let me = view.local.unit.id;
-    let target = crate::ai::planner_units::garrison_wanted_by(view.brief, state.strategy.current).max(1);
+    let target = crate::ai::planner_units::garrison_wanted_at(view.brief, state.strategy.current, city).max(1);
     let rules = view.local.view.rules();
     view.local.own_units.iter().filter(|u| u.id != me && u.tile == city && role_of(rules, u.kind) == AiRole::Military).count() >= target
 }

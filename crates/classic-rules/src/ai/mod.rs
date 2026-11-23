@@ -44,6 +44,7 @@ pub mod air;
 pub mod allocator;
 pub mod army_fit;
 pub mod barbarians;
+pub mod belief_lists;
 pub mod books;
 pub mod battlefield;
 pub mod camps;

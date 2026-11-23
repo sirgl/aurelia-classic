@@ -144,13 +144,23 @@ fn effects_of(set: &EffectSet) -> impl Iterator<Item = &CompiledEffect> {
 /// Every static condition of the rules' buildings, policies and
 /// technologies (the conditions the cell may meet), in rules order.
 pub fn static_conditions(rules: &CompiledRuleset) -> Vec<Condition> {
-    let mut out: Vec<Condition> = Vec::new();
     let sets = rules
         .buildings
         .iter()
         .map(|b| &b.effects)
         .chain(rules.module.policies.iter().map(|p| &p.effects))
         .chain(rules.technologies.iter().map(|t| &t.effects));
+    conditions_of(sets, Vec::new())
+}
+
+/// `static_conditions` and then the beliefs' (the belief head's model: the
+/// others keep their bits).
+pub fn belief_conditions(rules: &CompiledRuleset) -> Vec<Condition> {
+    conditions_of(rules.module.beliefs.iter().map(|b| &b.effects), static_conditions(rules))
+}
+
+/// `out` and the static conditions of `sets` it lacks, up to `MAX_CONDITIONS`.
+fn conditions_of<'a>(sets: impl Iterator<Item = &'a EffectSet>, mut out: Vec<Condition>) -> Vec<Condition> {
     for set in sets {
         for e in effects_of(set) {
             for c in [e.condition, e.second_condition] {
@@ -168,7 +178,12 @@ impl Model {
     /// the work radius that are known and ours or nobody's.
     #[allow(clippy::too_many_arguments)]
     pub fn build(facts: &impl TileFacts, rules: &CompiledRuleset, player: PlayerId, nation: u8, techs: &[TechId], seeds: &[CitySeed], empire: Empire) -> Model {
-        let conditions = static_conditions(rules);
+        Self::build_with(facts, rules, player, nation, techs, seeds, empire, static_conditions(rules))
+    }
+
+    /// `build` with the static conditions `conditions` (`belief_conditions` for the belief head).
+    #[allow(clippy::too_many_arguments)]
+    pub fn build_with(facts: &impl TileFacts, rules: &CompiledRuleset, player: PlayerId, nation: u8, techs: &[TechId], seeds: &[CitySeed], empire: Empire, conditions: Vec<Condition>) -> Model {
         let set = TechSet::of(techs);
         let dims = facts.dimensions();
         let mut cities = Vec::new();
@@ -259,6 +274,15 @@ impl Model {
 
     /// The model of the observed empire.
     pub fn of_observation(obs: &AIObservation<'_>, rules: &CompiledRuleset) -> Model {
+        Self::of_observation_with(obs, rules, static_conditions(rules))
+    }
+
+    /// The model of the observed empire whose tiles also know the beliefs' conditions (the belief head).
+    pub fn of_observation_for_beliefs(obs: &AIObservation<'_>, rules: &CompiledRuleset) -> Model {
+        Self::of_observation_with(obs, rules, belief_conditions(rules))
+    }
+
+    fn of_observation_with(obs: &AIObservation<'_>, rules: &CompiledRuleset, conditions: Vec<Condition>) -> Model {
         let capital = obs.view.own_capital();
         let seeds: Vec<CitySeed> = obs
             .own_cities
@@ -298,7 +322,7 @@ impl Model {
             rival_eras: obs.view.met_eras().iter().map(|(_, e)| usize::from(*e)).collect(),
             city_states: obs.city_states.len() as i64,
         };
-        Model::build(&obs.view, rules, obs.player, obs.economy.nation, &obs.economy.techs, &seeds, empire)
+        Model::build_with(&obs.view, rules, obs.player, obs.economy.nation, &obs.economy.techs, &seeds, empire, conditions)
     }
 
     /// The capital's index (else the first city's).

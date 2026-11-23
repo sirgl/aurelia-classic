@@ -525,8 +525,8 @@ fn recall_saving(brief: &TurnBrief, state: &AiState, rules: &CompiledRuleset, pr
 /// back and forth.
 fn release(brief: &TurnBrief, state: &mut AiState, rules: &CompiledRuleset, prices: &Prices, stakes: &Stakes, watch: &mut Watch) {
     let Some(target) = operations::assault_target(state) else { return };
-    let standing = crate::ai::planner_units::garrison_wanted_by(brief, state.strategy.current).max(1);
     for danger in &mut watch.dangers {
+        let standing = crate::ai::planner_units::garrison_wanted_at(brief, state.strategy.current, danger.city).max(1);
         let mut guards: Vec<&UnitBrief> = brief
             .units
             .iter()

@@ -84,7 +84,7 @@ fn free_for_retake(brief: &TurnBrief, state: &AiState, unit: EntityId, lost: &[T
 
 /// The city has more guards on its defence than it wants.
 fn surplus_guard(brief: &TurnBrief, state: &AiState, city: TileId) -> bool {
-    state.tasks().iter().filter(|t| t.task == UnitTask::Defend { city }).count() > crate::ai::planner_units::garrison_wanted_by(brief, state.strategy.current).max(1)
+    state.tasks().iter().filter(|t| t.task == UnitTask::Defend { city }).count() > crate::ai::planner_units::garrison_wanted_at(brief, state.strategy.current, city).max(1)
 }
 
 /// The chance of the threat to take the city (`defence::chance`, per mille) from which a surplus guard stays on it:

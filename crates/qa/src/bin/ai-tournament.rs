@@ -176,6 +176,7 @@ fn run<R: BenchRules>(options: &Options) -> Result<(), String> {
             suite.at_speed(&def.key, &def.values)
         }
     };
+    let suite = suite.with_stage(aurelia_qa::bench::suite::FLOW_STAGE);
     let game_ai = R::variants()[0];
     let side = |name: &Option<String>| name.as_deref().unwrap_or(game_ai).to_owned();
     let pairing = Pairing { baseline: side(&options.baseline), candidate: side(&options.candidate), landless_seat: options.landless_seat };
