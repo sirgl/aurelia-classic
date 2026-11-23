@@ -16,6 +16,7 @@
 //! units that fight.
 
 pub mod act;
+pub mod assault;
 pub mod families;
 pub mod lab;
 pub mod suite;
@@ -86,6 +87,8 @@ pub struct Scene {
     pub hold_lost: Option<u32>,
     pub first_kill: Option<u32>,
     pub kills_by: BTreeMap<u32, u32>,
+    /// What the assault families keep between rounds (damage, resting, promotions seen).
+    pub track: assault::Track,
 }
 
 impl Scene {
@@ -210,6 +213,10 @@ pub fn play(rules: &CompiledRuleset, mut game: GameState, mut scene: Scene, play
     if scene.hunt {
         hunt(&mut driver, &game, &scene);
     }
+    {
+        let l = scene.learner;
+        assault::sample(rules, &game, &mut scene, l);
+    }
     let mut rows_trace = Vec::new();
     if trace {
         rows_trace.push(families::line(rules, &game, &scene, 0));
@@ -224,12 +231,17 @@ pub fn play(rules: &CompiledRuleset, mut game: GameState, mut scene: Scene, play
         loop {
             let now = game.view().auth.turn().round;
             let active = game.view().auth.active_player();
+            assault::keep_war(rules, &mut game, &scene);
             if active == scene.learner && scripted_mine != Some(now) && !game.is_over() {
                 scripted_mine = Some(now);
                 match &seat {
                     Seat::Mind(_) => {}
                     Seat::Script(name) => {
                         families::reference_turn(rules, &mut game, &mut scene, name);
+                        {
+        let l = scene.learner;
+        assault::sample(rules, &game, &mut scene, l);
+    }
                     }
                     Seat::Passive => {
                         act::passive_turn(&mut game, rules, scene.learner, &scene.mine);
@@ -243,7 +255,9 @@ pub fn play(rules: &CompiledRuleset, mut game: GameState, mut scene: Scene, play
                 scripted_theirs = Some(now);
                 families::enemy_turn(rules, &mut game, &mut scene);
             }
-            match driver.step(&mut game, rules) {
+            let stepped = driver.step(&mut game, rules);
+            assault::sample(rules, &game, &mut scene, active);
+            match stepped {
                 kernel::ai::StepOutcome::Worked | kernel::ai::StepOutcome::PlayerDone(_) => {}
                 kernel::ai::StepOutcome::RoundDone => break,
                 kernel::ai::StepOutcome::Waiting if game.is_over() => break,
@@ -262,6 +276,9 @@ pub fn play(rules: &CompiledRuleset, mut game: GameState, mut scene: Scene, play
     }
     let rel = game.view().auth.turn().round.saturating_sub(round0);
     let win = verdict.unwrap_or(false);
+    if assault::is_assault(scene.fam) {
+        scene.info.insert("picks".into(), scene.track.picks.join("; "));
+    }
     let measures = families::measures(rules, &game, &scene, rel);
     Ok(Row { family: scene.fam.name().to_owned(), era: lab::era_names(rules).get(scene.era as usize).cloned().unwrap_or_default(), instance: scene.instance, attempt: scene.attempt, player: player.to_owned(), win, rounds: rel, measures, info: scene.info.clone(), trace: rows_trace })
 }
