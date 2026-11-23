@@ -322,12 +322,16 @@ fn probe_with(rules: &CompiledRuleset, game: &GameState, scene: &Scene, expert: 
         if !first_of_turn {
             return;
         }
+        let from = super::record::recorded();
         super::record::teach();
         super::observe::pause_history(true);
         families::reference_turn(rules, &mut copy, &mut sc, expert);
         super::observe::pause_history(false);
         super::record::push_end(&copy, rules);
         super::record::mute();
+        if truncate_on() {
+            TURN_LABELS.with(|t| *t.borrow_mut() = Some((from, super::record::labels_from(from), 0)));
+        }
         EXPERT_TRACK.with(|t| *t.borrow_mut() = Some(sc.track));
         return;
     }
@@ -379,6 +383,35 @@ fn beta_turn(game: &GameState, scene: &Scene) -> bool {
     }
     let h = crate::trainers::lab::mix((scene.instance as u64) << 20 ^ u64::from(game.view().auth.turn().round) << 4 ^ scene.fam as u64 ^ u64::from(scene.era) << 40);
     (h % 10_000) as f64 / 10_000.0 < beta
+}
+
+thread_local! {
+    /// The probed turn's labels (ARMY_DAGGER_TRUNCATE=1): where they start in the record, (pointer, action) each,
+    /// and how many of them the net has followed so far.
+    static TURN_LABELS: std::cell::RefCell<Option<(usize, Vec<(i16, i16)>, usize)>> = const { std::cell::RefCell::new(None) };
+}
+
+/// Labels only up to the first divergence (the coordinator's fix (1)): the expert's labels describe its own turn's
+/// states; once the net chose otherwise, the later ones are of states the net is not in, and are dropped.
+fn truncate_on() -> bool {
+    static ON: OnceLock<bool> = OnceLock::new();
+    *ON.get_or_init(|| std::env::var_os("ARMY_DAGGER_TRUNCATE").is_some())
+}
+
+/// The net chose (pointer, action) at its k-th decision of the turn: keep the labels while it follows the expert.
+fn follow(pointer: i16, action: i16) {
+    TURN_LABELS.with(|t| {
+        let mut t = t.borrow_mut();
+        let Some((from, labels, k)) = t.as_mut() else { return };
+        let same = labels.get(*k).is_some_and(|l| *l == (pointer, action));
+        if same {
+            *k += 1;
+        } else {
+            // The label of this moment stays (its state is the net's); the rest goes.
+            super::record::truncate(*from + *k + 1);
+            *t = None;
+        }
+    });
 }
 
 fn no_reconcile() -> bool {
@@ -493,6 +526,7 @@ pub fn turn(rules: &CompiledRuleset, game: &mut GameState, orders: &Orders, scen
         let Some((at, best)) = pick else { break };
         if end >= best {
             timing.decisions += 1;
+            follow(-1, -1);
             break;
         }
         let Some(unit) = tokens.unit[at] else { break };
@@ -512,7 +546,9 @@ pub fn turn(rules: &CompiledRuleset, game: &mut GameState, orders: &Orders, scen
         let mut order: Vec<usize> = (0..candidates.len()).collect();
         order.sort_by(|a, b| scores[*b].total_cmp(&scores[*a]).then(a.cmp(b)));
         let mut acted = false;
+        let mut chosen = -1i16;
         for i in order {
+            chosen = i as i16;
             match &candidates[i].action {
                 Action::Done => {
                     act::stand(game, rules, unit);
@@ -527,7 +563,9 @@ pub fn turn(rules: &CompiledRuleset, game: &mut GameState, orders: &Orders, scen
         if !acted {
             act::stand(game, rules, unit);
         }
+        follow(at as i16, if acted { chosen } else { 0 });
     }
+    TURN_LABELS.with(|t| *t.borrow_mut() = None);
     if map.is_some() {
         MEMORY.with(|m| {
             if let Some(run) = m.borrow_mut().as_mut() {

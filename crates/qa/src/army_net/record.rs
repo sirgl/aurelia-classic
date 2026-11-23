@@ -149,6 +149,21 @@ pub fn slots_of(game: &GameState, orders: &Orders, tokens: &Tokens) -> Vec<i16> 
         .collect()
 }
 
+/// The number of decisions recorded so far in this play.
+pub fn recorded() -> usize {
+    with(|r| r.decisions.len()).unwrap_or(0)
+}
+
+/// The labels (pointer, action) of the decisions recorded from `from` on.
+pub fn labels_from(from: usize) -> Vec<(i16, i16)> {
+    with(|r| r.decisions.iter().skip(from).map(|d| (d.pointer, d.action)).collect()).unwrap_or_default()
+}
+
+/// Drops the decisions recorded from `n` on (DAgger: the labels after the net left the expert's turn).
+pub fn truncate(n: usize) {
+    with(|r| r.decisions.truncate(n));
+}
+
 /// The net plays the seat: its commands are not recorded (DAgger).
 pub fn mute() {
     with(|r| r.mode = Mode::Muted);
