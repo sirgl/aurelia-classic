@@ -77,6 +77,10 @@ struct Options {
     /// The speed's pace percent (Standard 100).
     pace: u32,
     ideal: bool,
+    /// `--trace FILE`: one JSON line per living seat every `trace_every` rounds and one per game at its end
+    /// (`trace_line`, `trace_end`); the science flow's look (work/nets/science-flow).
+    trace: Option<String>,
+    trace_every: u32,
 }
 
 impl Options {
@@ -105,6 +109,8 @@ fn options() -> Result<Options, String> {
         speed: String::new(),
         pace: 100,
         ideal: false,
+        trace: None,
+        trace_every: 10,
     };
     let mut rounds_given = false;
     let mut args = std::env::args().skip(1);
@@ -121,6 +127,8 @@ fn options() -> Result<Options, String> {
             }
             "--speed" => options.speed = value()?,
             "--ideal" => options.ideal = true,
+            "--trace" => options.trace = Some(value()?),
+            "--trace-every" => options.trace_every = value()?.parse().map_err(|e| format!("--trace-every: {e}"))?,
             "--seeds" => {
                 let text = value()?;
                 options.seeds = match text.split_once("..") {
@@ -239,6 +247,8 @@ struct GameResult {
     /// explored share of the map (per mille), majors met, city-states met,
     /// ruins claimed, the round of its first recon unit (0: none yet).
     opening: Vec<[u32; 5]>,
+    /// `--trace`'s lines of the game.
+    trace: Vec<String>,
 }
 
 /// The opening's checkpoint, a Standard round (scaled by the speed).
@@ -270,6 +280,10 @@ fn main() {
         }
     });
     let results: Vec<GameResult> = results.into_inner().expect("no thread panicked").into_iter().map(|r| r.expect("every game played")).collect();
+    if let Some(path) = &options.trace {
+        let lines: Vec<&str> = results.iter().flat_map(|g| g.trace.iter().map(String::as_str)).collect();
+        std::fs::write(path, lines.join("\n") + "\n").expect("the trace file is writable");
+    }
     let rules = ClassicBench::rules();
     print!("{}", report(&rules, &options, &results));
 }
@@ -415,6 +429,8 @@ fn play(rules: &CompiledRuleset, options: &Options, script: &'static str, seed: 
     let checkpoints_at = options.checkpoints();
     let mut shared_land = false;
     let mut opening = vec![[0u32; 5]; seats.len()];
+    let mut trace = Vec::new();
+    let mut adopted: Vec<Vec<(u16, u32)>> = vec![Vec::new(); seats.len()];
     let mut ruins = vec![0u32; seats.len()];
     let recon = |kind: classic_rules::ids::UnitKindId| rules.units.get(kind.0 as usize).and_then(|d| d.role) == Some(classic_rules::rules::content::UnitRole::Recon);
     while !game.is_over() && round(&game) <= options.rounds {
@@ -480,6 +496,22 @@ fn play(rules: &CompiledRuleset, options: &Options, script: &'static str, seed: 
                 }
             }
         }
+        if options.trace.is_some() {
+            for (index, player) in seats.iter().enumerate() {
+                for policy in &auth.module().culture().of(*player).policies {
+                    if !adopted[index].iter().any(|(p, _)| *p == policy.0) {
+                        adopted[index].push((policy.0, now));
+                    }
+                }
+            }
+            if now % options.trace_every == 0 {
+                for player in &seats {
+                    if auth.players().is_alive(*player) {
+                        trace.push(trace_line(&game, rules, script, seed, *player, now, &buildings));
+                    }
+                }
+            }
+        }
         if checkpoints_at.contains(&now) {
             for (index, player) in seats.iter().enumerate() {
                 checkpoints[index].insert(now, seat_at(&game, rules, *player, &buildings, &space));
@@ -493,6 +525,9 @@ fn play(rules: &CompiledRuleset, options: &Options, script: &'static str, seed: 
         }
     }
     let outcome = game.outcome().map(|o| (o.winner, victory_name(o.kind), o.round));
+    if options.trace.is_some() {
+        trace.push(trace_end(&game, rules, script, seed, &seats, outcome, &space_round, &unlocked, &adopted, &scientists));
+    }
     GameResult {
         seed,
         seats: seats.iter().enumerate().map(|(i, p)| (*p, checkpoints[i].clone(), unlocked[i].clone(), scientists[i])).collect(),
@@ -500,6 +535,7 @@ fn play(rules: &CompiledRuleset, options: &Options, script: &'static str, seed: 
         space_round,
         shared_land,
         opening,
+        trace,
     }
 }
 
@@ -788,4 +824,146 @@ fn report(rules: &CompiledRuleset, options: &Options, results: &[GameResult]) ->
     let academies: u32 = all.iter().map(|s| s.academies).sum();
     let _ = writeln!(out, "\n### Great scientists\n\n{} seats: {bulbs} used for a technology, {academies} for their improvement ({:.2} and {:.2} a seat).", all.len(), f64::from(bulbs) / all.len().max(1) as f64, f64::from(academies) / all.len().max(1) as f64);
     out
+}
+
+/// `--trace`: a living seat now (whole beakers a turn by source as `seat_at` splits them; the citizens,
+/// specialists by kind and their slots, the food surplus, the science buildings built, the research agreements).
+fn trace_line(game: &GameState<Classic>, rules: &CompiledRuleset, script: &str, seed: u64, player: PlayerId, now: u32, buildings: &[BuildingKindId]) -> String {
+    use classic_rules::derived::income::city_income;
+    let auth = game.view().auth;
+    let at = seat_at(game, rules, player, buildings, &[]);
+    let techs = auth.players().techs_of(player);
+    let era = classic_rules::ai::strategy_net::features::era_of(rules, techs);
+    let (mut food, mut specialists, mut slots, mut unemployed) = (0i64, vec![0u32; rules.specialists.len()], vec![0u32; rules.specialists.len()], 0u32);
+    let (mut biggest, mut capital_pop) = (0u32, 0u32);
+    for handle in auth.indexes().cities_of(player) {
+        let Some(core) = auth.cities().get(*handle) else { continue };
+        food += i64::from(city_income(auth, rules, core).food_surplus);
+        biggest = biggest.max(core.population);
+        if auth.indexes().cities_of(player).first() == Some(handle) {
+            capital_pop = core.population;
+        }
+        let work = kernel::derived::yields::city_work(auth, rules, core);
+        let free = kernel::derived::citizens::specialist_slots(rules, core);
+        for (k, n) in work.specialists.iter().enumerate() {
+            if let Some(x) = specialists.get_mut(k) {
+                *x += u32::from(*n);
+            }
+            if let Some(x) = slots.get_mut(k) {
+                *x += u32::from(free[k]);
+            }
+        }
+        let worked = work.worked().len() as u32 + work.specialists.iter().map(|n| u32::from(*n)).sum::<u32>();
+        unemployed += core.population.saturating_sub(worked);
+    }
+    let relations = auth.module().relations();
+    let agreements = (0..auth.players().count() as u8).filter(|q| *q != player.0 && relations.has_research_agreement(player, PlayerId(*q), now)).count();
+    // The diplomacy an agreement needs: met majors alive, at war, both embassies, friends.
+    let k = &auth.knowledge()[player.0 as usize];
+    let (mut met, mut war, mut embassies, mut friends) = (0u32, 0u32, 0u32, 0u32);
+    // Friends without an agreement: [no technology, our gold short, theirs short, neither: the AI's choice].
+    let mut blocked = [0u32; 4];
+    for q in 0..auth.players().count() as u8 {
+        let q = PlayerId(q);
+        if q == player || !auth.players().is_alive(q) || auth.players().is_city_state(q) || k.contact(q).met_round.is_none() {
+            continue;
+        }
+        if auth.players().kind_of(q) != kernel::world::player::PlayerKind::Major {
+            continue;
+        }
+        met += 1;
+        war += u32::from(auth.diplomacy().at_war(player, q));
+        embassies += u32::from(relations.has_embassy(player, q) && relations.has_embassy(q, player));
+        friends += u32::from(relations.are_friends(player, q, now));
+        // A friend without an agreement: what the rules say blocks one (`deals::item_problem`'s order), else the AI's choice.
+        if relations.are_friends(player, q, now) && !relations.has_research_agreement(player, q, now) {
+            let era = |p| classic_rules::combat::city::current_era(auth, rules, p).map_or(0, |e| e.research_agreement_cost);
+            let cost = kernel::rules::speeds::SpeedValues::scale(era(player).max(era(q)), auth.settings().speed(rules).gold_percent);
+            let tech = rules.technologies.iter().any(|t| t.allows_research_agreement);
+            let knows = |p: PlayerId| auth.players().techs_of(p).iter().any(|t| rules.technologies.get(t.0 as usize).is_some_and(|d| d.allows_research_agreement));
+            if tech && !knows(player) && !knows(q) {
+                blocked[0] += 1;
+            } else if auth.players().treasury_of(player) < cost {
+                blocked[1] += 1;
+            } else if auth.players().treasury_of(q) < cost {
+                blocked[2] += 1;
+            } else {
+                blocked[3] += 1;
+            }
+        }
+    }
+    let treasury = auth.players().treasury_of(player);
+    let gold = classic_rules::derived::income::player_income(auth, rules, player).gold;
+    let s = at.sources;
+    let built: Vec<String> = at.buildings.iter().filter(|(_, c)| c.built > 0 || c.open > 0).map(|(k, c)| format!("\"{}\":[{},{}]", rules.buildings[*k as usize].key, c.built, c.open)).collect();
+    let spec: Vec<String> = rules.specialists.iter().enumerate().map(|(k, d)| format!("\"{}\":[{},{}]", d.key, specialists[k], slots[k])).collect();
+    let r = at.routes;
+    format!(
+        "{{\"g\":\"{script}/{seed}\",\"p\":{},\"r\":{now},\"era\":{era},\"techs\":{},\"cities\":{},\"pop\":{},\"big\":{biggest},\"cap\":{capital_pop},\"food\":{food},\"excess\":{},\"sci\":{},\"src\":[{},{},{},{},{},{},{}],\"spec\":{{{}}},\"idle\":{unemployed},\"bld\":{{{}}},\"ra\":{agreements},\"met\":{met},\"war\":{war},\"emb\":{embassies},\"friends\":{friends},\"ra_block\":[{},{},{},{}],\"treasury\":{treasury},\"gold\":{gold},\"routes\":[{},{},{},{},{}],\"route_sci\":{},\"route_food\":{},\"pol\":{}}}",
+        player.0,
+        at.techs,
+        at.cities,
+        at.citizens,
+        at.excess,
+        s.total,
+        s.citizens,
+        s.tiles,
+        s.specialists,
+        s.city_effects,
+        s.trade,
+        s.process,
+        s.empire,
+        spec.join(","),
+        built.join(","),
+        blocked[0],
+        blocked[1],
+        blocked[2],
+        blocked[3],
+        r.internal_land,
+        r.internal_sea,
+        r.international_land,
+        r.international_sea,
+        r.to_city_states,
+        r.science,
+        r.food,
+        auth.module().culture().of(player).policies.len(),
+    )
+}
+
+/// `--trace`: the game's end (the outcome, the round each seat knew the spaceship's technologies, the branches and
+/// the policies with the round adopted, the great scientists' bulbs and academies).
+#[allow(clippy::too_many_arguments)]
+fn trace_end(
+    game: &GameState<Classic>,
+    rules: &CompiledRuleset,
+    script: &str,
+    seed: u64,
+    seats: &[PlayerId],
+    outcome: Option<(PlayerId, &'static str, u32)>,
+    space_round: &[Option<u32>],
+    unlocked: &[Vec<(u16, u32)>],
+    adopted: &[Vec<(u16, u32)>],
+    scientists: &[Scientists],
+) -> String {
+    let auth = game.view().auth;
+    let out = outcome.map_or("null".to_string(), |(w, k, r)| format!("[{},\"{k}\",{r}]", w.0));
+    let seat: Vec<String> = seats
+        .iter()
+        .enumerate()
+        .map(|(i, p)| {
+            let branches: Vec<String> = unlocked[i].iter().map(|(b, r)| format!("[\"{}\",{r}]", rules.module.policy_branches[*b as usize].key)).collect();
+            let policies: Vec<String> = adopted[i].iter().map(|(b, r)| format!("[\"{}\",{r}]", rules.module.policies[*b as usize].key)).collect();
+            format!(
+                "{{\"p\":{},\"nation\":{},\"space\":{},\"branches\":[{}],\"policies\":[{}],\"bulbs\":{},\"academies\":{}}}",
+                p.0,
+                auth.players().nation_of(*p),
+                space_round[i].map_or("null".to_string(), |r| r.to_string()),
+                branches.join(","),
+                policies.join(","),
+                scientists[i].bulbs,
+                scientists[i].academies
+            )
+        })
+        .collect();
+    format!("{{\"g\":\"{script}/{seed}\",\"end\":{},\"outcome\":{out},\"seats\":[{}]}}", round(game), seat.join(","))
 }

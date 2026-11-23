@@ -28,6 +28,11 @@ pub struct ScienceSummary {
     pub victories: Vec<(u32, BlockEstimate)>,
     /// The round of the side's science victories, and the earliest.
     pub victory_round: BlockEstimate,
+    /// The median round of the side's science victories (the middle two's mean), and their count.
+    #[serde(default)]
+    pub median_round: Option<f64>,
+    #[serde(default)]
+    pub won: u32,
     pub earliest: Option<u32>,
     /// Per checkpoint (then the end): technologies and science a turn, the
     /// side's seats' mean and each game's best seat of the side.
@@ -118,9 +123,13 @@ impl ScienceSummary {
             let done = r.space_parts > 0 && seats.clone().any(|s| s.pace.parts.len() as u32 >= r.space_parts);
             complete.add(r.seed, f64::from(u8::from(done)));
         }
+        let mut rounds: Vec<u32> = games.iter().filter_map(|r| won(r)).collect();
+        rounds.sort_unstable();
         Self {
             victories,
             victory_round: victory_round.estimate(),
+            median_round: median(&rounds),
+            won: rounds.len() as u32,
             earliest: games.iter().filter_map(|r| won(r)).min(),
             progress,
             project: project.estimate(),
@@ -141,9 +150,11 @@ impl ScienceSummary {
         let earliest = self.earliest.map_or_else(|| "—".to_owned(), |r| r.to_string());
         let _ = writeln!(
             out,
-            "{variant}: science victories {}; their round {} (earliest {earliest})\n",
+            "{variant}: science victories {}; their round {} (earliest {earliest}; {} victories, median round {})\n",
             by.join(", "),
-            interval(&self.victory_round)
+            interval(&self.victory_round),
+            self.won,
+            self.median_round.map_or_else(|| "—".to_owned(), |m| format!("{m:.1}"))
         );
         let _ = writeln!(out, "| {variant}: science | techs (mean) | techs (best seat) | science a turn (mean) | science a turn (best seat) |");
         let _ = writeln!(out, "|---|---:|---:|---:|---:|");
@@ -264,5 +275,15 @@ mod tests {
         let by: Vec<(u32, f64)> = b.victories.iter().map(|(r, e)| (*r, e.mean)).collect();
         assert_eq!(by, vec![(300, 0.0), (320, 0.0)]);
         assert_eq!(b.earliest, Some(450));
+    }
+}
+
+/// The median of sorted rounds (the mean of the middle two of an even count); none of none.
+fn median(sorted: &[u32]) -> Option<f64> {
+    let n = sorted.len();
+    match n {
+        0 => None,
+        _ if n % 2 == 1 => Some(f64::from(sorted[n / 2])),
+        _ => Some((f64::from(sorted[n / 2 - 1]) + f64::from(sorted[n / 2])) / 2.0),
     }
 }
