@@ -119,7 +119,11 @@ pub fn followers(faith: &CityFaith, population: u32) -> Vec<(Creed, u32)> {
 /// logic/city/managers/CityReligionManager.kt (`getMajorityReligionName`:
 /// followers >= population / 2 in integers); equal.
 pub fn majority(faith: &CityFaith, population: u32) -> Option<Creed> {
-    let counts = followers(faith, population);
+    majority_of(followers(faith, population), faith)
+}
+
+/// `majority` of a city whose `followers` are at hand.
+fn majority_of(counts: Vec<(Creed, u32)>, faith: &CityFaith) -> Option<Creed> {
     let total: u32 = counts.iter().map(|c| c.1).sum();
     let mut best: Option<(Creed, u32, u32)> = None;
     for (creed, n) in counts {
@@ -209,7 +213,7 @@ pub fn compute_religion_counts(auth: &AuthWorld, religion: ReligionId) -> Follow
         if foreign {
             out.foreign_followers += n;
         }
-        if majority(faith, core.population) == Some(creed) {
+        if majority_of(counts, faith) == Some(creed) {
             out.cities += 1;
             if foreign {
                 out.foreign_cities += 1;

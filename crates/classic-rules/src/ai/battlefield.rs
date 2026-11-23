@@ -290,12 +290,7 @@ impl<'v, 'a> Battlefield<'v, 'a> {
         let near = |t: &Target| centres.iter().filter_map(|c| dims.distance(*c, t.tile)).min().unwrap_or(i32::MAX);
         targets.sort_by_key(|t| (near(t), !t.is_city(), t.tile));
         targets.truncate(MAX_TARGETS);
-        let mut tiles = BTreeMap::new();
-        for centre in centres {
-            for tile in crate::math::hex_disc(dims, *centre, radius) {
-                tiles.entry(tile).or_insert_with(|| tile_info(view, rules, tile, own_cities));
-            }
-        }
+        let tiles = theatre_tiles(view, rules, dims, centres, radius, own_cities);
         let mut field = Self { view, rules, dims, player: view.player(), round, targets, tiles, reach: Vec::new(), prior_blow: 0 };
         field.reach = (0..field.targets.len()).map(|i| field.flood(i)).collect();
         field.prior_blow = prior.unwrap_or(0);
@@ -453,38 +448,111 @@ impl<'v, 'a> Battlefield<'v, 'a> {
         }
         let budget = target.stats.movement;
         let map = KnownMap::land(self.view);
-        let mut best: BTreeMap<TileId, (u32, TileId)> = BTreeMap::new();
-        let mut heap = BinaryHeap::new();
-        best.insert(target.tile, (0, target.tile));
-        heap.push(Reverse((0u32, target.tile.0)));
-        let mut expanded = 0;
-        while let Some(Reverse((cost, tile))) = heap.pop() {
-            let tile = TileId(tile);
-            if best.get(&tile).is_some_and(|(c, _)| *c < cost) {
-                continue;
-            }
-            expanded += 1;
-            if expanded > REACH_NODES || cost >= budget {
-                continue;
-            }
-            for next in self.dims.neighbors(tile) {
-                if !self.tiles.contains_key(&next) {
+        FLOOD.with_borrow_mut(|scratch| {
+            scratch.start(self.view.tile_count());
+            let mut heap = BinaryHeap::new();
+            scratch.set(target.tile, 0, target.tile);
+            heap.push(Reverse((0u32, target.tile.0)));
+            let mut expanded = 0;
+            while let Some(Reverse((cost, tile))) = heap.pop() {
+                let tile = TileId(tile);
+                if scratch.get(tile).is_some_and(|(c, _)| c < cost) {
                     continue;
                 }
-                let Some(points) = step_points(&map, tile, next) else { continue };
-                let cost = cost.saturating_add(points);
-                if best.get(&next).is_none_or(|(c, _)| cost < *c) {
-                    best.insert(next, (cost, tile));
-                    heap.push(Reverse((cost, next.0)));
+                expanded += 1;
+                if expanded > REACH_NODES || cost >= budget {
+                    continue;
+                }
+                for next in self.dims.neighbors(tile) {
+                    if !self.tiles.contains_key(&next) {
+                        continue;
+                    }
+                    let Some(points) = step_points(&map, tile, next) else { continue };
+                    let cost = cost.saturating_add(points);
+                    if scratch.get(next).is_none_or(|(c, _)| cost < c) {
+                        scratch.set(next, cost, tile);
+                        heap.push(Reverse((cost, next.0)));
+                    }
                 }
             }
-        }
-        let nodes = best
-            .into_iter()
-            .map(|(tile, (cost, parent))| ReachNode { tile, left: budget.saturating_sub(cost), parent })
-            .collect();
-        Reach { nodes }
+            scratch.touched.sort_unstable();
+            let nodes = scratch
+                .touched
+                .iter()
+                .map(|tile| {
+                    let (cost, parent) = scratch.get(*tile).expect("a touched tile is set");
+                    ReachNode { tile: *tile, left: budget.saturating_sub(cost), parent }
+                })
+                .collect();
+            Reach { nodes }
+        })
     }
+}
+
+thread_local! {
+    static FLOOD: std::cell::RefCell<FloodScratch> = std::cell::RefCell::new(FloodScratch::default());
+}
+
+/// The reach search's tables (`Battlefield::flood`), kept per thread and reset by a new generation:
+/// a cost and a parent per tile of the map in place of a tree map per search.
+#[derive(Default)]
+struct FloodScratch {
+    generation: u32,
+    stamp: Vec<u32>,
+    cost: Vec<u32>,
+    parent: Vec<u32>,
+    /// The tiles set in this search, in the order they were first set.
+    touched: Vec<TileId>,
+}
+
+impl FloodScratch {
+    fn start(&mut self, tiles: usize) {
+        if self.stamp.len() != tiles {
+            self.stamp = vec![0; tiles];
+            self.cost = vec![0; tiles];
+            self.parent = vec![0; tiles];
+            self.generation = 0;
+        }
+        self.generation += 1;
+        self.touched.clear();
+    }
+
+    fn get(&self, tile: TileId) -> Option<(u32, TileId)> {
+        let at = tile.0 as usize;
+        (self.stamp[at] == self.generation).then(|| (self.cost[at], TileId(self.parent[at])))
+    }
+
+    fn set(&mut self, tile: TileId, cost: u32, parent: TileId) {
+        let at = tile.0 as usize;
+        if self.stamp[at] != self.generation {
+            self.stamp[at] = self.generation;
+            self.touched.push(tile);
+        }
+        self.cost[at] = cost;
+        self.parent[at] = parent.0;
+    }
+}
+
+/// The tiles within `radius` of any of the `centres` with what the player knows of each: a bitmap
+/// over the map collects the union of the discs (about 30 centres at 90 tiles each overlap almost
+/// entirely), and its set bits come out in `TileId` order, the order the map is built in.
+fn theatre_tiles(view: &PlayerView<'_>, rules: &CompiledRuleset, dims: MapDimensions, centres: &[TileId], radius: i32, own_cities: &[TileId]) -> BTreeMap<TileId, TileInfo> {
+    let mut seen = vec![0u64; view.tile_count().div_ceil(64)];
+    for centre in centres {
+        for tile in crate::math::hex_disc(dims, *centre, radius) {
+            seen[tile.0 as usize / 64] |= 1 << (tile.0 % 64);
+        }
+    }
+    let mut tiles = Vec::new();
+    for (word, bits) in seen.iter().enumerate() {
+        let mut bits = *bits;
+        while bits != 0 {
+            let tile = TileId((word * 64) as u32 + bits.trailing_zeros());
+            tiles.push((tile, tile_info(view, rules, tile, own_cities)));
+            bits &= bits - 1;
+        }
+    }
+    tiles.into_iter().collect()
 }
 
 fn tile_info(view: &PlayerView<'_>, rules: &CompiledRuleset, tile: TileId, own_cities: &[TileId]) -> TileInfo {
