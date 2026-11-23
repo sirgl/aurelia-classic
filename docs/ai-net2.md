@@ -56,3 +56,18 @@ Every run goes through `work/res/res`.
 | P8 | a save made by today's main build loads into the promoted build and plays on | the game goes on, no panic |
 
 The results are in `work/nets/promote-net2/PROMOTE.md`.
+
+## Candidate: science-flow (bench only, `experimental-ai`)
+
+`science-flow` is `standard` with four more neurons of `net2` (`net2/science.rs`, `weights::SCIENTISTS`, `AGREEMENT`,
+`SCIENCE_TILT`; `Net2Plan::science`). Every other variant keeps them off (`TurnBrief::science_flow`), so the hashes of
+`standard` and `pre-net2` do not move.
+
+| neuron | output | executor that reads it |
+|---|---|---|
+| `SCIENTISTS` | the share of the science specialists' slots filled | `citizens::science_specialist_commands`: forced specialists, the city keeps `gate::SCIENTIST_FOOD` food a turn |
+| `AGREEMENT` (per rival) | the ties: a research agreement with this rival pays | `Net2Plan::denies_item` lifts the runaway's denial for the friendship and the agreement; `diplomacy` offers the ladder every round; the allocator keeps the agreements' gold (`Science::chest`) |
+| `SCIENCE_TILT` | the tilt of the allocator's beaker price | the driver multiplies `TurnBrief::prices`' science after `net2` thinks |
+
+The look, the measurements and the gates are in `work/nets/science-flow/SCIENCE-FLOW.md`. Diagnostic switch:
+`SCIENCE_FLOW_TRACE=<file>` writes the levers of each turn (it decides nothing).

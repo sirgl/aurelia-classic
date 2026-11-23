@@ -380,6 +380,8 @@ pub struct TurnBrief {
     /// The science levers priced by what they do (`ai::science_levers`,
     /// `Variant::science_levers`).
     pub levers: crate::ai::science_levers::ScienceLevers,
+    /// `science-flow`: `net2`'s science-flow neurons play (`Variant::science_flow`; `Net2Plan::science`).
+    pub science_flow: bool,
     /// The spaceship is built where it is finished soonest
     /// (`victory::space_plan`, `Variant::space_finish`).
     pub space_finish: bool,
@@ -584,6 +586,7 @@ impl TurnBrief {
             site_net: crate::ai::site_net::SiteNetPlay::Off,
             effects: crate::ai::effects::EffectChecks::NONE,
             levers: crate::ai::science_levers::ScienceLevers::NONE,
+            science_flow: false,
             space_finish: false,
             abilities: false,
             religion_fix: false,

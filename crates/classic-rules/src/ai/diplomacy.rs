@@ -86,7 +86,7 @@ pub(crate) fn item_value_with(
 ) -> i64 {
     let r = relation(obs, other);
     let trust = r.is_some_and(|r| trusted(obs.round, r));
-    if net2.is_some_and(|p| helps(item) && p.denies_help(other)) {
+    if net2.is_some_and(|p| helps(item) && p.denies_item(other, item)) {
         return REFUSED;
     }
     if net2.is_some_and(|p| item == DealItem::OpenBorders && p.trust(other) < TRUST_MIN) {
@@ -225,7 +225,7 @@ pub fn proposals_with(obs: &AIObservation<'_>, rules: &CompiledRuleset, agreemen
         } else {
             continue;
         };
-        if net2.is_some_and(|p| items.iter().any(|(_, i)| helps(*i) && p.denies_help(r.other) || *i == DealItem::OpenBorders && p.trust(r.other) < TRUST_MIN)) {
+        if net2.is_some_and(|p| items.iter().any(|(_, i)| helps(*i) && p.denies_item(r.other, *i) || *i == DealItem::OpenBorders && p.trust(r.other) < TRUST_MIN)) {
             continue;
         }
         let possible = items.iter().all(|(giver, item)| {
@@ -325,6 +325,12 @@ pub fn denied(brief: &crate::ai::planner::TurnBrief, rival: PlayerId) -> bool {
     contained(brief) == Some(rival) || brief.net2_for(crate::ai::net2::plan::Part::Deals).is_some_and(|p| p.denies_help(rival))
 }
 
+/// `denied` for one item: `science-flow`'s ties take the friendship and the research agreement out of `net2`'s denial
+/// (`Net2Plan::denies_item`).
+pub fn denied_item(brief: &crate::ai::planner::TurnBrief, rival: PlayerId, item: DealItem) -> bool {
+    contained(brief) == Some(rival) || brief.net2_for(crate::ai::net2::plan::Part::Deals).is_some_and(|p| p.denies_item(rival, item))
+}
+
 /// An item that helps its receiver run: friendship, a research agreement, a pact, open borders.
 pub fn helps(item: DealItem) -> bool {
     matches!(item, DealItem::Friendship | DealItem::ResearchAgreement | DealItem::DefensivePact | DealItem::OpenBorders)
@@ -379,6 +385,19 @@ impl crate::ai::system::SystemAdvisor for DiplomacyAdvisor {
             if let Some(plan) = input.brief.net2_for(crate::ai::net2::plan::Part::Peace).filter(|p| !p.peace_with.is_empty()) {
                 let wanted = crate::ai::peace::peace_offers(input).into_iter().filter(|c| matches!(c, Command::ProposeDeal { to, .. } if plan.makes_peace_with(*to) && !input.brief.retaking_from(*to)));
                 out.extend(crate::ai::combat::proposals(5, wanted.collect::<Vec<_>>()));
+            }
+        }
+        // `science-flow`: the ladder to an agreement with a rival of the science ties (embassies, friendship, the agreement)
+        // is offered in every round, not every fifth: an agreement ended or a friendship made waits no interval for the next
+        // step (`Net2Plan::ties_with`; the look: 0.58 of a friend a turn without an agreement nothing in the rules blocked).
+        if !my_round {
+            if let Some(plan) = net2.filter(|p| !p.science.ties.is_empty()) {
+                let ladder = |item: &DealItem| matches!(item, DealItem::Embassy | DealItem::Friendship | DealItem::ResearchAgreement);
+                let deals: Vec<Command> = proposals_with(obs, input.rules, agreement_prices(input), net2)
+                    .into_iter()
+                    .filter(|c| matches!(c, Command::ProposeDeal { to, items, .. } if plan.ties_with(*to) && items.iter().all(|(_, i)| ladder(i))))
+                    .collect();
+                out.extend(crate::ai::combat::proposals(5, deals));
             }
         }
         if my_round {

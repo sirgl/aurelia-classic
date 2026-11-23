@@ -648,6 +648,72 @@ pub const CITY_CAP: Neuron = Neuron {
     ],
 };
 
+// ---- the science flow (work/nets/science-flow/SCIENCE-FLOW.md): played by `science-flow` only (`TurnBrief::science_flow`) ----
+
+/// The share of its science specialists' slots a seat fills (`Science::scientists`; the executor
+/// `citizens::science_specialist_commands` keeps each city's food at `gate::SCIENTIST_FOOD`). Why (the look, 80 self-play
+/// games of `standard`, Quick): the science winners entered the Modern era with 2 scientists in 11 slots and 25 food a
+/// turn to spare, the Atomic era with 9 in 16; small-continents 1 p4 went from 185 to 376 beakers when its cities took 9
+/// scientists (r170→r180) and back to 341 when they left them for food tiles (r210, food +100). A scientist is 3 beakers,
+/// 2 more with Secularism (taken by every seat at r~160), times the city's science percents, and 3 points of a great
+/// scientist; the rules' default weights rank it level with a 3-food tile.
+pub const SCIENTISTS: Neuron = Neuron {
+    name: "scientists",
+    bias: -900,
+    why: "early the citizens stay on the tiles: a growing citizen is a beaker and more (ai-growth.md); the level only adds slots to what the rules' weights fill themselves",
+    join: UNIT,
+    terms: &[
+        ts(F(fe::PROGRESS), Shape::Above(300), 2500, "the later the game, the fewer rounds a new citizen pays back its food (0.6 of the game: +750, 0.75: +1125); a human fills the slots of the universities and schools late whatever its aim"),
+        t(Y(y::AIM_SCIENCE), 600, "the science aim: the ship is beakers, and a filled slot is beakers now and great scientists later (sf1: the aim's share is 0.35 at the median mid-game, so the aim tilts and does not gate)"),
+        t(F(fe::AT_WAR), -500, "at war the cities work the hammers"),
+    ],
+};
+
+/// A research agreement with one rival pays our race (`Science::ties`): the friendship and the agreement with it are
+/// proposed and taken though it runs away (`Net2Plan::denies_item`), offered every round, and the gold they cost is kept
+/// (`Science::chest`). Why (the look): at the Modern era a seat met 3.45 majors and had 0.38 agreements; of its 1.55
+/// friends 1.17 had none: 0.36 our gold short (the allocator spent it; treasury 425 and +121 a turn at the Modern era),
+/// 0.26 theirs, 0.58 nothing in the rules; and the runaway, whom `net2` denies every help (`gate::DENY_HELP`), is the
+/// partner with the most science (`net2-no-deals`, the denial off: 0.75 agreements at the Modern era, 1.06 at r300
+/// against 0.41, 42 science victories in 80 self-play games against 29). The rules pay min(both sciences over the deal)
+/// / 3 × 50 % at its end: with a partner as fast as us, a sixth of our science a turn for ~280 gold at Quick, 4 beakers
+/// a gold, where a bought building is about one. Equal beakers to both shorten a faster rival's lead in rounds: for a
+/// seat that races the runaway it is a good partner; for one that does not race it, the beakers are its victory.
+pub const AGREEMENT: Neuron = Neuron {
+    name: "agreement",
+    bias: 600,
+    why: "an agreement is 4 beakers a gold: a seat at peace signs one with every friend, as a human does",
+    join: UNIT,
+    terms: &[
+        t(Y(y::AIM_SCIENCE), 400, "the science aim: the beakers are the victory it plays for"),
+        ts(R(r::PACE), Shape::Below(500), -1200, "a slower partner pays a smaller pool (the smaller science): at a quarter less −300"),
+        t(Q(q::DISTRUST), -1000, "a distrusted rival breaks the friendship or comes with an army (D12)"),
+        t(Q(q::MENACE), -600, "its army at our border: a friendship feeds the sneak attack"),
+        t(R(r::AT_WAR), -2000, "no deal in a war"),
+        t(Q(q::RUNAWAY), -800, "the runaway wins with the beakers: a seat that does not race it gives it none (`gate::DENY_HELP`)"),
+        ts(Q(q::RUNAWAY), Shape::Times(Y(y::AIM_SCIENCE)), 800, "a seat that races it gains as many beakers and shortens its lead in rounds: the denial lifts with the aim"),
+    ],
+};
+
+/// The tilt of the allocator's beaker price (`Science::beaker_tilt`; the driver multiplies `TurnBrief::prices`' science
+/// by 1000 + it, so the production ranks, the purchases and the focus read it). sf3 put it into the production head's
+/// multiplier (`price_tilt[pd::SCIENCE]`) instead: the head picks among the allocator's best orders only, and the lags
+/// below did not move (public school 80 rounds, research lab 40).
+/// Why (the look, science winners of 80 self-play games): from the technology to the building in every city a library
+/// took 55 rounds, a university 25, a public school 40, a research lab 35, while the Modern era lasted 55 and the
+/// Atomic 25; a human racing the ship builds each in the round it opens. The aim's row already tilts the price (+800 ×
+/// the aim's share × `PRICE_GAIN`); with the aim's share at 0.35 mid-game that is +140, beside the wonders' +400.
+pub const SCIENCE_TILT: Neuron = Neuron {
+    name: "science_tilt",
+    bias: 0,
+    why: "early the carried rows price the beaker: growth and cities come first (the full deviations grew 21 % fewer citizens)",
+    join: LINEAR,
+    terms: &[
+        ts(F(fe::PROGRESS), Shape::Above(400), 3000, "from 0.4 of the game (the Renaissance, r~135 of 330) the beakers are the race: 0.6 → +600, 0.8 → +1200"),
+        t(F(fe::AT_WAR), -400, "at war the hammers go to the army"),
+    ],
+};
+
 // ---- the offence addendum (work/new-net-offence-addendum-2026-11-22.md §3): declared, not yet built ----
 
 /// The offence is off: `net2` plays as the addendum's control `net2-defence` (every `Offence` field and
@@ -684,6 +750,9 @@ pub mod gate {
     pub const EMBARGO: (Milli, &str) = (600, "the embargo, the cheap brake, only on a clear runaway (W2, VP #8)");
     pub const BLOCK: (Milli, &str) = (500, "the ballot goes against a rival only when it would win the vote");
     pub const SPACE_RESEARCH: (Milli, &str) = (500, "the research keeps to the ship's way when the science aim and the way gone say so more likely than not");
+    pub const AGREEMENT: (Milli, &str) = (500, "a tie when the agreement pays more likely than not (`weights::AGREEMENT`)");
+    /// Food a turn a city keeps when it takes a science specialist (`citizens::science_specialist_commands`).
+    pub const SCIENTIST_FOOD: (i32, &str) = (2, "two food a turn: the city still grows, slower, and never starves for a slot");
     /// Ships escorting an `Overseas` order (`fleet::FLEET_SIZE`).
     pub const ESCORT_SHIPS: (u32, &str) = (2, "the landing needs ships that shell the coast (`fleet.rs` 1-10)");
     /// Standard rounds after a war order spent its budget without paying before another order on that rival.

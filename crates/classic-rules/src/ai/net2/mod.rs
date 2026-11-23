@@ -25,6 +25,7 @@ pub mod offence;
 pub mod orders;
 pub mod plan;
 pub mod rival_inputs;
+pub mod science;
 pub mod site_head;
 pub mod trace;
 pub mod weights;
@@ -71,6 +72,10 @@ pub fn think(obs: &AIObservation<'_>, brief: &TurnBrief, state: &mut AiState, ru
     }
     space_trace(obs.player.0, obs.round, &inputs, after.part_hold);
     let mut levers = after.plan;
+    // `science-flow`: the science flow's levers (`science`); every other variant keeps them off.
+    if brief.science_flow {
+        levers.science = science::plan(obs, rules, &pass, &intent, &inputs);
+    }
     read_soldiers(&mut levers, &own.inputs);
     // The offence whose inputs the pass has (`offence`; the driver clears it for `net2-defence`).
     offence::apply(&mut levers, &pass);

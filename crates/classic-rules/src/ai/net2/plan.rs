@@ -708,6 +708,24 @@ pub struct Net2Plan {
     /// (`weights::SPACE_RESEARCH` at least `gate::SPACE_RESEARCH`; the research head, `strategy_net::heads::research`,
     /// reads it).
     pub space_research: bool,
+    /// `science-flow`'s levers (`net2::science`; all off for every other variant).
+    pub science: Science,
+}
+
+/// The science flow's levers (`weights::SCIENTISTS`, `weights::AGREEMENT`), read by the citizens' executor, the diplomacy
+/// and the allocator's gold. Off (zeros, empty) unless the seat plays `science-flow` (`TurnBrief::science_flow`).
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Science {
+    /// The share of the science specialists' slots the cities fill (thousandths; `citizens::science_specialist_commands`).
+    pub scientists: Milli,
+    /// The rivals a research agreement with pays our race (`weights::AGREEMENT` ≥ `gate::AGREEMENT`), by id: the friendship
+    /// and the agreement with them are proposed and taken though the rival runs away (not the war order's target).
+    pub ties: Vec<PlayerId>,
+    /// Gold kept for the agreements the ties still lack (their cost each; `allocator::spend_gold` does not spend it).
+    pub chest: u32,
+    /// The tilt of the allocator's beaker price (thousandths added to 1000; `weights::SCIENCE_TILT`): the driver multiplies
+    /// `TurnBrief::prices`' science by it after `net2` thinks, so the production ranks, the purchases and the focus read it.
+    pub beaker_tilt: Milli,
 }
 
 /// The trust of a rival without a reading (a city-state, a stranger): a stranger is not yet a liar.
@@ -742,6 +760,21 @@ impl Net2Plan {
     /// `deny_help[r]` (§4.6).
     pub fn denies_help(&self, rival: PlayerId) -> bool {
         self.rival(rival).is_some_and(|r| r.help == Help::Deny)
+    }
+
+    /// `denies_help` for one item: the friendship and the research agreement with a rival of the science ties
+    /// (`Science::ties`) are given though it runs away.
+    pub fn denies_item(&self, rival: PlayerId, item: crate::world::relations::DealItem) -> bool {
+        use crate::world::relations::DealItem;
+        if matches!(item, DealItem::Friendship | DealItem::ResearchAgreement) && self.ties_with(rival) {
+            return false;
+        }
+        self.denies_help(rival)
+    }
+
+    /// A research agreement with `rival` pays our race (`Science::ties`).
+    pub fn ties_with(&self, rival: PlayerId) -> bool {
+        self.science.ties.contains(&rival)
     }
 
     /// `peace_with ∋ r` (§4.4).

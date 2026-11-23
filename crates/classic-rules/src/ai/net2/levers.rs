@@ -326,6 +326,7 @@ pub fn after_intent(pass: &Pass, intent: &Intent, inputs: &Inputs, round: u32) -
         order_eases: super::orders::order_eases(&pass.core.war, &inputs.targets, &pass.eases, inputs.seat.war_gain),
         space_hold: space_hold(&inputs.space, part_hold),
         space_research: pass.parts.plays(Part::Strategy) && space_research >= gate::SPACE_RESEARCH.0,
+        science: Default::default(),
     };
     After { plan, price_tilt, peace, part_hold, city_cap, space_research }
 }

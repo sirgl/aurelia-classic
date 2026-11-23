@@ -76,7 +76,8 @@ pub struct Allocator {
     jobs: u32,
     /// A new city keeps the empire content (or the empire is young).
     may_settle: bool,
-    /// Gold the running operations keep for their army's upkeep.
+    /// Gold the running operations keep for their army's upkeep, and `science-flow`'s gold for the research agreements
+    /// its ties still lack (`Net2Plan::science`'s chest).
     war_chest: u32,
     /// The gold kept for the alliance of a rival that would win the World Leader vote
     /// (`city_states::guard_chest`, `vote-guard`); only the gifts that take it may spend it.
@@ -138,7 +139,7 @@ impl Allocator {
             cities: obs.own_cities.len() as i32,
             jobs: if brief.effects.demand { finder_jobs(obs, brief, state, rules) } else { open_jobs(obs) },
             may_settle: may_settle(obs, brief, state, prices.model),
-            war_chest: war_chest(obs, state) + state.war_plan.map_or(0, |plan| plan.chest),
+            war_chest: war_chest(obs, state) + state.war_plan.map_or(0, |plan| plan.chest) + brief.net2.as_ref().map_or(0, |plan| plan.science.chest),
             guard_chest: crate::ai::city_states::guard_chest(obs, &prices),
             personality: brief.personality,
             sea: brief.sea_jobs.clone(),

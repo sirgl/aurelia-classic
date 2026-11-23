@@ -99,6 +99,11 @@ impl SystemAdvisor for EconomyAdvisor {
         if let Some(prices) = valued(input).filter(|_| input.brief.levers.specialists) {
             out.extend(proposals(FOCUS_PRIORITY, crate::ai::citizens::specialist_commands(input.observation, input.rules, prices)));
         }
+        // `science-flow`: the science specialists at `net2`'s level (`weights::SCIENTISTS`).
+        if let Some(plan) = input.brief.net2.as_ref().filter(|_| input.brief.science_flow) {
+            let floor = crate::ai::net2::weights::gate::SCIENTIST_FOOD.0;
+            out.extend(proposals(FOCUS_PRIORITY, crate::ai::citizens::science_specialist_commands(input.observation, input.rules, plan.science.scientists, floor)));
+        }
         out
     }
 }

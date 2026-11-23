@@ -191,6 +191,72 @@ pub fn specialist_commands(obs: &AIObservation<'_>, rules: &CompiledRuleset, pri
     out
 }
 
+/// `science-flow`: the science specialists of every city at `net2`'s level (`Net2Plan::science`, `weights::SCIENTISTS`):
+/// the share `level` (thousandths) of the city's slots of the specialists that yield science (read from the rules'
+/// specialists, none named), set by hand (`SetSpecialists`; the rules assign the other citizens by the focus). The
+/// executor only reads the level; it keeps the city's food: a scientist is added only while the food a turn, less the
+/// food of the worked tile the rules give up first (the lowest by the focus' weights), stays at `food_floor` or more,
+/// and one is taken back a turn while the city makes less than the floor.
+pub fn science_specialist_commands(obs: &AIObservation<'_>, rules: &CompiledRuleset, level: crate::ai::strategy_net::Milli, food_floor: i32) -> Vec<Command> {
+    use crate::ai::science_levers as levers;
+    let default = rules.roles.default_specialist;
+    // The kinds that yield science, the most science first (then the lower id).
+    let mut kinds: Vec<usize> = rules.specialists.iter().enumerate().filter(|(i, d)| d.yields.science > 0 && Some(crate::rules::content::SpecialistId(*i as u16)) != default).map(|(i, _)| i).collect();
+    kinds.sort_by_key(|i| (std::cmp::Reverse(rules.specialists[*i].yields.science), *i));
+    if kinds.is_empty() {
+        return Vec::new();
+    }
+    let techs = crate::derived::tile_yields::TechSet::of(&obs.economy.techs);
+    let mut out = Vec::new();
+    for city in &obs.own_cities {
+        let slots = levers::slots(rules, city);
+        let free: u32 = kinds.iter().map(|k| u32::from(slots[*k])).sum();
+        let now: u32 = kinds.iter().map(|k| u32::from(city.citizens.forced(crate::rules::content::SpecialistId(*k as u16)))).sum();
+        if free == 0 && now == 0 {
+            continue;
+        }
+        let target = ((i64::from(level.clamp(0, 1000)) * i64::from(free) + 500) / 1000) as u32;
+        let count = if city.income.food_surplus < food_floor {
+            now.saturating_sub(1).min(target)
+        } else if target <= now {
+            target
+        } else {
+            // The worked tiles the rules give up first, lowest score by the focus' weights.
+            let w = kernel::derived::citizens::weights(city.citizens.focus);
+            let mut worked: Vec<(i32, i32)> = city
+                .worked
+                .iter()
+                .filter(|t| **t != city.tile)
+                .map(|t| {
+                    let y = crate::derived::tile_yields::plot_yields(&obs.view, rules, *t, &techs).at_least(0);
+                    (y.food * w[0] + y.production * w[1] + y.gold * w[2] + y.science * w[3] + y.culture * w[4] + y.module * w[5], y.food)
+                })
+                .collect();
+            worked.sort_unstable();
+            let (mut food, mut count) = (city.income.food_surplus, now);
+            for (_, tile_food) in worked {
+                if count >= target || food - tile_food < food_floor {
+                    break;
+                }
+                food -= tile_food;
+                count += 1;
+            }
+            count
+        };
+        // Filled the most science first, each kind up to its slots.
+        let mut left = count;
+        for k in &kinds {
+            let specialist = crate::rules::content::SpecialistId(*k as u16);
+            let n = left.min(u32::from(slots[*k])).min(u32::from(crate::world::citizens::MAX_FORCED_SPECIALISTS));
+            left -= n;
+            if city.citizens.forced(specialist) != n as u8 {
+                out.push(Command::SetSpecialists { player: obs.player, city: city.handle, specialist, count: n as u8 });
+            }
+        }
+    }
+    out
+}
+
 /// How many specialists of each kind `city` should have (index =
 /// `SpecialistId`): its citizens on the best of its tiles and its slots,
 /// each at the prices of the turn (a tile its yields, a specialist its
