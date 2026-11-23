@@ -5,11 +5,14 @@
 
 use classic_content::core::core_rules;
 use classic_rules::ai::net2::inputs::{self, InputMemory};
-use classic_rules::ai::net2::plan::{Inputs, RivalInputs};
+use classic_rules::ai::net2::levers::{self, Pass};
+use classic_rules::ai::net2::plan::{CoreMemory, Inputs, Parts, RivalInputs};
+use classic_rules::ai::net2::weights::{a, q};
 use classic_rules::ai::planner;
 use classic_rules::ai::rival_model::{estimate, soldiers, Book, Guess, SoldiersEvidence};
 use classic_rules::ai::state::AiState;
 use classic_rules::ai::strategy_net::features::neutral;
+use classic_rules::ai::strategy_net::weights::kc;
 use classic_rules::command::Command;
 use classic_rules::derived::standing::{Demographic, Measure};
 use classic_rules::ids::{PlayerId, TechId, TerrainId, TileId, UnitKindId};
@@ -332,6 +335,19 @@ fn r6_open_cities_and_the_garrison_flag() {
     assert_eq!(rival(&i, A).open_cities, 0, "a soldier next to it");
 }
 
+/// Our capital at (8, 12) with one warrior, the rival `A` met at peace and five of its warriors two tiles off, one
+/// round played: the stack at the border of R11 and of `the_stack_that_declares_war_stays_a_menace`.
+fn stack_at_the_border(rules: &CompiledRuleset) -> GameState {
+    let mut game = world(rules, 2, &[(8, 12), (30, 12)]);
+    game.debug_meet(US, A);
+    spawn(&mut game, rules, US, 8, 11, "warrior");
+    for i in 0..5 {
+        spawn(&mut game, rules, A, 10 + i % 2, 11 + i / 2, "warrior");
+    }
+    advance(&mut game, rules, 1);
+    game
+}
+
 #[test]
 fn r11_a_stack_at_the_border() {
     let rules = rules();
@@ -341,19 +357,48 @@ fn r11_a_stack_at_the_border() {
     let (mut state, mut memory) = (AiState::new(US, 1), InputMemory::default());
     let none = read(&game, &rules, US, &mut state, &mut memory);
     assert_eq!(rival(&none, A).stack, 0);
-    for i in 0..5 {
-        spawn(&mut game, &rules, A, 10 + i % 2, 11 + i / 2, "warrior");
-    }
-    advance(&mut game, &rules, 1);
+    let mut game = stack_at_the_border(&rules);
+    let (mut state, mut memory) = (AiState::new(US, 1), InputMemory::default());
     let i = read(&game, &rules, US, &mut state, &mut memory);
     let stack = rival(&i, A).stack;
     assert!(stack > 500, "five against one: {stack}");
     assert_eq!(i.cities[0].stack_owner, Some(A));
-    // At war the stack is the war: the input is for peace.
+    // At war the stack is the attack itself: the input stays (work/nets/capitals: read at peace only, the menace and
+    // every lever answering it fell to 0 on the turn of the declaration).
     game.debug_force_war(&rules, US, A);
     advance(&mut game, &rules, 1);
     let i = read(&game, &rules, US, &mut state, &mut memory);
-    assert_eq!(rival(&i, A).stack, 0);
+    let at_war = rival(&i, A).stack;
+    assert!(at_war > 500, "the same five against one at war: {at_war}");
+}
+
+/// The pass of `net2` before the intent on the inputs read from the game (`levers::before_intent`).
+fn pass(inputs: &Inputs, game: &GameState) -> Pass {
+    let mut carried = [0; kc::N];
+    carried[kc::WARLIKE] = 300;
+    levers::before_intent(inputs, &carried, &CoreMemory::default(), game.view().auth.turn().round, 100, Parts::All)
+}
+
+#[test]
+fn the_stack_that_declares_war_stays_a_menace() {
+    // work/nets/capitals, offset 3340 seed 3340001 seat 4: a rival's stack at our capital declares war. With R11 read at
+    // peace only, `menace` fell from 930 to 0 on that turn, and with it the levers that answered the stack (the
+    // military price tilt 800 · max menace, the guard 1200 · stack menace, the defence posture 1500 · max menace); the
+    // capital fell 10 rounds later. Read from the game, the answer holds across the declaration.
+    let rules = rules();
+    let mut game = stack_at_the_border(&rules);
+    let (mut state, mut memory) = (AiState::new(US, 1), InputMemory::default());
+    let peace = read(&game, &rules, US, &mut state, &mut memory);
+    let before = pass(&peace, &game);
+    game.debug_force_war(&rules, US, A);
+    advance(&mut game, &rules, 1);
+    let war = read(&game, &rules, US, &mut state, &mut memory);
+    let after = pass(&war, &game);
+    let menace = |p: &Pass| p.rivals.iter().find(|r| r.rival == A).unwrap().concepts[q::MENACE];
+    assert!(menace(&before) > 500, "the stack at peace is a menace: {}", menace(&before));
+    assert!(menace(&after) >= menace(&before), "the attack is no less a menace than the stack before it: {} then {}", menace(&before), menace(&after));
+    assert!(after.aggregates[a::MAX_MENACE] >= before.aggregates[a::MAX_MENACE], "the levers read the max menace");
+    assert!(levers::tilt(&after).posture[1] >= levers::tilt(&before).posture[1], "defence keeps its term");
 }
 
 #[test]

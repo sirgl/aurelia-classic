@@ -9,6 +9,9 @@
   who is massing an army at the border, who is about to win. They go to war for a named target and build the army for it
   first, try to retake what they lost, guard the cities a rival threatens, deny help and trade to a nation that is running
   away with the game, and keep their research on the way to the spaceship once they aim for a science victory.
+- **An army at the border stays a threat once the war starts.** A computer player that saw a neighbour's army gather
+  by its cities raised its guard and its defenders' worth, and dropped both on the turn that army declared war. It now
+  keeps answering that army through the war.
 - **How much stronger.** In 800 test games at Quick speed against the default AI described in the next point, the new one
   takes about 66 % of the points (a real victory counts in full, a win on the turn limit as a quarter) and wins 342 games
   by a real victory against 136. A computer turn takes no longer than before. Saves made by the previous version still

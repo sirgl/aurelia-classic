@@ -108,7 +108,7 @@ pub struct RivalInputs {
     pub pace: Milli,
     /// R10: its culture share against ours.
     pub culture: Milli,
-    /// R11: at peace, its military power inside our borders or within `THREAT_RADIUS` of our cities over our power there.
+    /// R11: at peace and at war, its military power inside our borders or within `THREAT_RADIUS` of our cities over our power there.
     pub stack: Milli,
     /// R12: `relation.warmonger` / `DENOUNCE_WARMONGER` (250), clamped.
     pub warmonger: Milli,
