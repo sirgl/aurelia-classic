@@ -83,6 +83,8 @@ pub struct Scene {
     // State.
     pub pillaged: BTreeSet<TileId>,
     pub taken: Option<u32>,
+    /// The round the learner's losses first passed the family's loss cap (the assault families).
+    pub cap_broken: Option<u32>,
     pub founded: Option<u32>,
     pub crossed: bool,
     pub city_low: bool,

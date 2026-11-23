@@ -21,10 +21,10 @@ import mlx.core as mx
 import mlx.nn as nn
 import mlx.optimizers as optim
 
-from .data import MEMORY_STATE, TRACK
+from .data import MEMORY_STATE, TRACK, Flat, map_file, read_play_at, skip_play_at
 from .export import export
 from .model_m import AIMS, P_ENGAGED, P_ETA, P_STAGE, P_TURNS, P_WAITED, PLANS, SLOTS, STAGES, U_ENGAGED, U_RESTING, U_WAITED, MemNet
-from .train import Device, best_teachers, decision_weights, load
+from .train import Device, best_teachers, decision_weights
 from .data import F_HIST
 from .model_mh import H_MAX, MHNet
 from .model_mb import MBNet
@@ -70,6 +70,48 @@ class Plays:
                     self.turns_in_stage[i] = run
                 if meta['family'] in ASSAULT and meta.get('win'):
                     self.eta[i] = max(0, meta.get('rounds', 0) - flat.round[i])
+
+
+class Stream:
+    """The recordings indexed, not loaded (RAM: the index only; the files stay mapped): `flat(ids)` reads just
+    those plays, so a step or an evaluation chunk holds only its own decisions."""
+
+    def __init__(self, paths, nth=1, skip=None):
+        self.bufs = []
+        self.where = []   # per play: (file index, offset)
+        self.metas = []
+        self.t_max = 0
+        self.decisions = 0
+        self.labelled = 0
+        seen = 0
+        for k, path in enumerate(paths):
+            drop = (skip or {}).get(path, set())
+            buf = map_file(path)
+            self.bufs.append(buf)
+            at = 0
+            while at < len(buf):
+                meta, after, t_max, labelled, n = skip_play_at(buf, at)
+                keep = meta['family'] not in drop
+                if keep:
+                    seen += 1
+                    keep = seen % nth == 0
+                if keep:
+                    self.where.append((k, at))
+                    self.metas.append(meta)
+                    self.t_max = max(self.t_max, t_max)
+                    self.decisions += n
+                    self.labelled += labelled
+                at = after
+
+    def __len__(self):
+        return len(self.metas)
+
+    def flat(self, ids):
+        out = Flat()
+        for i in ids:
+            k, at = self.where[i]
+            read_play_at(out, self.bufs[k], at)
+        return out
 
 
 class DeviceM(Device):
@@ -316,6 +358,26 @@ def dec_one(model, b, um, pm):
 
 
 COMPILED = {}
+# Checkpoints of the play over training: one per half-epoch and one at each job's end, the last few kept.
+CKPT_KEEP = 8
+
+
+def save_checkpoint(model, out, epoch):
+    """OUT/ckpt/e<epoch>.safetensors and its Rust export .bin, a line in OUT/ckpt/index.jsonl; only the last
+    CKPT_KEEP checkpoints' files stay (the index keeps every line)."""
+    d = os.path.join(out, 'ckpt')
+    os.makedirs(d, exist_ok=True)
+    name = f'e{epoch:.2f}'
+    model.save_weights(os.path.join(d, name + '.safetensors'))
+    export(model, os.path.join(d, name + '.bin'))
+    with open(os.path.join(d, 'index.jsonl'), 'a') as f:
+        f.write(json.dumps({'epoch': round(epoch, 2), 'path': os.path.abspath(os.path.join(d, name + '.bin')), 'weights': os.path.abspath(os.path.join(d, name + '.safetensors'))}) + '\n')
+    kept = sorted((float(n[1:-len('.safetensors')]) for n in os.listdir(d) if n.endswith('.safetensors')))
+    for e in kept[:-CKPT_KEEP]:
+        for ext in ('.safetensors', '.bin'):
+            path = os.path.join(d, f'e{e:.2f}{ext}')
+            if os.path.exists(path):
+                os.remove(path)
 
 
 def compiled(model, name, with_aux=True):
@@ -396,8 +458,9 @@ def run_step(model, dev, plan, tm, aux_w, with_aux=True, compile_=True):
     return loss, main, aux_tot, dict(aux_parts), accs
 
 
-def evaluate(model, dev, plays, tm, bs=256):
-    """Held-out accuracy with the memory unrolled over whole plays (no dropout), by family; and the aux numbers."""
+def evaluate(model, device_of, plays, tm, bs=256):
+    """Held-out accuracy with the memory unrolled over whole plays (no dropout), by family; and the aux numbers.
+    `device_of(ids)`: the DeviceM of those plays (streamed: one chunk at a time on the device)."""
     fam_hit = collections.defaultdict(float)
     fam_n = collections.defaultdict(int)
     tot = collections.defaultdict(float)
@@ -406,7 +469,8 @@ def evaluate(model, dev, plays, tm, bs=256):
     aux = collections.defaultdict(float)
     steps = 0
     for s in range(0, len(plays), bs):
-        chunk = plays[s:s + bs]
+        dev = device_of(plays[s:s + bs])
+        chunk = list(range(len(dev.plays.first)))
         plan = plan_batch(dev, chunk, 10 ** 6, 0.0, None, tm, train=False)
         loss, main, aux_tot, parts, accs = run_step(model, dev, plan, tm, 0.0)
         mx.eval(loss, main, aux_tot, parts)
@@ -463,6 +527,8 @@ def main():
     ap.add_argument('--map-ch', type=int, default=32)
     ap.add_argument('--history', action='store_true', help='variant MH: the history window of facts, linked to the plan')
     ap.add_argument('--every-nth-play', type=int, default=1)
+    ap.add_argument('--resume', action='store_true', help='continue OUT from its last checkpoint (OUT/state.json: the step; OUT/opt.safetensors: the optimizer)')
+    ap.add_argument('--warmup', type=int, default=20, help='resumed without the optimizer state: lr ramps up over these steps')
     a = ap.parse_args()
     from .train import SIEGE
     if a.cpu:
@@ -478,31 +544,29 @@ def main():
         for f in fams.split(','):
             out |= SIEGE if f == 'siege' else {f}
         skip[path] = out
-    train = load(a.train, a.every_nth_play, skip)
-    hold = load(a.hold, a.every_nth_play)
-    best, table = best_teachers(train.plays)
+    train = Stream(a.train, a.every_nth_play, skip)
+    hold = Stream(a.hold, a.every_nth_play)
+    best, table = best_teachers(train.metas)
     json.dump({'best': best, 'wins': table, 'lost_weight': a.lost_weight, 'best_factor': a.best_factor}, open(os.path.join(a.out, 'teachers.json'), 'w'), indent=1)
-    tm = max(max(train.t), max(hold.t))
+    tm = max(train.t_max, hold.t_max)
     cm = 128
-    print(f'loaded {len(train)} train / {len(hold)} held-out decisions from {len(train.plays)} / {len(hold.plays)} plays in {time.time() - t0:.0f} s; T {tm}', flush=True)
+    print(f'indexed {train.decisions} train / {hold.decisions} held-out decisions of {len(train)} / {len(hold)} plays in {time.time() - t0:.0f} s; T {tm}', flush=True)
     up = set()
     for f in filter(None, a.up.split(',')):
         up |= SIEGE if f == 'siege' else {f}
-    weights = decision_weights(train, best, a.lost_weight, a.best_factor)
-    if up:
-        weights = [w * (a.up_factor if train.plays[p]['family'] in up else 1.0) for w, p in zip(weights, train.play)]
-    weights = [0.0 if pt < -1 else w for w, pt in zip(weights, train.ptr)]
-    dev = DeviceM(train, weights, tm, cm)
-    hw = [0.0 if pt < -1 else w for w, pt in zip(decision_weights(hold, best, a.lost_weight, a.best_factor), hold.ptr)]
-    hdev = DeviceM(hold, hw, tm, cm)
-    # The flat byte buffers are on the device now: free the host copies (RAM: the device arrays and the per-decision
-    # lists stay, about half of what both took).
-    for fl in (train, hold):
-        for k in ('tok', 'dist', 'sel', 'danger', 'cand', 'promo', 'pos', 'cpos', 'slot', 'hist', 'hist_slot', 'hist_age', 'statics'):
-            setattr(fl, k, bytearray())
-    import gc
-    gc.collect()
-    promos = max(400, int(mx.max(dev.promo).item()) + 1)
+
+    def device_of(stream, ids, up):
+        """The DeviceM of these plays with their decision weights (the family up-weighting on training plays)."""
+        flat = stream.flat(ids)
+        weights = decision_weights(flat, best, a.lost_weight, a.best_factor)
+        if up:
+            weights = [w * (a.up_factor if flat.plays[p]['family'] in up else 1.0) for w, p in zip(weights, flat.play)]
+        weights = [0.0 if pt < -1 else w for w, pt in zip(weights, flat.ptr)]
+        return DeviceM(flat, weights, tm, cm)
+
+    hold_device = lambda ids: device_of(hold, ids, set())
+    # The promotion vocabulary: 400 (every recording so far stays below; a larger id fails the gather loudly in MLX).
+    promos = 400
     shape = dict(d=a.d, heads=a.heads, layers=a.layers, ff=2 * a.d, promos=promos)
     model = MBNet(map_ch=a.map_ch, **shape) if a.map else (MHNet(**shape) if a.history else MemNet(**shape))
     model.hand_init()
@@ -514,35 +578,55 @@ def main():
         model.load_weights(list(init.items()), strict=False)
     mx.eval(model.parameters())
     n_params = sum(v.size for _, v in nn.utils.tree_flatten(model.parameters()))
-    labelled = sum(1 for x in train.ptr if x >= -1)
-    plays_all = list(range(len(train.plays)))
+    labelled = train.labelled
+    plays_all = list(range(len(train)))
     steps = int(a.epochs * len(plays_all) / a.plays)
     sched = optim.cosine_decay(a.lr, steps, a.lr * 0.05)
+    start = 0
+    best_both = -1.0
+    state_path = os.path.join(a.out, 'state.json')
+    opt_path = os.path.join(a.out, 'opt.safetensors')
+    if a.resume:
+        state = json.load(open(state_path))
+        start, best_both = state['step'], state['best_both']
+        model.load_weights(os.path.join(a.out, 'last.safetensors'))
+        if not os.path.exists(opt_path):
+            # No optimizer state (a run of the code before checkpoints): fresh moments, the lr ramped up again.
+            base, w0 = sched, start
+            sched = lambda s: base(s) * mx.minimum(1.0, (mx.array(s).astype(mx.float32) - w0) / a.warmup)
     opt = optim.AdamW(learning_rate=sched, weight_decay=1e-4)
+    if a.resume:
+        opt.init(model.trainable_parameters())
+        if os.path.exists(opt_path):
+            opt.state = nn.utils.tree_unflatten(list(mx.load(opt_path).items()))
+        else:
+            opt.state['step'] = mx.array(start, mx.uint64)
+        rng = random.Random(a.seed * 1000003 + start)  # a resumed job draws a new play order
+        print(f'resumed at step {start} (best held-out joint accuracy {best_both:.4f}; optimizer state {"loaded" if os.path.exists(opt_path) else "fresh, lr warm-up " + str(a.warmup)})', flush=True)
     cur = []
     acc_share = 0.0
     for spec in a.curriculum.split(','):
         L, share = spec.split(':')
         acc_share += float(share)
         cur.append((int(acc_share * steps), int(L)))
-    hold_plays = list(range(len(hold.plays)))
+    hold_plays = list(range(len(hold)))
     hold_eval = hold_plays[::a.eval_plays]
     config = {'run': os.path.basename(os.path.normpath(a.out)), 'variant': 'M (learned memory)', 'plays_per_step': a.plays, 'lr': a.lr, 'epochs': a.epochs, 'steps': steps,
               'schedule': f'AdamW (weight decay 1e-4), cosine decay to 0.05 lr over {steps} steps, grad clip 1.0', 'aux_weight': a.aux, 'mem_drop': a.mem_drop, 'curriculum': cur,
               'parameters': n_params, 'T': tm, 'C': cm, 'promos': promos, 'init': a.init or 'hand_init', 'best_teachers': best, 'labelled_decisions': labelled,
               'decision_weight': {'won_play': 1.0, 'lost_play': a.lost_weight, 'best_teacher_factor': a.best_factor, 'dagger_label': 2.0, 'up_families': sorted(up), 'up_factor': a.up_factor if up else 1.0},
               'losses': {'pointer_ce': 1.0, 'action_ce': 1.0, 'value': 0.5, 'danger_mse': 0.5, 'aux_teacher_state': a.aux},
-              'train': {'files': a.train, 'decisions': len(train), 'plays': len(train.plays)}, 'hold': {'files': a.hold, 'decisions': len(hold), 'plays': len(hold.plays)}, 'device': str(mx.default_device())}
-    json.dump(config, open(os.path.join(a.out, 'config.json'), 'w'), indent=1)
-    curves = open(os.path.join(a.out, 'curves.jsonl'), 'w')
+              'train': {'files': a.train, 'decisions': train.decisions, 'plays': len(train)}, 'hold': {'files': a.hold, 'decisions': hold.decisions, 'plays': len(hold)}, 'device': str(mx.default_device())}
+    if not a.resume:
+        json.dump(config, open(os.path.join(a.out, 'config.json'), 'w'), indent=1)
+    curves = open(os.path.join(a.out, 'curves.jsonl'), 'a' if a.resume else 'w')
     print(f'{n_params} parameters, {steps} steps of {a.plays} plays; curriculum {cur}', flush=True)
 
-    def loss_fn(model, plan):
+    def loss_fn(model, dev, plan):
         loss, main, aux, parts, accs = run_step(model, dev, plan, tm, a.aux)
         return loss, (main, aux)
 
     grad_fn = nn.value_and_grad(model, loss_fn)
-    best_both = -1.0
     order = []
     seen_dec = 0
     log = collections.defaultdict(float)
@@ -551,16 +635,17 @@ def main():
     log_dec = 0
     t_train = 0.0
     stopped = False
-    for s in range(1, steps + 1):
+    for s in range(start + 1, steps + 1):
         L = next((l for upto, l in cur if s <= upto), cur[-1][1])
         if not order:
             order = plays_all[:]
             rng.shuffle(order)
         chunk, order = order[:a.plays], order[a.plays:]
         ts = time.time()
-        plan = plan_batch(dev, chunk, L, a.mem_drop, rng, tm)
+        dev = device_of(train, chunk, up)
+        plan = plan_batch(dev, list(range(len(chunk))), L, a.mem_drop, rng, tm)
         n_dec = sum(len(g[0]) for g in plan[3].values())
-        (loss, (main, aux)), grads = grad_fn(model, plan)
+        (loss, (main, aux)), grads = grad_fn(model, dev, plan)
         grads, norm = optim.clip_grad_norm(grads, 1.0)
         opt.update(model, grads)
         mx.eval(model.parameters(), opt.state, loss, main, aux, norm)
@@ -580,7 +665,7 @@ def main():
         if s % a.log_every == 0 or is_eval:
             rec = {'step': s, 'L': L, 'epoch': s * a.plays / len(plays_all), **{k: v / log_n for k, v in log.items()}, 'lr': float(sched(s)), 'dps': log_dec / max(log_t, 1e-9), 'dps_mean': seen_dec / t_train, 'wall_s': time.time() - t0}
             if is_eval:
-                ev, by_family = evaluate(model, hdev, hold_plays if (stopped or s == steps) else hold_eval, tm)
+                ev, by_family = evaluate(model, hold_device, hold_plays if (stopped or s == steps) else hold_eval, tm)
                 rec['hold'] = ev
                 rec['hold_by_family'] = by_family
             log = collections.defaultdict(float)
@@ -590,10 +675,15 @@ def main():
             print(json.dumps({k: v for k, v in rec.items() if k != 'hold_by_family'}), flush=True)
             if is_eval:
                 model.save_weights(os.path.join(a.out, 'last.safetensors'))
+                mx.save_safetensors(opt_path, dict(nn.utils.tree_flatten(opt.state)))
                 if ev['acc_both'] > best_both:
                     best_both = ev['acc_both']
                     model.save_weights(os.path.join(a.out, 'weights.safetensors'))
                     export(model, os.path.join(a.out, 'army-net.bin'))
+                json.dump({'step': s, 'steps': steps, 'best_both': best_both}, open(state_path, 'w'))
+        half_epoch = int(2 * s * a.plays / len(plays_all)) > int(2 * (s - 1) * a.plays / len(plays_all))
+        if half_epoch or stopped or s == steps:
+            save_checkpoint(model, a.out, s * a.plays / len(plays_all))
         if stopped:
             print(f'stopped at step {s} of {steps} (the {a.max_minutes} min limit of one GPU job)', flush=True)
             break

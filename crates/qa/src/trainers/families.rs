@@ -497,6 +497,7 @@ pub(super) fn blank(fam: Fam, lab: &Lab, instance: usize, attempt: u32) -> Scene
         start_round: 0,
         pillaged: Default::default(),
         taken: None,
+        cap_broken: None,
         founded: None,
         crossed: false,
         city_low: false,
@@ -1759,10 +1760,14 @@ pub fn judge(rules: &CompiledRuleset, game: &GameState, sc: &mut Scene, rel: u32
         }
         f @ (Fam::AssaultHeal | Fam::PromotionChoice | Fam::HillArchers | Fam::CityFire | Fam::PlannedAssault) => {
             let cap = assault::loss_cap(f, sc.mine.len());
-            if lost > cap {
+            if lost > cap && sc.cap_broken.is_none() {
+                sc.cap_broken = Some(rel);
+            }
+            let broken = sc.cap_broken.is_some();
+            if broken && !play_on_past_cap() {
                 Some(false)
             } else if sc.taken.is_some() {
-                Some(true)
+                Some(!broken)
             } else if limit || !mine.iter().any(|(p, _)| !act::is_civilian(rules, p.kind)) {
                 Some(false)
             } else {
@@ -1887,6 +1892,12 @@ pub fn judge(rules: &CompiledRuleset, game: &GameState, sc: &mut Scene, rel: u32
     v
 }
 
+/// `ARMY_PLAY_ON_CAP=1`: an assault scene whose loss cap broke plays on to its capture or its round limit, so
+/// the capture rate is measured beside the win (the verdict stays a loss: the win rules do not change).
+fn play_on_past_cap() -> bool {
+    std::env::var("ARMY_PLAY_ON_CAP").is_ok_and(|v| v == "1")
+}
+
 fn cost(rules: &CompiledRuleset, k: UnitKindId) -> f64 {
     f64::from(rules.units[k.0 as usize].cost)
 }
@@ -1907,6 +1918,7 @@ pub fn measures(rules: &CompiledRuleset, game: &GameState, sc: &Scene, rel: u32)
     }
     if sc.target.is_some() {
         m.insert("taken".into(), sc.taken.map_or(-1.0, f64::from));
+        m.insert("cap_broken".into(), sc.cap_broken.map_or(-1.0, f64::from));
         if let Some((hp, max)) = sc.target.and_then(|t| city_hp(rules, game, t)) {
             m.insert("city_hp_share".into(), hp as f64 / max as f64);
         }
