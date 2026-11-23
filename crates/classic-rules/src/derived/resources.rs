@@ -441,7 +441,21 @@ pub fn strategic_combat_penalty(ledger: &ResourceLedger, rules: &CompiledRuleset
 
 /// The penalty of one unit of the player (0 for a unit that requires
 /// nothing: the ledger is not built; 0 for barbarians, as Unciv).
+///
+/// Every unit asks for its modifiers many times between two commands (the AI's observation reads all
+/// of them), and the answer is the player's whole ledger measured against the kind: it is answered
+/// from the world's memo while the world does not change (`kernel::effects::memo`).
 pub fn unit_resource_penalty(auth: &AuthWorld, rules: &CompiledRuleset, player: PlayerId, kind: UnitKindId) -> i32 {
+    if unit_requirements(rules, kind).is_empty() || auth.players().is_barbarian(player) {
+        return 0;
+    }
+    #[derive(Clone, Copy, PartialEq, Eq, Hash)]
+    struct Key(PlayerId, UnitKindId);
+    auth.memo().module_value(Key(player, kind), || compute_unit_resource_penalty(auth, rules, player, kind))
+}
+
+/// `unit_resource_penalty` computed from the world, never from the memo.
+pub fn compute_unit_resource_penalty(auth: &AuthWorld, rules: &CompiledRuleset, player: PlayerId, kind: UnitKindId) -> i32 {
     if unit_requirements(rules, kind).is_empty() || auth.players().is_barbarian(player) {
         return 0;
     }

@@ -123,3 +123,17 @@ winners); science at r132 +13 %, technologies +1.8 %; 52.7 % against `science-fl
 science-win round 314 against 309). The research did not move: each city adds 5 % to every technology's cost on the
 pace maps, the new cities have no library (lag 34 rounds), and the first worker stays at r45. The look and the tables are
 in `work/nets/early-growth`; the trace is `ai-science-pace --early FILE`.
+
+Round 2 (`net2::growth`, `plan::Growth`; off for every other variant):
+
+| piece | what the executor reads | why (look 3610–3614 with the GOLD, DEF, GARR, ALLOC trace lines) |
+|---|---|---|
+| `GARRISON` (gate 500, per city) | `planner_cities::garrison_order` orders no flat garrison in a city the net leaves out (a city founded after the plan waits for the next reading) | young non-capital cities before their library built a military unit or a scout in 47 % of their rounds, 79 % of it the flat garrison ordered at founding (pop 1, 3 hammers); below the empire's mean production a quiet city builds its infrastructure first, the watch answers a seen threat |
+| `BUY_CHEST` | `allocator::spend_gold`: the tiles, the gifts and the other heads leave the hurry price of the cheapest worker, settler or science building heading a queue | 2533 tiles and 4 libraries bought by r135 (120 seats); a library's offer had the better ratio (1853 against 1195) but its price (300) was above the spendable gold in 3706 of 4591 offers |
+| `Growth::jobs_ahead` (`gate::JOBS_AHEAD`) | the allocator's worker counts at least the cities' owned tiles with a job, up to the citizens + 2 | the worked tiles alone gave the worker no value in most decisions before the first one (0 jobs in 34 of 74) |
+| site head S11·S12 (`site::SHARED` = 333) | a third of the land a site shares with an own city is subtracted | 263 of 394 cities were founded 3 tiles from their nearest own city |
+
+Found and not changed: the building price does not count the buildings a building opens (`building_here`'s depth is
+the free buildings'); the worker's chop does not count the hammers the chop gives; a worker's job weight is linear in its
+gain. A higher worker gain for a lacking luxury (tried) left the improvable lacking luxuries as open as before (1.4 kinds
+at r50): their cause is not the job's value.
