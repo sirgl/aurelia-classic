@@ -57,6 +57,8 @@ use super::{Piece, Scene};
 /// strike from the rotation or from death) and rests until `ROTATE_BACK`.
 pub const ROTATE_BELOW: u16 = 70;
 pub const ROTATE_BACK: u16 = 90;
+/// A shooter in the burst leaves below this (the city's strongest strike takes about 90).
+pub const ROTATE_BURST: u16 = 45;
 
 /// What a scene keeps between rounds (the measures and the references' memory).
 #[derive(Debug, Clone, Default)]
@@ -518,7 +520,10 @@ pub fn turn(rules: &CompiledRuleset, game: &mut GameState, sc: &mut Scene, f: Fl
     let low = city_hp(rules, game, city).is_some_and(|(hp, max)| hp * 10 <= max * 3);
     for (p, c) in sc.mine_alive(game) {
         let rests = sc.track.resting.contains(&p.id);
-        if f.rotate && !low && !rests && c.hp < ROTATE_BELOW {
+        // In the burst a shooter keeps firing down to the weakest strike's reach (a strike takes up to 90): the city heals 20 a
+        // turn, so a shooter that leaves at 70 gives the city its healing back.
+        let below = if sc.track.engaged && matches!(p.role, "ranged" | "siege") { ROTATE_BURST } else { ROTATE_BELOW };
+        if f.rotate && !low && !rests && c.hp < below {
             sc.track.resting.insert(p.id);
         }
         if rests && (c.hp >= ROTATE_BACK || low) {
@@ -572,10 +577,20 @@ pub fn turn(rules: &CompiledRuleset, game: &mut GameState, sc: &mut Scene, f: Fl
         }
         let states: Vec<(bool, bool)> = active.iter().map(|(p, c)| ready(game, p, c)).collect();
         // Every shooter can at least arrive on a firing tile (those that can fire at once do; the rest arrive and fire next turn).
-        let all_ready = states.iter().zip(&active).all(|(s, (p, _))| s.1 || !matches!(p.role, "ranged" | "siege"));
+        // With fewer firing tiles than shooters (hills round the city) the surplus shooters are a reserve: the army goes
+        // once as many shooters can arrive as there are tiles for them.
+        let shooters = active.iter().filter(|(p, _)| matches!(p.role, "ranged" | "siege")).count();
+        let slots: std::collections::BTreeSet<TileId> = active
+            .iter()
+            .filter(|(p, _)| matches!(p.role, "ranged" | "siege"))
+            .filter_map(|(_, c)| act::range_of(rules, c.kind))
+            .flat_map(|r| firing_tiles(game, rules, city, r, &targets))
+            .collect();
+        let arrive = states.iter().zip(&active).filter(|(s, (p, _))| s.1 && matches!(p.role, "ranged" | "siege")).count();
+        let all_ready = arrive >= shooters.min(slots.len().max(1)) && states.iter().zip(&active).all(|(s, (p, _))| s.1 || matches!(p.role, "ranged" | "siege"));
         // The army goes whole: while a unit still rests the others wait (the rotation's first turns), up to a limit.
-        let wait_for_rest = !sc.track.resting.is_empty() && sc.track.waited < 10;
-        if (all_ready && !wait_for_rest) || active.is_empty() || sc.track.waited >= 12 {
+        let wait_for_rest = !sc.track.resting.is_empty() && sc.track.waited < 4;
+        if (all_ready && !wait_for_rest) || active.is_empty() || sc.track.waited >= 5 {
             sc.track.engaged = true;
         } else {
             sc.track.waited += 1;

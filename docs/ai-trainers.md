@@ -286,11 +286,11 @@ rate is 100 % by construction); tac2 is work/tac a2a1b36 plus this module (`tac2
 
 | family | kept / drawn | passive % | random % | best solver % (drawn) | standard % | tac2 % | unciv % |
 |---|---|---|---|---|---|---|---|
-| `assault-heal` | 700/700 | 0 | 0 | 94 | 41 | 46 | 59 |
-| `promotion-choice` | 700/700 | 0 | 0 | 78 | 25 | 28 | 62 |
-| `hill-archers` | 666/700 | 0 | 0 | 22 | 41 | 34 | 24 |
-| `city-fire` | 697/700 | 0 | 0 | 48 | 42 | 33 | 32 |
-| `planned-assault` | 658/700 | 0 | 0 | 25 | 28 | 16 | 22 |
+| `assault-heal` | 700/700 | 0 | 0 | 99 | 40 | 46 | 59 |
+| `promotion-choice` | 700/700 | 0 | 0 | 81 | 26 | 27 | 62 |
+| `hill-archers` | 700/700 | 0 | 0 | 66 | 33 | 25 | 20 |
+| `city-fire` | 700/700 | 0 | 0 | 95 | 42 | 30 | 31 |
+| `planned-assault` | 690/700 | 0 | 0 | 43 | 28 | 13 | 21 |
 
 Findings: standard and tac2 lose assault-heal and promotion-choice mainly by not resting the wounded and not staging
 the approach (see the traces on the page); in hill-archers and planned-assault the references are still weaker than
@@ -336,6 +336,32 @@ shooters; ref-choke sends melee in only for a kill. Test `the_citadel_stands_on_
 re-measured (100 instances a cell, seven eras; the ancient era also builds): kept 679/800 (was 714/800); passive 0 %,
 random 0 %, standard 0 % (was 0 %), tac2 0 %, unciv 26 % (was 25 %); ref-choke 8 % and ref-fight 9 % on the drawn
 attempts (the proof keeps those they win). The first-measurement row of `citadel` above is superseded.
+
+## Targets for the hill-archers and planned-assault references (written 23 November 2026, before the runs)
+
+The reference must win at least 70 % of all drawn attempts in the family, or at least 1.5 times the win rate of
+`standard` on the kept attempts (all cells together, 100 instances a cell). Measured with `runs/t3` after the
+improvement; the result is written in the section below.
+
+## Improvement of the references (23 November 2026, `runs/t3`, `runs/t3-tac2`, 100 instances a cell)
+
+Target (written before the runs, above): the reference wins at least 70 % of all drawn attempts or at least 1.5 times
+`standard` on the kept attempts. Causes found by trace and fixed in the one planner `assault::turn`:
+1. The readiness deadlock: with fewer firing tiles (hills round the city) than shooters, a surplus shooter was never
+   "ready", so the army waited the full 12 rounds and went after the city had bought its defences (hill-archers
+   medieval: the assault began at round 13). Now the army goes when as many shooters can arrive as there are tiles
+   (the rest are a reserve), and waits at most 4 rounds for a resting unit and 5 for the staging.
+2. The rotation took shooters out of the burst at 70 hit points, and the city heals 20 a turn: a shooter in the burst
+   now leaves below 45 (`ROTATE_BURST`; the city's strongest strike takes about 90), melee waiting still at 70.
+
+| family | reference (all drawn attempts) before | after | standard (kept) | ratio |
+|---|---|---|---|---|
+| `hill-archers` | ref-hills 22 %, ref-planned 11 % | ref-hills 57 %, ref-planned 66 % | 33 % | 2.0 |
+| `planned-assault` | ref-planned 25 % | ref-planned 43 % | 28 % | 1.5 |
+
+Both meet the second clause (planned-assault only just). tac2 13-25 %, unciv 20-21 % on the two. The other three
+families were re-proved with the same planner (assault-heal 99 %, promotion-choice 81 %, city-fire 95 % on the drawn
+attempts); the table above is the new one. The first part-2 run is `runs/t2`.
 
 ## Limits
 
