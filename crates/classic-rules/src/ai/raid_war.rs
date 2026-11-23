@@ -72,9 +72,15 @@ fn away(view: &UnitView<'_, '_>, city: crate::ids::TileId) -> bool {
     !view.brief.endangered(city) && view.local.view.dimensions().distance(view.local.unit.tile, city).is_some_and(|d| d > CITY_RING)
 }
 
+/// `net2`'s offence: its war order at war with no operation of ours on the rival (`WarOrder::raid`, MO6): the war exists
+/// and no capture is under way, so a free unit pillages as under `raid-war` (CHAIN.md MO6). False without a plan.
+pub fn ordered_raid(brief: &crate::ai::planner::TurnBrief) -> bool {
+    crate::ai::operations::with_net2(brief, crate::ai::net2::plan::Part::War, |p| p.war.order().is_some_and(|o| o.raid)).unwrap_or(false)
+}
+
 /// The pillage trip of a unit that is free to go, if one pays.
 pub fn sortie(view: &UnitView<'_, '_>, state: &AiState, tools: &mut PlanTools<'_>) -> Option<Decision> {
-    if !view.brief.raid_war {
+    if !view.brief.raid_war && !ordered_raid(view.brief) {
         return None;
     }
     let unit = view.local.unit;

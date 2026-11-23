@@ -110,6 +110,13 @@
 //! `NetsXSite` stays as an alias that plays as `Standard`, and `NextX` plays as `PreNetsX`. Every other
 //! variant plays as it was measured (`StrategistX`, `EconSite` and its hand edits, `NetsX` on the mind of
 //! `NextX`).
+//! In the sixteenth promotion (23 November) `Standard` took the play of `Net2`: the mind of `NetsXSite` with
+//! `net2` (`ai::net2`) in place of the strategist's pass and its site head in place of the guarded site score,
+//! its offence and the war's going on priced at peace (`net2_parts`, `net2_offence`, `values_war_at_peace`),
+//! under the name `standard`, in every build (none of `net2`'s code is behind the feature). `PreNet2` is the
+//! standard before it (the play of `NetsXSite`; bench only, `experimental-ai`); `Net2` stays as an alias that
+//! plays as `Standard`, and `NetsXSite` plays as `PreNet2`. Every other variant plays as it was measured
+//! (`Net2Defence`, `Net2Tac`, the ablation's `Net2Without` and `Net2Off`, `Tac2`, `PeaceFix` …).
 
 use crate::ai::grand_strategy::Stakes;
 use crate::ai::operations::WarGate;
@@ -178,6 +185,11 @@ pub enum Variant {
     /// classic/docs/ai-strategist-defects.md), and its settlers value a site by the site net held near the
     /// land score, away from rivals and armies and with a dearer walk (`EconSite`'s settlers,
     /// classic/docs/ai-econ-nets.md); `PreNetsX` is the standard before it.
+    /// Since the sixteenth promotion (23 November) it plays as `Net2`: on top of the play of `NetsXSite`
+    /// one net (`ai::net2`) reads the seat and every rival and takes the strategist's turn, the wars
+    /// and their aims, the deals, the peace, the city-states, the congress, the guard of the cities,
+    /// the fleet, the city cap and the research on the spaceship's way, and its site head values the
+    /// settlers' sites (classic/docs/ai-net2.md); `PreNet2` is the standard before it.
     #[default]
     Standard,
     /// The game's AI before the eleventh promotion (2 November): `Standard` without the
@@ -889,6 +901,38 @@ pub enum Variant {
     /// fourteenth promotion (`StrategistX`, `StrategistXThreat`, `EconSite` and its hand edits, `NetsX`)
     /// keep playing as they were measured. Kept for the bench (`experimental-ai` only).
     PreNetsX,
+    /// `net2` (22 November, classic/docs/ai-net2.md, work/new-net-design-2026-11-22.md): the mind of
+    /// `NetsXSite` (the play of `standard`) with `net2` (`ai::net2`) in place of the strategist and its
+    /// site head in place of the guarded site score. A bench-only candidate (`experimental-ai`); it plays
+    /// as `NetsXSite` wherever `net2` has no say (`ClassicMind::new`).
+    /// Promoted to `Standard` on 23 November (the sixteenth promotion): kept under its name as an alias
+    /// that plays as `Standard`.
+    Net2,
+    /// `net2-defence` (the offence addendum, work/new-net-offence-addendum-2026-11-22.md): `Net2` with the
+    /// offence switched off (`Variant::net2_offence`), the control of every offence measure. Until the
+    /// offence is built it plays exactly as `Net2`. Bench only (`experimental-ai`).
+    Net2Defence,
+    /// `tac2` (work/tactical-net-design-2026-11-22.md §6.2): the mind of `Standard` with the tactical unit
+    /// nets (`ai::unit_net`) in the scope of their tasks. Bench only (`experimental-ai`).
+    Tac2,
+    /// `net2-tac`: `Net2` with the tactical unit nets of `Tac2`. Bench only (`experimental-ai`).
+    Net2Tac,
+    /// `net2-no-<part>` (net2/GAP.md, the ablation): `Net2` with one part of `net2` played as `nets-x-site`
+    /// plays it (`net2::Part`). Bench only (`experimental-ai`).
+    Net2Without(crate::ai::net2::Part),
+    /// `net2-off`: `Net2` with no part of `net2` playing; every decision is `nets-x-site`'s, the check that the
+    /// ablation's fallback is exact. Bench only (`experimental-ai`).
+    Net2Off,
+    /// `peace-fix` (work/nets/tricks/CHAIN.md D8, tac/runs/C1.md): `Standard` with the war's going on priced also
+    /// without an operation at peace time (`values_war_at_peace`), the fix alone for its own promotion gate. Bench only
+    /// (`experimental-ai`).
+    PeaceFix,
+    /// The game's AI before the sixteenth promotion (23 November): the mind of `NetsXSite` (the play of the
+    /// fifteenth promotion), without `net2` (`ClassicMind::new`). The control of the promotion. The variants
+    /// built on the standard of the fifteenth promotion (`Net2Defence`, `Net2Tac`, the ablation's `Net2Without`
+    /// and `Net2Off`, `Tac2`, `PeaceFix`) keep playing as they were measured. Kept for the bench
+    /// (`experimental-ai` only).
+    PreNet2,
 }
 
 /// The net's base: the expert the end-to-end net learns from and the mind it
@@ -909,7 +953,7 @@ const NUDGED_CANDIDATES: u32 = 40;
 
 impl Variant {
     /// The game's AI first.
-    pub const ALL: [Variant; 165] = [
+    pub const ALL: [Variant; 182] = [
         Variant::Standard,
         Variant::PreCamps,
         Variant::PreWorkers,
@@ -1075,6 +1119,23 @@ impl Variant {
         Variant::NetsXSite,
         Variant::StrategistXThreat,
         Variant::PreNetsX,
+        Variant::Net2,
+        Variant::Net2Defence,
+        Variant::Tac2,
+        Variant::Net2Tac,
+        Variant::Net2Without(crate::ai::net2::Part::Strategy),
+        Variant::Net2Without(crate::ai::net2::Part::War),
+        Variant::Net2Without(crate::ai::net2::Part::Deals),
+        Variant::Net2Without(crate::ai::net2::Part::Peace),
+        Variant::Net2Without(crate::ai::net2::Part::CityStates),
+        Variant::Net2Without(crate::ai::net2::Part::Congress),
+        Variant::Net2Without(crate::ai::net2::Part::Sites),
+        Variant::Net2Without(crate::ai::net2::Part::Fleet),
+        Variant::Net2Without(crate::ai::net2::Part::Guard),
+        Variant::Net2Without(crate::ai::net2::Part::Economy),
+        Variant::Net2Off,
+        Variant::PeaceFix,
+        Variant::PreNet2,
     ];
 
     /// The parts of the strategist's wishes the variant plays (`strategy_net::wishes::Parts`): a property
@@ -1088,7 +1149,9 @@ impl Variant {
             Variant::StrategistX => Parts { threat: false, tall_first: true },
             Variant::StrategistXThreat => Parts { threat: true, tall_first: false },
             // `nets-x` and `nets-x-site` play `strategist-x`'s strategist under their own names.
-            Variant::NetsX | Variant::NetsXSite => Variant::StrategistX.strategist_parts(),
+            // `net2` and its relatives play `nets-x-site`'s strategist parts (tall first): `net2` replaces the
+            // strategist's pass, not its wishes' parts.
+            Variant::NetsX | Variant::NetsXSite | Variant::Net2 | Variant::Net2Defence | Variant::Tac2 | Variant::Net2Tac | Variant::Net2Without(_) | Variant::Net2Off | Variant::PeaceFix => Variant::StrategistX.strategist_parts(),
             _ => Parts::NONE,
         }
     }
@@ -1242,6 +1305,25 @@ impl Variant {
             Variant::NetsXSite => "nets-x-site",
             Variant::StrategistXThreat => "strategist-x-threat",
             Variant::PreNetsX => "pre-nets-x",
+            Variant::Net2 => "net2",
+            Variant::Net2Defence => "net2-defence",
+            Variant::Tac2 => "tac2",
+            Variant::Net2Tac => "net2-tac",
+            Variant::Net2Without(part) => match part {
+                crate::ai::net2::Part::Strategy => "net2-no-strategy",
+                crate::ai::net2::Part::War => "net2-no-war",
+                crate::ai::net2::Part::Deals => "net2-no-deals",
+                crate::ai::net2::Part::Peace => "net2-no-peace",
+                crate::ai::net2::Part::CityStates => "net2-no-cs",
+                crate::ai::net2::Part::Congress => "net2-no-congress",
+                crate::ai::net2::Part::Sites => "net2-no-sites",
+                crate::ai::net2::Part::Fleet => "net2-no-fleet",
+                crate::ai::net2::Part::Guard => "net2-no-guard",
+                crate::ai::net2::Part::Economy => "net2-no-economy",
+            },
+            Variant::Net2Off => "net2-off",
+            Variant::PeaceFix => "peace-fix",
+            Variant::PreNet2 => "pre-net2",
             Variant::ArmyFit => "army-fit",
             Variant::Camps => "camps",
             Variant::ArmyCamps => "army-camps",
@@ -1280,11 +1362,14 @@ impl Variant {
     /// `pre-next-x` (the standard before) are the bench's. The play of `nets-x-site` is the game's since
     /// the fifteenth promotion: `Standard` plays it in every build (the site net's table is compiled in
     /// every build since); the names `nets-x-site` and `pre-nets-x` (the standard before) are the bench's.
+    /// The play of `net2` is the game's since the sixteenth promotion: `Standard` plays it in every build
+    /// (none of `ai::net2` is behind the feature); the names `net2` and `pre-net2` (the standard before) are
+    /// the bench's.
     pub fn compiled(self) -> bool {
         cfg!(feature = "experimental-ai")
             || !matches!(
                 self,
-                Variant::Net | Variant::UnitNet | Variant::Hybrid | Variant::SiteNet | Variant::ChoiceNet | Variant::ChoiceNetProduction | Variant::ChoiceNetResearch | Variant::StandardScripted | Variant::PreCsGifts | Variant::Sharp | Variant::TallReal | Variant::Next | Variant::WonderCancel | Variant::WonderRace | Variant::NextW | Variant::NextRace | Variant::PreNext | Variant::WarPays | Variant::TacticianFit | Variant::WarMuster | Variant::SiegeCall | Variant::NextWar | Variant::Retake2 | Variant::NextWarRetake | Variant::VoteGuard | Variant::FieldCraft | Variant::RaidWar | Variant::Landless | Variant::LandlessPlan | Variant::NextX | Variant::PreNextX | Variant::StrategistX | Variant::StrategistXThreat | Variant::EconSite | Variant::EconSiteTall | Variant::EconSiteOwnLand | Variant::NetsX | Variant::NetsXSite | Variant::PreNetsX
+                Variant::Net | Variant::UnitNet | Variant::Hybrid | Variant::SiteNet | Variant::ChoiceNet | Variant::ChoiceNetProduction | Variant::ChoiceNetResearch | Variant::StandardScripted | Variant::PreCsGifts | Variant::Sharp | Variant::TallReal | Variant::Next | Variant::WonderCancel | Variant::WonderRace | Variant::NextW | Variant::NextRace | Variant::PreNext | Variant::WarPays | Variant::TacticianFit | Variant::WarMuster | Variant::SiegeCall | Variant::NextWar | Variant::Retake2 | Variant::NextWarRetake | Variant::VoteGuard | Variant::FieldCraft | Variant::RaidWar | Variant::Landless | Variant::LandlessPlan | Variant::NextX | Variant::PreNextX | Variant::StrategistX | Variant::StrategistXThreat | Variant::EconSite | Variant::EconSiteTall | Variant::EconSiteOwnLand | Variant::NetsX | Variant::NetsXSite | Variant::PreNetsX | Variant::Net2 | Variant::Net2Defence | Variant::Tac2 | Variant::Net2Tac | Variant::Net2Without(_) | Variant::Net2Off | Variant::PeaceFix | Variant::PreNet2
             )
     }
 
@@ -1538,9 +1623,41 @@ impl Variant {
     }
 
     /// Its tactical and operations layer is the unit net's (`ai::unit_net`,
-    /// `TurnBrief::unit_net`): `UnitNet` and `Hybrid`.
+    /// `TurnBrief::unit_net`): `UnitNet` and `Hybrid`, and the tactical candidates `Tac2` and `Net2Tac`.
     pub fn unit_net(self) -> bool {
-        matches!(self, Variant::UnitNet | Variant::Hybrid)
+        matches!(self, Variant::UnitNet | Variant::Hybrid | Variant::Tac2 | Variant::Net2Tac)
+    }
+
+    /// `net2` (`ai::net2`) decides the strategist's pass and the settlers' site score: `Standard` (since the
+    /// sixteenth promotion) and its alias `Net2`, its control `Net2Defence`, `Net2Tac` and the ablation's
+    /// variants. No other variant, `pre-net2` and `nets-x-site` among them.
+    pub fn net2(self) -> bool {
+        self.net2_parts().is_some()
+    }
+
+    /// The parts of `net2` the variant plays (None: no `net2`): every part but in the ablation
+    /// (`Net2Without`, `Net2Off`).
+    pub fn net2_parts(self) -> Option<crate::ai::net2::Parts> {
+        use crate::ai::net2::Parts;
+        match self {
+            Variant::Standard | Variant::Net2 | Variant::Net2Defence | Variant::Net2Tac => Some(Parts::All),
+            Variant::Net2Without(part) => Some(Parts::Without(part)),
+            Variant::Net2Off => Some(Parts::Nothing),
+            _ => None,
+        }
+    }
+
+    /// The war's going on is priced also without an operation at peace time (`TurnBrief::war_at_peace`,
+    /// `peace::WarProspect::of`): an assault group's case and `net2`'s war order. `peace-fix` (the fix alone), every
+    /// `net2` variant (`standard` since the sixteenth promotion) and the tactical candidates.
+    pub fn values_war_at_peace(self) -> bool {
+        matches!(self, Variant::PeaceFix | Variant::Tac2 | Variant::Net2Tac) || self.net2()
+    }
+
+    /// `net2`'s offence (work/new-net-offence-addendum-2026-11-22.md) plays: every `net2` variant but
+    /// `Net2Defence` (`standard` since the sixteenth promotion).
+    pub fn net2_offence(self) -> bool {
+        matches!(self, Variant::Standard | Variant::Net2 | Variant::Net2Tac | Variant::Net2Without(_) | Variant::Net2Off)
     }
 
     /// Its free military units clear the barbarian camps near its cities (`ai::camps`):
@@ -2304,7 +2421,7 @@ mod tests {
         assert_eq!(Variant::from_name("hybrid"), Some(Variant::Hybrid));
         assert!(!Variant::UnitNet.strategy_net() && Variant::Hybrid.strategy_net());
         let on: Vec<Variant> = Variant::ALL.into_iter().filter(|v| v.unit_net()).collect();
-        assert_eq!(on, [Variant::UnitNet, Variant::Hybrid]);
+        assert_eq!(on, [Variant::UnitNet, Variant::Hybrid, Variant::Tac2, Variant::Net2Tac]);
     }
 
     #[test]

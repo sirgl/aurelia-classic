@@ -32,6 +32,14 @@ pub const FOCUS_PRIORITY: i32 = 5;
 #[derive(Debug, Clone, Copy, Default)]
 pub struct EconomyAdvisor;
 
+/// The unit a great person's order moves or spends (`great_person_commands`, `general_commands`).
+fn ordered_unit(command: &Command) -> Option<crate::ids::UnitHandle> {
+    match command {
+        Command::MarchTo { unit, .. } | Command::GreatPersonAction { unit, .. } => Some(*unit),
+        _ => None,
+    }
+}
+
 fn proposals(priority: i32, commands: Vec<Command>) -> Vec<Proposal> {
     commands
         .into_iter()
@@ -43,11 +51,21 @@ impl SystemAdvisor for EconomyAdvisor {
     /// Before the planner: its production orders of this turn then see
     /// the happiness building (no duplicate order from one observation).
     fn start_of_turn(&self, input: &AdvisorInput<'_, '_>) -> Vec<Proposal> {
-        let great = if input.brief.abilities {
+        let mut great = if input.brief.abilities {
             crate::ai::unit_abilities::great_person_commands(input)
         } else {
             crate::ai::great_people::great_person_commands(input.observation, input.rules)
         };
+        // `net2`'s `Generals::Hold`: a Great General with no war to lead stands in the nearest city (none
+        // without a plan). A general that already has an order (its citadel, the walk to its site) keeps it.
+        let generals = crate::ai::great_people::generals_of(input.brief);
+        for command in crate::ai::great_people::general_commands(input.observation, input.rules, generals) {
+            let unit = ordered_unit(&command);
+            let ordered = unit.is_some() && great.iter().any(|c| ordered_unit(c) == unit);
+            if !ordered {
+                great.push(command);
+            }
+        }
         // Priced happiness is the allocator's to buy (`PriceModel::Uses`).
         let happiness = match valued(input) {
             Some(_) => Vec::new(),

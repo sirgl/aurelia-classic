@@ -154,8 +154,61 @@ const GUARD_RADIUS_NEAR: i32 = 4;
 /// and failures that lose more than 5 units at most 2 points above it, a third under the gates of the
 /// lane (1.5 and 3 points). Margins 100 / 150 / 175 / 200 gave +1.48 / +1.20 / +0.98 / +0.86 units.
 const GUARD_MARGIN_PERCENT: u64 = 175;
-fn margin_percent() -> u64 {
-    GUARD_MARGIN_PERCENT
+
+/// The margin of a retake against `captor` under `net2`'s war order (design §4.4): with a `Retake` order on
+/// it the margin falls from `GUARD_MARGIN_PERCENT` to `RETAKE_ORDER_MARGIN_PERCENT` as the order's value
+/// rises from the value that starts an order (550) to 1000, a capital in the captor's hands (retake 1200 · R19
+/// in `retake_r`). Without such an order the margin is the fitted one.
+fn margin_percent(brief: &TurnBrief, captor: PlayerId) -> u64 {
+    crate::ai::operations::with_net2(brief, crate::ai::net2::plan::Part::War, |plan| plan.war_on(captor).filter(|o| o.kind == crate::ai::net2::plan::WarKind::Retake).map(|o| o.value))
+        .flatten()
+        .map_or(GUARD_MARGIN_PERCENT, order_margin)
+}
+
+/// The value at which a war order starts (design §4.4).
+const ORDER_START_VALUE: i64 = 550;
+/// The margin at an order value of 1000: the fitted margins 100 / 150 / 175 cost +1.48 / +1.20 / +0.98 units
+/// a retake (above); 125 is the cost of about +1.35, accepted for a capital, not for a city (the order's value
+/// reaches 1000 only with R19, or with R20 and a local force).
+const RETAKE_ORDER_MARGIN_PERCENT: u64 = 125;
+
+/// The margin for an order of `value` (thousandths): linear between the two margins.
+pub fn order_margin(value: i64) -> u64 {
+    let t = (value - ORDER_START_VALUE).clamp(0, 1000 - ORDER_START_VALUE) as u64;
+    let span = 1000 - ORDER_START_VALUE as u64;
+    GUARD_MARGIN_PERCENT - (GUARD_MARGIN_PERCENT - RETAKE_ORDER_MARGIN_PERCENT) * t / span
+}
+
+/// The strategy memory of `state` as the retake reads it: its part of `AiState::mind_memory`. The bytes may
+/// hold the commander's memory beside it (`unit_net::memory`, an envelope of the two); the retake decoded the
+/// whole bytes, took the envelope for a spoiled memory and wiped the strategy net's and the commander's
+/// memory every turn (tactical design §6.2, lane B's `Memory::of`; this is its local stand-in until part B
+/// lands `strategy_net::Memory::of` and `store`, then the two bodies are one line each).
+fn strategy_memory(state: &AiState) -> strategy_net::Memory {
+    #[cfg(feature = "experimental-ai")]
+    let (strategy, _) = crate::ai::unit_net::memory::split(&state.mind_memory);
+    #[cfg(not(feature = "experimental-ai"))]
+    let strategy = state.mind_memory.clone();
+    strategy_net::Memory::decode(&strategy)
+}
+
+/// Writes `memory` back, the commander's part kept.
+fn store_strategy_memory(memory: &strategy_net::Memory, state: &mut AiState) {
+    #[cfg(feature = "experimental-ai")]
+    {
+        let (_, unit) = crate::ai::unit_net::memory::split(&state.mind_memory);
+        state.mind_memory = crate::ai::unit_net::memory::join(&memory.encode(), &unit);
+    }
+    #[cfg(not(feature = "experimental-ai"))]
+    {
+        state.mind_memory = memory.encode();
+    }
+}
+
+/// The cities the seat lost in the window and still counts as lost (its own memory), for the war order of a
+/// retake (`operations::targets_for`).
+pub fn lost_tiles(state: &AiState) -> Vec<TileId> {
+    strategy_memory(state).retake.map(|m| m.lost.iter().map(|l| l.tile).collect()).unwrap_or_default()
 }
 
 /// Most cities the memory keeps as lost (the oldest go first): a seat that loses more than this in a
@@ -331,7 +384,7 @@ fn assess(brief: &TurnBrief, rules: &CompiledRuleset, stakes: &Stakes, site: &Si
     // The city strikes once a round at the group (a unit of the group's mean strength).
     let mean = strength_sum / members.len() as i64;
     let city_hit = u32::from(city_strike_damage(site.estimate.strength, mean, Roll::Expected));
-    if outmatched(own_power, group_hp, city_hit, rounds, site.guard_power, margin_percent()) {
+    if outmatched(own_power, group_hp, city_hit, rounds, site.guard_power, margin_percent(brief, site.captor)) {
         return (None, false);
     }
     let left = u64::from(group_hp.max(1)).saturating_sub(u64::from(city_hit) * u64::from(rounds));
@@ -358,11 +411,11 @@ pub fn cases_remembered(observation: &AIObservation<'_>, brief: &TurnBrief, stat
     let window = crate::ai::operations::march_limit(brief);
     let own: Vec<TileId> = brief.cities.iter().map(|c| c.tile).collect();
     let seen: Vec<(TileId, PlayerId)> = observation.visible_foreign_cities.iter().map(|c| (c.tile, c.owner)).collect();
-    let mut kept = strategy_net::Memory::decode(&state.mind_memory);
+    let mut kept = strategy_memory(state);
     let mut memory = kept.retake.take().unwrap_or_default();
     memory.observe(brief.round, window, &own, &seen);
     kept.retake = Some(memory.clone());
-    state.mind_memory = kept.encode();
+    store_strategy_memory(&kept, state);
     let lost_tiles: Vec<TileId> = memory.lost.iter().map(|l| l.tile).collect();
     let (kept, threatened) = kept_guards(observation, brief, state, rules);
     let free: Vec<usize> = (0..brief.units.len())

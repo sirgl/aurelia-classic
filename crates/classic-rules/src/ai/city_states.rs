@@ -27,14 +27,56 @@ fn gift_value(info: &CityStateInfo, me: crate::ids::PlayerId) -> Option<i32> {
     Some(info.influence + if quest { 100 } else { 0 })
 }
 
+/// `net2`'s share of the gold for the city-states this turn (`Net2Plan::cs_gold_share`); 0 (today's reserve
+/// and ceiling) without a plan. THE ONE PLACE the gift paths read it.
+pub fn gold_share_of(brief: &crate::ai::planner::TurnBrief) -> crate::ai::strategy_net::Milli {
+    brief.net2_for(crate::ai::net2::plan::Part::CityStates).map_or(0, |plan| plan.cs_gold_share)
+}
+
+/// The reserve the treasury keeps before it gifts, under a `net2` gold share for the city-states (design §4.7,
+/// `Net2Plan::cs_gold_share`, 0…1000): `GIFT_RESERVE` × (1000 − share) / 1000. Share 0 is today's reserve.
+pub fn reserve_for(share: crate::ai::strategy_net::Milli) -> u32 {
+    GIFT_RESERVE * (1000 - share.clamp(0, 1000)) as u32 / 1000
+}
+
+/// The gift ceiling under the share: `ceiling` × (1000 + share) / 1000 (a seat that spends on city-states tops
+/// an alliance up higher before it turns the gold elsewhere). Share 0 is today's ceiling.
+pub fn ceiling_for(ceiling: i32, share: crate::ai::strategy_net::Milli) -> i32 {
+    (i64::from(ceiling) * (1000 + share.clamp(0, 1000)) / 1000) as i32
+}
+
+/// `net2`'s contested city-state (its input G10, design §2.2: "cheap flips"): allied to another nation, not at war
+/// with us, and our influence trails the ally's by under `FRIENDS_THRESHOLD` points. The ally's influence is not on
+/// the screen: at least the alliance's threshold, and the mean of our own alliances when we hold some (the same
+/// estimate as `guard_targets`). Some(the influence to pass); None: not contested. THE ONE definition: `net2`'s
+/// input counts these, and the gift executor (`priced_gifts_shared`) offers them while the plan shares gold with
+/// the city-states (CHAIN.md: the input counted them and the executor skipped every city-state allied to another).
+pub fn contested_beat(obs: &AIObservation<'_>, info: &CityStateInfo) -> Option<i32> {
+    use crate::knowledge::public::PlayerQueries;
+    let me = obs.player;
+    if info.at_war || !info.ally.is_some_and(|a| a != me) {
+        return None;
+    }
+    let held: Vec<i32> = obs.city_states.iter().filter(|c| c.ally == Some(me)).map(|c| c.influence).collect();
+    let threshold = obs.view.city_state_terms(info.player).map_or(ALLIES_THRESHOLD, |t| t.allies_at);
+    let leader = if held.is_empty() { threshold } else { (held.iter().map(|v| i64::from(*v)).sum::<i64>() / held.len() as i64) as i32 }.max(threshold);
+    (leader - info.influence < crate::world::city_states::FRIENDS_THRESHOLD).then_some(leader.max(info.influence))
+}
+
 /// One gold gift a turn to the most valuable city-state while the treasury
 /// is above the reserve.
 pub fn gift_orders(obs: &AIObservation<'_>) -> Vec<Command> {
+    gift_orders_shared(obs, 0)
+}
+
+/// `gift_orders` under a `net2` gold share (`reserve_for`).
+pub fn gift_orders_shared(obs: &AIObservation<'_>, share: crate::ai::strategy_net::Milli) -> Vec<Command> {
     let treasury = obs.economy.treasury;
-    if treasury < GIFT_RESERVE + SMALL_GIFT {
+    let reserve = reserve_for(share);
+    if treasury < reserve + SMALL_GIFT {
         return Vec::new();
     }
-    let gold = if treasury >= 2 * GIFT_RESERVE + MEDIUM_GIFT {
+    let gold = if treasury >= 2 * reserve + MEDIUM_GIFT {
         MEDIUM_GIFT
     } else {
         SMALL_GIFT
@@ -207,6 +249,12 @@ pub struct PricedGift {
 /// delegates toward the World Leader vote. A gift is worth its share of the project's value per
 /// gold.
 pub fn priced_gifts(obs: &AIObservation<'_>, prices: &crate::ai::value::Prices, gold: u32) -> Vec<PricedGift> {
+    priced_gifts_shared(obs, prices, gold, 0)
+}
+
+/// `priced_gifts` under a `net2` gold share (`ceiling_for`): the ceiling above which a gift is thrown away rises
+/// with the share.
+pub fn priced_gifts_shared(obs: &AIObservation<'_>, prices: &crate::ai::value::Prices, gold: u32, share: crate::ai::strategy_net::Milli) -> Vec<PricedGift> {
     use crate::knowledge::public::PlayerQueries;
     let mut out = Vec::new();
     if gold < SMALL_GIFT {
@@ -221,7 +269,9 @@ pub fn priced_gifts(obs: &AIObservation<'_>, prices: &crate::ai::value::Prices, 
     for info in &obs.city_states {
         let free = info.ally.is_none_or(|a| a == obs.player);
         let contest = targets.iter().find(|t| t.city_state == info.player);
-        let Some(terms) = obs.view.city_state_terms(info.player).filter(|_| (free || contest.is_some()) && !info.at_war) else { continue };
+        // `net2`: a contested city-state (its input G10) is a target while the plan shares gold with the city-states.
+        let flip = if share > 0 && contest.is_none() { contested_beat(obs, info) } else { None };
+        let Some(terms) = obs.view.city_state_terms(info.player).filter(|_| (free || contest.is_some() || flip.is_some()) && !info.at_war) else { continue };
         let lacking: i32 = obs
             .view
             .tradeable_luxuries(info.player)
@@ -234,7 +284,7 @@ pub fn priced_gifts(obs: &AIObservation<'_>, prices: &crate::ai::value::Prices, 
         let invest = info.quests.iter().any(|q| matches!(q, QuestKind::Invest));
         // A quest for gold pays its influence for any gift (`Invest` only makes a gift worth more).
         let quest = info.quests.iter().any(|q| matches!(q, QuestKind::GiveGold { .. }));
-        if contest.is_none() && prices.gift_cap && !quest && info.influence >= gift_ceiling(terms.allies_at, lead) {
+        if contest.is_none() && flip.is_none() && prices.gift_cap && !quest && info.influence >= ceiling_for(gift_ceiling(terms.allies_at, lead), share) {
             continue;
         }
         let (target, hold, guard) = match contest {
@@ -251,7 +301,8 @@ pub fn priced_gifts(obs: &AIObservation<'_>, prices: &crate::ai::value::Prices, 
                 }
                 (t.beat, i64::from(t.rounds), t.worth)
             }
-            None => (terms.allies_at, rounds, 0),
+            // A contested alliance is taken by passing the ally's estimated influence, then held as our own.
+            None => (flip.unwrap_or(terms.allies_at), rounds, 0),
         };
         for size in [SMALL_GIFT, MEDIUM_GIFT].into_iter().filter(|g| *g <= gold) {
             let points = i64::from(crate::world::city_states::gold_gift_influence_at(&obs.speed, obs.round, size, invest, 0).max(1));
@@ -342,6 +393,6 @@ impl crate::ai::system::SystemAdvisor for CityStatesAdvisor {
         if priced {
             return Vec::new();
         }
-        crate::ai::combat::proposals(3, gift_orders(input.observation))
+        crate::ai::combat::proposals(3, gift_orders_shared(input.observation, gold_share_of(input.brief)))
     }
 }
