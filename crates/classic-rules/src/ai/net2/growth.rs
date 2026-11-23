@@ -32,7 +32,7 @@ pub fn plan(obs: &AIObservation<'_>, brief: &TurnBrief, state: &crate::ai::state
         let capital = inputs.capital == Some(own.tile);
         let row = garrison_row(brief, own, &guard, &camps, mean, at_war, capital);
         if fire(&w::GARRISON, &Frame { c: &row, s: &pass.seat, ..Frame::default() }) < gate::GARRISON.0 {
-            garrison_waits.push(city.city);
+            garrison_waits.push(own.tile);
         }
     }
     let chest_heads = chest_heads(obs, rules);

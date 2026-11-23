@@ -58,6 +58,11 @@ pub struct Economy {
     pub gold: i32,
     pub production: i32,
     pub science: i32,
+    /// Food surplus a turn, summed over its cities (`CityIncome::food_surplus`:
+    /// what the stores get; a starving city counts negative). Reports saved
+    /// before read it as zero.
+    #[serde(default)]
+    pub food: i32,
     #[serde(default)]
     pub culture: u32,
     #[serde(default)]
@@ -93,7 +98,22 @@ pub struct Economy {
     pub faithful_cities: u32,
     #[serde(default)]
     pub followers: u32,
+    /// The demographics screen's rows (reports saved before read zeros).
+    #[serde(default)]
+    pub demographics: [Demo; 7],
 }
+
+/// One row of the game's demographics screen (`classic_rules::derived::standing`, the figures the
+/// AI reads as public information): the player's value and its rank among the living nations.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Demo {
+    pub value: i64,
+    pub rank: u32,
+}
+
+/// The rows of the demographics screen, in the order of `Measure::ALL` and with its names: population,
+/// crop yield, manufactured goods, GNP, literacy (percent of the technologies known), land area, soldiers.
+pub const DEMOGRAPHICS: [&str; 7] = ["population", "crop yield", "manufactured goods", "GNP", "literacy", "land area", "soldiers"];
 
 /// Buildings by the yield they add (one building may count in several).
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -485,6 +505,7 @@ impl BenchRules for ClassicBench {
             gold: obs.economy.income.gold,
             production: obs.own_cities.iter().map(|c| c.income.production).sum(),
             science: obs.economy.income.science,
+            food: obs.own_cities.iter().map(|c| c.income.food_surplus).sum(),
             culture: obs.economy.income.culture,
             faith: obs.economy.income.faith,
             buildings: side_buildings(rules, obs.own_cities.iter().flat_map(|c| &c.buildings)),
@@ -508,6 +529,8 @@ impl BenchRules for ClassicBench {
                 .iter()
                 .find(|r| Some(r.religion) == obs.faith.overview.religion)
                 .map_or(0, |r| r.counts.followers),
+            demographics: classic_rules::derived::standing::Measure::ALL
+                .map(|m| obs.public.row(m).map_or_else(Demo::default, |d| Demo { value: d.value, rank: d.rank as u32 })),
         }
     }
 

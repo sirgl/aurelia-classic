@@ -998,6 +998,30 @@ fn the_ideology_follows_the_style() {
     assert_eq!(pick(neutral(&[(fe::AT_WAR, 1000), (fe::FORCE, 700)])), "core:policy/autocracy");
 }
 
+/// `net2`'s part `Ideology`: the ideology by its tenets' worth, the roles' name read nowhere — the pick of all
+/// three is the tenets' best, the one also taken when the named ideology is not offered at all.
+#[test]
+fn the_ideology_by_its_tenets_does_not_read_the_roles() {
+    let rules = classic();
+    let map = grassland_capital(&rules);
+    let m = model(&rules, &map, 6, &start_techs(&rules), 6);
+    let keys = ["core:policy/freedom", "core:policy/order", "core:policy/autocracy"];
+    let offered = |without: Option<&str>| -> Vec<(PolicyBranchId, u8)> { keys.iter().filter(|k| Some(**k) != without).map(|k| (branch(&rules, k), 0)).collect() };
+    for features in [great_land_no_room(), open_land(), neutral(&[(fe::AT_WAR, 1000), (fe::FORCE, 700)])] {
+        let p = plan(&rules, &features, &m);
+        let pick = |culture: &Culture| match choose_policy(&m, &rules, &p, &base(), culture) {
+            Some(PolicyChoice::Ideology(b)) => rules.module.policy_branches[b.0 as usize].key.clone(),
+            _ => panic!("an ideology"),
+        };
+        let named = pick(&Culture { ideologies: offered(None), ..Culture::default() });
+        let tenets = pick(&Culture { ideologies: offered(None), by_tenets: true, ..Culture::default() });
+        if tenets != named {
+            let without = pick(&Culture { ideologies: offered(Some(&named)), ..Culture::default() });
+            assert_eq!(without, tenets, "with {named} not offered the named path is silent: the tenets' best");
+        }
+    }
+}
+
 /// The worked example of the weights page (work/strategy-net-weights.html):
 /// `cargo test --test ai_strategy_net example_dump -- --ignored --nocapture`.
 #[test]

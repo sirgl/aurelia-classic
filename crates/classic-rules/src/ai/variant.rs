@@ -935,6 +935,10 @@ pub enum Variant {
     /// (`net2::weights::g::OPENING`): a real tall seat founds the opening's cities its happiness allows. Bench only
     /// (`experimental-ai`).
     EarlyGrowth,
+    /// `layout-defence` (work/nets/layout-defence): `Standard` with `net2`'s hold of the cities on (`net2::hold`:
+    /// `weights::FRONT`, `weights::HOLD`; `Net2Plan::hold`): the standing garrison, the reserve and the upgrades of a
+    /// city follow the threat its place on the map makes, before an enemy is in sight. Bench only (`experimental-ai`).
+    LayoutDefence,
     /// The game's AI before the sixteenth promotion (23 November): the mind of `NetsXSite` (the play of the
     /// fifteenth promotion), without `net2` (`ClassicMind::new`). The control of the promotion. The variants
     /// built on the standard of the fifteenth promotion (`Net2Defence`, `Net2Tac`, the ablation's `Net2Without`
@@ -961,7 +965,7 @@ const NUDGED_CANDIDATES: u32 = 40;
 
 impl Variant {
     /// The game's AI first.
-    pub const ALL: [Variant; 184] = [
+    pub const ALL: [Variant; 187] = [
         Variant::Standard,
         Variant::PreCamps,
         Variant::PreWorkers,
@@ -1141,10 +1145,13 @@ impl Variant {
         Variant::Net2Without(crate::ai::net2::Part::Fleet),
         Variant::Net2Without(crate::ai::net2::Part::Guard),
         Variant::Net2Without(crate::ai::net2::Part::Economy),
+        Variant::Net2Without(crate::ai::net2::Part::Beliefs),
+        Variant::Net2Without(crate::ai::net2::Part::Ideology),
         Variant::Net2Off,
         Variant::PeaceFix,
         Variant::ScienceFlow,
         Variant::EarlyGrowth,
+        Variant::LayoutDefence,
         Variant::PreNet2,
     ];
 
@@ -1161,7 +1168,7 @@ impl Variant {
             // `nets-x` and `nets-x-site` play `strategist-x`'s strategist under their own names.
             // `net2` and its relatives play `nets-x-site`'s strategist parts (tall first): `net2` replaces the
             // strategist's pass, not its wishes' parts.
-            Variant::NetsX | Variant::NetsXSite | Variant::Net2 | Variant::Net2Defence | Variant::Tac2 | Variant::Net2Tac | Variant::Net2Without(_) | Variant::Net2Off | Variant::PeaceFix | Variant::ScienceFlow | Variant::EarlyGrowth => Variant::StrategistX.strategist_parts(),
+            Variant::NetsX | Variant::NetsXSite | Variant::Net2 | Variant::Net2Defence | Variant::Tac2 | Variant::Net2Tac | Variant::Net2Without(_) | Variant::Net2Off | Variant::PeaceFix | Variant::ScienceFlow | Variant::EarlyGrowth | Variant::LayoutDefence => Variant::StrategistX.strategist_parts(),
             _ => Parts::NONE,
         }
     }
@@ -1330,11 +1337,14 @@ impl Variant {
                 crate::ai::net2::Part::Fleet => "net2-no-fleet",
                 crate::ai::net2::Part::Guard => "net2-no-guard",
                 crate::ai::net2::Part::Economy => "net2-no-economy",
+                crate::ai::net2::Part::Beliefs => "net2-no-beliefs",
+                crate::ai::net2::Part::Ideology => "net2-no-ideology",
             },
             Variant::Net2Off => "net2-off",
             Variant::PeaceFix => "peace-fix",
             Variant::ScienceFlow => "science-flow",
             Variant::EarlyGrowth => "early-growth",
+            Variant::LayoutDefence => "layout-defence",
             Variant::PreNet2 => "pre-net2",
             Variant::ArmyFit => "army-fit",
             Variant::Camps => "camps",
@@ -1381,7 +1391,7 @@ impl Variant {
         cfg!(feature = "experimental-ai")
             || !matches!(
                 self,
-                Variant::Net | Variant::UnitNet | Variant::Hybrid | Variant::SiteNet | Variant::ChoiceNet | Variant::ChoiceNetProduction | Variant::ChoiceNetResearch | Variant::StandardScripted | Variant::PreCsGifts | Variant::Sharp | Variant::TallReal | Variant::Next | Variant::WonderCancel | Variant::WonderRace | Variant::NextW | Variant::NextRace | Variant::PreNext | Variant::WarPays | Variant::TacticianFit | Variant::WarMuster | Variant::SiegeCall | Variant::NextWar | Variant::Retake2 | Variant::NextWarRetake | Variant::VoteGuard | Variant::FieldCraft | Variant::RaidWar | Variant::Landless | Variant::LandlessPlan | Variant::NextX | Variant::PreNextX | Variant::StrategistX | Variant::StrategistXThreat | Variant::EconSite | Variant::EconSiteTall | Variant::EconSiteOwnLand | Variant::NetsX | Variant::NetsXSite | Variant::PreNetsX | Variant::Net2 | Variant::Net2Defence | Variant::Tac2 | Variant::Net2Tac | Variant::Net2Without(_) | Variant::Net2Off | Variant::PeaceFix | Variant::ScienceFlow | Variant::EarlyGrowth | Variant::PreNet2
+                Variant::Net | Variant::UnitNet | Variant::Hybrid | Variant::SiteNet | Variant::ChoiceNet | Variant::ChoiceNetProduction | Variant::ChoiceNetResearch | Variant::StandardScripted | Variant::PreCsGifts | Variant::Sharp | Variant::TallReal | Variant::Next | Variant::WonderCancel | Variant::WonderRace | Variant::NextW | Variant::NextRace | Variant::PreNext | Variant::WarPays | Variant::TacticianFit | Variant::WarMuster | Variant::SiegeCall | Variant::NextWar | Variant::Retake2 | Variant::NextWarRetake | Variant::VoteGuard | Variant::FieldCraft | Variant::RaidWar | Variant::Landless | Variant::LandlessPlan | Variant::NextX | Variant::PreNextX | Variant::StrategistX | Variant::StrategistXThreat | Variant::EconSite | Variant::EconSiteTall | Variant::EconSiteOwnLand | Variant::NetsX | Variant::NetsXSite | Variant::PreNetsX | Variant::Net2 | Variant::Net2Defence | Variant::Tac2 | Variant::Net2Tac | Variant::Net2Without(_) | Variant::Net2Off | Variant::PeaceFix | Variant::ScienceFlow | Variant::EarlyGrowth | Variant::LayoutDefence | Variant::PreNet2
             )
     }
 
@@ -1658,12 +1668,17 @@ impl Variant {
         self == Variant::EarlyGrowth
     }
 
+    /// `net2`'s hold of the cities plays (`net2::hold`, `Net2Plan::hold`): `LayoutDefence` only.
+    pub fn layout_defence(self) -> bool {
+        self == Variant::LayoutDefence
+    }
+
     /// The parts of `net2` the variant plays (None: no `net2`): every part but in the ablation
     /// (`Net2Without`, `Net2Off`).
     pub fn net2_parts(self) -> Option<crate::ai::net2::Parts> {
         use crate::ai::net2::Parts;
         match self {
-            Variant::Standard | Variant::Net2 | Variant::Net2Defence | Variant::Net2Tac | Variant::ScienceFlow | Variant::EarlyGrowth => Some(Parts::All),
+            Variant::Standard | Variant::Net2 | Variant::Net2Defence | Variant::Net2Tac | Variant::ScienceFlow | Variant::EarlyGrowth | Variant::LayoutDefence => Some(Parts::All),
             Variant::Net2Without(part) => Some(Parts::Without(part)),
             Variant::Net2Off => Some(Parts::Nothing),
             _ => None,
@@ -1680,7 +1695,7 @@ impl Variant {
     /// `net2`'s offence (work/new-net-offence-addendum-2026-11-22.md) plays: every `net2` variant but
     /// `Net2Defence` (`standard` since the sixteenth promotion).
     pub fn net2_offence(self) -> bool {
-        matches!(self, Variant::Standard | Variant::Net2 | Variant::Net2Tac | Variant::Net2Without(_) | Variant::Net2Off | Variant::ScienceFlow | Variant::EarlyGrowth)
+        matches!(self, Variant::Standard | Variant::Net2 | Variant::Net2Tac | Variant::Net2Without(_) | Variant::Net2Off | Variant::ScienceFlow | Variant::EarlyGrowth | Variant::LayoutDefence)
     }
 
     /// Its free military units clear the barbarian camps near its cities (`ai::camps`):

@@ -25,6 +25,7 @@
 //! No content is named: conditions such as "desert tiles" are the rules'
 //! effect conditions evaluated on our own tiles.
 
+pub mod beliefs;
 pub mod branches;
 pub mod cell;
 pub mod effects;

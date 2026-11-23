@@ -190,7 +190,8 @@ impl crate::ai::system::SystemAdvisor for PolicyAdvisor {
     ) -> Vec<crate::ai::system::Proposal> {
         if let (Some(plan), Some(prices)) = (input.brief.strategy.as_deref(), input.brief.prices.as_ref()) {
             // The strategy net's policy head (`ai::strategy_net::heads::policy`).
-            let command = crate::ai::strategy_net::heads::policy(input.observation, input.rules, prices, plan);
+            let by_tenets = input.brief.net2.as_ref().is_some_and(|n| n.parts.plays(crate::ai::net2::Part::Ideology));
+            let command = crate::ai::strategy_net::heads::policy(input.observation, input.rules, prices, plan, by_tenets);
             return command.map(|command| crate::ai::system::Proposal { priority: 20, command }).into_iter().collect();
         }
         let priced = input.brief.prices.as_ref().filter(|_| input.brief.levers.policies);

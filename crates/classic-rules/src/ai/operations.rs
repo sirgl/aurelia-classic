@@ -22,7 +22,7 @@ use crate::ai::planner_strategy::{
     rounds_since, EARLIEST_WAR_ROUND, MIN_WAR_ROUNDS, OBJECTIVE_RANGE, PEACE_COOLDOWN_ROUNDS, PREPARE_ROUNDS,
     WAR_WEARINESS_ROUNDS,
 };
-use crate::ai::planner_units::{approach, garrison_wanted_by, hold, move_along, HEAL_BELOW_HP};
+use crate::ai::planner_units::{approach, garrison_wanted_at, hold, move_along, HEAL_BELOW_HP};
 use crate::ai::state::{
     AiState, ArmyRole, Composition, ObjectiveKind, Operation, OperationPhase, SeenCity, Strategy, UnitTask, WarObjective,
     WarPlan,
@@ -2170,13 +2170,13 @@ fn assemble_rounds(brief: &TurnBrief, rules: &CompiledRuleset, arsenal: &Arsenal
 /// garrison beyond what its city wants (but never a guard of a city in
 /// danger, `ai::defence`).
 pub(crate) fn free_units<'b>(brief: &'b TurnBrief, state: &'b AiState, rules: &'b CompiledRuleset) -> impl Iterator<Item = &'b UnitBrief> {
-    let wanted = garrison_wanted_by(brief, state.strategy.current).max(1);
+    let wanted = move |city| garrison_wanted_at(brief, state.strategy.current, city).max(1);
     brief.units.iter().filter(move |u| {
         let free = match state.task_of(u.id).map(|t| t.task) {
             None => true,
             Some(UnitTask::Assault { .. }) => !brief.war.siege.assault,
             Some(UnitTask::Defend { city }) if brief.endangered(city) => false,
-            Some(UnitTask::Defend { city }) => senior_defenders(state, city, u.id) >= wanted,
+            Some(UnitTask::Defend { city }) => senior_defenders(state, city, u.id) >= wanted(city),
             Some(_) => false,
         };
         free && u.hp >= HEAL_BELOW_HP && army_role(rules, u.kind).is_some()
@@ -2186,7 +2186,7 @@ pub(crate) fn free_units<'b>(brief: &'b TurnBrief, state: &'b AiState, rules: &'
 /// How the player's army units are held (the war probe): all, in an operation, as the garrison
 /// a city wants, as a guard of a city in danger, hurt, with another task.
 fn held_classes(brief: &TurnBrief, state: &AiState, rules: &CompiledRuleset) -> (usize, usize, usize, usize, usize, usize) {
-    let wanted = garrison_wanted_by(brief, state.strategy.current).max(1);
+    let wanted = |city| garrison_wanted_at(brief, state.strategy.current, city).max(1);
     let mut out = (0, 0, 0, 0, 0, 0);
     for u in brief.units.iter().filter(|u| army_role(rules, u.kind).is_some()) {
         out.0 += 1;
@@ -2194,7 +2194,7 @@ fn held_classes(brief: &TurnBrief, state: &AiState, rules: &CompiledRuleset) -> 
             Some(UnitTask::Operation { .. }) => out.1 += 1,
             _ if u.hp < HEAL_BELOW_HP => out.4 += 1,
             Some(UnitTask::Defend { city }) if brief.endangered(city) => out.3 += 1,
-            Some(UnitTask::Defend { city }) if senior_defenders(state, city, u.id) < wanted => out.2 += 1,
+            Some(UnitTask::Defend { city }) if senior_defenders(state, city, u.id) < wanted(city) => out.2 += 1,
             Some(UnitTask::Defend { .. }) | Some(UnitTask::Assault { .. }) | None => {}
             Some(_) => out.5 += 1,
         }

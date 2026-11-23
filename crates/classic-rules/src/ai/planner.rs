@@ -384,6 +384,8 @@ pub struct TurnBrief {
     pub science_flow: bool,
     /// `early-growth`: `net2` reads the opening (`Variant::early_growth`; `net2::weights::g::OPENING`).
     pub early_growth: bool,
+    /// `layout-defence`: `net2`'s hold of the cities plays (`Variant::layout_defence`; `Net2Plan::hold`).
+    pub layout_defence: bool,
     /// The spaceship is built where it is finished soonest
     /// (`victory::space_plan`, `Variant::space_finish`).
     pub space_finish: bool,
@@ -590,6 +592,7 @@ impl TurnBrief {
             levers: crate::ai::science_levers::ScienceLevers::NONE,
             science_flow: false,
             early_growth: false,
+            layout_defence: false,
             space_finish: false,
             abilities: false,
             religion_fix: false,

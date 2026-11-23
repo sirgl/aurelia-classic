@@ -650,10 +650,16 @@ pub enum Part {
     Guard,
     /// The tilt of the military price.
     Economy,
+    /// The beliefs of the religion chosen by their declared effects (`strategy_net::beliefs`), not by the fixed
+    /// preference lists (`ai::belief_lists`).
+    Beliefs,
+    /// The ideology by its tenets' worth (`strategy_net::heads::choose_policy`), not the one the rules' roles name
+    /// for the plan's posture and style (`ai_ideology`).
+    Ideology,
 }
 
 impl Part {
-    pub const ALL: [Part; 10] = [Part::Strategy, Part::War, Part::Deals, Part::Peace, Part::CityStates, Part::Congress, Part::Sites, Part::Fleet, Part::Guard, Part::Economy];
+    pub const ALL: [Part; 12] = [Part::Strategy, Part::War, Part::Deals, Part::Peace, Part::CityStates, Part::Congress, Part::Sites, Part::Fleet, Part::Guard, Part::Economy, Part::Beliefs, Part::Ideology];
 
     pub fn name(self) -> &'static str {
         match self {
@@ -667,6 +673,8 @@ impl Part {
             Part::Fleet => "fleet",
             Part::Guard => "guard",
             Part::Economy => "economy",
+            Part::Beliefs => "beliefs",
+            Part::Ideology => "ideology",
         }
     }
 }
@@ -736,15 +744,18 @@ pub struct Net2Plan {
     pub science: Science,
     /// `early-growth`'s levers (`net2::growth`; all off for every other variant).
     pub growth: Growth,
+    /// `layout-defence`'s hold of the cities (`net2::hold`; empty for every other variant).
+    pub hold: Hold,
 }
 
 /// The early growth's levers (`net2::growth`), read by the city planner's garrison, the allocator's gold and worker and
 /// the site head. Empty and zero unless the seat plays `early-growth` (`TurnBrief::early_growth`).
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Growth {
-    /// Own cities whose flat garrison waits (`weights::GARRISON` below `gate::GARRISON`); a threat is the defence
-    /// watch's (`planner_cities::defence_orders`).
-    pub garrison_waits: Vec<EntityId>,
+    /// The tiles of the own cities whose flat garrison waits (`weights::GARRISON` below `gate::GARRISON`), read by the
+    /// one garrison rule (`planner_units::garrison_wanted_at`: none there); a threat is the defence watch's
+    /// (`planner_cities::defence_orders`).
+    pub garrison_waits: Vec<TileId>,
     /// Gold the tiles, the gifts and the other heads leave for a growth purchase (`weights::BUY_CHEST` × the hurry
     /// price of the cheapest head in `chest_heads`; `allocator::spend_gold`).
     pub chest: u32,
@@ -756,6 +767,38 @@ pub struct Growth {
     /// The jobs the workers have ahead (`net2::growth::jobs_ahead`): the tiles the cities work now and will work next
     /// with a job the known technologies allow; the allocator's worker counts at least these (0: its own count).
     pub jobs_ahead: u32,
+}
+
+/// The hold of the cities (`weights::FRONT`, `weights::HOLD`): how many holders each city keeps beyond the empire's
+/// standing garrison and the gold kept from the other purchases while a city in the watch is short of them. Read by
+/// the units' planner (`planner_units::garrison_wanted_at`), the city planner (the garrison it builds, the defenders it
+/// switches to: `planner_cities::hold_orders`) and the allocator (the chest). Empty unless the seat plays `layout-defence`
+/// (`TurnBrief::layout_defence`).
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Hold {
+    /// Per own city.
+    pub cities: Vec<CityHold>,
+    /// Gold kept while a city in the watch is short of its holders: the rules' price of buying a defender there
+    /// (`allocator::spend_gold` does not spend it; `planner_cities::hold_orders` buys the defender).
+    pub chest: u32,
+}
+
+/// The hold of one own city.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CityHold {
+    pub city: EntityId,
+    pub tile: TileId,
+    /// `weights::HOLD`, 0…1000.
+    pub level: Milli,
+    /// The holders the city keeps beyond the empire's standing garrison (`gate::HOLD_ONE`, `HOLD_TWO`, `HOLD_THREE`).
+    pub extra: u8,
+}
+
+impl Hold {
+    /// The holders beyond the standing garrison the city on `tile` keeps (0 without a reading).
+    pub fn extra_at(&self, tile: TileId) -> usize {
+        self.cities.iter().find(|c| c.tile == tile).map_or(0, |c| usize::from(c.extra))
+    }
 }
 
 /// The science flow's levers (`weights::SCIENTISTS`, `weights::AGREEMENT`), read by the citizens' executor, the diplomacy

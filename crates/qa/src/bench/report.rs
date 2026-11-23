@@ -10,7 +10,7 @@ use std::fmt::Write as _;
 
 use serde::{Deserialize, Serialize};
 
-use crate::bench::modules::Standing;
+use crate::bench::modules::{Standing, DEMOGRAPHICS};
 use crate::bench::pace::PaceSummary;
 use crate::bench::science::ScienceSummary;
 use crate::bench::sequential::Sequential;
@@ -40,6 +40,11 @@ pub struct TournamentReport {
     /// Head to head only.
     pub versus: Option<Versus>,
     pub sides: Vec<SideSummary>,
+    /// Head to head only: candidate minus baseline at each stage (as
+    /// `sides[0].standings`), paired by seed: for each of its `metrics()`, then each demographics row's
+    /// value, then each one's rank (`StandingSummary::means`).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub deltas: Vec<Vec<BlockEstimate>>,
     pub round_ms: Timing,
     pub wall_seconds: f64,
     pub jobs: usize,
@@ -475,8 +480,13 @@ pub struct StandingSummary {
     pub gold: Estimate,
     #[serde(default)]
     pub production: Estimate,
+    /// Food surplus a turn over the cities, and culture a turn.
+    #[serde(default)]
+    pub food: Estimate,
     #[serde(default)]
     pub science: Estimate,
+    #[serde(default)]
+    pub culture: Estimate,
     #[serde(default)]
     pub treasury: Estimate,
     /// Excess happiness.
@@ -504,6 +514,9 @@ pub struct StandingSummary {
     pub faithful_cities: Estimate,
     #[serde(default)]
     pub followers: Estimate,
+    /// The demographics rows (`modules::DEMOGRAPHICS`): the value and the rank among the living nations.
+    #[serde(default)]
+    pub demographics: [(Estimate, Estimate); 7],
 }
 
 impl StandingSummary {
@@ -520,7 +533,9 @@ impl StandingSummary {
             wonders: estimate(|s| f64::from(s.economy.wonders)),
             gold: estimate(|s| f64::from(s.economy.gold)),
             production: estimate(|s| f64::from(s.economy.production)),
+            food: estimate(|s| f64::from(s.economy.food)),
             science: estimate(|s| f64::from(s.economy.science)),
+            culture: estimate(|s| f64::from(s.economy.culture)),
             treasury: estimate(|s| f64::from(s.economy.treasury)),
             happiness: estimate(|s| f64::from(s.economy.happiness)),
             very_unhappy: estimate(|s| f64::from(u8::from(s.economy.happiness <= classic_rules::derived::happiness::VERY_UNHAPPY_THRESHOLD))),
@@ -532,10 +547,20 @@ impl StandingSummary {
             religion: estimate(|s| f64::from(s.economy.religion)),
             faithful_cities: estimate(|s| f64::from(s.economy.faithful_cities)),
             followers: estimate(|s| f64::from(s.economy.followers)),
+            demographics: std::array::from_fn(|row| (Estimate::of(standings.iter().map(|s| s.economy.demographics[row].value as f64)), Estimate::of(standings.iter().map(|s| f64::from(s.economy.demographics[row].rank))))),
         }
     }
 
-    fn metrics(&self) -> [(&'static str, Estimate); 21] {
+    /// The means of `metrics()`, then of the demographics' values, then of their ranks: the columns of
+    /// the Δ (`TournamentReport::deltas`).
+    fn means(&self) -> Vec<f64> {
+        let mut out: Vec<f64> = self.metrics().iter().map(|(_, e)| e.mean).collect();
+        out.extend(self.demographics.iter().map(|(v, _)| v.mean));
+        out.extend(self.demographics.iter().map(|(_, r)| r.mean));
+        out
+    }
+
+    fn metrics(&self) -> [(&'static str, Estimate); 23] {
         [
             ("score", self.score),
             ("cities", self.cities),
@@ -546,7 +571,9 @@ impl StandingSummary {
             ("wonders", self.wonders),
             ("gold", self.gold),
             ("production", self.production),
+            ("food", self.food),
             ("science", self.science),
+            ("culture", self.culture),
             ("treasury", self.treasury),
             ("happiness", self.happiness),
             ("seats at -10 or below", self.very_unhappy),
@@ -665,6 +692,7 @@ impl TournamentReport {
                 .into_iter()
                 .map(|(side, variant)| side_summary(side, variant, results, run.suite.rounds, &run.suite.checkpoints))
                 .collect(),
+            deltas: if run.mode == Mode::Versus { stage_deltas(results, &run.suite.checkpoints) } else { Vec::new() },
             round_ms: Timing::of(&round_ms),
             wall_seconds: run.wall_seconds,
             jobs: run.jobs,
@@ -759,13 +787,23 @@ impl TournamentReport {
     }
 
     fn standings_table(&self, out: &mut String) {
-        let header: Vec<String> = self.sides.iter().map(|s| format!("{} (mean ± 95 %)", s.variant)).collect();
-        let _ = writeln!(out, "| round | metric | {} |", header.join(" | "));
-        let _ = writeln!(out, "|---|---|{}", "---:|".repeat(self.sides.len()));
+        let versus = !self.deltas.is_empty();
+        let mut header: Vec<String> = self.sides.iter().map(|s| format!("{} (mean ± 95 %)", s.variant)).collect();
+        if versus {
+            header.push("Δ (95 %)".to_owned());
+        }
         let Some(first) = self.sides.first() else { return };
+        if versus {
+            if let Some(n) = self.deltas.iter().flatten().map(|d| d.blocks).min().filter(|n| *n < MIN_DELTA_BLOCKS) {
+                let _ = writeln!(out, "Δ intervals with N < {MIN_DELTA_BLOCKS} seed blocks are indicative only (N = {n}).\n");
+            }
+            let _ = writeln!(out, "{}\n", self.flows_line());
+        }
+        let _ = writeln!(out, "| round | metric | {} |", header.join(" | "));
+        let _ = writeln!(out, "|---|---|{}", "---:|".repeat(header.len()));
         for (at, standing) in first.standings.iter().enumerate() {
             for (m, (name, _)) in standing.metrics().iter().enumerate() {
-                let cells: Vec<String> = self
+                let mut cells: Vec<String> = self
                     .sides
                     .iter()
                     .map(|s| {
@@ -773,10 +811,88 @@ impl TournamentReport {
                         format!("{:.1} ± {:.1}", e.mean, e.half_width())
                     })
                     .collect();
+                if versus {
+                    cells.push(self.deltas.get(at).and_then(|d| d.get(m)).map_or_else(|| "—".to_owned(), delta_cell));
+                }
                 let _ = writeln!(out, "| {} | {name} | {} |", standing.round_name(), cells.join(" | "));
             }
         }
         out.push('\n');
+        self.demographics_table(out);
+    }
+
+    /// The demographics screen at every stage, as the game shows it (`classic_rules::derived::standing`,
+    /// the rows the AI reads as public information): each side's value, the Δ of the values, each side's
+    /// rank among the living nations (1 = best) and the Δ of the ranks. Four rows are a quantity of the
+    /// stage table above and give only their rank here: population, GNP (`gold`), land area (`tiles`) and
+    /// literacy (`techs` over the technologies of the rules, in percent). Crop yield (gross food of the
+    /// cities, not their surplus `food`), manufactured goods (the cities' production rates, not
+    /// `production`) and soldiers (their number, not their strength `military`) are other figures.
+    /// The screen has no approval row: it is `happiness` of the stage table (no rank).
+    fn demographics_table(&self, out: &mut String) {
+        let Some(first) = self.sides.first() else { return };
+        let same = ["population", "", "", "gold", "techs", "tiles", ""];
+        let metrics = first.standings[0].metrics().len();
+        let rows = DEMOGRAPHICS.len();
+        let versus = !self.deltas.is_empty();
+        let names: Vec<&str> = self.sides.iter().map(|s| s.variant.as_str()).collect();
+        let mut header: Vec<String> = names.iter().map(|n| (*n).to_owned()).collect();
+        let mut ranks: Vec<String> = names.iter().map(|n| format!("{n} rank")).collect();
+        if versus {
+            header.push("Δ (95 %)".to_owned());
+            ranks.push("Δ rank (95 %)".to_owned());
+        }
+        let _ = writeln!(out, "Demographics (mean over seats; rank among all living nations, 1 = best):\n");
+        let _ = writeln!(out, "| round | row | {} | {} |", header.join(" | "), ranks.join(" | "));
+        let _ = writeln!(out, "|---|---|{}", "---:|".repeat(header.len() + ranks.len()));
+        for (at, standing) in first.standings.iter().enumerate() {
+            for row in 0..rows {
+                let mut cells: Vec<String> = Vec::new();
+                for s in &self.sides {
+                    let d = &s.standings[at].demographics;
+                    cells.push(match (same[row], d.get(row)) {
+                        ("", Some((v, _))) => format!("{:.1} ± {:.1}", v.mean, v.half_width()),
+                        (name, _) => format!("= {name}"),
+                    });
+                }
+                if versus {
+                    cells.push(match (same[row], self.deltas.get(at).and_then(|d| d.get(metrics + row))) {
+                        ("", Some(d)) => delta_cell(d),
+                        _ => "—".to_owned(),
+                    });
+                }
+                for s in &self.sides {
+                    cells.push(s.standings[at].demographics.get(row).map_or_else(|| "—".to_owned(), |(_, r)| format!("{:.2} ± {:.2}", r.mean, r.half_width())));
+                }
+                if versus {
+                    cells.push(self.deltas.get(at).and_then(|d| d.get(metrics + rows + row)).map_or_else(|| "—".to_owned(), |d| delta_cell(d)));
+                }
+                let _ = writeln!(out, "| {} | {} | {} |", standing.round_name(), DEMOGRAPHICS[row], cells.join(" | "));
+            }
+        }
+        out.push('\n');
+    }
+
+    /// The rows whose Δ excludes 0 at each stage: candidate minus baseline,
+    /// paired by seed. Of this many rows about one in twenty is a false
+    /// alarm; read the line as a pointer, not a verdict.
+    fn flows_line(&self) -> String {
+        let Some(first) = self.sides.first() else { return String::new() };
+        let stages: Vec<String> = first
+            .standings
+            .iter()
+            .enumerate()
+            .map(|(at, standing)| {
+                let rows: Vec<String> = standing
+                    .metrics()
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(m, (name, _))| self.deltas.get(at)?.get(m).filter(|d| significant(d)).map(|d| format!("{name} {:+.1}", d.mean)))
+                    .collect();
+                format!("{}: {}", standing.round_name(), if rows.is_empty() { "none".to_owned() } else { rows.join(", ") })
+            })
+            .collect();
+        format!("**Flows** (rows where the Δ of candidate minus baseline excludes 0, 95 %, paired by seed): {}", stages.join("; "))
     }
 
     fn matches_table(&self, out: &mut String) {
@@ -868,6 +984,56 @@ fn versus(results: &[MatchResult]) -> Versus {
         .sum::<f64>()
         / f64::from(games.max(1));
     Versus::of(seed_blocks(results), candidate_wins, draws, expected)
+}
+
+/// Fewest seed blocks for which a Δ may be marked: the bootstrap interval of a few blocks is about
+/// the min and max of their differences, and with 4 blocks it excludes 0 in about one case in eight
+/// with no effect.
+pub const MIN_DELTA_BLOCKS: u32 = 8;
+
+/// The Δ interval excludes 0, and there are enough seed blocks to mark it.
+pub fn significant(d: &BlockEstimate) -> bool {
+    d.blocks >= MIN_DELTA_BLOCKS && (d.low > 0.0 || d.high < 0.0)
+}
+
+fn delta_cell(d: &BlockEstimate) -> String {
+    let mark = if significant(d) { " *" } else { "" };
+    format!("{:+.1} [{:+.1}, {:+.1}]{mark}", d.mean, d.low, d.high)
+}
+
+/// Candidate minus baseline of every metric at every stage with its 95 %
+/// interval: per seed block (every game of one seed, both seatings) the
+/// difference of the two sides' mean over their seats, then the bootstrap
+/// over the blocks (`BlockEstimate`). Blocks where a side has no seat at
+/// the stage are left out.
+fn stage_deltas(results: &[MatchResult], checkpoints: &[u32]) -> Vec<Vec<BlockEstimate>> {
+    let mut seeds: Vec<u64> = results.iter().map(|r| r.seed).collect();
+    seeds.sort_unstable();
+    seeds.dedup();
+    (0..=checkpoints.len())
+        .map(|at| {
+            let mut blocks: Vec<Vec<BlockSum>> = Vec::new();
+            for seed in &seeds {
+                let of_side = |side: Side| -> Vec<Standing> {
+                    results
+                        .iter()
+                        .filter(|r| r.seed == *seed)
+                        .flat_map(|r| r.seats.iter())
+                        .filter(|s| s.side == side)
+                        .filter_map(|s| s.standings.get(at).copied())
+                        .collect()
+                };
+                let (candidate, baseline) = (of_side(Side::Candidate), of_side(Side::Baseline));
+                if candidate.is_empty() || baseline.is_empty() {
+                    continue;
+                }
+                let (c, b) = (StandingSummary::of(None, &candidate).means(), StandingSummary::of(None, &baseline).means());
+                blocks.push(c.iter().zip(&b).map(|(x, y)| BlockSum { total: x - y, games: 1 }).collect());
+            }
+            let metrics = blocks.first().map_or(0, Vec::len);
+            (0..metrics).map(|m| BlockEstimate::of(&blocks.iter().map(|b| b[m]).collect::<Vec<_>>())).collect()
+        })
+        .collect()
 }
 
 /// The games grouped by seed, in the order of the seeds' first games.
@@ -1231,6 +1397,88 @@ mod tests {
         let pairing = Pairing { baseline: "allocator".to_owned(), candidate: "standard".to_owned(), landless_seat: None };
         let run = RunInfo { rules: "classic", suite: &suite, mode: Mode::Versus, pairing: &pairing, seed_offset: 0, jobs: 1, wall_seconds: 0.0 };
         TournamentReport::new(&run, results)
+    }
+
+    /// A duel of `seed` whose seats' food and culture a turn are the given.
+    fn flow_duel(seed: u64, food: [i32; 2], culture: [u32; 2]) -> MatchResult {
+        let mut r = duel(seed, None, [0, 0]);
+        for (at, seat) in r.seats.iter_mut().enumerate() {
+            seat.standings[0].economy.food = food[at];
+            seat.standings[0].economy.culture = culture[at];
+        }
+        r
+    }
+
+    fn metric_at(r: &TournamentReport, name: &str) -> BlockEstimate {
+        let at = r.sides[0].standings[0].metrics().iter().position(|(n, _)| *n == name).unwrap();
+        r.deltas[0][at]
+    }
+
+    /// Seeds differ by tens of food a turn, the candidate is 2 above the baseline in every one of them
+    /// (the pairing sees it, a comparison of the two means would not); its culture is 1 above in half
+    /// the seeds and 1 below in the other half (a Δ the interval keeps around 0).
+    #[test]
+    fn the_delta_is_paired_by_seed() {
+        let results: Vec<MatchResult> = (1..=8u64)
+            .map(|seed| {
+                let base = 10 * seed as i32;
+                let sign = if seed % 2 == 0 { 1 } else { -1 };
+                flow_duel(seed, [base + 2, base], [(100 + sign) as u32, 100])
+            })
+            .collect();
+        let report = report(&results);
+        let food = metric_at(&report, "food");
+        assert_eq!((food.mean, food.low, food.high, food.blocks), (2.0, 2.0, 2.0, 8));
+        assert!(significant(&food));
+        let unpaired = report.sides[0].standings[0].food.minus(&report.sides[1].standings[0].food);
+        assert!(unpaired.0.abs() <= unpaired.1, "unpaired the same 2 is lost in the spread: {unpaired:?}");
+        let culture = metric_at(&report, "culture");
+        assert_eq!(culture.mean, 0.0);
+        assert!(culture.low < 0.0 && 0.0 < culture.high && !significant(&culture), "{culture:?}");
+        let text = report.markdown(false);
+        assert!(text.contains("Δ (95 %)"), "{text}");
+        assert!(text.contains("| r100 | food | 47.0 ± 17.0 | 45.0 ± 17.0 | +2.0"), "{text}");
+        assert!(text.contains("| +2.0 [+2.0, +2.0] * |"), "{text}");
+        assert!(text.contains("| +0.0 [-0.8, +0.8] |"), "{text}");
+        assert!(text.contains("r100: food +2.0;"), "the flows line names food and not culture: {text}");
+    }
+
+    /// Below `MIN_DELTA_BLOCKS` seed blocks the interval is shown but never marked or listed in the
+    /// flows; at the threshold the same differences are marked.
+    #[test]
+    fn few_blocks_are_indicative_only() {
+        let rows = |n: u64| -> String {
+            let results: Vec<MatchResult> = (1..=n).map(|seed| flow_duel(seed, [10 * seed as i32 + 2, 10 * seed as i32], [0, 0])).collect();
+            let r = report(&results);
+            assert_eq!(significant(&metric_at(&r, "food")), n >= MIN_DELTA_BLOCKS as u64);
+            r.markdown(false)
+        };
+        let few = rows(MIN_DELTA_BLOCKS as u64 - 1);
+        assert!(few.contains("| +2.0 [+2.0, +2.0] |"), "{few}");
+        assert!(!few.contains("[+2.0, +2.0] *") && !few.contains("food +2.0"), "{few}");
+        assert_eq!(few.matches("are indicative only (N = 7)").count(), 1, "{few}");
+        let enough = rows(MIN_DELTA_BLOCKS as u64);
+        assert!(enough.contains("| +2.0 [+2.0, +2.0] * |") && enough.contains("food +2.0"), "{enough}");
+        assert!(!enough.contains("indicative only"), "{enough}");
+    }
+
+    /// One seed block is no interval: nothing is marked; a solo run has no Δ column.
+    #[test]
+    fn the_delta_needs_blocks_and_two_sides() {
+        let one = report(&[flow_duel(1, [9, 0], [0, 0])]);
+        assert!(!significant(&metric_at(&one, "food")));
+        let suite = Suite::named("duel").unwrap();
+        let pairing = Pairing { baseline: "allocator".to_owned(), candidate: "standard".to_owned(), landless_seat: None };
+        let run = RunInfo { rules: "classic", suite: &suite, mode: Mode::Solo, pairing: &pairing, seed_offset: 0, jobs: 1, wall_seconds: 0.0 };
+        let solo = TournamentReport::new(&run, &[flow_duel(1, [9, 0], [0, 0]), flow_duel(2, [9, 0], [0, 0])]);
+        assert!(solo.deltas.is_empty());
+        assert!(!solo.markdown(false).contains("Δ (95 %)"));
+    }
+
+    #[test]
+    fn the_metric_table_lists_food_and_culture() {
+        let names: Vec<&str> = StandingSummary::of(None, &[]).metrics().iter().map(|(n, _)| *n).collect();
+        assert!(names.contains(&"food") && names.contains(&"culture"), "{names:?}");
     }
 
     #[test]
