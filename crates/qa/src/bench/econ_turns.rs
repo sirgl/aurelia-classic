@@ -97,7 +97,7 @@ pub fn rules_line(game: &GameState, rules: &CompiledRuleset) -> Value {
                    "nation": d.nation, "replaces": d.replaces.map(|b| b.0), "unbuildable": d.unbuildable,
                    "obsolete": d.obsolete_tech.map(|t| t.0), "maintenance": d.maintenance, "hurry": d.hurry_cost_modifier,
                    "consumes": d.consumes_resources.iter().map(|(r, n)| json!([r.0, n])).collect::<Vec<_>>(),
-                   "placement": dbg(&d.placement)})
+                   "placement": dbg(&d.placement), "water_routes": d.placement.allows_water_routes})
         })
         .collect();
     let units: Vec<Value> = rules
@@ -109,13 +109,15 @@ pub fn rules_line(game: &GameState, rules: &CompiledRuleset) -> Value {
                    "class": d.class, "tech": d.required_tech.map(|t| t.0), "obsolete": d.obsolete_tech.map(|t| t.0), "unbuildable": d.unbuildable,
                    "resources": d.required_resources.iter().map(|(r, n)| json!([r.0, n])).collect::<Vec<_>>(),
                    "requires": d.requires_buildings.iter().map(|b| b.0).collect::<Vec<_>>(), "nation": d.nation,
-                   "replaces": d.replaces.map(|u| u.0), "era": era_index(d.era), "strength": d.strength})
+                   "replaces": d.replaces.map(|u| u.0), "era": era_index(d.era), "strength": d.strength,
+                   "no_maintenance": d.module.economy.no_maintenance})
         })
         .collect();
     let specialists: Vec<Value> = rules
         .specialists
         .iter()
-        .map(|d| json!({"name": d.name, "yields": y6(&d.yields), "points": kernel::rules::rows::SpecialistExtension::points(&d.module)}))
+        .map(|d| json!({"name": d.name, "yields": y6(&d.yields), "points": kernel::rules::rows::SpecialistExtension::points(&d.module),
+                        "gpp": d.module.great_person_points}))
         .collect();
     let techs: Vec<Value> = rules
         .technologies
@@ -129,7 +131,8 @@ pub fn rules_line(game: &GameState, rules: &CompiledRuleset) -> Value {
     let resources: Vec<Value> = rules
         .resources
         .iter()
-        .map(|d| json!({"wonder": d.wonder_production.map(|w| json!([w.percent, era_index(w.before_era)])), "class": dbg(&d.class)}))
+        .map(|d| json!({"wonder": d.wonder_production.map(|w| json!([w.percent, era_index(w.before_era)])), "class": dbg(&d.class),
+                        "tech": d.required_tech.map(|t| t.0), "improvements": d.improvements.iter().map(|i| i.0).collect::<Vec<_>>()}))
         .collect();
     let players = auth.players();
     let settings = auth.settings();
@@ -137,13 +140,38 @@ pub fn rules_line(game: &GameState, rules: &CompiledRuleset) -> Value {
         .map(|p| {
             let pid = PlayerId(p as u8);
             json!({"ai": settings.is_ai(pid), "major": players.is_major(pid), "nation": players.nation_of(pid),
-                   "handicap": dbg(&settings.handicap(rules, pid))})
+                   "handicap": dbg(&settings.handicap(rules, pid)),
+                   "road_features": kernel::navigation::profile::own_land_road_features(auth, rules, pid).iter().map(|f| f.0).collect::<Vec<_>>()})
         })
         .collect();
     let size = classic_rules::world::size::WorldSize::of(auth.map().dimensions);
     let map = auth.map();
     let terrain: Vec<i32> = (0..map.tile_count() as u32).map(|t| map.terrain(TileId(t)).map_or(-1, |c| i32::from(c.0))).collect();
-    json!({"t": "econ_rules", "effects": effects, "terrain": terrain,
+    let policies: Vec<Value> = rules
+        .module
+        .policies
+        .iter()
+        .map(|d| json!({"name": d.name, "branch": d.branch.map(|b| b.0), "role": dbg(&d.role), "requires": d.prerequisites.iter().map(|q| q.0).collect::<Vec<_>>()}))
+        .collect();
+    let branches: Vec<Value> = rules
+        .module
+        .policy_branches
+        .iter()
+        .map(|d| {
+            json!({"name": d.name, "kind": dbg(&d.kind), "era": era_index(d.era_prerequisite), "opener": d.opener.map(|q| q.0),
+                   "finisher": d.finisher.map(|q| q.0), "exclusive": d.mutually_exclusive_with.iter().map(|b| b.0).collect::<Vec<_>>(),
+                   "first_free": d.first_adopter_free_policies, "second_free": d.second_adopter_free_policies})
+        })
+        .collect();
+    let great_people: Vec<Value> = rules
+        .module
+        .great_people
+        .iter()
+        .map(|d| json!({"kind": dbg(&d.kind), "kind_index": d.kind.index(), "unit": d.unit.0, "specialist": d.specialist.map(|s| s.0), "source": dbg(&d.points_source)}))
+        .collect();
+    json!({"t": "econ_rules", "effects": effects, "terrain": terrain, "policies": policies, "branches": branches, "great_people": great_people,
+           "max_rounds": settings.speed(rules).max_rounds(), "policy_per_city": classic_rules::classic::world_size::policy_cost_per_city(size),
+           "heritage_per_wonder": classic_rules::world::congress::HERITAGE_CULTURE_PER_WONDER, "boost_percent": classic_rules::world::congress::BOOST_PERCENT,
            "terrain_codes": rules.terrains.iter().map(|d| d.map_code.map_or(-1, i32::from)).collect::<Vec<_>>(), "buildings": buildings, "units": units, "specialists": specialists,
            "default_specialist": rules.roles.default_specialist.map(|s| s.0), "techs": techs, "resources": resources,
            "eras": rules.eras.iter().map(|e| e.index).collect::<Vec<_>>(),
@@ -158,8 +186,8 @@ pub fn rules_line(game: &GameState, rules: &CompiledRuleset) -> Value {
 }
 
 /// The dynamic planes of one tile: feature, resource, improvement, pillaged, owner, owning city
-/// (slot index), city on it.
-pub fn tile_planes(auth: Auth<'_>) -> Vec<[i32; 7]> {
+/// (slot index), city on it, the resource's amount, the route (0 none, 1 road, 2 railroad).
+pub fn tile_planes(auth: Auth<'_>) -> Vec<[i32; 9]> {
     let map = auth.map();
     (0..map.tile_count() as u32)
         .map(TileId)
@@ -172,17 +200,23 @@ pub fn tile_planes(auth: Auth<'_>) -> Vec<[i32; 7]> {
                 map.owner(t).flatten().map_or(-1, |p| i32::from(p.0)),
                 map.owning_city(t).map_or(-1, |c| c.index as i32),
                 auth.indexes().city_on_tile(t).map_or(-1, |c| c.index as i32),
+                i32::from(map.resource_amount(t)),
+                match map.route(t) {
+                    kernel::world::map::Route::None => 0,
+                    kernel::world::map::Route::Road => 1,
+                    kernel::world::map::Route::Railroad => 2,
+                },
             ]
         })
         .collect()
 }
 
 /// The tiles whose planes differ from `last` (all of them without one): `[tile, planes...]`.
-pub fn tile_diff(last: Option<&[[i32; 7]]>, now: &[[i32; 7]]) -> Vec<Value> {
+pub fn tile_diff(last: Option<&[[i32; 9]]>, now: &[[i32; 9]]) -> Vec<Value> {
     now.iter()
         .enumerate()
         .filter(|(i, p)| last.is_none_or(|l| l.get(*i) != Some(*p)))
-        .map(|(i, p)| json!([i, p[0], p[1], p[2], p[3], p[4], p[5], p[6]]))
+        .map(|(i, p)| json!([i, p[0], p[1], p[2], p[3], p[4], p[5], p[6], p[7], p[8]]))
         .collect()
 }
 
@@ -239,6 +273,24 @@ fn city_inputs(auth: Auth<'_>, rules: &CompiledRuleset, core: &kernel::world::ci
 pub fn player_state(auth: Auth<'_>, rules: &CompiledRuleset, p: PlayerId, answers: bool) -> Value {
     let players = auth.players();
     let map = auth.map();
+    // The great person rate of the player as the city step reads it (`accumulate_great_people`):
+    // its stats, the friends' rate and the World Congress funding.
+    let gp_friends = classic_rules::derived::great_people::friendship_rate_with(auth, p, |q| {
+        classic_rules::derived::great_people::friend_stat_of(&kernel::effects::player::player_modifiers(auth, rules, q))
+    });
+    let gp_funding: Vec<i32> = rules.module.great_people.iter().map(|d| classic_rules::world::congress::funding_percent(auth, d.kind)).collect();
+    let mut gp_rate = kernel::effects::player::player_modifiers(auth, rules, p).stats.clone();
+    {
+        use classic_rules::rules::stats::{ClassicStat, Stat};
+        gp_rate.add(Stat::Module(ClassicStat::GreatPeopleRate), gp_friends);
+        let mut seen = Vec::new();
+        for (d, shift) in rules.module.great_people.iter().zip(&gp_funding) {
+            if *shift != 0 && !seen.contains(&d.kind) {
+                seen.push(d.kind);
+                gp_rate.add(Stat::Module(ClassicStat::GreatPersonRate(d.kind)), *shift);
+            }
+        }
+    }
     let mut cities = Vec::new();
     for &h in auth.indexes().cities_of(p) {
         let Some(core) = auth.cities().get(h) else { continue };
@@ -253,6 +305,7 @@ pub fn player_state(auth: Auth<'_>, rules: &CompiledRuleset, p: PlayerId, answer
             "capital": kernel::world::city::is_capital(rules, core), "coastal": map.coastal_land(core.tile), "river": map.river(core.tile),
             "culture": core.culture, "acquired": core.acquired, "radius": core.radius, "status": dbg(&core.status),
             "inputs": city_inputs(auth, rules, core, h),
+            "gpp": auth.cities().module_of(h).map(|m| m.great_person_points.to_vec()).unwrap_or_default(),
             "blocked": core.queue.iter().map(|i| <classic_rules::classic::systems::ClassicSystems as kernel::systems::module::ModuleSystems<Classic>>::queue_item_blocked(auth, rules, p, *i)).collect::<Vec<_>>(),
         });
         if answers {
@@ -274,6 +327,7 @@ pub fn player_state(auth: Auth<'_>, rules: &CompiledRuleset, p: PlayerId, answer
                 "head_cost": core.queue.first().and_then(|i| m.production_cost(rules, *i)),
                 "happiness": m.module.happiness,
                 "unhappiness": classic_rules::derived::happiness::city_unhappiness(auth, rules, core),
+                "gp_points": classic_rules::derived::great_people::city_points(rules, &b, &gp_rate).to_vec(),
             });
         }
         cities.push(c);
@@ -336,8 +390,36 @@ pub fn player_state(auth: Auth<'_>, rules: &CompiledRuleset, p: PlayerId, answer
         "allied_science": classic_rules::derived::income::allied_city_state_science(auth, p),
         "wonders_built": auth.cities().iter().flat_map(|(_, c)| c.buildings.iter().copied()).filter(|b| rules.buildings.get(b.0 as usize).is_some_and(|d| d.wonder)).map(|b| b.0).collect::<std::collections::BTreeSet<_>>(),
         "economy": players.economy_of(p).map(|e| json!({"ga_turns": e.golden_age_turns, "ga_meter": e.golden_age_meter, "ga_count": e.golden_ages,
-                                                         "excess": e.excess_happiness})),
+                                                         "excess": e.excess_happiness, "gp_created": e.great_people_created,
+                                                         "writers": e.great_writers_created, "artists": e.great_artists_created,
+                                                         "musicians": e.great_musicians_created, "science_history": e.science_history.to_vec()})),
     });
+    s["resources"] = json!(resource_lines(auth, rules, p));
+    let u = classic_rules::derived::maintenance::upkeep(auth, rules, p);
+    s["upkeep"] = json!([u.units, u.buildings, u.routes, u.connections]);
+    s["unit_weights"] = json!(unit_weights(auth, rules, p));
+    s["army_tax"] = json!(auth.module().congress().is_active(classic_rules::world::congress::ResolutionKind::StandingArmyTax));
+    s["heritage"] = json!(auth.module().congress().is_active(classic_rules::world::congress::ResolutionKind::CulturalHeritageSites));
+    s["gold_deals"] = json!(auth.module().relations().trades().iter().filter(|t| t.from == p || t.to == p).filter_map(|t| match t.flow {
+            classic_rules::world::relations::TradeFlow::GoldPerTurn(g) => Some(json!([t.from.0, t.to.0, g, t.until])),
+            _ => None,
+        }).collect::<Vec<_>>());
+    let c = auth.module().culture().of(p);
+    s["culture"] = json!({"pool": c.culture, "lifetime": c.lifetime, "recent": c.recent, "branches": c.branches.iter().map(|b| b.0).collect::<Vec<_>>(),
+                   "ideology": c.ideology.map(|b| b.0), "free_policies": c.free_policies, "free_tenets": c.free_tenets, "free_used": c.free_used,
+                   "max_cities": c.max_cities, "free_buildings": c.free_buildings.iter().map(|(b, n)| json!([b.0, n])).collect::<Vec<_>>(),
+                   "policy_cost": classic_rules::derived::culture::next_policy_cost(auth, rules, p),
+                   "cs": classic_rules::world::city_states::player_bonus(auth, rules, p, classic_rules::rules::content::CityStateBonusKind::Culture),
+                   "boost_turns": auth.module().congress().rewards_of(p).culture_boost_turns});
+    s["gp"] = json!({"threshold": rules.module.great_people.iter().map(|d| classic_rules::derived::great_people::great_person_threshold(auth, rules, p, d.kind)).collect::<Vec<_>>(),
+                     "friends": gp_friends, "funding": gp_funding});
+    s["income_gold"] = json!(classic_rules::derived::income::player_income(auth, rules, p).gold);
+    s["round"] = json!(auth.turn().round);
+    // The cities a route network (or two harbors on one sea) links to the capital, computed on this
+    // world (`derived::connections`): the connection gold's answer.
+    s["reached"] = json!(kernel::world::city::capital_of(auth, rules, p)
+        .map(|cap| kernel::derived::connections::compute_connected_cities(auth, rules, p, cap).iter().map(|c| c.index).collect::<Vec<_>>())
+        .unwrap_or_default());
     if answers {
         let pm = kernel::effects::player::player_modifiers(auth, rules, p);
         let sci: i32 = auth
@@ -360,6 +442,78 @@ pub fn player_state(auth: Auth<'_>, rules: &CompiledRuleset, p: PlayerId, answer
         });
     }
     s
+}
+
+/// The player's resource ledger (`derived::resources::resource_ledger`): per resource with a total
+/// or a use, `[resource, total, used, untradeable, imports, from allied city-states, used beyond the
+/// own units and buildings]` — the last four are the parts MLX does not derive (Feitoria copies, deals,
+/// city-state alliances).
+fn resource_lines(auth: Auth<'_>, rules: &CompiledRuleset, p: PlayerId) -> Vec<Value> {
+    use classic_rules::world::player::ClassicPlayers;
+    let ledger = classic_rules::derived::resources::resource_ledger(auth, rules, p);
+    let n = rules.resources.len();
+    let mut own = vec![0i32; n];
+    for &u in auth.indexes().units_of(p) {
+        if let Some(d) = auth.units().get(u).and_then(|v| rules.units.get(v.core.kind.0 as usize)) {
+            for (r, k) in &d.required_resources {
+                own[r.0 as usize] += i32::from(*k);
+            }
+        }
+    }
+    for &h in auth.indexes().cities_of(p) {
+        if let Some(c) = auth.cities().get(h) {
+            for b in &c.buildings {
+                if let Some(d) = rules.buildings.get(b.0 as usize) {
+                    for (r, k) in &d.consumes_resources {
+                        own[r.0 as usize] += i32::from(*k);
+                    }
+                }
+            }
+        }
+    }
+    let round = auth.turn().round;
+    let mut imports = vec![0i32; n];
+    for t in auth.module().relations().trades() {
+        if let classic_rules::world::relations::TradeFlow::Resource { resource, amount } = t.flow {
+            if round < t.until && t.to == p {
+                imports[resource.0 as usize] += i32::from(amount);
+            }
+        }
+    }
+    let from_cs: Vec<u16> = if auth.players().is_city_state(p) {
+        vec![0; n]
+    } else {
+        classic_rules::derived::resources::from_city_states(auth, rules, p)
+    };
+    (0..n)
+        .filter_map(|i| {
+            let r = classic_rules::ids::ResourceId(i as u16);
+            let (total, used) = (ledger.total(r), ledger.used(r));
+            (total != 0 || used != 0).then(|| {
+                json!([i, total, used, ledger.available(r) - ledger.tradeable(r), imports[i], from_cs.get(i).copied().unwrap_or(0), used - own[i]])
+            })
+        })
+        .collect()
+}
+
+/// The maintenance weight (hundredths of a unit, `maintenance::unit_weights_times100`) of each unit
+/// kind the player has: 0 with NoMaintenance, else 100 + its MaintenancePercent.
+fn unit_weights(auth: Auth<'_>, rules: &CompiledRuleset, p: PlayerId) -> Vec<Value> {
+    use classic_rules::classic::effects::ClassicUnitStat;
+    use kernel::rules::effects::UnitStat;
+    let owner_part = kernel::effects::unit::owner_unit_modifiers(auth, rules, p);
+    let mut kinds: Vec<u16> = auth.indexes().units_of(p).iter().filter_map(|u| auth.units().get(*u)).map(|v| v.core.kind.0).collect();
+    kinds.sort_unstable();
+    kinds.dedup();
+    kinds
+        .into_iter()
+        .map(|k| {
+            let kind = classic_rules::ids::UnitKindId(k);
+            let free = rules.units.get(k as usize).is_some_and(|d| d.module.economy.no_maintenance);
+            let pct = kernel::effects::unit::owner_stat_for_kind(auth, rules, &owner_part, p, kind, UnitStat::Module(ClassicUnitStat::MaintenancePercent));
+            json!([k, if free { 0 } else { (100 + pct).max(0) }])
+        })
+        .collect()
 }
 
 /// The items the player's technologies and nation allow (the kernel's gates before any city rule:

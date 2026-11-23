@@ -1,34 +1,44 @@
 """The economy on the GPU (MLX), third subsystem: a player's end of turn for its cities and its
-research, exact to the Rust rules (`kernel::systems::turn::end_turn`: the Happiness, GoldenAge,
-Cities, Science, Research, Diplomacy (research agreements) and WorkerJobs steps).
+empire, exact to the Rust rules (`kernel::systems::turn::end_turn`: the Happiness, GoldenAge,
+Cities (GreatPeople, Growth, Production, Borders), Gold, Culture, Science, Research, Diplomacy
+(research agreements) and WorkerJobs steps).
 
     python -m aurelia_nn.tacsim.turn DUMP.jsonl|DIR    # parity against Rust: the state after every end of turn
 
 Before the cities: the happiness snapshot and the golden age step (`happy.py`), whose excess and
 golden age the city step reads. Per city, in the turn's city order, from one snapshot of its yields
 (`city.evaluate`; a city reads what the earlier ones completed: owner-wide effects, wonders, free
-buildings, a golden age started):
+buildings, a golden age started, the resource copies taken, the great people born):
+- great people (`great.py`): the points of its specialists and buildings × the rates into the
+  progress; at the threshold one is born (a unit: its upkeep counts);
 - growth (`grow_city` with the classic formulas): the food difference (citizens and specialists eat,
   the growth percents on a surplus), the food kept, the threshold (speed, the AI's growth percent
   and its per-era modifier), growth, starvation, «avoid growth»; a settler at the head converts the
   surplus into production instead;
 - production: the stock grows by the rate; the queue drains from its head while the stock covers
   the head's cost (lost orders leave first: built already, a wonder built elsewhere, a missing
-  building, the resources lacking); a city with an empty queue and a process converts it (wealth,
+  building, the resources short in the turn's running ledger (`ledger.py`): what the earlier units
+  and buildings of this turn took); a city with an empty queue and a process converts it (wealth,
   research); a completed building's OnBuilt rows (free buildings here or in the first cities without
-  one, citizens, a golden age); a completed wonder leaves every queue of the player;
+  one, citizens, a golden age, free units, free policies); a completed wonder leaves every queue of
+  the player;
 - borders: the culture into the stock; at the level's threshold (the kernel's deterministic power)
   the best neutral tile next to the territory joins the city;
-then per player: the cities' science through the player's terms (Rationalism, the allied
-city-states, the scholars) into the stock; the research queue completes while the stock covers the
-head's price (`derived::research::technology_cost`: the base, difficulty, world size, cities, known
-by met nations, speed); a research agreement at its end pays a third of the smaller pool; the
-unlocks after the research; the worker jobs the turn's rate completes (improvements, removed
-features and their production to the nearest city).
+then per player: the Gold step (`treasury.py`: the cities' gold through the player's Gold modifiers
+less the upkeep of units, buildings and routes plus the connection gold of the world the cities
+left; below zero the treasury empties and the shortfall comes off the science); the Culture step
+(`culture.py`: the cities' culture, the city-states, the heritage sites, the excess happiness, the
+league's boost; the free policies of completed buildings and of an era entered); the cities' science
+through the player's terms (Rationalism, the allied city-states, the scholars) into the stock; the
+research queue completes while the stock covers the head's price (`derived::research::
+technology_cost`); a research agreement at its end pays a third of the smaller pool; the unlocks
+after the research; the worker jobs the turn's rate completes (improvements, removed features and
+their production to the nearest city).
 
-Not in MLX yet (the parity counts them apart): the gold deficit's science loss (turns that end with
-an empty treasury), the World Congress rewards (golden age points, science), techs stolen or
-granted by other systems, a razed city's burning.
+Not in MLX yet (the parity counts them apart): the World Congress rewards (golden age points,
+science, free policies), the gold per turn of deals settled at the round's end, gold from other
+systems inside the turn (natural wonder finds, trade missions), techs stolen or granted by other
+systems, a razed city's burning.
 """
 
 import argparse
@@ -38,8 +48,12 @@ import time
 import mlx.core as mx
 
 from . import city as C
+from . import great as GP
 from . import happy as H
+from . import ledger as L
+from . import player as P
 from . import rdebug as R
+from . import treasury as TR
 
 I32 = mx.int32
 I64 = mx.int64
@@ -54,6 +68,7 @@ VERY_UNHAPPY_PRODUCTION = -50
 UNHAPPY_GROWTH_PERCENT = -75
 VERY_UNHAPPY_GROWTH_PERCENT = -100
 FOOD_BASE, FOOD_PER_POP = 15, 8
+GOLD_INDEX = 3  # `YieldKind::Gold.index()` (Output 0, Food 1, Production 2, Gold 3, Science 4, Culture 5)
 
 
 def growth_percent(excess):
@@ -151,6 +166,10 @@ def on_built(model):
             out.setdefault(sid, []).append(("cities", R.arg(mb["building"]), mb["count"]))
         elif t == "Grant" and R.tag(mb[0]) == "Population" and sel in ("EventCity", "SourceCity"):
             out.setdefault(sid, []).append(("population", R.body(mb[0])[0], 1))
+        elif t == "Module" and R.tag(mb[0]) == "FreePolicies":
+            out.setdefault(sid, []).append(("free_policies", R.body(mb[0])["count"], 1))
+        elif t == "FreeUnit" and sel in ("EventCity", "SourceCity"):
+            out.setdefault(sid, []).append(("free_unit", R.arg(mb["unit"]), mb["count"]))
         elif t == "Grant" and R.tag(mb[0]) == "Module" and R.tag(R.body(mb[0])[0]) == "GoldenAge":
             out.setdefault(sid, []).append(("golden_age", R.body(R.body(mb[0])[0])["turns"], 1))
     model._on_built = out
@@ -215,6 +234,7 @@ def transition(model, game, turns):
     # The Happiness and GoldenAge steps run before the cities: the snapshot's excess (the growth and
     # production penalties) and the golden age after its step (tile gold, +20 % production).
     prow = model.__dict__.setdefault("player_rows", H.PlayerRows(model.rows, er))
+    P.prepare(game, turns)
     hap = H.happiness(model, prow, game, turns)
     turns = [dict(t, _golden=bool(h["ga"] and h["ga"]["turns"] > 0), _unhappy=VERY_UNHAPPY_PRODUCTION if h["excess"] <= VERY_UNHAPPY_THRESHOLD else 0,
                   _excess=h["excess"], _ga=h["ga"]) for t, h in zip(turns, hap)]
@@ -223,15 +243,29 @@ def transition(model, game, turns):
         return b, None, None, None
     results = {(ti, res["h"]): res for ti, res in city_out}
     order = {ti: [c["h"] for c in t["pre"]["state"]["cities"]] for ti, t in enumerate(turns)}
+    tb = L.tables(model)
+
+    def takes(r):
+        return r["built"] or r.get("born") or any(tb.needs(u) for u in r["trained"])
+
     for k in range(1, max(len(v) for v in order.values())):
-        variants, idx = [], []
+        variants, idx, runs = [], [], []
         for ti, hs in order.items():
-            if k < len(hs) and any(results[(ti, h)]["built"] for h in hs[:k] if (ti, h) in results):
+            if k < len(hs) and any(takes(results[(ti, h)]) for h in hs[:k] if (ti, h) in results):
                 # The city's own buildings may have grown by an earlier city's grant: its row reads them.
                 variants.append(make_variant(turns[ti], k, results, ti, er))
                 idx.append(ti)
+                # The ledger as the earlier cities left it (their units trained, buildings completed).
+                run = b.ledgers[ti].copy()
+                for h in hs[:k]:
+                    r = results.get((ti, h))
+                    for item in (r or {}).get("taken", []):
+                        run.take(item)
+                    for grp in (r or {}).get("born_groups", []):
+                        run.born[grp] += 1
+                runs.append(run)
         if variants:
-            _, out = city_steps(model, game, variants)
+            _, out = city_steps(model, game, variants, ledgers=runs)
             for vi, res in out:
                 results[(idx[vi], res["h"])] = res
     # The turn's grants to its cities (the later ones read them already as their own buildings).
@@ -261,14 +295,26 @@ def transition(model, game, turns):
     return finish_turns(model, game, b, turns, city_out, per_turn)
 
 
-def city_steps(model, game, turns):
-    """Growth and production of the cities of `turns` (each city from the snapshot of its turn line)."""
+def city_steps(model, game, turns, ledgers=None):
+    """Growth and production of the cities of `turns` (each city from the snapshot of its turn line).
+    `ledgers`: the resource ledger each turn line's (variant's) city starts from; None: the turns'
+    own, from their worlds (`ledger.base`), updated as their cities resolve in order."""
     er = model.er
     nu = model.nu
     b = C.Batch(model, game, turns, side="pre", mid=True)
     if b.n == 0:
         return b, None
     got = C.evaluate(model, game, b)
+    tb = L.tables(model)
+    if ledgers is None:
+        prow4 = model.__dict__.setdefault("player_rows4", P.Rows(model.rows, er))
+        elx_v = got["extra_lux"].tolist()
+        elx = {(ti, c["h"]): elx_v[i] for i, (ti, c) in enumerate(b.cities) if elx_v[i]}
+        copies = L.building_copies(model, prow4)
+        ledgers = [L.Running(tb, tot, used, copies) for tot, used in L.base(model, prow4, game, turns, "pre", elx)]
+        for run, t in zip(ledgers, turns):
+            run.born = GP.born_of(t["pre"]["state"].get("economy"))
+        b.ledgers = [r.copy() for r in ledgers]
     cols = b.cols
     n = b.n
     rates = got["rates"]
@@ -312,11 +358,28 @@ def city_steps(model, game, turns):
            "pop": mx.where(resist, pop, new_pop).tolist(), "prod": prod.tolist(), "rates": rates.tolist()}
     # The queue drains (Python over the few items; the costs and checks are the rules' tables).
     cost_pct = got["cost_pct"].tolist()
+    # The GreatPeople step (first in a city's turn): the points from the city's snapshot.
+    prow4 = model.__dict__.setdefault("player_rows4", P.Rows(model.rows, er))
+    D = GP.defs(model)
+    gp_sn, gp_pts, gp_rt = got["spec_n"].tolist(), got["gp_points"].tolist(), got["gp_rate"].tolist()
+    gp_rates = {}
     city_out = []
     for ci, (ti, c) in enumerate(b.cities):
         t = b.turns[ti]
         st = t["pre"]["state"]
         res = {"h": c["h"], "pop": out["pop"][ci], "food": out["food"][ci], "kept": out["kept"][ci], "rates": out["rates"][ci], "cost_pct": cost_pct[ci]}
+        res["born"], res["born_groups"] = [], []
+        if "gpp" in c and c["resist"] == 0:
+            if ti not in gp_rates:
+                gp_rates[ti] = GP.player_rate(prow4, t)
+            stats_, funding_ = gp_rates[ti]
+            pts = GP.city_points(D, gp_sn[ci], gp_pts[ci], gp_rt[ci], stats_, funding_)
+            before = dict(ledgers[ti].born)
+            res["gpp"], res["born"] = GP.accumulate(D, c["gpp"], pts, gp_sn[ci], gp_pts[ci], ledgers[ti].born, model.speed["pace_percent"],
+                                                    game["rules"]["players"][t["player"]]["nation"])
+            res["born_groups"] = [k for k in before for _ in range(ledgers[ti].born[k] - before[k])]
+        elif "gpp" in c:
+            res["gpp"] = list(c["gpp"])
         buildings = list(c["buildings"])
         queue = [C.item_of(q, nu) for q in c["queue"]]
         stock = c["prod"]
@@ -324,6 +387,8 @@ def city_steps(model, game, turns):
         trained = []
         built = []
         grants = []
+        taken = []
+        freed = []
         if c["resist"] > 0:
             res.update({"prod": stock, "queue": queue, "buildings": buildings})
         else:
@@ -337,13 +402,13 @@ def city_steps(model, game, turns):
                     sci_p = conv
             else:
                 stock += production
-                blocked = c.get("blocked")
+                run = ledgers[ti]
                 wonders = set(st.get("wonders_built", []))
                 own_other = [o for o in st["cities"] if o["h"] != c["h"]]
 
                 def lost(item, at):
                     if 0 <= item < nu:
-                        return blocked is not None and at < len(blocked) and blocked[at]
+                        return run.blocked(item)
                     k = item - nu
                     d = er["buildings"][k]
                     if k in buildings:
@@ -357,7 +422,7 @@ def city_steps(model, game, turns):
                     if d["requires_empire"] and not all(all(has_class(er, o["buildings"], rq) for rq in d["requires_empire"])
                                                         for o in st["cities"] if o["status"] != "Puppet"):
                         return True
-                    return blocked is not None and at < len(blocked) and blocked[at]
+                    return run.blocked(item)
 
                 # sweep_city_unbuildable: NeedsBuilding orders anywhere.
                 def needs(item):
@@ -389,6 +454,8 @@ def city_steps(model, game, turns):
                     stock -= cost
                     queue.pop(0)
                     pos.pop(0)
+                    run.take(item)
+                    taken.append(item)
                     if item < nu:
                         trained.append(item)
                     else:
@@ -402,6 +469,13 @@ def city_steps(model, game, turns):
                         for kind, arg, count in on_built(model).get(item - nu, []):
                             if kind == "here" and arg not in buildings:
                                 buildings.append(arg)
+                                run.take(nu + arg)
+                                taken.append(nu + arg)
+                            elif kind == "free_unit":
+                                for _ in range(count):
+                                    run.take(arg)
+                                    taken.append(arg)
+                                freed.append((arg, count))
                             elif kind == "cities":
                                 grants.append((arg, count))
                             elif kind == "population":
@@ -409,7 +483,8 @@ def city_steps(model, game, turns):
                             elif kind == "golden_age":
                                 res["golden_age"] = arg
             res.update({"prod": stock, "queue": queue, "buildings": buildings})
-        res["trained"], res["built"], res["grants"] = trained, built, grants
+        res["trained"], res["built"], res["grants"], res["taken"] = trained, built, grants, taken
+        res["freed"] = freed
         res["science_add"] = out["rates"][ci][3] + sci_p if c["resist"] == 0 else 0
         res["gold_add"] = out["rates"][ci][2] + gold_p if c["resist"] == 0 else 0
         city_out.append((ti, res))
@@ -624,7 +699,9 @@ def finish_turns(model, game, b, turns, city_out, per_turn):
             gp = game["rules"]["players"]
             if any(o != p and gp[o]["major"] and st["alive"][o] and st["all_techs"][o][head] == "1" for o in range(len(gp))):
                 sci = sci * (100 + SCHOLARS_PERCENT) // 100
-        sci = max(sci, 0)
+        # The Gold step (after the cities, before the science): the treasury, a deficit off the science.
+        gold = gold_step(model, game, t, ti, by_city, per_turn.get(ti, {"gold": 0})["gold"], claims.get(ti, []))
+        sci = max(sci + min(gold["deficit"], 0), 0)
         stock = st["science"] + sci
         # Korea (CapitalScienceBuildingBoost): a science building completed in the capital this turn
         # adds half the median price of the technologies researchable now (during the city step).
@@ -676,7 +753,26 @@ def finish_turns(model, game, b, turns, city_out, per_turn):
                 if ga["turns"] == 0:
                     ga["count"] += 1
                 ga["turns"] += length
-        players_out[ti] = {"ga": ga, "science": stock, "queue": queue, "techs": "".join("1" if k else "0" for k in known), "learned": learned,
+        # The Culture step: the cities' culture (Borders) and the player's sources into the pool.
+        cul = None
+        if "culture" in st:
+            rs = [by_city.get((ti, c["h"])) for c in st["cities"]]
+            csum = sum(max(r["rates"][4], 0) for r, c in zip(rs, st["cities"]) if r is not None and c["resist"] == 0)
+            wonders = sum(1 for r in rs if r for x in r["buildings"] if er["buildings"][x]["kind"] == "WorldWonder")
+            from . import culture as CU
+            cul = CU.collect(model, model.__dict__["player_rows4"], game, t, csum, t.get("_excess", post["excess"]), wonders, len(st["cities"]))
+            for c in st["cities"]:
+                r = by_city.get((ti, c["h"]))
+                for x in (r or {}).get("built", []):
+                    for kind, arg, count in on_built(model).get(x, []):
+                        if kind == "free_policies":
+                            cul["free_policies"] += arg
+            # OnEraEntered (a technology of a later era learned this turn): the nation's free policies.
+            era0 = st["era"]
+            era1 = max([er["techs"][k]["era"] for k, ch in enumerate(players_out_techs(st["techs"], learned))] + [era0]) if learned else era0
+            if era1 > era0:
+                cul["free_policies"] += era_policies(model).get(game["rules"]["players"][p]["nation"], 0)
+        players_out[ti] = {"ga": ga, "science": stock, "treasury": gold["treasury"], "gold": gold, "culture": cul, "queue": queue, "techs": "".join("1" if k else "0" for k in known), "learned": learned,
                            "cities_science": cities_sci, "collected": sci}
     # The unlocks after the research: the kernel's gates (not buildable, another nation's, replaced
     # by the nation's unique unit) and the required technology, one gather per item.
@@ -701,6 +797,72 @@ def finish_turns(model, game, b, turns, city_out, per_turn):
         if ti in players_out:
             players_out[ti]["claims"] = cl
     return b, city_out, players_out, jobs_out
+
+
+def players_out_techs(bits, learned):
+    """The indices of the technologies known after the research (the pre bits and the learned)."""
+    return sorted({k for k, ch in enumerate(bits) if ch == "1"} | set(learned))
+
+
+def era_policies(model):
+    """{nation: free policies} of the nations' OnEraEntered rows (FreePolicies)."""
+    if not hasattr(model, "_era_policies"):
+        out = {}
+        for src, sid, bucket, text in model.er["effects"]:
+            if bucket != "triggered" or src != "nation":
+                continue
+            e = R.body(R.parse(text))
+            m = e["modifier"]
+            if R.tag(e["trigger"]) == "OnEraEntered" and R.tag(m) == "Module" and R.tag(R.body(m)[0]) == "FreePolicies":
+                out[sid] = out.get(sid, 0) + R.body(R.body(m)[0])["count"]
+        model._era_policies = out
+    return model._era_policies
+
+
+def gold_step(model, game, t, ti, by_city, cities_gold, claims):
+    """The Gold step: the cities' gold through the player's Gold modifiers, less the upkeep of the
+    world the cities left (units trained, buildings completed, sizes, the tiles claimed)."""
+    er = game["rules"]
+    st, post = t["pre"]["state"], t["post"]["state"]
+    if "upkeep" not in st:
+        return {"treasury": None, "deficit": 0}
+    prow4 = model.__dict__.setdefault("player_rows4", P.Rows(model.rows, model.er))
+    w = TR.world_of(model, game, t, "pre")
+    post_c = {c["h"]: c for c in post["cities"]}
+    built = []
+    for c in w.cities:
+        r = by_city.get((ti, c["h"]))
+        if r is None:
+            continue
+        built += [x for x in r["buildings"] if x not in c["buildings"]]
+        c["buildings"], c["pop"] = r["buildings"], r["pop"]
+        c["capital"] = TR.is_capital(model, c["buildings"])
+        pc = post_c.get(c["h"])
+        if pc is not None:
+            c["garrison"] = pc["inputs"]["garrison"]
+        for u in r["trained"]:
+            w.units[u] = w.units.get(u, 0) + 1
+        for u, n in r.get("freed", []):
+            w.units[u] = w.units.get(u, 0) + n
+        for u in r.get("born", []):
+            w.units[u] = w.units.get(u, 0) + 1
+    # The connections as the Gold step computes them: the turn's world with its completed harbors.
+    reach = set(TR.connected(model, game, t, "pre", {h: r["buildings"] for (ti_, h), r in by_city.items() if ti_ == ti}) or [])
+    for c in w.cities:
+        c["connected"] = c["h"] in reach
+    for k, v in post.get("unit_weights", []):
+        w.weights.setdefault(k, v)
+    if claims:
+        w.owned_tiles = sorted(set(w.owned_tiles) | {x for x, _ in claims})
+    stats, _ = P.stats_and_costs(prow4, t, "pre", extra_buildings=built)
+    hc = TR.handicap(er, st, t["player"])
+    up = TR.upkeep(model, er, hc, stats, w, TR.max_rounds(er), st.get("army_tax", False))
+    gross = TR.evaluate(cities_gold, TR.stage(st["rust"]["player_yields"][GOLD_INDEX]))
+    net = gross - (up[0] + up[1] + up[2] - up[3])
+    after = st["treasury"] + net
+    if after >= 0:
+        return {"treasury": min(after, 2 ** 32 - 1), "deficit": 0, "upkeep": up, "gross": gross}
+    return {"treasury": 0, "deficit": max(after, -2 ** 31), "upkeep": up, "gross": gross}
 
 
 def science_buildings(model):
@@ -759,6 +921,11 @@ def compare(b, city_out, players_out, jobs_out, er, nu):
             stats["job_tiles"] += 1
             ok = all(post[0 if k == "feature" else 2][tile] == v for k, v in ch.items())
             stats["job_tiles_ok"] += int(ok)
+            if not ok and len([e for e in examples if "job" in e]) < 8:
+                st_ = b.turns[ti]["pre"]["state"]
+                examples.append({"round": b.turns[ti]["round"], "player": b.turns[ti]["player"], "job": tile, "mlx": ch,
+                                 "post": [post[0][tile], post[2][tile]], "pre": [b.turns[ti]["pre_planes"][0][tile], b.turns[ti]["pre_planes"][2][tile]],
+                                 "jobs": [j for j in st_["jobs"] if j[0] == tile], "rate": st_["work_rate"]})
     fields = {}
     examples = []
     for ti, res in city_out:
@@ -779,7 +946,14 @@ def compare(b, city_out, players_out, jobs_out, er, nu):
             fields[k] = fields.get(k, 0) + int(e)
             ok &= e
         stats["cities_ok"] += int(ok)
-        if not ok and len(examples) < 8:
+        if "gpp" in c and "gpp" in res:
+            stats["gp_cities"] = stats.get("gp_cities", 0) + 1
+            gok = c["gpp"] == res["gpp"]
+            stats["gp_cities_ok"] = stats.get("gp_cities_ok", 0) + int(gok)
+            if not gok and len([e for e in examples if "gpp" in e]) < 3:
+                examples.append({"round": t["round"], "player": t["player"], "city": res["h"], "gpp": [t["pre"]["state"]["cities"] and
+                                 {x["h"]: x for x in t["pre"]["state"]["cities"]}[res["h"]]["gpp"], c["gpp"], res["gpp"]], "born": res.get("born")})
+        if not ok and len([e for e in examples if "bad" in e]) < 8:
             pre = {x["h"]: x for x in t["pre"]["state"]["cities"]}[res["h"]]
             examples.append({"round": t["round"], "player": t["player"], "city": res["h"],
                              "bad": [k for k in want if want[k] != mine[k]], "want": want, "mlx": mine,
@@ -798,6 +972,38 @@ def compare(b, city_out, players_out, jobs_out, er, nu):
             pe = post["economy"]
             stats["golden_ages"] = stats.get("golden_ages", 0) + 1
             stats["golden_ages_ok"] = stats.get("golden_ages_ok", 0) + int((pe["ga_turns"], pe["ga_meter"], pe["ga_count"]) == (pr["ga"]["turns"], pr["ga"]["meter"], pr["ga"]["count"]))
+        if pr.get("treasury") is not None:
+            stats["treasury"] = stats.get("treasury", 0) + 1
+            tok = post["treasury"] == pr["treasury"]
+            stats["treasury_ok"] = stats.get("treasury_ok", 0) + int(tok)
+            if not tok:
+                # Why (the inputs MLX does not derive): the deals' gold settled at the round's end, the
+                # founder's belief gold that grew with its followers inside the turn (religion), a city-state.
+                pre_st = t["pre"]["state"]
+                if t["post"].get("round") != t["round"] and pre_st.get("gold_deals"):
+                    cause = "deals at the round's end"
+                elif t.get("_next_gold") is not None and t["_next_gold"] != pre_st["rust"]["player_yields"][GOLD_INDEX]:
+                    cause = "founder's belief gold changed (religion)"
+                elif not t["_players"][t["player"]]["major"]:
+                    cause = "city-state"
+                else:
+                    cause = "other"
+                causes = stats.setdefault("treasury_causes", {})
+                causes[cause] = causes.get(cause, 0) + 1
+            if not tok and len([e for e in examples if "treasury" in e]) < 4:
+                examples.append({"round": t["round"], "player": t["player"], "treasury": [t["pre"]["state"]["treasury"], post["treasury"], pr["treasury"]],
+                                 "gold": pr["gold"], "upkeep_pre_post": [t["pre"]["state"]["upkeep"], post["upkeep"]], "income_pre": t["pre"]["state"]["income_gold"],
+                                 "deals": t["pre"]["state"].get("gold_deals"), "post_round": t["post"].get("round")})
+        if pr.get("culture") is not None and "culture" in post:
+            stats["culture"] = stats.get("culture", 0) + 1
+            want = post["culture"]
+            mine = pr["culture"]
+            cok = all(want[k] == mine[k] for k in ("pool", "lifetime", "recent", "max_cities", "free_policies"))
+            stats["culture_ok"] = stats.get("culture_ok", 0) + int(cok)
+            if not cok and len([e for e in examples if "culture" in e]) < 4:
+                examples.append({"round": t["round"], "player": t["player"], "culture": {k: [t["pre"]["state"]["culture"][k], want[k], mine[k]]
+                                                                                        for k in ("pool", "lifetime", "recent", "max_cities", "free_policies")},
+                                 "cs": want["cs"], "boost": want["boost_turns"]})
         if post["treasury"] == 0:
             stats["empty_treasury"] = stats.get("empty_treasury", 0) + 1
             stats["empty_treasury_science_ok"] = stats.get("empty_treasury_science_ok", 0) + int(post["science"] == pr["science"])
@@ -807,7 +1013,7 @@ def compare(b, city_out, players_out, jobs_out, er, nu):
         stats["players_ok"] += int(ok)
         for k in ("science", "techs", "queue"):
             fields["p_" + k] = fields.get("p_" + k, 0) + int(post[k] == pr[k])
-        if not ok and len([e for e in examples if "science" in e]) < 6:
+        if not ok and len([e for e in examples if "science" in e and "upkeep_pre_post" not in e]) < 6:
             examples.append({"round": t["round"], "player": t["player"], "science": [post["science"], pr["science"]],
                              "pre_science": t["pre"]["state"]["science"], "collected": pr["collected"], "cities_science": pr["cities_science"],
                              "rust_pre_cities_science": t["pre"]["state"]["rust"]["cities_science"],
@@ -831,6 +1037,12 @@ def run(path, limit_games=None, chunk=64, show=8):
         if model is None:
             model = C.Model(game["tables"], game["rules"])
         turns = [t for t in game["turns"] if t["pre"]["state"]["cities"]]
+        # Each line with the player's next line's Gold modifiers (a cause of a treasury mismatch).
+        nxt = {}
+        for t in reversed(game["turns"]):
+            t["_next_gold"] = nxt.get(t["player"])
+            if "rust" in t["pre"]["state"]:
+                nxt[t["player"]] = t["pre"]["state"]["rust"]["player_yields"][GOLD_INDEX]
         for k in range(0, len(turns), chunk):
             t1 = time.time()
             b, city_out, players_out, jobs_out = transition(model, game, turns[k:k + chunk])
@@ -839,7 +1051,12 @@ def run(path, limit_games=None, chunk=64, show=8):
                 continue
             s, f, e = compare(b, city_out, players_out, jobs_out, model.er, model.nu)
             for key in s:
-                tot[key] = tot.get(key, 0) + s[key]
+                if isinstance(s[key], dict):
+                    d = tot.setdefault(key, {})
+                    for k2, v2 in s[key].items():
+                        d[k2] = d.get(k2, 0) + v2
+                else:
+                    tot[key] = tot.get(key, 0) + s[key]
             for key in f:
                 fields[key] = fields.get(key, 0) + f[key]
             for x in e:
@@ -857,7 +1074,7 @@ def main(argv=None):
     o = ap.parse_args(argv)
     rep = run(o.dump, o.games, show=o.show)
     print(f"end of turn: cities {rep['cities_ok']}/{rep['cities']}, players {rep['players_ok']}/{rep['players']} equal, "
-          f"tiles of completed worker jobs {rep['job_tiles_ok']}/{rep['job_tiles']}, unlocks {rep.get('unlocks_ok', 0)}/{rep.get('unlocks', 0)}, border tiles claimed {rep.get('claims_ok', 0)}/{rep.get('claims', 0)}, golden age {rep.get('golden_ages_ok', 0)}/{rep.get('golden_ages', 0)}, science on turns that end with an empty treasury {rep.get('empty_treasury_science_ok', 0)}/{rep.get('empty_treasury', 0)}; fields {rep['fields']}; "
+          f"tiles of completed worker jobs {rep['job_tiles_ok']}/{rep['job_tiles']}, unlocks {rep.get('unlocks_ok', 0)}/{rep.get('unlocks', 0)}, border tiles claimed {rep.get('claims_ok', 0)}/{rep.get('claims', 0)}, golden age {rep.get('golden_ages_ok', 0)}/{rep.get('golden_ages', 0)}, treasury {rep.get('treasury_ok', 0)}/{rep.get('treasury', 0)}, culture pool {rep.get('culture_ok', 0)}/{rep.get('culture', 0)} (treasury causes {rep.get('treasury_causes', {})}), great person progress {rep.get('gp_cities_ok', 0)}/{rep.get('gp_cities', 0)}, science on turns that end with an empty treasury {rep.get('empty_treasury_science_ok', 0)}/{rep.get('empty_treasury', 0)}; fields {rep['fields']}; "
           f"load {rep['load_s']} s, run {rep['run_s']} s")
     for e in rep["examples"]:
         print("  ex:", json.dumps(e))

@@ -52,8 +52,8 @@ NEVER = {"TileTerrainUntil", "OpponentRole", "OpponentDomain", "OpponentClassOf"
          "LearnedTechnology", "UnitDomain", "UnitRole"}
 MODULE_NEVER = {"OpponentIsBarbarian", "OpponentIsCityState", "OpponentHasMoreCities", "NearFollowingCity", "GreatPersonIs"}
 # Modifier codes.
-M_NONE, M_FLAT, M_PCT, M_PERPOP, M_GROWTH, M_STAT, M_COST, M_FLAT_COUNT, M_PCT_COUNT, M_HAPPY, M_HAPPY_COUNT = range(11)
-S_FOODKEPT, S_ANYSPEC, S_SPEC, S_SPECFOOD, S_WONDERCULTURE, S_POPUNHAPPY, S_SPECUNHAPPY, S_NOOCCUPIED = range(1, 9)
+M_NONE, M_FLAT, M_PCT, M_PERPOP, M_GROWTH, M_STAT, M_COST, M_FLAT_COUNT, M_PCT_COUNT, M_HAPPY, M_HAPPY_COUNT, M_GPP = range(12)
+S_FOODKEPT, S_ANYSPEC, S_SPEC, S_SPECFOOD, S_WONDERCULTURE, S_POPUNHAPPY, S_SPECUNHAPPY, S_NOOCCUPIED, S_EXTRALUX, S_GPRATE = range(1, 11)
 # The society and economy stats a player's rows may carry (`happy.py`), by their innermost name.
 PLAYER_STATS = ("CityCountUnhappinessPercent", "PopulationUnhappinessPercent", "HappinessPerCity", "NaturalWonderHappinessPercent",
                 "GoldenAgeLengthPercent", "ScienceWhileHappyPercent", "HappinessPerLuxury", "AllyScience", "ResearchAgreementPercent", "CapitalScienceBuildingBoost")
@@ -117,6 +117,14 @@ class Rows:
             self.extra[key] = (len(rows), row["src"][1])
             rows.append(row)
         return self.extra[key]
+
+    def gp_kind(self, name):
+        """`GreatPersonKind::index()` of a kind name (−2: a kind without a definition)."""
+        name = R.tag(name) if not isinstance(name, str) else name
+        for d in self.er.get("great_people", []):
+            if R.tag(R.parse(d["kind"])) == name:
+                return d["kind_index"]
+        return -2
 
     def filter_index(self, f):
         key = json.dumps(f, sort_keys=True)
@@ -220,6 +228,8 @@ class Rows:
                 return (M_HAPPY_COUNT, 0, ib["amount"], COUNTS[name], per["every"], -1 if mx_ is None else abs(mx_))
             if it == "ModifyCityState" and R.tag(ib["stat"]) in PLAYER_STATS:
                 return (M_STAT, 100 + PLAYER_STATS.index(R.tag(ib["stat"])), ib["amount"], 0, 0, 0)
+            if it == "AddGreatPersonPoints":
+                return (M_GPP, self.gp_kind(ib["kind"]), ib["amount"], 0, 0, 0)
             if it in ("AddHappinessPerFollowingCity", "AddYieldPerFollowers", "AddYieldPerFollowingCity"):
                 raise Unsupported(f"unresolved {it}")
             return (M_NONE, 0, 0, 0, 0, 0)
@@ -229,6 +239,8 @@ class Rows:
             stt = R.tag(st)
             if stt == "FoodKept":
                 return (M_STAT, S_FOODKEPT, amount, 0, 0, 0)
+            if stt == "ExtraLuxuryCopies":
+                return (M_STAT, S_EXTRALUX, amount, 0, 0, 0)
             if stt == "AnySpecialistYield":
                 return (M_STAT, S_ANYSPEC, amount, chan(R.body(st)[0]), 0, 0)
             if stt == "SpecialistYield":
@@ -251,6 +263,10 @@ class Rows:
                         return (M_STAT, 100 + PLAYER_STATS.index(soc), amount, 0, 0, 0)
                 if R.tag(inner) == "PopulationUnhappinessPercent":
                     return (M_STAT, S_POPUNHAPPY, amount, 0, 0, 0)
+                if R.tag(inner) == "GreatPeopleRate":
+                    return (M_STAT, S_GPRATE, amount, -1, 0, 0)
+                if R.tag(inner) == "GreatPersonRate":
+                    return (M_STAT, S_GPRATE, amount, self.gp_kind(R.body(inner)[0]), 0, 0)
                 if R.tag(inner) in PLAYER_STATS:
                     return (M_STAT, 100 + PLAYER_STATS.index(R.tag(inner)), amount, 0, 0, 0)
             return (M_NONE, 0, 0, 0, 0, 0)  # a stat of another system
@@ -367,6 +383,7 @@ class Model:
                 own[sid] += R.body(m)["amount"]
         self.wonder_culture = mx.array(own, dtype=I32)
         self.speed = R.body(R.parse(er["speed"]))
+        self.n_gp_kinds = 1 + max([d["kind_index"] for d in er.get("great_people", [])] + [0])
         self.res_wonder = [r["wonder"] for r in er["resources"]]
         self.res_class = [resource_class(R.tag(R.arg(R.parse(r["class"])))) if R.arg(R.parse(r["class"])) is not None else -1
                           for r in er["resources"]]
@@ -458,8 +475,9 @@ def games_of(path, limit_games=None):
             elif t == "econ_rules":
                 ctx[g]["rules"] = d
             elif t == "round":
+                n = len(d["feature"])
                 ctx[g]["planes"] = [list(p) for p in zip(d["feature"], d["resource"], d["improvement"], [int(x) for x in d["pillaged"]],
-                                                          d["owner"], d["ocity"], d["cityh"])]
+                                                          d["owner"], d["ocity"], d["cityh"], d.get("amount", [0] * n), d.get("route", [0] * n))]
             elif t == "turn":
                 c = ctx[g]
                 for tile, *p in d["pre"]["tiles"]:
@@ -596,11 +614,21 @@ def evaluate(model, game, batch):
     """MLX: the yields of every city of the batch. Returns a dict of arrays."""
     if batch.n == 0:
         return None
+    return evaluate_arrays(model, batch_arrays(model, game, batch))
+
+
+ARRAY_KEYS = ("pop", "capital", "bld", "wide", "pol", "nation", "xc", "xt", "head", "counts", "garrison", "coastal", "river", "peace",
+              "connected", "golden", "capbuilt", "landmark", "focus", "forced", "locked", "avoid", "gw", "csfood", "unhappy", "after",
+              "resist", "wonder_res", "handicap", "era", "ai", "owner_cities", "techs")
+
+
+def batch_arrays(model, game, batch):
+    """The batch as device arrays: its columns, and the tile planes of each city's candidates (from the
+    whole map's plot yields of each turn line). `evaluate_arrays` reads nothing else, so a state kept
+    on the device (`gpu.py`) feeds it the same dict."""
     model.tables()
-    er = model.er
     cols = batch.cols
     C = batch.n
-    nb, nu, ns = model.nb, model.nu, model.ns
     tb = model.tb
     tables = game["tables"]
     w, h = batch.w, batch.h
@@ -624,28 +652,73 @@ def evaluate(model, game, batch):
     # --- per city gathers.
     row = mx.array(cols["row"], dtype=I32)
     cand = mx.array(cols["cand"], dtype=I32)  # [C, K]
-    on = cand >= 0
     cidx = mx.maximum(cand, 0)
     flat_idx = (row[:, None] * T + cidx).reshape(-1)
 
     def per_cand(a):
         return mx.take(a.reshape(B * T, *a.shape[2:]), flat_idx, axis=0).reshape(C, NCAND, *a.shape[2:])
 
-    craw = per_cand(raw)
-    c_feature, c_resource, c_imp, c_pill = per_cand(feature), per_cand(resource), per_cand(improvement), per_cand(pillaged)
-    c_ocity = per_cand(ocity)
+    A = {"raw": raw, "cand": cand, "craw": per_cand(raw), "c_feature": per_cand(feature), "c_resource": per_cand(resource),
+         "c_imp": per_cand(improvement), "c_pill": per_cand(pillaged), "c_ocity": per_cand(ocity)}
     terrain = mx.array(game["rules"]["terrain"], dtype=I32)  # per game (the map)
-    c_terrain = mx.take(terrain, cidx)
-    c_river = mx.take(mx.array(tables["tiles"]["river"]), cidx)
-    c_water = mx.take(mx.array(tables["tiles"]["water"]), cidx)
-    c_lake = mx.take(mx.array(tables["tiles"]["lake"]), cidx)
-    c_wonder = mx.take(mx.array(tables["tiles"]["wonder"], dtype=I32), cidx)
+    A["c_terrain"] = mx.take(terrain, cidx)
+    A["c_river"] = mx.take(mx.array(tables["tiles"]["river"]), cidx)
+    A["c_water"] = mx.take(mx.array(tables["tiles"]["water"]), cidx)
+    A["c_lake"] = mx.take(mx.array(tables["tiles"]["lake"]), cidx)
+    A["c_wonder"] = mx.take(mx.array(tables["tiles"]["wonder"], dtype=I32), cidx)
     centre = mx.array(cols["centre"], dtype=I32)
-    handle = mx.array([c["h"] for _, c in batch.cities], dtype=I32)
-    is_centre = cand == centre[:, None]
-    unworked = mx.array([[tt in uw for tt in cs] for cs, uw in zip(cols["cand"], cols["unworked"])])
-    workable = on & ~is_centre & (c_ocity == handle[:, None]) & ~unworked
-    techs = mx.array(cols["techs"])  # [C, NT]
+    A["is_centre"] = cand == centre[:, None]
+    A["handle"] = mx.array([c["h"] for _, c in batch.cities], dtype=I32)
+    A["unworked"] = mx.array([[tt in uw for tt in cs] for cs, uw in zip(cols["cand"], cols["unworked"])])
+    # Unimproved features next to the centre (CityAdjacentUnimprovedFeature).
+    cn = mx.take(nbr, centre, axis=0)  # [C, 6]
+    A["cn_on"] = cn >= 0
+    cn_flat = (row[:, None] * T + mx.maximum(cn, 0)).reshape(-1)
+    A["n_feature"] = mx.take(feature.reshape(-1), cn_flat).reshape(C, 6)
+    A["n_imp"] = mx.take(improvement.reshape(-1), cn_flat).reshape(C, 6)
+    A.update(column_arrays(model, cols, C, batch.x_city, batch.x_tile))
+    return A
+
+
+def column_arrays(model, cols, C, x_city, x_tile):
+    """The batch's columns (lists) as device arrays."""
+    er = model.er
+    A = {}
+    for k in ("pop", "nation", "head", "counts", "landmark", "focus", "forced", "gw", "csfood", "unhappy", "after", "wide", "era", "owner_cities"):
+        A[k] = mx.array(cols[k], dtype=I32)
+    for k in ("capital", "bld", "garrison", "coastal", "river", "peace", "connected", "golden", "capbuilt", "locked", "avoid", "resist", "ai", "techs"):
+        A[k] = mx.array(cols[k])
+    A["handicap"] = mx.array(cols["handicap"], dtype=I32)
+    npol = 1 + max([max(p) for p in cols["policies"] if p] + [r["src"][1] for r in model.rows.city + model.rows.tile if r["src"][0] == "policy"] + [0])
+    A["pol"] = mx.array([[i in set(p) for i in range(npol)] for p in cols["policies"]])
+    NX = max(1, len(model.rows.extra))
+    xc = [[0] * NX for _ in range(C)]
+    for r, xi, n in x_city:
+        xc[r][xi] += n
+    xt = [[0] * NX for _ in range(C)]
+    for r, xi, n in x_tile:
+        xt[r][xi] += n
+    A["xc"], A["xt"] = mx.array(xc, dtype=I32), mx.array(xt, dtype=I32)
+    wr = er["wonder_resources"]
+    A["wonder_res"] = mx.array([[r in set(v) for r in wr] + [False] for v in cols["wonder_res"]])
+    return A
+
+
+def evaluate_arrays(model, A, steps=None):
+    """MLX: the yields of every city of `A` (`batch_arrays`). Returns a dict of arrays. `steps`: the
+    citizens' placement steps (≥ the most free citizens of a city; None: read from the device)."""
+    model.tables()
+    er = model.er
+    nb, nu, ns = model.nb, model.nu, model.ns
+    tb = model.tb
+    cand, craw = A["cand"], A["craw"]
+    C = cand.shape[0]
+    on = cand >= 0
+    c_feature, c_resource, c_imp, c_pill, c_ocity = A["c_feature"], A["c_resource"], A["c_imp"], A["c_pill"], A["c_ocity"]
+    c_terrain, c_river, c_water, c_lake, c_wonder = A["c_terrain"], A["c_river"], A["c_water"], A["c_lake"], A["c_wonder"]
+    is_centre = A["is_centre"]
+    workable = on & ~is_centre & (c_ocity == A["handle"][:, None]) & ~A["unworked"]
+    techs = A["techs"]  # [C, NT]
     NT = techs.shape[1]
     # The resource as the owner sees it (its revealing technology known).
     r_tech = mx.take(tb.r_tech, mx.where(c_resource < 0, tb.nr, c_resource))
@@ -654,35 +727,16 @@ def evaluate(model, game, batch):
     c_class = mx.where(seen_r, mx.take(res_class, mx.where(c_resource < 0, tb.nr, c_resource)), -1)
     working_imp = mx.where(c_pill, -1, c_imp)
     # --- the city's masks.
-    pop = mx.array(cols["pop"], dtype=I32)
-    capital = mx.array(cols["capital"])
-    bld = mx.array(cols["bld"])  # [C, NB]
-    wide = mx.array(cols["wide"], dtype=I32)
-    npol = 1 + max([max(p) for p in cols["policies"] if p] + [r["src"][1] for r in model.rows.city + model.rows.tile if r["src"][0] == "policy"] + [0])
-    pol = mx.array([[i in set(p) for i in range(npol)] for p in cols["policies"]])
-    nation = mx.array(cols["nation"], dtype=I32)
-    NX = max(1, len(model.rows.extra))
-    xc = [[0] * NX for _ in range(C)]
-    for r, xi, n in batch.x_city:
-        xc[r][xi] += n
-    xt = [[0] * NX for _ in range(C)]
-    for r, xi, n in batch.x_tile:
-        xt[r][xi] += n
-    xc, xt = mx.array(xc, dtype=I32), mx.array(xt, dtype=I32)
-    head = mx.array(cols["head"], dtype=I32)
-    counts = mx.array(cols["counts"], dtype=I32)
+    pop, capital, bld, wide, pol, nation = A["pop"], A["capital"], A["bld"], A["wide"], A["pol"], A["nation"]
+    xc, xt = A["xc"], A["xt"]
+    NX = xc.shape[1]
+    head = A["head"]
     world_wonders = mx.sum(bld & model.wonder[None], axis=1).astype(I32)
-    counts = mx.concatenate([pop[:, None], world_wonders[:, None], counts[:, 2:]], axis=1)  # [C, 9] (`COUNTS`)
+    counts = mx.concatenate([pop[:, None], world_wonders[:, None], A["counts"][:, 2:]], axis=1)  # [C, 9] (`COUNTS`)
     NCOUNT = counts.shape[1]
-    flags = {C_GARRISON: mx.array(cols["garrison"]), C_COASTAL: mx.array(cols["coastal"]), C_RIVER: mx.array(cols["river"]),
-             C_PEACE: mx.array(cols["peace"]), C_CONNECTED: mx.array(cols["connected"]), C_GOLDEN: mx.array(cols["golden"]),
-             C_CAPBUILT: mx.array(cols["capbuilt"])}
-    # Unimproved features next to the centre (CityAdjacentUnimprovedFeature).
-    cn = mx.take(nbr, centre, axis=0)  # [C, 6]
-    cn_on = cn >= 0
-    cn_flat = (row[:, None] * T + mx.maximum(cn, 0)).reshape(-1)
-    n_feature = mx.take(feature.reshape(-1), cn_flat).reshape(C, 6)
-    n_imp = mx.take(improvement.reshape(-1), cn_flat).reshape(C, 6)
+    flags = {C_GARRISON: A["garrison"], C_COASTAL: A["coastal"], C_RIVER: A["river"], C_PEACE: A["peace"], C_CONNECTED: A["connected"],
+             C_GOLDEN: A["golden"], C_CAPBUILT: A["capbuilt"]}
+    cn_on, n_feature, n_imp = A["cn_on"], A["n_feature"], A["n_imp"]
 
     def instances(rt, extra):
         """[C, R]: instances of each row (source and capital gate)."""
@@ -753,6 +807,11 @@ def evaluate(model, game, batch):
     pop_unhappy_pct = mx.sum(mx.where(stat == S_POPUNHAPPY, mamt, 0), axis=1)
     spec_unhappy_pct = mx.sum(mx.where(stat == S_SPECUNHAPPY, mamt, 0), axis=1)
     no_occupied = mx.sum(mx.where(stat == S_NOOCCUPIED, mamt, 0), axis=1)
+    extra_lux = mx.sum(mx.where(stat == S_EXTRALUX, mamt, 0), axis=1)
+    NK = model.n_gp_kinds
+    kinds_k = mx.arange(NK)[None, None, :]
+    gp_points = mx.sum(mx.where(((mkind == M_GPP)[..., None]) & (mch[..., None] == kinds_k), mamt[..., None], 0), axis=1)  # [C, NK]
+    gp_rate = mx.sum(mx.where(((stat == S_GPRATE)[..., None]) & ((mk[..., None] == kinds_k) | (mk[..., None] == -1)), mamt[..., None], 0), axis=1)
     wonder_pct = mx.sum(mx.where(stat == S_WONDERCULTURE, mamt, 0), axis=1)
     any_spec = mx.sum(mx.where((stat == S_ANYSPEC)[..., None] & (mx.arange(NY)[None, None] == mk[..., None]), mamt[..., None], 0), axis=1)
     # SpecialistYield: (kind, channel): the column `every` holds the specialist (−1: all but the default).
@@ -767,21 +826,7 @@ def evaluate(model, game, batch):
     prod_item_pct = mx.sum(mx.where((mkind == M_PCT) & (mch == 1) & ((rt["c"][:, 0, 0] == C_PRODUCING) | (rt["c"][:, 0, 0] == C_CAPBUILT))[None],
                                     mamt, 0), axis=1)
     # Marble: a wonder resource of the city's territory speeds world wonders.
-    res_pct = []
-    for ci, (h_, wr) in enumerate(zip(cols["head"], cols["wonder_res"])):
-        v = 0
-        if h_ >= nu:
-            bd = er["buildings"][h_ - nu]
-            if bd["kind"] == "WorldWonder":
-                for r_ in er["wonder_resources"]:
-                    bonus = model.res_wonder[r_]
-                    if bonus is None or r_ not in wr:
-                        continue
-                    before = bonus[1]
-                    if before < 0 or bd["era"] < 0 or bd["era"] < before:
-                        v += bonus[0]
-        res_pct.append(v)
-    res_pct = mx.array(res_pct, dtype=I32)
+    res_pct = wonder_resource_percent(model, head, A["wonder_res"])
     pct = pct + mx.where(mx.arange(NY)[None] == 1, res_pct[:, None], 0)
     item_pct = prod_item_pct + res_pct
     # --- Tile-scope effects on the candidate tiles.
@@ -810,15 +855,15 @@ def evaluate(model, game, batch):
     t_flat = mx.sum(mx.where(((tk == M_FLAT)[:, None] & chs)[None, None], (tn * tamt[None, None])[..., None], 0), axis=2)  # [C, K, 6]
     t_pct = mx.sum(mx.where(((tk == M_PCT)[:, None] & chs)[None, None], (tn * tamt[None, None])[..., None], 0), axis=2)
     y = trunc_div((craw + t_flat) * (100 + t_pct), 100)
-    y = y + mx.where(mx.arange(NY)[None, None] == 4, mx.array(cols["landmark"], dtype=I32)[..., None], 0)
+    y = y + mx.where(mx.arange(NY)[None, None] == 4, A["landmark"][..., None], 0)
     y = mx.where(is_centre[..., None], mx.maximum(y, mx.array(econ.CITY_MIN, dtype=I32)), y)
     y = mx.maximum(y, 0)
-    golden = mx.array(cols["golden"])
+    golden = A["golden"]
     y = y + mx.where((mx.arange(NY)[None, None] == 2) & golden[:, None, None] & (y[..., 2:3] >= 1), 1, 0)
     # --- citizens.
-    wts = mx.array(cols["focus"], dtype=I32)  # [C, 7]
+    wts = A["focus"]  # [C, 7]
     slots = mx.sum(mx.where(bld[:, :, None], model.slots[None], 0), axis=1)  # [C, S]
-    forced = mx.array(cols["forced"], dtype=I32)
+    forced = A["forced"]
     citizens = pop
     spec_n = mx.zeros((C, ns), dtype=I32)
     for s in range(ns):
@@ -826,12 +871,12 @@ def evaluate(model, game, batch):
         spec_n = spec_n + mx.where(mx.arange(ns)[None] == s, n[:, None], 0)
         slots = slots - mx.where(mx.arange(ns)[None] == s, n[:, None], 0)
         citizens = citizens - n
-    locked = mx.array(cols["locked"]) & workable
+    locked = A["locked"] & workable
     rank = mx.cumsum(locked.astype(I32), axis=1)
     take_locked = locked & (rank <= citizens[:, None])
     citizens = citizens - mx.sum(take_locked.astype(I32), axis=1)
     taken = take_locked | is_centre
-    avoid = mx.array(cols["avoid"])
+    avoid = A["avoid"]
     food_needed = FOOD_PER_CITIZEN * pop + mx.where(avoid, 0, FOOD_PER_CITIZEN)
     pos = mx.arange(NCAND)[None]
     default = model.default_spec
@@ -839,7 +884,8 @@ def evaluate(model, game, batch):
     spec_score_base = mx.sum(spec_table * wts[:, None, :6], axis=2) + model.spec_points[None] * wts[:, 6:7]  # [C, S] not hungry
     spec_food = spec_table[..., 0]
     tile_score_base = mx.sum(y * wts[:, None, :6], axis=2)
-    steps = int(mx.max(citizens).item()) if C else 0
+    if steps is None:
+        steps = int(mx.max(citizens).item()) if C else 0
     worked_mask = taken
     for step in range(steps):
         active = citizens > step
@@ -870,31 +916,82 @@ def evaluate(model, game, batch):
     base = base + mx.where(has_spec[:, None], any_spec, 0)
     # The module's base: city-state food, a science per citizen, great works, wonders' culture.
     wonder_bonus = trunc_div(mx.sum(mx.where(bld, model.wonder_culture[None], 0), axis=1) * wonder_pct, 100)
-    gw = mx.array(cols["gw"], dtype=I32)
-    module_base = mx.stack([mx.array(cols["csfood"], dtype=I32), mx.zeros((C,), dtype=I32), mx.zeros((C,), dtype=I32), pop,
+    gw = A["gw"]
+    module_base = mx.stack([A["csfood"], mx.zeros((C,), dtype=I32), mx.zeros((C,), dtype=I32), pop,
                             gw + wonder_bonus, mx.zeros((C,), dtype=I32)], axis=1)
     base = base + module_base
-    unhappy = mx.array(cols["unhappy"], dtype=I32)
+    unhappy = A["unhappy"]
     emp_pct = mx.where(golden, GOLDEN_AGE_PRODUCTION_PERCENT + unhappy, unhappy)
     pct_all = pct + mx.where(mx.arange(NY)[None] == 1, emp_pct[:, None], 0)
-    after = mx.array(cols["after"], dtype=I32)
+    after = A["after"]
     hundredths = (base + flat) * (100 + pct_all)
     rates = mx.maximum(hundredths, 0) // 100 + after
-    resist = mx.array(cols["resist"])
+    resist = A["resist"]
     rates = mx.where(resist[:, None], 0, rates)
     base_out = mx.where(resist[:, None], 0, base)
     # --- the production cost of the head of the queue.
-    head_cost = production_cost(model, cols, head, cost_pct)
+    head_cost = production_cost_arrays(model, A, head, cost_pct)
     return {"worked": worked_mask, "cand": cand, "y": y, "spec_n": spec_n, "tile_yields": tile_yields, "spec_yields": spec_yields,
             "base": base_out, "rates": rates, "growth_percent": growth_percent, "item_percent": item_pct, "food_kept_stat": food_kept,
-            "spec_food_pct": spec_food_pct, "head_cost": head_cost, "flat": flat, "pct": pct_all, "cost_pct": mx.stack(cost_pct, axis=1), "raw": raw,
-            "happiness": city_happiness, "pop_unhappy_pct": pop_unhappy_pct, "spec_unhappy_pct": spec_unhappy_pct, "no_occupied": no_occupied}
+            "spec_food_pct": spec_food_pct, "head_cost": head_cost, "flat": flat, "pct": pct_all, "cost_pct": mx.stack(cost_pct, axis=1), "raw": A.get("raw"),
+            "happiness": city_happiness, "pop_unhappy_pct": pop_unhappy_pct, "spec_unhappy_pct": spec_unhappy_pct, "no_occupied": no_occupied,
+            "extra_lux": extra_lux,
+            "gp_points": gp_points, "gp_rate": gp_rate}
 
 
 def trunc_div(a, b):
     """Integer division toward zero (Rust), for b > 0."""
     q = mx.abs(a) // b
     return mx.where(a < 0, -q, q)
+
+
+def wonder_resource_percent(model, head, wonder_res):
+    """Marble: a wonder resource of the city's territory speeds a world wonder at the head (before
+    its era limit). `wonder_res` [C, wonder resources + 1] bool."""
+    er = model.er
+    if not hasattr(model, "_wr_tables"):
+        nu = model.nu
+        wr = er["wonder_resources"]
+        bonus = [model.res_wonder[r] for r in wr]
+        pct = mx.array([b[0] if b else 0 for b in bonus] + [0], dtype=I32)
+        before = mx.array([b[1] if b else -1 for b in bonus] + [-1], dtype=I32)
+        ww = mx.array([False] * nu + [d["kind"] == "WorldWonder" for d in er["buildings"]] + [False])
+        era = mx.array([-1] * nu + [d["era"] for d in er["buildings"]] + [-1], dtype=I32)
+        model._wr_tables = (pct, before, ww, era)
+    pct, before, ww, era = model._wr_tables
+    hi = mx.where(head < 0, ww.shape[0] - 1, head)
+    e = mx.take(era, hi)[:, None]
+    ok = wonder_res & ((before[None] < 0) | (e < 0) | (e < before[None]))
+    v = mx.sum(mx.where(ok, pct[None], 0), axis=1)
+    return mx.where(mx.take(ww, hi), v, 0).astype(I32)
+
+
+def production_cost_arrays(model, A, head, cost_pct):
+    """`CityModifiers::production_cost` of each city's head (−1 without one), vectorized: the item's
+    base, the speed, the AI's handicap percents (× the per-era modifier), the city's cost percent."""
+    er = model.er
+    nu = model.nu
+    if not hasattr(model, "_cost_tables"):
+        u, b = er["units"], er["buildings"]
+        model._cost_tables = (mx.array([d["cost"] for d in u] + [d["cost"] for d in b] + [0], dtype=I32),
+                              mx.array([0] * len(u) + [max(d["cpc"], 0) for d in b] + [0], dtype=I32),
+                              mx.array([bool(d["founder"]) for d in u] + [False] * len(b) + [False]),
+                              mx.array([0] * len(u) + [2 if d["wonder"] else 1 for d in b] + [0], dtype=I32))
+    cost_t, cpc_t, founder_t, which_t = model._cost_tables
+    sp = model.speed["production_percent"]
+    hi = mx.where(head < 0, cost_t.shape[0] - 1, head)
+    hc = A["handicap"]
+    era_pct = mx.maximum(hc[:, 4] * A["era"] + 100, 0)
+    base = mx.take(cost_t, hi) + mx.take(cpc_t, hi) * A["owner_cities"]
+    which = mx.take(which_t, hi)
+    hpct = mx.take_along_axis(hc, which[:, None], axis=1)[:, 0]
+    scale = mx.maximum(mx.maximum(hpct, 0) * era_pct // 100, 1)
+    sped = base if sp == 100 else mx.maximum(base * sp // 100, 1)
+    handi = mx.where(A["ai"], mx.maximum(sped * scale // 100, 1), sped)
+    base = mx.where(mx.take(founder_t, hi), sped, handi)
+    p = mx.where(head >= nu, cost_pct[1], cost_pct[0])
+    cost = mx.maximum(base * (100 + p), 100) // 100
+    return mx.where(head < 0, -1, cost)
 
 
 def production_cost(model, cols, head, cost_pct):

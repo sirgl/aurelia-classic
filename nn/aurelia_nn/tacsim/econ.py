@@ -93,7 +93,7 @@ def plot_yields(tb, nb, st, finish=True):
     land); `finish=False`: the plot yields before `finish_tile` (the city's tile effects come between). `st`: kind, mountain, water, lake, river, wonder (static, [B, T]); feature, resource,
     improvement, pillaged, owner, city ([B, T]); techs [B, P, NT] bool; viewer [B]."""
     B, T = st["kind"].shape
-    nbm = mx.broadcast_to(nb[None], (B, T, 6))
+    nbm = nb if nb.ndim == 3 else mx.broadcast_to(nb[None], (B, T, 6))  # [T, 6] shared, or [B, T, 6] per row (local layouts)
     on = (nbm >= 0)
 
     def nbr(a):

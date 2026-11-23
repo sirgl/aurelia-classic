@@ -42,7 +42,7 @@ pub struct EconDump {
     /// `AURELIA_ECON_TURNS`: the end-turn lines too (`bench::econ_turns`).
     turns: bool,
     /// The dynamic planes as the game's last line left them (the turn lines carry the diff).
-    last: Option<Vec<[i32; 7]>>,
+    last: Option<Vec<[i32; 9]>>,
     /// The ending player, its round and the world before its end of turn.
     pending: Option<(PlayerId, u32, Value)>,
 }
@@ -117,12 +117,14 @@ fn tables(game: &GameState, rules: &CompiledRuleset) -> Value {
     let lake: Vec<bool> = tiles.clone().map(|t| map.lake(t)).collect();
     let river: Vec<bool> = tiles.clone().map(|t| map.river(t)).collect();
     let wonder: Vec<i32> = tiles.clone().map(|t| map.natural_wonder(t).map_or(-1, |w| i32::from(w.0))).collect();
+    let hills: Vec<bool> = tiles.clone().map(|t| map.terrain(t).is_some_and(|c| map.terrain_kinds().is_hills(c.0))).collect();
+    let water_area: Vec<i64> = tiles.clone().map(|t| map.water_area(t).map_or(-1, i64::from)).collect();
     let players = auth.players();
     let majors: Vec<u8> = (0..players.count()).map(|p| p as u8).filter(|p| players.is_major(PlayerId(*p))).collect();
     json!({"t": "tables", "game": self_name(game), "map_w": dims.width, "map_h": dims.height, "players": players.count(), "majors": majors,
            "techs": rules.technologies.len(), "terrain_kinds": terrain_kinds, "features": features, "resources": resources,
            "improvements": improvements, "wonders": wonders,
-           "tiles": {"kind": kind, "mountain": mountain, "water": water, "lake": lake, "river": river, "wonder": wonder}})
+           "tiles": {"kind": kind, "mountain": mountain, "water": water, "lake": lake, "river": river, "wonder": wonder, "hills": hills, "water_area": water_area}})
 }
 
 fn self_name(_game: &GameState) -> Value {
@@ -174,6 +176,8 @@ impl MatchRecorder<ClassicBench> for EconDump {
             let planes = super::econ_turns::tile_planes(game.view().auth);
             r["ocity"] = json!(planes.iter().map(|p| p[5]).collect::<Vec<_>>());
             r["cityh"] = json!(planes.iter().map(|p| p[6]).collect::<Vec<_>>());
+            r["amount"] = json!(planes.iter().map(|p| p[7]).collect::<Vec<_>>());
+            r["route"] = json!(planes.iter().map(|p| p[8]).collect::<Vec<_>>());
             self.last = Some(planes);
         }
         self.write(r);
