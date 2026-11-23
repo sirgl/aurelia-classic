@@ -6,8 +6,9 @@
 //!   game twice gives the same plans and the same hash;
 //! - the site head is the guarded `net_score` when the plan says nothing (no menace, a wide seat), and a
 //!   tall seat adds only its gap bonus;
-//! - the invariants: `standard` and `pre-nets-x` play as pinned, with no plan in any brief; the variants that
-//!   are not `net2`'s never have one; `net2-defence` plays as `net2` until the offence exists.
+//! - the invariants: `pre-net2` (the standard of the fifteenth promotion) and `pre-nets-x` play as pinned, with
+//!   no plan in any brief; `standard` (since the sixteenth promotion) plays as `net2`, plan for plan; the
+//!   variants that are not `net2`'s never have one; `net2-defence` plays as `net2` until the offence exists.
 
 #![cfg(feature = "experimental-ai")]
 
@@ -178,18 +179,28 @@ fn net2_defence_plays_as_net2_until_the_offence_exists() {
     assert!(ClassicMind::new(Variant::Net2).net2_offence() && !ClassicMind::new(Variant::Net2Defence).net2_offence());
 }
 
-/// The invariants: no variant but `net2`'s has a plan, `standard` plays as `nets-x-site` (its alias) and
-/// `pre-nets-x` as the standard before, at the hashes the game without the feature pins
-/// (`ai_experimental_off.rs`: `NETS_X_SITE_120`, `OLD_STANDARD_120`).
+/// The invariants: no variant but `net2`'s has a plan, `pre-net2` (the standard of the fifteenth promotion) plays
+/// as `nets-x-site` and `pre-nets-x` as the standard before it, at the hashes the game without the feature pinned
+/// before the sixteenth promotion (`ai_experimental_off.rs`: `PRE_NET2_120`, `PRE_NETS_X_120`).
 #[test]
-fn standard_and_pre_nets_x_play_unchanged_with_no_plan() {
-    const NETS_X_SITE_120: u64 = 0x0d29_24db_3999_6453;
-    const OLD_STANDARD_120: u64 = 0xc13f_b8a6_f3df_ced8;
-    for (variant, pinned) in [(Variant::Standard, NETS_X_SITE_120), (Variant::PreNetsX, OLD_STANDARD_120)] {
+fn pre_net2_and_pre_nets_x_play_unchanged_with_no_plan() {
+    const PRE_NET2_120: u64 = 0x0d29_24db_3999_6453;
+    const PRE_NETS_X_120: u64 = 0xc13f_b8a6_f3df_ced8;
+    for (variant, pinned) in [(Variant::PreNet2, PRE_NET2_120), (Variant::NetsXSite, PRE_NET2_120), (Variant::PreNetsX, PRE_NETS_X_120)] {
         let (hash, seen) = play(variant, 120);
         assert!(seen.iter().all(|s| s.plan.is_none()), "{}: a brief with a net2 plan", variant.name());
         assert_eq!(hash, pinned, "{}: {hash:016x}", variant.name());
     }
+}
+
+/// The sixteenth promotion: `standard` is the game of `net2`, the same plans on every turn and the same hash.
+#[test]
+fn standard_plays_net2() {
+    let (net2, net2_seen) = play(Variant::Net2, ROUNDS);
+    let (standard, standard_seen) = play(Variant::Standard, ROUNDS);
+    assert_eq!(standard, net2, "{standard:016x}");
+    assert_eq!(standard_seen, net2_seen);
+    assert!(strategic(&standard_seen).iter().all(|s| s.plan.is_some()));
 }
 
 #[test]
@@ -202,7 +213,7 @@ fn only_the_net2_variants_think_with_net2() {
     let named: Vec<&str> = Variant::ALL.into_iter().filter(|v| v.net2()).map(|v| v.name()).collect();
     assert_eq!(
         named,
-        ["net2", "net2-defence", "net2-tac", "net2-no-strategy", "net2-no-war", "net2-no-deals", "net2-no-peace", "net2-no-cs", "net2-no-congress", "net2-no-sites", "net2-no-fleet", "net2-no-guard", "net2-no-economy", "net2-off"]
+        ["standard", "net2", "net2-defence", "net2-tac", "net2-no-strategy", "net2-no-war", "net2-no-deals", "net2-no-peace", "net2-no-cs", "net2-no-congress", "net2-no-sites", "net2-no-fleet", "net2-no-guard", "net2-no-economy", "net2-off"]
     );
     for name in ["net2", "net2-defence", "tac2", "net2-tac", "net2-no-war", "net2-off"] {
         let variant = Variant::from_name(name).unwrap_or_else(|| panic!("{name}"));
