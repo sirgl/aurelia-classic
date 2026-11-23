@@ -72,6 +72,15 @@ pub struct SeatInputs {
     pub size_model: Milli,
     /// A spaceship part of ours stands outside the capital (0/1000; `weights::g::PART_OUT`).
     pub part_out: Milli,
+    /// The opening's cities the size model does not found, 250 a city (`weights::g::OPENING`; `net2::opening`); 0 unless
+    /// the seat plays `early-growth` (`TurnBrief::early_growth`). Set after the intent, read by `CITY_CAP` only.
+    pub opening: Milli,
+    /// The opening's cities still to found, the model's among them, 250 a city (`weights::g::OPENING_GAP`;
+    /// `net2::opening_gap`); 0 unless `early-growth`. Set after the intent, read by `EXPANSION_TILT` only.
+    pub opening_gap: Milli,
+    /// Luxury kinds lying unconnected on our tiles beyond our workers, 500 a kind (`weights::g::LUX_OPEN`;
+    /// `net2::lux_open`); 0 unless `early-growth`. Read by `WORKER_TILT` only.
+    pub lux_open: Milli,
 }
 
 /// One strategic resource the missing spaceship parts need (the hold's quantity, `Net2Plan::space_hold`).

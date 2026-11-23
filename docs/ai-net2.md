@@ -104,3 +104,22 @@ them off (`TurnBrief::science_flow`; the input is 0 and the memory writes no byt
 The chest is released by the net: `r::CHEST_WAIT` (the rounds the chest held a partner's gold unsigned, over
 `gate::CHEST_WAIT_ROUNDS`) lowers `AGREEMENT` until the rival is no tie. The look, the measurements and the gates are in
 `work/nets/science-flow/SCIENCE-FLOW.md`.
+
+## Candidate: early-growth (bench only, `experimental-ai`; not measured against its gates)
+
+`early-growth` is `science-flow` with three more inputs of `net2` (`weights::g::OPENING`, `OPENING_GAP`, `LUX_OPEN`;
+`net2::opening`, `opening_gap`, `lux_open`), one more term of `CITY_CAP` and two price tilts (`weights::EXPANSION_TILT`,
+`WORKER_TILT`, outside `neurons()` like the science-flow neurons). Every other variant keeps the inputs at 0
+(`TurnBrief::early_growth`), so the hashes of `standard`, `pre-net2` and `science-flow` do not move.
+
+| piece | what | why (look, 20 self-play games, seeds 3610–3614, Quick) |
+|---|---|---|
+| `OPENING` → `CITY_CAP` | the opening's cities (below `gate::OPENING_CITIES` = 4, on free sites, each keeping excess happiness ≥ 0) beyond the size model's | the model keeps 6 points after a city (`tall_real::CONTENT_FLOOR`): 2 cities in 4909 of 6650 turns of r1–100 |
+| `OPENING_GAP` → `EXPANSION_TILT` | the expansion price +1.5 per opening city | the head replaced the allocator's settler by a granary or a library; a city the cap allowed waited 32 rounds for its settler |
+| `LUX_OPEN` → `WORKER_TILT` | the worker price +2 per luxury kind waiting beyond the workers | first worker r46 with 1.9 luxury kinds unconnected at r40 |
+
+Measured on the tuning set only: the 3rd city r80 → r34, the 4th r108 → r93, cities at r80 2.57 → 3.31 (science
+winners); science at r132 +13 %, technologies +1.8 %; 52.7 % against `science-flow` on offset 3650 (200 games, median
+science-win round 314 against 309). The research did not move: each city adds 5 % to every technology's cost on the
+pace maps, the new cities have no library (lag 34 rounds), and the first worker stays at r45. The look and the tables are
+in `work/nets/early-growth`; the trace is `ai-science-pace --early FILE`.

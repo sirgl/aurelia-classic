@@ -98,6 +98,9 @@ impl SeatInputs {
             self.parts_short,
             self.size_model,
             self.part_out,
+            self.opening,
+            self.opening_gap,
+            self.lux_open,
         ]
     }
 }

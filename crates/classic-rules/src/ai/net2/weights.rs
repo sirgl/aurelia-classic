@@ -119,8 +119,19 @@ pub mod g {
     pub const SIZE_MODEL: usize = 14;
     /// A spaceship part of ours stands outside the capital, the tile it is installed on (0/1000).
     pub const PART_OUT: usize = 15;
-    pub const N: usize = 16;
-    pub const NAMES: [&str; N] = ["capital_lost", "cities_lost", "war_rounds", "war_gain", "unhappy_trend", "embark", "enemy_air", "gold_stock", "cs_allies", "cs_contested", "own_infamy", "ties_at_risk", "space_race", "parts_short", "size_model", "part_out"];
+    /// The opening's cities a real tall seat still lacks beyond the size model's new ones: below `gate::OPENING_CITIES`,
+    /// on the free sites, each keeping the empire content (excess happiness ≥ 0 after the city and its first citizen at
+    /// the empire's rates), 250 a city (`net2::opening`; `early-growth` only, else 0; set after the intent).
+    pub const OPENING: usize = 16;
+    /// The opening's cities a real tall seat still lacks, the model's new ones among them: below
+    /// `gate::OPENING_CITIES`, on the free sites, each keeping the empire content, 250 a city (`net2::opening_gap`;
+    /// `early-growth` only, else 0; set after the intent).
+    pub const OPENING_GAP: usize = 17;
+    /// Luxury kinds the empire lacks lying on its own tiles without their improvement, beyond its workers (alive or
+    /// queued), 500 a kind (`net2::lux_open`; `early-growth` only, else 0).
+    pub const LUX_OPEN: usize = 18;
+    pub const N: usize = 19;
+    pub const NAMES: [&str; N] = ["capital_lost", "cities_lost", "war_rounds", "war_gain", "unhappy_trend", "embark", "enemy_air", "gold_stock", "cs_allies", "cs_contested", "own_infamy", "ties_at_risk", "space_race", "parts_short", "size_model", "part_out", "opening", "opening_gap", "lux_open"];
 }
 
 /// A rival's inputs (`plan::RivalInputs` in order).
@@ -671,6 +682,7 @@ pub const CITY_CAP: Neuron = Neuron {
         t(K(kc::HAPPINESS_CRISIS), -6000, "in a crisis the rules cut growth: no city (`CITY_CRISIS`)"),
         t(A(a::MAX_MENACE), -2000, "rivals' pressure: a stack at our border takes the settler and the young city first (MO8)"),
         ts(F(fe::PROGRESS), Shape::Above(600), -5000, "late a new city has no rounds to grow its citizens: the model's horizon refused every city in 1326 of 3178 turns of r198–263 (R4 traces); the tilt's founding stops too (−1.6 cities at 93 % of the game)"),
+        t(G(g::OPENING), 4000, "the opening's cities a city a city (`early-growth`): the model keeps 6 points of happiness after a city (`tall_real::CONTENT_FLOOR`), which held the science-flow seats at 2 cities in 4909 of 6650 turns of r1–100 (look 3610–3614: cities 1.93 at r40, 2.57 at r80; the 3rd city at r80, the 4th at r108 for the science winners); a strong player founds about four good cities early while the empire stays content (≥ 0), Tradition's few strong cities"),
     ],
 };
 
@@ -723,6 +735,35 @@ pub const AGREEMENT: Neuron = Neuron {
     ],
 };
 
+// ---- the early growth (work/nets/early-growth): played by `early-growth` only (`TurnBrief::early_growth`) ----
+
+/// The tilt of the expansion price's multiplier while the opening lacks cities (`price_tilt[pd::EXPANSION]`; the
+/// strategist's production head multiplies a settler's value by it). Why (look 3610–3614, the opening's cap on): the
+/// allocator picked the settler and the head replaced it by a granary (52 times by r60), a library (39), stone works
+/// (10); a tall seat's expansion price is ×0.45–0.72 (the tall row's −700, the defence posture), so a city the cap
+/// allowed at 2 cities waited 32 rounds (median) for its settler, at 3 cities 40.
+pub const EXPANSION_TILT: Neuron = Neuron {
+    name: "expansion_tilt",
+    bias: 0,
+    why: "no tilt without an opening city to found: the tall row prices a city beyond the plan's count",
+    join: LINEAR,
+    terms: &[t(G(g::OPENING_GAP), 6000, "an opening city to found lifts the price by 1.5 (×0.5 → ×2.0): the settler the allocator ranks first is the head's pick before a granary or a library, which a 2-hammer city builds anyway and the new city builds too")],
+};
+
+/// The tilt of the worker price's multiplier while a luxury we lack lies unimproved on our tiles
+/// (`price_tilt[pd::WORKER]`). Why (look 3610–3614): the first worker came at r46 (median; quartiles 40–51) while the
+/// seats held 1.9 luxury kinds unconnected inside their borders at r40; a luxury kind is 4 points of happiness here
+/// (7.8 points of 2.0 kinds at r80), a city and its citizen cost about 3.3, so the 4th city waited on the happiness
+/// (3413 turns at 3 cities with no city allowed, excess 1.3); the head replaced the allocator's worker by a granary 21
+/// times, a lighthouse 16, stone works 14, the Great Library 11 by r60.
+pub const WORKER_TILT: Neuron = Neuron {
+    name: "worker_tilt",
+    bias: 0,
+    why: "no tilt without a luxury waiting for its worker: the allocator's worker value counts the worked tiles",
+    join: LINEAR,
+    terms: &[t(G(g::LUX_OPEN), 4000, "a luxury kind waiting lifts the price by 2 (×1 → ×3): its connection is a city's happiness, which the worked-tile value does not see")],
+};
+
 // ---- the offence addendum (work/new-net-offence-addendum-2026-11-22.md §3): declared, not yet built ----
 
 /// The offence is off: `net2` plays as the addendum's control `net2-defence` (every `Offence` field and
@@ -767,6 +808,8 @@ pub mod gate {
     pub const CHEST_WAIT_ROUNDS: (u32, &str) = (20, "four proposal intervals: past them a partner's refusal is not its gold, which a few rounds of its income bring");
     /// Food a turn a city keeps when it takes a science specialist (`citizens::science_specialist_commands`).
     pub const SCIENTIST_FOOD: (i32, &str) = (2, "two food a turn: the city still grows, slower, and never starves for a slot");
+    /// The cities of the opening a real tall seat founds while content (`weights::g::OPENING`).
+    pub const OPENING_CITIES: (u32, &str) = (4, "a strong player expands to about four good cities early and grows them (Tradition: few strong cities); the strategist's own floor (`strategy_net::weights::CITY_FLOOR`) is four as well, and the size model replaced it for a real tall seat");
     /// Ships escorting an `Overseas` order (`fleet::FLEET_SIZE`).
     pub const ESCORT_SHIPS: (u32, &str) = (2, "the landing needs ships that shell the coast (`fleet.rs` 1-10)");
     /// Standard rounds after a war order spent its budget without paying before another order on that rival.
@@ -797,5 +840,6 @@ pub fn count() -> usize {
     for neuron in neurons() {
         n += neuron.terms.len() + usize::from(matches!(neuron.join, Join::Sum(_)));
     }
-    n + TILT.len() + 11 + 5
+    // The gates read by `neurons()`' levers (11) and the opening's (`gate::OPENING_CITIES`), the site head (5).
+    n + TILT.len() + 12 + 5
 }

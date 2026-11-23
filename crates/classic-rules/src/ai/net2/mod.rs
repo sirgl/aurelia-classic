@@ -68,6 +68,12 @@ pub fn think(obs: &AIObservation<'_>, brief: &TurnBrief, state: &mut AiState, ru
     let logits = std::env::var_os("NET2_TRACE").map(|_| strategy_net::logits_net(&situation.features, &memory.held, net));
     let mut intent = strategy_net::intent_step(seat, &mut memory, &situation, net, &tilt);
     inputs.seat.size_model = size_model(parts, &intent);
+    // `early-growth`: the opening's cities the model does not found (`weights::g::OPENING`); 0 for every other variant.
+    if brief.early_growth {
+        inputs.seat.opening = opening(obs, &situation.features, parts, &intent);
+        inputs.seat.opening_gap = opening_gap(obs, &situation.features, parts, &intent);
+        inputs.seat.lux_open = lux_open(obs, rules);
+    }
     let after = levers::after_intent(&pass, &intent, &inputs, obs.round);
     cap_cities(obs, parts, &mut intent, after.city_cap);
     if let Some(logits) = &logits {
@@ -85,7 +91,13 @@ pub fn think(obs: &AIObservation<'_>, brief: &TurnBrief, state: &mut AiState, ru
     offence::apply(&mut levers, &pass);
     memory.net2 = Some(plan::Memory2 { core: pass.core.clone(), inputs: own.inputs, science: own.science });
     let _plan_span = prof::span("net2/plan_with_intent");
-    let price_tilt = if parts.plays(Part::Economy) { after.price_tilt } else { [0; pd::N] };
+    let mut price_tilt = if parts.plays(Part::Economy) { after.price_tilt } else { [0; pd::N] };
+    // `early-growth`: the opening's settlers and the luxuries' workers (`weights::EXPANSION_TILT`, `WORKER_TILT`).
+    if brief.early_growth && parts.plays(Part::Economy) {
+        let g = inputs.seat.row();
+        price_tilt[pd::EXPANSION] += concepts::fire(&weights::EXPANSION_TILT, &concepts::Frame { g: &g, ..concepts::Frame::default() });
+        price_tilt[pd::WORKER] += concepts::fire(&weights::WORKER_TILT, &concepts::Frame { g: &g, ..concepts::Frame::default() });
+    }
     let strategy = strategy_net::plan_with_intent(seat, state, memory, &situation, intent, &price_tilt, Wishes::default());
     Plan2 { strategy, net2: levers }
 }
@@ -97,6 +109,62 @@ fn size_model(parts: Parts, intent: &strategy_net::Intent) -> strategy_net::Mill
         return 0;
     }
     strategy_net::Milli::from(intent.more_cities.min(4)) * 250
+}
+
+/// `weights::g::OPENING`: the opening's cities (`gate::OPENING_CITIES`) beyond the cities now and the size model's new
+/// ones, on the free sites (`fe::ROOM`), each keeping the empire's excess happiness at 0 or above after the city and its
+/// first citizen (the empire's rates now, `value::Unhappiness::of`), 250 a city; 0 for a seat that does not play the
+/// real tall style or without the strategy part. A reading of the rules; the founding is `CITY_CAP`'s.
+pub fn opening(obs: &AIObservation<'_>, features: &[strategy_net::Milli; strategy_net::weights::fe::N], parts: Parts, intent: &strategy_net::Intent) -> strategy_net::Milli {
+    let open = opening_cities(obs, features, parts, intent);
+    (open - i64::from(intent.more_cities)).clamp(0, 4) * 250
+}
+
+/// `weights::g::OPENING_GAP`: the opening's cities still to found (as `opening`), the size model's new ones among
+/// them, 250 a city.
+pub fn opening_gap(obs: &AIObservation<'_>, features: &[strategy_net::Milli; strategy_net::weights::fe::N], parts: Parts, intent: &strategy_net::Intent) -> strategy_net::Milli {
+    opening_cities(obs, features, parts, intent).clamp(0, 4) * 250
+}
+
+/// The opening's cities a real tall seat may still found: below `gate::OPENING_CITIES`, on the free sites, each
+/// keeping the empire content (`opening`); 0 off the real tall style or without the strategy part.
+fn opening_cities(obs: &AIObservation<'_>, features: &[strategy_net::Milli; strategy_net::weights::fe::N], parts: Parts, intent: &strategy_net::Intent) -> i64 {
+    use strategy_net::weights::fe;
+    if !intent.tall_real || !parts.plays(Part::Strategy) {
+        return 0;
+    }
+    let cities = obs.own_cities.len() as i64;
+    let gap = (i64::from(weights::gate::OPENING_CITIES.0) - cities).max(0);
+    let sites = features[fe::ROOM] * strategy_net::features::ROOM_SITES as i64 / 1000;
+    let rates = crate::ai::value::Unhappiness::of(obs);
+    let content = (i64::from(obs.economy.turn_happiness).max(0) * 100 / (rates.city + rates.citizen).max(1)).max(0);
+    if strategy_net::trace::enabled() {
+        strategy_net::trace::push(format!("r{} p{} OPEN cities {cities} gap {gap} sites {sites} content {content} model {}", obs.round, obs.player.0, intent.more_cities));
+    }
+    gap.min(sites).min(content)
+}
+
+/// `weights::g::LUX_OPEN`: the luxury kinds the empire has no copy of lying on its own tiles (within 3 of a city) without
+/// their improvement, as the player sees them, less its workers alive or queued, 500 a kind up to two. A reading of
+/// the rules and the observation; the worker's price is `WORKER_TILT`'s.
+pub fn lux_open(obs: &AIObservation<'_>, rules: &CompiledRuleset) -> strategy_net::Milli {
+    use crate::rules::content::ResourceClass;
+    let mut kinds: Vec<crate::ids::ResourceId> = Vec::new();
+    for city in &obs.own_cities {
+        for tile in crate::math::hex_disc(obs.view.dimensions(), city.tile, 3) {
+            let Some(s) = obs.view.tile(tile).snapshot().copied() else { continue };
+            let Some(resource) = s.resource.filter(|_| s.owner == Some(obs.player) && !s.city) else { continue };
+            let Some(def) = rules.resources.get(resource.0 as usize) else { continue };
+            let improved = s.improvement.is_some_and(|i| def.improvements.contains(&i));
+            if def.class == Some(ResourceClass::Luxury) && !improved && obs.economy.resources.total(resource) == 0 && !kinds.contains(&resource) {
+                kinds.push(resource);
+            }
+        }
+    }
+    let builder = |kind: crate::ids::UnitKindId| rules.units.get(kind.0 as usize).is_some_and(|d| d.builder && d.domain == crate::rules::content::Domain::Land);
+    let workers = obs.own_units.iter().filter(|u| builder(u.kind)).count()
+        + obs.own_cities.iter().flat_map(|c| c.queue.iter()).filter(|i| matches!(i, crate::ids::ProductionItem::Unit(k) if builder(*k))).count();
+    (kinds.len().saturating_sub(workers).min(2) * 500) as strategy_net::Milli
 }
 
 /// A real tall seat's new cities are the net's (`weights::CITY_CAP`), not the rules' size model's (`tall_real_step`
