@@ -35,24 +35,25 @@ from .sim import first_index, Sim, A_UNIT, A_CITY, A_END, A_ROUND, A_PAD, V_NONE
 I32 = mx.int32
 
 
-def replicate(path, batch_size, limit=None, families=None, seed=1):
+def replicate(path, batch_size, limit=None, families=None, seed=1, dumps=None, fast_damage=False):
     from .parity import sight_radius
-    dumps = load_lines(path, limit=limit, families=families)
+    if dumps is None:
+        dumps = load_lines(path, limit=limit, families=families)
     tb = Batch(dumps)
     mr = max(1, max(p["moves_land"] for d in dumps for p in d["scene"]["profiles"]) // 60)
     geo = Geometry(tb.w, radius=sight_radius(dumps), move_radius=max(mr, 4), h=tb.h)
     has_near = any(t["cond"][0] == "other" for d in dumps for p in d["scene"]["profiles"] for t in p["terms"])
     has_air = any(p["domain"] == "Air" or p.get("air_intercept_range", 0) > 0 for d in dumps for p in d["scene"]["profiles"])
-    kw = dict(move_radius=mr, has_near_imp=has_near, dest_pool=tb.dest_pool, withdraw_pool=tb.withdraw_pool, has_air=has_air,
+    kw = dict(fast_damage=fast_damage, move_radius=mr, has_near_imp=has_near, dest_pool=tb.dest_pool, withdraw_pool=tb.withdraw_pool, has_air=has_air,
               features=tb.features())
     tsim = Sim(geo, tb.m, tb.cost_pool, tb.cstatic, tb.n_pieces, extra=tb.extra(), **kw)
     assert all(o >= 0 for o in geo.disc_to_local_list)
     idx = mx.arange(batch_size) % tb.b
     take = lambda a: mx.take(a, idx, axis=0)
-    m = {k: take(v) for k, v in tb.m.items()}
+    # The copies share their template's static tables (`tid`); only the small city statics are copied.
     cs = {k: take(v) for k, v in tb.cstatic.items()}
-    ex = {k: take(v) for k, v in tb.extra().items()}
-    sim = Sim(geo, m, tb.cost_pool, cs, take(tb.n_pieces), los=take(tsim.los), extra=ex, **kw)
+    cs["tile_t"], cs["alive_t"] = tb.cstatic["tile"], tb.cstatic["alive"]
+    sim = Sim(geo, tb.m, tb.cost_pool, cs, take(tb.n_pieces), los=tsim.los, extra=tb.extra(), tid=idx, **kw)
     s0 = tb.initial_state()
     s0["n_unmodelled"] = mx.zeros((tb.b,), dtype=mx.int32)
     s = {k: take(v) for k, v in s0.items()}
@@ -97,7 +98,7 @@ def features(sim, s, slot, mk):
     att = (mx.take_along_axis(mk["attack_d"], mx.broadcast_to(mx.maximum(sim.geo.local_to_disc, 0)[None], (B, L)), axis=1) & (sim.geo.local_to_disc >= 0)[None]).astype(mx.float32)
     hp = (g1(s["u_hp"], slot).astype(mx.float32) / 100)[:, None] * mx.ones((1, L))
     mv = (g1(s["u_mv"], slot).astype(mx.float32) / 300)[:, None] * mx.ones((1, L))
-    x = mx.stack([own, foe, uhp * own, uhp * foe, city, f(sim.m["hills"]), f(sim.m["rough"]), f(sim.m["water"]), reach, att, hp, mv], axis=2)
+    x = mx.stack([own, foe, uhp * own, uhp * foe, city, f(sim.mplane("hills")), f(sim.mplane("rough")), f(sim.mplane("water")), reach, att, hp, mv], axis=2)
     return x.reshape(B, -1)
 
 
@@ -278,23 +279,49 @@ def play(runner, s, rounds, mode="seq", seed=0):
     return s, launches, unit_launches, time.perf_counter() - t0, n_side
 
 
-def run(path, batches, rounds, policy, modes, limit=None, out=None, families=None):
+def buckets(dumps):
+    """The scene templates by size (the units of each side): a batch of one size steps only as many units
+    per side-turn as its scenes have (a mixed batch steps the largest scene's count for all)."""
+    def size(n):
+        return next(b for b in (2, 4, 8, 16, 1 << 20) if n <= b)
+
+    out = {}
+    for d in dumps:
+        out.setdefault((size(d["scene"]["n_mine"]), size(d["scene"]["n_theirs"])), []).append(d)
+    return out
+
+
+BUCKET_MIN = 4096  # scenes per bucket at least, on average: below, launches dominate and one mixed batch wins
+
+
+def run(path, batches, rounds, policy, modes, limit=None, out=None, families=None, bucket="auto", fast_damage=False):
+    """`bucket`: "auto" (by size when every bucket gets BUCKET_MIN scenes on average: measured, a 100k
+    batch x3.1, a 10k batch of 7 sizes a little slower than mixed), True, False."""
     rows = []
+    all_dumps = load_lines(path, limit=limit, families=families)
+    sized = buckets(all_dumps)
     for B in batches:
-        sim, s0, tb, dumps = replicate(path, B, limit=limit, families=families)
-        net = None
-        if policy == "net":
-            net = TacticNet(sim.geo.l)
-            mx.eval(net.parameters())
-        runner = Runner(sim, policy, net)
+        use = bucket if bucket != "auto" else B >= BUCKET_MIN * len(sized)
+        groups = sized if use else {"all": all_dumps}
         for mode in modes:
-            # Warm-up (compilation) on one round, then the measurement.
-            play(runner, dict(s0), 1, mode=mode, seed=99)
-            t = time.perf_counter()
-            s, launches, unit_launches, secs, n_side = play(runner, dict(s0), rounds, mode=mode, seed=1)
-            row = {"batch": B, "policy": policy, "mode": mode, "rounds": rounds, "seconds": round(secs, 3),
-                   "launches": launches, "unit_launches_per_side_turn": unit_launches / (2 * rounds), "ms_per_launch": round(1000 * secs / launches, 3),
-                   "scene_rounds_per_s": round(B * rounds / secs, 1), "units_per_side": n_side, "templates": tb.b}
+            total_secs, total_sr, launches = 0.0, 0, 0
+            for key, dumps in groups.items():
+                Bk = max(1, round(B * len(dumps) / len(all_dumps)))
+                sim, s0, tb, _ = replicate(path, Bk, dumps=dumps, fast_damage=fast_damage)
+                net = None
+                if policy == "net":
+                    net = TacticNet(sim.geo.l)
+                    mx.eval(net.parameters())
+                runner = Runner(sim, policy, net)
+                # Warm-up (compilation) on one round, then the measurement.
+                play(runner, dict(s0), 1, mode=mode, seed=99)
+                s, nl, unit_launches, secs, n_side = play(runner, dict(s0), rounds, mode=mode, seed=1)
+                total_secs += secs
+                total_sr += Bk * rounds
+                launches += nl
+            row = {"batch": B, "policy": policy, "mode": mode, "rounds": rounds, "fast_damage": fast_damage, "bucketed": bool(use), "buckets": len(groups),
+                   "seconds": round(total_secs, 3), "launches": launches, "ms_per_launch": round(1000 * total_secs / launches, 3),
+                   "scene_rounds_per_s": round(total_sr / total_secs, 1), "templates": len(all_dumps)}
             rows.append(row)
             print(json.dumps(row), flush=True)
     if out:
@@ -313,9 +340,11 @@ def main(argv=None):
     ap.add_argument("--limit", type=int)
     ap.add_argument("--families")
     ap.add_argument("--out")
+    ap.add_argument("--fast-damage", action="store_true", help="the float32 damage (not the parity mode)")
+    ap.add_argument("--bucket", default="auto", help="auto | on | off: batches of one scene size")
     o = ap.parse_args(argv)
     run(o.dump, [int(x) for x in o.batch.split(",")], o.rounds, o.policy, o.modes.split(","), o.limit, o.out,
-        o.families.split(",") if o.families else None)
+        o.families.split(",") if o.families else None, bucket={"auto": "auto", "on": True, "off": False}[o.bucket], fast_damage=o.fast_damage)
 
 
 if __name__ == "__main__":

@@ -71,8 +71,9 @@ def pow4(x):
     return mul64(x2, x2)
 
 
-def scale_by_ratio(dmg, me, opp):
-    """floor(dmg * k(me, opp)), Rust `damage::scale_by_ratio` (strengths in hundredths)."""
+def scale_by_ratio(dmg, me, opp, fast=False):
+    """floor(dmg * k(me, opp)), Rust `damage::scale_by_ratio` (strengths in hundredths). `fast`: the
+    float32 value only (no exact correction; off by one where the float rounds across an integer)."""
     me = mx.maximum(me, 1).astype(I64)
     opp = mx.maximum(opp, 1).astype(I64)
     dmg = mx.maximum(dmg, 0).astype(I64)
@@ -91,6 +92,8 @@ def scale_by_ratio(dmg, me, opp):
     r4 = r * r * r * r
     k = mx.where(weaker, 2.0 / (r4 + 1.0), (r4 + 1.0) / 2.0)
     q0 = mx.floor(dmg.astype(mx.float32) * k).astype(I64)
+    if fast:
+        return q0
     target = mul128_small(num, _u(dmg))
     best = mx.zeros_like(q0)
     for delta in (-3, -2, -1, 0, 1, 2, 3):
@@ -111,11 +114,11 @@ def wounded_factor(damage, wounded_mod):
     return MAX_HP - damage * w // 100
 
 
-def unit_damage(me, opp, my_damage, wounded_mod, roll):
+def unit_damage(me, opp, my_damage, wounded_mod, roll, fast=False):
     """Melee (unit vs unit or vs city) and ranged damage of a unit (the same constants)."""
     dr = wounded_factor(my_damage.astype(I64), wounded_mod.astype(I64))
     dmg = BASE * dr // MAX_HP + roll.astype(I64) * dr // MAX_HP
-    return to_hp(scale_by_ratio(dmg, me, opp))
+    return to_hp(scale_by_ratio(dmg, me, opp, fast))
 
 
 def city_damage(city, opp, roll):
@@ -124,11 +127,11 @@ def city_damage(city, opp, roll):
     return to_hp(scale_by_ratio(dmg, city, opp))
 
 
-def interception_damage(interceptor, attacker, interceptor_damage, taken_percent, roll):
+def interception_damage(interceptor, attacker, interceptor_damage, taken_percent, roll, fast=False):
     """Damage of an interception (`damage::interception_damage`): the interceptor's wounded factor is
     100 - its damage (all of it, not the 33 % rule), the rounded damage times the attacker's
     InterceptionDamageTaken factor, truncated."""
-    hp = unit_damage(interceptor, attacker, interceptor_damage, mx.full(interceptor_damage.shape, 100 - WOUNDED_PERCENT, dtype=mx.int32), roll)
+    hp = unit_damage(interceptor, attacker, interceptor_damage, mx.full(interceptor_damage.shape, 100 - WOUNDED_PERCENT, dtype=mx.int32), roll, fast)
     return hp * mx.maximum(100 + taken_percent.astype(I64), 0) // 100
 
 

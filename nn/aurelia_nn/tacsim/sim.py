@@ -104,8 +104,9 @@ def put1(arr, idx, val, where):
 
 class Sim:
     def __init__(self, geo, m, cost_pool, cstatic, n_pieces, move_radius=None, has_near_imp=True, los=None, extra=None,
-                 dest_pool=None, withdraw_pool=None, has_air=False, features=None):
+                 dest_pool=None, withdraw_pool=None, has_air=False, features=None, tid=None, fast_damage=False):
         self.has_near_imp = has_near_imp
+        self.fast = fast_damage
         # The rules the batch can meet (`Batch.features`); the others stay out of the compiled graph.
         self.f = {"promo": True, "withdraw": True, "capture_defeated": True, "spawn": True, "citadel": True, "mountains": True}
         self.f.update(features or {})
@@ -116,7 +117,12 @@ class Sim:
         self.cs = cstatic
         self.n_pieces = n_pieces
         self.z = extra or {}
-        self.B, self.T = m["hills"].shape
+        # The scene templates: the static tables (tiles `m`, promotions and spawns `z`, line of sight,
+        # the city plane) have one row per template; `tid` [B] maps each scene to its template (a
+        # throughput batch replicates templates without copying their tables).
+        Bt, self.T = m["hills"].shape
+        self.tid = mx.arange(Bt).astype(I32) if tid is None else tid.astype(I32)
+        self.B = self.tid.shape[0]
         self.dest_pool = dest_pool
         self.withdraw_pool = withdraw_pool
         self.iters = move_radius or geo.move_radius
@@ -124,7 +130,7 @@ class Sim:
         g = geo
         self.terr_rough = m["rough"]
         self.cost_flat = cost_pool.reshape(-1)
-        ct, ca = cstatic["tile"], cstatic["alive"]
+        ct, ca = cstatic.get("tile_t", cstatic["tile"]), cstatic.get("alive_t", cstatic["alive"])
         Bc, C = ct.shape
         idx = mx.where(ca & (ct >= 0), (mx.arange(Bc) * self.T)[:, None] + ct, Bc * self.T)
         self.city_plane = mx.full((Bc * self.T + 1,), -1, dtype=I32).at[idx.reshape(-1)].maximum(
@@ -135,7 +141,7 @@ class Sim:
         # Per scene: line-of-sight bits per (tile, disc offset), W uint64 words per tile ([B, T * W]).
         lvl = m["sight_level"]
         eye = m["hills"].astype(I32)
-        B, T, W = self.B, self.T, g.words
+        B, T, W = Bt, self.T, g.words
         words = []
         chunk = max(1, 4096 // max(1, g.o))
         for t0 in range(0, T, chunk):
@@ -151,6 +157,28 @@ class Sim:
             words.append(mx.stack(ws, axis=2))
             mx.eval(words[-1])
         self.los = mx.concatenate(words, axis=1).reshape(B, T * W)
+
+    def tg(self, arr, *idx):
+        """arr[tid[b], idx0[b], idx1[b], ...] of a template table (one gather over the flattened axes)."""
+        flat = self.tid
+        for k, i in enumerate(idx):
+            flat = flat * arr.shape[k + 1] + mx.maximum(i, 0)
+        rest = arr.shape[1 + len(idx):]
+        return mx.take(arr.reshape((-1,) + rest), flat, axis=0)
+
+    def mg(self, name, idx):
+        """The tile plane `name` at window tiles `idx` [B, ...] of each scene's template."""
+        tid = self.tid.reshape((-1,) + (1,) * (idx.ndim - 1))
+        return mx.take(self.m[name].reshape(-1), tid * self.T + mx.maximum(idx, 0))
+
+    def mplane(self, name):
+        """The whole plane `name` per scene [B, T] (materialised: for the few whole-plane reads)."""
+        return mx.take(self.m[name], self.tid, axis=0)
+
+    def lg(self, idx):
+        """The line-of-sight words at flat indices `idx` [B, ...] (tile * W + word)."""
+        tid = self.tid.reshape((-1,) + (1,) * (idx.ndim - 1))
+        return mx.take(self.los.reshape(-1), tid * self.los.shape[1] + mx.maximum(idx, 0))
 
     # Profile fields a promotion changes (ints added, bools or-ed) and that a spawn writes.
     D_INT = list(DELTA_INT.values()) + STAT_NAMES
@@ -201,7 +229,7 @@ class Sim:
 
     def stack_class(self, s, tiles):
         """The stack class of every unit slot as it would stand on `tiles` [B, U]."""
-        water = gn(self.m["water"].astype(I32), tiles) > 0
+        water = self.mg("water", tiles) > 0
         civ = s["p_civilian"]
         land = mx.where(water, CL_EMB, mx.where(civ, CL_CIV, CL_MIL))
         sea = mx.where(civ, CL_NAVAL_CIV, CL_NAVAL)
@@ -220,7 +248,7 @@ class Sim:
     def los_word(self, src, o):
         """The line-of-sight word holding offset `o` of source tile `src` (same shapes)."""
         W = self.geo.words
-        return gn(self.los, mx.maximum(src, 0) * W + mx.maximum(o, 0) // 64)
+        return self.lg(mx.maximum(src, 0) * W + mx.maximum(o, 0) // 64)
 
     def los_bit(self, src, dst):
         """Line of sight from window tile src to dst ([B, ...] each), within the sight disc."""
@@ -230,8 +258,8 @@ class Sim:
         return (bit == 1) & (o >= 0)
 
     def unit_sight(self, s):
-        water = gn(self.m["water"], s["u_tile"])
-        hills = gn(self.m["hills"], s["u_tile"])
+        water = self.mg("water", s["u_tile"])
+        hills = self.mg("hills", s["u_tile"])
         land = mx.minimum(s["p_sight"] + hills.astype(I32), 7)
         emb = s["p_land"] & ~s["p_hovering"] & water
         return mx.where(emb, s["p_embarked_sight"], land)
@@ -251,10 +279,10 @@ class Sim:
         inside = (mx.abs(dq) <= R) & (mx.abs(dr) <= R)
         o = mx.take(geo.rel.reshape(-1), mx.clip(dq + R, 0, 2 * R) * (2 * R + 1) + mx.clip(dr + R, 0, 2 * R))
         if W == 1:
-            word = gn(self.los, src)[:, :, None]  # [B, S, 1]
+            word = self.lg(mx.maximum(src, 0))[:, :, None]  # [B, S, 1]
         else:
             Bs, S = src.shape
-            allw = gn(self.los, (mx.maximum(src, 0)[:, :, None] * W + mx.arange(W)[None, None, :]))  # [B, S, W]
+            allw = self.lg(mx.maximum(src, 0)[:, :, None] * W + mx.arange(W)[None, None, :])  # [B, S, W]
             word = mx.take_along_axis(allw, mx.maximum(o, 0) // 64, axis=2)
         bit = mx.right_shift(word, (mx.maximum(o, 0) % 64).astype(mx.uint64)) & 1
         ok = valid[:, :, None] & (src[:, :, None] >= 0) & (tiles[:, None, :] >= 0) & inside & (o >= 0) & (bit == 1)
@@ -280,7 +308,8 @@ class Sim:
 
     def city_on(self, s, tiles):
         """City slot on each tile [B, N] (-1 none): cities do not move, a plane built once."""
-        return mx.where(tiles >= 0, gn(self.city_plane, tiles), -1)
+        tid = self.tid.reshape((-1,) + (1,) * (tiles.ndim - 1))
+        return mx.where(tiles >= 0, mx.take(self.city_plane.reshape(-1), tid * self.T + mx.maximum(tiles, 0)), -1)
 
     def controls_and_blocks(self, s, side):
         """Per window tile, for the mover's side: a visible enemy unit stands there (blocks the step),
@@ -308,7 +337,7 @@ class Sim:
         mil_sea = mx.where(mil >= 0, gn(s["p_sea"].astype(I32), mil) > 0, False)
         enemy_mil = mil_side == enemy[:, None]
         by_city = city_owner == enemy[:, None]
-        ctrl_land = vis & ((enemy_mil & (mil_sea | ~self.m["water"])) | by_city)
+        ctrl_land = vis & ((enemy_mil & (mil_sea | ~self.mplane("water"))) | by_city)
         self._ctrl_sea = vis & ((enemy_mil & mil_sea) | by_city)
         return block, ctrl_land, vis, mil, civ, mil_side, civ_side, city, city_owner
 
@@ -340,7 +369,7 @@ class Sim:
         embarks = g1(s["p_embarks"], slot)
         land_full = g1(s["p_moves_land"], slot)
         emb_full = g1(s["p_moves_embarked"], slot)
-        water_l = mx.where(lt >= 0, gn(self.m["water"].astype(I32), lt) > 0, False)
+        water_l = mx.where(lt >= 0, self.mg("water", lt) > 0, False)
         full_l = mx.where(embarks[:, None] & water_l, emb_full[:, None], mx.where(embarks[:, None], land_full[:, None], 1 << 20))
         start = mx.minimum(mv, full_l[:, 0])
         left = mx.where(mx.arange(L)[None, :] == 0, start[:, None], -1)
@@ -423,7 +452,7 @@ class Sim:
         all_moves = (code == 255) | slowed
         # The budget (`MoveBudget::of_unit`) and the allowance per tile (`Allowance::full_on`).
         embarks = g1(s["p_embarks"], slot)
-        water = self.m["water"]
+        water = self.mplane("water")
         here_water = gn(water.astype(I32), tile[:, None])[:, 0] > 0
         mmax = g1(s["u_mmax"], slot)
         land_a = mx.where(embarks & here_water, g1(s["p_moves_land"], slot), mmax)
@@ -473,10 +502,10 @@ class Sim:
         pct = mx.maximum(g1(s["p_xp_needed_pct"], slot), -100)
         need = mx.maximum((10 * level * (level + 1) // 2) * (100 + pct) // 100, 1)
         held = grow(s["u_prom"], slot)  # [B, NP]
-        fit = grow(self.z["z_fit"], slot)
-        req, anyof = self.z["z_req"], self.z["z_anyof"]  # [B, NP, R] prerequisite lists (-1 none)
+        fit = self.tg(self.z["z_fit"], slot)
+        req, anyof = mx.take(self.z["z_req"], self.tid, axis=0), mx.take(self.z["z_anyof"], self.tid, axis=0)  # [B, NP, R] (-1 none)
         req_ok = mx.all((req < 0) | gn(held, req), axis=2)
-        any_ok = ~self.z["z_has_any"] | mx.any((anyof >= 0) & gn(held, anyof), axis=2)
+        any_ok = ~mx.take(self.z["z_has_any"], self.tid, axis=0) | mx.any((anyof >= 0) & gn(held, anyof), axis=2)
         ready = alive & (g1(s["u_xp"], slot) >= need)
         return ready[:, None] & fit & ~held & req_ok & any_ok
 
@@ -491,11 +520,11 @@ class Sim:
         st = g1(s["u_st"], slot)
         mv = g1(s["u_mv"], slot)
         civilian = g1(s["p_civilian"], slot)
-        water_here = gn(self.m["water"].astype(I32), tile[:, None])[:, 0] > 0
+        water_here = self.mg("water", tile[:, None])[:, 0] > 0
         land = g1(s["p_land"], slot)
         fort = alive & ~((st == 1) | (st == 2)) & ~civilian & ~g1(s["p_no_defensive_bonus"], slot) & land & ~water_here
         setup = alive & g1(s["p_must_set_up"], slot) & (st != 3) & (mv > 0) & ~water_here
-        fo = mx.take_along_axis(self.m["found_ok"].reshape(B, 2 * T), (side * T + mx.maximum(tile, 0))[:, None], axis=1)[:, 0]
+        fo = mx.take(self.m["found_ok"].reshape(-1), self.tid * (2 * T) + side * T + mx.maximum(tile, 0))
         found = alive & g1(s["p_founder"], slot) & fo
         promo = self.promo_mask(s, slot, alive) if self.f["promo"] else mx.zeros((B, s["u_prom"].shape[2]), dtype=mx.bool_)
         # Moves.
@@ -556,8 +585,8 @@ class Sim:
         enemy_unit_seen = t_vis & ((t_mil_side == enemy[:, None]) | (t_civ_side == enemy[:, None]))
         own_there = (t_mil_side == side[:, None]) | (t_civ_side == side[:, None])
         target_ok = foreign_city | (enemy_unit_seen & ~own_there)
-        water_t = mx.where(tgt >= 0, gn(self.m["water"].astype(I32), tgt) > 0, False)
-        water_me = gn(self.m["water"].astype(I32), tile[:, None])[:, 0] > 0
+        water_t = mx.where(tgt >= 0, self.mg("water", tgt) > 0, False)
+        water_me = self.mg("water", tile[:, None])[:, 0] > 0
         embarked = g1(s["p_land"], slot) & water_me
         # Melee.
         melee_ok = ~ranged & ~g1(s["p_only_defensive"], slot) & (base_c > 0)
@@ -632,7 +661,7 @@ class Sim:
         for k in ("tctx", "ttype", "targ", "targ2", "tpct", "tprom"):
             f[k] = grow(s["p_" + k], slot)
         f["prom"] = grow(s["u_prom"], slot)
-        f["water"] = gn(self.m["water"].astype(I32), f["tile"][:, None])[:, 0] > 0
+        f["water"] = self.mg("water", f["tile"][:, None])[:, 0] > 0
         f["embarked"] = f["land"] & f["water"]
         return f
 
@@ -642,8 +671,8 @@ class Sim:
         total = mx.sum(mx.where(ctx, f["ctx"], 0), axis=1)
         in_ctx = mx.take_along_axis(ctx, f["tctx"], axis=1)
         tt, ta = f["ttype"], f["targ"]
-        feat = gn(self.m["feature"], battle[:, None])[:, 0]
-        tkind = gn(self.m["terrain_kind"], battle[:, None])[:, 0]
+        feat = self.mg("feature", battle[:, None])[:, 0]
+        tkind = self.mg("terrain_kind", battle[:, None])[:, 0]
         ov = other["valid"] if other is not None else mx.zeros_like(f["valid"])
         orole = other["role"] if other is not None else mx.zeros_like(f["slot"])
         odom = other["domain"] if other is not None else mx.zeros_like(f["slot"])
@@ -663,7 +692,7 @@ class Sim:
     def near_improvement(self, s, f):
         geo = self.geo
         disc = mx.take(geo.att_tile, mx.maximum(f["tile"], 0), axis=0)  # [B, OA]
-        imp = mx.where(disc >= 0, gn(self.m["improvement"], disc), -1)
+        imp = mx.where(disc >= 0, self.mg("improvement", disc), -1)
         own = mx.where(disc >= 0, gn(s["owner"], disc), -1) == f["side"][:, None]
         d = geo.att_dist[None]
         hit = (imp[:, None, :] == f["targ"][:, :, None]) & own[:, None, :] & (d[:, None, :] <= f["targ2"][:, :, None])
@@ -698,7 +727,7 @@ class Sim:
         U = s["u_alive"].shape[1]
         tiles = s["u_tile"]
         d = self.geo.distance(tiles, mx.broadcast_to(f["tile"][:, None], tiles.shape))
-        water = gn(self.m["water"].astype(I32), tiles) > 0
+        water = self.mg("water", tiles) > 0
         own = s["u_alive"] & (tiles >= 0) & (s["u_side"] == f["side"][:, None]) & ~s["p_civilian"] & ~s["p_air"] & (mx.arange(U)[None, :] != f["slot"][:, None])
         return mx.any(own & (d == 1) & (water == f["water"][:, None]), axis=1)
 
@@ -710,8 +739,8 @@ class Sim:
         return mx.stack(out, axis=1)
 
     def tile_defense(self, s, tile, side):
-        gdef = gn(self.m["ground_def"], tile[:, None])[:, 0]
-        idef = gn(self.m["improvement_def"], tile[:, None])[:, 0]
+        gdef = self.mg("ground_def", tile[:, None])[:, 0]
+        idef = self.mg("improvement_def", tile[:, None])[:, 0]
         own = gn(s["owner"], tile[:, None])[:, 0]
         return gdef + mx.where((own < 0) | (own == side), idef, 0)
 
@@ -726,7 +755,7 @@ class Sim:
     def melee_attack_strength(self, s, a, d, to, vs_city):
         tr = True
         friendly = gn(s["owner"], to[:, None])[:, 0] == a["side"]
-        rough = gn(self.m["rough"].astype(I32), to[:, None])[:, 0] > 0
+        rough = self.mg("rough", to[:, None])[:, 0] > 0
         dv = d["valid"] if d is not None else mx.zeros_like(a["valid"])
         cols = {ANY: mx.array(tr), ATTACK: mx.array(tr), VS_CITY: vs_city, ATT_OPEN: ~vs_city & ~rough, ATT_ROUGH: ~vs_city & rough,
                 FRIENDLY: friendly, ATT_FRIENDLY: friendly, OUTSIDE_FRIENDLY: ~friendly,
@@ -736,9 +765,9 @@ class Sim:
         m = self.context_sum(s, a, ctx, to, d if d is not None else None) + self.generic(s, a, d, True)
         m = m + mx.where(vs_city & self.near_sapper(s, a["side"], to), 50, 0)
         dirs = self.dir_between(a["tile"], to)
-        river = mx.take_along_axis(self.m["river"].reshape(self.B, -1), (mx.maximum(a["tile"], 0) * 6 + mx.maximum(dirs, 0))[:, None], axis=1)[:, 0] & (dirs >= 0)
+        river = mx.take(self.m["river"].reshape(-1), self.tid * (self.T * 6) + mx.maximum(a["tile"], 0) * 6 + mx.maximum(dirs, 0)) & (dirs >= 0)
         m = m + mx.where(river & ~(a["amphibious"] | a["river_crossing"]), -20, 0)
-        water_to = gn(self.m["water"].astype(I32), to[:, None])[:, 0] > 0
+        water_to = self.mg("water", to[:, None])[:, 0] > 0
         m = m + mx.where(a["land"] & a["water"] & ~water_to & ~a["amphibious"], -50, 0)
         strength = self.finish(a["base_combat"], m)
         if d is not None:
@@ -754,12 +783,13 @@ class Sim:
 
     def defense_strength(self, s, d, a, ranged):
         tile = d["tile"]
-        rough = gn(self.m["rough"].astype(I32), tile[:, None])[:, 0] > 0
+        rough = self.mg("rough", tile[:, None])[:, 0] > 0
         friendly = gn(s["owner"], tile[:, None])[:, 0] == d["side"]
-        cols = {ANY: mx.array(True), DEFENSE: mx.array(True), DEF_VS_RANGED: mx.array(ranged), DEF_OPEN: ~rough, DEF_ROUGH: rough,
+        rg = mx.array(ranged) if isinstance(ranged, bool) else ranged
+        cols = {ANY: mx.array(True), DEFENSE: mx.array(True), DEF_VS_RANGED: rg, DEF_OPEN: ~rough, DEF_ROUGH: rough,
                 FRIENDLY: friendly, OUTSIDE_FRIENDLY: ~friendly}
-        if not ranged:
-            cols[ADJ_FRIENDLY] = self.friendly_adjacent(s, d)
+        if ranged is not True:
+            cols[ADJ_FRIENDLY] = self.friendly_adjacent(s, d) & ~rg
         ctx = self.ctxset(cols)
         m = self.context_sum(s, d, ctx, tile, a) + self.generic(s, d, a, False)
         terrain = mx.where(d["water"], 0, self.tile_defense(s, tile, d["side"]))
@@ -769,7 +799,7 @@ class Sim:
         return mx.where(d["embarked"], d["embarked_defense"], self.finish(d["base_combat"], m))
 
     def ranged_strength(self, s, me, other, vs_city, target, attacking):
-        rough = gn(self.m["rough"].astype(I32), target[:, None])[:, 0] > 0
+        rough = self.mg("rough", target[:, None])[:, 0] > 0
         friendly = gn(s["owner"], target[:, None])[:, 0] == me["side"]
         ov = other["valid"] if other is not None else mx.zeros_like(me["valid"])
         unit_target = ~vs_city if attacking else mx.zeros_like(vs_city)
@@ -818,6 +848,11 @@ class Sim:
 
     # ------------------------------------------------------------------ applying actions
 
+    def unit_damage(self, me, opp, my_damage, wounded_mod, roll):
+        """`damage::melee_damage` / `ranged_damage` / `city_strike_damage` (a city: no wounded factor, pass 0
+        damage): exact 128-bit by default, the float32 ratio with `fast_damage` (not the parity mode)."""
+        return exact.unit_damage(me, opp, my_damage, wounded_mod, roll, fast=self.fast).astype(I32)
+
     def set_unit(self, s, slot, where, **vals):
         for k, v in vals.items():
             s["u_" + k] = put1(s["u_" + k], slot, v if isinstance(v, mx.array) else mx.full(slot.shape, v, dtype=s["u_" + k].dtype), where)
@@ -845,8 +880,8 @@ class Sim:
         return self.set_unit(s, slot, where, st=mx.where(st == 3, 3, 0), mv=mv, att=att)
 
     def refresh_allowance(self, s, slot, old_tile, new_tile, where):
-        wo = gn(self.m["water"].astype(I32), old_tile[:, None])[:, 0] > 0
-        wn = gn(self.m["water"].astype(I32), new_tile[:, None])[:, 0] > 0
+        wo = self.mg("water", old_tile[:, None])[:, 0] > 0
+        wn = self.mg("water", new_tile[:, None])[:, 0] > 0
         change = where & (wo != wn) & g1(s["p_land"], slot)
         mmax = mx.where(wn & g1(s["p_embarks"], slot), g1(s["p_moves_embarked"], slot), g1(s["p_moves_land"], slot))
         mv = mx.minimum(g1(s["u_mv"], slot), mmax)
@@ -879,17 +914,17 @@ class Sim:
         s["u_prom"] = put1(s["u_prom"], new, mx.zeros((self.B, s["u_prom"].shape[2]), dtype=mx.bool_), where)
         if profile_from is not None:
             known = where & (profile_from >= 0)
-            s["u_prom"] = put1(s["u_prom"], new, grow(self.z["sp_prom"], profile_from), known)
-            s = self.set_unit(s, new, known, level=g1(self.z["sp_level"], profile_from))
-            ri = grow(self.sp_int, profile_from)  # [B, n]: one gather per table
+            s["u_prom"] = put1(s["u_prom"], new, self.tg(self.z["sp_prom"], profile_from), known)
+            s = self.set_unit(s, new, known, level=self.tg(self.z["sp_level"], profile_from))
+            ri = self.tg(self.sp_int, profile_from)  # [B, n]: one gather per table
             for i, k in enumerate(self.sp_keys["int"]):
                 s["p_" + k] = put1(s["p_" + k], new, ri[:, i], known)
             if self.sp_bool is not None:
-                rb = grow(self.sp_bool, profile_from)
+                rb = self.tg(self.sp_bool, profile_from)
                 for i, k in enumerate(self.sp_keys["bool"]):
                     s["p_" + k] = put1(s["p_" + k], new, rb[:, i], known)
             for k, tab in zip(self.sp_keys["vec"], self.sp_vec):
-                s["p_" + k] = put1(s["p_" + k], new, grow(tab, profile_from).astype(s["p_" + k].dtype), known)
+                s["p_" + k] = put1(s["p_" + k], new, self.tg(tab, profile_from).astype(s["p_" + k].dtype), known)
         s["n_slots"] = mx.where(where, new + 1, new)
         return s, new
 
@@ -909,10 +944,10 @@ class Sim:
             return s
         sp = g1(s["p_civ_spawn"], victim)
         known = sp >= 0
-        water = gn(self.m["water"].astype(I32), tile[:, None])[:, 0] > 0
-        mmax = mx.where(water & g1(self.z["sp_land"], sp) & g1(self.z["sp_embarks"], sp), g1(self.z["sp_moves_embarked"], sp), g1(self.z["sp_moves_land"], sp))
+        water = self.mg("water", tile[:, None])[:, 0] > 0
+        mmax = mx.where(water & self.tg(self.z["sp_land"], sp) & self.tg(self.z["sp_embarks"], sp), self.tg(self.z["sp_moves_embarked"], sp), self.tg(self.z["sp_moves_land"], sp))
         s, _ = self.new_unit(s, csid, tile, spawn, mx.full(victim.shape, 100, dtype=I32), mx.where(known, mmax, moves),
-                             mx.where(known, g1(self.z["sp_kind"], sp), kind), profile_from=sp)
+                             mx.where(known, self.tg(self.z["sp_kind"], sp), kind), profile_from=sp)
         return s
 
     def free_tile_near(self, s, owner, tile, cls, dest_id, where):
@@ -933,7 +968,7 @@ class Sim:
         nb = mx.take(self.geo.nbr, mx.maximum(d["tile"], 0), axis=0)  # [B, 6]
         da = self.geo.distance(nb, mx.broadcast_to(a_tile[:, None], nb.shape))
         wd = mx.take(self.withdraw_pool.reshape(-1), (mx.maximum(d["dest_id"], 0) * self.T)[:, None] + mx.maximum(nb, 0))
-        water = gn(self.m["water"].astype(I32), nb) > 0
+        water = self.mg("water", nb) > 0
         cls = mx.where(d["sea"][:, None], CL_NAVAL, mx.where(water, CL_EMB, CL_MIL))
         stop = self.can_stop_at(s, d["side"], cls, nb)
         ok = (nb >= 0) & (nb != a_tile[:, None]) & (da != 1) & wd & stop & (self.city_on(s, nb) < 0)
@@ -974,15 +1009,15 @@ class Sim:
         not stay; any other joins the unit and adds its change to the profile (contexts, stats, flags,
         moves, sight, range; the movement tables of the new set)."""
         p = mx.maximum(p, 0)
-        insta = g1(self.z["z_insta"], p)
+        insta = self.tg(self.z["z_insta"], p)
         s = self.set_unit(s, slot, where, level=g1(s["u_level"], slot) + 1)
         s = self.set_unit(s, slot, where & insta, hp=mx.minimum(g1(s["u_hp"], slot) + INSTANT_HEAL, 100))
         keep = where & ~insta
         held = grow(s["u_prom"], slot)
         held = held | ((mx.arange(held.shape[1])[None, :] == p[:, None]) & keep[:, None])
         s["u_prom"] = put1(s["u_prom"], slot, held, keep)
-        di = g2(self.pz_int, slot, p)  # [B, 23 + NI]: one gather for every change
-        db = g2(self.pz_bool, slot, p)
+        di = self.tg(self.pz_int, slot, p)  # [B, 23 + NI]: one gather for every change
+        db = self.tg(self.pz_bool, slot, p)
         s["p_ctx"] = put1(s["p_ctx"], slot, grow(s["p_ctx"], slot) + di[:, :N_CTX], keep)
         for i, k in enumerate(self.D_INT):
             name = "p_" + k
@@ -990,17 +1025,17 @@ class Sim:
         for i, k in enumerate(FLAG_DELTA):
             name = "p_" + k
             s[name] = put1(s[name], slot, g1(s[name], slot) | db[:, i], keep)
-        cm = g2(self.z["z_cmov"], slot, p)
+        cm = self.tg(self.z["z_cmov"], slot, p)
         mset = g1(s["u_mset"], slot)
         nset = mx.where(cm >= 0, mset | mx.left_shift(mx.ones_like(cm), mx.maximum(cm, 0)), mset)
-        cid = g2(self.z["z_combo_cost"], slot, nset)
-        did = g2(self.z["z_combo_dest"], slot, nset)
+        cid = self.tg(self.z["z_combo_cost"], slot, nset)
+        did = self.tg(self.z["z_combo_dest"], slot, nset)
         moved = keep & (cm >= 0)
         known = moved & (cid >= 0)
         s = self.set_unit(s, slot, moved, mset=nset)
         s["p_cost_id"] = put1(s["p_cost_id"], slot, cid, known)
         s["p_dest_id"] = put1(s["p_dest_id"], slot, did, known)
-        s["n_unmodelled"] = s["n_unmodelled"] + (moved & ~known).astype(I32) + (keep & g2(self.z["z_odd"], slot, p)).astype(I32)
+        s["n_unmodelled"] = s["n_unmodelled"] + (moved & ~known).astype(I32) + (keep & self.tg(self.z["z_odd"], slot, p)).astype(I32)
         return s
 
     def attack(self, s, side, slot, to, take):
@@ -1020,13 +1055,15 @@ class Sim:
         c_maxhp = g1(self.cs["max_hp"], cslot)
         c_hp = c_maxhp - g1(s["c_dmg"], cslot)
         a_dmg_taken = 100 - a["hp"]
-        # Strengths.
-        att_melee_unit = self.melee_attack_strength(s, a, d, to, mx.zeros_like(take))
-        att_melee_city = self.melee_attack_strength(s, a, None, to, mx.ones_like(take))
-        def_melee = self.defense_strength(s, d, a, False)
-        att_ranged_unit = self.ranged_strength(s, a, d, mx.zeros_like(take), to, True)
-        att_ranged_city = self.ranged_strength(s, a, None, mx.ones_like(take), to, True)
-        def_ranged = self.defense_vs_ranged(s, d, a)
+        # Strengths: one of each kind per scene (the target, unit or city, is a per-scene flag).
+        att_m = self.melee_attack_strength(s, a, d, to, is_city)
+        att_r = self.ranged_strength(s, a, d, is_city, to, True)
+        def_u = self.defense_strength(s, d, a, ranged)  # melee or vs ranged by the attacker's kind
+        ranged_land = ~d["ranged_support_fire"] & ~d["sea"] & (d["base_ranged"] > 0)
+        rs_d = self.ranged_strength(s, d, a, mx.zeros_like(take), d["tile"], False)
+        def_u = mx.where(ranged & ~d["embarked"] & ranged_land, rs_d, def_u)
+        att_sel = mx.where(ranged, att_r, att_m)
+        def_sel = mx.where(is_city, c_str, def_u)
         melee_unit = is_unit & ~ranged
         melee_city = is_city & ~ranged
         ranged_any = take & ranged
@@ -1051,10 +1088,13 @@ class Sim:
         if self.f["withdraw"]:
             s = self.set_unit(s, d["slot"], withdrew, tile=wtile, st=mx.zeros_like(slot))
             s = self.refresh_allowance(s, d["slot"], d["tile"], wtile, withdrew)
+        # The damage to the target (every kind of strike: one evaluation) and the answer of a melee.
+        hurt_air = air & (icpt > 0)
+        my_dmg = mx.where(hurt_air, mx.minimum(a_dmg_taken + icpt, 100), a_dmg_taken)
+        d1 = self.unit_damage(att_sel, def_sel, my_dmg, mx.where(hurt_air, 0, wm), r1)
+        d2 = self.unit_damage(def_sel, att_m, mx.where(is_city, 0, 100 - d["hp"]), d["wounded_mod"], r2)
         # --- melee unit vs unit
-        to_def = exact.unit_damage(att_melee_unit, def_melee, a_dmg_taken, wm, r1).astype(I32)
-        to_att = exact.unit_damage(def_melee, att_melee_unit, 100 - d["hp"], d["wounded_mod"], r2).astype(I32)
-        to_def, to_att = exact.resolve_mutual_kill(to_def, d["hp"], to_att, a["hp"])
+        to_def, to_att = exact.resolve_mutual_kill(d1, d["hp"], d2, a["hp"])
         s, d_killed = self.strike_unit(s, d["slot"], to_def, melee_unit)
         s, a_killed = self.strike_unit(s, slot, to_att, melee_unit)
         a_xp = g1(s["u_xp"], slot)
@@ -1077,8 +1117,8 @@ class Sim:
         s = self.advance(s, slot, to, moves_in)
         s = self.finish_attack(s, slot, moves_in, mx.zeros_like(win))
         # --- melee on a city
-        to_city = mx.minimum(exact.unit_damage(att_melee_city, c_str, a_dmg_taken, wm, r1).astype(I32), c_hp)
-        to_att_c = exact.city_damage(c_str, att_melee_city, r2).astype(I32)
+        to_city = mx.minimum(d1, c_hp)
+        to_att_c = d2
         falls = to_city >= c_hp
         to_att_c = mx.where(falls & (to_att_c >= a["hp"]), a["hp"] - 1, to_att_c)
         s["c_dmg"] = put1(s["c_dmg"], cslot, g1(s["c_dmg"], cslot) + to_city, melee_city)
@@ -1095,14 +1135,9 @@ class Sim:
         civ_target = ranged_any & is_civ
         unit_target = ranged_any & is_unit
         city_target = ranged_any & is_city
-        hurt_air = air & (icpt > 0)
-        r_unit = exact.unit_damage(att_ranged_unit, def_ranged, mx.where(hurt_air, mx.minimum(a_dmg_taken + icpt, 100), a_dmg_taken),
-                                   mx.where(hurt_air, 0, wm), r1).astype(I32)
-        r_unit = mx.where(civ_target, exact.CIVILIAN_DAMAGE, r_unit)
+        r_unit = mx.where(civ_target, exact.CIVILIAN_DAMAGE, d1)
         r_unit = mx.minimum(r_unit, d["hp"])
-        r_city = exact.unit_damage(att_ranged_city, c_str, mx.where(hurt_air, mx.minimum(a_dmg_taken + icpt, 100), a_dmg_taken),
-                                   mx.where(hurt_air, 0, wm), r1).astype(I32)
-        r_city = mx.minimum(r_city, mx.maximum(c_hp - 1, 0))
+        r_city = mx.minimum(d1, mx.maximum(c_hp - 1, 0))
         s["c_dmg"] = put1(s["c_dmg"], cslot, g1(s["c_dmg"], cslot) + r_city, city_target)
         s, rk = self.strike_unit(s, d["slot"], r_unit, unit_target | civ_target)
         dxp = mx.where(air, XP_DEF_AIR, XP_DEF_RANGED)
@@ -1111,14 +1146,15 @@ class Sim:
         axp = mx.where(city_target, mx.where(air, XP_ATT_CITY_AIR, XP_ATT_CITY_RANGED), mx.where(air, XP_ATT_AIR, XP_ATT_RANGED))
         s = self.set_unit(s, slot, ranged_any, xp=g1(s["u_xp"], slot) + self.xp_gain(axp, a["xp_percent"]))
         # The aircraft takes the target's answer (a surviving target) and the interception.
-        alive_t = city_target | ((unit_target | civ_target) & ~rk)
-        s["rng"], r3 = exact.draw(s["rng"], mx.full((B,), 1200, dtype=mx.int64), air & alive_t)
-        new_d_hp = g1(s["u_hp"], d["slot"])
-        ans_unit = exact.unit_damage(def_ranged, att_ranged_unit, 100 - new_d_hp, mx.zeros_like(wm), r3).astype(I32)
-        ans_city = exact.city_damage(c_str, att_ranged_city, r3).astype(I32)
-        answer = mx.where(city_target, ans_city, mx.where(unit_target & ~rk, ans_unit, 0))
-        total = mx.where(air, mx.where(alive_t, answer, 0) + icpt, 0)
-        s, air_dead = self.strike_unit(s, slot, total, air & (total > 0))
+        air_dead = mx.zeros_like(take)
+        if self.has_air:
+            alive_t = city_target | ((unit_target | civ_target) & ~rk)
+            s["rng"], r3 = exact.draw(s["rng"], mx.full((B,), 1200, dtype=mx.int64), air & alive_t)
+            new_d_hp = g1(s["u_hp"], d["slot"])
+            ans = self.unit_damage(def_sel, att_sel, mx.where(city_target, 0, 100 - new_d_hp), mx.zeros_like(wm), r3)
+            answer = mx.where(city_target | (unit_target & ~rk), ans, 0)
+            total = mx.where(air, mx.where(alive_t, answer, 0) + icpt, 0)
+            s, air_dead = self.strike_unit(s, slot, total, air & (total > 0))
         spent = ranged_any & ~air_dead & a["suicide"]
         s = self.set_unit(s, slot, spent, alive=mx.zeros(slot.shape, dtype=mx.bool_), tile=mx.full(slot.shape, -1, dtype=I32))
         s = self.finish_attack(s, slot, ranged_any & ~air_dead & ~a["suicide"], mx.ones_like(win))
@@ -1160,7 +1196,7 @@ class Sim:
         s_att = self.ranged_strength(s, a, g, mx.zeros_like(air), g["tile"], True)
         # interception_damage: the wounded factor is 100 - damage (no 33 % rule), the rounded damage
         # times the attacker's InterceptionDamageTaken factor, truncated.
-        dmg = exact.interception_damage(s_int, s_att, 100 - g["hp"], a["interception_taken"], r_i).astype(I32)
+        dmg = exact.interception_damage(s_int, s_att, 100 - g["hp"], a["interception_taken"], r_i, fast=self.fast).astype(I32)
         dmg = mx.where(p2, dmg, 0)
         s["u_icpt"] = put1(s["u_icpt"], g_slot, g1(s["u_icpt"], g_slot) + 1, p2)
         s["u_xp"] = put1(s["u_xp"], g_slot, g1(s["u_xp"], g_slot) + self.xp_gain(XP_INTERCEPT, g["xp_percent"]), p2 & (dmg > 0))
@@ -1175,13 +1211,13 @@ class Sim:
         got = where & (roll < chance.astype(mx.int64))
         sp = g2(s["p_capture_spawn"], a["slot"], d["slot"])
         got = got & (sp >= 0)
-        cls = mx.where(g1(self.z["sp_sea"], sp), CL_NAVAL, mx.where(g1(self.z["sp_civilian"], sp), CL_CIV, CL_MIL))
-        cls_on = lambda t: mx.where((gn(self.m["water"].astype(I32), t[:, None])[:, 0] > 0) & g1(self.z["sp_land"], sp), CL_EMB, cls)
-        spot = self.free_tile_near(s, a["side"], a["tile"], cls_on(a["tile"]), g1(self.z["sp_dest_id"], sp), got)
+        cls = mx.where(self.tg(self.z["sp_sea"], sp), CL_NAVAL, mx.where(self.tg(self.z["sp_civilian"], sp), CL_CIV, CL_MIL))
+        cls_on = lambda t: mx.where((self.mg("water", t[:, None])[:, 0] > 0) & self.tg(self.z["sp_land"], sp), CL_EMB, cls)
+        spot = self.free_tile_near(s, a["side"], a["tile"], cls_on(a["tile"]), self.tg(self.z["sp_dest_id"], sp), got)
         # The new unit's allowance on its tile (`moves_on`: embarked on water).
-        water = gn(self.m["water"].astype(I32), spot[:, None])[:, 0] > 0
-        mmax = mx.where(water & g1(self.z["sp_land"], sp) & g1(self.z["sp_embarks"], sp), g1(self.z["sp_moves_embarked"], sp), g1(self.z["sp_moves_land"], sp))
-        s, _ = self.new_unit(s, a["side"], spot, got, mx.full((B,), CAPTURED_UNIT_HP, dtype=I32), mmax, g1(self.z["sp_kind"], sp), profile_from=sp)
+        water = self.mg("water", spot[:, None])[:, 0] > 0
+        mmax = mx.where(water & self.tg(self.z["sp_land"], sp) & self.tg(self.z["sp_embarks"], sp), self.tg(self.z["sp_moves_embarked"], sp), self.tg(self.z["sp_moves_land"], sp))
+        s, _ = self.new_unit(s, a["side"], spot, got, mx.full((B,), CAPTURED_UNIT_HP, dtype=I32), mmax, self.tg(self.z["sp_kind"], sp), profile_from=sp)
         return s
 
     def heal_on_kill(self, s, slot, where, heal):
@@ -1225,7 +1261,7 @@ class Sim:
         _, c_rstr = self.city_strength(s, cslot, mil)
         strength = self.defense_vs_ranged(s, d, None)
         s["rng"], roll = exact.draw(s["rng"], mx.full((self.B,), 1200, dtype=mx.int64), take)
-        dmg = exact.city_damage(c_rstr, strength, roll).astype(I32)
+        dmg = self.unit_damage(c_rstr, strength, mx.zeros_like(roll).astype(I32), mx.zeros_like(roll).astype(I32), roll)
         dmg = mx.where(is_civ, exact.CIVILIAN_DAMAGE, dmg)
         dmg = mx.minimum(dmg, d["hp"])
         s["c_strike"] = put1(s["c_strike"], cslot, mx.ones(cslot.shape, dtype=mx.bool_), take)
@@ -1241,7 +1277,7 @@ class Sim:
         starts (fortification +1)."""
         tiles = s["u_tile"]
         mine = s["u_alive"] & (tiles >= 0) & (s["u_side"] == side[:, None]) & take[:, None]
-        water = gn(self.m["water"].astype(I32), tiles) > 0
+        water = self.mg("water", tiles) > 0
         owner = gn(s["owner"], tiles)
         friendly = owner == s["u_side"]
         cityt = self.city_on(s, tiles) >= 0
@@ -1260,7 +1296,7 @@ class Sim:
         if self.f["citadel"]:
             # Citadels (`citadel_damage`): the strongest intact citadel of the enemy next to the unit.
             nb = mx.take(self.geo.nbr, mx.maximum(tiles, 0), axis=0)  # [B, U, 6]
-            cit = mx.where(nb >= 0, gn(self.m["citadel_dmg"], nb), 0)
+            cit = mx.where(nb >= 0, self.mg("citadel_dmg", nb), 0)
             host = mx.where(nb >= 0, gn(s["owner"], nb), -1)
             hurt = mx.max(mx.where((cit > 0) & (host == (1 - s["u_side"])[:, :, None]), cit, 0), axis=2)
             hit = mine & (hurt > 0)
@@ -1271,7 +1307,7 @@ class Sim:
             mine = mine & ~dead
         if self.f["mountains"]:
             # Mountains (`mountain_damage`): a unit that crosses them loses 50 HP standing on one, never dying.
-            on_m = mine & s["p_cross_mountains"] & (gn(self.m["mountain"].astype(I32), tiles) > 0)
+            on_m = mine & s["p_cross_mountains"] & (self.mg("mountain", tiles) > 0)
             s["u_hp"] = mx.where(on_m, s["u_hp"] - mx.minimum(MOUNTAIN_DAMAGE, s["u_hp"] - 1), s["u_hp"])
         mmax = mx.where(s["p_embarks"] & water & s["p_land"], s["p_moves_embarked"], s["p_moves_land"])
         s["u_att"] = mx.where(mine, 0, s["u_att"])
