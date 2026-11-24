@@ -43,10 +43,29 @@ fn rounds(rules: &CompiledRuleset, count: usize) -> Vec<u64> {
     hashes
 }
 
+/// `AURELIA_AI_VARIANT` is the process's, and the tests of this binary run in parallel threads: the one that sets
+/// it holds this lock, and so does every test that needs it unset. The variable is removed again when the guard drops
+/// (also on a panic).
+static VARIANT_ENV: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+struct VariantUnset(#[allow(dead_code)] std::sync::MutexGuard<'static, ()>);
+
+fn variant_unset() -> VariantUnset {
+    let guard = VARIANT_ENV.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+    std::env::remove_var("AURELIA_AI_VARIANT");
+    VariantUnset(guard)
+}
+
+impl Drop for VariantUnset {
+    fn drop(&mut self) {
+        std::env::remove_var("AURELIA_AI_VARIANT");
+    }
+}
+
 #[test]
 fn the_variable_is_ignored_and_the_game_plays_standard() {
+    let _env = variant_unset();
     let rules = compile_rules(core_rules()).unwrap();
-    std::env::remove_var("AURELIA_AI_VARIANT");
     let plain = rounds(&rules, 12);
     assert!(plain.windows(2).any(|w| w[0] != w[1]), "the AI moves: the hashes change");
     for name in ["net", "strategy-net", "unit-net", "hybrid", "site-net", "choice-net", "standard-scripted", "no-such-variant", "pre-camps", "pre-next", "next-w", "pre-next-x", "next-x", "pre-nets-x", "nets-x-site", "econ-site", "net2", "net2-defence", "tac2", "net2-tac", "pre-net2"] {
@@ -54,7 +73,6 @@ fn the_variable_is_ignored_and_the_game_plays_standard() {
         assert_eq!(ClassicMind::default().variant(), Variant::Standard, "{name}");
         assert_eq!(rounds(&rules, 12), plain, "{name}");
     }
-    std::env::remove_var("AURELIA_AI_VARIANT");
 }
 
 #[test]
@@ -77,8 +95,8 @@ fn the_nets_have_no_name_in_this_build() {
 /// (`NET2_120`, pinned with the feature), not the old standard's.
 #[test]
 fn the_game_without_the_feature_plays_net2() {
+    let _env = variant_unset();
     let rules = compile_rules(core_rules()).unwrap();
-    std::env::remove_var("AURELIA_AI_VARIANT");
     let last = *rounds(&rules, 120).last().unwrap();
     assert_ne!(NET2_120, PRE_NET2_120);
     assert_eq!(last, NET2_120, "{last:016x}");
@@ -123,8 +141,8 @@ const CITY_STATES_ROUNDS: usize = 420;
 /// without the feature exactly as `net2` plays them with it.
 #[test]
 fn the_game_without_the_feature_plays_net2_with_city_states_gifts_and_votes() {
+    let _env = variant_unset();
     let rules = compile_rules(core_rules()).unwrap();
-    std::env::remove_var("AURELIA_AI_VARIANT");
     let config = ScenarioConfig { seed: 0xA1_5EED, players: 5, width: 60, height: 40, cities: 0, units: 0, water_ratio: 15 };
     let mut game = generate_new_game_with(&rules, &config, None, NewGameOptions { city_states: 6, ..NewGameOptions::default() });
     let mut driver = AiDriver::new(AiSettings::for_rules(&rules, rules.default_difficulty()), Vec::new());

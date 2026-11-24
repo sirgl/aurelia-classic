@@ -45,7 +45,7 @@ fn config(values: Option<ValuesConfig>) -> Config {
 #[test]
 fn decisions_are_valued_without_changing_the_game_and_exported_on_their_rows() {
     // The pinned random net with the defer choice on: deferrals are valued too.
-    std::env::set_var(classic_rules::ai::net_e2e::mind::DEFER_ENV, "1");
+    let _defer = classic_rules::ai::net_e2e::mind::defer_override("1");
     let rules = ClassicBench::rules();
     let valued_config = config(Some(ValuesConfig { k: 4, depth: 1, rollouts: 2, share: 1.0, later: 1.0 }));
     let plain = config(None);

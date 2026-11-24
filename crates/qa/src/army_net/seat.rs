@@ -123,9 +123,16 @@ pub fn teacher_state(game: &GameState, scene: &Scene, orders: &Orders, track: &c
     [i16::from(track.engaged), track.waited.min(i16::MAX as u32) as i16, stage, mask as i16]
 }
 
-/// The net for this process (a test: weights made in the test), when none is loaded yet.
-pub fn install_net(net: Net) -> bool {
-    NET.set(Ok(net)).is_ok()
+thread_local! {
+    /// The net a test installed for its own thread (`install_net`); it comes before the process's `ARMY_NET`.
+    static INSTALLED: std::cell::Cell<Option<&'static Net>> = const { std::cell::Cell::new(None) };
+}
+
+/// The net for this thread (a test: weights made in the test). Not the process's: the tests of one binary run in
+/// parallel threads, and a process-wide slot filled by the first caller (or by a failed `ARMY_NET` load of another
+/// test's play) made the result depend on which test came first. The net lives to the end of the process (a leak).
+pub fn install_net(net: Net) {
+    INSTALLED.with(|i| i.set(Some(Box::leak(Box::new(net)))));
 }
 
 /// Save and load in the middle of a play (the guard of the memory's persistence, `tests/army_net.rs`): at the
@@ -453,6 +460,9 @@ thread_local! {
 }
 
 pub fn net() -> Result<&'static Net, String> {
+    if let Some(net) = INSTALLED.with(std::cell::Cell::get) {
+        return Ok(net);
+    }
     let loaded = NET.get_or_init(|| {
         let path = std::env::var_os("ARMY_NET").ok_or("set ARMY_NET to the weights of the army net")?;
         Net::load(std::path::Path::new(&path))

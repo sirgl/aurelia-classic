@@ -277,28 +277,50 @@ pub fn speed_from_env() -> Result<Speed, String> {
     Ok(speed)
 }
 
+thread_local! {
+    static DEFER_OVERRIDE: std::cell::RefCell<Option<String>> = const { std::cell::RefCell::new(None) };
+}
+
+/// [`DEFER_ENV`] for the nets this thread loads, in place of the process environment: a test sets it with
+/// this guard instead of `std::env::set_var` (the environment is shared by the parallel tests of a binary, and
+/// the model cache below would keep whichever setting loaded first). Dropping the guard restores the earlier one.
+pub fn defer_override(value: &str) -> DeferOverride {
+    DeferOverride(DEFER_OVERRIDE.with(|d| d.borrow_mut().replace(value.to_owned())))
+}
+
+/// Restores the thread's earlier [`defer_override`] when dropped.
+pub struct DeferOverride(Option<String>);
+
+impl Drop for DeferOverride {
+    fn drop(&mut self) {
+        DEFER_OVERRIDE.with(|d| *d.borrow_mut() = self.0.take());
+    }
+}
+
 /// A weights file read and checked once per process (the bench seats one
 /// mind per game; the games share the model), at the environment's speed
-/// ([`speed_from_env`]).
+/// ([`speed_from_env`]). The cache holds one model per file and defer setting.
 pub fn load_model(path: &Path) -> Result<Arc<Model>, String> {
-    static MODELS: OnceLock<Mutex<BTreeMap<PathBuf, Arc<Model>>>> = OnceLock::new();
+    static MODELS: OnceLock<Mutex<BTreeMap<(PathBuf, Option<String>), Arc<Model>>>> = OnceLock::new();
+    let defer = DEFER_OVERRIDE.with(|d| d.borrow().clone()).or_else(|| std::env::var(DEFER_ENV).ok());
     let models = MODELS.get_or_init(Default::default);
     let mut models = models.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
-    if let Some(model) = models.get(path) {
+    let key = (path.to_owned(), defer.clone());
+    if let Some(model) = models.get(&key) {
         return Ok(model.clone());
     }
     let bytes = std::fs::read(path).map_err(|e| format!("the net's weights file {}: {e}", path.display()))?;
     let model = Model::from_bytes(&bytes).map_err(|e| format!("the net's weights file {}: {e}", path.display()))?;
     let model = model.with_speed(speed_from_env()?);
-    let model = Arc::new(match std::env::var(DEFER_ENV) {
-        Err(_) => model,
-        Ok(v) if v == "off" => model.with_defer(None),
-        Ok(v) => {
+    let model = Arc::new(match defer {
+        None => model,
+        Some(v) if v == "off" => model.with_defer(None),
+        Some(v) => {
             let logits: f64 = v.parse().map_err(|_| format!("{DEFER_ENV}={v}: `off` or the bias in logits"))?;
             model.with_defer(Some((logits * 256.0).round() as i32))
         }
     });
-    models.insert(path.to_owned(), model.clone());
+    models.insert(key, model.clone());
     Ok(model)
 }
 

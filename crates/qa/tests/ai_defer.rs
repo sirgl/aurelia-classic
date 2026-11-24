@@ -37,8 +37,8 @@ fn config() -> Config {
 #[test]
 fn a_deferring_net_samples_replays_and_exports_aligned() {
     // The pinned random net with the choice on (its own file is version 4): bias 1 logit.
-    // Each test runs in its own process (nextest), so the variable is this test's.
-    std::env::set_var(classic_rules::ai::net_e2e::mind::DEFER_ENV, "1");
+    // The setting is this thread's (`defer_override`), not the process environment's: the tests of a binary run in parallel.
+    let _defer = classic_rules::ai::net_e2e::mind::defer_override("1");
     let rules = ClassicBench::rules();
     let config = config();
     let job = &selfplay::jobs(&config, 1)[0];
