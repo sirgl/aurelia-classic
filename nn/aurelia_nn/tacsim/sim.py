@@ -33,6 +33,7 @@ from .scene import N_CTX, CTX_FLANKING, CTX_INTERCEPTION, FLAG_DELTA, STAT_NAMES
 
 I32 = mx.int32
 MOVE = 60
+BARBARIAN_BONUS = 33  # percent: `BARBARIAN_COMBAT_BONUS` of the default level (the camp scenes carry no level)
 # Contexts (kernel `combat_slot`).
 ANY, ATTACK, DEFENSE, VS_CITY, ATT_OPEN, ATT_ROUGH, DEF_OPEN, DEF_ROUGH, RATT_OPEN, RATT_ROUGH, DEF_VS_RANGED, RANGED_ATTACK, \
     VS_WOUNDED, VS_FORTIFIED, FRIENDLY, OUTSIDE_FRIENDLY, ATT_FRIENDLY, FLANKING, ADJ_FRIENDLY = range(19)
@@ -308,6 +309,21 @@ class Sim:
 
     # ------------------------------------------------------------------ the acting unit's options
 
+    @staticmethod
+    def is_foe(s, side, other):
+        """Is `other` (side ids, -1 none; [B, ...]) at war with `side` ([B] or broadcastable)? The two-sided scenes: the
+        other side. With a third party (twin packages 4 and 8: `s["war"]` [B, 3, 3] bool) the war table's row of `side`."""
+        w = s.get("war")
+        if w is None:
+            return other == (1 - side)
+        side = mx.array(side) if not isinstance(side, mx.array) else side
+        side = side.reshape(side.shape + (1,) * (other.ndim - side.ndim)) if side.ndim < other.ndim else side
+        B = other.shape[0]
+        shape = mx.broadcast_shapes(side.shape, other.shape)
+        side, other = mx.broadcast_to(side, shape), mx.broadcast_to(other, shape)
+        idx = (mx.clip(side, 0, 2) * 3 + mx.clip(other, 0, 2)).reshape(B, -1)
+        return (mx.take_along_axis(w.reshape(B, 9), idx, axis=1).reshape(shape)) & (other >= 0) & (side >= 0)
+
     def city_on(self, s, tiles):
         """City slot on each tile [B, N] (-1 none): cities do not move, a plane built once."""
         tid = self.tid.reshape((-1,) + (1,) * (tiles.ndim - 1))
@@ -320,7 +336,6 @@ class Sim:
         ships and cities: `_ctrl_sea`)."""
         B, T = self.B, self.T
         mil, civ = self.occupancy(s)
-        enemy = 1 - side
         mil_side = mx.where(mil >= 0, gn(s["u_side"], mil), -1)
         civ_side = mx.where(civ >= 0, gn(s["u_side"], civ), -1)
         tiles = mx.broadcast_to(mx.arange(T)[None, :], (B, T)).astype(I32)
@@ -332,13 +347,13 @@ class Sim:
         base = (mx.arange(B) * T)[:, None]
         idx = mx.where(at >= 0, base + at, B * T).reshape(-1)
         vis = mx.zeros((B * T + 1,), dtype=I32).at[idx].maximum(seen.astype(I32).reshape(-1))[: B * T].reshape(B, T) > 0
-        enemy_unit = ((mil_side == enemy[:, None]) | (civ_side == enemy[:, None]))
+        enemy_unit = self.is_foe(s, side[:, None], mil_side) | self.is_foe(s, side[:, None], civ_side)
         block = enemy_unit & vis
         city = self.city_on(s, tiles)
         city_owner = mx.where(city >= 0, gn(s["c_owner"], city), -1)
         mil_sea = mx.where(mil >= 0, gn(s["p_sea"].astype(I32), mil) > 0, False)
-        enemy_mil = mil_side == enemy[:, None]
-        by_city = city_owner == enemy[:, None]
+        enemy_mil = self.is_foe(s, side[:, None], mil_side)
+        by_city = self.is_foe(s, side[:, None], city_owner)
         ctrl_land = vis & ((enemy_mil & (mil_sea | ~self.mplane("water"))) | by_city)
         self._ctrl_sea = vis & ((enemy_mil & mil_sea) | by_city)
         return block, ctrl_land, vis, mil, civ, mil_side, civ_side, city, city_owner
@@ -424,7 +439,9 @@ class Sim:
         prev = mx.where(any_stop, g1(path, mx.maximum(first - 1, 0)), gl)
         final_tile = g1(lt, prev)
         final_left = g1(left, prev)
-        return final_tile, final_left
+        # The tiles the unit entered (the start is no entry): for the ruins of `armyruin`.
+        walked = (mx.arange(path.shape[1])[None, :] < mx.where(any_stop, first, path.shape[1])[:, None]) & (path > 0)
+        return final_tile, final_left, gn(lt, path), walked
 
     def path_costs(self, s, side, slot, iters=None, check_every=8):
         """The multi-turn move cost of unit `slot` of `side` to every tile of the map (kernel `astar`'s
@@ -582,9 +599,8 @@ class Sim:
         t_mil_side = mx.where(tgt >= 0, gn(mil_side, tgt), -1)
         t_civ_side = mx.where(tgt >= 0, gn(civ_side, tgt), -1)
         t_vis = mx.where(tgt >= 0, gn(vis.astype(I32), tgt) > 0, False)
-        enemy = 1 - side
-        foreign_city = (t_city >= 0) & (t_city_owner != side[:, None]) & (t_city_owner >= 0)
-        enemy_unit_seen = t_vis & ((t_mil_side == enemy[:, None]) | (t_civ_side == enemy[:, None]))
+        foreign_city = (t_city >= 0) & self.is_foe(s, side[:, None], t_city_owner)
+        enemy_unit_seen = t_vis & (self.is_foe(s, side[:, None], t_mil_side) | self.is_foe(s, side[:, None], t_civ_side))
         own_there = (t_mil_side == side[:, None]) | (t_civ_side == side[:, None])
         target_ok = foreign_city | (enemy_unit_seen & ~own_there)
         water_t = mx.where(tgt >= 0, self.mg("water", tgt) > 0, False)
@@ -619,9 +635,8 @@ class Sim:
         allowed = 1 + mx.clip(g1(s["p_attacks_per_turn"], slot), 0, 9)
         ready = alive & g1(s["p_air"], slot) & (g1(s["p_base_ranged"], slot) > 0) & (g1(s["p_range"], slot) > 0)
         ready = ready & (g1(s["u_mv"], slot) > 0) & (g1(s["u_att"], slot) < allowed)
-        enemy = 1 - side
-        foreign_city = (city >= 0) & (city_owner != side[:, None]) & (city_owner >= 0)
-        enemy_unit = (mil_side == enemy[:, None]) | (civ_side == enemy[:, None])
+        foreign_city = (city >= 0) & self.is_foe(s, side[:, None], city_owner)
+        enemy_unit = self.is_foe(s, side[:, None], mil_side) | self.is_foe(s, side[:, None], civ_side)
         own_there = (mil_side == side[:, None]) | (civ_side == side[:, None])
         target_ok = foreign_city | (enemy_unit & ~own_there)
         rng = mx.maximum(g1(s["p_range"], slot), 1)
@@ -639,9 +654,8 @@ class Sim:
         block, ctrl, vis, mil, civ, mil_side, civ_side, city, city_owner = self.controls_and_blocks(s, side)
         tgt = mx.take(geo.att_tile, mx.maximum(ct, 0), axis=0)
         d = mx.broadcast_to(geo.att_dist[None], tgt.shape)
-        enemy = 1 - side
         t_vis = mx.where(tgt >= 0, gn(vis.astype(I32), tgt) > 0, False)
-        t_unit = (mx.where(tgt >= 0, gn(mil_side, tgt), -1) == enemy[:, None]) | (mx.where(tgt >= 0, gn(civ_side, tgt), -1) == enemy[:, None])
+        t_unit = self.is_foe(s, side[:, None], mx.where(tgt >= 0, gn(mil_side, tgt), -1)) | self.is_foe(s, side[:, None], mx.where(tgt >= 0, gn(civ_side, tgt), -1))
         ok = ready[:, None] & (tgt >= 0) & (d >= 1) & (d <= CITY_RANGE) & t_vis & t_unit
         base = (mx.arange(B) * T)[:, None]
         return mx.zeros((B * T + 1,), dtype=I32).at[mx.where(ok, base + tgt, B * T).reshape(-1)].add(1)[: B * T].reshape(B, T) > 0
@@ -712,7 +726,7 @@ class Sim:
         near = mx.any(gg, axis=1)
         stacked = mx.max(mx.where(gg & (d_me == 0), s["p_stacked_general"], 0), axis=1)
         m = mx.where(near & f["land"], 15 + stacked + f["general_aura"], 0)
-        enemy = alive & (s["u_side"] != f["side"][:, None])
+        enemy = alive & self.is_foe(s, f["side"][:, None], s["u_side"])
         aura = enemy & (s["p_enemy_aura"] != 0) & (d_me <= 2) & (d_me <= s["p_aura_range"])
         m = m + mx.where(f["air"], 0, mx.sum(mx.where(aura, s["p_enemy_aura"], 0), axis=1))
         if other is not None and adjacency:
@@ -725,6 +739,9 @@ class Sim:
             m = m + mx.where(other["valid"], fl, 0)
         return m
 
+        if other is not None and "barb" in s:
+            # A non-barbarian fighting the barbarians (the camp scenes: side 1): `strength.rs::barbarian_combat_bonus`.
+            m = m + mx.where(s["barb"] & other["valid"] & (other["side"] == 1) & (f["side"] != 1), BARBARIAN_BONUS, 0)
     def friendly_adjacent(self, s, f):
         U = s["u_alive"].shape[1]
         tiles = s["u_tile"]
@@ -864,6 +881,11 @@ class Sim:
         return exact.unit_damage(me, opp, my_damage, wounded_mod, roll, fast=self.fast).astype(I32)
 
     def set_unit(self, s, slot, where, **vals):
+        if "tile" in vals and "u_arr" in s:
+            # The arrival stamp: Rust lists the units of a tile in the order they came (`units_on`), and the first foreign one
+            # is what a strike's features describe.
+            s["n_arr"] = s["n_arr"] + where.astype(I32)
+            s["u_arr"] = put1(s["u_arr"], slot, s["n_arr"], where)
         for k, v in vals.items():
             s["u_" + k] = put1(s["u_" + k], slot, v if isinstance(v, mx.array) else mx.full(slot.shape, v, dtype=s["u_" + k].dtype), where)
         return s
@@ -909,6 +931,8 @@ class Sim:
         # After a won fight the tile holds no other military unit (its defender is gone): no check.
         ok = where if mil is None else where & ((gn(mil, to[:, None])[:, 0] < 0) | (gn(mil, to[:, None])[:, 0] == slot))
         s = self.set_unit(s, slot, ok, tile=to, mv=mv - cost, st=mx.zeros_like(slot))
+        from . import armyruin
+        s = armyruin.enter(self, s, slot, to, ok)
         return self.refresh_allowance(s, slot, frm, to, ok)
 
     def new_unit(self, s, side, tile, where, hp, mmax, kind, profile_from=None):
@@ -917,7 +941,7 @@ class Sim:
         profile). Returns (state, slot)."""
         U = s["u_alive"].shape[1]
         new = s["n_slots"]
-        where = where & (new < U)
+        where = where & (new < s.get("n_cap", U))
         z = mx.zeros_like(new)
         s = self.set_unit(s, new, where, alive=mx.ones(new.shape, dtype=mx.bool_), side=side, tile=tile, hp=hp, mv=z, mmax=mmax,
                           att=z, st=z, xp=z, kind=kind, level=mx.ones_like(new), icpt=z, mset=z)
@@ -1016,8 +1040,10 @@ class Sim:
         mvv = mvv & (left_t >= 0)
         # (the walk and the attack are the heavy parts: skipped where no row moves or strikes)
         if bool(mx.any(mvv).item()):
-            end_tile, end_left = self.walk(s, slot, mk, tgt, mk["foreign_l"])
+            end_tile, end_left, steps, walked = self.walk(s, slot, mk, tgt, mk["foreign_l"])
             s = self.set_unit(s, slot, mvv, tile=end_tile, mv=mx.maximum(end_left, 0), st=mx.zeros_like(slot))
+            from . import armyruin
+            s = armyruin.enter_path(self, s, slot, steps, walked & mvv[:, None])
             s = self.refresh_allowance(s, slot, tile, end_tile, mvv)
         # Attack.
         atk = take & (verb == V_ATTACK)
@@ -1310,7 +1336,7 @@ class Sim:
         cityt = self.city_on(s, tiles) >= 0
         no = (s["u_hp"] >= 100) | (s["p_land"] & water) | moved | (s["p_sea"] & ~friendly & ~s["p_heal_outside_friendly"])
         no = no | (s["p_air"] & ~cityt)
-        enemy_host = (owner >= 0) & (owner != s["u_side"]) & (owner < 2)
+        enemy_host = (owner >= 0) & self.is_foe(s, s["u_side"], owner)
         rate = mx.where(cityt, 25 + mx.where(friendly, s["p_heal_friendly"], s["p_heal_neutral"]),
                         mx.where(~friendly, mx.where(enemy_host, 10 + s["p_heal_enemy"], 10 + s["p_heal_neutral"]), 20 + s["p_heal_friendly"]))
         # Medic: the best HealAdjacent of an own unit next to the unit.
@@ -1334,6 +1360,8 @@ class Sim:
         """The end of `side`'s turn: heal its units, the citadels' and mountains' damage, restore moves,
         attacks and interceptions, its cities heal and may strike again; then the other side's turn
         starts (fortification +1)."""
+        if "rl" in s:  # the round counter of the ruins (`armyruin`): the round is over when side 1's turn ends
+            s["rl"] = s["rl"] + ((side == 1) & take).astype(I32)
         tiles = s["u_tile"]
         mine = s["u_alive"] & (tiles >= 0) & (s["u_side"] == side[:, None]) & take[:, None]
         moved = (s["u_mv"] < s["u_mmax"]) & ~s["p_always_heal"]
@@ -1345,7 +1373,7 @@ class Sim:
             nb = mx.take(self.geo.nbr, mx.maximum(tiles, 0), axis=0)  # [B, U, 6]
             cit = mx.where(nb >= 0, self.mg("citadel_dmg", nb), 0)
             host = mx.where(nb >= 0, gn(s["owner"], nb), -1)
-            hurt = mx.max(mx.where((cit > 0) & (host == (1 - s["u_side"])[:, :, None]), cit, 0), axis=2)
+            hurt = mx.max(mx.where((cit > 0) & self.is_foe(s, s["u_side"][:, :, None], host), cit, 0), axis=2)
             hit = mine & (hurt > 0)
             dead = hit & (hurt >= s["u_hp"])
             s["u_hp"] = mx.where(hit & ~dead, s["u_hp"] - hurt, s["u_hp"])
@@ -1364,7 +1392,7 @@ class Sim:
         cmine = self.cs["alive"] & (s["c_owner"] == side[:, None]) & take[:, None]
         s["c_dmg"] = mx.where(cmine, mx.maximum(s["c_dmg"] - 20, 0), s["c_dmg"])
         s["c_strike"] = mx.where(cmine, False, s["c_strike"])
-        nxt = s["u_alive"] & (s["u_side"] == (1 - side)[:, None]) & take[:, None] & ((s["u_st"] == 1) | (s["u_st"] == 2))
+        nxt = s["u_alive"] & self.is_foe(s, side[:, None], s["u_side"]) & take[:, None] & ((s["u_st"] == 1) | (s["u_st"] == 2))
         s["u_st"] = mx.where(nxt, mx.minimum(s["u_st"] + 1, 2), s["u_st"])
         return s
 

@@ -33,10 +33,11 @@ import time
 import mlx.core as mx
 
 from . import armyprice
+from . import armythird
 from . import exact
 from .geometry import Geometry
 from .scene import Batch, N_CTX, FLAG_DELTA
-from .sim import Sim, g1, gn, grow, put1, I32, ANY, ATTACK, DEFENSE, VS_CITY, ATT_OPEN, ATT_ROUGH, DEF_OPEN, DEF_ROUGH, \
+from .sim import Sim, BARBARIAN_BONUS, g1, gn, grow, put1, I32, ANY, ATTACK, DEFENSE, VS_CITY, ATT_OPEN, ATT_ROUGH, DEF_OPEN, DEF_ROUGH, \
     RATT_OPEN, RATT_ROUGH, DEF_VS_RANGED, RANGED_ATTACK, VS_WOUNDED, VS_FORTIFIED, FRIENDLY, OUTSIDE_FRIENDLY, ATT_FRIENDLY, \
     ADJ_FRIENDLY, CTX_FLANKING
 
@@ -193,7 +194,7 @@ class Obs:
             alive = alive | (s["u_alive"] & far)
         civ = self.kind(s, "civ")
         own = alive & (s["u_side"] == side)
-        foes = alive & (s["u_side"] == foe)
+        foes = alive & (s["u_side"] == foe) if "war" not in s else alive & self.sim.is_foe(s, mx.full((B,), side, dtype=I32), s["u_side"])
         if self.fog_any:
             seen = sim.seen_by(s, mx.full((B,), side, dtype=I32), mx.where(alive, s["u_tile"], -1))
             foes = foes & (seen | ~t["fog"][:, None])
@@ -208,7 +209,7 @@ class Obs:
         cr = mx.concatenate([cr, t["far_r"]], axis=1)
         cside = mx.concatenate([mx.where(calive, s["c_owner"], -1), t["far_side"]], axis=1)
         return {"uq": uq, "ur": ur, "own": own, "foes": foes, "milfoe": foes & ~civ, "ownmil": own & ~civ, "civ": civ,
-                "reach": reach, "cq": cq, "cr": cr, "own_city": cside == side, "foe_city": cside == foe, "side": side}
+                "reach": reach, "cq": cq, "cr": cr, "own_city": cside == side, "foe_city": (cside == foe) if "war" not in s else self.sim.is_foe(s, mx.full((B,), side, dtype=I32), cside), "side": side}
 
     def spot(self, s, fd, me, tq, tr, tile):
         """observe.rs `Spot::of` for tiles (map tq, tr; window `tile`) [B, N] of the unit `me` [B]."""
@@ -499,12 +500,11 @@ class Obs:
         m_sl, c_sl = gn(mil, to), gn(civ, to)
         m_side = mx.where(m_sl >= 0, gn(s["u_side"], m_sl), -1)
         c_side = mx.where(c_sl >= 0, gn(s["u_side"], c_sl), -1)
-        enemy = 1 - side[:, None]
         own_there = (m_side == side[:, None]) | (c_side == side[:, None])
         seen_t = vis
-        foe_mil = (m_side == enemy) & seen_t
-        foe_civ = (c_side == enemy) & seen_t
-        city_def = is_city & (c_owner == enemy)
+        foe_mil = sim.is_foe(s, side[:, None], m_side) & seen_t
+        foe_civ = sim.is_foe(s, side[:, None], c_side) & seen_t
+        city_def = is_city & sim.is_foe(s, side[:, None], c_owner)
         unit_def = ~is_city & ~own_there & foe_mil
         civ_def = ~is_city & ~own_there & ~foe_mil & foe_civ
         ok = valid & ready & reach_ok & (city_def | unit_def | civ_def)
@@ -655,7 +655,7 @@ class Obs:
         near = mx.any(gg, axis=-1)
         stacked = mx.max(mx.where(gg & (d_me == 0), s["p_stacked_general"][:, None, :], 0), axis=-1)
         m = mx.where(near & f["land"], 15 + stacked + f["general_aura"], 0)
-        enemy = alive & (s["u_side"][:, None, :] != f["side"][..., None])
+        enemy = alive & self.sim.is_foe(s, f["side"][..., None], s["u_side"][:, None, :])
         aura = enemy & (s["p_enemy_aura"][:, None, :] != 0) & (d_me <= 2) & (d_me <= s["p_aura_range"][:, None, :])
         m = m + mx.where(f["air"], 0, mx.sum(mx.where(aura, s["p_enemy_aura"][:, None, :], 0), axis=-1))
         if other is not None and adjacency:
@@ -666,6 +666,8 @@ class Obs:
             raise_ = f["ctx"][..., CTX_FLANKING]
             fl = mx.where(raise_ > 0, fl * (100 + raise_) // 100, fl)
             m = m + mx.where(other["valid"], fl, 0)
+        if other is not None and "barb" in s:
+            m = m + mx.where(s["barb"][:, None] & other["valid"] & (other["side"] == 1) & (f["side"] != 1), BARBARIAN_BONUS, 0)
         return m
 
     def friendly_adjacent(self, s, f):
@@ -875,10 +877,10 @@ class Obs:
         c_sl = mx.where(tgt >= 0, c_sl, -1)
         m_side = mx.where(m_sl >= 0, gn(s["u_side"], m_sl), -1)
         c_side = mx.where(c_sl >= 0, gn(s["u_side"], c_sl), -1)
-        enemy = 1 - side
         seen = sim.seen_by(s, sd, tgt)
         # The previews only where a foe's unit or city stands (elsewhere `plan_attack` has no defender: not ok), packed.
-        has_foe = (tgt >= 0) & ((m_side == enemy) | (c_side == enemy) | (is_city & (c_owner == enemy)))
+        isf = lambda x: sim.is_foe(s, sd[:, None], x)
+        has_foe = (tgt >= 0) & (isf(m_side) | isf(c_side) | (is_city & isf(c_owner)))
         K = max(1, int(mx.max(mx.sum(has_foe, axis=1)).item()))
         if K < OA:
             pk = mx.argsort(mx.where(has_foe, 0, 1) * OA + mx.arange(OA)[None, :], axis=1)[:, :K].astype(I32)
@@ -894,7 +896,13 @@ class Obs:
         att_ok = sok
         tq, tr_ = self.mapq(tgt)
         ssp = self.spot(s, fd, me, tq, tr_, tgt)
-        first = mx.where(m_side == enemy, m_sl, mx.where(c_side == enemy, c_sl, -1))
+        first = mx.where(isf(m_side), m_sl, mx.where(isf(c_side), c_sl, -1))
+        if "u_arr" in s:
+            # Rust's first foreign unit of the tile is the one that arrived first (`units_on` keeps the order of arrival).
+            late = 1 << 30
+            a_m = mx.where(isf(m_side), gn(s["u_arr"], mx.maximum(m_sl, 0)), late)
+            a_c = mx.where(isf(c_side), gn(s["u_arr"], mx.maximum(c_sl, 0)), late)
+            first = mx.where(isf(m_side) | isf(c_side), mx.where(a_m <= a_c, m_sl, c_sl), -1)
         fs = mx.maximum(first, 0)
         fk = gn(s["u_kind"], fs)
         fa = [mx.zeros((B, OA), dtype=F32)] * F_ACT
@@ -917,13 +925,13 @@ class Obs:
         # kind of its group: they are gathered after the sort, and the kind's one-hot (columns 0..9) is added then.
         groups = []
         groups.append((0, None, move_key, move_ok, K_MOVE, lt, None, None))
-        foe_city = is_city & (c_owner == enemy)
+        foe_city = is_city & isf(c_owner)
         strike_feat = mx.stack(fa, axis=2)
         for kind, ok, key in (
-                (K_UNIT, att_ok & (m_side == enemy) & seen, GROUP[K_UNIT] * (1 << 20) + gn(handle, mx.maximum(m_sl, 0))),
-                (K_UNIT, att_ok & (c_side == enemy) & seen, GROUP[K_UNIT] * (1 << 20) + gn(handle, mx.maximum(c_sl, 0))),
+                (K_UNIT, att_ok & isf(m_side) & seen, GROUP[K_UNIT] * (1 << 20) + gn(handle, mx.maximum(m_sl, 0))),
+                (K_UNIT, att_ok & isf(c_side) & seen, GROUP[K_UNIT] * (1 << 20) + gn(handle, mx.maximum(c_sl, 0))),
                 (K_CITY, att_ok & foe_city, GROUP[K_CITY] * (1 << 20) + gn(c_handle, mx.maximum(city, 0))),
-                (K_RANGED, att_ok & ranged_kind[:, None] & (foe_city | (((m_side == enemy) | (c_side == enemy)) & seen)),
+                (K_RANGED, att_ok & ranged_kind[:, None] & (foe_city | ((isf(m_side) | isf(c_side)) & seen)),
                  GROUP[K_RANGED] * (1 << 20) + mx.where(tgt >= 0, tr_ * t["mw"][:, None] + tq, 0))):
             groups.append((1, None, key, ok, kind, tgt, None, None))
         # Fortify, set up, promotions: the unit's own tile.
@@ -1080,10 +1088,10 @@ def stream(path, limit=None, families=None, group=40, every=1):
                 else:
                     plays[name][2] = d
                     if len(plays) >= group and all(v[2] is not None for v in plays.values()):
-                        yield [[sc, [m for m in ms if m is not None], e] for sc, ms, e, _ in plays.values()]
+                        yield [armythird.remap_play([sc, [m for m in ms if m is not None], e]) for sc, ms, e, _ in plays.values()]
                         plays = collections.OrderedDict()
     if plays:
-        yield [[sc, [m for m in ms if m is not None], e] for sc, ms, e, _ in plays.values()]
+        yield [armythird.remap_play([sc, [m for m in ms if m is not None], e]) for sc, ms, e, _ in plays.values()]
 
 
 def build_templates(plays):
@@ -1107,6 +1115,7 @@ def build_templates(plays):
 def build_rows(plays, rows, templates=None):
     """A simulator over the plays' scenes (templates) and a state over `rows` [(play index, moment)]."""
     tb, tsim, kw = templates or build_templates(plays)
+    armythird.template_slots(tb, [sc for sc, _, _ in plays])
     geo = tsim.geo
     idx = mx.array([pi for pi, _ in rows], dtype=I32)
     take = lambda a: mx.take(a, idx, axis=0)
@@ -1126,6 +1135,7 @@ def build_rows(plays, rows, templates=None):
         ids.append((m["ids"] + [10 ** 6 + i for i in range(U)])[:U])
         handles.append((m["handles"] + [-1] * U)[:U])
     # Player-level effects the state record does not carry (an exogenous schedule from Rust): the wounded modifier.
+    s = armythird.setup_rows(sim, s, [(plays[pi][0], m) for pi, m in rows])
     wm = [(m.get("wm", []) + [0] * U)[:U] for _, m in rows]
     if any(any(x) for x in wm):
         s["p_wounded_mod"] = mx.array(wm, dtype=s["p_wounded_mod"].dtype)
@@ -1137,6 +1147,11 @@ def build_rows(plays, rows, templates=None):
         s["c_maxhp"] = mx.array([[c[1] for c in row] for row in cs0], dtype=I32)
     T = tb.t
     s["pillageable"] = mx.array([[c == "1" for c in (m.get("pillageable") or "0" * T)] for _, m in rows]).astype(I32)
+    # The ancient ruins still standing and the arrival order on the tiles (`armyruin`, `Sim.set_unit`).
+    s["ruin"] = mx.array([[c == "1" for c in (m.get("ruins") or "0" * T)] for _, m in rows]).astype(I32)
+    s["u_arr"] = mx.array([((list(m.get("upos") or []) + list(range(U)))[:U]) for _, m in rows], dtype=I32)
+    s["n_arr"] = mx.full((len(rows),), 1 << 10, dtype=I32)
+    s["rl"] = mx.array([m.get("round", 0) for _, m in rows], dtype=I32)
     s["u_id"] = mx.array(ids, dtype=I32)
     s["u_handle"] = mx.array(handles, dtype=I32)
     if not hasattr(tb, "tables0"):

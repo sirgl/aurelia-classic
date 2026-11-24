@@ -54,11 +54,11 @@ def turn_rows(plays, which):
         st = rebuild(sc)
         U = None
         for i, (e, units, cities) in enumerate(st):
-            if which == "enemy" and e["side"] == 0 and e["src"] == "end":
+            if which in ("enemy", "third") and e["side"] == 0 and e["src"] == "end":
                 start = (units, cities, e["rng"], e["round"])
-                # The enemy's turn end that follows.
+                # The enemy's (or, `third`, the third seat's) turn end that follows.
                 for e2, u2, c2 in st[i + 1:]:
-                    if e2["side"] == 1 and e2["src"] == "end":
+                    if e2["side"] == (1 if which == "enemy" else -1) and e2["src"] == "end":
                         rows.append((pi, start, (u2, c2), by_round))
                         break
             if which == "ours" and e["side"] == 0 and e["src"] == "end":
@@ -85,6 +85,12 @@ def as_row(plays, pi, start, by_round, U):
     for k in ("wm", "cstr"):
         if k in m:
             row[k] = m[k]
+    # The ruins and the arrival order at the end of our turn: the round's last moment (the turn end), not its first.
+    last = max((x for x in plays[pi][1] if x["round"] == rnd), key=lambda x: x["step"], default=m)
+    for k in ("ruins", "upos"):
+        if k in last:
+            row[k] = last[k]
+    row["round"] = rnd
     return row
 
 
@@ -105,6 +111,8 @@ def compare(g, rows, which, counts, show, ex):
             what = None
             if (u[0] == 1) != bool(al[b][k]):
                 what = f"{who} unit alive/dead"
+        if g.plays[pi][0]["scene"].get("n_main") is not None:
+            n_pieces = len(g.plays[pi][0]["scene"]["profiles"])  # the third seat's layout: pieces, spare slots, the third's pieces
             elif u[0] and u[1] != tl[b][k]:
                 what = f"{who} unit's tile"
             elif u[0] and u[2] != hp[b][k]:
@@ -148,7 +156,12 @@ def run(path, weights, families=None, which="enemy", show=3, out=None, group=400
         g.charge = charge
         g.scene_rule = scene_rule
         g.rel_now = mx.array([st[3] - gp[pi][0]["orders"]["start_round"] for pi, st, _, _ in rows], dtype=mx.int32)
-        if which == "enemy":
+        if which == "third":
+            from . import armycamp
+            live = ~g.s["done"] & (g.verdict < 0)
+            armycamp.neutral_turn(g, live)
+            armycamp.neutral_rule(g, live)
+        elif which == "enemy":
             if debug:
                 from . import armystd
                 sh, tg, C = armystd.plan_shots(g)
@@ -188,7 +201,7 @@ def main(argv=None):
     ap.add_argument("dump")
     ap.add_argument("--weights", required=True)
     ap.add_argument("--families")
-    ap.add_argument("--which", default="enemy", choices=["enemy", "ours"])
+    ap.add_argument("--which", default="enemy", choices=["enemy", "ours", "third"])
     ap.add_argument("--group", type=int, default=400)
     ap.add_argument("--out")
     ap.add_argument("--rule", default="std", choices=["std", "approx"])

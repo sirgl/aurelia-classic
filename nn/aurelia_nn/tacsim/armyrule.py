@@ -19,7 +19,7 @@ import mlx.core as mx
 from . import armyhist as H
 from . import armyobs as A
 from . import exact
-from .sim import g1, gn, I32, V_ATTACK, V_MOVE, V_SETUP
+from .sim import g1, gn, I32, V_ATTACK, V_MOVE, V_SETUP, Sim
 
 BIG = 1 << 20
 # A strike's key: the HP it leaves x 4096 + the target's window tile (< 4096); NOKEY: no target.
@@ -146,6 +146,8 @@ def shooter_slots(game, side):
         out = set()
         for sc, _, _ in game.plays:
             init = sc["initial"]["units"]
+            if side == 1 and sc["scene"].get("n_spare"):
+                out.update(range(sc["scene"]["n_main"], sc["scene"]["n_main"] + sc["scene"]["n_spare"]))  # the camp's spawns
             for k in range(U):
                 if k >= len(init):
                     out.add(k)
@@ -179,7 +181,7 @@ def _shoot(game, side, u):
     mil, civ = sim.occupancy(s)
     tl = mx.maximum(tile, 0)
     slots = mx.arange(U, dtype=I32)[None, :]
-    foe = s["u_alive"] & (tile >= 0) & (s["u_side"] == 1 - side)
+    foe = _foes(s, side)
     # One mark a tile: the defender (its military unit, else the civilian).
     dm, dc = gn(mil, tl), gn(civ, tl)
     mark = foe & ((dm == slots) | ((dm < 0) & (dc == slots)))
@@ -240,7 +242,14 @@ def enemy_turn(game):
     # The fog families' scripts (twin package 3; `armyfog`): nothing where no row is one.
     from . import armyfog
     armyfog.enemy_turn(game, live)
+    # Guard, convoy, snipe (twin package 7; `armyciv`).
+    from . import armyciv
+    armyciv.enemy_turn(game, live)
+    # The camp families' barbarians (twin package 4; `armycamp`): the script, then after the rule the countdown and the spawn.
+    from . import armycamp
+    armycamp.enemy_turn(game, live)
     seat_turn(game, 1, live)
+    armycamp.barbarian_end(game, live)
     game.s = game.sim.end_turn(game.s, mx.full((B,), 1, dtype=I32), live)
 
 
@@ -251,7 +260,20 @@ def enemy_turn(game):
 # blow from there; then the unit stands. Ties as Rust's: the lowest tile, the first target in the pieces' order.
 
 def _foes(s, side):
+    """The units at war with `side` (the other side; with a third seat the war table, `Sim.is_foe`)."""
+    if "war" in s:
+        return s["u_alive"] & (s["u_tile"] >= 0) & Sim.is_foe(s, mx.full((s["u_alive"].shape[0],), side, dtype=I32), s["u_side"])
     return s["u_alive"] & (s["u_tile"] >= 0) & (s["u_side"] == 1 - side)
+
+
+def _only(game, s, foes):
+    """A script's target list restricted to one tile where a foe stands on it (`game.script_only` [B], -1 none: the camp
+    families' neutral strikes the unit on the camp while one stands there)."""
+    only = getattr(game, "script_only", None)
+    if only is None:
+        return foes
+    there = foes & (s["u_tile"] == only[:, None])
+    return mx.where(mx.any(there, axis=1)[:, None], there, foes)
 
 
 def _marks(game, s, side):
@@ -261,7 +283,7 @@ def _marks(game, s, side):
     tl = mx.maximum(s["u_tile"], 0)
     dm, dc = gn(mil, tl), gn(civ, tl)
     slots = mx.arange(U, dtype=I32)[None, :]
-    return _foes(s, side) & ((dm == slots) | ((dm < 0) & (dc == slots)))
+    return _only(game, s, _foes(s, side)) & ((dm == slots) | ((dm < 0) & (dc == slots)))
 
 
 def _lex_min(keys, mask):
@@ -311,7 +333,12 @@ def _threat(game, s, side, tiles):
     fd = obs.field(s, side)
     q, r = obs.mapq(tiles)
     d = A.hexd(q[:, :, None] - fd["uq"][:, None, :], r[:, :, None] - fd["ur"][:, None, :])
-    return mx.sum(fd["milfoe"][:, None, :] & (d <= fd["reach"][:, None, :]), axis=2)
+    milfoe = fd["milfoe"]
+    ts = getattr(game, "script_threat", None)
+    if ts is not None:
+        # `act::threat_on(foe, x)` of a script whose `foe` is one nation (the camp barbarians': the learner's units only).
+        milfoe = s["u_alive"] & (s["u_tile"] >= 0) & (s["u_side"] == ts) & ~fd["civ"]
+    return mx.sum(milfoe[:, None, :] & (d <= fd["reach"][:, None, :]), axis=2)
 
 
 def _approach(game, me, side, take):
@@ -355,7 +382,7 @@ def _move_by_aim(game, me, side, take):
     opt = (ok_l | own) & take[:, None]
     q, r = obs.mapq(lt)
     fd = obs.field(s, side)
-    foes = _foes(s, side)
+    foes = _only(game, s, _foes(s, side))
     d_all = A.hexd(q[:, :, None] - fd["uq"][:, None, :], r[:, :, None] - fd["ur"][:, None, :])
     d = A.min_or(foes[:, None, :], d_all, 2, 99)
     rng = g1(obs.kind(s, "range"), me)

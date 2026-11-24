@@ -486,6 +486,10 @@ pub(crate) fn stance_code(s: Stance) -> i32 {
 /// The play's slot table: entity id -> slot.
 struct Slots {
     ids: Vec<EntityId>,
+    /// The slots from this index on are recycled when the list is full (a dead unit's slot goes to a new unit): the camp
+    /// scenes, where the fog camps' defenders (placed and taken off at once) would use all 24 slots before the camp spawns.
+    /// `usize::MAX`: never (every other scene: slots are never reused).
+    recycle_from: usize,
     /// The scene's promotion table (global ids; the state's promotion bits follow it).
     promos: Vec<PromotionId>,
 }
@@ -509,10 +513,16 @@ fn state(rules: &CompiledRuleset, game: &GameState, win: &Window, slots: &mut Sl
     // New units of the two seats get slots in id order (captured civilians).
     let mut new: Vec<(EntityId, UnitHandle)> = auth.units().iter_handles().filter(|(_, c)| sides.contains(&c.owner) && !slots.ids.contains(&c.id)).map(|(h, c)| (c.id, h)).collect();
     new.sort_by_key(|(id, _)| *id);
+    let by_id: BTreeMap<EntityId, UnitHandle> = auth.units().iter_handles().map(|(h, c)| (c.id, h)).collect();
     for (id, _) in &new {
+        if slots.ids.len() >= SLOTS && slots.recycle_from < SLOTS {
+            if let Some(k) = (slots.recycle_from..slots.ids.len()).find(|k| !by_id.contains_key(&slots.ids[*k])) {
+                slots.ids[k] = *id;
+                continue;
+            }
+        }
         slots.slot_of(*id);
     }
-    let by_id: BTreeMap<EntityId, UnitHandle> = auth.units().iter_handles().map(|(h, c)| (c.id, h)).collect();
     let units: Vec<Value> = slots
         .ids
         .iter()
@@ -717,7 +727,7 @@ fn scene_json(rules: &CompiledRuleset, game: &GameState, sc: &Scene, win: &Windo
     let reinforce: Vec<i32> = sc.reinforce.iter().map(|k| make(*k, sc.enemy, reinforce_at, &mut spawn)).collect();
     // The camp's spawn (camp families): the barbarians' strongest land unit as a spawn row (info-only; -1 elsewhere).
     let camp_spawn: i32 = if super::camp::is_camp(sc.fam) {
-        classic_rules::barbarian_unit(auth, rules, sc.enemy, classic_rules::rules::content::Domain::Land).map_or(-1, |k| make(k, sc.enemy, super::camp::camp_tile(sc), &mut spawn))
+        classic_rules::barbarian_unit_with(auth, rules, sc.enemy, classic_rules::rules::content::Domain::Land, &classic_rules::majors_consensus(auth)).map_or(-1, |k| make(k, sc.enemy, super::camp::camp_tile(sc), &mut spawn))
     } else {
         -1
     };
@@ -802,13 +812,16 @@ impl Track {
         let mut cities: Vec<TileId> = game.view().auth.cities().iter().map(|(_, c)| c.tile).filter(|t| win.index(*t).is_some()).collect();
         cities.sort_by_key(|t| t.0);
         let pieces: Vec<UnitHandle> = sc.mine.iter().chain(&sc.theirs).chain(&sc.third).map(|p| p.h).collect();
-        let mut slots = Slots { ids: Vec::new(), promos: promotion_table(rules, game, &pieces) };
+        let mut slots = Slots { ids: Vec::new(), recycle_from: usize::MAX, promos: promotion_table(rules, game, &pieces) };
         let mut scene = scene_json(rules, game, sc, &win, &cities, &mut slots);
         let sides = [sc.learner, sc.enemy];
         let initial = state(rules, game, &win, &mut slots, sides, &cities);
         let third = sc.neutral.map(|n| (n, sc.third.iter().map(|p| p.id).collect::<Vec<EntityId>>()));
         let camp = if super::camp::is_camp(sc.fam) { Some(super::camp::camp_tile(sc)) } else { None };
         let mut track = Track { win, slots, cities, sides, third, camp };
+        if camp.is_some() {
+            track.slots.recycle_from = track.slots.ids.len();
+        }
         scene["third"] = track.third_scene(rules, game, sc);
         let mut initial = initial;
         track.add_third(game, &mut initial);
@@ -818,7 +831,7 @@ impl Track {
     /// Info-only: the third seat's pieces (profiles with their promotions, in the order of `sc.third`), the camp's spawn
     /// kind. Null without a third seat.
     fn third_scene(&self, rules: &CompiledRuleset, game: &GameState, sc: &Scene) -> Value {
-        if self.third.is_none() {
+        if self.third.is_none() && self.camp.is_none() {
             return Value::Null;
         }
         let mut profiles: Vec<Value> = sc.third.iter().map(|p| profile(rules, game, &self.win, p.h)).collect();
@@ -829,13 +842,17 @@ impl Track {
         json!({"ids": sc.third.iter().map(|p| p.id.0).collect::<Vec<u64>>(), "profiles": profiles,
                "kinds": sc.third.iter().map(|p| p.kind.0).collect::<Vec<u16>>(),
                "camp": self.camp.map_or(-1, |t| self.win.index(t).map_or(-1, i64::from)),
-               "spawn_kind": self.camp.and_then(|_| classic_rules::barbarian_unit(game.view().auth, rules, sc.enemy, classic_rules::rules::content::Domain::Land)).map_or(-1, |k| i64::from(k.0))})
+               "spawn_kind": self.camp.and_then(|_| classic_rules::barbarian_unit_with(game.view().auth, rules, sc.enemy, classic_rules::rules::content::Domain::Land, &classic_rules::majors_consensus(game.view().auth))).map_or(-1, |k| i64::from(k.0))})
     }
 
     /// Info-only: the third seat's unit rows (the dump's unit record, side 2), its cities (a city of the third seat in the
     /// window: its index), and the camp's countdown (-1: no camp) are added to a state record.
     fn add_third(&self, game: &GameState, st: &mut Value) {
-        let Some((player, ids)) = &self.third else { return };
+        if self.third.is_none() && self.camp.is_none() {
+            return;
+        }
+        let none = (PlayerId(u8::MAX), Vec::new());
+        let (player, ids) = self.third.as_ref().unwrap_or(&none);
         let auth = game.view().auth;
         let by_id: BTreeMap<EntityId, UnitHandle> = auth.units().iter_handles().map(|(h, c)| (c.id, h)).collect();
         let rows: Vec<Value> = ids
@@ -925,7 +942,7 @@ pub fn dump_one(rules: &CompiledRuleset, fam: Fam, era: u8, instance: usize, att
     let mut cities: Vec<TileId> = game.view().auth.cities().iter().map(|(_, c)| c.tile).filter(|t| win.index(*t).is_some()).collect();
     cities.sort_by_key(|t| t.0);
     let pieces: Vec<UnitHandle> = sc.mine.iter().chain(&sc.theirs).map(|p| p.h).collect();
-    let mut slots = Slots { ids: Vec::new(), promos: promotion_table(rules, &game, &pieces) };
+    let mut slots = Slots { ids: Vec::new(), recycle_from: usize::MAX, promos: promotion_table(rules, &game, &pieces) };
     let scene = if record { scene_json(rules, &game, &sc, &win, &cities, &mut slots) } else {
         for p in sc.mine.iter().chain(&sc.theirs) {
             slots.slot_of(p.id);
