@@ -29,6 +29,8 @@ struct Play {
     moment: Option<Value>,
     /// The units and cities at the last event (`ARMY_OBS_EVENTS`): an event writes what changed since.
     last: Option<(Vec<Value>, Vec<Value>)>,
+    /// The third seat's rows at the last event (info-only: its changes go to the event's `t`).
+    last_third: Vec<Value>,
 }
 
 thread_local! {
@@ -161,7 +163,7 @@ pub fn start(rules: &CompiledRuleset, game: &GameState, scene: &Scene, orders: &
         "centre": scene.centre.0, "info": scene.info,
     });
     let line = json!({"type": "scene", "play": name, "scene": sc, "initial": initial, "orders": o, "kinds": kinds});
-    PLAY.with(|p| *p.borrow_mut() = Some(Play { name, track, lines: vec![line.to_string()], moment: None, last: Some(units_cities(&initial)) }));
+    PLAY.with(|p| *p.borrow_mut() = Some(Play { name, track, lines: vec![line.to_string()], moment: None, last: Some(units_cities(&initial)), last_third: initial["third"].as_array().cloned().unwrap_or_default() }));
 }
 
 fn units_cities(state: &Value) -> (Vec<Value>, Vec<Value>) {
@@ -193,6 +195,10 @@ pub fn event(rules: &CompiledRuleset, game: &GameState, side: classic_rules::ids
         let du: Vec<Value> = units.iter().enumerate().filter(|(k, u)| lu.get(*k) != Some(*u)).map(|(k, u)| json!([k, u])).collect();
         let dc: Vec<Value> = cities.iter().enumerate().filter(|(k, c)| lc.get(*k) != Some(*c)).map(|(k, c)| json!([k, c])).collect();
         play.last = Some((units, cities));
+        // Info-only: the third seat's changed rows `[index, row]`, its cities and the camp's countdown.
+        let third: Vec<Value> = state["third"].as_array().cloned().unwrap_or_default();
+        let dt: Vec<Value> = third.iter().enumerate().filter(|(k, u)| play.last_third.get(*k) != Some(*u)).map(|(k, u)| json!([k, u])).collect();
+        play.last_third = third;
         use classic_rules::Command as C;
         let (name, who, tgt) = match cmd {
             None => ("End".to_owned(), -1i64, -1i64),
@@ -219,6 +225,11 @@ pub fn event(rules: &CompiledRuleset, game: &GameState, side: classic_rules::ids
         let mut line = json!({"type": "ev", "round": auth.turn().round, "side": rel, "src": src, "cmd": name, "who": who, "tgt": tgt, "u": du, "c": dc, "rng": state["rng"], "vis": state["vis"]});
         if let Some(r) = SHADOW.with(|x| x.borrow_mut().take()) {
             line["rule"] = r;
+        }
+        if !state["third"].is_null() {
+            line["t"] = json!(dt);
+            line["tc"] = state["third_cities"].clone();
+            line["camp"] = state["camp"].clone();
         }
         play.lines.push(line.to_string());
     });
