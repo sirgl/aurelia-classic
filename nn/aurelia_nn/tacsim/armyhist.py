@@ -128,8 +128,9 @@ def hp_at(game, s, tile):
     mil, civ = sim.occupancy(s)
     tl = mx.maximum(tile, 0)[:, None]
     ms, cv = gn(mil, tl)[:, 0], gn(civ, tl)[:, 0]
-    foe_m = (tile >= 0) & (ms >= 0) & (g1(s["u_side"], mx.maximum(ms, 0)) == 1)
-    foe_c = (tile >= 0) & (cv >= 0) & (g1(s["u_side"], mx.maximum(cv, 0)) == 1)
+    # Rust's `hp_at`: the first unit of the tile whose owner is not the learner (the enemy's or the third seat's), not "the enemy's".
+    other = lambda sl: (tile >= 0) & (sl >= 0) & (g1(s["u_side"], mx.maximum(sl, 0)) >= 1)
+    foe_m, foe_c = other(ms), other(cv)
     uhp = mx.where(foe_m, g1(s["u_hp"], mx.maximum(ms, 0)), g1(s["u_hp"], mx.maximum(cv, 0)))
     hp = mx.where(is_city, chp, mx.where(foe_m | foe_c, uhp, 0))
     return hp, is_city, is_city | foe_m | foe_c
