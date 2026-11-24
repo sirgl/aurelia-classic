@@ -474,6 +474,53 @@ pub struct Timing {
     pub turns: u64,
 }
 
+/// The decision trace (`ARMY_NET_DECISION_TRACE=file.jsonl`, info only: the play is unchanged): per decision of the net, the
+/// play, the round, the unit (army slot, hp, ranged, distance to the objective, the memory's resting readout in force), the
+/// pointer's logits (the unit's, the end's, the best other unit's) and every candidate (kind, ends in a foe city's strike range,
+/// distance of its tile to the objective, threat, the change of that distance, logit, a move's moves left share and targets in reach
+/// from its tile), the candidate applied.
+fn decision_trace_on() -> bool {
+    trace_file().is_some()
+}
+
+fn trace_file() -> Option<&'static std::sync::Mutex<std::fs::File>> {
+    static FILE: OnceLock<Option<std::sync::Mutex<std::fs::File>>> = OnceLock::new();
+    FILE.get_or_init(|| std::env::var_os("ARMY_NET_DECISION_TRACE").and_then(|p| std::fs::OpenOptions::new().create(true).append(true).open(p).ok()).map(std::sync::Mutex::new)).as_ref()
+}
+
+#[allow(clippy::too_many_arguments)]
+fn trace_decision(scene: &Scene, orders: &Orders, tokens: &observe::Tokens, memory: &Option<super::model::MemoryState>, slots: &[i16], (at, ptr, end): (usize, &[Option<f32>], f32), candidates: &[observe::Candidate], scores: &[f32], chosen: i16, core: kernel::world::unit::UnitCore, round: u32) {
+    use std::io::Write;
+    let Ok(net) = net() else { return };
+    let slot = orders.army.iter().position(|a| *a == core.id).map_or(-1, |s| s as i64);
+    let rest = memory.as_ref().and_then(|m| net.resting_readout(m)).and_then(|r| usize::try_from(slot).ok().and_then(|s| r.get(s).copied()));
+    let rest_u = memory.as_ref().and_then(|m| usize::try_from(slot).ok().map(|s| m.u[s * super::model::U_DIM + 1]));
+    let other = ptr.iter().enumerate().filter(|(i, l)| *i != at && l.is_some()).filter_map(|(_, l)| *l).fold(f32::NEG_INFINITY, f32::max);
+    let f = &tokens.feat[at];
+    let city = (0..tokens.len()).find(|i| tokens.feat[*i][3] > 0.5 && tokens.feat[*i][43] > 0.5).map(|i| tokens.feat[i][7]);
+    let cands: Vec<serde_json::Value> = candidates
+        .iter()
+        .zip(scores)
+        .map(|(c, s)| {
+            let kind = (0..10).find(|k| c.feat[*k] > 0.5).unwrap_or(9);
+            serde_json::json!([kind, c.feat[16], (c.feat[22] * 12.0).round(), (c.feat[19] * 4.0).round(), c.feat[23] * 5.0, s, c.feat[27], (c.feat[29] * 3.0).round()])
+        })
+        .collect();
+    let _ = slots;
+    let line = serde_json::json!({
+        "fam": scene.fam.name(), "inst": scene.instance, "att": scene.attempt, "era": scene.era,
+        "round": round, "slot": slot, "hp": core.hp, "ranged": f[13] > 0.0, "d": (f[6] * 12.0).round(), "fire": f[36] > 0.5,
+        "rest": rest, "rest_u": rest_u, "city_hp": city,
+        "ptr": ptr[at], "end": end, "other": if other.is_finite() { Some(other) } else { None },
+        "cands": cands, "chosen": chosen,
+    });
+    if let Some(file) = trace_file() {
+        if let Ok(mut fh) = file.lock() {
+            let _ = writeln!(fh, "{line}");
+        }
+    }
+}
+
 /// One turn of the army: decisions until the net ends it.
 pub fn turn(rules: &CompiledRuleset, game: &mut GameState, orders: &Orders, scene: &Scene) -> Result<Timing, String> {
     let net = net()?;
@@ -566,7 +613,7 @@ pub fn turn(rules: &CompiledRuleset, game: &mut GameState, orders: &Orders, scen
         let t3 = Instant::now();
         let candidates = observe::candidates(game, rules, orders, unit);
         let t4 = Instant::now();
-        let scores = net.actions(&body, at, &candidates, map.as_ref());
+        let scores = net.actions_x(&body, at, &candidates, map.as_ref(), &tokens, mem_in.as_ref());
         let t5 = Instant::now();
         timing.observe_ns += (t4 - t3).as_nanos() as u64;
         timing.forward_ns += (t5 - t4).as_nanos() as u64;
@@ -596,6 +643,10 @@ pub fn turn(rules: &CompiledRuleset, game: &mut GameState, orders: &Orders, scen
             act::stand(game, rules, unit);
         }
         super::obsdump::choice(at as i64, if acted { i64::from(chosen) } else { -1 });
+        if decision_trace_on() {
+            let round = game.view().auth.turn().round.saturating_sub(orders.start_round);
+            trace_decision(scene, orders, &tokens, &memory, &slots, (at, &logits, end), &candidates, &scores, if acted { chosen } else { 0 }, core, round);
+        }
         follow(at as i16, if acted { chosen } else { 0 });
     }
     TURN_LABELS.with(|t| *t.borrow_mut() = None);

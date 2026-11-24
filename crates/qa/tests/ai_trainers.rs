@@ -277,3 +277,26 @@ fn no_trainer_ends_a_units_turn_outside_the_one_rule() {
     walk(&std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src"), &mut hits);
     assert!(hits.is_empty(), "a unit's turn ends through act::hold_unit only:\n{}", hits.join("\n"));
 }
+
+// ---- The teachers on the true rules (24 Nov: the enemy's units heal now too) ----
+
+/// The choke reference does not wait off the pass for the holders to be worn down: a holder that does not strike
+/// heals each turn (the rules), so the wait only paid while the harness kept it hurt (the old `stand` never healed
+/// the scripted enemy). On the sample (ancient and classical, instances 0-39, attempt 0, the scenes that build) the
+/// reference wins at least nine tenths of what the plain fighter wins; with the wait it won half of that.
+#[test]
+fn the_choke_reference_does_not_wait_for_holders_that_heal() {
+    let rules = ClassicBench::rules();
+    let (mut choke, mut fight, mut n) = (0, 0, 0);
+    for era in ["ancient", "classical"] {
+        let e = lab::era_index(&rules, era).unwrap();
+        for i in 0..40 {
+            let Ok((game, sc)) = families::build(&rules, Fam::Choke, e, i, 0) else { continue };
+            n += 1;
+            choke += usize::from(play(&rules, game.clone(), sc.clone(), "ref-choke", false).unwrap().win);
+            fight += usize::from(play(&rules, game, sc, "ref-fight", false).unwrap().win);
+        }
+    }
+    assert!(n >= 40, "the sample builds ({n})");
+    assert!(choke * 10 >= fight * 9, "ref-choke wins {choke} of {n}, ref-fight {fight}: the reference waits again");
+}

@@ -351,6 +351,54 @@ struct UnitRow {
     dist_end: i32,
 }
 
+/// The loss log (`loss_log`, info only): for each army unit that died in a round of an assault play, its slot, what struck it in the enemy's
+/// turn (the causes in order, the last one killed it: "city", the enemy unit's kind, "script" for the scripted field force, "other"; "own"
+/// for a unit that died in our own turn, by its own attack) and its tile at the start and at the end of our turn (-1: died in it).
+fn log_losses(army: &[EntityId], round: u32, pre: &BTreeMap<EntityId, (TileId, u16)>, post: Option<&BTreeMap<EntityId, (TileId, u16)>>, next: &BTreeMap<EntityId, (TileId, u16)>, killers: &BTreeMap<EntityId, Vec<String>>, out: &mut Vec<String>) {
+    for (id, (t0, _)) in pre {
+        let Some(slot) = army.iter().position(|a| a == id) else { continue };
+        let line = |cause: String, end: i64| format!("{round},{slot},{cause},{},{end}", t0.0);
+        match post.and_then(|p| p.get(id)) {
+            None if post.is_some() || !next.contains_key(id) => out.push(line("own".into(), -1)),
+            Some((t1, _)) if !next.contains_key(id) => out.push(line(killers.get(id).map_or_else(|| "other".to_owned(), |c| c.join("+")), i64::from(t1.0))),
+            _ => {}
+        }
+    }
+}
+
+/// `AiDriver::step` for the enemy's side in an assault play with the damage to our army attributed (info only): the same calls as
+/// `AiDriver::step`; around a command that strikes (a unit's attack or the city's strike) our army's hp is read before and after.
+fn watched_step<P: kernel::ai::mind::AiMind<Classic>>(driver: &mut AiDriver<Classic, P>, game: &mut GameState, rules: &CompiledRuleset, scene: &Scene, killers: &mut BTreeMap<EntityId, Vec<String>>) -> kernel::ai::StepOutcome {
+    use classic_rules::command::Command as C;
+    use kernel::ai::{Advance, StepOutcome};
+    driver.configure_game(game);
+    match driver.advance(game, rules) {
+        Advance::Worked => StepOutcome::Worked,
+        Advance::RoundDone => StepOutcome::RoundDone,
+        Advance::Waiting => StepOutcome::Waiting,
+        Advance::Command(command) | Advance::EndTurn(command) => {
+            let name_of = |game: &GameState, h: UnitHandle| game.view().auth.units().get(h).and_then(|u| rules.units.get(u.core.kind.0 as usize)).map_or_else(|| "?".to_owned(), |d| d.name.clone());
+            let cause = match &command {
+                C::CityStrike { .. } => Some("city".to_owned()),
+                C::AttackUnit { attacker, .. } => Some(name_of(game, *attacker)),
+                C::RangedAttack { unit, .. } => Some(name_of(game, *unit)),
+                _ => None,
+            };
+            let before: Option<BTreeMap<EntityId, u16>> = cause.as_ref().map(|_| scene.mine_alive(game).iter().map(|(p, c)| (p.id, c.hp)).collect());
+            let result = game.execute(rules, command);
+            if let (Some(cause), Some(before)) = (cause, before) {
+                let after: BTreeMap<EntityId, u16> = scene.mine_alive(game).iter().map(|(p, c)| (p.id, c.hp)).collect();
+                for (id, hp) in before {
+                    if after.get(&id).is_none_or(|h| *h < hp) {
+                        killers.entry(id).or_default().push(cause.clone());
+                    }
+                }
+            }
+            driver.executed(result)
+        }
+    }
+}
+
 fn play_on<P: kernel::ai::mind::AiMind<Classic>>(rules: &CompiledRuleset, mut game: GameState, mut scene: Scene, player: &str, trace: bool, seat: Seat, mut driver: AiDriver<Classic, P>) -> Result<Row, String> {
     driver.set_trace_capacity(0);
     if !lab::mode::fog() {
@@ -408,6 +456,10 @@ fn play_on<P: kernel::ai::mind::AiMind<Classic>>(rules: &CompiledRuleset, mut ga
     let mut rest_prev: BTreeSet<usize> = BTreeSet::new();
     let slot_of = |id: &EntityId| orders.army.iter().position(|a| a == id);
     let stage_label = |s: usize, e: bool| format!("{}{}", crate::army_net::model::STAGE_NAMES.get(s).copied().unwrap_or("?"), if e { "+e" } else { "" });
+    // The loss log and the position log (info only): who struck which army unit in the enemy's turn, the army's tiles at the end of our turn.
+    let mut killers: BTreeMap<EntityId, Vec<String>> = BTreeMap::new();
+    let mut losses: Vec<String> = Vec::new();
+    let mut poslog: BTreeMap<u32, Vec<(usize, u32)>> = BTreeMap::new();
     let mut scripted_mine: Option<u32> = None;
     let mut scripted_theirs: Option<u32> = None;
     let mut guard = 0;
@@ -433,6 +485,10 @@ fn play_on<P: kernel::ai::mind::AiMind<Classic>>(rules: &CompiledRuleset, mut ga
                     if let Some((r, post)) = r_post.take() {
                         let hit = post.iter().filter(|(id, (t, hp))| lab::dist(&game, *t, city_t) <= classic_rules::combat::city::CITY_ATTACK_RANGE && pre.get(*id).is_none_or(|x| x.1 < *hp)).count();
                         rlog.entry(r).or_default().3 = hit;
+                        if let Some((_, pre_prev)) = r_pre.as_ref() {
+                            log_losses(&orders.army, r, pre_prev, Some(&post), &pre, &killers, &mut losses);
+                        }
+                        killers.clear();
                     }
                     if let (Seat::Net, Some((r, _))) = (&seat, r_pre.as_ref()) {
                         if let Some((s, e)) = crate::army_net::seat::take_stage() {
@@ -522,12 +578,32 @@ fn play_on<P: kernel::ai::mind::AiMind<Classic>>(rules: &CompiledRuleset, mut ga
                                 row.dist_end = lab::dist(&game, *t, city_t);
                             }
                         }
+                        poslog.insert(*r, post.iter().filter_map(|(id, (t, _))| slot_of(id).map(|s| (s, t.0))).collect());
                         r_post = Some((*r, post));
                     }
                 }
+                let scripted_before = logged.then(|| snap(&game, &scene));
                 families::enemy_turn(rules, &mut game, &mut scene);
+                if let Some(before) = scripted_before {
+                    let after = snap(&game, &scene);
+                    for (id, (_, hp)) in &before {
+                        if after.get(id).is_none_or(|x| x.1 < *hp) {
+                            killers.entry(*id).or_default().push("script".to_owned());
+                        }
+                    }
+                }
                 if scene_rule::on() {
+                    // The scene rule's part of the enemy's turn (city strikes, shots, stand); the loss log names it "rule".
+                    let ruled_before = logged.then(|| snap(&game, &scene));
                     scene_rule::turn(rules, &mut game, &scene, scene.enemy);
+                    if let Some(before) = ruled_before {
+                        let after = snap(&game, &scene);
+                        for (id, (_, hp)) in &before {
+                            if after.get(id).is_none_or(|x| x.1 < *hp) {
+                                killers.entry(*id).or_default().push("rule".to_owned());
+                            }
+                        }
+                    }
                 }
             }
             let t_step = std::time::Instant::now();
@@ -536,7 +612,10 @@ fn play_on<P: kernel::ai::mind::AiMind<Classic>>(rules: &CompiledRuleset, mut ga
             let stepped = if active == scene.learner && (crate::army_net::record::active() || seat == Seat::Net) {
                 crate::army_net::record::step(&mut driver, &mut game, rules)
             } else if crate::army_net::obsdump::events_wanted() {
+                // The event dump (MLX parity) wins over the loss log's watch of the enemy's commands: both only read the step.
                 crate::army_net::obsdump::step(&mut driver, &mut game, rules)
+            } else if logged && active == scene.enemy {
+                watched_step(&mut driver, &mut game, rules, &scene, &mut killers)
             } else {
                 driver.step(&mut game, rules)
             };
@@ -590,6 +669,14 @@ fn play_on<P: kernel::ai::mind::AiMind<Classic>>(rules: &CompiledRuleset, mut ga
                 }
             }
         }
+        let last = snap(&game, &scene);
+        match (r_post.take(), r_pre.as_ref()) {
+            (Some((r, post)), Some((_, pre))) => log_losses(&orders.army, r, pre, Some(&post), &last, &killers, &mut losses),
+            (None, Some((r, pre))) => log_losses(&orders.army, *r, pre, None, &last, &killers, &mut losses),
+            _ => {}
+        }
+        scene.info.insert("loss_log".into(), losses.join(";"));
+        scene.info.insert("pos_log".into(), poslog.iter().map(|(r, v)| format!("{r}:{}", v.iter().map(|(s, t)| format!("{s},{t}")).collect::<Vec<_>>().join("|"))).collect::<Vec<_>>().join(";"));
         let unit_log = ulog
             .iter()
             .map(|(r, rows)| format!("{r}:{}", rows.values().map(|u| format!("{},{},{}{},{}{},{},{}", u.slot, u.hp, u8::from(u.rest_gov), u8::from(u.rest_end), u8::from(u.struck_city), u8::from(u.struck_any), u.dist_start, u.dist_end)).collect::<Vec<_>>().join("|")))

@@ -208,7 +208,7 @@ pub fn main(args: &[String]) -> Result<(), String> {
         let mem_in = memory.as_ref().map(|(_, m)| super::model::MemIn { state: m, slots: &d.slots });
         let body = net.body(&d.tokens, map.as_ref(), mem_in.as_ref());
         let (ptr, end) = net.pointer(&body, &d.tokens);
-        let acts = if d.pointer >= 0 { net.actions(&body, d.pointer as usize, &d.candidates, map.as_ref()) } else { Vec::new() };
+        let acts = if d.pointer >= 0 { net.actions_x(&body, d.pointer as usize, &d.candidates, map.as_ref(), &d.tokens, mem_in.as_ref()) } else { Vec::new() };
         forward_ns += t0.elapsed().as_nanos();
         if d.flags & MEMORY_STATE != 0 {
             if let Some((_, m)) = memory.as_mut() {

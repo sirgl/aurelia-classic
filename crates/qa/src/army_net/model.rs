@@ -194,7 +194,19 @@ pub struct Net {
     xhist: Option<XHistW>,
     /// Variant MBN: the notes' separate cross-attention and heads (None: none).
     xnotes: Option<XNoteW>,
+    /// MBe: the hand-set term "a wounded unit does not end its turn in the city's strike range" (`ww`, None: none).
+    ww: Option<[f32; WW_LEN]>,
 }
+
+/// The numbers of the hand-set term `ww` (`army/model_mb.py`, `MBENet`; M-HANDOFF.md, "Hand edit: wounded out of range"):
+/// [scale, hp threshold, hp slope, ranged hp threshold, resting weight, city-low threshold, city-low slope, resting slope,
+/// stay scale, healing weight, back threshold, strike scale, ranged strike threshold, stay escape, ranged engaged threshold,
+/// foe city only].
+pub const WW_LEN: usize = 16;
+/// Half the smallest step of a token's hit points (1 / 100): "gained since our last turn" is number 46 above it.
+const HEALING_STEP: f32 = 0.005;
+/// Half the step of the threat numbers (a count / 4): a candidate's threat (19) is below the unit's (39) by more than it.
+const THREAT_STEP: f32 = 0.125;
 
 /// Variant MBN's note weights (`army/model_mb.py`, `MBNNet`): a note's embedding `n2(relu(n1(note)))`; per layer a
 /// cross-attention like MBH's (`null`, `same`, `slope` per layer and head; its context through `no[layer]`); the heads
@@ -611,6 +623,11 @@ impl Net {
         } else {
             None
         };
+        let ww = match t.get("ww") {
+            Some((shape, v)) if shape.as_slice() == [WW_LEN] => Some(std::array::from_fn(|i| v[i])),
+            Some((shape, _)) => return Err(format!("ww is {shape:?}, not [{WW_LEN}]")),
+            None => None,
+        };
         let price = if t.contains_key("w_price") {
             let (shape, w) = get("w_price")?;
             if shape.as_slice() != [3, c.d] {
@@ -621,6 +638,7 @@ impl Net {
             None
         };
         Ok(Net {
+            ww,
             xnotes,
             xhist,
             price,
@@ -1277,6 +1295,77 @@ impl Net {
             out.push(y[0]);
         }
         out
+    }
+
+    /// `actions` plus MBe's hand-set terms (`ww`; the same logits as `actions` without it), both times the unit's gate
+    /// g = wounded x (1 - city_low): (1) a non-strike candidate (done, move, fortify, set up) whose tile is in a foe city's strike
+    /// range (candidate number 16) loses `scale x g`; (2) a move of a unit that stands out of that range (its token's number 36)
+    /// loses `stay scale x g` (a unit that moves does not heal). wounded = max(sigmoid(hp slope (threshold - hp)), resting weight x
+    /// sigmoid(resting slope x the memory's resting readout), healing weight x sigmoid(hp slope (back threshold - hp)) x
+    /// sigmoid(hp slope (gained since our last turn - HEALING_STEP))), the threshold the ranged one for a unit with range; city_low =
+    /// sigmoid(slope (threshold - the objective city's hp share)); (3) a strike (kinds 2-4) loses `strike scale x sigmoid(hp slope
+    /// (strike threshold - hp)) x (1 - city_low)`, the strike threshold the hp threshold, for a unit with range the ranged strike
+    /// threshold. A unit with range reads the ranged engaged threshold instead of the ranged one while the memory's plan says
+    /// engaged (`plan_stage`'s readout: the teacher's shooters fire down to `ROTATE_BURST` once the assault went in). With
+    /// `foe city only` = 1 both gates are 0 unless the objective is a foe city (a city token with number 43, not 45: the terms
+    /// are the city assault's rotation, not a rule of the field). With
+    /// `stay escape` = 1 the stay term spares a move to a tile less threatened than the unit's own (candidate
+    /// number 19 below the token's 39: the teacher's rest moves only to a safer or better healing tile). `MBENet.wounded_term` is
+    /// the same arithmetic.
+    pub fn actions_x(&self, body: &Body, unit: usize, candidates: &[Candidate], map: Option<&MapState>, tokens: &Tokens, mem: Option<&MemIn>) -> Vec<f32> {
+        let mut out = self.actions(body, unit, candidates, map);
+        let Some(w) = self.ww else { return out };
+        let (g, gs) = self.wounded_gate(&w, unit, tokens, mem);
+        let out_of_fire = 1.0 - tokens.feat[unit][36];
+        let here_threat = tokens.feat[unit][39];
+        for (o, c) in out.iter_mut().zip(candidates) {
+            let f = c.feat[16] * (c.feat[0] + c.feat[1] + c.feat[5] + c.feat[6]);
+            let strike = c.feat[2] + c.feat[3] + c.feat[4];
+            let escape = if c.feat[19] < here_threat - THREAT_STEP { w[13] } else { 0.0 };
+            *o -= (w[0] * f + w[8] * c.feat[1] * out_of_fire * (1.0 - escape)) * g + w[11] * strike * gs;
+        }
+        out
+    }
+
+    /// The unit's factors of the `ww` terms: (wounded x (1 - city low), its strike gate x (1 - city low)).
+    fn wounded_gate(&self, w: &[f32; WW_LEN], unit: usize, tokens: &Tokens, mem: Option<&MemIn>) -> (f32, f32) {
+        let sig = |v: f32| 1.0 / (1.0 + (-v).exp());
+        let f = &tokens.feat[unit];
+        let engaged = match (mem, self.mem.as_ref().and_then(|m| m.aux_p)) {
+            (Some(m), Some(a)) => a[2] * m.state.p[P_ENGAGED_N] + a[3] > 0.0,
+            _ => false,
+        };
+        let thr = if f[13] > 0.0 {
+            if engaged {
+                w[14]
+            } else {
+                w[3]
+            }
+        } else {
+            w[1]
+        };
+        let hp = sig(w[2] * (thr - f[7]));
+        let rest = match (mem, self.mem.as_ref().and_then(|m| m.aux_rest)) {
+            (Some(m), Some(a)) => match usize::try_from(m.slots.get(unit).copied().unwrap_or(-1)) {
+                Ok(s) if s < SLOTS => w[4] * sig(w[7] * (a[0] * m.state.u[s * U_DIM + U_RESTING_IDX] + a[1])),
+                _ => 0.0,
+            },
+            _ => 0.0,
+        };
+        let healing = w[9] * sig(w[2] * (w[10] - f[7])) * sig(w[2] * (f[46] - HEALING_STEP));
+        let objective = (0..tokens.len()).find(|i| tokens.feat[*i][3] > 0.5 && tokens.feat[*i][43] > 0.5);
+        let city = objective.map_or(1.0, |i| tokens.feat[i][7]);
+        let foe_city = objective.is_some_and(|i| tokens.feat[i][45] < 0.5);
+        if w[15] > 0.5 && !foe_city {
+            return (0.0, 0.0);
+        }
+        let low = sig(w[6] * (w[5] - city));
+        let strike = sig(w[2] * ((if f[13] > 0.0 { w[12] } else { w[1] }) - f[7]));
+        (hp.max(rest).max(healing) * (1.0 - low), strike * (1.0 - low))
+    }
+
+    pub fn has_ww(&self) -> bool {
+        self.ww.is_some()
     }
 
     /// The value head: (the objective's win logit, the expected share of the army lost).

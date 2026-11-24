@@ -42,7 +42,8 @@ def main():
     elif 'm_in.weight' in w:
         # MB / MBA: the map encoded once per turn from the turn's first moment.
         from .model_mb import MBANet, MBHNet, MBNet, MBNNet
-        cls = MBNNet if 'nx_slope' in w else (MBHNet if 'hx_slope' in w else (MBANet if 'w_price' in w else MBNet))
+        from .model_mb import MBENet
+        cls = MBNNet if 'nx_slope' in w else (MBHNet if 'hx_slope' in w else (MBANet if 'w_price' in w else (MBENet if 'ww' in w else MBNet)))
         model = cls(promos=w['promo'].shape[0] - 1, map_ch=w['m_in.weight'].shape[0])
     else:
         model = (MHNet if 'h1.weight' in w else MemNet)(promos=w['promo'].shape[0] - 1)
@@ -130,6 +131,8 @@ def main():
             if flat.ptr[i] >= 0:
                 if isinstance(model, MBANet):
                     al = model.action_logits_a(h, b['unit'], b['cand'], b['promo'], b['cmask'], b['gcand'], b['cand_ok'])[0][0].tolist()
+                elif 'ww' in w:
+                    al = model.action_logits_g(h, b['unit'], b['cand'], b['promo'], b['cmask'], b['gcand'], b['cand_ok'], b['tok'], b['slot'], Us[k], Ps[k])[0].tolist()
                 elif has_map:
                     al = model.action_logits_g(h, b['unit'], b['cand'], b['promo'], b['cmask'], b['gcand'], b['cand_ok'])[0].tolist()
                 else:
