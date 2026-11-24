@@ -1,0 +1,69 @@
+# Stage 2 of the M5 kit (tools/m5/campaign2.sh, docs/m5/PROMPT-2.md). Edit, then `tools/m5/campaign2.sh start`.
+# A finished job is never redone: results go to lab/runs/campaign2/results.jsonl; a restart resumes at the first job
+# without an "ok" line (a training resumes from its last checkpoint). The plays per step and the chunk length are
+# taken from tools/m5/campaign.toml ([train], the stage-1 auto-tune result) unless set here (> 0).
+
+[stage2]
+retries = 1
+plays = 0                 # 0: use campaign.toml's [train] plays
+chunk_min = 0             # 0: use campaign.toml's [train] chunk_min
+quick_hold_to = 100       # held-out instances 80..hold_to-1
+full_hold_to = 100
+stage1_results = "runs/campaign/results.jsonl"   # relative to the lab dir: where "the best ladder size" is read from
+# The M5 is free only overnight (Roman, 23 Nov 2026: «до утра только»). The campaign starts no job whose estimate does
+# not end before deadline - report_min; such a job and every later job of its chain are recorded "skipped_deadline".
+# deadline is a local clock time: the next one after the first `start` (kept in lab/runs/campaign2/deadline.json, so a
+# restart keeps it). The env var M5_DEADLINE (HH:MM) overrides it at the first start.
+deadline = "08:00"
+report_min = 45           # left for the summary, the report and the push
+
+# The MBf recipe (the M4 lab's "B-line restart", docs/army-net/M-HANDOFF.md): A0 -> M0 (memory, imitation only),
+# B -> B1 (map encoder, imitation only), init = M0's trunk + memory + B1's encoder with zero projections, MBf.
+[recipe]
+a_epochs = 10             # A0: bs 512, lr 1e-3
+a_lr = 1e-3
+m_epochs = 6              # M0 from A0: plays 128, lr 1e-3, curriculum 4 -> 8 -> full turns
+m_lr = 1e-3
+b_epochs = 6              # B (d 64, 64-channel encoder), no init
+b_lr = 1e-3
+b1_epochs = 2             # B1 from B, lr 5e-4, siege x2
+b1_lr = 5e-4
+mbf_lr = 3e-4             # MBf: cosine, curriculum 999:1 (full plays), siege + ambush-fog + hunt-fog x2
+
+[step1]                   # the MBf recipe once, on the M4's size (comparison with the M4's numbers)
+d = 64
+layers = 3
+seed = 1
+mbf_epochs = 2
+
+[speed]                   # step 2: MLX version x precision, MB d 64 / 3 layers, same seed, same data order
+steps = 200
+loss_tol = 0.03           # a combination is "correct" when its mean training loss over steps 101-200 is within 3 % of
+acc_tol = 0.01            # the reference's (pinned MLX, f32) and its held-out joint accuracy within 0.01
+min_gain = 0.05           # a faster combination is taken only when it is at least 5 % faster than the reference
+
+[step3]                   # paper-grade seeds at the best stage-1 ladder size, the MBf recipe
+seeds = [21, 22, 23, 24, 25]
+mbf_epochs = 2            # overnight: 2 epochs as in step 1 and the M4's MBf (was 4)
+evals = ["quick", "quickzero", "full"]   # overnight: the memory-zeroed run on the quick set only (fullzero costs ~30 min a seed)
+seed_encoders = false     # true: B and B1 are retrained per seed (about +1 h each on the M5); false: one B1 shared
+
+[step4]                   # wider nets, the MBf recipe from scratch at each width (the kit has no growth script)
+mbf_epochs = 4
+[[step4.wide]]
+d = 192
+layers = 3
+seed = 31
+[[step4.wide]]
+d = 256
+layers = 3
+seed = 32
+
+# Duration model, in "MB epochs" of d 64 / 3 layers (one epoch of MBf training = 1.0): from the M4 lab's wall times
+# (A0 600 s, M0 896 s, B 2660 s, B1 1244 s, MBf 21 min for 2 epochs = 630 s per epoch). Widths scale with
+# (d / 64)^1.5 x (layers / 3)^0.9 as in stage 1. The unit itself is measured on the M5 by stage 1 (the calibrate line).
+[estimate]
+a0 = 0.95
+m0 = 1.4
+b = 4.2
+b1 = 2.0

@@ -1,0 +1,312 @@
+# Stage 3 of the M5 kit: one night of army-net research (tools/m5/campaign3.py, docs/m5/PROMPT-3.md).
+# The queue is the list of [[job]] below, IN VALUE ORDER: edit it here (order, parameters, estimates) without a code
+# change. A finished job ("ok" in lab/runs/campaign3/results.jsonl) is never redone; a restart resumes at the first job
+# without an "ok" line. A job whose estimate does not end before deadline - report_min is recorded "skipped_deadline"
+# and the queue goes on (a shorter later job may still fit); the summary always runs. A job whose `after` job did not
+# end ok is recorded "skipped_dep".
+#
+# Every job: name (unique), kind, group (the summary's section), est_min (minutes ON THE M5; the campaign rescales the
+# estimates of a kind by the measured / estimated ratio of the jobs of that kind already done), after (names).
+# `tools/m5/campaign3.sh plan` prints the queue with the time each job would end.
+
+[campaign]
+deadline = "08:00"          # local HH:MM, fixed at the first start (lab/runs/campaign3/deadline.json); M5_DEADLINE overrides
+report_min = 45             # left for the summary, the report and the push
+retries = 1                 # a failed job is retried this many times, then "failed_final"
+chunk_min = 30              # one GPU job of a training lasts at most this long (a checkpoint between chunks)
+cpu_max = 0                 # 0: the broker's budget (all performance cores); smoke: 3
+scene_rule_version = "1"    # ARMY_SCENE_RULE_VERSION for every Rust run (1 = the rule rl2 / u175 were made and measured with)
+mlx_gb = 0                  # 0: the broker's value (RES_MLX_GB); else the MLX memory limit of a training (GB)
+
+[data]
+kept = "data/kept-r.jsonl"                       # unpacked from lab-seed/kept-r.jsonl.gz by the seed job
+twin_families = "siege,ram,bombard,promotion-choice,planned-assault,raid,prey,assault-heal,hill-archers,city-fire"
+quick_families = "siege,ram,assault-heal,city-fire,hill-archers,planned-assault,promotion-choice,rush,raid,prey,focus,snipe"
+teach_players = "solvers,unciv"
+train_from = 0
+train_to = 80               # instances 0..79: the teacher recordings and the twin's training scenes
+hold_from = 80
+hold_to = 100               # held-out 80..99
+
+# ---------------------------------------------------------------------------------------------------------------------
+# P0: setup and smoke (the Rust binary, the venv, the data the night needs, the base nets, a sanity check)
+[[job]]
+name = "setup"
+kind = "setup"
+group = "P0"
+est_min = 12
+
+[[job]]
+name = "seed"
+kind = "seed"                # lab-seed -> lab/data (kept-r) and lab/runs/net-<name>/ (weights + Rust export)
+group = "P0"
+after = ["setup"]
+est_min = 1
+nets = ["MBf6c", "rl2-u175"]
+
+[[job]]
+name = "teach-r"
+kind = "teach"               # the teachers on kept-r under the scene rule: train 0-79 and held-out 80-99, recorded
+group = "P0"
+after = ["seed"]
+est_min = 8
+
+[[job]]
+name = "dump-MBf6c"
+kind = "dump"                # MBf6c's Rust dumps of the twin families: training scenes 0-79 (slim) and held-out 80-99 (events, slim)
+group = "P0"
+after = ["seed"]
+net = "MBf6c"
+est_min = 10
+
+[[job]]
+name = "sanity-u175"
+kind = "rust_eval"           # u175 quick + full on kept-r held-out in Rust, paired against the M4's rows (lab-seed/ref)
+group = "P0"
+after = ["seed"]
+net = "rl2-u175"
+ref = "u0175"                # lab-seed/ref/{q,f}-u0175.rows.jsonl.gz
+est_min = 3
+
+[[job]]
+name = "sanity-MBf6c"
+kind = "rust_eval"
+group = "P0"
+after = ["seed"]
+net = "MBf6c"
+ref = "MBf6c"
+est_min = 3
+
+[[job]]
+name = "twin-MBf6c"
+kind = "twin"                # MBf6c's own play in the MLX twin on its held-out dump: the twin's reference line
+group = "P0"
+after = ["dump-MBf6c"]
+net = "MBf6c"
+est_min = 4
+
+# ---------------------------------------------------------------------------------------------------------------------
+# P1: the needle test (step 1.1): the smallest net that retrieves a fact among distractors at >= 95 %
+[[job]]
+name = "needle"
+kind = "needle"
+group = "P1"
+est_min = 90
+lengths = "64,128,256"
+widths = "64,96,128"
+layers = "3,4,6"
+needles = "1,3,5"
+steps = 3000
+eval_every = 250
+max_minutes = 90
+
+# ---------------------------------------------------------------------------------------------------------------------
+# P2: architecture screening by imitation, seed 1. The same recipe, data and steps for every arm: MB d 64 from scratch
+# on teach-r (train_m --map --map-ch 64), then the held-out imitation accuracy and the twin's own play of its families.
+# `arch` is train_m's --arch (MBXNet flags; "base" = MB arithmetic through the same class); `extra` more trainer args.
+[imit]                        # the shared recipe of every imitation arm (P2, P3)
+epochs = 5
+plays = 128
+lr = 1e-3
+d = 64
+heads = 4
+map_ch = 64
+curriculum = "4:0.1,8:0.1,999:0.8"
+up = "siege,ambush-fog,hunt-fog"
+up_factor = 2
+eval_every = 400
+log_every = 25
+eval_plays = 4
+
+[[job]]
+name = "arm-base"
+kind = "imit"
+group = "P2"
+after = ["teach-r", "dump-MBf6c"]
+arch = "base"
+layers = 3
+seed = 1
+est_min = 30
+baseline = true
+
+[[job]]
+name = "arm-L6"
+kind = "imit"
+group = "P2"
+after = ["teach-r", "dump-MBf6c"]
+arch = "base"
+layers = 6
+seed = 1
+est_min = 52
+
+[[job]]
+name = "arm-loop3x2"
+kind = "imit"
+group = "P2"
+after = ["teach-r", "dump-MBf6c"]
+arch = "loop=2"
+layers = 3
+seed = 1
+est_min = 52
+
+[[job]]
+name = "arm-swiglu"
+kind = "imit"
+group = "P2"
+after = ["teach-r", "dump-MBf6c"]
+arch = "swiglu"
+layers = 3
+seed = 1
+est_min = 32
+
+[[job]]
+name = "arm-rms-qk"
+kind = "imit"
+group = "P2"
+after = ["teach-r", "dump-MBf6c"]
+arch = "rmsnorm,qknorm"
+layers = 3
+seed = 1
+est_min = 33
+
+[[job]]
+name = "arm-gate"
+kind = "imit"
+group = "P2"
+after = ["teach-r", "dump-MBf6c"]
+arch = "gate_attn"
+layers = 3
+seed = 1
+est_min = 32
+
+[[job]]
+name = "arm-muon"
+kind = "imit"
+group = "P2"
+after = ["teach-r", "dump-MBf6c"]
+arch = "rmsnorm,qknorm"
+extra = ["--opt", "muon", "--muon-lr", "0.02"]
+layers = 3
+seed = 1
+est_min = 33
+
+[[job]]
+name = "gate-P2"
+kind = "gate"                # gatestats: every P2 arm against arm-base on the twin's held-out plays (paired, Holm)
+group = "P2"
+arms = ["arm-L6", "arm-loop3x2", "arm-swiglu", "arm-rms-qk", "arm-gate", "arm-muon"]
+base = "arm-base"
+est_min = 1
+
+[[job]]
+name = "pick-P2"
+kind = "pick"                # the best two P2 arms (twin family mean, then hold accuracy) -> @best1, @best2
+group = "P2"
+arms = ["arm-L6", "arm-loop3x2", "arm-swiglu", "arm-rms-qk", "arm-gate", "arm-muon"]
+top = 2
+est_min = 0
+
+# ---------------------------------------------------------------------------------------------------------------------
+# P3: seed 2 of the baseline and of the best two P2 arms (`like` copies an arm's settings; "@best1" is resolved by pick-P2)
+[[job]]
+name = "arm-base-s2"
+kind = "imit"
+group = "P3"
+after = ["teach-r", "dump-MBf6c"]
+like = "arm-base"
+seed = 2
+est_min = 30
+
+[[job]]
+name = "best1-s2"
+kind = "imit"
+group = "P3"
+after = ["pick-P2"]
+like = "@best1"
+seed = 2
+est_min = 40
+
+[[job]]
+name = "best2-s2"
+kind = "imit"
+group = "P3"
+after = ["pick-P2"]
+like = "@best2"
+seed = 2
+est_min = 40
+
+[[job]]
+name = "gate-P3"
+kind = "gate"                # seeds 1 and 2 pooled per arm (gatestats pairs seed i with seed i)
+group = "P3"
+arms = ["@best1", "@best2"]
+base = "arm-base"
+seeds = 2
+est_min = 1
+
+# ---------------------------------------------------------------------------------------------------------------------
+# P4: RL seed variance: the rl2 GRPO recipe (armyrl, ten twin families, the imitation anchor on the 24 others) from
+# MBf6c with another seed; the checkpoint selected on validation 70-79 is played in Rust (kept-r held-out, quick + full)
+# and compared with MBf6c on the same binary (gatestats) and with the M4's u175 (seed 1).
+[rl]
+K = 6
+anchor_w = 0.0
+anchor_auto = 3.0
+updates = 185                # rl2 ran 185 updates in its 90-minute cap; the seeds run the same count
+minutes = 150                # a safety cap
+ckpt_every = 25
+extra = ["--anchor-skip-twin"]
+
+[[job]]
+name = "rl-s2"
+kind = "rl"
+group = "P4"
+after = ["teach-r", "dump-MBf6c"]
+seed = 2
+est_min = 85
+
+[[job]]
+name = "rl-s2-rust"
+kind = "rl_rust"
+group = "P4"
+after = ["rl-s2", "sanity-MBf6c"]
+rl = "rl-s2"
+est_min = 6
+
+[[job]]
+name = "rl-s3"
+kind = "rl"
+group = "P4"
+after = ["teach-r", "dump-MBf6c"]
+seed = 3
+est_min = 85
+
+[[job]]
+name = "rl-s3-rust"
+kind = "rl_rust"
+group = "P4"
+after = ["rl-s3", "sanity-MBf6c"]
+rl = "rl-s3"
+est_min = 6
+
+[[job]]
+name = "summary"
+kind = "summary"
+group = "end"
+est_min = 0
+
+# ---------------------------------------------------------------------------------------------------------------------
+# The smoke mode (`campaign3.sh smoke`, lab/runs/campaign3-smoke/): every job kind once with tiny budgets, to prove
+# the pipeline end to end on any machine. The values below replace the job's own.
+[smoke]
+deadline_min = 120           # the smoke's deadline: now + this
+cpu_max = 3
+mlx_gb = 6
+train_to = 2                 # teacher recordings and dumps: instances 0..1 and 80..81
+hold_to = 82
+twin_families = "siege,raid,assault-heal"
+quick_families = "siege,raid,assault-heal"
+full_families = "siege,raid,assault-heal,hold"
+imit = { max_steps = 3, plays = 8, eval_plays = 1, eval_every = 1000, log_every = 1 }
+rl = { updates = 2, minutes = 5, ckpt_every = 1, P = 8, G = 2, K = 2, split = 1 }
+needle = { lengths = "64", widths = "64", layers = "3", needles = "1", steps = 30, eval_every = 10, max_minutes = 2 }

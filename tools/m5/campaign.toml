@@ -1,0 +1,36 @@
+# The overnight campaign (tools/m5/campaign.sh). Edit, then `tools/m5/campaign.sh start`.
+# A job that finished is never redone: results are appended to lab/runs/campaign/results.jsonl and a restart
+# resumes from the first job without an "ok" line (a training resumes from its last checkpoint).
+
+[train]                 # the recipe shared by every net (tools/m5/train.sh)
+epochs = 2
+plays = 128             # plays a step
+lr = 1e-3
+chunk_min = 30          # minutes of one GPU job; a chunk ends with a checkpoint
+
+[campaign]
+retries = 1             # a failed job is retried this many times, then recorded as failed and skipped
+seeds = [11, 12, 13]    # three independent training seeds at the best ladder size
+quick_hold_to = 100     # held-out instances 80..quick_hold_to-1 (100 = all 20)
+full_hold_to = 100
+ablate_memory = true    # the memory-zeroed full table of every net (ARMY_NET_ZERO_MEMORY=1)
+
+# (1) the capacity ladder on the B line: width d, layers
+[[ladder]]
+d = 48
+layers = 3
+[[ladder]]
+d = 64
+layers = 3
+[[ladder]]
+d = 96
+layers = 3
+[[ladder]]
+d = 128
+layers = 3
+[[ladder]]
+d = 128
+layers = 4
+[[ladder]]
+d = 128
+layers = 6
