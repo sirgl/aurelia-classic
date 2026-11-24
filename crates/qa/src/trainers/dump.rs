@@ -147,6 +147,16 @@ fn condition_json(rules: &CompiledRuleset, c: &Condition) -> Value {
 }
 
 /// The compiled combat and movement profile of a unit (its kind, promotions and owner).
+/// Info-only (the twin's schedule of player-level combat effects): the unit's percents of the profiles' contexts
+/// (`CONTEXTS`, as `profile_of`'s `contexts`) WITHOUT its promotions: its kind and what its owner holds (policies,
+/// tenets, timed effects, beliefs, the happiness and resource penalties), the part a player changes during a play.
+pub(crate) fn kind_contexts(rules: &CompiledRuleset, game: &GameState, core: UnitCore) -> Vec<i32> {
+    let mut bare = core;
+    bare.promotions = Default::default();
+    let mods = unit_modifiers(game.view().auth, rules, &bare);
+    CONTEXTS.iter().map(|c| mods.combat[combat_slot(*c)]).collect()
+}
+
 fn profile(rules: &CompiledRuleset, game: &GameState, win: &Window, h: UnitHandle) -> Value {
     let core = *game.view().auth.units().get(h).unwrap().core;
     profile_of(rules, game, win, h, core, true)
@@ -888,6 +898,11 @@ impl Track {
     /// The slots' entity ids.
     pub fn ids(&self) -> &[EntityId] {
         &self.slots.ids
+    }
+
+    /// The third seat's pieces' ids (`scene.third.ids`; empty without a third seat).
+    pub fn third_ids(&self) -> &[EntityId] {
+        self.third.as_ref().map_or(&[], |(_, ids)| ids.as_slice())
     }
 
     /// The window index of a map tile (-1 outside).

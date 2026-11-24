@@ -163,8 +163,37 @@ pub fn start(rules: &CompiledRuleset, game: &GameState, scene: &Scene, orders: &
         // The scene's private facts the family scripts read (the memory families' side, hiding place and first step): info only.
         "centre": scene.centre.0, "info": scene.info,
     });
-    let line = json!({"type": "scene", "play": name, "scene": sc, "initial": initial, "orders": o, "kinds": kinds});
+    let mut line = json!({"type": "scene", "play": name, "scene": sc, "initial": initial, "orders": o, "kinds": kinds});
+    // Info-only: the units' combat percents without their promotions at the scene's start (when the profiles' `contexts`
+    // are measured), per slot and per third-seat id (`kind_contexts`; the twin's schedule adds the change since).
+    let (kx0, kx30) = kinds_contexts(rules, game, &track);
+    line["kx0"] = kx0;
+    line["kx30"] = kx30;
     PLAY.with(|p| *p.borrow_mut() = Some(Play { name, track, lines: vec![line.to_string()], moment: None, last: Some(units_cities(&initial)), last_third: initial["third"].as_array().cloned().unwrap_or_default() }));
+}
+
+/// Per slot id and per third-seat id: the unit's `kind_contexts` (`[]` for a unit not on the map).
+fn kinds_contexts(rules: &CompiledRuleset, game: &GameState, track: &Track) -> (Value, Value) {
+    let auth = game.view().auth;
+    let by_id: std::collections::BTreeMap<kernel::ids::EntityId, kernel::world::unit::UnitCore> = auth.units().iter_handles().map(|(_, c)| (c.id, *c)).collect();
+    let of = |ids: &[kernel::ids::EntityId]| -> Value {
+        json!(ids.iter().map(|i| by_id.get(i).map_or_else(Vec::new, |c| crate::trainers::dump::kind_contexts(rules, game, *c))).collect::<Vec<Vec<i32>>>())
+    };
+    (of(track.ids()), of(track.third_ids()))
+}
+
+/// Per third-seat id: the wounded modifier and the arena handle (-1: not on the map), info-only.
+fn third_wm_handles(rules: &CompiledRuleset, game: &GameState, track: &Track) -> (Vec<i64>, Vec<i64>) {
+    let auth = game.view().auth;
+    track
+        .third_ids()
+        .iter()
+        .map(|i| {
+            auth.units().iter_handles().find(|(_, c)| c.id == *i).map_or((0, -1), |(h, c)| {
+                (i64::from(classic_rules::effects::unit::unit_modifiers(auth, rules, c).stat(classic_rules::rules::effects::UnitStat::WoundedDamagePercent)), i64::from(h.index))
+            })
+        })
+        .unzip()
 }
 
 fn units_cities(state: &Value) -> (Vec<Value>, Vec<Value>) {
@@ -420,9 +449,14 @@ pub fn moment(rules: &CompiledRuleset, game: &GameState, orders: &Orders, tokens
             .collect();
         let pill = pillageable(rules, game, &play.track);
         let made: Vec<Value> = made.iter().filter_map(|(id, k)| play.track.ids().iter().position(|x| x == id).map(|s| json!([s, k]))).collect();
+        let (kx, kx3) = kinds_contexts(rules, game, &play.track);
+        let (wm3, handles3) = third_wm_handles(rules, game, &play.track);
         play.moment = Some(json!({
             "type": "moment", "play": play.name, "round": auth.turn().round, "step": step, "state": state, "ids": ids, "maptile": maptile,
             "handles": handles, "prev": prev, "made": made, "wm": wm, "war": war, "pillageable": pill, "ruins": ruins(rules, game, &play.track), "upos": tile_places(game, &ids), "cstr": cstr,
+            // Info-only: the units' combat percents without promotions (`kind_contexts`), the third seat's the same, its
+            // wounded modifiers and arena handles (per `scene.third.ids`).
+            "kx": kx, "kx3": kx3, "wm3": wm3, "handles3": handles3,
             "tok": {"n": n, "feat": hex16(&feat), "dist": dist, "pos": tokens.pos, "tile": tokens.tile.iter().map(|t| t.0).collect::<Vec<u32>>(), "slot": slots, "ref": refs},
             "cands": cands,
             // The history tokens the net reads (MBH; every net's tokens carry them): numbers (f16 bits), army slots, ages.
