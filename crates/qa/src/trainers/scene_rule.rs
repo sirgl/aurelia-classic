@@ -170,9 +170,10 @@ pub fn turn(rules: &CompiledRuleset, game: &mut GameState, scene: &Scene, side: 
             act::try_cmd(game, rules, side, Command::CityStrike { city, target });
         }
     }
-    // 3. Shots.
+    // 3. Shots. (A piece on interception duty stays as it is: a unit that shot or ended its turn by hand has moved and
+    // cannot intercept; only the air-threat family sets the stance.)
     for p in pieces {
-        if act::alive(game, p, side).is_none() {
+        if act::alive(game, p, side).is_none_or(|c| c.stance == Stance::Intercept) {
             continue;
         }
         let foes = foe_tiles(game, scene, side);
@@ -184,6 +185,9 @@ pub fn turn(rules: &CompiledRuleset, game: &mut GameState, scene: &Scene, side: 
     // heals) fortifies; a piece that marched or struck stays as it is (a hunter closing in is not dug in).
     for p in pieces {
         let Some(c) = act::alive(game, p, side) else { continue };
+        if c.stance == Stance::Intercept {
+            continue;
+        }
         let stood = c.moves_left > 0 && !c.has_moved();
         if c.moves_left > 0 {
             act::hold_unit(game, rules, p.h);
