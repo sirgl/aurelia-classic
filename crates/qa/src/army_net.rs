@@ -60,6 +60,9 @@ impl Aim {
             Fam::Hold | Fam::Rush | Fam::Feint | Fam::ScoutReport => Aim::Hold,
             Fam::FogSniper => Aim::Destroy,
             Fam::CityReinforced | Fam::TwoFronts | Fam::SecondCity | Fam::TwinSiege => Aim::TakeCity,
+            // The look families: the order is the operation (the siege), the home is marked as the refuge; the net must look beyond it.
+            Fam::SurpriseAttack | Fam::BlindSector | Fam::SecondFront | Fam::BaitLook => Aim::TakeCity,
+            Fam::AirThreat | Fam::NavalApproach => Aim::Hold,
             Fam::Siege | Fam::Ram | Fam::Bombard | Fam::Prey | Fam::AssaultHeal | Fam::PromotionChoice | Fam::HillArchers | Fam::CityFire | Fam::PlannedAssault | Fam::AssaultReinforce | Fam::AssaultPeace => Aim::TakeCity,
             Fam::Guard | Fam::Counter => Aim::Protect,
             Fam::Raid => Aim::Pillage,

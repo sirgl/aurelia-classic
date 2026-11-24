@@ -58,19 +58,23 @@ use super::act::{self, Aim, Nerve};
 use super::assault;
 use super::families::{blank, defences, Fam, Painter};
 use super::lab::{dist, tiles_within, Arm, Lab};
+use super::look_families as look;
 use super::memory;
 use super::{Piece, Scene};
 
 pub fn is_history(f: Fam) -> bool {
-    matches!(f, Fam::Feint | Fam::FogSniper | Fam::CityReinforced | Fam::ScoutReport | Fam::TwoFronts | Fam::SecondCity | Fam::TwinSiege)
+    look::is_look(f) || matches!(f, Fam::Feint | Fam::FogSniper | Fam::CityReinforced | Fam::ScoutReport | Fam::TwoFronts | Fam::SecondCity | Fam::TwinSiege)
 }
 
 /// The families whose tokens hold only the foes our side sees (`army_net::Orders::fog`).
 pub fn is_fog(f: Fam) -> bool {
-    matches!(f, Fam::FogSniper | Fam::CityReinforced | Fam::ScoutReport)
+    look::is_fog(f) || matches!(f, Fam::FogSniper | Fam::CityReinforced | Fam::ScoutReport)
 }
 
 pub fn rounds(f: Fam) -> u32 {
+    if look::is_look(f) {
+        return look::rounds(f);
+    }
     match f {
         Fam::Feint | Fam::ScoutReport => 9,
         Fam::FogSniper => 3,
@@ -82,6 +86,9 @@ pub fn rounds(f: Fam) -> u32 {
 }
 
 pub fn solvers(f: Fam) -> &'static [&'static str] {
+    if look::is_look(f) {
+        return look::solvers(f);
+    }
     match f {
         Fam::Feint => &["ref-trace"],
         Fam::ScoutReport => &["ref-extend"],
@@ -95,6 +102,9 @@ pub fn solvers(f: Fam) -> &'static [&'static str] {
 
 /// Every reference name each family plays (the right teacher first).
 pub fn teachers(f: Fam) -> &'static [&'static str] {
+    if look::is_look(f) {
+        return look::teachers(f);
+    }
     match f {
         Fam::Feint => &["ref-trace", "ref-split", "ref-guess", "ref-first", "ref-wait"],
         Fam::ScoutReport => &["ref-extend", "ref-spread", "ref-stay"],
@@ -107,6 +117,9 @@ pub fn teachers(f: Fam) -> &'static [&'static str] {
 }
 
 pub fn task(f: Fam) -> &'static str {
+    if look::is_look(f) {
+        return look::task(f);
+    }
     match f {
         Fam::Feint => "an enemy force marched three rounds, now equidistant from our two cities: hold the one its last step points at",
         Fam::FogSniper => "an enemy bowman in the fog shoots our units: find him from where the strikes came and kill him",
@@ -136,7 +149,7 @@ fn rel_xy(game: &GameState, centre: TileId, t: TileId) -> (i64, i64) {
     (i64::from(t.0) % w - i64::from(centre.0) % w, i64::from(t.0) / w - i64::from(centre.0) / w)
 }
 
-fn tile_rel(game: &GameState, centre: TileId, d: (i64, i64)) -> Option<TileId> {
+pub(super) fn tile_rel(game: &GameState, centre: TileId, d: (i64, i64)) -> Option<TileId> {
     let dims = game.view().auth.map().dimensions;
     let (w, h) = (i64::from(dims.width), i64::from(dims.height));
     let (x, y) = (i64::from(centre.0) % w + d.0, i64::from(centre.0) / w + d.1);
@@ -147,11 +160,11 @@ fn hdf(dq: f64, dr: f64) -> f64 {
     (dq.abs() + dr.abs() + (dq + dr).abs()) / 2.0
 }
 
-fn put_tiles(info: &mut BTreeMap<String, String>, key: &str, v: &[TileId]) {
+pub(super) fn put_tiles(info: &mut BTreeMap<String, String>, key: &str, v: &[TileId]) {
     info.insert(key.into(), v.iter().map(|t| t.0.to_string()).collect::<Vec<_>>().join(","));
 }
 
-fn get_tiles(info: &BTreeMap<String, String>, key: &str) -> Vec<TileId> {
+pub(super) fn get_tiles(info: &BTreeMap<String, String>, key: &str) -> Vec<TileId> {
     info.get(key).map(|s| s.split(',').filter_map(|x| x.parse().ok()).map(TileId).collect()).unwrap_or_default()
 }
 
@@ -165,17 +178,17 @@ fn get_pairs(info: &BTreeMap<String, String>, key: &str) -> Vec<(i64, i64)> {
         .unwrap_or_default()
 }
 
-fn rel_round(game: &GameState, sc: &Scene) -> u32 {
+pub(super) fn rel_round(game: &GameState, sc: &Scene) -> u32 {
     game.view().auth.turn().round.saturating_sub(sc.start_round)
 }
 
-fn owner_of_city(game: &GameState, t: TileId) -> Option<classic_rules::ids::PlayerId> {
+pub(super) fn owner_of_city(game: &GameState, t: TileId) -> Option<classic_rules::ids::PlayerId> {
     let auth = game.view().auth;
     auth.indexes().city_on_tile(t).and_then(|c| auth.cities().get(c)).map(|c| c.owner)
 }
 
 /// A kind of `arm` of movement 2 (the march scenes are timed for it).
-fn pace2(p: &mut Painter, arm: Arm) -> Result<classic_rules::ids::UnitKindId, String> {
+pub(super) fn pace2(p: &mut Painter, arm: Arm) -> Result<classic_rules::ids::UnitKindId, String> {
     let k = p.kind(arm).ok_or("no kind")?;
     if act::moves_of(p.rules, k) != 2 {
         return Err(format!("{} has movement {}", p.rules.units[k.0 as usize].name, act::moves_of(p.rules, k)));
@@ -184,7 +197,7 @@ fn pace2(p: &mut Painter, arm: Arm) -> Result<classic_rules::ids::UnitKindId, St
 }
 
 /// The era's strongest melee kind of the common kinds.
-fn strongest_melee(p: &Painter) -> Result<classic_rules::ids::UnitKindId, String> {
+pub(super) fn strongest_melee(p: &Painter) -> Result<classic_rules::ids::UnitKindId, String> {
     p.lab.kinds.by_arm.get(&Arm::Melee).and_then(|v| v.iter().copied().max_by_key(|k| (p.rules.units[k.0 as usize].strength, k.0))).ok_or_else(|| "no melee".to_owned())
 }
 
@@ -193,7 +206,7 @@ fn put_group(p: &mut Painter, side: classic_rules::ids::PlayerId, anchor: TileId
 }
 
 /// The era's strongest kind of `arm` (the common kinds; the ranged by ranged strength).
-fn strongest(p: &Painter, arm: Arm) -> Result<classic_rules::ids::UnitKindId, String> {
+pub(super) fn strongest(p: &Painter, arm: Arm) -> Result<classic_rules::ids::UnitKindId, String> {
     let rules = p.rules;
     let power = |k: classic_rules::ids::UnitKindId| {
         let d = &rules.units[k.0 as usize];
@@ -203,7 +216,7 @@ fn strongest(p: &Painter, arm: Arm) -> Result<classic_rules::ids::UnitKindId, St
 }
 
 /// A group on the free tiles nearest `anchor` (within `r`); `flat`: foot units of movement 2 only; `strong`: the era's strongest kinds.
-fn put_group_by(p: &mut Painter, side: classic_rules::ids::PlayerId, anchor: TileId, r: i32, arms: &[(Arm, &'static str)], flat: bool, strong: bool) -> Result<Vec<Piece>, String> {
+pub(super) fn put_group_by(p: &mut Painter, side: classic_rules::ids::PlayerId, anchor: TileId, r: i32, arms: &[(Arm, &'static str)], flat: bool, strong: bool) -> Result<Vec<Piece>, String> {
     let spots = p.spots(anchor, r, arms.len())?;
     let mut out = Vec::new();
     for ((arm, role), t) in arms.iter().zip(spots) {
@@ -224,6 +237,9 @@ fn put_group_by(p: &mut Painter, side: classic_rules::ids::PlayerId, anchor: Til
 }
 
 pub(super) fn build(p: &mut Painter, fam: Fam, lab: &Lab, instance: usize, attempt: u32) -> Result<Scene, String> {
+    if look::is_look(fam) {
+        return look::build(p, fam, lab, instance, attempt);
+    }
     let mut s = match fam {
         Fam::Feint => build_feint(p, lab, instance, attempt)?,
         Fam::ScoutReport => build_scout(p, lab, instance, attempt)?,
@@ -244,7 +260,7 @@ pub(super) fn build(p: &mut Painter, fam: Fam, lab: &Lab, instance: usize, attem
 
 
 /// A city of ours worn down to `left` percent of its hit points (the march scenes: an empty city falls to the first blows).
-fn weaken(p: &mut Painter, city: classic_rules::ids::CityHandle, left: i64) {
+pub(super) fn weaken(p: &mut Painter, city: classic_rules::ids::CityHandle, left: i64) {
     let max = {
         let auth = p.game.view().auth;
         auth.cities().get(city).map(|c| i64::from(classic_rules::combat::city::max_hit_points(auth, p.rules, c)))
@@ -419,7 +435,7 @@ fn march_enemy(rules: &CompiledRuleset, game: &mut GameState, sc: &mut Scene) {
 }
 
 /// The foes our side may use: the seen ones in a fog family, else all.
-fn foes_seen(rules: &CompiledRuleset, game: &GameState, sc: &Scene) -> Vec<UnitCore> {
+pub(super) fn foes_seen(rules: &CompiledRuleset, game: &GameState, sc: &Scene) -> Vec<UnitCore> {
     if is_fog(sc.fam) {
         memory::seen_foes(rules, game, sc.learner, sc.enemy).into_iter().filter(|c| !act::is_civilian(rules, c.kind)).collect()
     } else {
@@ -444,7 +460,7 @@ fn project(game: &GameState, centre: TileId, a: TileId, b: TileId, n: i64, citie
 }
 
 /// The defence of one city: the units go to it (the melee first), strike at even odds and fortify.
-fn defend(rules: &CompiledRuleset, game: &mut GameState, sc: &Scene, units: &[Piece], city: TileId) {
+pub(super) fn defend(rules: &CompiledRuleset, game: &mut GameState, sc: &Scene, units: &[Piece], city: TileId) {
     let (me, foe) = (sc.learner, sc.enemy);
     let friends: Vec<classic_rules::ids::UnitHandle> = units.iter().map(|p| p.h).collect();
     let sc2 = sc.clone();
@@ -458,7 +474,7 @@ fn defend(rules: &CompiledRuleset, game: &mut GameState, sc: &Scene, units: &[Pi
     }
 }
 
-fn hold_all(rules: &CompiledRuleset, game: &mut GameState, sc: &Scene) {
+pub(super) fn hold_all(rules: &CompiledRuleset, game: &mut GameState, sc: &Scene) {
     for p in &sc.mine {
         if act::alive(game, p, sc.learner).is_some() {
             let _ = act::fortify(game, rules, sc.learner, p.h);
@@ -1266,6 +1282,9 @@ fn twin_judge(game: &GameState, sc: &Scene, rel: u32) -> Option<bool> {
 
 /// The enemy's turn of a history family.
 pub fn enemy_turn(rules: &CompiledRuleset, game: &mut GameState, sc: &mut Scene) {
+    if look::is_look(sc.fam) {
+        return look::enemy_turn(rules, game, sc);
+    }
     match sc.fam {
         Fam::Feint | Fam::ScoutReport => march_enemy(rules, game, sc),
         Fam::FogSniper => sniper_enemy(rules, game, sc),
@@ -1277,6 +1296,9 @@ pub fn enemy_turn(rules: &CompiledRuleset, game: &mut GameState, sc: &mut Scene)
 
 /// The learner's reference `name` for a history family. False: the name is none of this family's.
 pub fn reference_turn(rules: &CompiledRuleset, game: &mut GameState, sc: &mut Scene, name: &str) -> bool {
+    if look::is_look(sc.fam) {
+        return look::reference_turn(rules, game, sc, name);
+    }
     if !teachers(sc.fam).contains(&name) {
         return false;
     }
@@ -1291,7 +1313,10 @@ pub fn reference_turn(rules: &CompiledRuleset, game: &mut GameState, sc: &mut Sc
 }
 
 /// The verdict at a round's end.
-pub fn judge(_rules: &CompiledRuleset, game: &GameState, sc: &Scene, rel: u32) -> Option<bool> {
+pub fn judge(rules: &CompiledRuleset, game: &GameState, sc: &Scene, rel: u32) -> Option<bool> {
+    if look::is_look(sc.fam) {
+        return look::judge(rules, game, sc, rel);
+    }
     match sc.fam {
         Fam::Feint | Fam::ScoutReport => march_judge(game, sc, rel),
         Fam::FogSniper => sniper_judge(game, sc, rel),

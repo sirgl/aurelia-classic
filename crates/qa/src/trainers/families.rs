@@ -69,6 +69,7 @@ use serde::{Deserialize, Serialize};
 use super::act::{self, Aim, Nerve};
 use super::assault;
 use super::history_families as history;
+use super::look_families as look;
 use super::memory;
 use super::lab::{self, dist, Arm, Draw, Lab};
 use super::{Piece, Scene};
@@ -121,10 +122,17 @@ pub enum Fam {
     TwoFronts,
     SecondCity,
     TwinSiege,
+    // The "where to look" trainers (`look_families.rs`; appended again: the older families keep their seeds).
+    AirThreat,
+    SurpriseAttack,
+    NavalApproach,
+    BlindSector,
+    SecondFront,
+    BaitLook,
 }
 
 impl Fam {
-    pub const ALL: [Fam; 41] = [
+    pub const ALL: [Fam; 47] = [
         Fam::Duel,
         Fam::Focus,
         Fam::Hold,
@@ -166,6 +174,12 @@ impl Fam {
         Fam::TwoFronts,
         Fam::SecondCity,
         Fam::TwinSiege,
+        Fam::AirThreat,
+        Fam::SurpriseAttack,
+        Fam::NavalApproach,
+        Fam::BlindSector,
+        Fam::SecondFront,
+        Fam::BaitLook,
     ];
 
     pub fn name(self) -> &'static str {
@@ -211,6 +225,12 @@ impl Fam {
             Fam::TwoFronts => "two-fronts",
             Fam::SecondCity => "second-city",
             Fam::TwinSiege => "twin-siege",
+            Fam::AirThreat => "air-threat",
+            Fam::SurpriseAttack => "surprise-attack",
+            Fam::NavalApproach => "naval-approach",
+            Fam::BlindSector => "blind-sector",
+            Fam::SecondFront => "second-front",
+            Fam::BaitLook => "bait-look",
         }
     }
 
@@ -354,6 +374,7 @@ impl Fam {
             Fam::Airstrike => k.has(Arm::Bomber),
             // The assault families need the era's siege unit (a city of any era wears down the archers of the era before it).
             f if assault::is_assault(f) => land && k.has(Arm::Siege),
+            f if look::is_look(f) => look::claims(f, rules, k),
             f if history::is_history(f) => history::claims(f, k),
             _ => land,
         }
@@ -1180,7 +1201,7 @@ pub fn build(rules: &CompiledRuleset, fam: Fam, era: u8, instance: usize, attemp
         }
         Fam::AssaultHeal | Fam::PromotionChoice | Fam::HillArchers | Fam::CityFire | Fam::PlannedAssault | Fam::AssaultReinforce | Fam::AssaultPeace => unreachable!("built by assault::build"),
         Fam::AmbushFog | Fam::HuntFog => unreachable!("built by memory::build"),
-        Fam::Feint | Fam::FogSniper | Fam::CityReinforced | Fam::ScoutReport | Fam::TwoFronts | Fam::SecondCity | Fam::TwinSiege => unreachable!("built by history_families::build"),
+        Fam::Feint | Fam::FogSniper | Fam::CityReinforced | Fam::ScoutReport | Fam::TwoFronts | Fam::SecondCity | Fam::TwinSiege | Fam::AirThreat | Fam::SurpriseAttack | Fam::NavalApproach | Fam::BlindSector | Fam::SecondFront | Fam::BaitLook => unreachable!("built by history_families::build"),
         Fam::Airstrike => {
             let home_t = at(&p, -3, 0)?;
             p.city(me, home_t, 4, false);
@@ -1707,7 +1728,7 @@ pub fn judge(rules: &CompiledRuleset, game: &GameState, sc: &mut Scene, rel: u32
     let civ_ok = sc.mine.iter().filter(|p| p.role == "civilian").all(|p| act::alive(game, p, sc.learner).is_some());
     let v = match sc.fam {
         Fam::AmbushFog | Fam::HuntFog => memory::judge(rules, game, sc, rel),
-        Fam::Feint | Fam::FogSniper | Fam::CityReinforced | Fam::ScoutReport | Fam::TwoFronts | Fam::SecondCity | Fam::TwinSiege => history::judge(rules, game, sc, rel),
+        Fam::Feint | Fam::FogSniper | Fam::CityReinforced | Fam::ScoutReport | Fam::TwoFronts | Fam::SecondCity | Fam::TwinSiege | Fam::AirThreat | Fam::SurpriseAttack | Fam::NavalApproach | Fam::BlindSector | Fam::SecondFront | Fam::BaitLook => history::judge(rules, game, sc, rel),
         Fam::Duel => {
             if combat_theirs == 0 && !mine.is_empty() {
                 Some(true)
@@ -1998,6 +2019,9 @@ pub fn measures(rules: &CompiledRuleset, game: &GameState, sc: &Scene, rel: u32)
         m.insert("dealt_per_round".into(), t.city_dealt as f64 / f64::from(rel.max(1)));
         m.insert("rested".into(), f64::from(t.rested));
         m.insert("picks".into(), t.picks.len() as f64);
+    }
+    if look::is_look(sc.fam) {
+        look::measures(sc, rel, &mut m);
     }
     if sc.fam == Fam::Convoy {
         m.insert("founded".into(), sc.founded.map_or(-1.0, f64::from));

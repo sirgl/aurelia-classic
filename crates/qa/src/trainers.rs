@@ -21,6 +21,7 @@ pub mod dump;
 pub mod families;
 pub mod history_families;
 pub mod lab;
+pub mod look_families;
 pub mod memory;
 pub mod scene_rule;
 pub mod suite;
