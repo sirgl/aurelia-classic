@@ -7,8 +7,9 @@
 //! - the site head is the guarded `net_score` when the plan says nothing (no menace, a wide seat), and a
 //!   tall seat adds only its gap bonus;
 //! - the invariants: `pre-net2` (the standard of the fifteenth promotion) and `pre-nets-x` play as pinned, with
-//!   no plan in any brief; `standard` (since the sixteenth promotion) plays as `net2`, plan for plan; the
-//!   variants that are not `net2`'s never have one; `net2-defence` plays as `net2` until the offence exists.
+//!   no plan in any brief; `pre-early-growth` (the standard of the sixteenth promotion) plays as `net2`, plan for
+//!   plan, and `standard` (since the seventeenth) as `early-growth`; the variants that are not `net2`'s never have
+//!   one; `net2-defence` plays as `net2` until the offence exists.
 
 #![cfg(feature = "experimental-ai")]
 
@@ -193,14 +194,28 @@ fn pre_net2_and_pre_nets_x_play_unchanged_with_no_plan() {
     }
 }
 
-/// The sixteenth promotion: `standard` is the game of `net2`, the same plans on every turn and the same hash.
+/// The sixteenth promotion: `standard` was the game of `net2`, the same plans on every turn and the same hash.
+/// Since the seventeenth that standard is `pre-early-growth`, and `net2` plays on as it was measured.
 #[test]
-fn standard_plays_net2() {
+fn pre_early_growth_plays_net2() {
     let (net2, net2_seen) = play(Variant::Net2, ROUNDS);
+    let (before, before_seen) = play(Variant::PreEarlyGrowth, ROUNDS);
+    assert_eq!(before, net2, "{before:016x}");
+    assert_eq!(before_seen, net2_seen);
+    assert!(strategic(&before_seen).iter().all(|s| s.plan.is_some()));
+}
+
+/// The seventeenth promotion: `standard` is the game of `early-growth`, the same plans on every turn and the same
+/// hash, and a game of its own: the old standard (`pre-early-growth`) plays otherwise.
+#[test]
+fn standard_plays_early_growth() {
+    let (growth, growth_seen) = play(Variant::EarlyGrowth, ROUNDS);
     let (standard, standard_seen) = play(Variant::Standard, ROUNDS);
-    assert_eq!(standard, net2, "{standard:016x}");
-    assert_eq!(standard_seen, net2_seen);
+    assert_eq!(standard, growth, "{standard:016x}");
+    assert_eq!(standard_seen, growth_seen);
     assert!(strategic(&standard_seen).iter().all(|s| s.plan.is_some()));
+    let (before, _) = play(Variant::PreEarlyGrowth, ROUNDS);
+    assert_ne!(standard, before, "the promoted standard plays another game than the one before it");
 }
 
 #[test]
@@ -213,9 +228,9 @@ fn only_the_net2_variants_think_with_net2() {
     let named: Vec<&str> = Variant::ALL.into_iter().filter(|v| v.net2()).map(|v| v.name()).collect();
     assert_eq!(
         named,
-        ["standard", "net2", "net2-defence", "net2-tac", "net2-no-strategy", "net2-no-war", "net2-no-deals", "net2-no-peace", "net2-no-cs", "net2-no-congress", "net2-no-sites", "net2-no-fleet", "net2-no-guard", "net2-no-economy", "net2-no-beliefs", "net2-no-ideology", "net2-off", "science-flow", "layout-defence"]
+        ["standard", "net2", "net2-defence", "net2-tac", "net2-no-strategy", "net2-no-war", "net2-no-deals", "net2-no-peace", "net2-no-cs", "net2-no-congress", "net2-no-sites", "net2-no-fleet", "net2-no-guard", "net2-no-economy", "net2-no-beliefs", "net2-no-ideology", "net2-off", "science-flow", "early-growth", "layout-defence", "pre-early-growth"]
     );
-    for name in ["net2", "net2-defence", "tac2", "net2-tac", "net2-no-war", "net2-off", "science-flow", "layout-defence"] {
+    for name in ["net2", "net2-defence", "tac2", "net2-tac", "net2-no-war", "net2-off", "science-flow", "early-growth", "layout-defence", "pre-early-growth"] {
         let variant = Variant::from_name(name).unwrap_or_else(|| panic!("{name}"));
         assert_eq!(ClassicMind::new(variant).variant(), variant, "{name}");
     }

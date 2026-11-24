@@ -64,6 +64,8 @@ pub enum Join {
     Sum(Act),
     /// The largest term, clamped to 0…1000 (the bias is not read).
     Max,
+    /// The smallest term, linear (the bias is not read): the first of several limits.
+    Min,
 }
 
 /// One weighted input and why it has that weight.
@@ -119,8 +121,17 @@ pub mod g {
     pub const SIZE_MODEL: usize = 14;
     /// A spaceship part of ours stands outside the capital, the tile it is installed on (0/1000).
     pub const PART_OUT: usize = 15;
-    pub const N: usize = 16;
-    pub const NAMES: [&str; N] = ["capital_lost", "cities_lost", "war_rounds", "war_gain", "unhappy_trend", "embark", "enemy_air", "gold_stock", "cs_allies", "cs_contested", "own_infamy", "ties_at_risk", "space_race", "parts_short", "size_model", "part_out"];
+    /// The opening's cities a real tall seat still lacks beyond the size model's new ones, 250 a city (`OPENING`;
+    /// `early-growth` only, else 0; set after the intent).
+    pub const OPENING: usize = 16;
+    /// The opening's cities a real tall seat still lacks, the model's new ones among them, 250 a city (`OPENING_ROOM`;
+    /// `early-growth` only, else 0; set after the intent).
+    pub const OPENING_GAP: usize = 17;
+    /// Luxury kinds the empire lacks lying on its own tiles without their improvement, beyond its workers (alive or
+    /// queued), 500 a kind (`net2::growth::lux_open`; `early-growth` only, else 0).
+    pub const LUX_OPEN: usize = 18;
+    pub const N: usize = 19;
+    pub const NAMES: [&str; N] = ["capital_lost", "cities_lost", "war_rounds", "war_gain", "unhappy_trend", "embark", "enemy_air", "gold_stock", "cs_allies", "cs_contested", "own_infamy", "ties_at_risk", "space_race", "parts_short", "size_model", "part_out", "opening", "opening_gap", "lux_open"];
 }
 
 /// A rival's inputs (`plan::RivalInputs` in order).
@@ -678,6 +689,7 @@ pub const CITY_CAP: Neuron = Neuron {
         t(K(kc::HAPPINESS_CRISIS), -6000, "in a crisis the rules cut growth: no city (`CITY_CRISIS`)"),
         t(A(a::MAX_MENACE), -2000, "rivals' pressure: a stack at our border takes the settler and the young city first (MO8)"),
         ts(F(fe::PROGRESS), Shape::Above(600), -5000, "late a new city has no rounds to grow its citizens: the model's horizon refused every city in 1326 of 3178 turns of r198–263 (R4 traces); the tilt's founding stops too (−1.6 cities at 93 % of the game)"),
+        t(G(g::OPENING), 4000, "the opening's cities beyond the model's, a city a city (`early-growth`, `OPENING`): the model keeps 6 points of happiness after a city (`tall_real::CONTENT_FLOOR`), which held science-flow's seats at 2 cities in 4909 of 6650 turns of r1–100 (look: 2.57 cities at r80, the 3rd city at r80 and the 4th at r108 for the science winners)"),
     ],
 };
 
@@ -728,6 +740,216 @@ pub const AGREEMENT: Neuron = Neuron {
         ts(Q(q::RUNAWAY), Shape::Times(Y(y::AIM_SCIENCE)), 800, "a seat that races it gains as many beakers and shortens its lead in rounds: the denial lifts with the aim"),
         t(R(r::CHEST_WAIT), -600, "a partner that let our gold wait this long does not sign (0.26 of the friends without an agreement lacked their own gold, which a few rounds of income bring): a level friend (740) frees the chest after 8 rounds, about three offers at its cadence; a sure tie (1000) after 17"),
     ],
+};
+
+// ---- the early growth (work/nets/early-growth): played by `early-growth` only (`TurnBrief::early_growth`) ----
+
+/// The tilt of the expansion price's multiplier while the opening lacks cities (`price_tilt[pd::EXPANSION]`; the
+/// strategist's production head multiplies a settler's value by it). Why (look 3610–3614, the opening's cap on): the
+/// allocator picked the settler and the head replaced it by a granary (52 times by r60), a library (39), stone works
+/// (10); a tall seat's expansion price is ×0.45–0.72 (the tall row's −700, the defence posture), so a city the cap
+/// allowed at 2 cities waited 32 rounds (median) for its settler, at 3 cities 40.
+pub const EXPANSION_TILT: Neuron = Neuron {
+    name: "expansion_tilt",
+    bias: 0,
+    why: "no tilt without an opening city to found: the tall row prices a city beyond the plan's count",
+    join: LINEAR,
+    terms: &[t(G(g::OPENING_GAP), 6000, "an opening city to found lifts the price by 1.5 (×0.5 → ×2.0): the settler the allocator ranks first is the head's pick before a granary or a library, which a 2-hammer city builds anyway and the new city builds too")],
+};
+
+/// The tilt of the worker price's multiplier while a luxury we lack lies unimproved on our tiles
+/// (`price_tilt[pd::WORKER]`). Why (look 3610–3614): the first worker came at r46 (median; quartiles 40–51) while the
+/// seats held 1.9 luxury kinds unconnected inside their borders at r40; a luxury kind is 4 points of happiness here
+/// (7.8 points of 2.0 kinds at r80), a city and its citizen cost about 3.3, so the 4th city waited on the happiness
+/// (3413 turns at 3 cities with no city allowed, excess 1.3); the head replaced the allocator's worker by a granary 21
+/// times, a lighthouse 16, stone works 14, the Great Library 11 by r60.
+pub const WORKER_TILT: Neuron = Neuron {
+    name: "worker_tilt",
+    bias: 0,
+    why: "no tilt without a luxury waiting for its worker: the allocator's worker value counts the worked tiles",
+    join: LINEAR,
+    terms: &[t(G(g::LUX_OPEN), 4000, "a luxury kind waiting lifts the price by 2 (×1 → ×3): its connection is a city's happiness, which the worked-tile value does not see")],
+};
+
+/// The opening's row of the seat (`net2::growth::opening_row`), read by `OPENING_ROOM` and `OPENING` through `Src::C`.
+pub mod go {
+    /// Own cities, 250 a city.
+    pub const CITIES: usize = 0;
+    /// Free sites (`fe::ROOM` × `strategy_net::features::ROOM_SITES`), 250 a site.
+    pub const SITES: usize = 1;
+    /// The cities the excess happiness pays for, each with its first citizen at the empire's rates now
+    /// (`value::Unhappiness::of`), 250 a city.
+    pub const CONTENT: usize = 2;
+    /// The seat plays the real tall style and `net2`'s strategy part (0/1000).
+    pub const TALL: usize = 3;
+    /// The size model's new cities (`Intent::more_cities`), 250 a city.
+    pub const MODEL: usize = 4;
+    /// `OPENING_ROOM`'s output (set after it fires; read by `OPENING`).
+    pub const ROOM: usize = 5;
+    pub const N: usize = 6;
+}
+
+/// The opening's cities a real tall seat may still found, 250 a city (`g::OPENING_GAP`, `OPENING`'s input): the first
+/// of its limits.
+pub const OPENING_ROOM: Neuron = Neuron {
+    name: "opening_room",
+    bias: 0,
+    why: "the founding stops at the first of its limits",
+    join: Join::Min,
+    terms: &[
+        ts(C(go::CITIES), Shape::Below(1000), 1000, "up to four cities: science-flow's seats at 3–4 cities at r80 made 82–83 beakers a turn at r132 against 72 at 2 cities and won by science in 10–12 % of the games against 8 % (230 seats against 233; 5 cities: 5 seats, no reading; runs/derive-e1-sf.md)"),
+        t(C(go::SITES), 1000, "a city a free site: the opening founds no city the land has no site for"),
+        t(C(go::CONTENT), 1000, "a city the happiness pays for (excess ≥ 0 after it and its first citizen; below 0 the rules slow every city's growth): the size model's floor of 6 points held science-flow's seats at 2 cities in 4909 of 6650 turns of r1–100 (look)"),
+        t(C(go::TALL), 1000, "a real tall seat with the strategy part only: 1000 never binds, 0 is no opening (the other seats' count is the strategist's)"),
+    ],
+};
+
+/// The opening's cities beyond the size model's new ones, 250 a city, up to four (`g::OPENING`, read by `CITY_CAP`).
+pub const OPENING: Neuron = Neuron {
+    name: "opening",
+    bias: 0,
+    why: "no city beyond the model without the opening's room",
+    join: UNIT,
+    terms: &[t(C(go::ROOM), 1000, "the opening's room"), t(C(go::MODEL), -1000, "less the model's own new cities: `CITY_CAP` reads them at `g::SIZE_MODEL`")],
+};
+
+/// The early growth's garrison row of one own city (`net2::growth::garrison_row`), read by `GARRISON` through `Src::C`
+/// (its own frame: `GUARD`'s `c` row is not read here). A new reason to keep the garrison is a new slot and a term.
+pub mod gc {
+    /// The city's production is below the mean of the empire's cities (0/1000).
+    pub const LOW_PRODUCTION: usize = 0;
+    /// A barbarian camp the player knows within `camps::CAMP_REACH` of the city (0/1000).
+    pub const CAMP_NEAR: usize = 1;
+    /// `c::STACK_MENACE`: the menace of the owner of the strongest stack near the city.
+    pub const STACK_MENACE: usize = 2;
+    /// `c::DANGER`: the defence watch sees the city in danger (0/1000).
+    pub const DANGER: usize = 3;
+    /// `c::DISTRUST_NEAR`: the largest distrust of the rivals with a city within 8 tiles.
+    pub const DISTRUST_NEAR: usize = 4;
+    /// At war with a major (0/1000).
+    pub const AT_WAR: usize = 5;
+    /// The city is the capital (0/1000).
+    pub const CAPITAL: usize = 6;
+    /// How near the nearest seen city of a major is, as a rival's war net reads our city (`t::NEAR`: ramp(15 − tiles,
+    /// 0, 10), 1000 at 5 tiles or less).
+    pub const RIVAL_NEAR: usize = 7;
+    pub const N: usize = 8;
+}
+
+/// The early growth's purchase row of the seat (`net2::growth::buy_row`), read by `BUY_CHEST` through `Src::C`.
+pub mod gb {
+    /// A head the chest may buy (`CHEST_ITEM`) heads a queue with `gate::CHEST_TURNS` or more turns left (0/1000).
+    pub const WAITING: usize = 0;
+    /// At war with a major (0/1000).
+    pub const AT_WAR: usize = 1;
+    pub const N: usize = 2;
+}
+
+/// A queue head's row (`net2::growth::item_row`), read by `CHEST_ITEM` through `Src::C`.
+pub mod gi {
+    /// A builder of the land (0/1000): the jobs ahead and the luxuries waiting are land tiles.
+    pub const WORKER: usize = 0;
+    /// A settler (0/1000).
+    pub const SETTLER: usize = 1;
+    /// A building, not a wonder, with an effect that yields science (0/1000).
+    pub const SCIENCE: usize = 2;
+    pub const N: usize = 3;
+}
+
+/// The seat's worker row (`net2::growth::jobs_ahead`), read by `WORKER_SHORT` through `Src::C`.
+pub mod gw {
+    /// Own cities, 1000 a city.
+    pub const CITIES: usize = 0;
+    /// Builders of the land alive or queued, 1000 a worker.
+    pub const WORKERS: usize = 1;
+    pub const N: usize = 2;
+}
+
+/// A city's jobs row (`net2::growth::jobs_ahead`), read by `JOBS_CAP` through `Src::C`.
+pub mod gj {
+    /// The city's citizens, 1000 a citizen.
+    pub const CITIZENS: usize = 0;
+    pub const N: usize = 1;
+}
+
+/// Whether a city builds its flat garrison (`planner_cities::garrison_order`: one military unit in every city from
+/// the first contact), 0…1000, at least `gate::GARRISON` to build it (`Growth::garrison_waits` below it). Why
+/// (science-flow's self-play, seeds 3700–3716, runs/derive-e1-sf.md): the young non-capital cities after Writing and
+/// before their library (r ≤ 135) were below the empire's mean production in 44793 of 46672 rounds; there a military
+/// unit or a scout headed the queue in 49.6 % of the rounds, 70.3 % of it ordered by the flat garrison, at 3 hammers
+/// (a spearman is 12 rounds); the library came 34 rounds after the founding or Writing and 18 % had none by r135
+/// (look). The defence watch, which answers a seen threat (507 of 554 of its orders were against barbarians, look),
+/// stays as it is.
+pub const GARRISON: Neuron = Neuron {
+    name: "garrison",
+    bias: 1000,
+    why: "a city keeps today's garrison: one unit from the first contact",
+    join: UNIT,
+    terms: &[
+        t(C(gc::LOW_PRODUCTION), -1000, "a young city below the empire's mean production builds its infrastructure first: half its rounds went to a military head, 70 % of it the flat garrison; at or above the mean 7.7 % (1879 rounds)"),
+        t(C(gc::CAMP_NEAR), 1000, "a camp within reach spawns raiders every few rounds (`camps::LOSS_PER_CAMP_ROUND`): the garrison stays"),
+        t(C(gc::STACK_MENACE), 1000, "a rival's stack near the city"),
+        t(C(gc::DANGER), 1000, "the watch sees a threat: the city is not left empty"),
+        t(C(gc::DISTRUST_NEAR), 700, "a distrusted neighbour within 8 tiles (above 715 distrust the garrison stays)"),
+        t(C(gc::AT_WAR), 1000, "at war with a major every city keeps its garrison"),
+        t(C(gc::CAPITAL), 1000, "the capital keeps its garrison: with the wait on every city early-growth lost 4 capitals against science-flow's 3 in E3 (offsets 3722–3723, 400 games); a capital was below the mean in 696 of its 64800 rounds (r ≤ 135), the only rounds the wait reached it"),
+        t(C(gc::RIVAL_NEAR), 1000, "a city a rival's war net reaches keeps its garrison: its `EASE` gives a small city with no defender seen about 1000·near (size +1000, no garrison +800, walls about +400, bias −2200), so from near 0.5 (10 tiles) it is the soft city that opens a prey war; in R3 (offsets 4840–4841) 3 of the 5 capitals early-growth lost fell in a prey war whose first target was such a city (pop 1–2, garrison 0, near 1000, ease 913–1000; runs/case/)"),
+        t(S(s::CAPITAL_FALL), 1000, "after a fall the rest must hold"),
+    ],
+};
+
+/// Whether a queue head may spend the growth chest (`Growth::chest_heads`), 0…1000, at least `gate::CHEST_ITEM`. A
+/// wonder has no gold price under the rules (Unciv's `hurryCostModifier` −1: not for sale), so it never meets the chest.
+pub const CHEST_ITEM: Neuron = Neuron {
+    name: "chest_item",
+    bias: 0,
+    why: "no other head spends the chest: the tiles' and the other heads' gold stays theirs",
+    join: UNIT,
+    terms: &[
+        t(C(gi::WORKER), 1000, "the first worker came at r46 (median; quartiles 40–51) while 1.9 luxury kinds lay unconnected at r40 (look)"),
+        t(C(gi::SETTLER), 1000, "a city the cap allowed waited 32 rounds (median) for its settler at 2 cities, 40 at 3 (look)"),
+        t(C(gi::SCIENCE), 1000, "a library's hurry offer was worth more a gold than a tile's (ratio median 1853 against 1195), but its price (300) was above the spendable gold in 3706 of 4591 offers (look)"),
+    ],
+};
+
+/// The share of the hurry price of the cheapest chest head (`CHEST_ITEM`) that the tiles and the gifts leave in the
+/// treasury (`Growth::chest`), 0…1000. Why (look 3610–3614 with the gold trace): by r135 the seats bought 2533 tiles
+/// (21 a seat, 54 gold each) and 4 libraries; the tiles took the gold (spendable median 40 above a reserve of 105–130)
+/// every turn before it reached a library (300), a worker (220) or a settler.
+pub const BUY_CHEST: Neuron = Neuron {
+    name: "buy_chest",
+    bias: 0,
+    why: "no chest without a growth item waiting: the tiles keep the gold",
+    join: UNIT,
+    terms: &[
+        t(C(gb::WAITING), 1000, "a library, a worker or a settler at a queue's head: the gold waits for it, the tiles after"),
+        t(C(gb::AT_WAR), -1000, "at war the gold is the defenders' (`defence::affordable_now`)"),
+        t(S(s::CAPITAL_FALL), -1000, "after a fall the gold holds the rest"),
+    ],
+};
+
+/// The empire lacks builders of the land (0…1000; at least `gate::WORKER_SHORT` the allocator's worker counts the jobs
+/// ahead, `Growth::jobs_ahead`). Why (look 3610–3611): the worked tiles alone held the first worker out of the
+/// allocator's options, 0 jobs in 34 of 74 decisions before it.
+pub const WORKER_SHORT: Neuron = Neuron {
+    name: "worker_short",
+    bias: 0,
+    why: "no city without its worker, no jobs ahead",
+    join: UNIT,
+    terms: &[
+        t(C(gw::CITIES), 1000, "a worker a city: with the jobs ahead counted for any number of workers the workers a city at r120 went from 0.95 to 1.41 and 23 % of them stood idle (look, round 2)"),
+        t(C(gw::WORKERS), -1000, "a worker alive or queued covers a city's jobs"),
+    ],
+};
+
+/// The tiles of a city whose jobs the workers count ahead, thousandths of a tile (`Growth::jobs_ahead`: the reading
+/// counts the city's owned unimproved land tiles with a job up to it).
+pub const JOBS_CAP: Neuron = Neuron {
+    name: "jobs_cap",
+    bias: 2000,
+    why: "two citizens ahead: a young city grows from 1 to 3 citizens in 12 rounds (median of 1199 cities) and a seat's first worker finishes its second improvement 14 rounds after its birth (median of 480 seats; runs/derive-e1-sf.md): the jobs it starts now are done when the city works those tiles",
+    join: LINEAR,
+    terms: &[t(C(gj::CITIZENS), 1000, "a tile a citizen: the tiles the city works now")],
 };
 
 // ---- the hold of the cities (work/nets/layout-defence): played by `layout-defence` only (`TurnBrief::layout_defence`) ----
@@ -824,6 +1046,14 @@ pub mod gate {
     pub const CHEST_WAIT_ROUNDS: (u32, &str) = (20, "four proposal intervals: past them a partner's refusal is not its gold, which a few rounds of its income bring");
     /// Food a turn a city keeps when it takes a science specialist (`citizens::science_specialist_commands`).
     pub const SCIENTIST_FOOD: (i32, &str) = (2, "two food a turn: the city still grows, slower, and never starves for a slot");
+    /// A city's flat garrison is built from this `weights::GARRISON` level.
+    pub const GARRISON: (Milli, &str) = (500, "the garrison when the threats outweigh the low production");
+    /// Turns a growth item still needs for the chest to wait for it (`weights::gb::WAITING`).
+    pub const CHEST_TURNS: (u32, &str) = (4, "an item done in a few turns comes without the gold: the gold waits for the heads it saves the most rounds on");
+    /// A queue head spends the growth chest from this `weights::CHEST_ITEM` level.
+    pub const CHEST_ITEM: (Milli, &str) = (500, "a head the chest is for, more likely than not");
+    /// The jobs ahead are counted from this `weights::WORKER_SHORT` level.
+    pub const WORKER_SHORT: (Milli, &str) = (500, "a city without its worker, more likely than not");
     /// `layout-defence`: the hold level from which a city keeps one holder beyond the standing garrison (`weights::HOLD`).
     pub const HOLD_ONE: (Milli, &str) = (500, "one more holder when the hold says so more likely than not");
     /// `layout-defence`: the hold level from which a city keeps two.
@@ -838,12 +1068,15 @@ pub mod gate {
     pub const PREPARE_ROUNDS: (u32, &str) = (30, "the war machine's `FORM_LIMIT`: an army that has not marched by then does not");
 }
 
-/// The site head (§3.4): site = clamp(S1, S2 − BOUND, S2 + BOUND) + S3 − GAP·S4·(1 + S5/1000) − ARMY·S6 − TRAVEL·S7 + FILL·S8·S9/10⁶.
+/// The site head (§3.4): site = clamp(S1, S2 − BOUND, S2 + BOUND) + S3 − GAP·S4·(1 + S5/1000) − ARMY·S6 − TRAVEL·S7 + FILL·S8·S9/10⁶
+/// − S11·S12/1000 (S12 = SHARED for `early-growth`, else 0).
 pub mod site {
     pub const BOUND: (i64, &str) = (169, "`bounded_net`: one citizen; outside it the net reads off its data");
     pub const GAP: (i64, &str) = (30, "`RIVAL_PENALTY`: the forward city is the one the next war takes first; up to twice next to a menacing rival");
     pub const ARMY: (i64, &str) = (60, "`ARMY_PENALTY`: an army 4–6 tiles off reaches the settler in a turn or two");
     pub const TRAVEL: (i64, &str) = (40, "`TRAVEL_COST` 30 + `NET_TRAVEL_RISK` 10");
+    /// S12 of `early-growth` (`Growth::shared`), thousandths of S11.
+    pub const SHARED: (i64, &str) = (750, "three quarters of the land a site shares with an own city: science-flow's non-capital cities founded by r60 had 3.65 citizens 30 rounds later at 3 tiles from an own city (14 shared tiles of 36), 3.62 at 4 (9), 4.30 at 5 (4), 4.94 at 6+ (1), the later ones 4.42, 4.73, 5.56, 5.89 (1135 cities); the least squares of the share of citizens lost on the share of tiles shared, by founding half, is 0.76 (95 % CI 0.44–0.99, games resampled; tools/derive.py, runs/derive-e1-sf.md)");
     pub const FILL: (i64, &str) = (0, "read, no weight: a gap inside our land stays ours, the outward site is the one a rival takes; at 25 the term chose a gap over a better outward site in 242 of 5633 settler decisions, mostly at 2-5 cities, and without the head net2 took +4.1, +4.2 and +2.1 points (GAP.md)");
 }
 
@@ -860,5 +1093,12 @@ pub fn count() -> usize {
     for neuron in neurons() {
         n += neuron.terms.len() + usize::from(matches!(neuron.join, Join::Sum(_)));
     }
-    n + TILT.len() + 11 + 5
+    // `early-growth`'s own neurons (read outside `neurons()`).
+    for neuron in [&EXPANSION_TILT, &WORKER_TILT, &OPENING_ROOM, &OPENING, &GARRISON, &CHEST_ITEM, &BUY_CHEST, &WORKER_SHORT, &JOBS_CAP] {
+        n += usize::from(neuron.bias != 0);
+        n += neuron.terms.len();
+    }
+    // The gates read by `neurons()`' levers (11) and the growth's (`gate::GARRISON`, `CHEST_TURNS`, `CHEST_ITEM`,
+    // `WORKER_SHORT`), the site head (5) and its shared land (`site::SHARED`).
+    n + TILT.len() + 15 + 6
 }

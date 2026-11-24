@@ -120,7 +120,11 @@ use kernel::replay::hash::authoritative_hash;
 /// - 23 November, the sixteenth promotion: `standard` plays as `net2` (classic/docs/ai-net2.md); the smoke game's
 ///   70 rounds play the same: the benched `net2` against itself (`ai/promote-net2` bfe8966, before the promotion)
 ///   gave 0c770e6ba5d4e5a8, as the old `standard` did, and so do the new `standard` and `pre-net2`; the hash stays.
-const SMOKE_RESULT_HASH: &str = "0c770e6ba5d4e5a8";
+/// - 24 November, the seventeenth promotion: `standard` plays as `early-growth` (classic/docs/ai-net2.md); its science
+///   flow and early growth change the smoke game: 079f22688fe0f2f8, the hash of the benched `early-growth` against
+///   itself (`runs/bin-r4`, classic 31d19c6, before the promotion), measured; the old `standard` against itself (now
+///   `pre-early-growth`) gave the old 0c770e6ba5d4e5a8 there and on the promoted build.
+const SMOKE_RESULT_HASH: &str = "079f22688fe0f2f8";
 
 fn pairing(candidate: &str) -> Pairing {
     Pairing { baseline: "standard".to_owned(), candidate: candidate.to_owned(), landless_seat: None }

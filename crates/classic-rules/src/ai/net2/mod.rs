@@ -30,6 +30,7 @@ pub mod plan;
 mod readers;
 pub mod rival_inputs;
 pub mod science;
+pub mod growth;
 pub mod site_head;
 pub mod trace;
 pub mod weights;
@@ -72,6 +73,10 @@ pub fn think(obs: &AIObservation<'_>, brief: &TurnBrief, state: &mut AiState, ru
     let logits = std::env::var_os("NET2_TRACE").map(|_| strategy_net::logits_net(&situation.features, &memory.held, net));
     let mut intent = strategy_net::intent_step(seat, &mut memory, &situation, net, &tilt);
     inputs.seat.size_model = size_model(parts, &intent);
+    // `early-growth`: the opening's cities and the luxuries waiting (`growth::read_opening`); 0 for every other variant.
+    if brief.early_growth {
+        growth::read_opening(obs, rules, &situation.features, parts, &intent, &mut inputs.seat);
+    }
     let after = levers::after_intent(&pass, &intent, &inputs, obs.round);
     cap_cities(obs, parts, &mut intent, after.city_cap);
     if let Some(logits) = &logits {
@@ -84,6 +89,11 @@ pub fn think(obs: &AIObservation<'_>, brief: &TurnBrief, state: &mut AiState, ru
     if brief.science_flow {
         levers.science = science::plan(obs, rules, &pass, &intent, &inputs, &mut own.science);
     }
+    // `early-growth`: the young cities' garrisons, the growth purchases' gold, the shared land of a site (`growth`);
+    // every other variant keeps them off.
+    if brief.early_growth {
+        levers.growth = growth::plan(obs, brief, state, rules, &pass, &inputs);
+    }
     // `layout-defence`: the hold of the cities (`hold`); every other variant keeps it empty.
     if brief.layout_defence {
         levers.hold = hold::plan(obs, brief, state, &pass, &own.inputs, rules);
@@ -94,7 +104,11 @@ pub fn think(obs: &AIObservation<'_>, brief: &TurnBrief, state: &mut AiState, ru
     offence::apply(&mut levers, &pass);
     memory.net2 = Some(plan::Memory2 { core: pass.core.clone(), inputs: own.inputs, science: own.science });
     let _plan_span = prof::span("net2/plan_with_intent");
-    let price_tilt = if parts.plays(Part::Economy) { after.price_tilt } else { [0; pd::N] };
+    let mut price_tilt = if parts.plays(Part::Economy) { after.price_tilt } else { [0; pd::N] };
+    // `early-growth`: the opening's settlers and the luxuries' workers (`weights::EXPANSION_TILT`, `WORKER_TILT`).
+    if brief.early_growth && parts.plays(Part::Economy) {
+        growth::tilt_prices(&inputs.seat, &mut price_tilt);
+    }
     let strategy = strategy_net::plan_with_intent(seat, state, memory, &situation, intent, &price_tilt, Wishes::default());
     Plan2 { strategy, net2: levers }
 }

@@ -136,6 +136,8 @@ def fire(neuron, frame, ar):
         for term in neuron["terms"]:
             best = max(best, ar.div(term["w"] * _shaped(term, frame, ar), ONE))
         return ar.unit(best)
+    if neuron["join"] == "min":
+        return min((ar.div(term["w"] * _shaped(term, frame, ar), ONE) for term in neuron["terms"]), default=0)
     total = sum(term["w"] * _shaped(term, frame, ar) for term in neuron["terms"])
     out = neuron["bias"] + ar.div(total, ONE)
     return ar.unit(out) if neuron["join"] == "unit" else out

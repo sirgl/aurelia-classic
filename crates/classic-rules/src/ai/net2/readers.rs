@@ -26,6 +26,7 @@ const READERS: &[(&str, &str, &str)] = &[
     ("space_research", "strategy_net/heads.rs", "n.space_research"),
     ("capital_gate", "victory.rs", "|p| p.capital_gate"),
     ("science", "economy.rs", "plan.science.scientists"),
+    ("growth", "allocator.rs", "plan.growth.chest"),
     ("hold", "planner_units.rs", "plan.hold.extra_at(city)"),
     // Hold and CityHold: the hold of the cities (`layout-defence`)
     ("cities", "planner_cities.rs", "p.hold.cities.is_empty()"),

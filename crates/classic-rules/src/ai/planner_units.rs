@@ -499,10 +499,21 @@ fn garrison_target(view: &UnitView<'_, '_>, state: &AiState, city: TileId) -> us
 
 /// Garrison holders the city on `city` wants under `strategy`: the empire's standing garrison
 /// (`garrison_wanted_by`) and, once it has one, the holders beyond it that `net2`'s hold of the city asks for
-/// (`Net2Plan::hold`, `layout-defence`; none for every other variant). Every count of a city's garrison reads
+/// (`Net2Plan::hold`, `layout-defence`; none for every other variant); none while `net2`'s garrison lets the city wait
+/// (`garrison_waits_at`, `early-growth`). Every count of a city's garrison reads
 /// this one rule (`tests::every_garrison_count_reads_the_city`).
 pub fn garrison_wanted_at(brief: &TurnBrief, strategy: Strategy, city: TileId) -> usize {
+    if garrison_waits_at(brief, city) {
+        return 0;
+    }
     garrison_with(brief, strategy, crate::ai::operations::with_net2(brief, crate::ai::net2::plan::Part::Guard, |plan| plan.hold.extra_at(city)).unwrap_or(0))
+}
+
+/// `early-growth`: `net2`'s garrison lets the city on `city` build its infrastructure before its flat garrison
+/// (`Growth::garrison_waits`, `weights::GARRISON`); false for every other variant.
+pub fn garrison_waits_at(brief: &TurnBrief, city: TileId) -> bool {
+    let waits = crate::ai::operations::with_net2(brief, crate::ai::net2::plan::Part::Guard, |plan| plan.growth.garrison_waits.contains(&city));
+    waits.unwrap_or(false)
 }
 
 /// The garrison of a city that `extra` holders beyond the standing garrison are asked of (`garrison_wanted_at`; the

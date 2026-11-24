@@ -574,6 +574,9 @@ fn generated_line(rng: &mut Lcg) -> String {
         parts_short: seat_row[13],
         size_model: seat_row[14],
         part_out: if seat_row[15] > 500 { 1000 } else { 0 },
+        opening: seat_row[16] / 250 * 250,
+        opening_gap: seat_row[17] / 250 * 250,
+        lux_open: seat_row[18] / 500 * 500,
         ..SeatInputs::default()
     };
     let rivals: Vec<RivalInputs> = (0..1 + rng.below(7)).map(|i| generated_rival(rng, 1 + i as u8)).collect();
@@ -625,7 +628,9 @@ fn the_parity_fixture_is_the_integer_net() {
 #[test]
 fn the_weights_count() {
     let n = super::weights::count();
-    assert_eq!(n, 168, "net2's own hand weights (the 13 carried concepts and the carried logits are `strategy_net::weights`'s)");
+    // `early-growth`: the opening's term of `CITY_CAP`, the opening's neurons, the tilts, the garrison and its bias, the
+    // chest's neurons, the jobs' neurons and the bias of their cap, their gates, the shared land.
+    assert_eq!(n, 202, "net2's own hand weights (the 13 carried concepts and the carried logits are `strategy_net::weights`'s)");
 }
 
 #[test]

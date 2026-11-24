@@ -2,7 +2,8 @@
 //! guarded `planner_settle::net_score`. Part E calls `score` from the site search; the legal and
 //! minimum-score gates stay in `planner_settle`.
 //!
-//! site = clamp(S1, S2 − 169, S2 + 169) + S3 − 30·S4·(1 + S5/1000) − 60·S6 − 40·S7 + 25·S8·S9/10⁶
+//! site = clamp(S1, S2 − 169, S2 + 169) + S3 − 30·S4·(1 + S5/1000) − 60·S6 − 40·S7 + 25·S8·S9/10⁶ − S11·S12/1000
+//! (S11·S12: `early-growth`'s shared land, 0 for every other variant).
 
 use crate::ai::strategy_net::layers::ONE;
 
@@ -15,7 +16,8 @@ pub fn score(site: &SiteInputs) -> i64 {
     let net = site.pop50.clamp(site.land - bound, site.land + bound);
     let gap = w::GAP.0 * site.rival_gap * (ONE + site.rival_menace) / ONE;
     let fill = w::FILL.0 * site.fill * site.tall / (ONE * ONE);
-    net + site.dist - gap - w::ARMY.0 * site.army - w::TRAVEL.0 * site.travel + fill
+    let shared = site.shared * site.shared_weight / ONE;
+    net + site.dist - gap - w::ARMY.0 * site.army - w::TRAVEL.0 * site.travel + fill - shared
 }
 
 #[cfg(test)]
@@ -44,5 +46,11 @@ mod tests {
         assert_eq!(score(&site()) - score(&SiteInputs { army: 2, travel: 3, ..site() }), 120 + 120);
         assert_eq!(score(&SiteInputs { fill: 1000, tall: 1000, ..site() }), score(&site()), "a gap weighs nothing: it stays ours (GAP.md)");
         assert_eq!(score(&SiteInputs { fill: 1000, tall: 0, ..site() }), score(&site()), "a wide seat does not");
+    }
+
+    #[test]
+    fn shared_land_costs_its_weight() {
+        assert_eq!(score(&SiteInputs { shared: 420, ..site() }), score(&site()), "no weight, no term (every variant but early-growth)");
+        assert_eq!(score(&site()) - score(&SiteInputs { shared: 420, shared_weight: 333, ..site() }), 139, "a third of the shared land");
     }
 }

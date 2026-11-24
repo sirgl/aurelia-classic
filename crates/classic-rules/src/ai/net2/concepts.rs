@@ -75,6 +75,17 @@ pub fn fire(neuron: &Neuron, frame: &Frame<'_>) -> Milli {
             }
             unit(best)
         }
+        Join::Min => {
+            let mut least: Option<Milli> = None;
+            for term in neuron.terms {
+                let value = term.w * frame.shaped(term) / ONE;
+                least = Some(match least {
+                    Some(l) => l.min(value),
+                    None => value,
+                });
+            }
+            least.unwrap_or(0)
+        }
     }
 }
 
@@ -98,6 +109,9 @@ impl SeatInputs {
             self.parts_short,
             self.size_model,
             self.part_out,
+            self.opening,
+            self.opening_gap,
+            self.lux_open,
         ]
     }
 }

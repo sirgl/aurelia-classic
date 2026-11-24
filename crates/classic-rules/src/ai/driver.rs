@@ -123,6 +123,8 @@ pub struct ClassicMind {
     net2_offence: bool,
     /// `Variant::ScienceFlow`: `net2`'s science-flow neurons play (`TurnBrief::science_flow`).
     science_flow: bool,
+    /// `Variant::EarlyGrowth`: `net2` reads the opening (`TurnBrief::early_growth`).
+    early_growth: bool,
     /// `Variant::LayoutDefence`: `net2`'s hold of the cities plays (`TurnBrief::layout_defence`).
     layout_defence: bool,
     /// `Variant::values_war_at_peace` (`TurnBrief::war_at_peace`).
@@ -176,14 +178,21 @@ impl ClassicMind {
         // `values_war_at_peace` answer for `Standard` as for `Net2`), under its own name, and `pre-net2` plays as
         // `standard` did before it (the mind of `nets-x-site` without `net2`), under its own. Every other
         // variant, `net2` (an alias of `standard`) and `nets-x-site` among them, plays as before.
+        // The seventeenth promotion (24 November): `standard` plays as `early-growth` did (the mind of `net2` with
+        // `net2`'s science flow and early growth: `Variant::science_flow` and `early_growth` answer for `Standard` as
+        // for `EarlyGrowth`), under its own name, and `pre-early-growth` plays as `standard` did before it (the mind
+        // of `net2`: `net2_parts`, `net2_offence` and `values_war_at_peace`, the science flow and the early growth
+        // off), under its own. Every other variant, `early-growth` (an alias of `standard`), `science-flow` and
+        // `net2` (on the standard before) among them, plays as before.
         let (variant, promoted) = match variant {
             Variant::Standard => (Variant::NetsXSite, Some(Variant::Standard)),
+            Variant::PreEarlyGrowth => (Variant::NetsXSite, Some(Variant::PreEarlyGrowth)),
             Variant::PreNet2 => (Variant::NetsXSite, Some(Variant::PreNet2)),
             Variant::PreNetsX => (Variant::NextX, Some(Variant::PreNetsX)),
             Variant::PreNextX => (Variant::Standard, Some(Variant::PreNextX)),
             // `net2`, its control and the tactical candidates play as `pre-net2` (the play of `nets-x-site`)
             // under their own names; `net2::think` and the unit nets are switched on below, as for `standard`.
-            Variant::Net2 | Variant::Net2Defence | Variant::Net2Tac | Variant::Tac2 | Variant::Net2Without(_) | Variant::Net2Off | Variant::PeaceFix | Variant::ScienceFlow | Variant::LayoutDefence => (Variant::NetsXSite, Some(variant)),
+            Variant::Net2 | Variant::Net2Defence | Variant::Net2Tac | Variant::Tac2 | Variant::Net2Without(_) | Variant::Net2Off | Variant::PeaceFix | Variant::ScienceFlow | Variant::EarlyGrowth | Variant::LayoutDefence => (Variant::NetsXSite, Some(variant)),
             // The economy nets' candidates (classic/docs/ai-econ-nets.md) play as `standard` under their own
             // names, with their nets on (`economy_nets`).
             Variant::EconSite | Variant::EconSiteTall | Variant::EconSiteOwnLand => (Variant::NextX, Some(variant)),
@@ -192,6 +201,7 @@ impl ClassicMind {
         let (net2, net2_offence, tactical_nets) = (promoted.and_then(Variant::net2_parts), promoted.is_some_and(Variant::net2_offence), matches!(promoted, Some(Variant::Tac2 | Variant::Net2Tac)));
         let war_at_peace = promoted.is_some_and(Variant::values_war_at_peace);
         let science_flow = promoted.is_some_and(Variant::science_flow);
+        let early_growth = promoted.is_some_and(Variant::early_growth);
         let layout_defence = promoted.is_some_and(Variant::layout_defence);
         let requested = variant;
         // `next-war-retake` is `next-war` with the retake of `retake2` (its flag on top of the war of
@@ -268,7 +278,7 @@ impl ClassicMind {
         let named = named.or(matches!(requested, Variant::NextW | Variant::NextWar | Variant::NextWarRetake | Variant::NextX | Variant::StrategistX | Variant::StrategistXThreat | Variant::NetsX | Variant::NetsXSite).then_some(requested));
         // The game's AI since the fourteenth promotion and the standard before it carry their own names.
         let named = promoted.or(named);
-        Self { advisors, variant, genome: None, humans: Vec::new(), walks: Default::default(), choice: None, #[cfg(feature = "experimental-ai")] net, book, named, walls, conquest: None, unciv, tall: None, sharp, tall_real, next, wonder_race, pays, fit, muster, call, retake2, vote_guard, field, raidw, landless, landless_plan, siege_mend: false, strategist, net2, net2_offence, science_flow, layout_defence, war_at_peace, tactical_nets }
+        Self { advisors, variant, genome: None, humans: Vec::new(), walks: Default::default(), choice: None, #[cfg(feature = "experimental-ai")] net, book, named, walls, conquest: None, unciv, tall: None, sharp, tall_real, next, wonder_race, pays, fit, muster, call, retake2, vote_guard, field, raidw, landless, landless_plan, siege_mend: false, strategist, net2, net2_offence, science_flow, early_growth, layout_defence, war_at_peace, tactical_nets }
     }
 
     /// A league book that may play on another base (`book_on`): a duel book
@@ -314,7 +324,7 @@ impl ClassicMind {
         advisors.register(crate::classic::ClassicSystem::Diplomacy, Box::new(crate::ai::diplomacy::DiplomacyAdvisor { embassies: variant.values_embassies() }));
         // The net plays on `NET_BASE`: its siege too.
         let walls = variant.siege_walls().then(|| Box::new(crate::ai::siege_walls::SiegeWalls::new().joined(variant.siege_join())));
-        Self { advisors, variant, genome: None, humans: Vec::new(), walks: Default::default(), choice: None, net: Some(Box::new(net)), book: None, named: None, walls, conquest: None, unciv: None, tall: None, sharp: false, tall_real: false, next: false, wonder_race: 0, pays: false, fit: false, muster: false, call: false, retake2: false, vote_guard: false, field: false, raidw: false, landless: false, landless_plan: false, siege_mend: false, strategist: crate::ai::strategy_net::wishes::Parts::NONE, net2: None, net2_offence: false, science_flow: false, layout_defence: false, war_at_peace: false, tactical_nets: false }
+        Self { advisors, variant, genome: None, humans: Vec::new(), walks: Default::default(), choice: None, net: Some(Box::new(net)), book: None, named: None, walls, conquest: None, unciv: None, tall: None, sharp: false, tall_real: false, next: false, wonder_race: 0, pays: false, fit: false, muster: false, call: false, retake2: false, vote_guard: false, field: false, raidw: false, landless: false, landless_plan: false, siege_mend: false, strategist: crate::ai::strategy_net::wishes::Parts::NONE, net2: None, net2_offence: false, science_flow: false, early_growth: false, layout_defence: false, war_at_peace: false, tactical_nets: false }
     }
 
     /// The net's part (`Variant::Net`), if any.
@@ -361,7 +371,7 @@ impl ClassicMind {
     pub fn variant(&self) -> Variant {
         // The joint build's candidate, the game's AI since the fourteenth promotion (which plays as it)
         // and the standard before it carry the flags below under their own names.
-        if let Some(v @ (Variant::NextX | Variant::Standard | Variant::PreNextX | Variant::PreNetsX | Variant::StrategistX | Variant::StrategistXThreat | Variant::EconSite | Variant::EconSiteTall | Variant::EconSiteOwnLand | Variant::NetsX | Variant::NetsXSite | Variant::Net2 | Variant::Net2Defence | Variant::Tac2 | Variant::Net2Tac | Variant::Net2Without(_) | Variant::Net2Off | Variant::ScienceFlow | Variant::LayoutDefence | Variant::PreNet2)) = self.named {
+        if let Some(v @ (Variant::NextX | Variant::Standard | Variant::PreNextX | Variant::PreNetsX | Variant::StrategistX | Variant::StrategistXThreat | Variant::EconSite | Variant::EconSiteTall | Variant::EconSiteOwnLand | Variant::NetsX | Variant::NetsXSite | Variant::Net2 | Variant::Net2Defence | Variant::Tac2 | Variant::Net2Tac | Variant::Net2Without(_) | Variant::Net2Off | Variant::ScienceFlow | Variant::EarlyGrowth | Variant::LayoutDefence | Variant::PreNet2 | Variant::PreEarlyGrowth)) = self.named {
             return v;
         }
         if self.landless {
@@ -418,12 +428,12 @@ impl ClassicMind {
 
     /// The variant whose economy nets the mind plays (`Variant::site_net`, `Variant::choice_mode`): an
     /// economy nets' candidate (`econ-site` and its hand edits) plays `standard` with its own,
-    /// `nets-x-site`, the game's AI since the fifteenth promotion, `pre-net2` and the `net2` variants with
+    /// `nets-x-site`, the game's AI since the fifteenth promotion, `pre-net2`, `pre-early-growth` and the `net2` variants with
     /// `econ-site`'s; every other mind its variant's.
     fn economy_nets(&self) -> Variant {
         match self.named {
             Some(v @ (Variant::EconSite | Variant::EconSiteTall | Variant::EconSiteOwnLand)) => v,
-            Some(Variant::NetsXSite | Variant::Standard | Variant::Net2 | Variant::Net2Defence | Variant::Tac2 | Variant::Net2Tac | Variant::Net2Without(_) | Variant::Net2Off | Variant::ScienceFlow | Variant::LayoutDefence | Variant::PreNet2) => Variant::EconSite,
+            Some(Variant::NetsXSite | Variant::Standard | Variant::Net2 | Variant::Net2Defence | Variant::Tac2 | Variant::Net2Tac | Variant::Net2Without(_) | Variant::Net2Off | Variant::ScienceFlow | Variant::EarlyGrowth | Variant::LayoutDefence | Variant::PreNet2 | Variant::PreEarlyGrowth) => Variant::EconSite,
             _ => self.variant,
         }
     }
@@ -879,6 +889,7 @@ impl ClassicMind {
         brief.effects = self.variant.effect_checks();
         brief.levers = self.variant.science_levers();
         brief.science_flow = self.science_flow;
+        brief.early_growth = self.early_growth;
         brief.layout_defence = self.layout_defence;
         brief.space_finish = self.variant.space_finish();
         brief.abilities = self.variant.unit_abilities();
@@ -1265,7 +1276,7 @@ mod sharp_tests {
         assert_eq!(mind_parts(&threat), mind_parts(&standard));
         assert_eq!((candidate.strategist, threat.strategist, standard.strategist), (Parts { threat: false, tall_first: true }, Parts { threat: true, tall_first: false }, Parts::NONE));
         assert_eq!((candidate.variant(), threat.variant()), (Variant::StrategistX, Variant::StrategistXThreat));
-        assert!(Variant::ALL.iter().filter(|v| v.strategist_parts().any()).eq([Variant::StrategistX, Variant::NetsX, Variant::NetsXSite, Variant::StrategistXThreat, Variant::Net2, Variant::Net2Defence, Variant::Tac2, Variant::Net2Tac].iter().chain(Variant::ALL.iter().filter(|v| matches!(v, Variant::Net2Without(_) | Variant::Net2Off | Variant::PeaceFix | Variant::ScienceFlow | Variant::LayoutDefence)))));
+        assert!(Variant::ALL.iter().filter(|v| v.strategist_parts().any()).eq([Variant::StrategistX, Variant::NetsX, Variant::NetsXSite, Variant::StrategistXThreat, Variant::Net2, Variant::Net2Defence, Variant::Tac2, Variant::Net2Tac].iter().chain(Variant::ALL.iter().filter(|v| matches!(v, Variant::Net2Without(_) | Variant::Net2Off | Variant::PeaceFix | Variant::ScienceFlow | Variant::EarlyGrowth | Variant::LayoutDefence)))));
     }
 
     /// The fourteenth promotion (14 November): the game's AI is the mind of `next-x` and names itself
@@ -1288,10 +1299,10 @@ mod sharp_tests {
         assert_eq!((tall.variant, tall.pays, tall.vote_guard, tall.landless_plan), (Variant::PreNext, false, false, false));
     }
 
-    /// Every part of a mind the fifteenth promotion can move: `mind_parts`, the strategist's wishes and the
-    /// economy nets it plays.
+    /// Every part of a mind the fifteenth to seventeenth promotions can move: `mind_parts`, the strategist's
+    /// wishes, the economy nets it plays, `net2`'s switches, the science flow, the early growth and the hold.
     fn mind_and_nets(m: &ClassicMind) -> String {
-        format!("{} {:?} {:?}", mind_parts(m), (m.strategist, m.economy_nets().site_net(), m.economy_nets().choice_mode()), (m.net2, m.net2_offence, m.war_at_peace, m.tactical_nets))
+        format!("{} {:?} {:?} {:?}", mind_parts(m), (m.strategist, m.economy_nets().site_net(), m.economy_nets().choice_mode()), (m.net2, m.net2_offence, m.war_at_peace, m.tactical_nets), (m.science_flow, m.early_growth, m.layout_defence))
     }
 
     /// The fifteenth promotion (22 November): the game's AI is the mind of `nets-x-site` (the strategist's
@@ -1324,15 +1335,15 @@ mod sharp_tests {
     /// `standard`; `net2` stays as its alias with the same mind; `pre-net2` is the standard before it, the
     /// mind of `nets-x-site` without `net2` (bench only). No other variant's mind moves: the ones measured on
     /// the standard of the fifteenth promotion (`net2-defence`, `net2-tac`, the ablation, `tac2`, `peace-fix`)
-    /// still play it, and `nets-x-site` plays `pre-net2`.
+    /// still play it, and `nets-x-site` plays `pre-net2`. Since the seventeenth promotion the standard of this
+    /// test is `pre-early-growth` (`the_game_plays_early_growth_and_pre_early_growth_is_the_standard_before`).
     #[test]
     fn the_game_plays_net2_and_pre_net2_is_the_standard_before() {
         use crate::ai::net2::Parts;
-        let (standard, alias, before, site) = (ClassicMind::new(Variant::Standard), ClassicMind::new(Variant::Net2), ClassicMind::new(Variant::PreNet2), ClassicMind::new(Variant::NetsXSite));
+        let (standard, alias, before, site) = (ClassicMind::new(Variant::PreEarlyGrowth), ClassicMind::new(Variant::Net2), ClassicMind::new(Variant::PreNet2), ClassicMind::new(Variant::NetsXSite));
         assert_eq!(mind_and_nets(&standard), mind_and_nets(&alias));
-        assert_eq!(mind_and_nets(&ClassicMind::default()), mind_and_nets(&standard), "the game's AI");
         assert_eq!(mind_and_nets(&before), mind_and_nets(&site));
-        assert_eq!((standard.variant(), alias.variant(), before.variant(), site.variant()), (Variant::Standard, Variant::Net2, Variant::PreNet2, Variant::NetsXSite));
+        assert_eq!((standard.variant(), alias.variant(), before.variant(), site.variant()), (Variant::PreEarlyGrowth, Variant::Net2, Variant::PreNet2, Variant::NetsXSite));
         assert_eq!((standard.net2, standard.net2_offence, standard.war_at_peace, standard.tactical_nets), (Some(Parts::All), true, true, false));
         assert_eq!((before.net2, before.net2_offence, before.war_at_peace, before.tactical_nets), (None, false, false, false));
         assert!(standard.plays_net2() && !before.plays_net2() && !site.plays_net2());
@@ -1345,10 +1356,46 @@ mod sharp_tests {
             // `peace-fix` was measured without the site net (its economy nets are its variant's), the others with it.
             assert_eq!(mind.economy_nets() == before.economy_nets(), v != Variant::PeaceFix, "{}", v.name());
         }
-        assert_eq!(*Variant::ALL.last().unwrap(), Variant::PreNet2);
+        assert!(Variant::ALL.contains(&Variant::PreNet2));
         assert_eq!(Variant::from_name("standard"), Some(Variant::Standard));
         assert_eq!(Variant::from_name("pre-net2"), cfg!(feature = "experimental-ai").then_some(Variant::PreNet2));
         assert_eq!(Variant::from_name("net2"), cfg!(feature = "experimental-ai").then_some(Variant::Net2));
+    }
+
+    /// The seventeenth promotion (24 November): the game's AI is the mind of `early-growth` (the mind of `net2`
+    /// with the science flow and the early growth) and names itself `standard`; `early-growth` stays as its alias
+    /// with the same mind in every part; `pre-early-growth` is the standard before it, the mind of `net2` without
+    /// them (bench only). No other variant's mind moves: `net2` and the variants measured on the standard of the
+    /// sixteenth promotion (`net2-defence`, `net2-tac`, the ablation, `tac2`, `peace-fix`, `layout-defence`)
+    /// still play it, `science-flow` plays it with the science flow alone.
+    #[test]
+    fn the_game_plays_early_growth_and_pre_early_growth_is_the_standard_before() {
+        let (standard, alias, before, net2, flow) = (ClassicMind::new(Variant::Standard), ClassicMind::new(Variant::EarlyGrowth), ClassicMind::new(Variant::PreEarlyGrowth), ClassicMind::new(Variant::Net2), ClassicMind::new(Variant::ScienceFlow));
+        assert_eq!(mind_and_nets(&standard), mind_and_nets(&alias));
+        assert_eq!(mind_and_nets(&ClassicMind::default()), mind_and_nets(&standard), "the game's AI");
+        assert_eq!(mind_and_nets(&before), mind_and_nets(&net2));
+        assert_eq!((standard.variant(), alias.variant(), before.variant()), (Variant::Standard, Variant::EarlyGrowth, Variant::PreEarlyGrowth));
+        assert_eq!((standard.science_flow, standard.early_growth, standard.layout_defence), (true, true, false));
+        assert_eq!((alias.science_flow, alias.early_growth), (true, true));
+        assert_eq!((before.science_flow, before.early_growth, before.layout_defence), (false, false, false));
+        assert_eq!((flow.science_flow, flow.early_growth), (true, false));
+        // The play of `net2` is whole in all three: the same switches, the same parts of the mind.
+        assert_eq!(mind_parts(&standard), mind_parts(&before));
+        assert_eq!((standard.net2, standard.net2_offence, standard.war_at_peace), (before.net2, before.net2_offence, before.war_at_peace));
+        // The variants measured on the sixteenth promotion's standard keep their minds and play no science flow.
+        for v in [Variant::Net2, Variant::Net2Defence, Variant::Net2Tac, Variant::Net2Off, Variant::Tac2, Variant::PeaceFix, Variant::LayoutDefence] {
+            let mind = ClassicMind::new(v);
+            assert_eq!(mind_parts(&mind), mind_parts(&before), "{} plays on the standard it was measured on", v.name());
+            assert_eq!((mind.science_flow, mind.early_growth), (false, false), "{}", v.name());
+            assert_eq!(mind.strategist, before.strategist, "{}", v.name());
+        }
+        // Every variant but the three that play it answers the two switches `false`.
+        assert!(Variant::ALL.iter().all(|v| v.science_flow() == matches!(v, Variant::Standard | Variant::ScienceFlow | Variant::EarlyGrowth)));
+        assert!(Variant::ALL.iter().all(|v| v.early_growth() == matches!(v, Variant::Standard | Variant::EarlyGrowth)));
+        assert_eq!(*Variant::ALL.last().unwrap(), Variant::PreEarlyGrowth);
+        assert_eq!(Variant::from_name("standard"), Some(Variant::Standard));
+        assert_eq!(Variant::from_name("pre-early-growth"), cfg!(feature = "experimental-ai").then_some(Variant::PreEarlyGrowth));
+        assert_eq!(Variant::from_name("early-growth"), cfg!(feature = "experimental-ai").then_some(Variant::EarlyGrowth));
     }
 
     /// The economy nets' candidates (classic/docs/ai-econ-nets.md) are the mind of `standard` under their

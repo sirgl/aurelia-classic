@@ -97,3 +97,18 @@ fn a_save_of_main_before_net2_loads_and_plays_on() {
     assert!(hashes.windows(2).any(|w| w[0] != w[1]), "the game moves on");
     game.validate(&rules).unwrap();
 }
+
+/// A save of main before the seventeenth promotion (classic edfa519, the old `standard` of 4 nations after 100
+/// rounds; `fixtures/standard-edfa519.recipe.rs`): its AI memory has no `science-flow` section; it loads, the world
+/// hashes as saved, and the new `standard` (`early-growth`, with an empty memory of its own) plays it on.
+#[test]
+fn a_save_of_main_before_early_growth_loads_and_plays_on() {
+    const SAVE: &[u8] = include_bytes!("fixtures/standard-edfa519.aurelia");
+    const WORLD: u64 = 0x6a5c_0f0a_4fa3_318f;
+    let rules = compile_rules(core_rules()).unwrap();
+    let (mut game, mut driver) = load(SAVE, &rules);
+    assert_eq!(authoritative_hash(&game), WORLD);
+    let hashes = play(&mut game, &rules, &mut driver, 40);
+    assert!(hashes.windows(2).any(|w| w[0] != w[1]), "the game moves on");
+    game.validate(&rules).unwrap();
+}

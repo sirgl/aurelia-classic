@@ -146,6 +146,9 @@ pub(crate) struct Empire {
     fit: Option<FitContext>,
     /// Barbarian camps want a clearing group the free units do not make (`ai::camps`).
     pub(crate) camp_demand: usize,
+    /// Cities whose garrison waits (`early-growth`: `planner_units::garrison_waits_at`, `net2::weights::GARRISON`);
+    /// empty for every other variant.
+    garrison_waits: Vec<crate::ids::TileId>,
     /// `layout-defence`: the cities with fewer holders than `net2`'s hold of them asks for (`hold_short`), and the
     /// units the empire's army lacks for every city's garrison; empty and 0 for every other variant.
     hold_short: Vec<crate::ids::TileId>,
@@ -616,6 +619,7 @@ impl Empire {
             refused: Vec::new(),
             fit: brief.army_fit.then(|| FitContext::of(obs, brief, state, rules)),
             camp_demand: if brief.camps { crate::ai::camps::demand(obs, brief, state, rules) } else { 0 },
+            garrison_waits: obs.own_cities.iter().map(|c| c.tile).filter(|t| crate::ai::planner_units::garrison_waits_at(brief, *t)).collect(),
             hold_short: hold_short(brief, state),
             hold_room: hold_room(brief, state, military),
             hold_alarm: hold_short(brief, state).into_iter().filter(|t| brief.endangered(*t)).collect(),
@@ -1589,6 +1593,11 @@ fn needs_garrison(
     rules: &CompiledRuleset,
     city: &OwnCity,
 ) -> bool {
+    // `early-growth`: net2's garrison lets the city wait (`garrison_waits_at`), the one place the wait is read for the
+    // orders: a city that waits needs none, flat or held (`hold_short` reads it through `garrison_wanted_at`).
+    if empire.garrison_waits.contains(&city.tile) {
+        return false;
+    }
     let wanted =
         crate::ai::planner_units::garrison_wanted(obs.speed.standard_round(obs.round), &obs.relations, empire.strategy);
     wanted > 0 && (!garrisoned(obs, rules, city) || held_short(empire, city))
@@ -1630,6 +1639,8 @@ fn garrison_order(
     rules: &CompiledRuleset,
     slot: &Slot<'_>,
 ) -> Option<Decision> {
+    // `early-growth`: net2's garrison (`weights::GARRISON`) lets a quiet city below the mean production build its
+    // infrastructure first (`needs_garrison`); a seen threat is `defence_orders`'.
     let needed = needs_garrison(obs, empire, rules, slot.city) && !slot.plans_military(rules);
     if !needed || empire.military >= empire.military_cap {
         return None;

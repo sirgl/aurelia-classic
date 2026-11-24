@@ -42,10 +42,12 @@ harness = ["kernel/harness"]
 # `next-x`, with the war of `next-war-retake`, the vote guard and the landless plan, since the
 # fourteenth; playing as `nets-x-site`, with the strategist's tall first and the site net with its
 # guard, since the fifteenth; playing as `net2`, with `ai::net2` in place of the strategist's pass,
-# since the sixteenth) whatever `AURELIA_AI_VARIANT` says, and the table of the choice net
+# since the sixteenth; playing as `early-growth`, with `net2`'s science flow and early growth, since the
+# seventeenth) whatever `AURELIA_AI_VARIANT` says, and the table of the choice net
 # (played only by the `ChoiceNet*` variants) is not compiled. The site net's table
 # (`ai::site_weights`) is compiled in every build since the fifteenth promotion, and `ai::net2` (its
-# weights in `ai::net2::weights`) in every build: the game plays them.
+# weights in `ai::net2::weights`, its science flow in `ai::net2::science`, its early growth in `ai::net2::growth`)
+# in every build: the game plays them.
 experimental-ai = []
 gpu = ["experimental-ai", "dep:wgpu", "dep:pollster"]
 

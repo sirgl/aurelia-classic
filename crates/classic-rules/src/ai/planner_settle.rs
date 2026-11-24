@@ -309,7 +309,25 @@ impl SiteContext<'_, '_> {
             tall: read.plan.tall_share,
             // S10 belongs to the offence (addendum §2.5), not built: 0 is today's behaviour.
             claim: 0,
+            shared: if read.plan.growth.shared > 0 { i64::from(self.shared_land(tile)) } else { 0 },
+            shared_weight: read.plan.growth.shared,
         }
+    }
+
+    /// S11 (`early-growth`): the land score of the site's work-radius tiles that are within the work radius of an own
+    /// city too, at the land score's radius weight (`score_legal`): the tiles the older city works first.
+    fn shared_land(&self, tile: TileId) -> i32 {
+        let dims = self.view.dimensions();
+        let mut shared = 0;
+        for near in crate::math::hex_disc(dims, tile, CITY_WORK_RADIUS) {
+            if near == tile || self.own_cities.contains(&near) {
+                continue;
+            }
+            if self.own_cities.iter().any(|c| dims.distance(*c, near).is_some_and(|d| d <= CITY_WORK_RADIUS)) {
+                shared += 3 * self.tile_score(near, tile);
+            }
+        }
+        shared
     }
 
     /// The danger a site on the site net's path is in, in score points (0 or below): the net

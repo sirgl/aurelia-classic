@@ -618,7 +618,8 @@ pub const SPACE_TRACE_ENV: &str = "AURELIA_SPACE_TRACE";
 /// `fractal/small/seed 1853017/odd`) contains the text: one game of a suite again, with its traces.
 pub const MATCH_FILTER_ENV: &str = "AURELIA_BENCH_MATCH";
 
-/// Dev-only: `AURELIA_CAPITAL_TRACE` (any value) writes every capture of an original capital to stderr.
+/// Dev-only: `AURELIA_CAPITAL_TRACE` (any value) writes every capture of an original capital and every war between two
+/// seats to stderr.
 pub const CAPITAL_TRACE_ENV: &str = "AURELIA_CAPITAL_TRACE";
 
 impl MatchLog {
@@ -763,6 +764,10 @@ impl MatchLog {
     fn open_war(&mut self, declarer: PlayerId, enemy: PlayerId, since: u32) {
         let seat = |p: PlayerId| self.seats.iter().any(|s| s.player == p);
         if seat(declarer) && seat(enemy) {
+            if let Some(label) = &self.capital_trace {
+                let side = |p: PlayerId| self.seats.iter().find(|s| s.player == p).map_or("other", |s| if s.side == Side::Candidate { "candidate" } else { "baseline" });
+                eprintln!("WAR {label} round {since} declared by {} ({}) on {} ({})", declarer.0, side(declarer), enemy.0, side(enemy));
+            }
             self.wars.push(OpenWar { declarer, enemy, since, won: false });
             self.record(enemy, |r| r.attacked += 1);
         }

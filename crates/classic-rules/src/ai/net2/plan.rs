@@ -72,6 +72,15 @@ pub struct SeatInputs {
     pub size_model: Milli,
     /// A spaceship part of ours stands outside the capital (0/1000; `weights::g::PART_OUT`).
     pub part_out: Milli,
+    /// The opening's cities the size model does not found, 250 a city (`weights::g::OPENING`; `net2::opening`); 0 unless
+    /// the seat plays `early-growth` (`TurnBrief::early_growth`). Set after the intent, read by `CITY_CAP` only.
+    pub opening: Milli,
+    /// The opening's cities still to found, the model's among them, 250 a city (`weights::g::OPENING_GAP`;
+    /// `net2::opening_gap`); 0 unless `early-growth`. Set after the intent, read by `EXPANSION_TILT` only.
+    pub opening_gap: Milli,
+    /// Luxury kinds lying unconnected on our tiles beyond our workers, 500 a kind (`weights::g::LUX_OPEN`;
+    /// `net2::lux_open`); 0 unless `early-growth`. Read by `WORKER_TILT` only.
+    pub lux_open: Milli,
 }
 
 /// One strategic resource the missing spaceship parts need (the hold's quantity, `Net2Plan::space_hold`).
@@ -316,6 +325,11 @@ pub struct SiteInputs {
     pub tall: Milli,
     /// S10 (offence addendum §2.5): kinds we lack in the site's radius within 3 of a rival's border, / 2.
     pub claim: Milli,
+    /// S11 (`early-growth`): the land score of the site's tiles within the work radius of an own city (their
+    /// `tile_score`, the radius weight of the land score), points; 0 when `Growth::shared` is 0.
+    pub shared: i64,
+    /// S12: `Growth::shared`, the weight of S11 (thousandths).
+    pub shared_weight: Milli,
 }
 
 // ---- the outputs (design §4.4–§4.7) ----
@@ -728,8 +742,31 @@ pub struct Net2Plan {
     pub capital_gate: Option<crate::ids::TileId>,
     /// `science-flow`'s levers (`net2::science`; all off for every other variant).
     pub science: Science,
+    /// `early-growth`'s levers (`net2::growth`; all off for every other variant).
+    pub growth: Growth,
     /// `layout-defence`'s hold of the cities (`net2::hold`; empty for every other variant).
     pub hold: Hold,
+}
+
+/// The early growth's levers (`net2::growth`), read by the city planner's garrison, the allocator's gold and worker and
+/// the site head. Empty and zero unless the seat plays `early-growth` (`TurnBrief::early_growth`).
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Growth {
+    /// The tiles of the own cities whose flat garrison waits (`weights::GARRISON` below `gate::GARRISON`), read by the
+    /// one garrison rule (`planner_units::garrison_wanted_at`: none there); a threat is the defence watch's
+    /// (`planner_cities::defence_orders`).
+    pub garrison_waits: Vec<TileId>,
+    /// Gold the tiles, the gifts and the other heads leave for a growth purchase (`weights::BUY_CHEST` × the hurry
+    /// price of the cheapest head in `chest_heads`; `allocator::spend_gold`).
+    pub chest: u32,
+    /// Own cities whose queue head may spend the chest (`weights::CHEST_ITEM`).
+    pub chest_heads: Vec<EntityId>,
+    /// The site head's weight of the land a site shares with an own city (`weights::site::SHARED`, thousandths of
+    /// the land score of those tiles); 0: no term.
+    pub shared: Milli,
+    /// The jobs the workers have ahead (`net2::growth::jobs_ahead`): the tiles the cities work now and will work next
+    /// with a job the known technologies allow; the allocator's worker counts at least these (0: its own count).
+    pub jobs_ahead: u32,
 }
 
 /// The hold of the cities (`weights::FRONT`, `weights::HOLD`): how many holders each city keeps beyond the empire's

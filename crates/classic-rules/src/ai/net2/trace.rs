@@ -65,6 +65,7 @@ fn neuron_json(n: &Neuron) -> String {
         Join::Sum(Act::Unit) => "unit",
         Join::Sum(Act::Linear) => "linear",
         Join::Max => "max",
+        Join::Min => "min",
     };
     let terms: Vec<String> = n.terms.iter().map(term_json).collect();
     format!("{{\"bias\": {}, \"join\": \"{join}\", \"terms\": [{}]}}", n.bias, terms.join(", "))

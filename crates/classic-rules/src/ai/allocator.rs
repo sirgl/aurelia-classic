@@ -27,7 +27,7 @@ use crate::ai::trace::{Actor, Reason};
 use crate::ai::value::{Centi, PriceModel, Prices};
 use crate::command::Command;
 use crate::derived::income::unit_upkeep_at;
-use crate::ids::{ProductionItem, TileId};
+use crate::ids::{CityHandle, ProductionItem, TileId};
 use crate::knowledge::observation::{AIObservation, OwnCity};
 use crate::rules::content::Personality;
 use crate::rules::CompiledRuleset;
@@ -83,6 +83,9 @@ pub struct Allocator {
     /// The gold kept for the alliance of a rival that would win the World Leader vote
     /// (`city_states::guard_chest`, `vote-guard`); only the gifts that take it may spend it.
     guard_chest: u32,
+    /// `early-growth`: the gold the tiles, the gifts and the other heads leave for a growth purchase, and the heads
+    /// that may spend it (`Net2Plan::growth`); none for every other variant.
+    growth_chest: GrowthChest,
     personality: Personality,
     /// A trade unit worth building, priced (`PriceModel::Uses`).
     trade: Option<TradeProspect>,
@@ -144,10 +147,11 @@ impl Allocator {
             empire,
             prices,
             cities: obs.own_cities.len() as i32,
-            jobs: if brief.effects.demand { finder_jobs(obs, brief, state, rules) } else { open_jobs(obs) },
+            jobs: worker_jobs(obs, brief, state, rules),
             may_settle: may_settle(obs, brief, state, prices.model),
             war_chest: war_chest(obs, state) + state.war_plan.map_or(0, |plan| plan.chest) + brief.net2.as_ref().map_or(0, |plan| plan.science.chest) + crate::ai::operations::with_net2(brief, crate::ai::net2::plan::Part::Guard, |plan| plan.hold.chest).unwrap_or(0),
             guard_chest: crate::ai::city_states::guard_chest(obs, &prices),
+            growth_chest: GrowthChest::of(obs, brief),
             personality: brief.personality,
             sea: brief.sea_jobs.clone(),
             trade: match prices.model {
@@ -409,6 +413,7 @@ impl Allocator {
                 _ => (hurries < hurry_limit, Reason::Hurry),
             };
             let purse = if offer.guard { guard_room } else { spendable };
+            let purse = self.growth_chest.purse(&offer.command, purse);
             if !room || offer.price > purse || income - offer.upkeep < 0 || offer.ratio() <= self.least_ratio() {
                 continue;
             }
@@ -596,6 +601,39 @@ fn trade_prospect(obs: &AIObservation<'_>, rules: &CompiledRuleset, prices: &Pri
     };
     let value = obs.view.trade_prospects(city.handle, kind).iter().map(worth).max()?;
     (value > 0).then_some(TradeProspect { city: city.id, kind, value })
+}
+
+/// `early-growth`'s chest (`Growth::chest`, `chest_heads`): the gold only the listed queue heads may spend.
+#[derive(Debug, Clone, Default)]
+struct GrowthChest {
+    gold: u32,
+    heads: Vec<CityHandle>,
+}
+
+impl GrowthChest {
+    fn of(obs: &AIObservation<'_>, brief: &TurnBrief) -> Self {
+        let read = |plan: &crate::ai::net2::plan::Net2Plan| {
+            let heads = obs.own_cities.iter().filter(|c| plan.growth.chest_heads.contains(&c.id)).map(|c| c.handle).collect();
+            Self { gold: plan.growth.chest, heads }
+        };
+        crate::ai::operations::with_net2(brief, crate::ai::net2::plan::Part::Economy, read).unwrap_or_default()
+    }
+
+    /// The purse an offer may spend: all of it for a hurry of a listed head, the purse less the chest for the rest.
+    fn purse(&self, command: &Command, purse: u32) -> u32 {
+        match command {
+            Command::HurryProduction { city, .. } if self.heads.contains(city) => purse,
+            _ => purse.saturating_sub(self.gold),
+        }
+    }
+}
+
+/// The jobs the allocator's worker counts: the finder's or the worked tiles' (`TurnBrief::effects`), at least `net2`'s
+/// jobs ahead (`early-growth`: `Growth::jobs_ahead`, 0 for every other variant).
+fn worker_jobs(obs: &AIObservation<'_>, brief: &TurnBrief, state: &AiState, rules: &CompiledRuleset) -> u32 {
+    let own = if brief.effects.demand { finder_jobs(obs, brief, state, rules) } else { open_jobs(obs) };
+    let ahead = crate::ai::operations::with_net2(brief, crate::ai::net2::plan::Part::Economy, |plan| plan.growth.jobs_ahead);
+    own.max(ahead.unwrap_or(0))
 }
 
 /// Fixed-point scale of value per gold.
