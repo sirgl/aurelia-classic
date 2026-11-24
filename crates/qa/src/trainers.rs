@@ -19,6 +19,7 @@ pub mod act;
 pub mod assault;
 pub mod dump;
 pub mod families;
+pub mod history_families;
 pub mod lab;
 pub mod memory;
 pub mod scene_rule;
@@ -94,6 +95,8 @@ pub struct Scene {
     pub kills_by: BTreeMap<u32, u32>,
     /// What the assault families keep between rounds (damage, resting, promotions seen).
     pub track: assault::Track,
+    /// The second army's track (twin-siege: two armies at two cities).
+    pub track2: assault::Track,
     /// The "at any cost" assault families: the last round a capture wins (None: the round limit) and the enemy's
     /// reinforcements that land in the round after it (kinds; spawned once, then scene pieces).
     pub deadline: Option<u32>,

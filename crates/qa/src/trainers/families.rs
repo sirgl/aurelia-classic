@@ -68,6 +68,7 @@ use serde::{Deserialize, Serialize};
 
 use super::act::{self, Aim, Nerve};
 use super::assault;
+use super::history_families as history;
 use super::memory;
 use super::lab::{self, dist, Arm, Draw, Lab};
 use super::{Piece, Scene};
@@ -112,10 +113,18 @@ pub enum Fam {
     // The "at any cost" assault trainers (`assault.rs`; appended again: the older families keep their seeds).
     AssaultReinforce,
     AssaultPeace,
+    // The history and multi-front trainers (`history_families.rs`; appended again: the older families keep their seeds).
+    Feint,
+    FogSniper,
+    CityReinforced,
+    ScoutReport,
+    TwoFronts,
+    SecondCity,
+    TwinSiege,
 }
 
 impl Fam {
-    pub const ALL: [Fam; 34] = [
+    pub const ALL: [Fam; 41] = [
         Fam::Duel,
         Fam::Focus,
         Fam::Hold,
@@ -150,6 +159,13 @@ impl Fam {
         Fam::HuntFog,
         Fam::AssaultReinforce,
         Fam::AssaultPeace,
+        Fam::Feint,
+        Fam::FogSniper,
+        Fam::CityReinforced,
+        Fam::ScoutReport,
+        Fam::TwoFronts,
+        Fam::SecondCity,
+        Fam::TwinSiege,
     ];
 
     pub fn name(self) -> &'static str {
@@ -188,6 +204,13 @@ impl Fam {
             Fam::HuntFog => "hunt-fog",
             Fam::AssaultReinforce => "assault-reinforce",
             Fam::AssaultPeace => "assault-peace",
+            Fam::Feint => "feint",
+            Fam::FogSniper => "fog-sniper",
+            Fam::CityReinforced => "city-reinforced",
+            Fam::ScoutReport => "scout-report",
+            Fam::TwoFronts => "two-fronts",
+            Fam::SecondCity => "second-city",
+            Fam::TwinSiege => "twin-siege",
         }
     }
 
@@ -208,6 +231,7 @@ impl Fam {
             Fam::Snipe => 8,
             Fam::Surrounded => 4,
             f if memory::is_memory(f) => memory::rounds(f),
+            f if history::is_history(f) => history::rounds(f),
             f => assault::rounds(f),
         }
     }
@@ -239,6 +263,7 @@ impl Fam {
             Fam::Snipe => &["ref-snipe"],
             Fam::Surrounded => &["ref-break", "ref-flee"],
             f if memory::is_memory(f) => memory::solvers(f),
+            f if history::is_history(f) => history::solvers(f),
             f => assault::solvers(f),
         }
     }
@@ -273,6 +298,7 @@ impl Fam {
             Fam::Snipe => &[("MO7", 'U'), ("MT8", 'U'), ("E1", 'U'), ("M4", 'U'), ("CS4", 'U')],
             Fam::Surrounded => &[("MT4", 'D')],
             f if memory::is_memory(f) => &[],
+            f if history::is_history(f) => &[],
             f => assault::tricks(f),
         }
     }
@@ -306,6 +332,7 @@ impl Fam {
             Fam::Snipe => "catch an escorted civilian (worker, Great General) of the enemy",
             Fam::Surrounded => "a strong unit of ours about to be surrounded: break out or survive",
             f if memory::is_memory(f) => memory::task(f),
+            f if history::is_history(f) => history::task(f),
             f => assault::task(f),
         }
     }
@@ -327,6 +354,7 @@ impl Fam {
             Fam::Airstrike => k.has(Arm::Bomber),
             // The assault families need the era's siege unit (a city of any era wears down the archers of the era before it).
             f if assault::is_assault(f) => land && k.has(Arm::Siege),
+            f if history::is_history(f) => history::claims(f, k),
             _ => land,
         }
     }
@@ -512,6 +540,7 @@ pub(super) fn blank(fam: Fam, lab: &Lab, instance: usize, attempt: u32) -> Scene
         first_kill: None,
         kills_by: BTreeMap::new(),
         track: Default::default(),
+        track2: Default::default(),
         deadline: None,
         reinforce: Vec::new(),
     }
@@ -547,6 +576,11 @@ pub fn build(rules: &CompiledRuleset, fam: Fam, era: u8, instance: usize, attemp
     }
     if memory::is_memory(fam) {
         let mut s = memory::build(&mut p, fam, &lab, instance, attempt)?;
+        s.info.insert("attempt".into(), attempt.to_string());
+        return Ok((p.game, s));
+    }
+    if history::is_history(fam) {
+        let mut s = history::build(&mut p, fam, &lab, instance, attempt)?;
         s.info.insert("attempt".into(), attempt.to_string());
         return Ok((p.game, s));
     }
@@ -1146,6 +1180,7 @@ pub fn build(rules: &CompiledRuleset, fam: Fam, era: u8, instance: usize, attemp
         }
         Fam::AssaultHeal | Fam::PromotionChoice | Fam::HillArchers | Fam::CityFire | Fam::PlannedAssault | Fam::AssaultReinforce | Fam::AssaultPeace => unreachable!("built by assault::build"),
         Fam::AmbushFog | Fam::HuntFog => unreachable!("built by memory::build"),
+        Fam::Feint | Fam::FogSniper | Fam::CityReinforced | Fam::ScoutReport | Fam::TwoFronts | Fam::SecondCity | Fam::TwinSiege => unreachable!("built by history_families::build"),
         Fam::Airstrike => {
             let home_t = at(&p, -3, 0)?;
             p.city(me, home_t, 4, false);
@@ -1235,6 +1270,9 @@ fn city_hp(rules: &CompiledRuleset, game: &GameState, t: TileId) -> Option<(i64,
 
 /// The learner's reference `name` plays the scene units of the learner's seat for this turn.
 pub fn reference_turn(rules: &CompiledRuleset, game: &mut GameState, scene: &mut Scene, name: &str) {
+    if history::is_history(scene.fam) && history::reference_turn(rules, game, scene, name) {
+        return;
+    }
     if let Some(f) = assault::flags(name) {
         assault::turn(rules, game, scene, f);
         return;
@@ -1484,6 +1522,10 @@ pub fn enemy_turn(rules: &CompiledRuleset, game: &mut GameState, scene: &mut Sce
         memory::enemy_turn(rules, game, scene);
         return;
     }
+    if history::is_history(scene.fam) {
+        history::enemy_turn(rules, game, scene);
+        return;
+    }
     let (me, foe) = (scene.enemy, scene.learner);
     let sc = scene.clone();
     let friends = handles(&sc.theirs);
@@ -1665,6 +1707,7 @@ pub fn judge(rules: &CompiledRuleset, game: &GameState, sc: &mut Scene, rel: u32
     let civ_ok = sc.mine.iter().filter(|p| p.role == "civilian").all(|p| act::alive(game, p, sc.learner).is_some());
     let v = match sc.fam {
         Fam::AmbushFog | Fam::HuntFog => memory::judge(rules, game, sc, rel),
+        Fam::Feint | Fam::FogSniper | Fam::CityReinforced | Fam::ScoutReport | Fam::TwoFronts | Fam::SecondCity | Fam::TwinSiege => history::judge(rules, game, sc, rel),
         Fam::Duel => {
             if combat_theirs == 0 && !mine.is_empty() {
                 Some(true)
