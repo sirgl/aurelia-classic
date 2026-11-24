@@ -164,7 +164,7 @@ def kl_sum(brain, ref, rec, turn_M):
 class Anchor:
     """The imitation loss of `train_m` on recorded teacher plays (the MBf6c recipe), `plays` a step."""
 
-    def __init__(self, path, plays, seed, model):
+    def __init__(self, path, plays, seed, model, exclude=()):
         from aurelia_nn.army import train_m as TM
         from aurelia_nn.army.train import SIEGE, best_teachers, decision_weights
         self.TM = TM
@@ -177,6 +177,8 @@ class Anchor:
         self.rng = random.Random(seed * 7919 + 1)
         self.order = []
         self.model = model
+        # The plays the anchor draws from: all, or those of the families not in `exclude` (the ones RL does not train).
+        self.pool = [i for i, m in enumerate(self.stream.metas) if m["family"] not in set(exclude)]
 
         def fn(m, dev, plan):
             loss, main, aux, parts, accs = TM.run_step(m, dev, plan, self.tm, 0.3)
@@ -192,7 +194,7 @@ class Anchor:
 
     def grad(self):
         if len(self.order) < self.plays:
-            self.order = list(range(len(self.stream)))
+            self.order = list(self.pool)
             self.rng.shuffle(self.order)
         ids, self.order = self.order[:self.plays], self.order[self.plays:]
         dev = self.device(ids)
@@ -221,7 +223,9 @@ def main(argv=None):
     ap.add_argument("--boost", type=float, default=4.0)
     ap.add_argument("--lr", type=float, default=3e-5)
     ap.add_argument("--anchor-w", type=float, default=1.0)
+    ap.add_argument("--anchor-auto", type=float, default=0.0, help="lambda = this x ||g_RL|| / ||g_anchor|| of the first update (one digit); 0: --anchor-w")
     ap.add_argument("--anchor-plays", type=int, default=32)
+    ap.add_argument("--anchor-skip-twin", action="store_true", help="the anchor draws only the plays of the families the twin does not train")
     ap.add_argument("--updates", type=int, default=300)
     ap.add_argument("--minutes", type=float, default=150.0)
     ap.add_argument("--ckpt-every", type=int, default=25)
@@ -254,11 +258,11 @@ def main(argv=None):
     model = load_net(a.weights)
     brain = Brain(model)
     ref = Brain(load_net(a.weights))
-    anchor = Anchor(a.anchor, a.anchor_plays, a.seed, model) if a.anchor else None
+    anchor = Anchor(a.anchor, a.anchor_plays, a.seed, model, exclude=FAMILIES if a.anchor_skip_twin else ()) if a.anchor else None
     curve = {"settings": {k: v for k, v in vars(a).items()}, "bars": {f: list(bars[f]) for f in fams}, "train_plays": {f: len(by_fam[f]) for f in fams},
              "held_plays": len(held), "val_plays": len(val), "held": [], "val": [], "updates": []}
     if anchor:
-        curve["anchor"] = {"plays": len(anchor.stream), "decisions": anchor.stream.decisions, "best": {f: list(v) for f, v in anchor.best.items()}}
+        curve["anchor"] = {"plays": len(anchor.stream), "pool": len(anchor.pool), "decisions": anchor.stream.decisions, "best": {f: list(v) for f, v in anchor.best.items()}}
 
     def save_curve():
         with open(os.path.join(a.out, "curve.json"), "w") as fh:
@@ -281,6 +285,7 @@ def main(argv=None):
     opt = optim.Adam(learning_rate=a.lr)
     rl_grad = make_rl_grad(model, brain)
     rate = {}
+    lam = a.anchor_w
     t_train = time.time()
     done = 0
     for u in range(1, a.updates + 1):
@@ -353,7 +358,11 @@ def main(argv=None):
             if anchor:
                 la, lm, ga = anchor.grad()
                 n_an = norm_of(ga)
-                ga = tree_map(lambda x: a.anchor_w * x, ga)
+                if a.anchor_auto and u == 1 and n_an > 0:
+                    lam = float(f"{a.anchor_auto * n_rl / n_an:.1g}")
+                    curve["lambda"] = lam
+                    print(f"lambda = {a.anchor_auto} x {n_rl:.4f} / {n_an:.4f} -> {lam}", flush=True)
+                ga = tree_map(lambda x: lam * x, ga)
                 total = ga if total is None else tree_map(lambda x, y: x + y, total, ga)
             norm = 0.0
             if total is not None and not a.probe:
