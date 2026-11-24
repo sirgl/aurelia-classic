@@ -15,6 +15,7 @@ import collections
 import json
 import os
 import random
+import re
 import time
 
 import mlx.core as mx
@@ -29,6 +30,7 @@ from .train import Device, best_teachers, decision_weights
 from .data import F_HIST
 from .model_mh import H_MAX, MHNet
 from .model_mb import HX_PARAMS, NX_PARAMS, MBANet, MBENet, MBHNet, MBNet, MBNNet
+from .model_x import MBXNet, arch_changes_net, parse_arch
 from .potential import potential, price_of
 
 u16 = lambda b: mx.array(memoryview(b).cast('H'))
@@ -651,6 +653,25 @@ def dec_one(model, b, um, pm):
 
 
 COMPILED = {}
+
+
+def save_arch(model, directory):
+    """OUT/arch.json beside the weights of an MBXNet (the loader builds the net from it and from the weights' keys)."""
+    if isinstance(model, MBXNet):
+        json.dump(model.config['arch'], open(os.path.join(directory, 'arch.json'), 'w'), indent=1)
+
+
+def export_if_rust(model, path):
+    """The Rust export, unless the net's arch (model_x flags) is more than MBNet's arithmetic: then a printed note."""
+    if isinstance(model, MBXNet) and arch_changes_net(model.config['arch']):
+        if not EXPORT_NOTED:
+            print(f'no Rust export: arch {model.config["arch"]} is not expressible in army-net.bin (weights.safetensors + arch.json only)', flush=True)
+            EXPORT_NOTED.append(True)
+        return
+    export(model, path)
+
+
+EXPORT_NOTED = []
 # Checkpoints of the play over training: one per half-epoch and one at each job's end, the last few kept.
 CKPT_KEEP = 8
 
@@ -662,7 +683,8 @@ def save_checkpoint(model, out, epoch):
     os.makedirs(d, exist_ok=True)
     name = f'e{epoch:.2f}'
     model.save_weights(os.path.join(d, name + '.safetensors'))
-    export(model, os.path.join(d, name + '.bin'))
+    save_arch(model, d)
+    export_if_rust(model, os.path.join(d, name + '.bin'))
     with open(os.path.join(d, 'index.jsonl'), 'a') as f:
         f.write(json.dumps({'epoch': round(epoch, 2), 'path': os.path.abspath(os.path.join(d, name + '.bin')), 'weights': os.path.abspath(os.path.join(d, name + '.safetensors'))}) + '\n')
     kept = sorted((float(n[1:-len('.safetensors')]) for n in os.listdir(d) if n.endswith('.safetensors')))
@@ -898,6 +920,20 @@ def evaluate_f32(model, device_of, plays, tm, bs):
     return ev, {f: fam_hit[f] / fam_n[f] for f in sorted(fam_n)}
 
 
+MUON_MATRICES = re.compile(r'layers\.\d+\.(q|k|v|o|f1|f2|f3|g)\.weight$')
+
+
+def multi_head(a):
+    return (a.history or a.notes) and a.new_lr_mult != 1.0
+
+
+def muon_optimizer(a, steps, adamw):
+    """Muon on the layers' attention and MLP matrices (cosine to 0.05 of --muon-lr), `adamw` on everything else."""
+    sched = optim.cosine_decay(a.muon_lr, steps, a.muon_lr * 0.05)
+    muon = optim.Muon(learning_rate=sched, momentum=0.95, nesterov=True)
+    return optim.MultiOptimizer([muon, adamw], [lambda path, _: MUON_MATRICES.match(path) is not None])
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--train', nargs='+', required=True)
@@ -936,6 +972,10 @@ def main():
     ap.add_argument('--head-w', type=float, default=0.2, help='MBA: weight of the auxiliary heads (decays to 0 over the second half)')
     ap.add_argument('--value-w', type=float, default=0.5, help='MBA: weight of the value head (win, capture, Phi 3 turns on)')
     ap.add_argument('--awi', type=float, default=0.0, help='MBA: advantage-weighted imitation, beta (0: plain)')
+    ap.add_argument('--arch', default='', help="MBX architecture flags (needs --map), e.g. 'swiglu,rmsnorm,qknorm,gate_attn,loop=2'; 'base': MBX with every flag off (= MB)")
+    ap.add_argument('--opt', choices=['adamw', 'muon'], default='adamw', help='muon: Muon on the layers\' attention and MLP matrices, AdamW on the rest')
+    ap.add_argument('--muon-lr', type=float, default=0.02)
+    ap.add_argument('--max-steps', type=int, default=0, help='stop the schedule after this many steps (0: from --epochs)')
     ap.add_argument('--resume', action='store_true', help='continue OUT from its last checkpoint (OUT/state.json: the step; OUT/opt.safetensors: the optimizer)')
     ap.add_argument('--new-lr-mult', type=float, default=1.0, help='MBH: the history parameters (model_mb.HX_PARAMS) learn at this multiple of --lr')
     ap.add_argument('--warmup', type=int, default=20, help='resumed without the optimizer state: lr ramps up over these steps')
@@ -996,7 +1036,13 @@ def main():
     promos = 400
     shape = dict(d=a.d, heads=a.heads, layers=a.layers, ff=2 * a.d, promos=promos)
     NOTE_DROP['p'] = a.note_drop
-    model = ((MBHNet if a.history else MBANet) if a.aux_heads else (MBNNet if a.notes else (MBENet if a.ww else MBNet)))(map_ch=a.map_ch, **shape) if a.map else (MHNet(**shape) if a.history else MemNet(**shape))
+    arch = parse_arch(a.arch) if a.arch else None
+    assert arch is None or (a.map and not (a.history or a.aux_heads or a.notes or a.ww)), '--arch needs --map and no other variant'
+    assert a.opt == 'adamw' or not multi_head(a), '--opt muon with the MBH / MBN new-lr group is not built'
+    if arch is not None:
+        model = MBXNet(map_ch=a.map_ch, arch=arch, **shape)
+    else:
+        model = ((MBHNet if a.history else MBANet) if a.aux_heads else (MBNNet if a.notes else (MBENet if a.ww else MBNet)))(map_ch=a.map_ch, **shape) if a.map else (MHNet(**shape) if a.history else MemNet(**shape))
     model.hand_init()
     if a.init:
         # A net without memory (A / AH) starts the shared parts; an M net everything; an M net starts MH's shared
@@ -1014,8 +1060,11 @@ def main():
     labelled = train.labelled
     plays_all = list(range(len(train)))
     steps = int(a.epochs * len(plays_all) / a.plays)
+    if a.max_steps:
+        steps = min(steps, a.max_steps)
     sched = optim.cosine_decay(a.lr, steps, a.lr * 0.05)
     multi = isinstance(model, (MBHNet, MBNNet)) and a.new_lr_mult != 1.0
+    grouped = multi or a.opt == 'muon'
     new_params = HX_PARAMS if isinstance(model, MBHNet) else NX_PARAMS
     sched_h = optim.cosine_decay(a.lr * a.new_lr_mult, steps, a.lr * a.new_lr_mult * 0.05)
     start = 0
@@ -1035,12 +1084,14 @@ def main():
     if multi:
         # MBH: the history's new parameters (zero / freshly drawn) in their own group at --new-lr-mult x the lr.
         opt = optim.MultiOptimizer([optim.AdamW(learning_rate=sched_h, weight_decay=1e-4), opt], [lambda path, _: path.split('.')[0] in new_params])
+    if a.opt == 'muon':
+        opt = muon_optimizer(a, steps, opt)
     if a.resume:
         opt.init(model.trainable_parameters())
         if os.path.exists(opt_path):
             opt.state = nn.utils.tree_unflatten(list(mx.load(opt_path).items()))
         else:
-            for o in (opt.optimizers if multi else [opt]):
+            for o in (opt.optimizers if grouped else [opt]):
                 o.state['step'] = mx.array(start, mx.uint64)
         rng = random.Random(a.seed * 1000003 + start)  # a resumed job draws a new play order
         print(f'resumed at step {start} (best held-out joint accuracy {best_both:.4f}; optimizer state {"loaded" if os.path.exists(opt_path) else "fresh, lr warm-up " + str(a.warmup)})', flush=True)
@@ -1059,6 +1110,10 @@ def main():
               'losses': {'pointer_ce': 1.0, 'action_ce': 1.0, 'value': 0.5, 'danger_mse': 0.5, 'aux_teacher_state': a.aux},
               'train': {'files': a.train, 'decisions': train.decisions, 'plays': len(train)}, 'hold': {'files': a.hold, 'decisions': hold.decisions, 'plays': len(hold)}, 'device': str(mx.default_device()),
               'encoder_compute': str(ENCODER['dtype']) if a.map else None}
+    config['arch'] = model.config['arch'] if isinstance(model, MBXNet) else None
+    config['optimizer'] = a.opt
+    if a.opt == 'muon':
+        config['schedule'] += f'; Muon (lr {a.muon_lr}, same cosine) on layers.*.q/k/v/o/f1/f2/f3/g weights, AdamW on the rest'
     if not a.resume:
         json.dump(config, open(os.path.join(a.out, 'config.json'), 'w'), indent=1)
     curves = open(os.path.join(a.out, 'curves.jsonl'), 'a' if a.resume else 'w')
@@ -1145,11 +1200,12 @@ def main():
             print(json.dumps({k: v for k, v in rec.items() if k not in ('hold_by_family', 'step_losses')}), flush=True)
             if is_eval:
                 model.save_weights(os.path.join(a.out, 'last.safetensors'))
+                save_arch(model, a.out)
                 mx.save_safetensors(opt_path, dict(nn.utils.tree_flatten(opt.state)))
                 if ev['acc_both'] > best_both:
                     best_both = ev['acc_both']
                     model.save_weights(os.path.join(a.out, 'weights.safetensors'))
-                    export(model, os.path.join(a.out, 'army-net.bin'))
+                    export_if_rust(model, os.path.join(a.out, 'army-net.bin'))
                 json.dump({'step': s, 'steps': steps, 'best_both': best_both}, open(state_path, 'w'))
         if half_epoch or stopped or s == steps:
             save_checkpoint(model, a.out, s * a.plays / len(plays_all))

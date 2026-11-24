@@ -21,7 +21,8 @@ def export(model, path):
         v = mx.array(v, mx.float32)
         tensors.append({'name': name, 'shape': list(v.shape), 'offset': len(data)})
         data.extend(v.reshape(-1).tolist())
-    head = json.dumps({'config': model.config, 'tensors': tensors}).encode()
+    config = {k: v for k, v in model.config.items() if k != 'arch'}  # MBX: the flags are not in the Rust format
+    head = json.dumps({'config': config, 'tensors': tensors}).encode()
     with open(path, 'wb') as f:
         f.write(struct.pack('<II', struct.unpack('<I', b'ARMW')[0], len(head)))
         f.write(head)

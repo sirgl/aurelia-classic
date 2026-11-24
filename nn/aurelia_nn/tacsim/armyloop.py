@@ -15,6 +15,7 @@ tokens. The states are Rust's (forced replay): what is compared is the decision,
 import argparse
 import collections
 import json
+import os
 import time
 
 import mlx.core as mx
@@ -26,16 +27,48 @@ TURN_END = (1 << 32) - 1
 PER_UNIT = 6
 
 
+def arch_of_weights(w, path):
+    """The model_x arch a weights file holds: from its keys (and OUT/arch.json beside it for a net with no flag on).
+    None: the file is an MBNet / MemNet / MBA... net of the older variants."""
+    from aurelia_nn.army.model_x import ARCH_OFF
+    arch = dict(ARCH_OFF)
+    arch["swiglu"] = "layers.0.f3.weight" in w
+    arch["qknorm"] = "layers.0.qn.weight" in w
+    arch["gate_attn"] = "layers.0.g.weight" in w
+    arch["rmsnorm"] = "layers.0.norm1.weight" in w and "layers.0.norm1.bias" not in w
+    arch["loop"] = w["pass_emb"].shape[0] if "pass_emb" in w else 1
+    sidecar = os.path.join(os.path.dirname(os.path.abspath(path)), "arch.json")
+    if arch != ARCH_OFF or "m_in.weight" in w and os.path.exists(sidecar):
+        return arch
+    return None
+
+
+def net_shape(w):
+    """d, heads, layers, ff of a net from its tensors' shapes (the old nets: 64, 4, 3, 128)."""
+    layers = len({k.split(".")[1] for k in w if k.startswith("layers.")})
+    return {"d": w["e2.weight"].shape[0], "heads": w["layers.0.dist_bias"].shape[0], "layers": layers,
+            "ff": w["layers.0.f1.weight"].shape[0], "promos": w["promo"].shape[0] - 1}
+
+
 def load_net(path):
     from aurelia_nn.army.model_m import MemNet
     from aurelia_nn.army.model_mb import MBANet, MBHNet, MBNet, MBNNet
+    from aurelia_nn.army.model_x import MBXNet, ff_of_swiglu_hidden
     w = mx.load(path)
+    shape = net_shape(w)
+    arch = arch_of_weights(w, path)
+    if arch is not None and arch["swiglu"]:
+        shape["ff"] = ff_of_swiglu_hidden(shape["ff"])
     if "m_in.weight" in w:
-        # MBH (the history; an MBA net) and MBN (the notes; an MB net) by their own parameters.
-        cls = MBHNet if "hx_slope" in w else (MBNNet if "nx_slope" in w else (MBANet if "w_price" in w else MBNet))
-        model = cls(promos=w["promo"].shape[0] - 1, map_ch=w["m_in.weight"].shape[0])
+        map_ch = w["m_in.weight"].shape[0]
+        if arch is not None:
+            model = MBXNet(map_ch=map_ch, arch=arch, **shape)
+        else:
+            # MBH (the history; an MBA net) and MBN (the notes; an MB net) by their own parameters.
+            cls = MBHNet if "hx_slope" in w else (MBNNet if "nx_slope" in w else (MBANet if "w_price" in w else MBNet))
+            model = cls(map_ch=map_ch, **shape)
     else:
-        model = MemNet(promos=w["promo"].shape[0] - 1)
+        model = MemNet(**shape)
     model.load_weights(path)
     model.eval()
     return model
