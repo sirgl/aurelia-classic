@@ -176,6 +176,49 @@ pub fn best_blow(game: &GameState, rules: &CompiledRuleset, side: PlayerId, unit
     best
 }
 
+/// What `unit` deals to the unit or city on `target` this turn at most (the rules' expected blow), from where it
+/// stands or from a reachable tile with a move left to strike; with the defender's hit points. None: it cannot.
+pub fn reach_blow(game: &GameState, rules: &CompiledRuleset, side: PlayerId, unit: UnitHandle, target: TileId) -> Option<(i64, i64)> {
+    let me = core_of(game, unit)?;
+    if me.owner != side || me.moves_left == 0 || is_civilian(rules, me.kind) {
+        return None;
+    }
+    let reach = range_of(rules, me.kind).unwrap_or(1);
+    let mut best: Option<(i64, i64)> = None;
+    if dist(game, me.tile, target) <= reach {
+        if let Some((dealt, _, hp)) = preview(game, rules, unit, None, target) {
+            best = Some((dealt, hp));
+        }
+    }
+    for (from, left) in reachable(game, rules, side, unit) {
+        if left == 0 || from == me.tile || !free_for(game, rules, unit, from) || dist(game, from, target) > reach {
+            continue;
+        }
+        if let Some((dealt, _, hp)) = preview(game, rules, unit, Some(from), target) {
+            if best.is_none_or(|b| dealt > b.0) {
+                best = Some((dealt, hp));
+            }
+        }
+    }
+    best
+}
+
+/// The target of a focus fire: of `targets`, the one with the fewest hit points among those a unit of `units` that still
+/// has its move can strike this turn (ties by tile). Every unit that follows strikes it (the shooters first, the
+/// melee after), so the blows add up to a kill before the defender heals.
+pub fn focus_target(game: &GameState, rules: &CompiledRuleset, side: PlayerId, units: &[UnitHandle], targets: &[TileId]) -> Option<TileId> {
+    let mut best: Option<(i64, u32, TileId)> = None;
+    for &t in targets {
+        let hp = units.iter().filter_map(|&u| reach_blow(game, rules, side, u, t)).map(|(_, hp)| hp).next();
+        if let Some(hp) = hp {
+            if best.is_none_or(|b| (hp, t.0) < (b.0, b.1)) {
+                best = Some((hp, t.0, t));
+            }
+        }
+    }
+    best.map(|b| b.2)
+}
+
 /// The reachable tiles of `unit` this turn with the moves left after the step (its own tile too).
 pub fn reachable(game: &GameState, rules: &CompiledRuleset, side: PlayerId, unit: UnitHandle) -> Vec<(TileId, u16)> {
     let mut v = game.player_view(rules, side).own_reachable(unit);

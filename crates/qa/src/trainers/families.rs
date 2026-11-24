@@ -1258,8 +1258,11 @@ pub fn reference_turn(rules: &CompiledRuleset, game: &mut GameState, scene: &mut
         _ => 3,
     }, p.id.0));
     let refuge = sc.refuge.unwrap_or(sc.centre);
-    for p in order {
+    for (turn_ix, p) in order.clone().into_iter().enumerate() {
         let Some(c) = act::alive(game, &p, me) else { continue };
+        // The units of this script that have still to act this turn (this one first): the focus is judged on them.
+        let to_act: Vec<classic_rules::ids::UnitHandle> = order[turn_ix..].iter().filter(|q| act::alive(game, q, me).is_some()).map(|q| q.h).collect();
+        let mut focus: Option<TileId> = None;
         let ranged = act::range_of(rules, c.kind).is_some();
         let (aim, nerve, city): (Aim, Nerve, bool) = match (name, sc.fam) {
             ("passive", _) => continue,
@@ -1279,6 +1282,12 @@ pub fn reference_turn(rules: &CompiledRuleset, game: &mut GameState, scene: &mut
             ("ref-hold", _) => {
                 let best = act::reachable(game, rules, me, p.h).into_iter().map(|(t, _)| t).max_by_key(|t| (act::defence(game, rules, *t, me), std::cmp::Reverse(t.0))).unwrap_or(c.tile);
                 (if ranged { Aim::Support } else { Aim::Hold(best) }, Nerve::Even, false)
+            }
+            ("ref-choke", fam) if fam != Fam::Citadel && { focus = act::focus_target(game, rules, me, &to_act, &foes_only(game)); focus.is_some() } => {
+                // Every unit strikes the weakest holder it can reach, the shooters first (the order above). No waiting
+                // off the pass for the holders to be worn down: a holder that does not strike heals every turn (the
+                // rules), so the wait only paid while the harness let it stay hurt; a blow now is worth more.
+                (if ranged { Aim::Support } else { Aim::Close }, Nerve::Even, false)
             }
             ("ref-choke", _) => {
                 let pass = sc.hold.unwrap_or(sc.centre);
@@ -1427,7 +1436,8 @@ pub fn reference_turn(rules: &CompiledRuleset, game: &mut GameState, scene: &mut
             }
             v
         };
-        let targets: &dyn Fn(&GameState) -> Vec<TileId> = if city && matches!(name, "ref-siege" | "ref-bombard") { &by_city } else if city { &foes_city } else { &foes_only };
+        let focused = |_: &GameState| focus.into_iter().collect::<Vec<TileId>>();
+        let targets: &dyn Fn(&GameState) -> Vec<TileId> = if focus.is_some() { &focused } else if city && matches!(name, "ref-siege" | "ref-bombard") { &by_city } else if city { &foes_city } else { &foes_only };
         act::unit_turn(game, rules, me, foe, p.h, &aim, nerve, targets, &friends);
     }
 }
