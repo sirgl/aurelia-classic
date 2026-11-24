@@ -38,10 +38,11 @@ NFO = None  # counted per call: the per-batch count is small, a fixed 6 doubled 
 ASSAULT = {"assault-heal", "promotion-choice", "hill-archers", "city-fire", "planned-assault"}
 
 
-def trim_tokens(tok):
+def trim_tokens(tok, n_real=None):
     """The tokens without the padding columns past the row with the most tokens (they are masked: no weight in the body,
-    never selectable). One host read."""
-    T = max(1, int(mx.max(tok["n"]).item()))
+    never selectable). One host read. `n_real`: only the first rows count (the rest pad a bucketed step)."""
+    n = tok["n"] if n_real is None else tok["n"][:n_real]
+    T = max(1, int(mx.max(n).item()))
     if T >= tok["mask"].shape[1]:
         return tok
     out = dict(tok)
@@ -180,6 +181,8 @@ class Game:
         self.city_low = mx.zeros((self.B,), dtype=mx.bool_)
         self.pr = armyprice.attach(self, plays)
         self.counts = collections.Counter()
+        # Counters kept on the device until the play's end (no host read per step): {name: mx scalar}.
+        self.lazy_counts = {}
         self.cand_fn = self.obs.candidates
         self.legacy = False
         self.body_fn = brain.body
@@ -328,13 +331,18 @@ class Game:
             if n0 == 0:
                 break
             if step > 0 and n0 < B and self.compact:
-                ids, pos = self._compact(active, n0)
+                # `row_bucket`: the active rows padded with inactive ones to a bucket size (`armyfast.bucket`), so the
+                # compiled parts see few shapes; the inactive rows decide nothing and are not merged back.
+                nb = self.row_bucket(n0, B) if self.row_bucket else n0
+                ids, pos = self._compact(active, nb)
                 self.row_ids = ids
                 saved = self._enter_rows(ids)
-                made_v, act_v = mx.take(made, ids, axis=0), mx.ones((n0,), dtype=mx.bool_)
+                made_v, act_v = mx.take(made, ids, axis=0), mx.arange(nb) < n0
+                self.row_real = n0
                 pick, ai, act_v, made_v = self.decide(rel, step, act_v, made_v, trace)
                 has = active
                 self.row_ids = None
+                self.row_real = None
                 self._leave_rows(saved, has, pos)
                 made = self._merge(made, made_v, has, pos)
                 active = mx.where(has, mx.take(act_v, pos, axis=0), False)
@@ -385,12 +393,23 @@ class Game:
         self.s = self.sim.end_turn(s, mx.zeros((B,), dtype=I32), live)
 
     compact = True
+    row_bucket = None
+    # The real (not padding) rows of a bucketed step: the sampled draws are made over them alone, as without padding
+    # (MLX's random bits depend on the array's size).
+    row_real = None
+
+    def draw(self, logits, key):
+        n = self.row_real
+        if n is None or n == logits.shape[0]:
+            return mx.random.categorical(logits, axis=-1, key=key).astype(I32)
+        d = mx.random.categorical(logits[:n], axis=-1, key=key).astype(I32)
+        return mx.concatenate([d, mx.zeros((logits.shape[0] - n,), dtype=I32)])
 
     def decide(self, rel, step, active, made, trace=None):
         """One decision step over the current rows (all of them, or the compacted active ones): the tokens, the body, the
         pointer, the unit's candidates, the greedy action, applied. Returns (pick, action index, still active, made)."""
         brain, s = self.brain, self.s
-        tok = trim_tokens(self.tokens(rel))
+        tok = trim_tokens(self.tokens(rel), self.row_real)
         unit = tok["unit"]
         stopped = mx.where(unit >= 0, gn(made, mx.maximum(unit, 0)) >= PER_UNIT, False)
         sel = tok["selectable"] & ~stopped & active[:, None]
@@ -415,7 +434,7 @@ class Game:
         if sampling:
             active_in = active & smask
             self.sample_key, k1, k2 = mx.random.split(self.sample_key, 3)
-            pidx = mx.random.categorical(lg, axis=-1, key=k1).astype(I32)
+            pidx = self.draw(lg, k1)
             pick = mx.where(smask, mx.where(pidx >= sel.shape[1], -1, pidx), greedy_pointer(lg, sel.shape[1]))
         else:
             pick = greedy_pointer(lg, sel.shape[1])
@@ -431,7 +450,7 @@ class Game:
         cand = self.cand_fn(s, me)
         al = brain.actions(h, pk, cand, self.M)
         if sampling:
-            ai = mx.where(smask, mx.random.categorical(al, axis=-1, key=k2).astype(I32), A.first_index_eq(al, mx.max(al, axis=1)))
+            ai = mx.where(smask, self.draw(al, k2), A.first_index_eq(al, mx.max(al, axis=1)))
         else:
             ai = A.first_index_eq(al, mx.max(al, axis=1))
         kind = mx.take_along_axis(cand["kind"], ai[:, None], axis=1)[:, 0]
@@ -751,7 +770,7 @@ class Game:
         verb = mx.where(kind == A.K_MOVE, V_MOVE, mx.where((kind == A.K_UNIT) | (kind == A.K_CITY) | (kind == A.K_RANGED), V_ATTACK,
                         mx.where(kind == A.K_FORT, V_FORT, mx.where(kind == A.K_SETUP, V_SETUP, mx.where(kind == A.K_PROMO, V_PROMOTE, V_NONE)))))
         sim_take = take & (verb != V_NONE)
-        if bool(mx.any(sim_take).item()):
+        if sim.branchless or bool(mx.any(sim_take).item()):
             mk = mk if mk is not None else sim.masks(s, sd, me)
             s = sim.apply_unit(s, sd, me, verb, tgt, mk, sim_take)
         # Done: the unit's turn is over (`act::stand`).
@@ -761,7 +780,7 @@ class Game:
         s = sim.set_unit(s, me, take & (kind == A.K_OTHER), st=mx.full(me.shape, 4, dtype=I32))
         # Pillage (`Transaction::pillage`): the improvement (else the road) goes, 25 HP from an improvement, a move.
         pil = take & (kind == A.K_PILLAGE)
-        if bool(mx.any(pil).item()):
+        if sim.branchless or bool(mx.any(pil).item()):
             tile = g1(s["u_tile"], me)
             had = sim.mg("improvement", tile[:, None])[:, 0] >= 0
             T = sim.T
@@ -771,7 +790,11 @@ class Game:
             s = sim.set_unit(s, me, pil & had, hp=mx.minimum(g1(s["u_hp"], me) + 25, 100))
             # The pillager acts: its fortification ends (Rust: stance Ready after the pillage; the apply check's raid lines).
             s = sim.set_unit(s, me, pil, mv=mx.maximum(g1(s["u_mv"], me) - 60, 0), st=mx.zeros(me.shape, dtype=I32))
-            self.counts["pillages"] += int(mx.sum(pil).item())
+            if sim.branchless:
+                # The count read at the play's end (`lazy_counts`), not here.
+                self.lazy_counts["pillages"] = self.lazy_counts.get("pillages", 0) + mx.sum(pil)
+            else:
+                self.counts["pillages"] += int(mx.sum(pil).item())
         self.s = s
 
     # -------------------------------------------------------------- the enemy's marches (a schedule)
@@ -1033,6 +1056,9 @@ class Game:
             mx.eval(self.s, self.verdict)
         # A capture ends the scene (the simulator's `done`): judge it.
         self.judge(rel)
+        for k, v in self.lazy_counts.items():
+            self.counts[k] += int(v.item())
+        self.lazy_counts = {}
         self.seconds = time.time() - t0
         self.rounds_played = rel
         return self.verdict
