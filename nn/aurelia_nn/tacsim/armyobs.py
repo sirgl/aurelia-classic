@@ -37,7 +37,7 @@ from . import armythird
 from . import exact
 from .geometry import Geometry
 from .scene import Batch, N_CTX, FLAG_DELTA
-from .sim import Sim, BARBARIAN_BONUS, g1, gn, grow, put1, I32, ANY, ATTACK, DEFENSE, VS_CITY, ATT_OPEN, ATT_ROUGH, DEF_OPEN, DEF_ROUGH, \
+from .sim import Sim, BARBARIAN_BONUS, friendly_land, g1, gn, grow, put1, I32, ANY, ATTACK, DEFENSE, VS_CITY, ATT_OPEN, ATT_ROUGH, DEF_OPEN, DEF_ROUGH, \
     RATT_OPEN, RATT_ROUGH, DEF_VS_RANGED, RANGED_ATTACK, VS_WOUNDED, VS_FORTIFIED, FRIENDLY, OUTSIDE_FRIENDLY, ATT_FRIENDLY, \
     ADJ_FRIENDLY, CTX_FLANKING
 
@@ -699,7 +699,7 @@ class Obs:
     def melee_attack_strength(self, s, a, d, to, vs_city):
         sim, geo = self.sim, self.geo
         shape = to.shape
-        friendly = gn(s["owner"], to) == a["side"]
+        friendly = friendly_land(s, a["side"], to)
         rough = sim.mg("rough", to) > 0
         dv = d["valid"]
         tr = mx.ones(shape, dtype=mx.bool_)
@@ -728,7 +728,7 @@ class Obs:
         tile = d["tile"]
         shape = tile.shape
         rough = sim.mg("rough", tile) > 0
-        friendly = gn(s["owner"], tile) == d["side"]
+        friendly = friendly_land(s, d["side"], tile)
         tr = mx.ones(shape, dtype=mx.bool_)
         rg = mx.full(shape, bool(ranged))
         cols = {ANY: tr, DEFENSE: tr, DEF_VS_RANGED: rg, DEF_OPEN: ~rough, DEF_ROUGH: rough, FRIENDLY: friendly, OUTSIDE_FRIENDLY: ~friendly}
@@ -746,7 +746,7 @@ class Obs:
         sim = self.sim
         shape = target.shape
         rough = sim.mg("rough", target) > 0
-        friendly = gn(s["owner"], target) == me["side"]
+        friendly = friendly_land(s, me["side"], target)
         ov = other["valid"]
         tr = mx.ones(shape, dtype=mx.bool_)
         unit_target = ~vs_city if attacking else mx.zeros(shape, dtype=mx.bool_)
@@ -1137,6 +1137,31 @@ def build_templates(plays):
     return tb, tsim, kw
 
 
+def kx_base(sc, ms):
+    """{slot: the unit's kind contexts (`kx`: its combat percents without promotions) when its profile was measured}: the
+    scene's start (`kx0`); a unit made later, its first moment's. Empty for the dumps before a832467."""
+    b = sc.get("_kxb")
+    if b is None:
+        b = {k: v for k, v in enumerate(sc.get("kx0") or []) if v}
+        for m in ms:
+            for k, v in enumerate(m.get("kx") or []):
+                if v and k not in b:
+                    b[k] = v
+        sc["_kxb"] = b
+    return b
+
+
+def kx_shift(kx, base, U):
+    """[U][N_CTX]: what a player changed in its units' combat percents since their profiles were measured (a tenet, a
+    timed effect, a penalty): `kx` now minus the base, per slot (0 where either is unknown)."""
+    out = [[0] * N_CTX for _ in range(U)]
+    for k, v in enumerate((kx or [])[:U]):
+        b = base.get(k)
+        if v and b:
+            out[k] = [x - y for x, y in zip(v, b)]
+    return out
+
+
 def build_rows(plays, rows, templates=None):
     """A simulator over the plays' scenes (templates) and a state over `rows` [(play index, moment)]."""
     tb, tsim, kw = templates or build_templates(plays)
@@ -1163,6 +1188,11 @@ def build_rows(plays, rows, templates=None):
     wm = [(m.get("wm", []) + [0] * U)[:U] for _, m in rows]
     if any(any(x) for x in wm):
         s["p_wounded_mod"] = mx.array(wm, dtype=s["p_wounded_mod"].dtype)
+    # The player-level combat percents changed since the scene's start (the dumps since a832467: `kx`): on the profiles'.
+    if any("kx" in m for _, m in rows):
+        sh = [kx_shift(m.get("kx"), kx_base(plays[pi][0], plays[pi][1]), U) for pi, m in rows]
+        if any(any(any(r) for r in x) for x in sh):
+            s["p_ctx"] = s["p_ctx"] + mx.array(sh, dtype=s["p_ctx"].dtype)
     if all("cstr" in m for _, m in rows):
         # The cities' strength without the garrison now (techs, buildings: exogenous), as the scene's `str0` at pop0.
         C = tb.c

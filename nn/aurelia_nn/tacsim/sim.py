@@ -66,6 +66,27 @@ def gn(arr, idx):
     return mx.take_along_axis(arr, flat, axis=1).reshape(idx.shape)
 
 
+def friendly_land(s, side, tiles):
+    """`combat::terrain::is_friendly_territory` for units of `side` on `tiles` [B, ...] (`side` broadcasts to them): the
+    land of the side, or of a host that grants it entry (`s["grant"]` [B, 3, 3] host -> guest: the open borders of the
+    families with a third seat); never for the barbarians (`s["barb"]`: side 1 of the camp scenes). The friendly-land
+    contexts of every strength and the heal rate read it (the one rule for "friendly")."""
+    owner = gn(s["owner"], tiles)
+    sd = mx.broadcast_to(side, owner.shape) if hasattr(side, "shape") else mx.full(owner.shape, side, dtype=I32)
+    ok = (owner >= 0) & (owner == sd)
+    g = s.get("grant")
+    if g is not None:
+        B = owner.shape[0]
+        h = mx.clip(owner, 0, 2)
+        idx = (h * 3 + mx.clip(sd, 0, 2)).reshape(B, -1)
+        granted = mx.take_along_axis(g.reshape(B, 9), idx, axis=1).reshape(owner.shape)
+        ok = ok | ((owner >= 0) & (owner != sd) & granted)
+    if "barb" in s:
+        barb = s["barb"].reshape((owner.shape[0],) + (1,) * (owner.ndim - 1))
+        ok = ok & ~(barb & (sd == 1))
+    return ok
+
+
 def grow(arr, slot):
     """arr[b, slot[b], ...] for arr [B, U, ...]: the slot's row."""
     shape = (arr.shape[0], 1) + arr.shape[2:]
@@ -791,7 +812,7 @@ class Sim:
 
     def melee_attack_strength(self, s, a, d, to, vs_city):
         tr = True
-        friendly = gn(s["owner"], to[:, None])[:, 0] == a["side"]
+        friendly = friendly_land(s, a["side"][:, None], to[:, None])[:, 0]
         rough = self.mg("rough", to[:, None])[:, 0] > 0
         dv = d["valid"] if d is not None else mx.zeros_like(a["valid"])
         cols = {ANY: mx.array(tr), ATTACK: mx.array(tr), VS_CITY: vs_city, ATT_OPEN: ~vs_city & ~rough, ATT_ROUGH: ~vs_city & rough,
@@ -821,7 +842,7 @@ class Sim:
     def defense_strength(self, s, d, a, ranged):
         tile = d["tile"]
         rough = self.mg("rough", tile[:, None])[:, 0] > 0
-        friendly = gn(s["owner"], tile[:, None])[:, 0] == d["side"]
+        friendly = friendly_land(s, d["side"][:, None], tile[:, None])[:, 0]
         rg = mx.array(ranged) if isinstance(ranged, bool) else ranged
         cols = {ANY: mx.array(True), DEFENSE: mx.array(True), DEF_VS_RANGED: rg, DEF_OPEN: ~rough, DEF_ROUGH: rough,
                 FRIENDLY: friendly, OUTSIDE_FRIENDLY: ~friendly}
@@ -837,7 +858,7 @@ class Sim:
 
     def ranged_strength(self, s, me, other, vs_city, target, attacking):
         rough = self.mg("rough", target[:, None])[:, 0] > 0
-        friendly = gn(s["owner"], target[:, None])[:, 0] == me["side"]
+        friendly = friendly_land(s, me["side"][:, None], target[:, None])[:, 0]
         ov = other["valid"] if other is not None else mx.zeros_like(me["valid"])
         unit_target = ~vs_city if attacking else mx.zeros_like(vs_city)
         cols = {ANY: mx.array(True), VS_CITY: vs_city}
@@ -1374,14 +1395,15 @@ class Sim:
         tiles = s["u_tile"]
         water = self.mg("water", tiles) > 0
         owner = gn(s["owner"], tiles)
-        friendly = owner == s["u_side"]
+        friendly = friendly_land(s, s["u_side"], tiles)
+        own = owner == s["u_side"]  # `heal_rate`: in a city the extra is the friendly one only in the side's own city
         cityt = self.city_on(s, tiles) >= 0
         no = (s["u_hp"] >= 100) | (s["p_land"] & water) | moved | (s["p_sea"] & ~friendly & ~s["p_heal_outside_friendly"])
         no = no | (s["p_air"] & ~cityt)
         if "barb" in s:
             no = no | (s["barb"][:, None] & (s["u_side"] == 1))  # `heal_amount`: barbarians never heal
         enemy_host = (owner >= 0) & self.is_foe(s, s["u_side"], owner)
-        rate = mx.where(cityt, 25 + mx.where(friendly, s["p_heal_friendly"], s["p_heal_neutral"]),
+        rate = mx.where(cityt, 25 + mx.where(own, s["p_heal_friendly"], s["p_heal_neutral"]),
                         mx.where(~friendly, mx.where(enemy_host, 10 + s["p_heal_enemy"], 10 + s["p_heal_neutral"]), 20 + s["p_heal_friendly"]))
         # Medic: the best HealAdjacent of an own unit next to the unit.
         dd = self.geo.distance(tiles[:, :, None], tiles[:, None, :])

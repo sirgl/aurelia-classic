@@ -112,12 +112,32 @@ def wm_after(wm, nxt, units, ended):
     return out
 
 
+def kx_after(kx, nxt, units, ended):
+    """The kind contexts (`kx`, per slot a list) after the turn ends of the seats `ended`, as `wm_after`: a unit of such a
+    seat takes the next moment's where it lives then; a unit dead by then takes its seat's most common change."""
+    nu, nk = nxt["state"]["units"], nxt.get("kx") or []
+    live = lambda k: k < len(nu) and nu[k][0] == 1 and k < len(nk) and bool(nk[k])
+    delta = {}
+    for side in ended:
+        ds = collections.Counter(tuple(a - b for a, b in zip(nk[k], v)) for k, v in enumerate(kx)
+                                 if v and k < len(units) and units[k][0] and units[k][8] == side and live(k))
+        delta[side] = ds.most_common(1)[0][0] if ds else None
+    out = []
+    for k, v in enumerate(kx):
+        if v and k < len(units) and units[k][0] and units[k][8] in ended:
+            d = delta[units[k][8]]
+            out.append(nk[k] if live(k) else ([a + b for a, b in zip(v, d)] if d else v))
+        else:
+            out.append(v)
+    return out
+
+
 def as_row(plays, pi, start, by_round, U, which="enemy"):
     units, cities, rng, rnd = start[:4]
     m = by_round.get(rnd) or min(by_round.values(), key=lambda x: abs(x["round"] - rnd))
     state = {"units": [u for u in units[:U]], "cities": cities, "rng": rng, "owner": m["state"]["owner"]}
     row = {"state": state, "ids": m.get("ids", []), "handles": m.get("handles", []), "pillageable": m.get("pillageable") or plays[pi][0]["orders"]["pillageable"]}
-    for k in ("wm", "cstr"):
+    for k in ("wm", "cstr", "kx"):
         if k in m:
             row[k] = m[k]
     if "cstr" in row:
@@ -139,6 +159,8 @@ def as_row(plays, pi, start, by_round, U, which="enemy"):
         nxt = min((x for x in plays[pi][1] if x["round"] == rnd + 1 and "wm" in x), key=lambda x: x["step"], default=None)
         if nxt is not None and "wm" in row:
             row["wm"] = wm_after(row["wm"], nxt, units, ended)
+        if nxt is not None and "kx" in row and "kx" in nxt:
+            row["kx"] = kx_after(row["kx"], nxt, units, ended)
         if nxt is not None and "cstr" in row and "cstr" in nxt:
             nc = nxt["state"]["cities"]
             row["cstr"] = [nxt["cstr"][k] if k < len(cities) and cities[k][0] in ended and k < len(nc) and nc[k][0] == cities[k][0]

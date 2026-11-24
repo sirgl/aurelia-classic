@@ -69,7 +69,7 @@ class Game:
             row = {"state": sc["initial"], "ids": m0.get("ids", []), "handles": m0.get("handles", []), "pillageable": sc["orders"]["pillageable"],
                    "ruins": sc["orders"].get("ruins")}
             if ms:
-                row.update({k: m0[k] for k in ("wm", "cstr", "upos") if k in m0})
+                row.update({k: m0[k] for k in ("wm", "cstr", "upos", "kx") if k in m0})
             rows.append((pi, row))
         self.templates = A.build_templates(plays)
         if forced is None:
@@ -81,6 +81,16 @@ class Game:
         self.B = len(idx)
         _, self.sim, s, self.tab = A.build_rows(plays, picked, self.templates)
         self.idx = mx.array(idx, dtype=I32)
+        # The kind contexts (`kx`: the player-level combat percents, the dumps since a832467) the profiles hold now, per play
+        # [U][N_CTX] (own play: every copy of a play follows its schedule); None: forced rows or a dump without them.
+        self._kx_ap = None
+        if forced is None and any("kx" in r for _, r in rows):
+            U0 = s["p_ctx"].shape[1]
+            self._kx_ap = []
+            for pi, r in rows:
+                base = A.kx_base(plays[pi][0], plays[pi][1])
+                kx = r.get("kx") or []
+                self._kx_ap.append([(kx[k] if k < len(kx) and kx[k] else base.get(k)) or [0] * A.N_CTX for k in range(U0)])
         if forced is None and salt:
             # Each copy its own combat stream (the first copy keeps Rust's).
             salt = (mx.arange(self.B).astype(mx.uint64) // P) * 0x2545F4914F6CDD1D
@@ -254,6 +264,27 @@ class Game:
         if moved:
             self._apply_economy(last)
 
+    def _kx_move(self, new, h):
+        """The profiles' combat percents follow each play's kind contexts `new` [P] (per slot a list, [] unknown; None: no
+        change) where `h` [B]: the change since the last applied one is added to `p_ctx` (the twin's own promotions stay)."""
+        U = len(self._kx_ap[0]) if self._kx_ap else 0
+        delta, any_ = [], False
+        for pi, kx in enumerate(new):
+            ap = self._kx_ap[pi]
+            row = [[0] * A.N_CTX for _ in range(U)]
+            if kx is not None:
+                for k in range(min(U, len(kx))):
+                    if kx[k] and kx[k] != ap[k]:
+                        row[k] = [a - b for a, b in zip(kx[k], ap[k])]
+                        ap[k] = list(kx[k])
+                        any_ = True
+            delta.append(row)
+        if not any_:
+            return
+        self.counts["kind contexts moved (a player's combat percents)"] += 1
+        d = mx.take(mx.array(delta, dtype=self.s["p_ctx"].dtype), self.idx, axis=0)
+        self.s["p_ctx"] = self.s["p_ctx"] + mx.where(h[:, None, None], d, 0)
+
     def _far_hex(self, pi, m):
         """The far cities' token rows of moment `m` (hex, as the dump has them)."""
         ftiles = {f[0] for f in self.plays[pi][0]["orders"]["far_cities"]}
@@ -299,6 +330,19 @@ class Game:
         s["p_wounded_mod"] = mx.where(h[:, None] & side_in(s["u_side"]), tk(nw), s["p_wounded_mod"])
         if "c_str0" in s and C:
             s["c_str0"] = mx.where(h[:, None] & side_in(s["c_owner"]), tk(cs), s["c_str0"])
+        if self._kx_ap is not None:
+            # The kind contexts of the ended seats' units likewise (`armyenemy.kx_after`), as a change of the profiles'.
+            from .armyenemy import kx_after
+            sel = [False] * len(self.plays)
+            for b, (pi, ok) in enumerate(zip(self.idx.tolist(), h.tolist())):
+                sel[pi] = sel[pi] or ok
+            new = []
+            for pi in range(len(self.plays)):
+                m = self.sched[pi].get(self.plays[pi][0]["orders"]["start_round"] + rel + 1)
+                cur = last[pi]
+                ok = sel[pi] and m is not None and cur is not None and "kx" in m and "kx" in cur
+                new.append(kx_after(cur["kx"], m, cur["state"]["units"], ended) if ok else None)
+            self._kx_move(new, h)
 
     def _apply_economy(self, last):
         s = self.s
@@ -321,6 +365,8 @@ class Game:
             s["c_str0"] = mx.where(h[:, None], tk(cs0), s["c_str0"])
             s["c_maxhp"] = mx.where(h[:, None], tk(cmax), s["c_maxhp"])
         s["p_wounded_mod"] = mx.where(h[:, None], tk(wm), s["p_wounded_mod"])
+        if self._kx_ap is not None:
+            self._kx_move([m.get("kx") if m is not None else None for m in last], h)
         # The far cities' rows (outside the window: their population and strength grow) from the same moment.
         NF = self.tab.t["far_tile"].shape[1]
         far = []

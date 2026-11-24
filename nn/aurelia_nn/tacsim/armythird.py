@@ -14,11 +14,15 @@ the barbarians / the enemy are at war with the learner and with the third; the l
 put the third at war with the enemy only (the same table).
 """
 
+import collections
+
 import mlx.core as mx
 
 from .sim import g1, I32
 
 SPARE = 3
+# The moments whose third-seat handles (`handles3`, the dumps since a832467) equal the guess of `remap_play`, and the others.
+HANDLES3 = collections.Counter()
 WIDTH = 24  # the window's width: a tile id is r * WIDTH + q
 
 CAMP = ("camp", "camp-race")
@@ -117,8 +121,20 @@ def remap_play(play):
     # neutral-joins-war: by the target's handle, the enemy's units before the third's).
     h0 = [h for h in (ms[0].get("handles") or []) if h is not None and h >= 0] if ms else []
     handles3 = [max(h0) + 1 + i for i in range(k3)] if h0 and k3 else None
+    # The scene's start: the third seat's kind contexts in its slots (`kx0`; the dumps since a832467).
+    if "kx0" in sc:
+        sc["kx0"] = fix_list(sc["kx0"], [], sc.get("kx30"))
     for m in ms:
         fix_state(m["state"])
+        # The dumps since a832467 carry the third seat's handles, wounded modifiers and kind contexts (`handles3`, `wm3`,
+        # `kx3`); the guess above is checked against them (HANDLES3) and stands only for the older dumps.
+        if "handles3" in m and handles3 is not None:
+            live = [(g, r) for g, r, u in zip(handles3, m["handles3"], m["state"].get("third") or []) if r >= 0]
+            HANDLES3["equal" if all(g == r for g, r in live) else "differ"] += 1
+        if "wm" in m:
+            m["wm"] = fix_list(m["wm"], 0, m.get("wm3"))
+        if "kx" in m:
+            m["kx"] = fix_list(m["kx"], [], m.get("kx3"))
         if "prev" in m and spare:
             # The turn-start snapshot (slot, tile, hp): a spawn's Rust slot is its spare slot here.
             m["prev"] = [[(p_[0] if p_[0] < P else (P + smap[p_[0]] if p_[0] in smap else -1))] + list(p_[1:]) for p_ in m["prev"]]
@@ -126,7 +142,7 @@ def remap_play(play):
         if "ids" in m:
             m["ids"] = fix_list(m["ids"], -1, ids3)
         if "handles" in m:
-            m["handles"] = fix_list(m["handles"], -1, handles3)
+            m["handles"] = fix_list(m["handles"], -1, m.get("handles3") or handles3)
     standing = set()  # the Rust slots that hold a spawn of the camp now (not a stray of the arena)
     for e in sc.get("events", []):
         # The events write a city of the third seat with the owner -1 (the dump's side of the third seat); the twin's is 2,
