@@ -8,7 +8,9 @@ each part removes the overlap of lazy evaluation, so the parts add up to more th
 """
 
 import argparse
+import array
 import collections
+import hashlib
 import json
 import time
 
@@ -100,6 +102,7 @@ def main(argv=None):
         res["groups"] = {n: len(ids) for n, ids in g.groups}
         res["peak_gb_by_group"] = {n: round(v / 1e9, 2) for n, v in g.peak.items()}
         res["verdict_wins"] = int(mx.sum(g.verdict == 1).item())
+        res["verdict_hash"] = hashlib.md5(array.array("i", g.verdict.tolist()).tobytes()).hexdigest()[:16]
     print(json.dumps(res, indent=1))
     if a.out:
         json.dump(res, open(a.out, "w"), indent=1)

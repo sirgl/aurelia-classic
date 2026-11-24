@@ -12,7 +12,9 @@ schedule. Also `syncs_of(fn)`: the count of host syncs a call makes (the guard t
 """
 
 import argparse
+import array
 import collections
+import hashlib
 import io
 import json
 import re
@@ -295,6 +297,7 @@ def main(argv=None):
     if a.mode != "wall":
         run.update(summarise(probe, wall))
     run["verdict_wins"] = int(mx.sum(g.verdict == 1).item())
+    run["verdict_hash"] = hashlib.md5(array.array("i", g.verdict.tolist()).tobytes()).hexdigest()[:16]
     print(json.dumps({k: run[k] for k in ("scenes", "mode", "wall_s", "scene_rounds_per_s", "peak_gb", "syncs_total")}), flush=True)
     if a.mode != "wall":
         print(table(run, a.rounds))
