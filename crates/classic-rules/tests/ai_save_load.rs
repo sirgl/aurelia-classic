@@ -112,3 +112,22 @@ fn a_save_of_main_before_early_growth_loads_and_plays_on() {
     assert!(hashes.windows(2).any(|w| w[0] != w[1]), "the game moves on");
     game.validate(&rules).unwrap();
 }
+
+/// The saves of release 0.3.0 (tag v0.3.0, `fixtures/release-0.3.0.recipe.rs`: the shipped rules, 4 nations after 100
+/// rounds and 6 after 160): the game's own load accepts them (the same rules, `RulesMatch::SameRules`), they validate,
+/// the world hashes as saved, and the standard AI of this version plays them on.
+#[test]
+fn the_saves_of_release_0_3_0_load_and_play_on() {
+    const SAVES: [(&[u8], u64); 2] = [
+        (include_bytes!("fixtures/release-0.3.0-small.aurelia"), 0xd918_cf75_75c7_7222),
+        (include_bytes!("fixtures/release-0.3.0-big.aurelia"), 0x9237_ef94_dbcc_a77f),
+    ];
+    let rules = compile_rules(classic_content::classic::classic_rules()).unwrap();
+    for (bytes, world) in SAVES {
+        let (mut game, mut driver) = load(bytes, &rules);
+        game.validate(&rules).unwrap();
+        assert_eq!(authoritative_hash(&game), world);
+        play(&mut game, &rules, &mut driver, 20);
+        game.validate(&rules).unwrap();
+    }
+}
