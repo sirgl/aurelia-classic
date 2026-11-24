@@ -463,6 +463,27 @@ fn camp_terrain_ok(
         .is_some_and(|t| def.valid_terrains.contains(&t))
 }
 
+/// The technologies that half the alive majors know: what `barbarian_techs` teaches the barbarians each turn (the same count; this one
+/// only reads, for the dump's question "what will the camp spawn").
+pub fn majors_consensus(auth: &crate::world::state::AuthWorld) -> Vec<crate::ids::TechId> {
+    let players = auth.players();
+    let majors: Vec<PlayerId> = (0..players.count())
+        .map(|p| PlayerId(p as u8))
+        .filter(|p| players.is_major(*p) && players.is_alive(*p))
+        .collect();
+    if majors.is_empty() {
+        return Vec::new();
+    }
+    let mut counts: std::collections::BTreeMap<u16, usize> = Default::default();
+    for p in &majors {
+        for t in players.techs_of(*p) {
+            *counts.entry(t.0).or_default() += 1;
+        }
+    }
+    counts.into_iter().filter(|(_, n)| n * 2 >= majors.len()).map(|(t, _)| crate::ids::TechId(t)).collect()
+}
+
+
 /// The strongest regular unit of `domain` the barbarians can field: a
 /// fighting role, buildable, its technology known, not obsolete for them.
 /// (The barbarian-only variants — brute, galley — are not in the catalog:
@@ -473,7 +494,19 @@ pub fn barbarian_unit(
     player: PlayerId,
     domain: Domain,
 ) -> Option<UnitKindId> {
-    let techs = auth.players().techs_of(player);
+    barbarian_unit_with(auth, rules, player, domain, &[])
+}
+
+/// `barbarian_unit` as it will be once the barbarians have also learned `extra` (the dump asks what the camp will spawn).
+pub fn barbarian_unit_with(
+    auth: &crate::world::state::AuthWorld,
+    rules: &CompiledRuleset,
+    player: PlayerId,
+    domain: Domain,
+    extra: &[crate::ids::TechId],
+) -> Option<UnitKindId> {
+    let mut techs: Vec<crate::ids::TechId> = auth.players().techs_of(player).into_iter().copied().collect();
+    techs.extend_from_slice(extra);
     let mut best: Option<(u16, UnitKindId)> = None;
     for (i, def) in rules.units.iter().enumerate() {
         let fighting = matches!(

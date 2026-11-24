@@ -727,7 +727,7 @@ fn scene_json(rules: &CompiledRuleset, game: &GameState, sc: &Scene, win: &Windo
     let reinforce: Vec<i32> = sc.reinforce.iter().map(|k| make(*k, sc.enemy, reinforce_at, &mut spawn)).collect();
     // The camp's spawn (camp families): the barbarians' strongest land unit as a spawn row (info-only; -1 elsewhere).
     let camp_spawn: i32 = if super::camp::is_camp(sc.fam) {
-        classic_rules::barbarian_unit(auth, rules, sc.enemy, classic_rules::rules::content::Domain::Land).map_or(-1, |k| make(k, sc.enemy, super::camp::camp_tile(sc), &mut spawn))
+        classic_rules::barbarian_unit_with(auth, rules, sc.enemy, classic_rules::rules::content::Domain::Land, &classic_rules::majors_consensus(auth)).map_or(-1, |k| make(k, sc.enemy, super::camp::camp_tile(sc), &mut spawn))
     } else {
         -1
     };
@@ -842,7 +842,7 @@ impl Track {
         json!({"ids": sc.third.iter().map(|p| p.id.0).collect::<Vec<u64>>(), "profiles": profiles,
                "kinds": sc.third.iter().map(|p| p.kind.0).collect::<Vec<u16>>(),
                "camp": self.camp.map_or(-1, |t| self.win.index(t).map_or(-1, i64::from)),
-               "spawn_kind": self.camp.and_then(|_| classic_rules::barbarian_unit(game.view().auth, rules, sc.enemy, classic_rules::rules::content::Domain::Land)).map_or(-1, |k| i64::from(k.0))})
+               "spawn_kind": self.camp.and_then(|_| classic_rules::barbarian_unit_with(game.view().auth, rules, sc.enemy, classic_rules::rules::content::Domain::Land, &classic_rules::majors_consensus(game.view().auth))).map_or(-1, |k| i64::from(k.0))})
     }
 
     /// Info-only: the third seat's unit rows (the dump's unit record, side 2), its cities (a city of the third seat in the
