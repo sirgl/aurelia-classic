@@ -312,6 +312,27 @@ fn the_scene_rule_is_the_trainers_default_and_standard_is_the_only_way_off() {
     assert!(std::panic::catch_unwind(|| rule_of(Some("simpel"))).is_err(), "an unknown value stops the run");
 }
 
+/// The scene rule's version: 1 (unset) is the rule of before, 2 plays the learner's civilians; a misspelt value stops the
+/// run; and the civilians' pass of version 2 walks a convoy's settler (the world where nobody moves it is version 1).
+#[test]
+fn the_scene_rule_version_is_one_by_default_and_two_plays_the_civilians() {
+    use aurelia_qa::trainers::scene_rule::version_of;
+    assert_eq!(version_of(None), 1, "unset: version 1");
+    assert_eq!(version_of(Some("1")), 1);
+    assert_eq!(version_of(Some("2")), 2);
+    for bad in ["3", "", "two", "0"] {
+        assert!(std::panic::catch_unwind(|| version_of(Some(bad))).is_err(), "{bad:?} stops the run");
+    }
+    let rules = ClassicBench::rules();
+    let era = (0..8u8).find(|e| families::build(&rules, Fam::Convoy, *e, 0, 0).is_ok()).expect("a convoy scene builds");
+    let (mut game, sc) = families::build(&rules, Fam::Convoy, era, 0, 0).unwrap();
+    let settler = sc.mine.iter().find(|p| p.role == "civilian").unwrap().clone();
+    let before = act::alive(&game, &settler, sc.learner).unwrap().tile;
+    families::civilians_turn(&rules, &mut game, &sc);
+    let after = act::alive(&game, &settler, sc.learner).map(|c| c.tile);
+    assert_ne!(after, Some(before), "the civilians' pass walks the settler (or founds the city)");
+}
+
 /// The camp rules the camp trainers stand on (`trainers::camp`, its module doc): a camp is cleared by a unit that ENTERS its
 /// tile (killing the keeper does not clear it), the neutral nation at peace with the learner cannot be struck by it and cannot
 /// stop on a tile of ours, the rules' record says who cleared, and the win rules read that record.

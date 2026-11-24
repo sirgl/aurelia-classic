@@ -61,7 +61,7 @@
 
 use std::collections::BTreeMap;
 
-use classic_rules::ids::{CityHandle, PlayerId, TileId, UnitKindId};
+use classic_rules::ids::{CityHandle, PlayerId, TileId, UnitHandle, UnitKindId};
 use classic_rules::{ClassicGame, Command, CompiledRuleset, GameState};
 use kernel::ids::BuildingKindId;
 use serde::{Deserialize, Serialize};
@@ -354,6 +354,9 @@ impl Fam {
             Fam::Kite => k.has(Arm::HitRun) && k.has(Arm::Melee),
             Fam::Harass => (k.has(Arm::MountedRanged) || k.uniques.contains_key(&Arm::MountedRanged)) && k.has(Arm::Melee),
             Fam::Snipe => (k.has(Arm::HitRun) || k.has(Arm::Mounted)) && k.has(Arm::Melee),
+            // Rule version 2: the raiders of guard and convoy are mounted (an era without a mounted kind gets a foot soldier
+            // that a walking civilian simply outruns: the passive control won 95 % of guard in the ancient era).
+            Fam::Guard | Fam::Convoy if super::scene_rule::version() == 2 => land && k.has(Arm::Mounted),
             Fam::Siege => land && (k.has(Arm::Siege)),
             Fam::Ram => land && (k.uniques.contains_key(&Arm::CityAssault) || k.has(Arm::CityAssault)),
             Fam::General => land && k.has(Arm::General),
@@ -873,14 +876,18 @@ pub fn build(rules: &CompiledRuleset, fam: Fam, era: u8, instance: usize, attemp
             s.hold = Some(t0);
         }
         Fam::Guard | Fam::Convoy => {
-            let home_t = at(&p, -6, 0)?;
+            // Rule version 2: the refuge of guard is three tiles farther (the civilians' own walk to a city two tiles away
+            // solved the scene without the army: the passive control won 70 %).
+            let home_t = at(&p, if fam == Fam::Guard && super::scene_rule::version() == 2 { -9 } else { -6 }, 0)?;
             p.city(me, home_t, 3, false);
             s.refuge = Some(home_t);
             let civ = if fam == Fam::Convoy { settler_kind(rules).ok_or("no settler")? } else if p.d.chance(33) && lab.kinds.has(Arm::General) { p.kind(Arm::General).ok_or("no general")? } else { civil_kind(rules).ok_or("no worker")? };
             let start = at(&p, -4, p.d.range(-1, 1))?;
             let ward = p.put(me, start, civ, "civilian");
             s.mine.push(ward);
-            let n_civ2 = usize::from(fam == Fam::Guard && p.d.chance(40));
+            // Rule version 2: one civilian (one escort cannot cover two: a civilian never shares a tile with another).
+            let v2 = super::scene_rule::version() == 2;
+            let n_civ2 = usize::from(fam == Fam::Guard && p.d.chance(40) && !v2);
             if n_civ2 > 0 {
                 let t = p.spots(at(&p, -3, 2)?, 1, 1)?[0];
                 let w2 = p.put(me, t, civil_kind(rules).ok_or("no worker")?, "civilian");
@@ -890,8 +897,11 @@ pub fn build(rules: &CompiledRuleset, fam: Fam, era: u8, instance: usize, attemp
             let t = p.spots(start, 1, 1)?[0];
             let esc = p.put(me, t, ek, "escort");
             s.mine.push(esc);
-            let n_raid = p.d.range(1, 2) as usize;
-            for t in p.spots(at(&p, p.d.range(0, 1), 0)?, 2, n_raid)? {
+            // Rule version 2 (guard): two raiders always (one is killed by a ranged escort standing still; the passive control won 11 %).
+            let n_raid = if v2 && fam == Fam::Guard { p.d.range(2, 2) } else { p.d.range(1, 2) } as usize;
+            // Rule version 2 (guard): the raiders start 2-3 tiles nearer, so that a civilian walking alone is caught in round 1.
+            let raid_x = if v2 && fam == Fam::Guard { p.d.range(-2, -1) } else { p.d.range(0, 1) };
+            for t in p.spots(at(&p, raid_x, 0)?, 2, n_raid)? {
                 let k = p.kind(Arm::Mounted).ok_or("no raider")?;
                 let piece = p.put(foe, t, k, "raider");
                 s.theirs.push(piece);
@@ -1316,8 +1326,11 @@ pub fn reference_turn(rules: &CompiledRuleset, game: &mut GameState, scene: &mut
     let foes_city = targets_of(&sc, true, true);
     let mut order: Vec<Piece> = sc.mine.clone();
     // Ranged and siege first (they soften), then melee, then the rest.
+    // Rule version 2: the civilians of the guard and convoy references play after their escort (the escort leads, the
+    // civilian joins it); before, they played first.
+    let v2 = super::scene_rule::on() && super::scene_rule::version() == 2 && matches!(name, "ref-guard" | "ref-guard-strike" | "ref-convoy");
     order.sort_by_key(|p| (match p.role {
-        "civilian" => 0,
+        "civilian" => if v2 { 20 } else { 0 },
         "ranged" | "siege" | "ship" | "bomber" => 1,
         "ram" => 2,
         "general" => 9,
@@ -1381,18 +1394,15 @@ pub fn reference_turn(rules: &CompiledRuleset, game: &mut GameState, scene: &mut
             ("ref-kite" | "ref-kite-careful", _) => (Aim::Kite, if name == "ref-kite" { Nerve::Even } else { Nerve::Careful }, false),
             ("ref-guard" | "ref-guard-strike" | "ref-convoy", _) => {
                 if p.role == "civilian" {
-                    if let (Some(site), Fam::Convoy) = (sc.target, sc.fam) {
-                        if c.tile == site || game.accepts_order(rules, me, &Command::FoundCity { settler: p.h }) && dist(game, c.tile, site) <= 1 {
-                            let _ = act::try_cmd(game, rules, me, Command::FoundCity { settler: p.h });
-                            continue;
-                        }
-                        (Aim::To(site), Nerve::Careful, false)
-                    } else {
-                        (Aim::To(refuge), Nerve::Careful, false)
-                    }
+                    civilian_turn(rules, game, &sc, &p, v2);
+                    continue;
                 } else {
                     let ward = sc.mine.iter().find(|q| q.role == "civilian" && act::alive(game, q, me).is_some()).map(|q| q.h);
                     match ward {
+                        Some(w) if v2 => {
+                            let goal = sc.target.filter(|_| sc.fam == Fam::Convoy).unwrap_or(refuge);
+                            (escort_field(rules, game, &sc, goal, w), if name == "ref-guard" { Nerve::Careful } else { Nerve::Even }, false)
+                        }
                         Some(w) => (Aim::Guard(w), if name == "ref-guard" { Nerve::Careful } else { Nerve::Even }, false),
                         None => (Aim::Close, Nerve::Even, false),
                     }
@@ -1506,6 +1516,66 @@ pub fn reference_turn(rules: &CompiledRuleset, game: &mut GameState, scene: &mut
         let targets: &dyn Fn(&GameState) -> Vec<TileId> = if focus.is_some() { &focused } else if city && matches!(name, "ref-siege" | "ref-bombard") { &by_city } else if city { &foes_city } else { &foes_only };
         act::unit_turn(game, rules, me, foe, p.h, &aim, nerve, targets, &friends);
     }
+}
+
+/// The learner's civilian script (the guard and convoy references' civilians, and the scene rule's under version 2):
+/// a settler of convoy founds the city where it stands next to the site (or on it), else walks to the site; every
+/// other civilian walks to the refuge, Careful (no tile a foe strikes when another is left). `join` (a teacher's turn
+/// under version 2, the escort having played first): the civilian goes to the tile of its escort when it can reach
+/// it, else as close as it can, and stands there (the stack: a civilian alone on a tile is captured).
+pub fn civilian_turn(rules: &CompiledRuleset, game: &mut GameState, sc: &Scene, p: &Piece, join: bool) {
+    let (me, foe) = (sc.learner, sc.enemy);
+    let Some(c) = act::alive(game, p, me) else { return };
+    let site = sc.target.filter(|_| sc.fam == Fam::Convoy);
+    let found = |game: &mut GameState| {
+        let ok = act::alive(game, p, me).is_some_and(|n| n.moves_left > 0) && game.accepts_order(rules, me, &Command::FoundCity { settler: p.h });
+        ok && act::try_cmd(game, rules, me, Command::FoundCity { settler: p.h })
+    };
+    if let Some(site) = site {
+        if c.tile == site || game.accepts_order(rules, me, &Command::FoundCity { settler: p.h }) && dist(game, c.tile, site) <= 1 {
+            let _ = act::try_cmd(game, rules, me, Command::FoundCity { settler: p.h });
+            return;
+        }
+    }
+    let goal = site.unwrap_or(sc.refuge.unwrap_or(sc.centre));
+    let escort = if join { sc.mine.iter().filter(|q| q.role != "civilian").find_map(|q| act::alive(game, q, me)) } else { None };
+    if let Some(e) = escort {
+        act::move_by(game, rules, me, p.h, |g, x, _| (dist(g, x, e.tile), dist(g, x, goal)));
+        if site.is_some() && act::alive(game, p, me).is_some_and(|n| Some(n.tile) == site) && found(game) {
+            return;
+        }
+        act::stand(game, rules, p.h);
+        return;
+    }
+    let foes_only = targets_of(sc, true, false);
+    act::unit_turn(game, rules, me, foe, p.h, &Aim::To(goal), Nerve::Careful, &foes_only, &handles(&sc.mine));
+}
+
+/// Under version 2 the escort of convoy and guard leads: it takes, of the tiles its civilian can also reach, the one
+/// nearest to the goal (a strike at good odds first, as every script's unit), and the civilian then joins it. The aim
+/// is a field over the map's tiles: the cost of a tile (0 = best).
+fn escort_field(rules: &CompiledRuleset, game: &GameState, sc: &Scene, goal: TileId, ward: UnitHandle) -> Aim {
+    let reach: Vec<TileId> = act::reachable(game, rules, sc.learner, ward).into_iter().map(|(t, _)| t).collect();
+    let n = game.view().auth.map().tile_count() as u32;
+    Aim::Field(std::rc::Rc::new((0..n).map(|i| { let t = TileId(i); (if reach.contains(&t) { 0 } else { 1000 }) + dist(game, t, goal) }).collect()))
+}
+
+/// Scene rule version 2, step 0b: the learner's civilians that no script has played this turn (unmoved, moves left) play
+/// the civilian script, in id order (a teacher's script plays them first, in this order, and they have moved).
+pub fn civilians_turn(rules: &CompiledRuleset, game: &mut GameState, scene: &Scene) {
+    let me = scene.learner;
+    let mut civs: Vec<&Piece> = scene.mine.iter().filter(|p| p.role == "civilian").collect();
+    civs.sort_by_key(|p| p.id.0);
+    for p in civs {
+        if act::alive(game, p, me).is_some_and(|c| c.moves_left > 0 && !c.has_moved()) {
+            civilian_turn(rules, game, scene, p, false);
+        }
+    }
+}
+
+/// The learner's pieces a passive or random control plays: under rule version 2 the civilians are the rule's.
+pub fn army_pieces(scene: &Scene, rules_civilians: bool) -> Vec<Piece> {
+    scene.mine.iter().filter(|p| !(rules_civilians && p.role == "civilian")).cloned().collect()
 }
 
 /// The general's tile: next to the most friends, out of the foes' reach.

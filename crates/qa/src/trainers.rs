@@ -556,10 +556,10 @@ fn play_on<P: kernel::ai::mind::AiMind<Classic>>(rules: &CompiledRuleset, mut ga
                         }
                     }
                     Seat::Passive => {
-                        act::passive_turn(&mut game, rules, scene.learner, &scene.mine);
+                        act::passive_turn(&mut game, rules, scene.learner, &families::army_pieces(&scene, scene_rule::plays_civilians(false)));
                     }
                     Seat::Random => {
-                        act::random_turn(&mut game, rules, scene.learner, &scene.mine, &rnd);
+                        act::random_turn(&mut game, rules, scene.learner, &families::army_pieces(&scene, scene_rule::plays_civilians(false)), &rnd);
                     }
                     Seat::Probe(name) => {
                         crate::army_net::seat::probe_and_play(rules, &mut game, &mut scene, name);
@@ -574,6 +574,10 @@ fn play_on<P: kernel::ai::mind::AiMind<Classic>>(rules: &CompiledRuleset, mut ga
                         net_time.updates += t.updates;
                         net_time.turns += 1;
                     }
+                }
+                if scene_rule::plays_civilians(matches!(seat, Seat::Mind(_))) {
+                    // Rule version 2, step 0b: our civilians by the family teacher's civilian script.
+                    families::civilians_turn(rules, &mut game, &scene);
                 }
                 if scene_rule::on() && !matches!(seat, Seat::Mind(_)) {
                     scene_rule::turn(rules, &mut game, &scene, scene.learner);
@@ -729,6 +733,7 @@ fn play_on<P: kernel::ai::mind::AiMind<Classic>>(rules: &CompiledRuleset, mut ga
     // Times are not measures of the play (they differ from run to run): they go to `info`.
     let mut info = scene.info.clone();
     info.insert("learner_mind_us".into(), learner_us.to_string());
+    info.insert("rule_version".into(), if scene_rule::on() { scene_rule::version() } else { 0 }.to_string());
     if seat == Seat::Net {
         measures.insert("net_decisions".into(), net_time.decisions as f64);
         measures.insert("net_updates".into(), net_time.updates as f64);
