@@ -124,6 +124,10 @@ def remap_play(play):
             m["handles"] = fix_list(m["handles"], -1, None)
     standing = set()  # the Rust slots that hold a spawn of the camp now (not a stray of the arena)
     for e in sc.get("events", []):
+        # The events write a city of the third seat with the owner -1 (the dump's side of the third seat); the twin's is 2,
+        # as `fix_state` makes the scene's and the moments' cities (the forced rows are rebuilt from the events).
+        if e.get("c"):
+            e["c"] = [[k, ([2] + list(c[1:])) if c[0] == -1 else c] for k, c in e["c"]]
         if "t" not in e:
             continue
         u = []

@@ -580,14 +580,14 @@ class Obs:
             v = grow(s[src], me)
             f[k] = mx.broadcast_to(v[:, None], (B, N) + v.shape[1:])
         # The held promotions are read only where a context gates on one: by (row of the slot, promotion), not gathered whole.
-        f["prom_row"] = (s["u_prom"], mx.broadcast_to((mx.arange(B, dtype=I32) * s["u_prom"].shape[1] + mx.maximum(me, 0))[:, None], (B, N)))
+        f["prom_row"] = (s["u_prom"], mx.broadcast_to((mx.arange(B, dtype=I32) * s["u_prom"].shape[1] + mx.clip(me, 0, s["u_prom"].shape[1] - 1))[:, None], (B, N)))
         f["water"] = self.sim.mg("water", frm) > 0
         f["embarked"] = f["land"] & f["water"]
         return f
 
     def fighter_n_slots(self, s, slots, valid):
         f = {"slot": slots, "valid": valid & (slots >= 0)}
-        sl = mx.maximum(slots, 0)
+        sl = mx.clip(slots, 0, s["u_alive"].shape[1] - 1)
         for k in ("u_tile", "u_side", "u_hp", "u_st", "u_mv", "u_mmax"):
             f[k[2:]] = gn(s[k], sl)
         for k in Sim.FIGHTER_KEYS:

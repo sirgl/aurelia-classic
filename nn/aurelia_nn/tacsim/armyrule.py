@@ -379,6 +379,8 @@ def _strike(game, me, side, tile, take):
         mk = sim.masks(s, sd, me)
         game.s = sim.apply_unit(s, sd, me, mx.full((B,), V_SETUP, dtype=I32), mx.zeros((B,), dtype=I32), mk, need & mk["setup"])
     mk = sim.masks(game.s, sd, me)
+    # The set-up spends a move: a unit that walked first and sets up has none left, and Rust refuses its strike.
+    take = take & (g1(game.s["u_mv"], me) > 0)
     game.s = sim.apply_unit(game.s, sd, me, mx.full((B,), V_ATTACK, dtype=I32), mx.maximum(tile, 0), mk, take)
 
 

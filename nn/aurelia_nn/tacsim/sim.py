@@ -54,21 +54,22 @@ CL_MIL, CL_CIV, CL_EMB, CL_NAVAL, CL_NAVAL_CIV, CL_AIR = range(6)
 
 
 def g1(arr, idx):
-    """arr[b, idx[b]] for arr [B, N] (idx clamped; callers mask idx < 0)."""
-    return mx.take_along_axis(arr, mx.maximum(idx, 0)[:, None], axis=1)[:, 0]
+    """arr[b, idx[b]] for arr [B, N] (idx clamped to [0, N - 1]; callers mask the rows out of range: an out-of-range
+    gather reads another row's memory on the GPU and crashes the CPU)."""
+    return mx.take_along_axis(arr, mx.clip(idx, 0, arr.shape[1] - 1)[:, None], axis=1)[:, 0]
 
 
 def gn(arr, idx):
     """arr[b, idx[b, ...]] for arr [B, N] and idx [B, ...]."""
     B = arr.shape[0]
-    flat = mx.maximum(idx, 0).reshape(B, -1)
+    flat = mx.clip(idx, 0, arr.shape[1] - 1).reshape(B, -1)
     return mx.take_along_axis(arr, flat, axis=1).reshape(idx.shape)
 
 
 def grow(arr, slot):
     """arr[b, slot[b], ...] for arr [B, U, ...]: the slot's row."""
     shape = (arr.shape[0], 1) + arr.shape[2:]
-    idx = mx.broadcast_to(mx.maximum(slot, 0).reshape((-1,) + (1,) * (arr.ndim - 1)), shape)
+    idx = mx.broadcast_to(mx.clip(slot, 0, arr.shape[1] - 1).reshape((-1,) + (1,) * (arr.ndim - 1)), shape)
     return mx.take_along_axis(arr, idx, axis=1)[:, 0]
 
 
@@ -558,8 +559,10 @@ class Sim:
         land = g1(s["p_land"], slot)
         fort = alive & ~((st == 1) | (st == 2)) & ~civilian & ~g1(s["p_no_defensive_bonus"], slot) & land & ~water_here
         setup = alive & g1(s["p_must_set_up"], slot) & (st != 3) & (mv > 0) & ~water_here
-        fo = mx.take(self.m["found_ok"].reshape(-1), self.tid * (2 * T) + side * T + mx.maximum(tile, 0))
-        found = alive & g1(s["p_founder"], slot) & fo
+        # `found_ok` has the two scene sides only: a third seat (side 2) founds nothing (an unclamped index read the next
+        # scene's row on the GPU and crashed the CPU).
+        fo = mx.take(self.m["found_ok"].reshape(-1), self.tid * (2 * T) + mx.minimum(side, 1) * T + mx.maximum(tile, 0))
+        found = alive & g1(s["p_founder"], slot) & fo & (side < 2)
         promo = self.promo_mask(s, slot, alive) if self.f["promo"] else mx.zeros((B, s["u_prom"].shape[2]), dtype=mx.bool_)
         # Moves.
         ctrl = mx.where(g1(s["p_sea"], slot)[:, None], self._ctrl_sea, ctrl)
