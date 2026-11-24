@@ -240,6 +240,9 @@ def enemy_turn(game):
     # The fog families' scripts (twin package 3; `armyfog`): nothing where no row is one.
     from . import armyfog
     armyfog.enemy_turn(game, live)
+    # Guard, convoy, snipe (twin package 7; `armyciv`).
+    from . import armyciv
+    armyciv.enemy_turn(game, live)
     seat_turn(game, 1, live)
     game.s = game.sim.end_turn(game.s, mx.full((B,), 1, dtype=I32), live)
 

@@ -517,6 +517,10 @@ class Game:
     def our_turn_end(self, live):
         """The end of the net's turn: every army unit stands (`act::stand`: no moves left), then the seat's AI mind
         fortifies some of them (`planner_units::hold` through its decision tree)."""
+        if self.scene_rule:
+            # Rule version 2 (twin package 7, `armyciv`): the rule plays our civilians after the net's turn.
+            from . import armyciv
+            armyciv.learner_pass(self, live)
         s = self.s
         army = self.tab.t["army"] >= 0
         s = self.sim.hold_units(s, army & (s["u_side"] == 0) & live[:, None] & (s["u_mv"] > 0), heal=self.hold_heals)
@@ -1004,6 +1008,9 @@ class Game:
         # The fog families (twin package 3; `armyfog`).
         from . import armyfog
         v = armyfog.judge(self, rel, v)
+        # Guard, convoy, snipe (twin package 7; `armyciv`).
+        from . import armyciv
+        v = armyciv.judge(self, rel, v)
         self.verdict = mx.where(self.verdict < 0, v, self.verdict)
 
     def play(self, limit_rounds=None):
