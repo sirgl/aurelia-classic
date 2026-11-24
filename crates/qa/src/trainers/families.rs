@@ -899,8 +899,8 @@ pub fn build(rules: &CompiledRuleset, fam: Fam, era: u8, instance: usize, attemp
             s.mine.push(esc);
             // Rule version 2 (guard): two raiders always (one is killed by a ranged escort standing still; the passive control won 11 %).
             let n_raid = if v2 && fam == Fam::Guard { p.d.range(2, 2) } else { p.d.range(1, 2) } as usize;
-            // Rule version 2 (guard): the raiders start 2-3 tiles nearer, so that a civilian walking alone is caught in round 1.
-            let raid_x = if v2 && fam == Fam::Guard { p.d.range(-2, -1) } else { p.d.range(0, 1) };
+            // Rule version 2 (guard): the raiders start 3-4 tiles nearer, so that a civilian walking alone is caught in round 1.
+            let raid_x = if v2 && fam == Fam::Guard { p.d.range(-3, -2) } else { p.d.range(0, 1) };
             for t in p.spots(at(&p, raid_x, 0)?, 2, n_raid)? {
                 let k = p.kind(Arm::Mounted).ok_or("no raider")?;
                 let piece = p.put(foe, t, k, "raider");
