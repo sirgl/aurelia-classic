@@ -142,6 +142,7 @@ def _camp_move(game, me, side, take, goal, kind):
     j, has = _lex_min([d, k2, lt], opt)
     go = has & (j != 0)
     game.s = sim.apply_unit(s, sd, me, mx.full((B,), V_MOVE, dtype=I32), mx.take_along_axis(lt, j[:, None], axis=1)[:, 0], mk, go)
+    mx.eval(game.s)
 
 
 def unit_turn(game, me, side, rows, aim, goal):
@@ -173,6 +174,7 @@ def unit_turn(game, me, side, rows, aim, goal):
             check(game)
             R._strike(game, me, side, t2, ap)
             check(game)
+    mx.eval(game.s)
     walk = mine & ~hit & ~ap
     s = game.s
     walk = walk & (g1(s["u_mv"], me) > 0)

@@ -248,6 +248,9 @@ def enemy_turn(game):
     # The camp families' barbarians (twin package 4; `armycamp`): the script, then after the rule the countdown and the spawn.
     from . import armycamp
     armycamp.enemy_turn(game, live)
+    # The third-party families' enemy (twin package 8; `armyparty`).
+    from . import armyparty
+    armyparty.enemy_turn(game, live)
     seat_turn(game, 1, live)
     armycamp.barbarian_end(game, live)
     game.s = game.sim.end_turn(game.s, mx.full((B,), 1, dtype=I32), live)
@@ -268,8 +271,14 @@ def _foes(s, side):
 
 def _only(game, s, foes):
     """A script's target list restricted to one tile where a foe stands on it (`game.script_only` [B], -1 none: the camp
-    families' neutral strikes the unit on the camp while one stands there)."""
+    families' neutral strikes the unit on the camp while one stands there), or to the foes within `radius` of a tile
+    (`game.script_near` = (tile [B], radius): the third party's race strikes what stands near the city)."""
     only = getattr(game, "script_only", None)
+    near = getattr(game, "script_near", None)
+    if near is not None:
+        tile, radius = near
+        d = game.sim.geo.distance(s["u_tile"], mx.broadcast_to(tile[:, None], s["u_tile"].shape))
+        foes = foes & (d <= radius)
     if only is None:
         return foes
     there = foes & (s["u_tile"] == only[:, None])
@@ -286,33 +295,77 @@ def _marks(game, s, side):
     return _only(game, s, _foes(s, side)) & ((dm == slots) | ((dm < 0) & (dc == slots)))
 
 
+def _cols(game, s, side):
+    """The strike targets of a script: (the tiles [B, N], the marks [B, N]): our units' tiles and, where the script names one
+    (`game.script_city` [B] window tile, -1 none: the ally's city, the city the third party takes), that city's tile
+    when the city is at war with `side`."""
+    mark = _marks(game, s, side)
+    to = s["u_tile"]
+    city = getattr(game, "script_city", None)
+    if city is None:
+        return to, mark
+    if getattr(game, "script_city_only", False):
+        mark = mx.zeros_like(mark)
+    sim = game.sim
+    owner = _city_owner_at(game, s, city)
+    foe = Sim.is_foe(s, mx.full((city.shape[0],), side, dtype=I32), owner) if "war" in s else owner == 1 - side
+    return mx.concatenate([to, mx.maximum(city, 0)[:, None]], axis=1), mx.concatenate([mark, foe[:, None]], axis=1)
+
+
+def _city_owner_at(game, s, city):
+    """[B] the owner (side) of the city on the window tile `city` [B], -1 none (and in a scene with no city in the window)."""
+    if s["c_owner"].shape[1] == 0:
+        return mx.full(city.shape, -1, dtype=I32)
+    cs = game.sim.city_on(s, mx.maximum(city, 0)[:, None])[:, 0]
+    return mx.where((cs >= 0) & (city >= 0), g1(s["c_owner"], mx.maximum(cs, 0)), -1)
+
+
+def _city_bonus(game, s, to):
+    """`best_blow`'s city bonus (20) for the tiles `to` [B, N] that hold a city."""
+    return mx.where(game.sim.city_on(s, to) >= 0, 20, 0)
+
+
 def _lex_min(keys, mask):
     """The first index of the lexicographic minimum of `keys` (a list of [B, N] int arrays) where `mask` [B, N]."""
     m = mask
     for k in keys:
         best = mx.min(mx.where(m, k, NOKEY), axis=1)
         m = m & (k == best[:, None])
-    return A.first_index_eq(m.astype(I32), mx.ones((m.shape[0],), dtype=I32)), mx.any(mask, axis=1)
+    j = A.first_index_eq(m.astype(I32), mx.ones((m.shape[0],), dtype=I32))
+    return mx.minimum(j, m.shape[1] - 1), mx.any(mask, axis=1)  # no candidate: n; clamp (CPU MLX segfaults on the out-of-range gather)
 
 
 def _blow(game, me, side, take):
     """`act::best_blow` (Even) from where `me` stands on our units: (has one, the target tile) [B]. The ties go to the first
-    target of the script's list: the pieces' order, or the lowest tile where the script's targets are sorted (`game.script_sorted`)."""
+    target of the script's list: the pieces' order, or the lowest tile where the script's targets are sorted (`game.script_sorted`).
+    `game.script_nerve` 'careful' / 'reckless': the other nerves of `act::Nerve`."""
     s, obs = game.s, game.obs
     B, U = s["u_alive"].shape
     tile = g1(s["u_tile"], me)
-    mark = _marks(game, s, side) & take[:, None] & (g1(s["u_mv"], me) > 0)[:, None]
-    to = s["u_tile"]
-    dealt, taken, dhp, ok = obs.preview(s, me, mx.broadcast_to(tile[:, None], (B, U)), to, mark, True)
+    to, mark = _cols(game, s, side)
+    N = to.shape[1]
+    mark = mark & take[:, None] & (g1(s["u_mv"], me) > 0)[:, None]
+    dealt, taken, dhp, ok = obs.preview(s, me, mx.broadcast_to(tile[:, None], (B, N)), to, mark, True)
     hp = g1(s["u_hp"], me)[:, None]
     kills = dealt >= dhp
-    fine = ok & mark & (kills | ((dealt >= taken) & (taken < hp)))
-    capt = ~obs.kind(s, "civ") & (obs.kind(s, "range") < 0)
-    score = mx.where(kills, 10000, 0) + (100 - mx.maximum(dhp - dealt, 0)) * 10 + mx.where(capt, 50, 0) - taken
+    fine = ok & mark & _nerve(game, kills, dealt, taken, hp)
+    capt = mx.concatenate([~obs.kind(s, "civ") & (obs.kind(s, "range") < 0)] + ([mx.zeros((B, 1), dtype=mx.bool_)] if N > U else []), axis=1)
+    score = mx.where(kills, 10000, 0) + (100 - mx.maximum(dhp - dealt, 0)) * 10 + mx.where(capt, 50, 0) + _city_bonus(game, s, to) - taken
     # Ties: the first target in the pieces' order (Rust's `ours` is `mine_alive`, not sorted).
-    tie = to if getattr(game, "script_sorted", False) else mx.broadcast_to(mx.arange(U, dtype=I32)[None, :], (B, U))
+    tie = to if getattr(game, "script_sorted", False) else mx.broadcast_to(mx.arange(N, dtype=I32)[None, :], (B, N))
     j, has = _lex_min([-score, tie], fine)
+    game.blow_kill = mx.take_along_axis(kills, j[:, None], axis=1)[:, 0]  # the best blow kills (score >= 10 000)
     return has, mx.take_along_axis(to, j[:, None], axis=1)[:, 0]
+
+
+def _nerve(game, kills, dealt, taken, hp):
+    """`act::Nerve`: Even (the default), Careful (a kill, or twice what it takes and under half its hit points), Reckless."""
+    nerve = getattr(game, "script_nerve", "even")
+    if nerve == "reckless":
+        return mx.ones_like(kills)
+    if nerve == "careful":
+        return kills | ((dealt >= 2 * taken) & (taken < hp // 2))
+    return kills | ((dealt >= taken) & (taken < hp))
 
 
 def _strike(game, me, side, tile, take):
@@ -352,23 +405,24 @@ def _approach(game, me, side, take):
     L = lt.shape[1]
     rng = g1(obs.kind(s, "range"), me)
     reach = mx.where(rng >= 0, rng, 1)
-    mark = _marks(game, s, side)
-    d = geo.distance(mx.broadcast_to(lt[:, :, None], (B, L, U)), mx.broadcast_to(s["u_tile"][:, None, :], (B, L, U)))
+    tiles, mark = _cols(game, s, side)
+    N = tiles.shape[1]
+    d = geo.distance(mx.broadcast_to(lt[:, :, None], (B, L, N)), mx.broadcast_to(tiles[:, None, :], (B, L, N)))
     pair = (ok_l & (left > 0) & take[:, None])[:, :, None] & mark[:, None, :] & (d <= reach[:, None, None])
-    flat = pair.reshape(B, L * U)
+    flat = pair.reshape(B, L * N)
     K = int(mx.max(mx.sum(flat, axis=1)).item())
     if K == 0:
         return mx.zeros((B,), dtype=mx.bool_), mx.zeros((B,), dtype=I32), mx.zeros((B,), dtype=I32)
     idx = mx.argsort(mx.where(flat, 0, 1), axis=1)[:, :K].astype(I32)
     valid = mx.take_along_axis(flat, idx, axis=1)
-    frm = mx.take_along_axis(lt, idx // U, axis=1)
-    to = mx.take_along_axis(s["u_tile"], idx % U, axis=1)
+    frm = mx.take_along_axis(lt, idx // N, axis=1)
+    to = mx.take_along_axis(tiles, idx % N, axis=1)
     dealt, taken, dhp, ok = obs.preview(s, me, frm, to, valid, False)
     hp = g1(s["u_hp"], me)[:, None]
     kills = dealt >= dhp
-    fine = ok & valid & (kills | ((dealt >= taken) & (taken < hp)))
+    fine = ok & valid & _nerve(game, kills, dealt, taken, hp)
     score = mx.where(kills, 10000, 0) + (100 - mx.maximum(dhp - dealt, 0)) * 10 - taken
-    tie = to if getattr(game, "script_sorted", False) else idx % U
+    tie = to if getattr(game, "script_sorted", False) else idx % N
     j, has = _lex_min([_threat(game, s, side, frm), -score, frm, tie], fine)
     pick = lambda a: mx.take_along_axis(a, j[:, None], axis=1)[:, 0]
     return has, pick(frm), pick(to)
@@ -387,7 +441,16 @@ def _move_by_aim(game, me, side, take):
     fd = obs.field(s, side)
     foes = _only(game, s, _foes(s, side))
     d_all = A.hexd(q[:, :, None] - fd["uq"][:, None, :], r[:, :, None] - fd["ur"][:, None, :])
-    d = A.min_or(foes[:, None, :], d_all, 2, 99)
+    d_foe = d_all
+    city = getattr(game, "script_city", None)
+    if city is not None:
+        # The script's city is one more target of its list (`targets(game)`): the distances look at it too.
+        to, mark = _cols(game, s, side)
+        cq, cr = obs.mapq(mx.maximum(city, 0)[:, None])
+        d_city = A.hexd(q - cq, r - cr)[:, :, None]
+        foes = mx.concatenate([foes, mark[:, -1:]], axis=1)
+        d_foe = mx.concatenate([d_all, d_city], axis=2)
+    d = A.min_or(foes[:, None, :], d_foe, 2, 99)
     rng = g1(obs.kind(s, "range"), me)
     ranged = (rng >= 0)[:, None]
     reach = mx.where(rng >= 0, rng, 1)[:, None]

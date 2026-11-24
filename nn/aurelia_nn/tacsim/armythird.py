@@ -23,6 +23,7 @@ WIDTH = 24  # the window's width: a tile id is r * WIDTH + q
 
 CAMP = ("camp", "camp-race")
 THIRD = ("neutral-path", "ally-siege", "defend-friend", "closed-borders", "spare-friends", "neutral-joins-war", "capital-race")
+ALLY = ("ally-siege", "defend-friend", "capital-race", "spare-friends")  # `third_party::ally_at_war`: the third is at war with the enemy
 
 
 def family(play_name):
@@ -145,22 +146,35 @@ def remap_play(play):
     return play
 
 
-def war_for(families):
-    """[n, 3, 3] bool: each row's war table at the play's start, by family."""
+def war_for(families, declared=None):
+    """[n, 3, 3] bool: each row's war table, by family. `declared` [n] bool: the neutral has declared war on the learner
+    (neutral-joins-war, from the learner's turn of relative round 3 on)."""
     rows = []
-    for fam in families:
+    for i, fam in enumerate(families):
         w = [[False] * 3 for _ in range(3)]
         w[0][1] = w[1][0] = True
-        if fam in CAMP:
+        if fam in CAMP or fam in ALLY:
             w[1][2] = w[2][1] = True
-        elif fam in THIRD:
-            w[1][2] = w[2][1] = fam not in ("neutral-path", "closed-borders", "spare-friends", "neutral-joins-war")
-            # neutral-path, closed-borders, spare-friends: the third is at peace with both; neutral-joins-war: at peace until
-            # the declaration (round `join_at`: the learner and the third are at war from then on).
-            if fam == "capital-race":
-                w[1][2] = w[2][1] = True
+        if fam == "neutral-joins-war" and declared is not None and declared[i]:
+            w[0][2] = w[2][0] = True
         rows.append(w)
     return mx.array(rows)
+
+
+def grant_for(rows):
+    """[n, 3, 3] bool: who lets whose units onto its land in peace (`debug_open_borders`; host -> guest): the allied families
+    open the borders both ways between the learner and the third; closed-borders opens the third's to the learner in one
+    instance in five (`info.borders`)."""
+    out = []
+    for sc, _ in rows:
+        g = [[False] * 3 for _ in range(3)]
+        fam = family(sc["play"])
+        if fam in ALLY:
+            g[0][2] = g[2][0] = True
+        if fam == "closed-borders" and sc["orders"]["info"].get("borders") == "open":
+            g[2][0] = True
+        out.append(g)
+    return mx.array(out)
 
 
 def template_slots(tb, scenes):
@@ -185,7 +199,9 @@ def setup_rows(sim, s, rows):
     if not any(has_third(sc) for sc, _ in rows):
         return s
     fams = [family(sc["play"]) for sc, _ in rows]
-    s["war"] = war_for(fams)
+    from . import armyparty
+    s["grant"] = grant_for(rows)
+    s["war"] = war_for(fams, [fam == "neutral-joins-war" and m.get("round", 0) - sc["orders"]["start_round"] >= armyparty.JOIN_AT for fam, (sc, m) in zip(fams, rows)])
     s["barb"] = mx.array([f in CAMP for f in fams])  # side 1 is the barbarians: the bonus against them
     tile, up, cd = [], [], []
     for sc, m in rows:
@@ -210,4 +226,4 @@ def setup_rows(sim, s, rows):
         known = (s["camp_row"] >= 0) & g1(s["u_alive"], slot) & (g1(s["u_side"], slot) == 1)
         if bool(mx.any(known).item()):
             s = sim.put_spawn_profile(s, slot, known, s["camp_row"])
-    return s
+    return armyparty.setup(s, rows)

@@ -25,6 +25,7 @@ import mlx.core as mx
 from . import armyobs as A
 from . import armyplay as P
 from .armyloop import Brain, load_net
+from .armythird import THIRD as THIRD_FAMS
 
 
 def rebuild(sc):
@@ -64,6 +65,12 @@ def turn_rows(plays, which):
                             start = (u1, c1, e1["rng"], e1["round"], None, e1.get("camp"))
                             break
                         if e1["side"] == 1:
+                            break
+                if which == "third" and e["side"] == 0 and sc["play"].split("/")[0] in THIRD_FAMS:
+                    # The third party families: the third seat plays after the enemy (the dumps' order).
+                    for e1, u1, c1 in st[i + 1:]:
+                        if e1["side"] == 1 and e1["src"] == "end":
+                            start = (u1, c1, e1["rng"], e1["round"], None, e1.get("camp"))
                             break
                 # The enemy's (or, `third`, the third seat's) turn end that follows.
                 for e2, u2, c2 in st[i + 1:]:

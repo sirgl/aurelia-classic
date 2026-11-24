@@ -28,6 +28,8 @@ def _drawn(s, hit):
 def _nearest_city(sim, s, side, tile):
     """The player's nearest city to `tile` (the first one in handle order on a tie), -1 none: [B]."""
     ct = sim.cs["tile"]
+    if ct.shape[1] == 0:  # a scene with no city in the window (neutral-path)
+        return mx.full(side.shape, -1, dtype=I32)
     mine = sim.cs["alive"] & (s["c_owner"] == side[:, None]) & (ct >= 0)
     dist = sim.geo.distance(mx.maximum(ct, 0), mx.broadcast_to(tile[:, None], ct.shape))
     key = mx.where(mine, dist * 64 + mx.arange(ct.shape[1])[None, :], 1 << 30)
@@ -39,8 +41,11 @@ def enter(sim, s, slot, tile, where):
     """The unit `slot` of every row in `where` has entered `tile`: the ruins there give their reward."""
     if "ruin" not in s:
         return s
+    slot = mx.maximum(slot, 0)  # CPU MLX reads out of range rows without a clamp (segfault); the rows outside `where` are masked below
+    ok_tile = tile >= 0
+    tile = mx.maximum(tile, 0)
     side = g1(s["u_side"], slot)
-    hit = where & (tile >= 0) & (gn(s["ruin"], tile[:, None])[:, 0] > 0) & (side >= 0) & (side <= 1)
+    hit = where & ok_tile & (gn(s["ruin"], tile[:, None])[:, 0] > 0) & (side >= 0)
     if "rl" in s:  # no reward in the first round of a play (Rust: no draw of the combat stream in any of 1 215 moves of round 0, 21 of 21 draws at round 1)
         hit = hit & (s["rl"] >= 1)
     if "camp_tile" in s:  # the barbarians of a camp scene are no major: no reward
@@ -54,7 +59,7 @@ def enter(sim, s, slot, tile, where):
     s["u_xp"] = put1(s["u_xp"], slot, g1(s["u_xp"], slot) + EXPERIENCE, xp)
     city = _nearest_city(sim, s, side, tile)
     grow = hit & (first == REWARD_CITIZEN) & (city >= 0)
-    s["c_pop"] = put1(s["c_pop"], city, g1(s["c_pop"], city) + 1, grow)
+    s["c_pop"] = put1(s["c_pop"], city, g1(s["c_pop"], mx.maximum(city, 0)) + 1, grow)
     return s
 
 

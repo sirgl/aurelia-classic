@@ -26,6 +26,7 @@ import time
 import mlx.core as mx
 
 from . import armycamp
+from . import armyparty
 from . import armyhist as H
 from . import armyobs as A
 from . import armyprice
@@ -533,6 +534,7 @@ class Game:
             self.s = s
             armyrule.seat_turn(self, 0, live)
             armycamp.mark(self)
+            armyparty.mark(self)
             return
         # Which of them the mind fortifies hangs on its tasks and operations (`decide_military` -> `follow_task` ->
         # `hold`), which are not ported. The rule FITTED on the event dump (not a port; 72 % of the army unit-turns
@@ -864,17 +866,21 @@ class Game:
             self.s = sim.hold_units(self.s, (mx.arange(U)[None, :] == u) & mine[:, None], heal=self.hold_heals)
 
     def third_turn(self, live):
-        """The third seat's turn (twin packages 4 and 8): after the learner's, before the enemy's. At its end its units' moves
-        are back and the enemy's fortification counts one more turn."""
-        armycamp.neutral_turn(self, live)
-        armycamp.neutral_rule(self, live)
+        """The third seat's turn. Camp families (twin package 4): after the learner's, before the enemy's; the third party
+        families (package 8; `armyparty`): after the enemy's (the dumps' order: learner, enemy, third). At its end its units'
+        moves are back and the next mover's fortification counts one more turn."""
+        party = armyparty.is_party(self) if "war" in self.s else mx.zeros((self.B,), dtype=mx.bool_)
+        armycamp.neutral_turn(self, live & ~party)
+        armycamp.neutral_rule(self, live & ~party)
+        armyparty.third_turn(self, live)
         if "war" in self.s:
             self.s = self.sim.end_turn(self.s, mx.full((self.B,), 2, dtype=I32), live)
 
     def enemy_turn(self):
         live = ~self.s["done"] & (self.verdict < 0)
+        party = armyparty.is_party(self) if "war" in self.s else mx.zeros((self.B,), dtype=mx.bool_)
         if not self.third_played:  # `armyenemy` forces the state after the third seat's turn
-            self.third_turn(live)
+            self.third_camp(live & ~party)
         # The family script's first act (`assault::enemy_turn`): the reinforcements of assault-reinforce land.
         armyprice.land_reinforcements(self, ~self.s["done"] & (self.verdict < 0))
         if self.scene_rule:
@@ -885,6 +891,15 @@ class Game:
             armystd.enemy_turn(self, charge_on=self.charge)
         else:
             self.enemy_turn_approx()
+        if not self.third_played and bool(mx.any(live & party).item()):
+            self.third_turn(~self.s["done"] & (self.verdict < 0) & party)
+
+    def third_camp(self, live):
+        """The camp families' third seat before the enemy (their dumps' order)."""
+        armycamp.neutral_turn(self, live)
+        armycamp.neutral_rule(self, live)
+        if "war" in self.s:
+            self.s = self.sim.end_turn(self.s, mx.full((self.B,), 2, dtype=I32), live)
 
     # -------------------------------------------------------------- the enemy: the simulator's script
 
@@ -1025,6 +1040,7 @@ class Game:
         from . import armyfog
         v = armyfog.judge(self, rel, v)
         v = armycamp.judge(self, rel, v)
+        v = armyparty.judge(self, rel, v)
         # Guard, convoy, snipe (twin package 7; `armyciv`).
         from . import armyciv
         v = armyciv.judge(self, rel, v)
@@ -1042,6 +1058,7 @@ class Game:
             self.counts["scene-rounds"] += int(mx.sum((self.verdict < 0) & ~self.s["done"]).item())
             self.schedule(rel)
             self.rel_now = mx.full((self.B,), rel, dtype=I32)
+            armyparty.keep_world(self, rel)
             ta = time.time()
             self.learner_turn(rel)
             mx.eval(self.s)

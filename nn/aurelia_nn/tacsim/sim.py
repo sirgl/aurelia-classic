@@ -166,7 +166,7 @@ class Sim:
         """arr[tid[b], idx0[b], idx1[b], ...] of a template table (one gather over the flattened axes)."""
         flat = self.tid
         for k, i in enumerate(idx):
-            flat = flat * arr.shape[k + 1] + mx.maximum(i, 0)
+            flat = flat * arr.shape[k + 1] + mx.clip(i, 0, arr.shape[k + 1] - 1)  # masked rows may carry any value (a tile as a promotion): CPU MLX segfaults on an out-of-range gather
         rest = arr.shape[1 + len(idx):]
         return mx.take(arr.reshape((-1,) + rest), flat, axis=0)
 
@@ -330,6 +330,20 @@ class Sim:
         tid = self.tid.reshape((-1,) + (1,) * (tiles.ndim - 1))
         return mx.where(tiles >= 0, mx.take(self.city_plane.reshape(-1), tid * self.T + mx.maximum(tiles, 0)), -1)
 
+    def closed_land(self, s, side):
+        """[B, T] the tiles a unit of `side` may not enter: foreign land whose owner is not at war with it and has not granted it
+        entry (`kernel::world::territory::may_enter`; twin package 8: `s["grant"]` [B, 3, 3] bool, host -> guest, the families
+        with a third seat). All False without a third seat."""
+        g = s.get("grant")
+        if g is None:
+            return mx.zeros((self.B, self.T), dtype=mx.bool_)
+        host = s["owner"]
+        h = mx.clip(host, 0, 2)
+        sd = mx.broadcast_to(mx.clip(side, 0, 2)[:, None], host.shape)
+        granted = mx.take_along_axis(g.reshape(self.B, 9), (h * 3 + sd).reshape(self.B, -1), axis=1).reshape(host.shape)
+        at_war = self.is_foe(s, side[:, None], host)
+        return (host >= 0) & (host != side[:, None]) & ~at_war & ~granted
+
     def controls_and_blocks(self, s, side):
         """Per window tile, for the mover's side: a visible enemy unit stands there (blocks the step),
         and the tile exerts a zone of control (kernel `Mover::controls`: ships control land and sea, land
@@ -349,7 +363,7 @@ class Sim:
         idx = mx.where(at >= 0, base + at, B * T).reshape(-1)
         vis = mx.zeros((B * T + 1,), dtype=I32).at[idx].maximum(seen.astype(I32).reshape(-1))[: B * T].reshape(B, T) > 0
         enemy_unit = self.is_foe(s, side[:, None], mil_side) | self.is_foe(s, side[:, None], civ_side)
-        block = enemy_unit & vis
+        block = (enemy_unit & vis) | self.closed_land(s, side)
         city = self.city_on(s, tiles)
         city_owner = mx.where(city >= 0, gn(s["c_owner"], city), -1)
         mil_sea = mx.where(mil >= 0, gn(s["p_sea"].astype(I32), mil) > 0, False)
@@ -1061,6 +1075,9 @@ class Sim:
         # (the walk and the attack are the heavy parts: skipped where no row moves or strikes)
         if bool(mx.any(mvv).item()):
             end_tile, end_left, steps, walked = self.walk(s, slot, mk, tgt, mk["foreign_l"])
+            # A walk that ends where it started (the first step is blocked by a unit the mover did not see) changes nothing:
+            # no moves spent, the stance kept (the dump's MoveUnit event of such an order has no unit row).
+            mvv = mvv & (end_tile != tile)
             s = self.set_unit(s, slot, mvv, tile=end_tile, mv=mx.maximum(end_left, 0), st=mx.zeros_like(slot))
             from . import armyruin
             s = armyruin.enter_path(self, s, slot, steps, walked & mvv[:, None])
@@ -1418,6 +1435,8 @@ class Sim:
             # A third seat plays between ours and the enemy's: the turn passes 0 -> 2 -> 1 -> 0 and the fortification of the
             # side whose turn starts counts one more turn.
             nxt_side = mx.where(side == 0, 2, mx.where(side == 2, 1, 0))
+            if "third_last" in s:  # the third party families: learner, enemy, third (0 -> 1 -> 2 -> 0)
+                nxt_side = mx.where(s["third_last"], mx.where(side == 0, 1, mx.where(side == 1, 2, 0)), nxt_side)
             nxt = s["u_alive"] & (s["u_side"] == nxt_side[:, None])
         else:
             nxt = s["u_alive"] & self.is_foe(s, side[:, None], s["u_side"])
