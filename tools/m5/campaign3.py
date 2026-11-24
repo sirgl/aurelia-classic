@@ -176,6 +176,12 @@ class Campaign:
     def margin_s(self) -> float:
         return 60 * float(self.c.get("report_min", 45)) * (0.05 if self.smoke else 1.0)
 
+    MODULES = {"train": "aurelia_nn.army.train_m", "play": "aurelia_nn.tacsim.armyplay", "rl": "aurelia_nn.tacsim.armyrl", "slim": "aurelia_nn.tacsim.armyslim"}
+
+    def mod(self, key: str) -> str:
+        """The Python module of a step ([modules] in the toml overrides the default)."""
+        return self.cfg.get("modules", {}).get(key) or self.MODULES[key]
+
     # ---- running commands ---------------------------------------------------------------------------------------
     def env(self, extra: dict | None = None) -> dict:
         e = dict(os.environ, AURELIA_LAB=str(LAB), AURELIA_EXAM_BIN=EXAM, ARMY_SCENE_RULE_VERSION=str(self.c.get("scene_rule_version", "1")),
@@ -272,7 +278,7 @@ class Campaign:
 
     def job_setup(self, j: dict) -> dict:
         info = {"git_head": subprocess.run(["git", "-C", str(REPO), "rev-parse", "--short", "HEAD"], capture_output=True, text=True).stdout.strip()}
-        if self.smoke:
+        if os.environ.get("M5_SKIP_SETUP"):   # a machine with its own venv and broker (M5_PY, M5_RES): build only if missing
             if not Path(EXAM).exists():
                 rc = self.res("setup-build", ["cargo", "build", "--release", "-p", "aurelia-qa", "--bin", "ai-exam"], cpu=self.cpu_spec(), cwd=REPO)
                 if rc:
@@ -344,7 +350,7 @@ class Campaign:
                 env["ARMY_OBS_EVENTS"] = "1"
             if self.suite(f"dump-{split}-{n}", f"runs/{split}-{n}-rows", frm, to, "army-net", dd["twin_families"], env=env):
                 return {"status": "failed", "why": f"the Rust dump {split} failed"}
-            if self.py(f"slim-{split}-{n}", ["-m", "aurelia_nn.tacsim.armyslim", full, slim]):
+            if self.py(f"slim-{split}-{n}", ["-m", self.mod("slim"), full, slim]):
                 return {"status": "failed", "why": f"armyslim {split} failed"}
             full.unlink(missing_ok=True)
         for split in ("tr", "ho"):
@@ -401,7 +407,7 @@ class Campaign:
             return {"twin_error": "no held-out dump"}
         outj = R / f"twin-{tag}" / "play.json"
         outj.parent.mkdir(parents=True, exist_ok=True)
-        args = ["-m", "aurelia_nn.tacsim.armyplay", dump, "--weights", weights, "--out", outj]
+        args = ["-m", self.mod("play"), dump, "--weights", weights, "--out", outj]
         if self.smoke:
             args += ["--limit", "12"]
         if self.py(f"twin-{tag}", args, gpu=True, ram=8):
@@ -436,7 +442,7 @@ class Campaign:
         im = self.imit
         out = R / name
         gb = self.mlx_gb()
-        base = ["-m", "aurelia_nn.army.train_m", "--train", R / "teach-r-train.bin", "--hold", R / "teach-r-hold.bin", "--out", out,
+        base = ["-m", self.mod("train"), "--train", R / "teach-r-train.bin", "--hold", R / "teach-r-hold.bin", "--out", out,
                 "--map", "--map-ch", s.get("map_ch", im["map_ch"]), "--d", s.get("d", im["d"]), "--layers", s.get("layers", 3), "--heads", s.get("heads", im["heads"]),
                 "--seed", s.get("seed", 1), "--epochs", s.get("epochs", im["epochs"]), "--plays", s.get("plays", im["plays"]), "--lr", s.get("lr", im["lr"]),
                 "--curriculum", s.get("curriculum", im["curriculum"]), "--up", s.get("up", im["up"]), "--up-factor", s.get("up_factor", im["up_factor"]),
@@ -581,7 +587,7 @@ class Campaign:
         if not (out / ".done").exists():
             shutil.rmtree(out, ignore_errors=True)   # armyrl does not resume: a cut run starts again
             gb = self.mlx_gb()
-            args = ["-m", "aurelia_nn.tacsim.armyrl", "--train", D / "tr-MBf6c-r.jsonl", "--held", D / "ho-MBf6c-r.jsonl",
+            args = ["-m", self.mod("rl"), "--train", D / "tr-MBf6c-r.jsonl", "--held", D / "ho-MBf6c-r.jsonl",
                     "--weights", R / "net-MBf6c" / "weights.safetensors", "--anchor", R / "teach-r-train.bin", "--bars", R / "teach-r-train" / "rows.jsonl",
                     "--out", out, "--K", rc_["K"], "--anchor-w", rc_["anchor_w"], "--anchor-auto", rc_["anchor_auto"], "--updates", rc_["updates"],
                     "--minutes", rc_["minutes"], "--ckpt-every", rc_["ckpt_every"], "--seed", j["seed"], *rc_.get("extra", [])]

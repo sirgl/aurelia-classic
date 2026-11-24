@@ -18,6 +18,12 @@ cpu_max = 0                 # 0: the broker's budget (all performance cores); sm
 scene_rule_version = "1"    # ARMY_SCENE_RULE_VERSION for every Rust run (1 = the rule rl2 / u175 were made and measured with)
 mlx_gb = 0                  # 0: the broker's value (RES_MLX_GB); else the MLX memory limit of a training (GB)
 
+[modules]                   # the code the queue calls (python -m MODULE, from nn/): change here if a module is renamed
+train = "aurelia_nn.army.train_m"
+play = "aurelia_nn.tacsim.armyplay"
+rl = "aurelia_nn.tacsim.armyrl"
+slim = "aurelia_nn.tacsim.armyslim"
+
 [data]
 kept = "data/kept-r.jsonl"                       # unpacked from lab-seed/kept-r.jsonl.gz by the seed job
 twin_families = "siege,ram,bombard,promotion-choice,planned-assault,raid,prey,assault-heal,hill-archers,city-fire"
