@@ -538,6 +538,34 @@ class Obs:
         dealt = mx.where(civ_def, mx.where(ranged_atk, exact.CIVILIAN_DAMAGE, 0), dealt)
         return dealt.astype(I32), taken.astype(I32), d_hp.astype(I32), ok
 
+    def preview_packed(self, s, me, frm, to, valid, from_real):
+        """`preview` of the pairs where `valid` [B, N] holds, packed: each valid pair is a row of its own (the state gathered
+        for it), not a column of a padded [B, N] (most rows have none or one). The results are zero where not valid."""
+        B, N = valid.shape
+        flat = valid.reshape(-1)
+        P = int(mx.sum(flat).item())
+        zero = mx.zeros((B, N), dtype=I32)
+        if P == 0:
+            return zero, zero, zero, mx.zeros((B, N), dtype=mx.bool_)
+        if 2 * P >= B * N:
+            return self.preview(s, me, frm, to, valid, from_real)
+        idx = mx.argsort(mx.where(flat, 0, B * N) + mx.arange(B * N, dtype=I32))[:P].astype(I32)
+        row = idx // N
+        sub = {k: mx.take(v, row, axis=0) for k, v in s.items()}
+        sim = self.sim
+        saved = (sim.cs, sim.tid, sim.n_pieces, sim.B, self.tab, self.t)
+        view = _rows_sim(sim, row)
+        sim.cs, sim.tid, sim.n_pieces, sim.B = view.cs, view.tid, view.n_pieces, view.B
+        self.tab = _rows_tab(self.tab, row)
+        self.t = self.tab.t
+        try:
+            dealt, taken, dhp, ok = self.preview(sub, mx.take(me, row), mx.take(frm.reshape(-1), idx)[:, None], mx.take(to.reshape(-1), idx)[:, None],
+                                                 mx.ones((P, 1), dtype=mx.bool_), from_real)
+        finally:
+            sim.cs, sim.tid, sim.n_pieces, sim.B, self.tab, self.t = saved
+        back = lambda v: mx.zeros((B * N,), dtype=I32).at[idx].add(v[:, 0].astype(I32)).reshape(B, N)
+        return back(dealt), back(taken), back(dhp), back(ok) > 0
+
     # The fighters of the preview: [B, N] fields (the attacker as it would stand on `frm`, the defenders by slot).
 
     def fighter_n(self, s, me, frm, st, N):
@@ -814,7 +842,7 @@ class Obs:
         if K < N:
             pk = mx.argsort(mx.where(inr_f, 0, 1) * N + mx.arange(N)[None, :], axis=1)[:, :K].astype(I32)
             inr_k = mx.take_along_axis(inr_f, pk, axis=1)
-            dealt, _, dhp, pok = self.preview(s, me, mx.take_along_axis(frm, pk, axis=1), mx.take_along_axis(tot, pk, axis=1), inr_k, False)
+            dealt, _, dhp, pok = self.preview_packed(s, me, mx.take_along_axis(frm, pk, axis=1), mx.take_along_axis(tot, pk, axis=1), inr_k, False)
             share = mx.where(pok & inr_k, mx.minimum(dealt.astype(F32) / mx.maximum(dhp, 1).astype(F32), 1.0), 0.0)
             dest = (mx.arange(B)[:, None] * L + pk // NFo).reshape(-1)
             best = mx.zeros((B * L,), dtype=F32).at[dest].maximum(share.reshape(-1)).reshape(B, L)
@@ -855,7 +883,7 @@ class Obs:
             pk = mx.argsort(mx.where(has_foe, 0, 1) * OA + mx.arange(OA)[None, :], axis=1)[:, :K].astype(I32)
             hk = mx.take_along_axis(has_foe, pk, axis=1)
             tk = mx.take_along_axis(tgt, pk, axis=1)
-            d_k, t_k, h_k, o_k = self.preview(s, me, mx.broadcast_to(tile[:, None], tk.shape), tk, hk, True)
+            d_k, t_k, h_k, o_k = self.preview_packed(s, me, mx.broadcast_to(tile[:, None], tk.shape), tk, hk, True)
             flat = (mx.arange(B)[:, None] * OA + pk).reshape(-1)
             back = lambda v, z: mx.full((B * OA,), z, dtype=v.dtype).at[flat].add(mx.where(hk, v, z).reshape(-1) - z).reshape(B, OA)
             dealt, taken, dhp = back(d_k, 0), back(t_k, 0), back(h_k, 0)
