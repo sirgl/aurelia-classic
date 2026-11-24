@@ -268,6 +268,8 @@ def main(argv=None):
     ap.add_argument("--anchor-only", action="store_true", help="the control: no play, no RL; each update is the anchor's step alone")
     ap.add_argument("--no-eval0", action="store_true")
     ap.add_argument("--mem-grad", type=int, default=0, help="the RL gradient through the memory's last W turns' steps (armymemgrad); 0: the memory is an input")
+    ap.add_argument("--new-layers", default="", help="net-deep: comma list of layer indices that are new (their own lr group)")
+    ap.add_argument("--new-lr-mult", type=float, default=1.0, help="the new layers learn at this multiple of --lr")
     ap.add_argument("--split", type=int, default=70, help="training scenes: instances below it; the rest of --train is the validation set")
     a = ap.parse_args(argv)
     mx.set_memory_limit(16 << 30)
@@ -316,6 +318,10 @@ def main(argv=None):
     if not a.no_eval0 and not a.probe:
         held_eval(0)
     opt = optim.Adam(learning_rate=a.lr)
+    if a.new_layers:
+        new_l = {f"layers.{i}." for i in a.new_layers.split(",")}
+        opt = optim.MultiOptimizer([optim.Adam(learning_rate=a.lr * a.new_lr_mult), opt], [lambda path, _: any(path.startswith(x) for x in new_l)])
+        curve["new_layers"] = {"layers": sorted(new_l), "lr": a.lr * a.new_lr_mult}
     rl_grad = make_rl_grad(model, brain)
     turn_grad = armymemgrad.make_turn_gradient(model, brain, logp_parts) if a.mem_grad else None
     rate = {}

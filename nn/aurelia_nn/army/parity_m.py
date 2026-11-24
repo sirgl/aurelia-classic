@@ -44,7 +44,10 @@ def main():
         from .model_mb import MBANet, MBHNet, MBNet, MBNNet
         from .model_mb import MBENet
         cls = MBNNet if 'nx_slope' in w else (MBHNet if 'hx_slope' in w else (MBANet if 'w_price' in w else (MBENet if 'ww' in w else MBNet)))
-        model = cls(promos=w['promo'].shape[0] - 1, map_ch=w['m_in.weight'].shape[0])
+        from .model import shape_of
+        n, kinds = shape_of(w)
+        deep = {} if kinds == 'ccc' else {'layers': n, 'kinds': kinds}
+        model = cls(promos=w['promo'].shape[0] - 1, map_ch=w['m_in.weight'].shape[0], **deep)
     else:
         model = (MHNet if 'h1.weight' in w else MemNet)(promos=w['promo'].shape[0] - 1)
     model.load_weights(a.weights)

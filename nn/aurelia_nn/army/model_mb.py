@@ -18,8 +18,8 @@ MAP_CH = 32
 
 
 class MBNet(MemNet):
-    def __init__(self, d=64, heads=4, layers=3, ff=128, promos=400, map_ch=MAP_CH):
-        super().__init__(d=d, heads=heads, layers=layers, ff=ff, promos=promos)
+    def __init__(self, d=64, heads=4, layers=3, ff=128, promos=400, map_ch=MAP_CH, kinds=None):
+        super().__init__(d=d, heads=heads, layers=layers, ff=ff, promos=promos, kinds=kinds)
         self.config['map_ch'] = map_ch
         self.config['map'] = {'ch': map_ch, 'once_per_turn': True}
         self.has_map = True
