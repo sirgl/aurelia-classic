@@ -90,6 +90,7 @@ def as_row(plays, pi, start, by_round, U):
     for k in ("ruins", "upos"):
         if k in last:
             row[k] = last[k]
+    row["round"] = rnd
     return row
 
 

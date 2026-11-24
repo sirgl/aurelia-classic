@@ -1151,6 +1151,7 @@ def build_rows(plays, rows, templates=None):
     s["ruin"] = mx.array([[c == "1" for c in (m.get("ruins") or "0" * T)] for _, m in rows]).astype(I32)
     s["u_arr"] = mx.array([((list(m.get("upos") or []) + list(range(U)))[:U]) for _, m in rows], dtype=I32)
     s["n_arr"] = mx.full((len(rows),), 1 << 10, dtype=I32)
+    s["rl"] = mx.array([m.get("round", 0) for _, m in rows], dtype=I32)
     s["u_id"] = mx.array(ids, dtype=I32)
     s["u_handle"] = mx.array(handles, dtype=I32)
     if not hasattr(tb, "tables0"):

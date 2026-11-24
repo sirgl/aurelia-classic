@@ -41,6 +41,8 @@ def enter(sim, s, slot, tile, where):
         return s
     side = g1(s["u_side"], slot)
     hit = where & (tile >= 0) & (gn(s["ruin"], tile[:, None])[:, 0] > 0) & (side >= 0) & (side <= 1)
+    if "rl" in s:  # no reward in the first round of a play (Rust: no draw of the combat stream in any of 1 215 moves of round 0, 21 of 21 draws at round 1)
+        hit = hit & (s["rl"] >= 1)
     if "camp_tile" in s:  # the barbarians of a camp scene are no major: no reward
         hit = hit & ~((s["camp_tile"] >= 0) & (side == 1))
     if not bool(mx.any(hit).item()):
@@ -60,7 +62,7 @@ def enter_path(sim, s, slot, path, walked):
     """The tiles of a walk, `path` [B, P] in order, `walked` [B, P] those the unit really entered: every ruin on them, in order."""
     if "ruin" not in s:
         return s
-    on = walked & (path >= 0) & (gn(s["ruin"], path) > 0)
+    on = walked & (path >= 0) & (gn(s["ruin"], path) > 0) & (s["rl"] >= 1)[:, None] if "rl" in s else walked & (path >= 0) & (gn(s["ruin"], path) > 0)
     if not bool(mx.any(on).item()):
         return s
     for j in range(path.shape[1]):

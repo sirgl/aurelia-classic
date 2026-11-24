@@ -1360,6 +1360,8 @@ class Sim:
         """The end of `side`'s turn: heal its units, the citadels' and mountains' damage, restore moves,
         attacks and interceptions, its cities heal and may strike again; then the other side's turn
         starts (fortification +1)."""
+        if "rl" in s:  # the round counter of the ruins (`armyruin`): the round is over when side 1's turn ends
+            s["rl"] = s["rl"] + ((side == 1) & take).astype(I32)
         tiles = s["u_tile"]
         mine = s["u_alive"] & (tiles >= 0) & (s["u_side"] == side[:, None]) & take[:, None]
         moved = (s["u_mv"] < s["u_mmax"]) & ~s["p_always_heal"]
