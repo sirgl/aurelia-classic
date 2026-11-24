@@ -52,9 +52,10 @@ def trim_tokens(tok):
 class Game:
     """A batch of scene copies played on the device."""
 
-    def __init__(self, plays, copies, brain, seed=1, forced=None):
+    def __init__(self, plays, copies, brain, seed=1, forced=None, salt=True):
         """`forced`: [(play index, moment-like row)] instead of each play's initial state (the forced checks: the
-        Rust state at a turn's start, one row each); then `copies` is ignored."""
+        Rust state at a turn's start, one row each); then `copies` is ignored. `salt` False: every copy of a play keeps
+        the play's combat stream (the GRPO groups: the copies differ only by the sampled decisions)."""
         self.plays = plays
         P = len(plays)
         self.brain = brain
@@ -75,7 +76,7 @@ class Game:
         self.B = len(idx)
         _, self.sim, s, self.tab = A.build_rows(plays, picked, self.templates)
         self.idx = mx.array(idx, dtype=I32)
-        if forced is None:
+        if forced is None and salt:
             # Each copy its own combat stream (the first copy keeps Rust's).
             salt = (mx.arange(self.B).astype(mx.uint64) // P) * 0x2545F4914F6CDD1D
             s["rng"] = s["rng"] ^ salt
@@ -139,6 +140,11 @@ class Game:
         self.price = mx.take(mx.array([x["orders"]["price"] for x in sc], dtype=mx.float32), self.idx, axis=0)
         self.this = None
         self.prev = None
+        # GRPO (`armygrpo`): at this round the net's picks and actions are sampled (temperature 1) and recorded; None: greedy.
+        self.sample_rel = None
+        self.sample_key = None
+        self.records = []
+        self.row_ids = None
         self.verdict = mx.full((self.B,), -1, dtype=I32)
         self.city_low = mx.zeros((self.B,), dtype=mx.bool_)
         self.cap_broken = mx.zeros((self.B,), dtype=mx.bool_)
@@ -248,10 +254,12 @@ class Game:
                 break
             if step > 0 and n0 < B and self.compact:
                 ids, pos = self._compact(active, n0)
+                self.row_ids = ids
                 saved = self._enter_rows(ids)
                 made_v, act_v = mx.take(made, ids, axis=0), mx.ones((n0,), dtype=mx.bool_)
                 pick, ai, act_v, made_v = self.decide(rel, step, act_v, made_v)
                 has = active
+                self.row_ids = None
                 self._leave_rows(saved, has, pos)
                 made = self._merge(made, made_v, has, pos)
                 active = mx.where(has, mx.take(act_v, pos, axis=0), False)
@@ -300,22 +308,53 @@ class Game:
         if step == 0 and brain.has_map:
             self.M = mx.where(active[:, None, None], brain.encode(self.statics, tok), self.M)
         h = self.body_fn(tok, self.um, self.pm, self.M, self.price)
-        pick = greedy_pointer(brain.pointer(h, sel), sel.shape[1])
+        lg = brain.pointer(h, sel)
+        sampling = self.sample_rel is not None and self.sample_rel == rel
+        if sampling:
+            active_in = active
+            self.sample_key, k1, k2 = mx.random.split(self.sample_key, 3)
+            pidx = mx.random.categorical(lg, axis=-1, key=k1).astype(I32)
+            pick = mx.where(pidx >= sel.shape[1], -1, pidx)
+        else:
+            pick = greedy_pointer(lg, sel.shape[1])
         active = active & (pick >= 0)
         n_act = int(mx.sum(active).item())
         self.counts["net decisions"] += n_act
         if n_act == 0:
+            if sampling:
+                self._record(active_in, tok, sel, pidx, pick, None, None)
             return pick, mx.zeros_like(pick), active, made
         pk = mx.maximum(pick, 0)
         me = mx.where(active, mx.take_along_axis(unit, pk[:, None], axis=1)[:, 0], 0)
         cand = self.cand_fn(s, me)
         al = brain.actions(h, pk, cand, self.M)
-        ai = A.first_index_eq(al, mx.max(al, axis=1))
+        if sampling:
+            ai = mx.random.categorical(al, axis=-1, key=k2).astype(I32)
+        else:
+            ai = A.first_index_eq(al, mx.max(al, axis=1))
         kind = mx.take_along_axis(cand["kind"], ai[:, None], axis=1)[:, 0]
         tgt = mx.take_along_axis(cand["tgt"], ai[:, None], axis=1)[:, 0]
+        if sampling:
+            self._record(active_in, tok, sel, pidx, pick, cand, ai)
         self.apply(me, kind, tgt, active, side=0, mk=None if self.legacy else cand["_mk"])
         made = put1(made, me, g1(made, me) + 1, active)
         return pick, ai, active, made
+
+    def _record(self, active_in, tok, sel, pidx, pick, cand, ai):
+        """A sampled decision step for the gradient pass (`armygrpo`): the rows that were deciding, with their inputs (the
+        trimmed tokens, the memory, the candidates' fields the action head reads), the sampled indices and the global row."""
+        n = int(mx.sum(active_in).item())
+        if n == 0:
+            return
+        ids, _ = self._compact(active_in, n)
+        take = lambda a: mx.take(a, ids, axis=0)
+        gid = take(self.row_ids if self.row_ids is not None else mx.arange(active_in.shape[0], dtype=I32))
+        rec = {"gid": gid, "tok": {k: take(tok[k]) for k in ("feat", "dist", "mask", "slot")}, "sel": take(sel),
+               "um": take(self.um), "pm": take(self.pm), "price": take(self.price), "pidx": take(pidx), "pick": take(pick)}
+        if cand is not None:
+            rec["cand"] = {k: take(cand[k]) for k in ("feat", "promo", "mask")}
+            rec["aidx"] = take(ai)
+        self.records.append(rec)
 
     # The compacted step: the rows `ids` of every per-row array, the simulator and the tables (exact: rows are independent).
     ROW_ATTRS = ("B", "s", "tab", "far_rows", "start", "price", "um", "pm", "alive", "M", "pillaged", "prev")
