@@ -74,12 +74,29 @@ class Plays:
                     self.eta[i] = max(0, meta.get('rounds', 0) - flat.round[i])
 
 
+def load_teachers(path):
+    """`--teachers-from` FILE: {"families": {family: [player, ...]}} (or the bare {family: [player, ...]}) -> family -> set."""
+    d = json.load(open(path))
+    d = d.get('families', d)
+    return {f: set(ps) for f, ps in d.items()}
+
+
+def teacher_allowed(meta, teachers):
+    """A play's labels stay in the training mix unless `teachers` lists its family and not its player. The net's own
+    plays (DAgger labels, player `army-net`) and the families the list does not name always stay."""
+    if not teachers or meta['player'] == 'army-net':
+        return True
+    allowed = teachers.get(meta['family'])
+    return allowed is None or meta['player'] in allowed
+
+
 class Stream:
     """The recordings indexed, not loaded (RAM: the index only; the files stay mapped): `flat(ids)` reads just
     those plays, so a step or an evaluation chunk holds only its own decisions."""
 
-    def __init__(self, paths, nth=1, skip=None):
+    def __init__(self, paths, nth=1, skip=None, teachers=None):
         self.bufs = []
+        self.dropped_teacher = collections.Counter()   # (family, player) -> plays left out by `teachers`
         self.where = []   # per play: (file index, offset)
         self.metas = []
         self.t_max = 0
@@ -94,6 +111,9 @@ class Stream:
             while at < len(buf):
                 meta, after, t_max, labelled, n = skip_play_at(buf, at)
                 keep = meta['family'] not in drop
+                if keep and not teacher_allowed(meta, teachers):
+                    self.dropped_teacher[(meta['family'], meta['player'])] += 1
+                    keep = False
                 if keep:
                     seen += 1
                     keep = seen % nth == 0
@@ -903,6 +923,8 @@ def main():
     ap.add_argument('--d', type=int, default=64)
     ap.add_argument('--layers', type=int, default=3)
     ap.add_argument('--heads', type=int, default=4)
+    ap.add_argument('--teachers-from', default=None, help='JSON {"families": {family: [player, ...]}}: in the train files keep only these '
+                    'teachers\' plays of a listed family (the winners-only labels); the net\'s own plays, unlisted families and the held-out files stay whole')
     ap.add_argument('--skip', nargs='*', default=[], help='PATH=fam,fam: leave out those families of that train file ("siege" = the siege set)')
     ap.add_argument('--map', action='store_true', help='variant MB: the map encoder once per turn')
     ap.add_argument('--map-ch', type=int, default=32)
@@ -942,8 +964,15 @@ def main():
         for f in fams.split(','):
             out |= SIEGE if f == 'siege' else {f}
         skip[path] = out
-    train = Stream(a.train, a.every_nth_play, skip)
+    teachers = load_teachers(a.teachers_from) if a.teachers_from else None
+    train = Stream(a.train, a.every_nth_play, skip, teachers)
     hold = Stream(a.hold, a.every_nth_play)
+    if teachers:
+        json.dump({'teachers_from': os.path.abspath(a.teachers_from), 'allowed': {f: sorted(p) for f, p in teachers.items()},
+                   'dropped_plays': {f'{f}/{p}': n for (f, p), n in sorted(train.dropped_teacher.items())}},
+                  open(os.path.join(a.out, 'teachers-from.json'), 'w'), indent=1)
+        print(f'--teachers-from: left out {sum(train.dropped_teacher.values())} teacher plays of the train files: '
+              + ', '.join(f'{f}/{p} {n}' for (f, p), n in sorted(train.dropped_teacher.items())), flush=True)
     best, table = best_teachers(train.metas)
     json.dump({'best': best, 'wins': table, 'lost_weight': a.lost_weight, 'best_factor': a.best_factor}, open(os.path.join(a.out, 'teachers.json'), 'w'), indent=1)
     tm = max(train.t_max, hold.t_max)
@@ -1026,7 +1055,7 @@ def main():
     config = {'run': os.path.basename(os.path.normpath(a.out)), 'variant': 'M (learned memory)', 'plays_per_step': a.plays, 'lr': a.lr, 'epochs': a.epochs, 'steps': steps,
               'schedule': f'AdamW (weight decay 1e-4), cosine decay to 0.05 lr over {steps} steps, grad clip 1.0' + (f'; new parameters {sorted(new_params)} at {a.new_lr_mult} x lr' if multi else ''), 'aux_weight': a.aux, 'mem_drop': a.mem_drop, 'curriculum': cur,
               'parameters': n_params, 'T': tm, 'C': cm, 'promos': promos, 'init': a.init or 'hand_init', 'best_teachers': best, 'labelled_decisions': labelled,
-              'decision_weight': {'won_play': 1.0, 'lost_play': a.lost_weight, 'best_teacher_factor': a.best_factor, 'dagger_label': 2.0, 'up_families': sorted(up), 'up_factor': a.up_factor if up else 1.0},
+              'teachers_from': os.path.abspath(a.teachers_from) if a.teachers_from else None, 'decision_weight': {'won_play': 1.0, 'lost_play': a.lost_weight, 'best_teacher_factor': a.best_factor, 'dagger_label': 2.0, 'up_families': sorted(up), 'up_factor': a.up_factor if up else 1.0},
               'losses': {'pointer_ce': 1.0, 'action_ce': 1.0, 'value': 0.5, 'danger_mse': 0.5, 'aux_teacher_state': a.aux},
               'train': {'files': a.train, 'decisions': train.decisions, 'plays': len(train)}, 'hold': {'files': a.hold, 'decisions': hold.decisions, 'plays': len(hold)}, 'device': str(mx.default_device()),
               'encoder_compute': str(ENCODER['dtype']) if a.map else None}
