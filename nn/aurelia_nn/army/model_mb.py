@@ -405,3 +405,56 @@ class MBNNet(MBNet):
         rest_age = mx.where(rest_slots > 0.5, mx.where(ns['rest'] > 0.5, ns['rest_age'] + 1.0, 0.0), 0.0)
         new = {'stage': stage_oh, 'stage_age': stage_age, 'engaged': engaged, 'waited': waited, 'free': free, 'change_age': change_age, 'reason': reason, 'rest': rest_slots, 'rest_age': rest_age}
         return {k: mx.where(valid.reshape((-1,) + (1,) * (v.ndim - 1)), v, ns[k]) for k, v in new.items()}
+
+
+# MBe: the hand-set term's numbers (M-HANDOFF.md, "Hand edit: wounded out of range (24 Nov)"; model.rs WW_LEN).
+WW = ('scale', 'hp_threshold', 'hp_slope', 'ranged_hp_threshold', 'resting_weight', 'city_low_threshold', 'city_low_slope', 'resting_slope')
+
+
+class MBENet(MBNet):
+    """MB plus one hand-set term of the action scorer (M-HANDOFF.md, "Hand edit: wounded out of range (24 Nov)"): a candidate
+    that does not strike (done, move, fortify, set up) and whose tile is in a foe city's strike range (candidate number 16)
+    loses `scale x wounded x (1 - city_low)` from its logit:
+      wounded  = max(sigmoid(hp_slope (thr - hp)), resting_weight x sigmoid(resting_slope (aux_u[1] on u[U_RESTING]))),
+                 hp = the unit token's number 7, thr = ranged_hp_threshold for a unit with range (token number 13 > 0),
+                 else hp_threshold; u = the unit's memory slot as the decision reads it;
+      city_low = sigmoid(city_low_slope (city_low_threshold - the objective city's hp share)) (token numbers 3, 43, 7).
+    `ww` = the numbers above (WW order). Zero scale = MB exactly. `crates/qa/src/army_net/model.rs` `actions_x` is the
+    same arithmetic."""
+
+    def __init__(self, d=64, heads=4, layers=3, ff=128, promos=400, map_ch=64):
+        super().__init__(d=d, heads=heads, layers=layers, ff=ff, promos=promos, map_ch=map_ch)
+        self.config['ww'] = list(WW)
+        self.ww = mx.zeros((len(WW),))
+
+    def wounded_gate(self, tok, unit, slot, um):
+        """[B]: wounded x (1 - city_low) of the acting unit."""
+        from .model_m import U_RESTING
+        b = tok.shape[0]
+        w = self.ww
+        ar = mx.arange(b)
+        f = tok[ar, unit]
+        thr = mx.where(f[:, 13] > 0.0, w[3], w[1])
+        hp = mx.sigmoid(w[2] * (thr - f[:, 7]))
+        s = slot[ar, unit]
+        u = um[ar, mx.maximum(s, 0), U_RESTING]
+        a = self.aux_u[1]
+        rest = mx.where(s >= 0, w[4] * mx.sigmoid(w[7] * (a[0] * u + a[1])), 0.0)
+        is_city = (tok[..., 3] > 0.5) & (tok[..., 43] > 0.5)
+        first = mx.argmax(is_city.astype(mx.int32), axis=1)
+        city = mx.where(mx.any(is_city, axis=1), tok[ar, first, 7], 1.0)
+        low = mx.sigmoid(w[6] * (w[5] - city))
+        return mx.maximum(hp, rest) * (1.0 - low)
+
+    def wounded_term(self, cand, gate):
+        """[B, C]: the term subtracted from each candidate's logit."""
+        f = cand[..., 16] * (cand[..., 0] + cand[..., 1] + cand[..., 5] + cand[..., 6])
+        return self.ww[0] * f * gate[:, None]
+
+    def action_logits_g(self, h, unit, cand, promo, cmask, gcand, cand_ok, tok=None, slot=None, um=None):
+        from .model import NEG
+        if tok is None:
+            raise ValueError('MBENet scores read the tokens, the slots and the memory (tok, slot, um)')
+        s = MBNet.action_logits_g(self, h, unit, cand, promo, cmask, gcand, cand_ok)
+        s = s - self.wounded_term(cand, self.wounded_gate(tok, unit, slot, um))
+        return mx.where(cmask, s, NEG)

@@ -28,7 +28,7 @@ from .model_m import AIMS, P_ENGAGED, P_ETA, P_STAGE, P_TURNS, P_WAITED, PLANS, 
 from .train import Device, best_teachers, decision_weights
 from .data import F_HIST
 from .model_mh import H_MAX, MHNet
-from .model_mb import HX_PARAMS, NX_PARAMS, MBANet, MBHNet, MBNet, MBNNet
+from .model_mb import HX_PARAMS, NX_PARAMS, MBANet, MBENet, MBHNet, MBNet, MBNNet
 from .potential import potential, price_of
 
 u16 = lambda b: mx.array(memoryview(b).cast('H'))
@@ -361,7 +361,9 @@ def decision_losses(model, b, um, pm):
     t = b['tok'].shape[1]
     h = hfull[:, :t]
     pl = model.pointer_logits(h, b['sel'])
-    if isinstance(model, MBNet):
+    if isinstance(model, MBENet):
+        al = model.action_logits_g(h, b['unit'], b['cand'], b['promo'], b['cmask'], b['gcand'], b['cand_ok'], b['tok'], b['slot'], um)
+    elif isinstance(model, MBNet):
         al = model.action_logits_g(h, b['unit'], b['cand'], b['promo'], b['cmask'], b['gcand'], b['cand_ok'])
     else:
         al = model.action_logits(h, b['unit'], b['cand'], b['promo'], b['cmask'])
@@ -916,6 +918,7 @@ def main():
     ap.add_argument('--new-lr-mult', type=float, default=1.0, help='MBH: the history parameters (model_mb.HX_PARAMS) learn at this multiple of --lr')
     ap.add_argument('--warmup', type=int, default=20, help='resumed without the optimizer state: lr ramps up over these steps')
     ap.add_argument('--mem-gb', type=float, default=12.0, help='MLX memory limit (match the broker --ram reservation); cache 2 GB')
+    ap.add_argument('--ww', action='store_true', help='variant MBe: MB with the hand-set term "a wounded unit does not end its turn in the city\'s strike range" (needs --map; its numbers come from --init)')
     ap.add_argument('--freeze', default='', help='top-level parameters kept fixed, comma-separated (e.g. w_price: a step that must not learn that input)')
     ap.add_argument('--no-pipeline', action='store_true', help='wait for each step before building the next (the same numbers; for timing)')
     ap.add_argument('--enc-bf16', action='store_true', help='MB: the map encoder computes in bfloat16 while training (f32 weights, optimizer, memory, '
@@ -964,7 +967,7 @@ def main():
     promos = 400
     shape = dict(d=a.d, heads=a.heads, layers=a.layers, ff=2 * a.d, promos=promos)
     NOTE_DROP['p'] = a.note_drop
-    model = ((MBHNet if a.history else MBANet) if a.aux_heads else (MBNNet if a.notes else MBNet))(map_ch=a.map_ch, **shape) if a.map else (MHNet(**shape) if a.history else MemNet(**shape))
+    model = ((MBHNet if a.history else MBANet) if a.aux_heads else (MBNNet if a.notes else (MBENet if a.ww else MBNet)))(map_ch=a.map_ch, **shape) if a.map else (MHNet(**shape) if a.history else MemNet(**shape))
     model.hand_init()
     if a.init:
         # A net without memory (A / AH) starts the shared parts; an M net everything; an M net starts MH's shared

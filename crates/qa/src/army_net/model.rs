@@ -194,7 +194,13 @@ pub struct Net {
     xhist: Option<XHistW>,
     /// Variant MBN: the notes' separate cross-attention and heads (None: none).
     xnotes: Option<XNoteW>,
+    /// MBe: the hand-set term "a wounded unit does not end its turn in the city's strike range" (`ww`, None: none).
+    ww: Option<[f32; WW_LEN]>,
 }
+
+/// The numbers of the hand-set term `ww` (`army/model_mb.py`, `MBENet`; M-HANDOFF.md, "Hand edit: wounded out of range"):
+/// [scale, hp threshold, hp slope, ranged hp threshold, resting weight, city-low threshold, city-low slope, resting slope].
+pub const WW_LEN: usize = 8;
 
 /// Variant MBN's note weights (`army/model_mb.py`, `MBNNet`): a note's embedding `n2(relu(n1(note)))`; per layer a
 /// cross-attention like MBH's (`null`, `same`, `slope` per layer and head; its context through `no[layer]`); the heads
@@ -611,6 +617,11 @@ impl Net {
         } else {
             None
         };
+        let ww = match t.get("ww") {
+            Some((shape, v)) if shape.as_slice() == [WW_LEN] => Some(std::array::from_fn(|i| v[i])),
+            Some((shape, _)) => return Err(format!("ww is {shape:?}, not [{WW_LEN}]")),
+            None => None,
+        };
         let price = if t.contains_key("w_price") {
             let (shape, w) = get("w_price")?;
             if shape.as_slice() != [3, c.d] {
@@ -621,6 +632,7 @@ impl Net {
             None
         };
         Ok(Net {
+            ww,
             xnotes,
             xhist,
             price,
@@ -1277,6 +1289,44 @@ impl Net {
             out.push(y[0]);
         }
         out
+    }
+
+    /// `actions` plus MBe's hand-set term (`ww`; the same logits as `actions` without it): a non-strike candidate (done, move,
+    /// fortify, set up) whose tile is in a foe city's strike range (candidate number 16) loses
+    /// `scale x wounded x (1 - city_low)`, wounded = max(sigmoid(hp slope (threshold - hp)), resting weight x sigmoid(resting slope
+    /// x the memory's resting readout)), the threshold the ranged one for a unit with range; city_low = sigmoid(slope (threshold -
+    /// the objective city's hp share)). `MBENet.wounded_term` is the same arithmetic.
+    pub fn actions_x(&self, body: &Body, unit: usize, candidates: &[Candidate], map: Option<&MapState>, tokens: &Tokens, mem: Option<&MemIn>) -> Vec<f32> {
+        let mut out = self.actions(body, unit, candidates, map);
+        let Some(w) = self.ww else { return out };
+        let g = self.wounded_gate(&w, unit, tokens, mem);
+        for (o, c) in out.iter_mut().zip(candidates) {
+            let f = c.feat[16] * (c.feat[0] + c.feat[1] + c.feat[5] + c.feat[6]);
+            *o -= w[0] * f * g;
+        }
+        out
+    }
+
+    /// The unit's factor of the `ww` term: wounded x (1 - city low).
+    fn wounded_gate(&self, w: &[f32; WW_LEN], unit: usize, tokens: &Tokens, mem: Option<&MemIn>) -> f32 {
+        let sig = |v: f32| 1.0 / (1.0 + (-v).exp());
+        let f = &tokens.feat[unit];
+        let thr = if f[13] > 0.0 { w[3] } else { w[1] };
+        let hp = sig(w[2] * (thr - f[7]));
+        let rest = match (mem, self.mem.as_ref().and_then(|m| m.aux_rest)) {
+            (Some(m), Some(a)) => match usize::try_from(m.slots.get(unit).copied().unwrap_or(-1)) {
+                Ok(s) if s < SLOTS => w[4] * sig(w[7] * (a[0] * m.state.u[s * U_DIM + U_RESTING_IDX] + a[1])),
+                _ => 0.0,
+            },
+            _ => 0.0,
+        };
+        let city = (0..tokens.len()).find(|i| tokens.feat[*i][3] > 0.5 && tokens.feat[*i][43] > 0.5).map_or(1.0, |i| tokens.feat[i][7]);
+        let low = sig(w[6] * (w[5] - city));
+        hp.max(rest) * (1.0 - low)
+    }
+
+    pub fn has_ww(&self) -> bool {
+        self.ww.is_some()
     }
 
     /// The value head: (the objective's win logit, the expected share of the army lost).
