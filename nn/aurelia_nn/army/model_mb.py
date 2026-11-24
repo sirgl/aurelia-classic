@@ -408,13 +408,14 @@ class MBNNet(MBNet):
 
 
 # MBe: the hand-set term's numbers (M-HANDOFF.md, "Hand edit: wounded out of range (24 Nov)"; model.rs WW_LEN).
-WW = ('scale', 'hp_threshold', 'hp_slope', 'ranged_hp_threshold', 'resting_weight', 'city_low_threshold', 'city_low_slope', 'resting_slope')
+WW = ('scale', 'hp_threshold', 'hp_slope', 'ranged_hp_threshold', 'resting_weight', 'city_low_threshold', 'city_low_slope', 'resting_slope', 'stay_scale')
 
 
 class MBENet(MBNet):
-    """MB plus one hand-set term of the action scorer (M-HANDOFF.md, "Hand edit: wounded out of range (24 Nov)"): a candidate
-    that does not strike (done, move, fortify, set up) and whose tile is in a foe city's strike range (candidate number 16)
-    loses `scale x wounded x (1 - city_low)` from its logit:
+    """MB plus hand-set terms of the action scorer (M-HANDOFF.md, "Hand edit: wounded out of range (24 Nov)"), both times the
+    acting unit's gate g = wounded x (1 - city_low): (1) a candidate that does not strike (done, move, fortify, set up) and whose
+    tile is in a foe city's strike range (candidate number 16) loses `scale x g` from its logit; (2) a move of a unit that stands
+    out of that range (its token's number 36) loses `stay_scale x g` (a unit that moves does not heal); where
       wounded  = max(sigmoid(hp_slope (thr - hp)), resting_weight x sigmoid(resting_slope (aux_u[1] on u[U_RESTING]))),
                  hp = the unit token's number 7, thr = ranged_hp_threshold for a unit with range (token number 13 > 0),
                  else hp_threshold; u = the unit's memory slot as the decision reads it;
@@ -446,15 +447,16 @@ class MBENet(MBNet):
         low = mx.sigmoid(w[6] * (w[5] - city))
         return mx.maximum(hp, rest) * (1.0 - low)
 
-    def wounded_term(self, cand, gate):
-        """[B, C]: the term subtracted from each candidate's logit."""
+    def wounded_term(self, cand, gate, out_of_fire):
+        """[B, C]: the terms subtracted from each candidate's logit (out_of_fire [B]: 1 - the unit token's number 36)."""
         f = cand[..., 16] * (cand[..., 0] + cand[..., 1] + cand[..., 5] + cand[..., 6])
-        return self.ww[0] * f * gate[:, None]
+        return (self.ww[0] * f + self.ww[8] * cand[..., 1] * out_of_fire[:, None]) * gate[:, None]
 
     def action_logits_g(self, h, unit, cand, promo, cmask, gcand, cand_ok, tok=None, slot=None, um=None):
         from .model import NEG
         if tok is None:
             raise ValueError('MBENet scores read the tokens, the slots and the memory (tok, slot, um)')
         s = MBNet.action_logits_g(self, h, unit, cand, promo, cmask, gcand, cand_ok)
-        s = s - self.wounded_term(cand, self.wounded_gate(tok, unit, slot, um))
+        out_of_fire = 1.0 - tok[mx.arange(tok.shape[0]), unit, 36]
+        s = s - self.wounded_term(cand, self.wounded_gate(tok, unit, slot, um), out_of_fire)
         return mx.where(cmask, s, NEG)

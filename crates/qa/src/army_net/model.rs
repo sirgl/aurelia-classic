@@ -199,8 +199,9 @@ pub struct Net {
 }
 
 /// The numbers of the hand-set term `ww` (`army/model_mb.py`, `MBENet`; M-HANDOFF.md, "Hand edit: wounded out of range"):
-/// [scale, hp threshold, hp slope, ranged hp threshold, resting weight, city-low threshold, city-low slope, resting slope].
-pub const WW_LEN: usize = 8;
+/// [scale, hp threshold, hp slope, ranged hp threshold, resting weight, city-low threshold, city-low slope, resting slope,
+/// stay scale].
+pub const WW_LEN: usize = 9;
 
 /// Variant MBN's note weights (`army/model_mb.py`, `MBNNet`): a note's embedding `n2(relu(n1(note)))`; per layer a
 /// cross-attention like MBH's (`null`, `same`, `slope` per layer and head; its context through `no[layer]`); the heads
@@ -1291,18 +1292,20 @@ impl Net {
         out
     }
 
-    /// `actions` plus MBe's hand-set term (`ww`; the same logits as `actions` without it): a non-strike candidate (done, move,
-    /// fortify, set up) whose tile is in a foe city's strike range (candidate number 16) loses
-    /// `scale x wounded x (1 - city_low)`, wounded = max(sigmoid(hp slope (threshold - hp)), resting weight x sigmoid(resting slope
-    /// x the memory's resting readout)), the threshold the ranged one for a unit with range; city_low = sigmoid(slope (threshold -
-    /// the objective city's hp share)). `MBENet.wounded_term` is the same arithmetic.
+    /// `actions` plus MBe's hand-set terms (`ww`; the same logits as `actions` without it), both times the unit's gate
+    /// g = wounded x (1 - city_low): (1) a non-strike candidate (done, move, fortify, set up) whose tile is in a foe city's strike
+    /// range (candidate number 16) loses `scale x g`; (2) a move of a unit that stands out of that range (its token's number 36)
+    /// loses `stay scale x g` (a unit that moves does not heal). wounded = max(sigmoid(hp slope (threshold - hp)), resting weight x
+    /// sigmoid(resting slope x the memory's resting readout)), the threshold the ranged one for a unit with range; city_low =
+    /// sigmoid(slope (threshold - the objective city's hp share)). `MBENet.wounded_term` is the same arithmetic.
     pub fn actions_x(&self, body: &Body, unit: usize, candidates: &[Candidate], map: Option<&MapState>, tokens: &Tokens, mem: Option<&MemIn>) -> Vec<f32> {
         let mut out = self.actions(body, unit, candidates, map);
         let Some(w) = self.ww else { return out };
         let g = self.wounded_gate(&w, unit, tokens, mem);
+        let out_of_fire = 1.0 - tokens.feat[unit][36];
         for (o, c) in out.iter_mut().zip(candidates) {
             let f = c.feat[16] * (c.feat[0] + c.feat[1] + c.feat[5] + c.feat[6]);
-            *o -= w[0] * f * g;
+            *o -= (w[0] * f + w[8] * c.feat[1] * out_of_fire) * g;
         }
         out
     }
