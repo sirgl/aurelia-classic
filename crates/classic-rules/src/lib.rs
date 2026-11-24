@@ -44,4 +44,6 @@ pub use rules::{compile_rules, CompiledRuleset};
 pub use systems::diplomacy::{INBOX_ROUNDS, MIN_WAR_ROUNDS_BEFORE_PEACE, OFFER_ROUNDS};
 pub use systems::ruins;
 pub use systems::plunder::PlunderSource;
+/// The barbarians' strongest land unit (the kind a camp spawns): info for the MLX twin's dump, no rule change.
+pub use systems::barbarians::barbarian_unit;
 pub use world::state::{GameConfig, GameState, GameView};
