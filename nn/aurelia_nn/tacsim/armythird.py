@@ -112,6 +112,11 @@ def remap_play(play):
         return out + (third if third is not None else [pad] * k3)
 
     fix_state(sc["initial"])
+    # The third seat's unit handles are not in the dump (its ids are): the scene makes its pieces after ours and the
+    # enemy's, so they take the next arena slots, in id order (a guess that orders the attack candidates as Rust does in
+    # neutral-joins-war: by the target's handle, the enemy's units before the third's).
+    h0 = [h for h in (ms[0].get("handles") or []) if h is not None and h >= 0] if ms else []
+    handles3 = [max(h0) + 1 + i for i in range(k3)] if h0 and k3 else None
     for m in ms:
         fix_state(m["state"])
         if "prev" in m and spare:
@@ -121,7 +126,7 @@ def remap_play(play):
         if "ids" in m:
             m["ids"] = fix_list(m["ids"], -1, ids3)
         if "handles" in m:
-            m["handles"] = fix_list(m["handles"], -1, None)
+            m["handles"] = fix_list(m["handles"], -1, handles3)
     standing = set()  # the Rust slots that hold a spawn of the camp now (not a stray of the arena)
     for e in sc.get("events", []):
         # The events write a city of the third seat with the owner -1 (the dump's side of the third seat); the twin's is 2,

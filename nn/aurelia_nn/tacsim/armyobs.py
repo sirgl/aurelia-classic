@@ -180,7 +180,10 @@ class Obs:
         return q, r
 
     def field(self, s, side=0):
-        """The two sides' units and cities (observe.rs `Field`) as coordinates and masks."""
+        """The two sides' units and cities (observe.rs `Field`) as coordinates and masks. The learner's (side 0) foes are
+        the enemy's units and cities only (`Field::of`: `orders.foe`, one nation; a third seat at war with us, the
+        neutral of neutral-joins-war after its declaration, is no token and no foe of the observation); the other
+        sides' scripts read the war table."""
         sim, t = self.sim, self.t
         B, U = s["u_alive"].shape
         foe = 1 - side
@@ -194,7 +197,8 @@ class Obs:
             alive = alive | (s["u_alive"] & far)
         civ = self.kind(s, "civ")
         own = alive & (s["u_side"] == side)
-        foes = alive & (s["u_side"] == foe) if "war" not in s else alive & self.sim.is_foe(s, mx.full((B,), side, dtype=I32), s["u_side"])
+        war = "war" in s and side != 0
+        foes = alive & self.sim.is_foe(s, mx.full((B,), side, dtype=I32), s["u_side"]) if war else alive & (s["u_side"] == foe)
         if self.fog_any:
             seen = sim.seen_by(s, mx.full((B,), side, dtype=I32), mx.where(alive, s["u_tile"], -1))
             foes = foes & (seen | ~t["fog"][:, None])
@@ -209,7 +213,7 @@ class Obs:
         cr = mx.concatenate([cr, t["far_r"]], axis=1)
         cside = mx.concatenate([mx.where(calive, s["c_owner"], -1), t["far_side"]], axis=1)
         return {"uq": uq, "ur": ur, "own": own, "foes": foes, "milfoe": foes & ~civ, "ownmil": own & ~civ, "civ": civ,
-                "reach": reach, "cq": cq, "cr": cr, "own_city": cside == side, "foe_city": (cside == foe) if "war" not in s else self.sim.is_foe(s, mx.full((B,), side, dtype=I32), cside), "side": side}
+                "reach": reach, "cq": cq, "cr": cr, "own_city": cside == side, "foe_city": self.sim.is_foe(s, mx.full((B,), side, dtype=I32), cside) if war else (cside == foe), "side": side}
 
     def spot(self, s, fd, me, tq, tr, tile):
         """observe.rs `Spot::of` for tiles (map tq, tr; window `tile`) [B, N] of the unit `me` [B]."""
@@ -943,8 +947,12 @@ class Obs:
         mv = g1(s["u_mv"], me)
         here_water = sim.mg("water", tile[:, None])[:, 0] > 0
         here_city = sim.city_on(s, tile[:, None])[:, 0] >= 0
+        # The tile's owner: none, or a nation at war with ours (`validate_pillage`: "own tile", "not at war"; the third seat's
+        # land in peace, an ally's, is refused).
+        howner = gn(s["owner"], mx.maximum(tile, 0)[:, None])[:, 0]
+        foe_land = Sim.is_foe(s, side, howner) if "war" in s else howner != side
         pill_ok = alive & g1(self.kind(s, "pillage"), me) & (mv > 0) & ~here_city & ~here_water & (gn(s["pillageable"], mx.maximum(tile, 0)[:, None])[:, 0] > 0) \
-            & (gn(s["owner"], mx.maximum(tile, 0)[:, None])[:, 0] != side)
+            & (howner != side) & ((howner < 0) | foe_land)
         icpt_ok = alive & (g1(self.kind(s, "icpt_range"), me) > 0) & (g1(s["u_st"], me) != 4)
         for kind, ok in ((K_FORT, mk["fort"]), (K_SETUP, mk["setup"]), (K_PILLAGE, pill_ok), (K_OTHER, icpt_ok)):
             groups.append((2, None, mx.full((B, 1), GROUP[kind] * (1 << 20), dtype=I32), ok[:, None], kind, tile[:, None], None, None))
@@ -1333,7 +1341,9 @@ def check(path, limit=None, show=5, families=None, chunk=256, out=None, group=40
                       bad["candidate sets"] += 1
                       extra = [x for x in mine if x not in theirs][:4]
                       miss = [x for x in theirs if x not in mine][:4]
-                      _ex(examples, show, plays[pi][0]["play"], m, f"unit {v}: candidates {len(mine)} vs Rust {len(theirs)}; extra {extra} missing {miss}")
+                      at = next((i for i, (x, y) in enumerate(zip(mine, theirs)) if x != y), None)
+                      order = f"; first unequal at {at}: {mine[at:at + 3]} vs Rust {theirs[at:at + 3]}" if at is not None else ""
+                      _ex(examples, show, plays[pi][0]["play"], m, f"unit {v}: candidates {len(mine)} vs Rust {len(theirs)}; extra {extra} missing {miss}{order}")
                       continue
                   stats["candidate lists equal sets"] += 1
                   allok = True
