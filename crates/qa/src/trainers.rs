@@ -318,6 +318,18 @@ fn combat_decision(d: &kernel::ai::plan::Decision<Classic>) -> bool {
     }
 }
 
+/// One army unit's row of a learner round in the unit log (`unit_log`).
+struct UnitRow {
+    slot: usize,
+    hp: u16,
+    rest_gov: bool,
+    rest_end: bool,
+    struck_city: bool,
+    struck_any: bool,
+    dist_start: i32,
+    dist_end: i32,
+}
+
 fn play_on<P: kernel::ai::mind::AiMind<Classic>>(rules: &CompiledRuleset, mut game: GameState, mut scene: Scene, player: &str, trace: bool, seat: Seat, mut driver: AiDriver<Classic, P>) -> Result<Row, String> {
     driver.set_trace_capacity(0);
     if !lab::mode::fog() {
@@ -366,6 +378,11 @@ fn play_on<P: kernel::ai::mind::AiMind<Classic>>(rules: &CompiledRuleset, mut ga
     let mut rlog: BTreeMap<u32, (String, usize, usize, usize)> = BTreeMap::new();
     let mut r_pre: Option<(u32, BTreeMap<EntityId, (TileId, u16)>)> = None;
     let mut r_post: Option<(u32, BTreeMap<EntityId, (TileId, u16)>)> = None;
+    // The unit log (`unit_log`, info only): per learner round and army unit (slot, hp at the turn's start, resting by the seat's own
+    // state in force for the turn's decisions and at its end, struck a city, struck anything, distance to the city at the turn's start and end).
+    let mut ulog: BTreeMap<u32, BTreeMap<usize, UnitRow>> = BTreeMap::new();
+    let mut rest_prev: BTreeSet<usize> = BTreeSet::new();
+    let slot_of = |id: &EntityId| orders.army.iter().position(|a| a == id);
     let stage_label = |s: usize, e: bool| format!("{}{}", crate::army_net::model::STAGE_NAMES.get(s).copied().unwrap_or("?"), if e { "+e" } else { "" });
     let mut scripted_mine: Option<u32> = None;
     let mut scripted_theirs: Option<u32> = None;
@@ -392,8 +409,23 @@ fn play_on<P: kernel::ai::mind::AiMind<Classic>>(rules: &CompiledRuleset, mut ga
                         if let Some((s, e)) = crate::army_net::seat::take_stage() {
                             rlog.entry(*r).or_default().0 = stage_label(s, e);
                         }
+                        if let Some(rest) = crate::army_net::seat::take_rest() {
+                            rest_prev = rest.iter().enumerate().filter(|(_, b)| **b).map(|(s, _)| s).collect();
+                            for row in ulog.entry(*r).or_default().values_mut() {
+                                row.rest_end = row.slot < rest.len() && rest[row.slot];
+                            }
+                        }
                     }
-                    r_pre = Some((now.saturating_sub(round0), pre));
+                    let rnow = now.saturating_sub(round0);
+                    // The net decides with the resting set it wrote at the last turn's end; a staged teacher's is set below, after its turn.
+                    let gov = |slot: usize| matches!(seat, Seat::Net) && rest_prev.contains(&slot);
+                    let rows = ulog.entry(rnow).or_default();
+                    for (id, (tile, hp)) in &pre {
+                        if let Some(slot) = slot_of(id) {
+                            rows.insert(slot, UnitRow { slot, hp: *hp, rest_gov: gov(slot), rest_end: false, struck_city: false, struck_any: false, dist_start: lab::dist(&game, *tile, city_t), dist_end: -1 });
+                        }
+                    }
+                    r_pre = Some((rnow, pre));
                 }
                 match &seat {
                     Seat::Mind(_) => {}
@@ -402,6 +434,11 @@ fn play_on<P: kernel::ai::mind::AiMind<Classic>>(rules: &CompiledRuleset, mut ga
                         if logged && assault::flags(name).is_some() {
                             let ts = crate::army_net::seat::teacher_state(&game, &scene, &orders, &scene.track);
                             rlog.entry(now.saturating_sub(round0)).or_default().0 = stage_label(ts[2].max(0) as usize, ts[0] > 0);
+                            for row in ulog.entry(now.saturating_sub(round0)).or_default().values_mut() {
+                                let rest = orders.army.get(row.slot).is_some_and(|id| scene.track.resting.contains(id));
+                                row.rest_gov = rest;
+                                row.rest_end = rest;
+                            }
                         }
                         {
                             let l = scene.learner;
@@ -442,6 +479,14 @@ fn play_on<P: kernel::ai::mind::AiMind<Classic>>(rules: &CompiledRuleset, mut ga
                         let e = rlog.entry(*r).or_default();
                         e.1 = fwd;
                         e.2 = post.len();
+                        let (city_slots, any_slots) = crate::army_net::observe::struck_slots_of_round(now);
+                        for row in ulog.entry(*r).or_default().values_mut() {
+                            row.struck_city = city_slots.contains(&(row.slot as i16));
+                            row.struck_any = any_slots.contains(&(row.slot as i16));
+                            if let Some((t, _)) = orders.army.get(row.slot).and_then(|id| post.get(id)) {
+                                row.dist_end = lab::dist(&game, *t, city_t);
+                            }
+                        }
                         r_post = Some((*r, post));
                     }
                 }
@@ -492,6 +537,19 @@ fn play_on<P: kernel::ai::mind::AiMind<Classic>>(rules: &CompiledRuleset, mut ga
                 rlog.entry(*r).or_default().0 = stage_label(s, e);
             }
         }
+        if let (Seat::Net, Some((r, _))) = (&seat, r_pre.as_ref()) {
+            if let Some(rest) = crate::army_net::seat::take_rest() {
+                for row in ulog.entry(*r).or_default().values_mut() {
+                    row.rest_end = row.slot < rest.len() && rest[row.slot];
+                }
+            }
+        }
+        let unit_log = ulog
+            .iter()
+            .map(|(r, rows)| format!("{r}:{}", rows.values().map(|u| format!("{},{},{}{},{}{},{},{}", u.slot, u.hp, u8::from(u.rest_gov), u8::from(u.rest_end), u8::from(u.struck_city), u8::from(u.struck_any), u.dist_start, u.dist_end)).collect::<Vec<_>>().join("|")))
+            .collect::<Vec<_>>()
+            .join(";");
+        scene.info.insert("unit_log".into(), unit_log);
         scene.info.insert("round_log".into(), rlog.iter().map(|(r, (l, f, a, h))| format!("{r}:{l}:{f}/{a}:{h}")).collect::<Vec<_>>().join(";"));
     }
     let mut measures = families::measures(rules, &game, &scene, rel);

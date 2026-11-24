@@ -41,6 +41,7 @@ pub fn reset_expert() {
     MEMORY.with(|m| *m.borrow_mut() = None);
     NOTES.with(|n| n.borrow_mut().clear());
     STAGE.with(|s| *s.borrow_mut() = None);
+    REST.with(|r| *r.borrow_mut() = None);
 }
 
 /// Variant M's memory of the play on this thread: the orders and scene it plays, the memory state.
@@ -59,6 +60,13 @@ thread_local! {
     static NOTES: std::cell::RefCell<Vec<String>> = const { std::cell::RefCell::new(Vec::new()) };
     /// The plan's own stage and engaged after the last turn end (`Net::plan_stage`), for the round log.
     static STAGE: std::cell::RefCell<Option<(usize, bool)>> = const { std::cell::RefCell::new(None) };
+    /// The net's own "resting" per army slot after its last turn end (the notes' `rest` of MBN, else the memory's unit readout), for the unit log.
+    static REST: std::cell::RefCell<Option<[bool; super::model::SLOTS]>> = const { std::cell::RefCell::new(None) };
+}
+
+/// The net's own resting set written at its last turn end (taken: None until the next one).
+pub fn take_rest() -> Option<[bool; super::model::SLOTS]> {
+    REST.with(|r| r.borrow_mut().take())
 }
 
 /// The net's own stage written at its last turn end (taken: None until the next one).
@@ -244,6 +252,12 @@ pub fn turn_end(game: &GameState, rules: &CompiledRuleset) {
         let mut state = run.state.clone();
         net.memory_step(&body, &tokens, &slots, &mut state);
         STAGE.with(|s| *s.borrow_mut() = net.plan_stage(&state));
+        REST.with(|r| {
+            *r.borrow_mut() = match state.notes.as_ref() {
+                Some(ns) => Some(std::array::from_fn(|s| ns.pull[s] > 0.5)),
+                None => net.resting_readout(&state),
+            }
+        });
         if let Some(ns) = state.notes.as_ref() {
             let round = game.view().auth.turn().round.saturating_sub(run.orders.start_round);
             NOTES.with(|n| n.borrow_mut().push(format!("r{round} {}", ns.written.join(" · "))));

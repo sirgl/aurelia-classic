@@ -406,6 +406,8 @@ pub struct Body {
 /// Unit slots of variant M's memory (a unit's index in `Orders::army`), its width, the plan tokens.
 pub const SLOTS: usize = 16;
 pub const U_DIM: usize = 16;
+/// The unit slot's "resting" number (`model_m.U_RESTING`).
+const U_RESTING_IDX: usize = 1;
 pub const PLANS: usize = 4;
 
 /// One GRU cell (PyTorch's convention, gates r, z, n): `wx` from the input, `wh` from the state, biases inside.
@@ -450,6 +452,8 @@ struct Memory {
     hyst: Vec<f32>,
     /// The plan token's readouts `aux_p` [[stage scale, shift], [engaged scale, shift]] (None: not exported).
     aux_p: Option<[f32; 4]>,
+    /// The unit readout of "resting" (`aux_u[1]`: scale, shift on `u[U_RESTING]`; None: not exported).
+    aux_rest: Option<[f32; 2]>,
 }
 
 /// The memory of one play (variant M): every army slot's u, the plan tokens, the slots seen at the last update.
@@ -561,7 +565,8 @@ impl Net {
             let gu = Gru { wx: mat("gu_wx", "gu_bx")?, wh: mat("gu_wh", "gu_bh")?, h: U_DIM };
             let gp = Gru { wx: mat("gp_wx", "gp_bx")?, wh: mat("gp_wh", "gp_bh")?, h: c.d };
             let aux_p = t.get("aux_p").filter(|(s, _)| s.as_slice() == [2, 2]).map(|(_, v)| [v[0], v[1], v[2], v[3]]);
-            Some(Memory { um: dense("um")?, plan0: raw("plan0")?, plan_bias: raw("plan_bias")?, gu, pq: dense("pq")?, pk: dense("pk")?, gp, hyst: raw("hyst")?, aux_p })
+            let aux_rest = t.get("aux_u").filter(|(s, _)| s.as_slice() == [4, 2]).map(|(_, v)| [v[2], v[3]]);
+            Some(Memory { um: dense("um")?, plan0: raw("plan0")?, plan_bias: raw("plan_bias")?, gu, pq: dense("pq")?, pk: dense("pk")?, gp, hyst: raw("hyst")?, aux_p, aux_rest })
         } else {
             None
         };
@@ -796,6 +801,17 @@ impl Net {
         let st: Vec<f32> = (0..STAGES).map(|k| a[0] * p0[k] + a[1]).collect();
         let s = st.iter().enumerate().fold((0usize, f32::NEG_INFINITY), |b, (i, x)| if *x > b.1 { (i, *x) } else { b }).0;
         Some((s, a[2] * p0[P_ENGAGED_N] + a[3] > 0.0))
+    }
+
+    /// The memory's own "resting" per army slot (`aux_u[1]` on `u[U_RESTING]`, the unit readout the auxiliary loss trains): info for
+    /// the unit diagnosis, never read by the play. None without memory or without the readout.
+    pub fn resting_readout(&self, state: &MemoryState) -> Option<[bool; SLOTS]> {
+        let a = self.mem.as_ref()?.aux_rest?;
+        let mut out = [false; SLOTS];
+        for (s, o) in out.iter_mut().enumerate() {
+            *o = a[0] * state.u[s * U_DIM + U_RESTING_IDX] + a[1] > 0.0;
+        }
+        Some(out)
     }
 
     pub fn has_memory(&self) -> bool {
