@@ -1310,7 +1310,24 @@ def check(path, limit=None, show=5, families=None, chunk=256, out=None, group=40
                   stats["candidates"] += len(theirs)
                   if any(a[1] < 0 for a in theirs):
                       # A move off the 24 x 24 window (a unit at its edge): the simulator has no tiles there.
+                      # Not gated; reported: does the twin's list equal Rust's without the off-window candidates?
                       stats["candidate lists reaching outside the window"] += 1
+                      inside = [(i, x) for i, x in enumerate(theirs) if x[1] >= 0]
+                      mine_in = [(i, x) for i, x in enumerate(mine) if x[1] >= 0]
+                      stats["candidates outside the window"] += len(theirs) - len(inside)
+                      if 0 <= v < U and ufar[b][v]:
+                          stats["outside lists: the unit itself beyond the window"] += 1
+                      elif [x for _, x in mine_in] == [x for _, x in inside]:
+                          if all(abs(cf[r][k][j] - rf[i][j]) <= 1e-6 for (k, _), (i, _) in zip(mine_in, inside) for j in range(F_ACT)):
+                              stats["outside lists: the window's part equal"] += 1
+                          else:
+                              stats["outside lists: the window's part, numbers differ"] += 1
+                              _ex(examples, show, plays[pi][0]["play"], m, f"unit {v} (outside list): window part numbers differ")
+                      else:
+                          stats["outside lists: the window's part, sets differ"] += 1
+                          extra = [x for _, x in mine_in if x not in theirs][:4]
+                          miss = [x for _, x in inside if x not in mine][:4]
+                          _ex(examples, show, plays[pi][0]["play"], m, f"unit {v} (outside list): window part {len(mine_in)} vs Rust {len(inside)}; extra {extra} missing {miss}")
                       continue
                   if mine != theirs:
                       bad["candidate sets"] += 1
