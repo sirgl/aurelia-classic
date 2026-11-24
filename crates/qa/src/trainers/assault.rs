@@ -540,9 +540,9 @@ fn heal_rate(game: &GameState, rules: &CompiledRuleset, me: PlayerId, t: TileId)
 
 /// A unit rests: it stays (and fortifies where the rules let it), heals what the end of the turn would give, and the
 /// seat's AI does not move it.
-fn rest(game: &mut GameState, rules: &CompiledRuleset, me: PlayerId, h: UnitHandle) {
+pub fn rest(game: &mut GameState, rules: &CompiledRuleset, me: PlayerId, h: UnitHandle) {
     let _ = act::fortify(game, rules, me, h);
-    game.debug_hold_unit(rules, h);
+    act::hold_unit(game, rules, h);
 }
 
 /// The targets of the siege: the city's tile and the enemy units within two of it.

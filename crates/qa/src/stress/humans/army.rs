@@ -85,7 +85,7 @@ pub fn hold(game: &mut GameState, rules: &CompiledRuleset, unit: UnitHandle) {
     if unmoved {
         let _ = game.execute(rules, Command::Fortify { unit });
     }
-    game.debug_hold_unit(rules, unit);
+    crate::trainers::act::hold_unit(game, rules, unit);
 }
 
 /// Holds every unit of `ids` that `owner` still holds.
