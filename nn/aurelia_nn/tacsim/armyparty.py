@@ -131,7 +131,8 @@ def _waypoints(game):
         cq, cr, ok = [], [], []
         for sc, _, _ in game.plays:
             w = sc["scene"]["window"]
-            c = sc["orders"]["centre"]
+            # A mixed batch holds scenes of other families (and older dumps without `centre`): their rows are masked out.
+            c = sc["orders"].get("centre", 0)
             cq.append(c % w["map_w"])
             cr.append(c // w["map_w"])
             ok.append((w["map_w"], w["map_h"]))
@@ -363,7 +364,7 @@ def _enemy_tiles(game):
         for sc, _, _ in game.plays:
             w = sc["scene"]["window"]
             row = [False] * T
-            for t in (sc["orders"]["info"].get("enemy_tiles") or "").split(","):
+            for t in ((sc["orders"].get("info") or {}).get("enemy_tiles") or "").split(","):
                 if t:
                     x, y = int(t) % w["map_w"] - w["q0"], int(t) // w["map_w"] - w["r0"]
                     if 0 <= x < w["w"] and 0 <= y < w["h"]:

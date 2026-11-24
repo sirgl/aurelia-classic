@@ -1176,6 +1176,7 @@ def run(path, weights, copies=1, families=None, limit=None, rust=None, out=None,
         res["families"][f] = {"plays": plays_n, "rust_win": round(100 * rw / max(plays_n, 1), 1), "mlx_win": round(100 * w1 / max(plays_n, 1), 1),
                               "same_verdict": same, "scenes": n, "mlx_win_all_copies": round(100 * w / max(n, 1), 1)}
     res["counts"] = dict(res["counts"])
+    res["dump fields missing"] = A.missing_report()
     if "streams" in res:
         res["streams"] = dict(res["streams"])
     res["seconds"] = round(res["seconds"], 1)

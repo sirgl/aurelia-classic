@@ -1066,6 +1066,18 @@ def load(path, limit=None, families=None):
     return out
 
 
+# The moment fields the twin reads with a default when they are absent (a dump older than the field: the default silently
+# stands for it, as the package-8 dumps of 13:41 without `ruins` / `upos`). `stream` counts the moments without each;
+# every tool reports the count (`missing_report`), so a stale dump shows in its result.
+MOMENT_FIELDS = ("wm", "cstr", "ruins", "upos", "kx")
+MISSING = collections.Counter()
+
+
+def missing_report():
+    """{field: moments without it, "moments": all moments read} of the dumps read so far."""
+    return dict(MISSING)
+
+
 def stream(path, limit=None, families=None, group=40, every=1):
     """The dump's plays in groups of `group` plays (each moment kept when its index in the play % `every` == 0)."""
     plays = collections.OrderedDict()
@@ -1091,6 +1103,10 @@ def stream(path, limit=None, families=None, group=40, every=1):
                 plays[name] = [d, [], None, 0]
             elif name in plays:
                 if d["type"] == "moment":
+                    MISSING["moments"] += 1
+                    for f in MOMENT_FIELDS:
+                        if f not in d:
+                            MISSING[f] += 1
                     plays[name][1].append(d if plays[name][3] % every == 0 else None)
                     plays[name][3] += 1
                 else:
@@ -1358,7 +1374,7 @@ def check(path, limit=None, show=5, families=None, chunk=256, out=None, group=40
                           stats["candidates equal"] += 1
                   if allok:
                       stats["candidate lists equal"] += 1
-    res = {"stats": dict(stats), "bad": dict(bad), "examples": examples, "seconds": {"build": round(t_build, 1), "tokens": round(t_tok, 1), "candidates": round(t_cand, 1), "all": round(time.time() - t0, 1)}}
+    res = {"stats": dict(stats), "bad": dict(bad), "dump fields missing": missing_report(), "examples": examples, "seconds": {"build": round(t_build, 1), "tokens": round(t_tok, 1), "candidates": round(t_cand, 1), "all": round(time.time() - t0, 1)}}
     print(json.dumps(res, indent=1))
     if out:
         with open(out, "w") as fh:

@@ -312,7 +312,7 @@ def replay(path, weights, group=200, limit=None, families=None, show=8, out=None
                     made[pi][unit[r][mp]] += 1
             st["memory steps"] += sum(ends)
         st["plays"] += P
-    res = {"stats": dict(st), "families": {f: dict(c) for f, c in sorted(fam.items())}, "examples": examples, "examples_notes": examples_notes,
+    res = {"stats": dict(st), "dump fields missing": A.missing_report(), "families": {f: dict(c) for f, c in sorted(fam.items())}, "examples": examples, "examples_notes": examples_notes,
            "seconds": {"observe": round(t_obs, 1), "net": round(t_net, 1), "all": round(time.time() - t0, 1)}}
     print(json.dumps(res, indent=1))
     if out:

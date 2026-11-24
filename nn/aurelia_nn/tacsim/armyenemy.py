@@ -243,7 +243,7 @@ def run(path, weights, families=None, which="enemy", show=3, out=None, group=400
             g.our_turn_end(mx.ones((g.B,), dtype=mx.bool_))
         mx.eval(g.s)
         compare(g, rows, which, counts, show, ex)
-    res = {"check": which, "rule": rule, "charge": charge, "scene_rule": scene_rule, "seconds": round(time.time() - t0, 1), "families": {}}
+    res = {"check": which, "dump fields missing": A.missing_report(), "rule": rule, "charge": charge, "scene_rule": scene_rule, "seconds": round(time.time() - t0, 1), "families": {}}
     fams = sorted({f for f, _ in counts})
     for f in fams:
         n = counts[(f, "turns")]
