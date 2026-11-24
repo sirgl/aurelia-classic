@@ -308,11 +308,13 @@ est_min = 0
 deadline_min = 120           # the smoke's deadline: now + this
 cpu_max = 3
 mlx_gb = 6
+mlx_cpu = false              # true: the MLX jobs run on the CPU without the GPU lock (a machine whose GPU other lanes hold)
 train_to = 2                 # teacher recordings and dumps: instances 0..1 and 80..81
 hold_to = 82
 twin_families = "siege,raid,assault-heal"
 quick_families = "siege,raid,assault-heal"
 full_families = "siege,raid,assault-heal,hold"
+teach_families = "siege,raid,assault-heal,hold,kite"   # the smoke's recordings: three twin families and two the anchor draws
 imit = { max_steps = 3, plays = 8, eval_plays = 1, eval_every = 1000, log_every = 1 }
 rl = { updates = 2, minutes = 5, ckpt_every = 1, P = 8, G = 2, K = 2, split = 1 }
 needle = { lengths = "64", widths = "64", layers = "3", needles = "1", steps = 30, eval_every = 10, max_minutes = 2 }

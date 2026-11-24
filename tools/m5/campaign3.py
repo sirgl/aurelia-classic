@@ -82,7 +82,7 @@ class Campaign:
             for k in ("cpu_max", "mlx_gb"):
                 if k in s:
                     self.c[k] = s[k]
-            for k in ("train_to", "hold_to", "twin_families", "quick_families", "full_families"):
+            for k in ("train_to", "hold_to", "twin_families", "quick_families", "full_families", "teach_families"):
                 if k in s:
                     self.data[k] = s[k]
             self.imit.update(s.get("imit", {}))
@@ -228,6 +228,10 @@ class Campaign:
         return self.res(name, cmd, cpu=self.cpu_spec(), env=env)
 
     def py(self, name: str, args: list, gpu: bool = False, cpu: str = "1", ram: float = 0, env: dict | None = None) -> int:
+        if gpu and self.smoke and (self.cfg.get("smoke", {}).get("mlx_cpu") or os.environ.get("M5_SMOKE_MLX_CPU")):
+            # the smoke on a machine whose GPU other lanes hold: MLX on the CPU, no GPU lock (oncpu.py)
+            args = [a for a in args if a != "-I"]
+            return self.res(name, [PY, str(M5 / "py" / "oncpu.py"), *args], cpu=cpu, gpu=False, ram=ram, env=env, cwd=NN)
         return self.res(name, [PY, *args], cpu=cpu, gpu=gpu, ram=ram, env=env, cwd=NN)
 
     # ---- metrics helpers ---------------------------------------------------------------------------------------
@@ -327,7 +331,7 @@ class Campaign:
                 continue
             shutil.rmtree(R / name, ignore_errors=True)
             (R / f"{name}.bin").unlink(missing_ok=True)
-            if self.suite(name, f"runs/{name}", frm, to, dd["teach_players"], record=f"runs/{name}.bin"):
+            if self.suite(name, f"runs/{name}", frm, to, dd["teach_players"], dd.get("teach_families"), record=f"runs/{name}.bin"):
                 return {"status": "failed", "why": f"{name} failed (lab/logs/{name}.log)"}
             (R / f"{name}.done").touch()
         for split in ("train", "hold"):
