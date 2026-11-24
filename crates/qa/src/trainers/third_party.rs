@@ -427,7 +427,7 @@ fn build_joins(p: &mut Painter, s: &mut Scene, lab: &Lab) -> Result<(), String> 
     put_all(p, foe, at(p, knob("NJ_ENEMY_AT", 6), 0)?, 1, &[Arm::Melee, Arm::Ranged, Arm::Melee][..knob("NJ_ENEMY_N", 1) as usize], &mut s.theirs)?;
     let mut plan = vec![Arm::Melee, Arm::Ranged, Arm::Mounted, Arm::Melee];
     plan.truncate(knob("NJ_UNITS", JOIN_UNITS as i64) as usize);
-    put_all(p, n, at(p, -knob("NJ_AT", 2), 1)?, 1, &plan, &mut s.third)?;
+    put_all(p, n, at(p, -knob("NJ_AT", 1), 1)?, 1, &plan, &mut s.third)?;
     for q in s.third.clone() {
         let _ = act::fortify(&mut p.game, p.rules, n, q.h);
     }
