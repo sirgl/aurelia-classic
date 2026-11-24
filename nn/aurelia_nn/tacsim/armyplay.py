@@ -263,25 +263,42 @@ class Game:
         h = m["tok"]["feat"]
         return tuple((v, h[i * W:(i + 1) * W]) for i, (k, v) in enumerate(m["tok"]["ref"]) if k == "c" and v in ftiles)
 
-    def our_mind_economy(self, rel):
-        """Our seat's mind runs at our turn's end, after the net's last moment: a tenet adopted there changes our units'
-        wounded modifier for the enemy's strikes of this round (neutral-path's forced enemy turns, 4 of 47 left). Our
-        units' modifier from the next round's first Rust moment (no other seat changes ours before then) where the play
-        has one and the unit lives in it; the other seats' and the rest of the economy stay."""
-        U = self.U
-        nw, has = [], []
+    def turn_end_economy(self, ended, rows=None):
+        """The seats `ended` have ended their turn since the round's moment: their minds ran after it (a tenet, a tech, a
+        city's growth). Their units' wounded modifiers and their cities' strengths from the next round's first Rust
+        moment (no seat changes them before then), in `rows` [B] (all by default), where the play has such a moment; a
+        unit dead by then takes its seat's change (`armyenemy.wm_after`). The forced checks set this in their rows."""
+        rel = getattr(self, "_rel", None)
+        if rel is None:
+            return
+        from .armyenemy import wm_after
+        U, C = self.U, self.s["c_pop"].shape[1]
+        last = getattr(self, "_last", [None] * len(self.plays))
+        nw, cs, has = [], [], []
         for pi in range(len(self.plays)):
             m = self.sched[pi].get(self.plays[pi][0]["orders"]["start_round"] + rel + 1)
-            ok = m is not None and "wm" in m
-            nu = m["state"]["units"] if ok else []
-            nw.append((m.get("wm", []) + [0] * U)[:U] if ok else [0] * U)
-            has.append([ok and k < len(nu) and nu[k][0] == 1 for k in range(U)])
-        if not any(any(h) for h in has):
+            cur = last[pi]
+            ok = m is not None and cur is not None and "wm" in m and "wm" in cur
+            has.append(ok)
+            if not ok:
+                nw.append([0] * U); cs.append([0] * C)
+                continue
+            units = cur["state"]["units"]
+            w = wm_after((cur["wm"] + [0] * U)[:U], m, units, ended)
+            nw.append((w + [0] * U)[:U])
+            cc = m.get("cstr") or cur.get("cstr") or []
+            cs.append(([c[0] for c in cc] + [0] * C)[:C])
+        if not any(has):
             return
-        tk = lambda v, dt=I32: mx.take(mx.array(v, dtype=dt), self.idx, axis=0)
         s = self.s
-        ours = tk(has, mx.bool_) & s["u_alive"] & (s["u_side"] == 0)
-        s["p_wounded_mod"] = mx.where(ours, tk(nw), s["p_wounded_mod"])
+        tk = lambda v, dt=I32: mx.take(mx.array(v, dtype=dt), self.idx, axis=0)
+        h = tk(has, mx.bool_)
+        if rows is not None:
+            h = h & rows
+        side_in = lambda a: mx.any(mx.stack([a == e for e in sorted(ended)]), axis=0)
+        s["p_wounded_mod"] = mx.where(h[:, None] & side_in(s["u_side"]), tk(nw), s["p_wounded_mod"])
+        if "c_str0" in s and C:
+            s["c_str0"] = mx.where(h[:, None] & side_in(s["c_owner"]), tk(cs), s["c_str0"])
 
     def _apply_economy(self, last):
         s = self.s
@@ -911,6 +928,8 @@ class Game:
         party = armyparty.is_party(self) if "war" in self.s else mx.zeros((self.B,), dtype=mx.bool_)
         if not self.third_played:  # `armyenemy` forces the state after the third seat's turn
             self.third_camp(live & ~party)
+            if "war" in self.s:
+                self.turn_end_economy({2}, live & ~party)
         # The family script's first act (`assault::enemy_turn`): the reinforcements of assault-reinforce land.
         armyprice.land_reinforcements(self, ~self.s["done"] & (self.verdict < 0))
         if self.scene_rule:
@@ -922,6 +941,7 @@ class Game:
         else:
             self.enemy_turn_approx()
         if not self.third_played and bool(mx.any(live & party).item()):
+            self.turn_end_economy({1}, live & party)
             self.third_turn(~self.s["done"] & (self.verdict < 0) & party)
 
     def third_camp(self, live):
@@ -1093,7 +1113,8 @@ class Game:
             self.learner_turn(rel)
             mx.eval(self.s)
             tb_ = time.time()
-            self.our_mind_economy(rel)
+            self._rel = rel
+            self.turn_end_economy({0})
             self.enemy_turn()
             mx.eval(self.s)
             self.counts["ms learner turns"] += int(1000 * (tb_ - ta))

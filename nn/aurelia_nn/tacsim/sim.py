@@ -1344,7 +1344,9 @@ class Sim:
         s["c_strike"] = put1(s["c_strike"], cslot, mx.ones(cslot.shape, dtype=mx.bool_), where)
         s = self.advance(s, slot, tile, where)
         s = self.finish_attack(s, slot, where, mx.zeros_like(where))
-        s["done"] = s["done"] | where
+        # A capture ends the scene, but in the third-party scenes (`pty_rows`) Rust plays the loop's iteration out and the
+        # judge ends it (the capturer's comrades still move after it): there the judge decides.
+        s["done"] = s["done"] | (where & ~s["pty_rows"] if "pty_rows" in s else where)
         return s
 
     def city_strike(self, s, side, cslot, tgt, take):

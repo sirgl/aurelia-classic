@@ -71,6 +71,7 @@ def setup(s, rows):
     """The sticky state of the rows [(scene line, moment)]."""
     B = len(rows)
     s["third_last"] = mx.array([sc["play"].split("/")[0] in THIRD for sc, _ in rows])
+    s["pty_rows"] = mx.array([sc["play"].split("/")[0] in THIRD for sc, _ in rows])
     s["pty_broken"] = mx.zeros((B,), dtype=mx.bool_)
     s["pty_by"] = mx.full((B,), -1, dtype=I32)
     s["pty_lost"] = mx.full((B,), -1, dtype=I32)

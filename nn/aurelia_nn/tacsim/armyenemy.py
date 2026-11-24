@@ -93,6 +93,25 @@ def turn_rows(plays, which):
     return rows
 
 
+def wm_after(wm, nxt, units, ended):
+    """The wounded modifiers after the turn ends of the seats `ended`: a unit of such a seat takes the next moment's value
+    where it lives then; a unit dead by then takes its seat's change (a tenet changes every unit of the seat alike: the
+    most common change among the seat's units that live in both)."""
+    nu, nw = nxt["state"]["units"], nxt["wm"]
+    live = lambda k: k < len(nu) and nu[k][0] == 1 and k < len(nw)
+    delta = {}
+    for side in ended:
+        ds = collections.Counter(nw[k] - w for k, w in enumerate(wm) if k < len(units) and units[k][0] and units[k][8] == side and live(k))
+        delta[side] = ds.most_common(1)[0][0] if ds else 0
+    out = []
+    for k, w in enumerate(wm):
+        if k < len(units) and units[k][0] and units[k][8] in ended:
+            out.append(nw[k] if live(k) else w + delta[units[k][8]])
+        else:
+            out.append(w)
+    return out
+
+
 def as_row(plays, pi, start, by_round, U, which="enemy"):
     units, cities, rng, rnd = start[:4]
     m = by_round.get(rnd) or min(by_round.values(), key=lambda x: abs(x["round"] - rnd))
@@ -101,16 +120,29 @@ def as_row(plays, pi, start, by_round, U, which="enemy"):
     for k in ("wm", "cstr"):
         if k in m:
             row[k] = m[k]
-    if which != "ours" and "wm" in row:
-        # Our seat's mind runs at our turn's end, after the net's last moment (a tenet adopted there changes our units'
-        # wounded modifier for the enemy's strikes of this round): our units' modifier from the next round's first moment
-        # (no other seat changes it before then), the other seats' from this round's. Where the play has no moment in
-        # the next round the change's round is unknown and this round's stands; a unit dead by then keeps this round's.
+    if "cstr" in row:
+        # A city's population changes at its owner's turn end (after the round's moment): the events carry the population
+        # at this instant, the moment's strength (without the garrison) the one of the moment's population; the strength
+        # moves by CITY_STRENGTH_PER_POP (40 hundredths) a head (`combat::city::city_strength`).
+        mc = m["state"]["cities"]
+        row["cstr"] = [[c[0] + 40 * (cities[k][3] - mc[k][3]), *c[1:]] if k < len(cities) and k < len(mc) else c
+                       for k, c in enumerate(row["cstr"])]
+    if which != "ours":
+        # The seats whose turn has ended since the round's moment (their minds ran after it: a tenet, a tech, a city's
+        # growth): ours before the enemy's turn and the third's; the enemy's too before the third's turn of the party
+        # families (the third plays after the enemy); the third's too before the camp families' enemy (it plays first).
+        # Their units' wounded modifiers and their cities' strengths come from the next round's first moment (no seat
+        # changes them before then), where the play has one and the unit lives in it; the rest from this round's. Where
+        # the play has no moment in the next round the round of a change is unknown and this round's stands.
+        party = plays[pi][0]["play"].split("/")[0] in THIRD_FAMS
+        ended = {0} | ({1} if which == "third" and party else set()) | ({2} if which == "enemy" and not party else set())
         nxt = min((x for x in plays[pi][1] if x["round"] == rnd + 1 and "wm" in x), key=lambda x: x["step"], default=None)
-        if nxt is not None:
-            nu = nxt["state"]["units"]
-            row["wm"] = [nw if k < len(units) and units[k][0] and units[k][8] == 0 and k < len(nu) and nu[k][0] == 1 else w
-                         for k, (w, nw) in enumerate(zip(row["wm"], nxt["wm"]))]
+        if nxt is not None and "wm" in row:
+            row["wm"] = wm_after(row["wm"], nxt, units, ended)
+        if nxt is not None and "cstr" in row and "cstr" in nxt:
+            nc = nxt["state"]["cities"]
+            row["cstr"] = [nxt["cstr"][k] if k < len(cities) and cities[k][0] in ended and k < len(nc) and nc[k][0] == cities[k][0]
+                           and k < len(nxt["cstr"]) else c for k, c in enumerate(row["cstr"])]
     # The ruins and the arrival order at the end of our turn: the round's last moment (the turn end), not its first.
     last = max((x for x in plays[pi][1] if x["round"] == rnd), key=lambda x: x["step"], default=m)
     for k in ("ruins", "upos"):
@@ -159,13 +191,17 @@ def compare(g, rows, which, counts, show, ex):
                 detail = f" slot {k} rust {u[:11]} mlx {[int(al[b][k]), tl[b][k], hp[b][k], st[b][k], xp[b][k], lv[b][k]]}"
         if first is None and any(c[1] != dmg[b][k] for k, c in enumerate(c2)):
             first = "city damage"
+            detail = f" rust {[c[1] for c in c2]} mlx {dmg[b][:len(c2)]}"
         counts[(fam, "turns")] += 1
         if first is None:
             counts[(fam, "equal")] += 1
         else:
             counts[(fam, first)] += 1
+            if any(u[0] and u[1] < 0 and u[8] in (0, 1) for u in start[0][:n_pieces]):
+                # Reported: a unit of ours or of the enemy is beyond the window at the turn's start (the twin has no tiles there).
+                counts[(fam, "of them: a unit beyond the window at the start")] += 1
             if len(ex[fam]) < show:
-                ex[fam].append(f"{g.plays[pi][0]['play']} r{start[3]}: {first}" + (detail if first != "city damage" else ""))
+                ex[fam].append(f"{g.plays[pi][0]['play']} r{start[3]}: {first}" + detail)
 
 
 def run(path, weights, families=None, which="enemy", show=3, out=None, group=400, rule="std", charge=False, debug=None, scene_rule=True, limit=None):
