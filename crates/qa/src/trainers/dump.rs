@@ -715,6 +715,12 @@ fn scene_json(rules: &CompiledRuleset, game: &GameState, sc: &Scene, win: &Windo
     // that lands them (an info-only field; the rows come after the capture spawns, whose indices stay).
     let reinforce_at = pieces.first().and_then(|h| auth.units().get(*h)).map_or(TileId(0), |u| u.core.tile);
     let reinforce: Vec<i32> = sc.reinforce.iter().map(|k| make(*k, sc.enemy, reinforce_at, &mut spawn)).collect();
+    // The camp's spawn (camp families): the barbarians' strongest land unit as a spawn row (info-only; -1 elsewhere).
+    let camp_spawn: i32 = if super::camp::is_camp(sc.fam) {
+        classic_rules::barbarian_unit(auth, rules, sc.enemy, classic_rules::rules::content::Domain::Land).map_or(-1, |k| make(k, sc.enemy, super::camp::camp_tile(sc), &mut spawn))
+    } else {
+        -1
+    };
     let city_list: Vec<Value> = cities
         .iter()
         .map(|t| {
@@ -768,7 +774,7 @@ fn scene_json(rules: &CompiledRuleset, game: &GameState, sc: &Scene, win: &Windo
         "city_counts": city_counts,
         "family": sc.fam.name(), "era": lab::era_names(rules).get(sc.era as usize), "era_index": sc.era, "instance": sc.instance, "attempt": sc.attempt,
         "window": {"q0": win.q0, "r0": win.r0, "w": win.w, "h": win.h, "map_w": win.map_w, "map_h": win.map_h},
-        "tiles": tiles, "profiles": profiles, "cities": city_list, "promotions": promotions, "spawn": spawn, "reinforce": reinforce,
+        "tiles": tiles, "profiles": profiles, "cities": city_list, "promotions": promotions, "spawn": spawn, "reinforce": reinforce, "camp_spawn": camp_spawn,
         "n_mine": sc.mine.len(), "n_theirs": sc.theirs.len(),
         "move_denominator": kernel::world::unit::MOVE_DENOMINATOR,
     })
