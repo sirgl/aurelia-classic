@@ -415,7 +415,8 @@ class Game:
             self.pillaged = self.pillaged | (hot & had[:, None])
             s["pillageable"] = mx.where(hot, 0, s["pillageable"])
             s = sim.set_unit(s, me, pil & had, hp=mx.minimum(g1(s["u_hp"], me) + 25, 100))
-            s = sim.set_unit(s, me, pil, mv=mx.maximum(g1(s["u_mv"], me) - 60, 0))
+            # The pillager acts: its fortification ends (Rust: stance Ready after the pillage; the apply check's raid lines).
+            s = sim.set_unit(s, me, pil, mv=mx.maximum(g1(s["u_mv"], me) - 60, 0), st=mx.zeros(me.shape, dtype=I32))
             self.counts["pillages"] += int(mx.sum(pil).item())
         self.s = s
 
