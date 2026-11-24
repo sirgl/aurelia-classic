@@ -57,8 +57,8 @@ def statics(game):
     role = lambda name: take([[r == name for r in rl] for rl in roles], mx.bool_)
     st = {"code": take(code), "n_pieces": take(n_pieces), "site": take(site), "refuge": take(refuge),
           "civilian": role("civilian"), "raider": role("raider"), "escort": role("escort")}
-    st["any"] = bool(mx.any(st["code"] >= 0).item())
-    st["slots_civ"] = [u for u in range(U) if bool(mx.any(st["civilian"][:, u]).item())]
+    st["any"] = any(c >= 0 for c in code)  # python facts of the plays: building the statics reads nothing from the device
+    st["slots_civ"] = [u for u in range(U) if any(rl[u] == "civilian" for rl in roles)]
     game._civ = st
     game.civ_founded = mx.zeros((game.B,), dtype=mx.bool_)
     return st

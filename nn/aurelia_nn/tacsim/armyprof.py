@@ -46,21 +46,30 @@ def main(argv=None):
     ap.add_argument("--scene-rule", dest="scene_rule", action="store_true", default=True)
     ap.add_argument("--standard", dest="scene_rule", action="store_false", help="Rust ARMY_SCENE_RULE=standard")
     ap.add_argument("--facts", choices=["auto", "on", "off"], default="auto", help="the history's facts log (auto: on for MBN / MBH)")
+    ap.add_argument("--split", choices=["auto", "on", "off"], default="auto", help="one game per family group (`armyplay.Batch`; untimed runs only)")
     ap.add_argument("--out")
     a = ap.parse_args(argv)
     mx.set_memory_limit(16 << 30)
     mx.set_cache_limit(2 << 30)
     brain = Brain(load_net(a.weights))
     plays = A.load(a.dump, limit=a.limit, families=a.families.split(",") if a.families else None)
-    g = P.Game(plays, a.copies, brain, facts=None if a.facts == "auto" else a.facts == "on")
-    g.fort_rule = "old"
-    g.scene_rule = a.scene_rule
-    if a.compile:
-        g.enable_compile()
-    if "mk" in a.legacy:
-        g.legacy = True
-    if "nfo" in a.legacy:
-        g.obs.nfo = None
+    facts = None if a.facts == "auto" else a.facts == "on"
+
+    def setup(g):
+        g.fort_rule = "old"
+        g.scene_rule = a.scene_rule
+        if a.compile:
+            g.enable_compile()
+        if "mk" in a.legacy:
+            g.legacy = True
+        if "nfo" in a.legacy:
+            g.obs.nfo = None
+    if a.untimed:
+        g = P.Batch(plays, a.copies, brain, split=a.split, setup=setup, facts=facts)
+        facts = None
+    else:
+        g = P.Game(plays, a.copies, brain, facts=facts)
+        setup(g)
     acc = collections.Counter()
     if not a.untimed:
         wrap(g.obs, "tokens", acc, "tokens")
@@ -77,14 +86,20 @@ def main(argv=None):
         wrap(g, "enemy_turn", acc, "enemy turn")
     t0 = time.time()
     g.play(a.rounds)
-    wall = time.time() - t0
+    wall_all = time.time() - t0
+    wall = g.seconds if a.untimed else wall_all  # the games' own play time (the batch's builds apart)
     parts = {k: round(v, 3) for k, v in acc.items() if not k.startswith("n ")}
     timed = sum(v for k, v in acc.items() if not k.startswith("n ") and k != "enemy turn")
     res = {"scenes": g.B, "rounds": a.rounds, "wall_s": round(wall, 2), "scene_rounds": g.counts["scene-rounds"],
            "scene_rounds_per_s": round(g.counts["scene-rounds"] / wall, 1), "net_decisions": g.counts["net decisions"],
            "parts_s": parts, "calls": {k[2:]: v for k, v in acc.items() if k.startswith("n ")},
            "host_and_rest_s": round(wall - timed - acc["enemy turn"], 3) if acc else None,
-           "peak_gb": round(mx.get_peak_memory() / 1e9, 2), "facts": g.facts, "notes": brain.notes, "history_read": brain.hist}
+           "peak_gb": round(mx.get_peak_memory() / 1e9, 2), "facts": getattr(g, "facts", None), "notes": brain.notes, "history_read": brain.hist}
+    if a.untimed:
+        res["wall_with_builds_s"] = round(wall_all, 2)
+        res["groups"] = {n: len(ids) for n, ids in g.groups}
+        res["peak_gb_by_group"] = {n: round(v / 1e9, 2) for n, v in g.peak.items()}
+        res["verdict_wins"] = int(mx.sum(g.verdict == 1).item())
     print(json.dumps(res, indent=1))
     if a.out:
         json.dump(res, open(a.out, "w"), indent=1)

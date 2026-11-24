@@ -30,6 +30,7 @@ from . import armyparty
 from . import armyhist as H
 from . import armyobs as A
 from . import armyprice
+from . import armythird
 from . import exact
 from .armyloop import Brain, greedy_pointer, load_net, PER_UNIT
 from .sim import g1, gn, put1, I32, V_NONE, V_FORT, V_SETUP, V_MOVE, V_ATTACK, V_PROMOTE
@@ -986,7 +987,7 @@ class Game:
             armystd.enemy_turn(self, charge_on=self.charge)
         else:
             self.enemy_turn_approx()
-        if not self.third_played and bool(mx.any(live & party).item()):
+        if not self.third_played and armyparty.has_family(self) and bool(mx.any(live & party).item()):
             self.turn_end_economy({1}, live & party)
             self.third_turn(~self.s["done"] & (self.verdict < 0) & party)
 
@@ -1177,7 +1178,87 @@ class Game:
         return self.verdict
 
 
-def run(path, weights, copies=1, families=None, limit=None, rust=None, out=None, group=None, rounds=None, setup=None):
+# ------------------------------------------------------------------------------------------------ the family groups
+# Every family module's pass (`armyrule.field_turn`, `armyfog`, `armyciv`, `armycamp`, `armyparty`, `armyprice`) runs over the
+# whole batch of a game and is masked to its family's rows. In a game of one family group the other groups' passes are skipped
+# (their state is absent); in a game that mixes groups every pass runs on every row, so a mix costs the SUM of the groups'
+# passes at the full batch (line 7: five packages mixed ran at 595 scene-rounds/s, the packages alone at 1 957 - 4 949). Rows are
+# independent, so a mixed batch is played as one game per group (`Batch`, `run`): the same plays, the same results.
+
+GROUPS = (
+    ("party", armythird.THIRD),
+    ("camp", ("camp", "camp-race")),
+    ("civ", ("guard", "convoy", "snipe")),
+    ("fog", ("ambush-fog", "hunt-fog")),
+    ("assault", tuple(sorted(ASSAULT | set(armyprice.ASSAULT)))),
+)
+# Scenes per group below which splitting a batch does not pay: a small batch is bound by kernel launches (about 2 us each), and
+# every game repeats the net's and the simulator's own launches; a large one by the passes' reads of [B, ~100] arrays.
+SPLIT_MIN_SCENES = 4000
+
+
+def family_group(family):
+    """The name of the group of passes the family's scene needs ("plain": none of the family modules)."""
+    for name, fams in GROUPS:
+        if family in fams:
+            return name
+    return "plain"
+
+
+def split_plays(plays):
+    """[(group name, [play indices])] in the order of the groups' first play; one entry when the plays are of one group."""
+    out = collections.OrderedDict()
+    for i, p in enumerate(plays):
+        out.setdefault(family_group(p[0]["play"].split("/")[0]), []).append(i)
+    return list(out.items())
+
+
+def should_split(plays, copies, split="auto"):
+    """Whether `plays` x `copies` are played as one game per group: `split` True / False, or "auto" (more than one group and
+    at least `SPLIT_MIN_SCENES` scenes)."""
+    if split is True or split == "on":
+        return len(split_plays(plays)) > 1
+    if split is False or split == "off":
+        return False
+    return len(split_plays(plays)) > 1 and len(plays) * copies >= SPLIT_MIN_SCENES
+
+
+class Batch:
+    """A batch of plays x copies played as one `Game` per family group (see above), the rows in the order of a single game
+    (row = copy * len(plays) + play). `setup(game)` runs on each game before it plays. Games are built, played and released one
+    after the other, so the peak memory is the largest group's."""
+
+    def __init__(self, plays, copies, brain, split="auto", setup=None, **kw):
+        self.plays, self.copies, self.brain, self.setup, self.kw = plays, copies, brain, setup, kw
+        self.groups = split_plays(plays) if should_split(plays, copies, split) else [("all", list(range(len(plays))))]
+        self.B = len(plays) * copies
+        self.counts = collections.Counter()
+        self.seconds = 0.0
+        self.hist_cmp = collections.Counter()
+        self.verdict = None
+        self.peak = {}
+
+    def play(self, limit_rounds=None):
+        P = len(self.plays)
+        out = [-1] * self.B
+        for name, ids in self.groups:
+            g = Game([self.plays[i] for i in ids], self.copies, self.brain, **self.kw)
+            if self.setup:
+                self.setup(g)
+            v = g.play(limit_rounds).tolist()
+            for r, x in enumerate(v):
+                out[(r // len(ids)) * P + ids[r % len(ids)]] = x
+            self.counts.update(g.counts)
+            self.hist_cmp.update(g.hist_cmp)
+            self.seconds += g.seconds
+            self.peak[name] = mx.get_peak_memory()
+            del g
+            mx.clear_cache()
+        self.verdict = mx.array(out, dtype=I32)
+        return self.verdict
+
+
+def run(path, weights, copies=1, families=None, limit=None, rust=None, out=None, group=None, rounds=None, setup=None, split="auto"):
     brain = Brain(load_net(weights))
     plays = A.load(path, limit=limit, families=families)
     res = {"families": {}, "counts": collections.Counter(), "seconds": 0.0}
@@ -1188,6 +1269,8 @@ def run(path, weights, copies=1, families=None, limit=None, rust=None, out=None,
             era = r["era"]
             rust_w[(r["family"], r["instance"], r["attempt"], era)] = r["win"]
     groups = [plays] if not group else [plays[i:i + group] for i in range(0, len(plays), group)]
+    if not group and should_split(plays, copies, split):
+        groups = [[plays[i] for i in ids] for _, ids in split_plays(plays)]  # one game per family group (`Batch`)
     per = collections.defaultdict(lambda: [0, 0, 0, 0, 0, 0])  # MLX wins, n, Rust wins, same verdict, plays, MLX wins (first copy)
     for gp in groups:
         g = Game(gp, copies, brain)
@@ -1244,6 +1327,7 @@ def main(argv=None):
     ap.add_argument("--families")
     ap.add_argument("--limit", type=int)
     ap.add_argument("--group", type=int)
+    ap.add_argument("--split", choices=["auto", "on", "off"], default="auto", help="one game per family group (auto: more than one group and >= %d scenes)" % SPLIT_MIN_SCENES)
     ap.add_argument("--out")
     ap.add_argument("--rounds", type=int, help="stop after this many rounds (the throughput runs)")
     ap.add_argument("--cpu", action="store_true")
@@ -1271,7 +1355,7 @@ def main(argv=None):
             g.brain.use_rust_memory()
         if a.compile:
             g.enable_compile()
-    res = run(a.dump, a.weights, copies=a.copies, families=a.families.split(",") if a.families else None, limit=a.limit, out=a.out, group=a.group, rounds=a.rounds, setup=setup)
+    res = run(a.dump, a.weights, copies=a.copies, families=a.families.split(",") if a.families else None, limit=a.limit, out=a.out, group=a.group, rounds=a.rounds, setup=setup, split=a.split)
     res["setup"] = {"play_on_cap": a.play_on_cap, "enemy": a.enemy, "old_heal": a.old_heal, "fort": a.fort, "charge": a.charge, "scene_rule": a.scene_rule, "old_judge": a.old_judge}
     if a.out:
         with open(a.out, "w") as fh:

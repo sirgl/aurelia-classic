@@ -17,6 +17,7 @@ import io
 import json
 import re
 import time
+import types
 
 import mlx.core as mx
 from mlx.utils import tree_flatten
@@ -94,6 +95,8 @@ class Probe:
         self.stack = []
         self.st = collections.defaultdict(collections.Counter)
         self.counter = None
+        self.done = set()
+        self.keep = []
 
     def nodes(self, arrs):
         if not arrs:
@@ -121,6 +124,12 @@ class Probe:
         self.nodes(arrs)
 
     def wrap(self, owner, name, label):
+        if isinstance(owner, types.ModuleType) or owner is getattr(self.game, "brain", None):
+            # a module's function or the net, shared by the games of a batch: wrapped once (the owner is kept, so its id stays)
+            if (id(owner), name) in self.done:
+                return
+            self.done.add((id(owner), name))
+            self.keep.append(owner)
         f = getattr(owner, name)
         probe = self
 
@@ -249,6 +258,7 @@ def main(argv=None):
     ap.add_argument("--mode", choices=["wall", "time", "count"], default="time")
     ap.add_argument("--facts", choices=["auto", "on", "off"], default="auto")
     ap.add_argument("--cpu", action="store_true")
+    ap.add_argument("--split", choices=["auto", "on", "off"], default="off", help="one game per family group (`armyplay.Batch`)")
     ap.add_argument("--out")
     a = ap.parse_args(argv)
     if a.cpu:
@@ -258,25 +268,33 @@ def main(argv=None):
     brain = Brain(load_net(a.weights))
     plays = A.load(a.dump, limit=a.limit, families=a.families.split(",") if a.families else None)
     mx.reset_peak_memory()
-    g = P.Game(plays, a.copies, brain, facts=None if a.facts == "auto" else a.facts == "on")
-    g.fort_rule = "old"
-    g.scene_rule = True
-    probe = Probe(g, a.mode)
-    if a.mode != "wall":
-        instrument(g, probe)
-    ctr = SyncCounter(probe.on_sync if a.mode == "count" else None)
+    shared = collections.defaultdict(collections.Counter)
+    ctr = SyncCounter()
+    probe = Probe(None, a.mode)
+    probe.st = shared
     probe.counter = ctr
-    mx.eval(g.s)
+    ctr.on_sync = probe.on_sync if a.mode == "count" else None
+
+    def setup(g):
+        g.fort_rule = "old"
+        g.scene_rule = True
+        probe.game = g
+        if a.mode != "wall":
+            instrument(g, probe)
+        mx.eval(g.s)
+    g = P.Batch(plays, a.copies, brain, split=a.split, setup=setup, facts=None if a.facts == "auto" else a.facts == "on")
     t0 = time.time()
     with ctr:
         v = g.play(a.rounds)
     mx.eval(v)
-    wall = time.time() - t0
+    wall = g.seconds
     run = {"scenes": g.B, "rounds": a.rounds, "mode": a.mode, "wall_s": round(wall, 3), "scene_rounds": g.counts["scene-rounds"],
            "scene_rounds_per_s": round(g.counts["scene-rounds"] / wall, 1), "peak_gb": round(mx.get_peak_memory() / 1e9, 2),
+           "groups": {n: len(ids) for n, ids in g.groups}, "split": a.split, "wall_with_builds_s": round(time.time() - t0, 2),
            "syncs_total": dict(ctr.n), "verdict_sum": int(mx.sum(v).item()), "families": a.families}
     if a.mode != "wall":
         run.update(summarise(probe, wall))
+    run["verdict_wins"] = int(mx.sum(g.verdict == 1).item())
     print(json.dumps({k: run[k] for k in ("scenes", "mode", "wall_s", "scene_rounds_per_s", "peak_gb", "syncs_total")}), flush=True)
     if a.mode != "wall":
         print(table(run, a.rounds))

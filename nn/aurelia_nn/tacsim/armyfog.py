@@ -73,7 +73,7 @@ def statics(game):
     take = lambda v, dt=I32: mx.take(mx.array(v, dtype=dt), game.idx, axis=0)
     st = {"code": take(code), "side": take(side), "hide": take(hide), "step": take(step), "cx": take(cx), "cy": take(cy),
           "n_pieces": take(n_pieces), "ambush": take(ambush, mx.bool_), "civilian": take(civilian, mx.bool_)}
-    st["any"] = bool(mx.any(st["code"] >= 0).item())
+    st["any"] = any(c >= 0 for c in code)  # a python fact of the plays
     game._fog = st
     game.fog_placed = mx.zeros((game.B, U), dtype=mx.bool_)
     game.fog_started = False

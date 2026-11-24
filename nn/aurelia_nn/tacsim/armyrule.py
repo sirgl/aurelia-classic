@@ -476,7 +476,10 @@ def field_turn(game, live, side=1):
     is_assault = getattr(game, "_is_assault", None)
     if is_assault is None:
         from .armyplay import ASSAULT
-        is_assault = game._is_assault = mx.array([f in ASSAULT for f in game.fam])
+        # False: a python fact of the plays, so a game without an assault family reads nothing from the device here
+        is_assault = game._is_assault = mx.array([f in ASSAULT for f in game.fam]) if any(f in ASSAULT for f in game.fam) else False
+    if is_assault is False:
+        return
     fl = mx.any(game.field & is_assault[:, None], axis=0).tolist()
     for u in [k for k in range(U) if fl[k]]:
         me = mx.full((B,), u, dtype=I32)

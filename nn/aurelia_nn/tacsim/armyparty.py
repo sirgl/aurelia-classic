@@ -51,6 +51,16 @@ def active(s):
     return "pty_by" in s
 
 
+def has_family(game, names=THIRD):
+    """Whether any row of the game is one of the families `names`: a python fact of the plays (`game.fam`), so a pass skips a
+    game without the family before any device read (a host sync costs ~108 us, and a game of one family group has no other)."""
+    cache = game.__dict__.setdefault("_has_family", {})
+    key = tuple(names)
+    if key not in cache:
+        cache[key] = any(f in names for f in game.fam)
+    return cache[key]
+
+
 # ------------------------------------------------------------------------------------------------ the relations
 
 FLIP = mx.array([[[False, False, True], [False, False, False], [True, False, False]]])  # the pair learner (0) / third (2)
@@ -289,6 +299,8 @@ def race_turn(game, live):
 def third_turn(game, live):
     """The third seat's turn of the party families: the family's script, then the scene rule's part (`third_rule`), then
     `mark`."""
+    if not has_family(game):
+        return
     rows = live & is_party(game)
     if not bool(mx.any(rows).item()):
         return
@@ -314,6 +326,8 @@ def enemy_turn(game, live, side=1):
     """`third_party::enemy_turn`: the enemy's pieces in order, `unit_turn` (Even) with the targets of ours and, where the third
     is at war with it, the third's. The units hold (neutral-path, ally-siege, closed-borders, spare-friends, capital-race),
     close in (neutral-joins-war; defend-friend: a melee unit goes to the ally's city, a shooter supports)."""
+    if not has_family(game):
+        return
     rows = live & is_party(game)
     if not bool(mx.any(rows).item()):
         return
@@ -396,7 +410,7 @@ def mark(game):
 def judge(game, rel, v):
     """`third_party::judge` of the party rows: the verdict [B] (1 won, 0 lost, -1 on) over `v`."""
     s = game.s
-    if not active(s) or not bool(mx.any(is_party(game)).item()):
+    if not active(s) or not has_family(game):
         return v
     mark(game)
     s = game.s
