@@ -400,7 +400,8 @@ pub struct Exposure<'t, 'v, 'a> {
     threats: &'t Threats<'v, 'a>,
     rules: &'a CompiledRuleset,
     source: Source,
-    pub unit: OwnUnit,
+    /// Private: the answers asked are kept by place and assume the unit never changes in the life of an exposure.
+    unit: OwnUnit,
     pub worth: i32,
     /// The answers given, by the place asked: the threats and the unit do not change in the life of an
     /// exposure, and the search asks the same place again for each of its candidates.
