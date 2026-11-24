@@ -897,6 +897,12 @@ class Obs:
         tq, tr_ = self.mapq(tgt)
         ssp = self.spot(s, fd, me, tq, tr_, tgt)
         first = mx.where(isf(m_side), m_sl, mx.where(isf(c_side), c_sl, -1))
+        if "u_arr" in s:
+            # Rust's first foreign unit of the tile is the one that arrived first (`units_on` keeps the order of arrival).
+            late = 1 << 30
+            a_m = mx.where(isf(m_side), gn(s["u_arr"], mx.maximum(m_sl, 0)), late)
+            a_c = mx.where(isf(c_side), gn(s["u_arr"], mx.maximum(c_sl, 0)), late)
+            first = mx.where(isf(m_side) | isf(c_side), mx.where(a_m <= a_c, m_sl, c_sl), -1)
         fs = mx.maximum(first, 0)
         fk = gn(s["u_kind"], fs)
         fa = [mx.zeros((B, OA), dtype=F32)] * F_ACT
@@ -1141,6 +1147,10 @@ def build_rows(plays, rows, templates=None):
         s["c_maxhp"] = mx.array([[c[1] for c in row] for row in cs0], dtype=I32)
     T = tb.t
     s["pillageable"] = mx.array([[c == "1" for c in (m.get("pillageable") or "0" * T)] for _, m in rows]).astype(I32)
+    # The ancient ruins still standing and the arrival order on the tiles (`armyruin`, `Sim.set_unit`).
+    s["ruin"] = mx.array([[c == "1" for c in (m.get("ruins") or "0" * T)] for _, m in rows]).astype(I32)
+    s["u_arr"] = mx.array([((list(m.get("upos") or []) + list(range(U)))[:U]) for _, m in rows], dtype=I32)
+    s["n_arr"] = mx.full((len(rows),), 1 << 10, dtype=I32)
     s["u_id"] = mx.array(ids, dtype=I32)
     s["u_handle"] = mx.array(handles, dtype=I32)
     if not hasattr(tb, "tables0"):

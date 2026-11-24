@@ -65,7 +65,8 @@ class Game:
         rows = []
         for pi, (sc, ms, _) in enumerate(plays):
             m0 = ms[0] if ms else {"ids": [], "handles": []}
-            row = {"state": sc["initial"], "ids": m0.get("ids", []), "handles": m0.get("handles", []), "pillageable": sc["orders"]["pillageable"]}
+            row = {"state": sc["initial"], "ids": m0.get("ids", []), "handles": m0.get("handles", []), "pillageable": sc["orders"]["pillageable"],
+                   "ruins": sc["orders"].get("ruins")}
             if ms:
                 row.update({k: m0[k] for k in ("wm", "cstr", "upos") if k in m0})
             rows.append((pi, row))

@@ -85,6 +85,11 @@ def as_row(plays, pi, start, by_round, U):
     for k in ("wm", "cstr"):
         if k in m:
             row[k] = m[k]
+    # The ruins and the arrival order at the end of our turn: the round's last moment (the turn end), not its first.
+    last = max((x for x in plays[pi][1] if x["round"] == rnd), key=lambda x: x["step"], default=m)
+    for k in ("ruins", "upos"):
+        if k in last:
+            row[k] = last[k]
     return row
 
 

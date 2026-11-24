@@ -439,7 +439,9 @@ class Sim:
         prev = mx.where(any_stop, g1(path, mx.maximum(first - 1, 0)), gl)
         final_tile = g1(lt, prev)
         final_left = g1(left, prev)
-        return final_tile, final_left
+        # The tiles the unit entered (the start is no entry): for the ruins of `armyruin`.
+        walked = (mx.arange(path.shape[1])[None, :] < mx.where(any_stop, first, path.shape[1])[:, None]) & (path > 0)
+        return final_tile, final_left, gn(lt, path), walked
 
     def path_costs(self, s, side, slot, iters=None, check_every=8):
         """The multi-turn move cost of unit `slot` of `side` to every tile of the map (kernel `astar`'s
@@ -879,6 +881,11 @@ class Sim:
         return exact.unit_damage(me, opp, my_damage, wounded_mod, roll, fast=self.fast).astype(I32)
 
     def set_unit(self, s, slot, where, **vals):
+        if "tile" in vals and "u_arr" in s:
+            # The arrival stamp: Rust lists the units of a tile in the order they came (`units_on`), and the first foreign one
+            # is what a strike's features describe.
+            s["n_arr"] = s["n_arr"] + where.astype(I32)
+            s["u_arr"] = put1(s["u_arr"], slot, s["n_arr"], where)
         for k, v in vals.items():
             s["u_" + k] = put1(s["u_" + k], slot, v if isinstance(v, mx.array) else mx.full(slot.shape, v, dtype=s["u_" + k].dtype), where)
         return s
@@ -924,6 +931,8 @@ class Sim:
         # After a won fight the tile holds no other military unit (its defender is gone): no check.
         ok = where if mil is None else where & ((gn(mil, to[:, None])[:, 0] < 0) | (gn(mil, to[:, None])[:, 0] == slot))
         s = self.set_unit(s, slot, ok, tile=to, mv=mv - cost, st=mx.zeros_like(slot))
+        from . import armyruin
+        s = armyruin.enter(self, s, slot, to, ok)
         return self.refresh_allowance(s, slot, frm, to, ok)
 
     def new_unit(self, s, side, tile, where, hp, mmax, kind, profile_from=None):
@@ -1031,8 +1040,10 @@ class Sim:
         mvv = mvv & (left_t >= 0)
         # (the walk and the attack are the heavy parts: skipped where no row moves or strikes)
         if bool(mx.any(mvv).item()):
-            end_tile, end_left = self.walk(s, slot, mk, tgt, mk["foreign_l"])
+            end_tile, end_left, steps, walked = self.walk(s, slot, mk, tgt, mk["foreign_l"])
             s = self.set_unit(s, slot, mvv, tile=end_tile, mv=mx.maximum(end_left, 0), st=mx.zeros_like(slot))
+            from . import armyruin
+            s = armyruin.enter_path(self, s, slot, steps, walked & mvv[:, None])
             s = self.refresh_allowance(s, slot, tile, end_tile, mvv)
         # Attack.
         atk = take & (verb == V_ATTACK)

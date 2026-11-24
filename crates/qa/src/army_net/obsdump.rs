@@ -154,6 +154,7 @@ pub fn start(rules: &CompiledRuleset, game: &GameState, scene: &Scene, orders: &
         "window": [q0, r0, w, map_w], "far_cities": far, "city_handles": city_handles,
         "promos": track.promos().iter().map(|p| p.0).collect::<Vec<u16>>(),
         "pillageable": pillageable(rules, game, &track),
+        "ruins": ruins(rules, game, &track),
         // The judge's inputs (`families::judge`): the scene's improved tiles (window indices), its context, the pieces.
         "improved": scene.improved.iter().map(|t| track.index(*t)).collect::<Vec<i32>>(),
         "context": scene.context, "n_mine": scene.mine.len(), "family": scene.fam.name(),
@@ -320,6 +321,41 @@ fn pillageable(rules: &CompiledRuleset, game: &GameState, track: &Track) -> Stri
         .collect()
 }
 
+/// Per window tile: the ancient ruins still there (an AI unit that enters their tile takes the reward and they are gone).
+fn ruins(rules: &CompiledRuleset, game: &GameState, track: &Track) -> String {
+    let map = game.view().auth.map();
+    let (q0, r0, w, map_w) = track.window();
+    (0..w * w)
+        .map(|i| {
+            let (q, r) = (q0 + i % w, r0 + i / w);
+            if q >= map_w || r * map_w + q < 0 || (r * map_w + q) as usize >= map.tile_count() {
+                return '0';
+            }
+            let t = classic_rules::ids::TileId((r * map_w + q) as u32);
+            let is_ruins = map
+                .working_improvement(t)
+                .and_then(|imp| rules.improvements.get(imp.0 as usize))
+                .is_some_and(|d| matches!(d.kind, classic_rules::rules::content::ImprovementKind::AncientRuins));
+            if is_ruins { '1' } else { '0' }
+        })
+        .collect()
+}
+
+/// Per unit slot: its place in the tile's unit list (`units_on`; -1 none). The strike features read the FIRST foreign unit of
+/// a tile in that list, which is the one that arrived there first.
+fn tile_places(game: &GameState, ids: &[u64]) -> Vec<i64> {
+    let auth = game.view().auth;
+    ids.iter()
+        .map(|i| {
+            auth.units()
+                .iter_handles()
+                .find(|(_, c)| c.id.0 == *i)
+                .and_then(|(h, c)| auth.indexes().units_on(c.tile).iter().position(|x| *x == h))
+                .map_or(-1, |p| p as i64)
+        })
+        .collect()
+}
+
 /// A decision moment of the net (before its pick): the state and what the builder made of it.
 #[allow(clippy::too_many_arguments)]
 pub fn moment(rules: &CompiledRuleset, game: &GameState, orders: &Orders, tokens: &Tokens, slots: &[i16], step: u32, made: &[(kernel::ids::EntityId, u32)]) {
@@ -386,7 +422,7 @@ pub fn moment(rules: &CompiledRuleset, game: &GameState, orders: &Orders, tokens
         let made: Vec<Value> = made.iter().filter_map(|(id, k)| play.track.ids().iter().position(|x| x == id).map(|s| json!([s, k]))).collect();
         play.moment = Some(json!({
             "type": "moment", "play": play.name, "round": auth.turn().round, "step": step, "state": state, "ids": ids, "maptile": maptile,
-            "handles": handles, "prev": prev, "made": made, "wm": wm, "war": war, "pillageable": pill, "cstr": cstr,
+            "handles": handles, "prev": prev, "made": made, "wm": wm, "war": war, "pillageable": pill, "ruins": ruins(rules, game, &play.track), "upos": tile_places(game, &ids), "cstr": cstr,
             "tok": {"n": n, "feat": hex16(&feat), "dist": dist, "pos": tokens.pos, "tile": tokens.tile.iter().map(|t| t.0).collect::<Vec<u32>>(), "slot": slots, "ref": refs},
             "cands": cands,
             // The history tokens the net reads (MBH; every net's tokens carry them): numbers (f16 bits), army slots, ages.
