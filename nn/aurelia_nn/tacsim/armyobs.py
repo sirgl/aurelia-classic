@@ -966,9 +966,16 @@ def stream(path, limit=None, families=None, group=40, every=1):
     n = 0
     import gzip
     with (gzip.open(path, "rt") if str(path).endswith(".gz") else open(path)) as fh:
+        cur = None
         for line in fh:
             d = json.loads(line)
+            if d["type"] == "ev":
+                # The event lines (`ARMY_OBS_EVENTS`) of the play whose scene line came last: kept on the scene.
+                if cur in plays:
+                    plays[cur][0].setdefault("events", []).append(d)
+                continue
             name = d["play"]
+            cur = name
             if families and name.split("/")[0] not in families:
                 continue
             if d["type"] == "scene":

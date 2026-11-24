@@ -814,6 +814,11 @@ impl Track {
         self.win.index(t).unwrap_or(-1)
     }
 
+    /// The scene side of a player: 0 the learner, 1 the enemy, -1 another.
+    pub fn side_of(&self, p: PlayerId) -> i64 {
+        self.sides.iter().position(|s| *s == p).map_or(-1, |i| i as i64)
+    }
+
     /// The window's cities (map tiles, in the scene's city order).
     pub fn cities(&self) -> &[TileId] {
         &self.cities

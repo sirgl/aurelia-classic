@@ -27,6 +27,8 @@ struct Play {
     track: Track,
     lines: Vec<String>,
     moment: Option<Value>,
+    /// The units and cities at the last event (`ARMY_OBS_EVENTS`): an event writes what changed since.
+    last: Option<(Vec<Value>, Vec<Value>)>,
 }
 
 thread_local! {
@@ -95,7 +97,89 @@ pub fn start(rules: &CompiledRuleset, game: &GameState, scene: &Scene, orders: &
         "deadline": scene.deadline,
     });
     let line = json!({"type": "scene", "play": name, "scene": sc, "initial": initial, "orders": o, "kinds": kinds});
-    PLAY.with(|p| *p.borrow_mut() = Some(Play { name, track, lines: vec![line.to_string()], moment: None }));
+    PLAY.with(|p| *p.borrow_mut() = Some(Play { name, track, lines: vec![line.to_string()], moment: None, last: Some(units_cities(&initial)) }));
+}
+
+fn units_cities(state: &Value) -> (Vec<Value>, Vec<Value>) {
+    (state["units"].as_array().cloned().unwrap_or_default(), state["cities"].as_array().cloned().unwrap_or_default())
+}
+
+/// The events beside the dump (`ARMY_OBS_EVENTS=1` with `ARMY_OBS_DUMP`): every command a seat of the scene
+/// executes, whoever issues it (the net or a family script through `act`, the seat's AI mind through the driver),
+/// and each turn's end, with what it changed. A MEASUREMENT: it reads the game and changes nothing.
+pub fn events_wanted() -> bool {
+    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ON.get_or_init(|| wanted() && std::env::var_os("ARMY_OBS_EVENTS").is_some())
+}
+
+/// One event: `src` who issued it ("act": the net or a family script; "mind": the seat's AI; "end": the turn's end),
+/// the command (its name, the acting unit's slot or the city's index, the target's window tile), and the units
+/// (`[slot, state record]`) and cities (`[index, record]`) that changed.
+pub fn event(rules: &CompiledRuleset, game: &GameState, side: classic_rules::ids::PlayerId, src: &str, cmd: Option<&classic_rules::Command>) {
+    if !events_wanted() {
+        return;
+    }
+    PLAY.with(|p| {
+        let mut p = p.borrow_mut();
+        let Some(play) = p.as_mut() else { return };
+        let auth = game.view().auth;
+        let state = play.track.state(rules, game);
+        let (units, cities) = units_cities(&state);
+        let (lu, lc) = play.last.take().unwrap_or_default();
+        let du: Vec<Value> = units.iter().enumerate().filter(|(k, u)| lu.get(*k) != Some(*u)).map(|(k, u)| json!([k, u])).collect();
+        let dc: Vec<Value> = cities.iter().enumerate().filter(|(k, c)| lc.get(*k) != Some(*c)).map(|(k, c)| json!([k, c])).collect();
+        play.last = Some((units, cities));
+        use classic_rules::Command as C;
+        let (name, who, tgt) = match cmd {
+            None => ("End".to_owned(), -1i64, -1i64),
+            Some(c) => {
+                let name: String = format!("{c:?}").chars().take_while(|ch| ch.is_alphanumeric()).collect();
+                let slot_of = |h: classic_rules::ids::UnitHandle| auth.units().get(h).and_then(|u| play.track.ids().iter().position(|x| *x == u.core.id)).map_or(-2, |s| s as i64);
+                let city_of = |h: classic_rules::ids::CityHandle| auth.cities().get(h).and_then(|c| play.track.cities().iter().position(|t| *t == c.tile)).map_or(-2, |s| s as i64);
+                let win = |t: classic_rules::ids::TileId| i64::from(play.track.index(t));
+                let who = match *c {
+                    C::CityStrike { city, .. } => city_of(city),
+                    _ => classic_rules::knowledge::actions::acting_unit(c).map_or(-1, slot_of),
+                };
+                let tgt = match *c {
+                    C::MoveUnit { destination, .. } | C::MarchTo { destination, .. } => win(destination),
+                    C::AttackUnit { defender, .. } => auth.units().get(defender).map_or(-2, |u| win(u.core.tile)),
+                    C::AttackCity { city, .. } => auth.cities().get(city).map_or(-2, |x| win(x.tile)),
+                    C::RangedAttack { target, .. } | C::CityStrike { target, .. } => win(target),
+                    _ => -1,
+                };
+                (name, who, tgt)
+            }
+        };
+        let rel = play.track.side_of(side);
+        play.lines.push(json!({"type": "ev", "round": auth.turn().round, "side": rel, "src": src, "cmd": name, "who": who, "tgt": tgt, "u": du, "c": dc, "rng": state["rng"], "vis": state["vis"]}).to_string());
+    });
+}
+
+/// `AiDriver::step` for a seat that is not recorded, with its commands and turn end as events.
+pub fn step<P: kernel::ai::mind::AiMind<classic_rules::classic::Classic>>(driver: &mut kernel::ai::driver::AiDriver<classic_rules::classic::Classic, P>, game: &mut GameState, rules: &CompiledRuleset) -> kernel::ai::StepOutcome {
+    use kernel::ai::{Advance, StepOutcome};
+    driver.configure_game(game);
+    match driver.advance(game, rules) {
+        Advance::Worked => StepOutcome::Worked,
+        Advance::RoundDone => StepOutcome::RoundDone,
+        Advance::Waiting => StepOutcome::Waiting,
+        Advance::Command(command) => {
+            let side = game.view().auth.active_player();
+            let seen = command.clone();
+            let result = game.execute(rules, command);
+            if result.is_ok() {
+                event(rules, game, side, "mind", Some(&seen));
+            }
+            driver.executed(result)
+        }
+        Advance::EndTurn(command) => {
+            let side = game.view().auth.active_player();
+            let result = game.execute(rules, command);
+            event(rules, game, side, "end", None);
+            driver.executed(result)
+        }
+    }
 }
 
 fn action_of(rules: &CompiledRuleset, game: &GameState, track: &mut Track, c: &Candidate) -> Value {

@@ -377,16 +377,22 @@ pub fn step<P: kernel::ai::mind::AiMind<Classic>>(driver: &mut AiDriver<Classic,
             let side = game.view().auth.active_player();
             let pending = before(game, rules, side, &command);
             let fact = observe::log_before(game, rules, side, &command);
+            let seen = super::obsdump::events_wanted().then(|| command.clone());
             let result = game.execute(rules, command);
             observe::log_after(game, rules, fact, result.is_ok());
             after(game, pending, result.is_ok());
+            if let (Some(c), true) = (seen, result.is_ok()) {
+                super::obsdump::event(rules, game, side, "mind", Some(&c));
+            }
             driver.executed(result)
         }
         Advance::EndTurn(command) => {
             super::seat::turn_end(game, rules);
             observe::note_turn_end(game, rules);
             end_turn(game, rules);
+            let side = game.view().auth.active_player();
             let result = game.execute(rules, command);
+            super::obsdump::event(rules, game, side, "end", None);
             driver.executed(result)
         }
     }

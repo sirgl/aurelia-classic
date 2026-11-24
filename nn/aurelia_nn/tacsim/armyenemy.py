@@ -1,0 +1,171 @@
+"""The enemy's turn and the end of ours in MLX against Rust, forced: each turn starts from the Rust state.
+
+    python -m aurelia_nn.tacsim.armyenemy DUMP.jsonl --weights RUN/weights.safetensors [--families F,..] [--rule NAME]
+
+The dump carries the events (`ARMY_OBS_EVENTS`): every command of both seats with what it changed, and each turn's
+end. From them the state of every play is rebuilt event by event. Two forced checks, each over all plays' turns in one
+batch:
+
+- the enemy's turn: from the Rust state after our turn's end, `Game.enemy_turn` (the enemy's commands and the end of
+  its turn) against the Rust state after the enemy's turn's end;
+- the end of our turn: from the Rust state after the net's last command, the seat's rule for our army units (the
+  fortify that the seat's AI mind gives them after the net) against the Rust state before our turn's end.
+
+Compared: every slot's life, tile and hit points, every window city's damage (and, for our turn's end, the stance).
+Reported per family: the turns compared, the turns equal, and the first difference's class.
+"""
+
+import argparse
+import collections
+import json
+import time
+
+import mlx.core as mx
+
+from . import armyobs as A
+from . import armyplay as P
+from .armyloop import Brain, load_net
+
+
+def rebuild(sc):
+    """The play's events with the units and cities after each (lists of records)."""
+    units = [list(u) for u in sc["initial"]["units"]]
+    cities = [list(c) for c in sc["initial"]["cities"]]
+    out = []
+    for e in sc.get("events", []):
+        for k, u in e["u"]:
+            while len(units) <= k:
+                units.append([0, -1, 0, 0, 0, 0, 0, 0, -1, -1, 0, "", 0])
+            units[k] = list(u)
+        for k, c in e["c"]:
+            cities[k] = list(c)
+        out.append((e, [list(u) for u in units], [list(c) for c in cities]))
+    return out
+
+
+def turn_rows(plays, which):
+    """Forced rows: (play index, row before, record after, round). `which`: "enemy" (after our end -> after the
+    enemy's end) or "ours" (after the net's last command -> before our end)."""
+    rows = []
+    for pi, (sc, ms, _) in enumerate(plays):
+        by_round = {}
+        for m in ms:
+            by_round.setdefault(m["round"], m)
+        st = rebuild(sc)
+        U = None
+        for i, (e, units, cities) in enumerate(st):
+            if which == "enemy" and e["side"] == 0 and e["src"] == "end":
+                start = (units, cities, e["rng"], e["round"])
+                # The enemy's turn end that follows.
+                for e2, u2, c2 in st[i + 1:]:
+                    if e2["side"] == 1 and e2["src"] == "end":
+                        rows.append((pi, start, (u2, c2), by_round))
+                        break
+            if which == "ours" and e["side"] == 0 and e["src"] == "end":
+                # The last event of the net (src act) before this end, else the turn's start.
+                j = i - 1
+                while j >= 0 and st[j][0]["side"] == 0 and st[j][0]["src"] == "mind":
+                    j -= 1
+                if j >= 0 and st[j][0]["side"] == 0 and st[j][0]["src"] == "act":
+                    pe, pu, pc = st[j]
+                    rows.append((pi, (pu, pc, pe["rng"], pe["round"]), (st[i - 1][1], st[i - 1][2]), by_round))
+    return rows
+
+
+def as_row(plays, pi, start, by_round, U):
+    units, cities, rng, rnd = start
+    m = by_round.get(rnd) or min(by_round.values(), key=lambda x: abs(x["round"] - rnd))
+    state = {"units": [u for u in units[:U]], "cities": cities, "rng": rng, "owner": m["state"]["owner"]}
+    row = {"state": state, "ids": m.get("ids", []), "handles": m.get("handles", []), "pillageable": m.get("pillageable") or plays[pi][0]["orders"]["pillageable"]}
+    for k in ("wm", "cstr"):
+        if k in m:
+            row[k] = m[k]
+    return row
+
+
+def compare(g, rows, which, counts, show, ex):
+    s = g.s
+    al, tl, hp, st = s["u_alive"].tolist(), s["u_tile"].tolist(), s["u_hp"].tolist(), s["u_st"].tolist()
+    dmg = s["c_dmg"].tolist()
+    side = s["u_side"].tolist()
+    for b, (pi, start, after, _) in enumerate(rows):
+        fam = g.fam[b]
+        u2, c2 = after
+        first = None
+        for k, u in enumerate(u2[:g.U]):
+            who = "enemy" if (u[8] if u[0] else side[b][k]) == 1 else "our"
+            if (u[0] == 1) != bool(al[b][k]):
+                first = first or f"{who} unit alive/dead"
+            elif u[0] and u[1] != tl[b][k]:
+                first = first or f"{who} unit's tile"
+            elif u[0] and u[2] != hp[b][k]:
+                first = first or f"{who} unit's hp"
+            elif u[0] and which == "ours" and (u[6] in (1, 2)) != (st[b][k] in (1, 2)):
+                first = first or f"{who} unit's fortify"
+        if first is None and any(c[1] != dmg[b][k] for k, c in enumerate(c2)):
+            first = "city damage"
+        counts[(fam, "turns")] += 1
+        if first is None:
+            counts[(fam, "equal")] += 1
+        else:
+            counts[(fam, first)] += 1
+            if len(ex[fam]) < show:
+                ex[fam].append(f"{g.plays[pi][0]['play']} r{start[3]}: {first}")
+
+
+def run(path, weights, families=None, which="enemy", show=3, out=None, group=400, rule="std", charge=False):
+    brain = Brain(load_net(weights))
+    counts = collections.Counter()
+    ex = collections.defaultdict(list)
+    t0 = time.time()
+    for gp in A.stream(path, families=families, group=group):
+        rows = turn_rows(gp, which)
+        if not rows:
+            continue
+        tb = A.build_templates(gp)[0]
+        U = tb.u
+        forced = [(pi, as_row(gp, pi, start, br, U)) for pi, start, _, br in rows]
+        g = P.Game(gp, 1, brain, forced=forced)
+        g.enemy_rule = rule
+        g.charge = charge
+        g.rel_now = mx.array([st[3] - gp[pi][0]["orders"]["start_round"] for pi, st, _, _ in rows], dtype=mx.int32)
+        if which == "enemy":
+            g.enemy_turn()
+        else:
+            g.our_turn_end(mx.ones((g.B,), dtype=mx.bool_))
+        mx.eval(g.s)
+        compare(g, rows, which, counts, show, ex)
+    res = {"check": which, "rule": rule, "charge": charge, "seconds": round(time.time() - t0, 1), "families": {}}
+    fams = sorted({f for f, _ in counts})
+    for f in fams:
+        n = counts[(f, "turns")]
+        res["families"][f] = {"turns": n, "equal": counts[(f, "equal")], "share": round(counts[(f, "equal")] / max(n, 1), 3),
+                              "first differences": {k: v for (ff, k), v in sorted(counts.items(), key=lambda x: -x[1]) if ff == f and k not in ("turns", "equal")},
+                              "examples": ex[f]}
+    n = sum(counts[(f, "turns")] for f in fams)
+    e = sum(counts[(f, "equal")] for f in fams)
+    res["total"] = {"turns": n, "equal": e, "share": round(e / max(n, 1), 3)}
+    print(json.dumps(res, indent=1))
+    if out:
+        json.dump(res, open(out, "w"), indent=1)
+    return res
+
+
+def main(argv=None):
+    ap = argparse.ArgumentParser()
+    ap.add_argument("dump")
+    ap.add_argument("--weights", required=True)
+    ap.add_argument("--families")
+    ap.add_argument("--which", default="enemy", choices=["enemy", "ours"])
+    ap.add_argument("--group", type=int, default=400)
+    ap.add_argument("--out")
+    ap.add_argument("--rule", default="std", choices=["std", "approx"])
+    ap.add_argument("--charge", action="store_true")
+    a = ap.parse_args(argv)
+    mx.set_memory_limit(16 << 30)
+    mx.set_cache_limit(2 << 30)
+    run(a.dump, a.weights, families=a.families.split(",") if a.families else None, which=a.which, out=a.out, group=a.group, rule=a.rule, charge=a.charge)
+
+
+if __name__ == "__main__":
+    main()

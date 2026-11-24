@@ -416,7 +416,13 @@ fn play_on<P: kernel::ai::mind::AiMind<Classic>>(rules: &CompiledRuleset, mut ga
             let t_step = std::time::Instant::now();
             // The recorder and the army net's memory (its turn-end hook) see the learner's commands through `record::step`
             // (`AiDriver::step` with hooks; the same commands).
-            let stepped = if active == scene.learner && (crate::army_net::record::active() || seat == Seat::Net) { crate::army_net::record::step(&mut driver, &mut game, rules) } else { driver.step(&mut game, rules) };
+            let stepped = if active == scene.learner && (crate::army_net::record::active() || seat == Seat::Net) {
+                crate::army_net::record::step(&mut driver, &mut game, rules)
+            } else if crate::army_net::obsdump::events_wanted() {
+                crate::army_net::obsdump::step(&mut driver, &mut game, rules)
+            } else {
+                driver.step(&mut game, rules)
+            };
             PROF[0].fetch_add(t_step.elapsed().as_micros() as u64, std::sync::atomic::Ordering::Relaxed);
             if active == scene.learner {
                 learner_us += t_step.elapsed().as_micros() as u64;
@@ -433,6 +439,7 @@ fn play_on<P: kernel::ai::mind::AiMind<Classic>>(rules: &CompiledRuleset, mut ga
         }
         let t_c = std::time::Instant::now();
         close_arena(rules, &mut game, &scene);
+        crate::army_net::obsdump::event(rules, &game, scene.enemy, "arena", None);
         PROF[2].fetch_add(t_c.elapsed().as_micros() as u64, std::sync::atomic::Ordering::Relaxed);
         let rel = game.view().auth.turn().round.saturating_sub(round0);
         verdict = families::judge(rules, &game, &mut scene, rel);

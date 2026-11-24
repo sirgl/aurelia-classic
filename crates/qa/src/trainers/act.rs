@@ -45,8 +45,12 @@ pub fn try_cmd(game: &mut GameState, rules: &CompiledRuleset, side: PlayerId, cm
 fn execute(game: &mut GameState, rules: &CompiledRuleset, side: PlayerId, cmd: Command) -> bool {
     let pending = crate::army_net::record::before(game, rules, side, &cmd);
     let fact = crate::army_net::observe::log_before(game, rules, side, &cmd);
+    let seen = crate::army_net::obsdump::events_wanted().then(|| cmd.clone());
     let ok = game.execute(rules, cmd).is_ok();
     crate::army_net::observe::log_after(game, rules, fact, ok);
+    if let (Some(c), true) = (seen, ok) {
+        crate::army_net::obsdump::event(rules, game, side, "act", Some(&c));
+    }
     crate::army_net::record::after(game, pending, ok);
     ok
 }

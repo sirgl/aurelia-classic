@@ -37,7 +37,9 @@ ASSAULT = {"assault-heal", "promotion-choice", "hill-archers", "city-fire", "pla
 class Game:
     """A batch of scene copies played on the device."""
 
-    def __init__(self, plays, copies, brain, seed=1):
+    def __init__(self, plays, copies, brain, seed=1, forced=None):
+        """`forced`: [(play index, moment-like row)] instead of each play's initial state (the forced checks: the
+        Rust state at a turn's start, one row each); then `copies` is ignored."""
         self.plays = plays
         P = len(plays)
         self.brain = brain
@@ -49,13 +51,19 @@ class Game:
                 row.update({k: m0[k] for k in ("wm", "cstr") if k in m0})
             rows.append((pi, row))
         self.templates = A.build_templates(plays)
-        idx = [i % P for i in range(P * copies)]
+        if forced is None:
+            idx = [i % P for i in range(P * copies)]
+            picked = [rows[i] for i in idx]
+        else:
+            idx = [pi for pi, _ in forced]
+            picked = list(forced)
         self.B = len(idx)
-        _, self.sim, s, self.tab = A.build_rows(plays, [rows[i] for i in idx], self.templates)
+        _, self.sim, s, self.tab = A.build_rows(plays, picked, self.templates)
         self.idx = mx.array(idx, dtype=I32)
-        # Each copy its own combat stream (the first copy keeps Rust's).
-        salt = (mx.arange(self.B).astype(mx.uint64) // P) * 0x2545F4914F6CDD1D
-        s["rng"] = s["rng"] ^ salt
+        if forced is None:
+            # Each copy its own combat stream (the first copy keeps Rust's).
+            salt = (mx.arange(self.B).astype(mx.uint64) // P) * 0x2545F4914F6CDD1D
+            s["rng"] = s["rng"] ^ salt
         U = s["u_alive"].shape[1]
         s["u_far"] = mx.zeros((self.B, U), dtype=mx.bool_)
         s["u_fq"] = mx.zeros((self.B, U), dtype=I32)
@@ -116,6 +124,9 @@ class Game:
         self.city_low = mx.zeros((self.B,), dtype=mx.bool_)
         self.cap_broken = mx.zeros((self.B,), dtype=mx.bool_)
         self.counts = collections.Counter()
+        self.enemy_rule = "std"
+        self.charge = False
+        self.build_walks(plays, idx, U)
 
     # -------------------------------------------------------------- the economy's schedule
 
@@ -200,18 +211,10 @@ class Game:
             self.counts["net decisions"] += n_act
         self.counts["net turns"] += int(mx.sum(~s["done"] & (self.verdict < 0)).item())
         self.compare_turn(rel, trace)
-        # Every army unit stands; the memory steps on the turn's last tokens.
+        # Every army unit stands, the seat's mind ends our turn; the memory steps on the turn's last tokens.
         live = ~s["done"] & (self.verdict < 0)
-        s["u_mv"] = mx.where(army & (s["u_side"] == 0) & live[:, None], 0, s["u_mv"])
-        # The seat's mind then fortifies army units (the AI's planner `hold`: in the Rust plays a melee unit mostly, a
-        # ranged one mostly only next to a foe; measured on the dump, not a port): `Sim.masks`'s fortify condition.
-        water = self.sim.mg("water", s["u_tile"]) > 0
-        fd = self.obs.field(s, 0)
-        d = A.hexd(fd["uq"][:, :, None] - fd["uq"][:, None, :], fd["ur"][:, :, None] - fd["ur"][:, None, :])
-        near = A.min_or(fd["foes"][:, None, :], d, 2, 99)
-        can_fort = s["u_alive"] & (s["u_tile"] >= 0) & (s["u_side"] == 0) & army & live[:, None] & ~((s["u_st"] == 1) | (s["u_st"] == 2)) \
-            & ~s["p_civilian"] & ~s["p_no_defensive_bonus"] & s["p_land"] & ~water & (~s["p_is_ranged"] | (near <= 1))
-        s["u_st"] = mx.where(can_fort, 1, s["u_st"])
+        self.our_turn_end(live)
+        s = self.s
         tok = self.tokens(rel)
         h = brain.body(tok, self.um, self.pm, self.M, self.price)
         um2, pm2, al2 = brain.step(h, tok, self.um, self.pm, self.alive)
@@ -219,6 +222,23 @@ class Game:
         self.pm = mx.where(live[:, None, None], pm2, self.pm)
         self.alive = mx.where(live[:, None], al2, self.alive)
         self.s = self.sim.end_turn(s, mx.zeros((B,), dtype=I32), live)
+
+    def our_turn_end(self, live):
+        """The end of the net's turn: every army unit stands (`act::stand`: no moves left), then the seat's AI mind
+        fortifies some of them (`planner_units::hold` through its decision tree)."""
+        s = self.s
+        army = self.tab.t["army"] >= 0
+        s["u_mv"] = mx.where(army & (s["u_side"] == 0) & live[:, None], 0, s["u_mv"])
+        # The rule measured on the dump (not a port): a melee unit, a ranged one only next to a foe; `Sim.masks`'s
+        # fortify condition.
+        water = self.sim.mg("water", s["u_tile"]) > 0
+        fd = self.obs.field(s, 0)
+        d = A.hexd(fd["uq"][:, :, None] - fd["uq"][:, None, :], fd["ur"][:, :, None] - fd["ur"][:, None, :])
+        near = A.min_or(fd["foes"][:, None, :], d, 2, 99)
+        can_fort = s["u_alive"] & (s["u_tile"] >= 0) & (s["u_side"] == 0) & army & live[:, None] & ~((s["u_st"] == 1) | (s["u_st"] == 2)) \
+            & ~s["p_civilian"] & ~s["p_no_defensive_bonus"] & s["p_land"] & ~water & (~s["p_is_ranged"] | (near <= 1))
+        s["u_st"] = mx.where(can_fort, 1, s["u_st"])
+        self.s = s
 
     def rust_turn(self, pi, rel):
         r = self.plays[pi][0]["orders"]["start_round"] + rel
@@ -312,6 +332,91 @@ class Game:
             self.counts["pillages"] += int(mx.sum(pil).item())
         self.s = s
 
+    # -------------------------------------------------------------- the enemy's marches (a schedule)
+
+    def build_walks(self, plays, idx, U):
+        """The enemy's units that stand outside its cities at the scene's start and are not the family script's: the
+        seat's AI marches them off (operations, tasks of the empire; they never strike in the dumps). Their tile after
+        each enemy turn comes from the Rust play's events (`ARMY_OBS_EVENTS`), by the round from the scene's start."""
+        R = 1 + max(p[0]["orders"]["rounds"] for p in plays) + 2
+        walk, walker = [], []
+        for sc, _, _ in plays:
+            roles = sc["orders"]["roles"]
+            ctiles = {c["tile"] for c in sc["scene"]["cities"]}
+            init = sc["initial"]["units"]
+            w = [k < len(init) and init[k][0] == 1 and init[k][8] == 1 and init[k][1] not in ctiles and (roles[k] if k < len(roles) else "") != "field" for k in range(U)]
+            walker.append(w)
+            sched = [[-1] * U for _ in range(R)]
+            units = [list(u) for u in init]
+            r0 = sc["orders"]["start_round"]
+            for e in sc.get("events", []):
+                for k, u in e["u"]:
+                    while len(units) <= k:
+                        units.append([0, -1])
+                    units[k] = u
+                if e["side"] == 1 and e["src"] == "end":
+                    rel = e["round"] - r0 - 1
+                    if 0 <= rel < R:
+                        sched[rel] = [units[k][1] if k < len(units) and w[k] and units[k][0] == 1 else -1 for k in range(U)]
+            walk.append(sched)
+        self.walker = mx.take(mx.array(walker), self.idx, axis=0)
+        self.walks = mx.take(mx.array(walk, dtype=I32), self.idx, axis=0)  # [B, R, U]
+        self.has_walks = any(any(w) for w in walker) and all("events" in p[0] for p in plays)
+        self.rel_now = mx.zeros((self.B,), dtype=I32)
+
+    def walk_to(self, me):
+        """The marching unit's tile after this enemy turn in the Rust play (-1: unknown, it stays)."""
+        R = self.walks.shape[1]
+        r = mx.clip(self.rel_now, 0, R - 1)
+        row = mx.take_along_axis(self.walks, mx.broadcast_to(r[:, None, None], (self.B, 1, self.U)), axis=1)[:, 0]
+        return mx.where(self.has_walks, g1(row, me), -1)
+
+    def field_script(self, live):
+        """The family script of the assault families (`assault::enemy_turn`): each field unit's `act::unit_turn`,
+        Close (melee) or Support (ranged) at even odds: strike from where it stands, else close in and strike."""
+        s, sim = self.s, self.sim
+        B, U, side = self.B, self.U, 1
+        sd = mx.full((B,), side, dtype=I32)
+        is_assault = mx.array([f in ASSAULT for f in self.fam])
+        for u in range(U):
+            me = mx.full((B,), u, dtype=I32)
+            s = self.s
+            mine = live & is_assault & g1(self.field, me) & g1(s["u_alive"], me) & (g1(s["u_side"], me) == side) & (g1(s["u_tile"], me) >= 0)
+            if not bool(mx.any(mine).item()):
+                continue
+            ok, t = self.best_blow(me, side)
+            hit = mine & ok
+            if bool(mx.any(hit).item()):
+                mk = sim.masks(self.s, sd, me)
+                self.s = sim.apply_unit(self.s, sd, me, mx.full((B,), V_ATTACK, dtype=I32), t, mk, hit)
+            fld = mine & ~hit
+            if bool(mx.any(fld).item()):
+                s = self.s
+                mk = sim.masks(s, sd, me)
+                fd = self.obs.field(s, side)
+                lq, lr = self.obs.mapq(mk["lt"])
+                d = A.hexd(lq[:, :, None] - fd["uq"][:, None, :], lr[:, :, None] - fd["ur"][:, None, :])
+                near = A.min_or(fd["foes"][:, None, :], d, 2, 99)
+                rng = g1(self.obs.kind(s, "range"), me)
+                want = mx.where((rng >= 0)[:, None], mx.abs(near - rng[:, None]), mx.maximum(near - 1, 0))
+                key = mx.where(mk["move_l"], want * 1000 - self.obs.defence(s, mk["lt"], 1), 1 << 30)
+                j = A.first_index_eq(key, mx.min(key, axis=1))
+                go = fld & (mx.min(key, axis=1) < (1 << 30))
+                tile = mx.take_along_axis(mk["lt"], j[:, None], axis=1)[:, 0]
+                self.s = sim.apply_unit(s, sd, me, mx.full((B,), V_MOVE, dtype=I32), tile, mk, go)
+                ok2, t2 = self.best_blow(me, side)
+                hit2 = go & ok2
+                if bool(mx.any(hit2).item()):
+                    mk = sim.masks(self.s, sd, me)
+                    self.s = sim.apply_unit(self.s, sd, me, mx.full((B,), V_ATTACK, dtype=I32), t2, mk, hit2)
+
+    def enemy_turn(self):
+        if self.enemy_rule == "std":
+            from . import armystd
+            armystd.enemy_turn(self, charge_on=self.charge)
+        else:
+            self.enemy_turn_approx()
+
     # -------------------------------------------------------------- the enemy: the simulator's script
 
     def best_blow(self, me, side):
@@ -343,7 +448,7 @@ class Game:
     def geo_(self):
         return self.sim.geo
 
-    def enemy_turn(self):
+    def enemy_turn_approx(self):
         s, sim = self.s, self.sim
         B, U = self.B, self.U
         side = 1
@@ -462,6 +567,7 @@ class Game:
                 break
             self.counts["scene-rounds"] += int(mx.sum((self.verdict < 0) & ~self.s["done"]).item())
             self.schedule(rel)
+            self.rel_now = mx.full((self.B,), rel, dtype=I32)
             ta = time.time()
             self.learner_turn(rel)
             mx.eval(self.s)
