@@ -766,14 +766,20 @@ class Obs:
         # The best blow from each destination over the foes (and the foe cities) in reach of it.
         rng_k = g1(self.kind(s, "range"), me)
         reach = mx.where(rng_k >= 0, rng_k, 1)
-        foes = fd["foes"]
-        dlf = hexd(lq[:, :, None] - fd["uq"][:, None, :], lr[:, :, None] - fd["ur"][:, None, :])  # [B, L, U]
+        # Only the foes' slots (the most any row has), not every slot: the pairs are [B, L, NF].
+        foes_all = fd["foes"]
+        NFo = max(1, int(mx.max(mx.sum(foes_all, axis=1)).item()))
+        fidx = mx.argsort(mx.where(foes_all, 0, 1) * U + mx.arange(U)[None, :], axis=1)[:, :NFo].astype(I32)
+        foes = mx.take_along_axis(foes_all, fidx, axis=1)
+        fq_, fr_ = mx.take_along_axis(fd["uq"], fidx, axis=1), mx.take_along_axis(fd["ur"], fidx, axis=1)
+        ftile = mx.take_along_axis(s["u_tile"], fidx, axis=1)
+        dlf = hexd(lq[:, :, None] - fq_[:, None, :], lr[:, :, None] - fr_[:, None, :])  # [B, L, NF]
         inr = foes[:, None, :] & (dlf <= reach[:, None, None]) & move_ok[:, :, None]
-        frm = mx.broadcast_to(lt[:, :, None], (B, L, U)).reshape(B, L * U)
-        tot = mx.broadcast_to(s["u_tile"][:, None, :], (B, L, U)).reshape(B, L * U)
-        dealt, _, dhp, pok = self.preview(s, me, frm, tot, inr.reshape(B, L * U), False)
+        frm = mx.broadcast_to(lt[:, :, None], (B, L, NFo)).reshape(B, L * NFo)
+        tot = mx.broadcast_to(ftile[:, None, :], (B, L, NFo)).reshape(B, L * NFo)
+        dealt, _, dhp, pok = self.preview(s, me, frm, tot, inr.reshape(B, L * NFo), False)
         share = mx.minimum(dealt.astype(F32) / mx.maximum(dhp, 1).astype(F32), 1.0)
-        best = mx.max(mx.where(pok & inr.reshape(B, L * U), share, 0.0).reshape(B, L, U), axis=2)
+        best = mx.max(mx.where(pok & inr.reshape(B, L * NFo), share, 0.0).reshape(B, L, NFo), axis=2)
         dlc = hexd(lq[:, :, None] - fd["cq"][:, None, :], lr[:, :, None] - fd["cr"][:, None, :])
         count = mx.sum(inr, axis=2) + mx.sum(fd["foe_city"][:, None, :] & (dlc <= reach[:, None, None]), axis=2)
         fm = [mx.zeros((B, L), dtype=F32)] * F_ACT
@@ -958,7 +964,8 @@ def stream(path, limit=None, families=None, group=40, every=1):
     """The dump's plays in groups of `group` plays (each moment kept when its index in the play % `every` == 0)."""
     plays = collections.OrderedDict()
     n = 0
-    with open(path) as fh:
+    import gzip
+    with (gzip.open(path, "rt") if str(path).endswith(".gz") else open(path)) as fh:
         for line in fh:
             d = json.loads(line)
             name = d["play"]
