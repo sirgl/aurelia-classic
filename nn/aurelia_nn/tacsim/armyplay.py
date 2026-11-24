@@ -996,6 +996,9 @@ class Game:
         v = mx.where(g, mx.where(taken, W, mx.where(lose, L, mx.where(limit, mx.where(self.either & (n_alive * 4 >= n * 3), W, L), N))), v)
         g = is_f({"bombard"})
         v = mx.where(g, mx.where(taken | self.city_low, W, mx.where(limit | (n_alive == 0), L, N)), v)
+        # The fog families (twin package 3; `armyfog`).
+        from . import armyfog
+        v = armyfog.judge(self, rel, v)
         self.verdict = mx.where(self.verdict < 0, v, self.verdict)
 
     def play(self, limit_rounds=None):

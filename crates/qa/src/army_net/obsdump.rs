@@ -157,6 +157,8 @@ pub fn start(rules: &CompiledRuleset, game: &GameState, scene: &Scene, orders: &
         "context": scene.context, "n_mine": scene.mine.len(), "family": scene.fam.name(),
         "roles": scene.mine.iter().chain(&scene.theirs).map(|p| p.role).collect::<Vec<&str>>(),
         "deadline": scene.deadline,
+        // The scene's private facts the family scripts read (the memory families' side, hiding place and first step): info only.
+        "centre": scene.centre.0, "info": scene.info,
     });
     let line = json!({"type": "scene", "play": name, "scene": sc, "initial": initial, "orders": o, "kinds": kinds});
     PLAY.with(|p| *p.borrow_mut() = Some(Play { name, track, lines: vec![line.to_string()], moment: None, last: Some(units_cities(&initial)) }));

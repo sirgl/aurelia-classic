@@ -237,6 +237,9 @@ def enemy_turn(game):
     B = game.B
     live = ~s["done"] & (game.verdict < 0)
     field_turn(game, live)
+    # The fog families' scripts (twin package 3; `armyfog`): nothing where no row is one.
+    from . import armyfog
+    armyfog.enemy_turn(game, live)
     seat_turn(game, 1, live)
     game.s = game.sim.end_turn(game.s, mx.full((B,), 1, dtype=I32), live)
 
@@ -374,9 +377,7 @@ def _move_by_aim(game, me, side, take):
 
 def field_turn(game, live, side=1):
     """The family script of the assault families on every field unit (slot order = the pieces' order)."""
-    sim = game.sim
     B, U = game.B, game.U
-    sd = mx.full((B,), side, dtype=I32)
     is_assault = getattr(game, "_is_assault", None)
     if is_assault is None:
         from .armyplay import ASSAULT
@@ -389,32 +390,42 @@ def field_turn(game, live, side=1):
             & (g1(s["u_mv"], me) > 0)
         if not bool(mx.any(mine).item()):
             continue
-        civ = g1(game.obs.kind(s, "civ"), me)
-        ok, t = _blow(game, me, side, mine & ~civ)
-        hit = mine & ~civ & ok
-        if bool(mx.any(hit).item()):
-            _strike(game, me, side, t, hit)
-        rest = mine & ~civ & ~hit
-        if bool(mx.any(rest).item()):
-            ok2, frm, t2 = _approach(game, me, side, rest)
-            ap = rest & ok2
-            if bool(mx.any(ap).item()):
-                mk = sim.masks(game.s, sd, me)
-                game.s = sim.apply_unit(game.s, sd, me, mx.full((B,), V_MOVE, dtype=I32), frm, mk, ap)
-                _strike(game, me, side, t2, ap)
-            walk = mine & ~hit & ~ap
-        else:
-            walk = mine & ~hit
-        if bool(mx.any(walk).item()):
-            s = game.s
-            walk = walk & (g1(s["u_mv"], me) > 0)
-            go, tile = _move_by_aim(game, me, side, walk)
-            if bool(mx.any(go).item()):
-                mk = sim.masks(game.s, sd, me)
-                game.s = sim.apply_unit(game.s, sd, me, mx.full((B,), V_MOVE, dtype=I32), tile, mk, go)
-            ok3, t3 = _blow(game, me, side, walk & ~civ)
-            h3 = walk & ~civ & ok3
-            if bool(mx.any(h3).item()):
-                _strike(game, me, side, t3, h3)
-        game.s = sim.hold_units(game.s, (mx.arange(U)[None, :] == u) & mine[:, None], heal=game.hold_heals)
-        mx.eval(game.s)
+        close_unit(game, me, side, mine)
+
+
+def close_unit(game, me, side, mine):
+    """One field unit's `act::unit_turn` (Close for a melee unit, Support for a ranged one, Even) in the rows `mine`
+    [B] where slot `me` is a live unit of `side` with moves left."""
+    sim = game.sim
+    B, U = game.B, game.U
+    sd = mx.full((B,), side, dtype=I32)
+    s = game.s
+    civ = g1(game.obs.kind(s, "civ"), me)
+    ok, t = _blow(game, me, side, mine & ~civ)
+    hit = mine & ~civ & ok
+    if bool(mx.any(hit).item()):
+        _strike(game, me, side, t, hit)
+    rest = mine & ~civ & ~hit
+    if bool(mx.any(rest).item()):
+        ok2, frm, t2 = _approach(game, me, side, rest)
+        ap = rest & ok2
+        if bool(mx.any(ap).item()):
+            mk = sim.masks(game.s, sd, me)
+            game.s = sim.apply_unit(game.s, sd, me, mx.full((B,), V_MOVE, dtype=I32), frm, mk, ap)
+            _strike(game, me, side, t2, ap)
+        walk = mine & ~hit & ~ap
+    else:
+        walk = mine & ~hit
+    if bool(mx.any(walk).item()):
+        s = game.s
+        walk = walk & (g1(s["u_mv"], me) > 0)
+        go, tile = _move_by_aim(game, me, side, walk)
+        if bool(mx.any(go).item()):
+            mk = sim.masks(game.s, sd, me)
+            game.s = sim.apply_unit(game.s, sd, me, mx.full((B,), V_MOVE, dtype=I32), tile, mk, go)
+        ok3, t3 = _blow(game, me, side, walk & ~civ)
+        h3 = walk & ~civ & ok3
+        if bool(mx.any(h3).item()):
+            _strike(game, me, side, t3, h3)
+    game.s = sim.hold_units(game.s, (mx.arange(U)[None, :] == me[:, None]) & mine[:, None], heal=game.hold_heals)
+    mx.eval(game.s)
