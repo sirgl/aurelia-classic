@@ -308,7 +308,7 @@ class Campaign:
             d.mkdir(parents=True, exist_ok=True)
             shutil.copy(SEED / "nets" / f"{n}.safetensors", d / "weights.safetensors")
             if not (d / "army-net.bin").exists():
-                if self.py(f"export-{n}", ["-I", str(M5 / "py" / "export_net.py"), d / "weights.safetensors", d / "army-net.bin"]):
+                if self.py(f"export-{n}", [str(M5 / "py" / "export_net.py"), d / "weights.safetensors", d / "army-net.bin"]):
                     return {"status": "failed", "why": f"export of {n} failed"}
         return {"status": "ok", "nets": j.get("nets", []), "kept_lines": sum(1 for _ in open(kept))}
 
@@ -365,14 +365,16 @@ class Campaign:
             (d / ".done").touch()
         return q / "rows.jsonl", f / "rows.jsonl"
 
-    def rust_gate(self, out: Path, a: tuple, b: tuple, a_label: str, b_label: str, spec_extra: dict | None = None) -> dict:
+    def rust_gate(self, out: Path, a: tuple, b: tuple, a_label: str, b_label: str, spec_extra: dict | None = None, sanity: bool = False) -> dict:
         teachers = [str(R / "teach-r-hold" / "rows.jsonl")] if (R / "teach-r-hold" / "rows.jsonl").exists() else []
         w = [self.data["hold_from"], self.data["hold_to"]]
         slices = [{"name": "quick", "window": w, "A": [str(x) for x in a[0]], "B": [str(x) for x in b[0]]},
                   {"name": "full", "window": w, "A": [str(x) for x in a[1]], "B": [str(x) for x in b[1]], "teachers": teachers}]
         spec = {"name": f"{b_label} vs {a_label}", "alpha": 0.05, "min_n": 5, "bootstrap_reps": 2000, "harm": {"tolerance_pts": 5},
                 "mean": {"slices": ["full"], "min_gain_pts": 0}}
-        if teachers:
+        if sanity:   # the same net on two machines: only the per-family paired tests, no gate blocks
+            spec.pop("mean")
+        elif teachers:
             spec["count_at_bar"] = {"slices": ["full"], "frac": 0.9, "min_gain": 0}
         spec.update(spec_extra or {})
         return self.gatestats(out, slices, spec, a_label, b_label)
@@ -387,8 +389,8 @@ class Campaign:
         ref = j.get("ref")
         if ref:
             ra, rb = D / "ref" / f"q-{ref}.rows.jsonl", D / "ref" / f"f-{ref}.rows.jsonl"
-            g = self.rust_gate(self.dir / f"gate-{j['name']}", ((ra,), (rb,)), ((rows[0],), (rows[1],)), f"{ref} (M4)", f"{n} (this machine)")
-            changed = sum(len(v) for s, v in (g.get("status") or {}).items() if s not in ("same",))
+            g = self.rust_gate(self.dir / f"gate-{j['name']}", ((ra,), (rb,)), ((rows[0],), (rows[1],)), f"{ref} (M4)", f"{n} (this machine)", sanity=True)
+            changed = sum(len(v) for s, v in (g.get("status") or {}).items() if s in ("up", "down", "DROP"))
             out.update({"vs_m4": g, "families_changed_beyond_noise": changed, "matches_m4": changed == 0 and "gate_error" not in g})
         return {"status": "ok", **out}
 
@@ -604,7 +606,7 @@ class Campaign:
             return {"status": "failed", "why": "no selected checkpoint"}
         w = R / rl / f"ckpt-{u:04d}.safetensors" if u else R / "net-MBf6c" / "weights.safetensors"
         bin_ = R / rl / f"sel-u{u:04d}.bin"
-        if not bin_.exists() and self.py(f"export-{rl}", ["-I", str(M5 / "py" / "export_net.py"), w, bin_]):
+        if not bin_.exists() and self.py(f"export-{rl}", [str(M5 / "py" / "export_net.py"), w, bin_]):
             return {"status": "failed", "why": "export failed"}
         rows = self.rust_rows(f"{rl}-u{u:04d}", bin_)
         if isinstance(rows, str):
@@ -805,6 +807,9 @@ def main() -> int:
     ap.add_argument("--smoke", action="store_true")
     a = ap.parse_args()
     cfg = tomllib.loads(Path(a.config).read_text())
+    if a.smoke and "smoke" not in LAB.name and not os.environ.get("M5_SMOKE_ANY_LAB"):
+        print(f"campaign3: --smoke needs its own lab (AURELIA_LAB=.../lab-smoke), not {LAB}: use tools/m5/campaign3.sh smoke", file=sys.stderr)
+        return 2
     c = Campaign(cfg, a.smoke)
     if a.cmd == "plan":
         c.plan()
