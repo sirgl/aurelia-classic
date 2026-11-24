@@ -69,6 +69,7 @@ use serde::{Deserialize, Serialize};
 use super::act::{self, Aim, Nerve};
 use super::assault;
 use super::memory;
+use super::sea_air_families as sea_air;
 use super::lab::{self, dist, Arm, Draw, Lab};
 use super::{Piece, Scene};
 
@@ -112,10 +113,15 @@ pub enum Fam {
     // The "at any cost" assault trainers (`assault.rs`; appended again: the older families keep their seeds).
     AssaultReinforce,
     AssaultPeace,
+    // The sea and air trainers (`sea_air_families.rs`; appended again: the older families keep their seeds).
+    NavalDuel,
+    LandingEscort,
+    AirIntercept,
+    AirRecon,
 }
 
 impl Fam {
-    pub const ALL: [Fam; 34] = [
+    pub const ALL: [Fam; 38] = [
         Fam::Duel,
         Fam::Focus,
         Fam::Hold,
@@ -150,6 +156,10 @@ impl Fam {
         Fam::HuntFog,
         Fam::AssaultReinforce,
         Fam::AssaultPeace,
+        Fam::NavalDuel,
+        Fam::LandingEscort,
+        Fam::AirIntercept,
+        Fam::AirRecon,
     ];
 
     pub fn name(self) -> &'static str {
@@ -188,6 +198,10 @@ impl Fam {
             Fam::HuntFog => "hunt-fog",
             Fam::AssaultReinforce => "assault-reinforce",
             Fam::AssaultPeace => "assault-peace",
+            Fam::NavalDuel => "naval-duel",
+            Fam::LandingEscort => "landing-escort",
+            Fam::AirIntercept => "air-intercept",
+            Fam::AirRecon => "air-recon",
         }
     }
 
@@ -207,6 +221,7 @@ impl Fam {
             Fam::Harass => 12,
             Fam::Snipe => 8,
             Fam::Surrounded => 4,
+            f if sea_air::is_sea_air(f) => sea_air::rounds(f),
             f if memory::is_memory(f) => memory::rounds(f),
             f => assault::rounds(f),
         }
@@ -238,6 +253,7 @@ impl Fam {
             Fam::Harass => &["ref-screen", "ref-fight"],
             Fam::Snipe => &["ref-snipe"],
             Fam::Surrounded => &["ref-break", "ref-flee"],
+            f if sea_air::is_sea_air(f) => sea_air::solvers(f),
             f if memory::is_memory(f) => memory::solvers(f),
             f => assault::solvers(f),
         }
@@ -272,6 +288,7 @@ impl Fam {
             Fam::Harass => &[("MO12", 'D')],
             Fam::Snipe => &[("MO7", 'U'), ("MT8", 'U'), ("E1", 'U'), ("M4", 'U'), ("CS4", 'U')],
             Fam::Surrounded => &[("MT4", 'D')],
+            f if sea_air::is_sea_air(f) => sea_air::tricks(f),
             f if memory::is_memory(f) => &[],
             f => assault::tricks(f),
         }
@@ -305,6 +322,7 @@ impl Fam {
             Fam::Harass => "slow melee and a ranged unit against a human's hit-and-run horse (keshik)",
             Fam::Snipe => "catch an escorted civilian (worker, Great General) of the enemy",
             Fam::Surrounded => "a strong unit of ours about to be surrounded: break out or survive",
+            f if sea_air::is_sea_air(f) => sea_air::task(f),
             f if memory::is_memory(f) => memory::task(f),
             f => assault::task(f),
         }
@@ -326,6 +344,7 @@ impl Fam {
             Fam::Sink => (k.has(Arm::NavalMelee) || k.has(Arm::NavalRanged)) && embark_known(rules, k.era),
             Fam::Airstrike => k.has(Arm::Bomber),
             // The assault families need the era's siege unit (a city of any era wears down the archers of the era before it).
+            f if sea_air::is_sea_air(f) => sea_air::claims(f, rules, k),
             f if assault::is_assault(f) => land && k.has(Arm::Siege),
             _ => land,
         }
@@ -542,6 +561,11 @@ pub fn build(rules: &CompiledRuleset, fam: Fam, era: u8, instance: usize, attemp
     let mut p = Painter { rules, lab: &lab, game: lab.game.clone(), d: Draw::new(seed(fam, era, instance, attempt)), w, h, cx: w / 2, cy: h / 2 };
     if assault::is_assault(fam) {
         let mut s = assault::build(&mut p, fam, &lab, instance, attempt)?;
+        s.info.insert("attempt".into(), attempt.to_string());
+        return Ok((p.game, s));
+    }
+    if sea_air::is_sea_air(fam) {
+        let mut s = sea_air::build(&mut p, fam, &lab, instance, attempt)?;
         s.info.insert("attempt".into(), attempt.to_string());
         return Ok((p.game, s));
     }
@@ -1146,6 +1170,7 @@ pub fn build(rules: &CompiledRuleset, fam: Fam, era: u8, instance: usize, attemp
         }
         Fam::AssaultHeal | Fam::PromotionChoice | Fam::HillArchers | Fam::CityFire | Fam::PlannedAssault | Fam::AssaultReinforce | Fam::AssaultPeace => unreachable!("built by assault::build"),
         Fam::AmbushFog | Fam::HuntFog => unreachable!("built by memory::build"),
+        Fam::NavalDuel | Fam::LandingEscort | Fam::AirIntercept | Fam::AirRecon => unreachable!("built by sea_air_families::build"),
         Fam::Airstrike => {
             let home_t = at(&p, -3, 0)?;
             p.city(me, home_t, 4, false);
@@ -1237,6 +1262,9 @@ fn city_hp(rules: &CompiledRuleset, game: &GameState, t: TileId) -> Option<(i64,
 pub fn reference_turn(rules: &CompiledRuleset, game: &mut GameState, scene: &mut Scene, name: &str) {
     if let Some(f) = assault::flags(name) {
         assault::turn(rules, game, scene, f);
+        return;
+    }
+    if sea_air::is_sea_air(scene.fam) && name != "passive" && sea_air::reference_turn(rules, game, scene, name) {
         return;
     }
     if memory::is_memory(scene.fam) && matches!(name, "ref-recall" | "ref-forget") {
@@ -1484,6 +1512,9 @@ pub fn enemy_turn(rules: &CompiledRuleset, game: &mut GameState, scene: &mut Sce
         memory::enemy_turn(rules, game, scene);
         return;
     }
+    if sea_air::enemy_turn(rules, game, scene) {
+        return;
+    }
     let (me, foe) = (scene.enemy, scene.learner);
     let sc = scene.clone();
     let friends = handles(&sc.theirs);
@@ -1665,6 +1696,7 @@ pub fn judge(rules: &CompiledRuleset, game: &GameState, sc: &mut Scene, rel: u32
     let civ_ok = sc.mine.iter().filter(|p| p.role == "civilian").all(|p| act::alive(game, p, sc.learner).is_some());
     let v = match sc.fam {
         Fam::AmbushFog | Fam::HuntFog => memory::judge(rules, game, sc, rel),
+        Fam::NavalDuel | Fam::LandingEscort | Fam::AirIntercept | Fam::AirRecon => sea_air::judge(rules, game, sc, rel),
         Fam::Duel => {
             if combat_theirs == 0 && !mine.is_empty() {
                 Some(true)

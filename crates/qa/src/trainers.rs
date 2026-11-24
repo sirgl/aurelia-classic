@@ -22,6 +22,7 @@ pub mod families;
 pub mod lab;
 pub mod memory;
 pub mod scene_rule;
+pub mod sea_air_families;
 pub mod suite;
 
 use std::collections::{BTreeMap, BTreeSet};

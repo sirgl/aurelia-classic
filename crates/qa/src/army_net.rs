@@ -63,7 +63,9 @@ impl Aim {
             Fam::Raid => Aim::Pillage,
             Fam::Retreat | Fam::Wounded | Fam::Surrounded | Fam::AmbushFog => Aim::Survive,
             Fam::Snipe | Fam::HuntFog => Aim::Catch,
-            Fam::Convoy => Aim::Escort,
+            Fam::Convoy | Fam::LandingEscort => Aim::Escort,
+            Fam::NavalDuel | Fam::AirRecon => Aim::Destroy,
+            Fam::AirIntercept => Aim::Hold,
         }
     }
 }
@@ -243,7 +245,7 @@ impl Orders {
         let start_round = game.view().auth.turn().round;
         let window = MapWindow::around(game, scene.centre);
         let statics = statics_of(rules, game, &window, scene.learner, scene.enemy, tile, scene.refuge);
-        Orders { side: scene.learner, foe: scene.enemy, aim, tile, refuge: scene.refuge, optional, start_round, rounds: scene.rounds, army, mean_strength: mean_strength.max(1.0), window, statics, fog: crate::trainers::memory::is_memory(scene.fam), price: price_override().map(|f| price_set(&f, scene.fam.name(), scene.mine.len(), scene.rounds, scene.deadline).unwrap_or_else(|| panic!("ARMY_PRICE={f}: not a price form (a,b,c | careful | anycost[:D])"))).unwrap_or_else(|| price_of(scene.fam.name(), scene.mine.len(), Some(scene.deadline.unwrap_or(scene.rounds)))) }
+        Orders { side: scene.learner, foe: scene.enemy, aim, tile, refuge: scene.refuge, optional, start_round, rounds: scene.rounds, army, mean_strength: mean_strength.max(1.0), window, statics, fog: crate::trainers::memory::is_memory(scene.fam) || scene.fam == Fam::AirRecon, price: price_override().map(|f| price_set(&f, scene.fam.name(), scene.mine.len(), scene.rounds, scene.deadline).unwrap_or_else(|| panic!("ARMY_PRICE={f}: not a price form (a,b,c | careful | anycost[:D])"))).unwrap_or_else(|| price_of(scene.fam.name(), scene.mine.len(), Some(scene.deadline.unwrap_or(scene.rounds)))) }
     }
 }
 
