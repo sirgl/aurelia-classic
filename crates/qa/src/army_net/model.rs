@@ -192,6 +192,37 @@ pub struct Net {
     price: Option<Vec<f32>>,
     /// Variant MBH: the history's separate cross-attention (None: none).
     xhist: Option<XHistW>,
+    /// Variant MBN: the notes' separate cross-attention and heads (None: none).
+    xnotes: Option<XNoteW>,
+}
+
+/// Variant MBN's note weights (`army/model_mb.py`, `MBNNet`): a note's embedding `n2(relu(n1(note)))`; per layer a
+/// cross-attention like MBH's (`null`, `same`, `slope` per layer and head; its context through `no[layer]`); the heads
+/// written at our turn's end: `rest` on [H_i, token, u_s, resting before], `reason` on its indicators, `free` on P_0,
+/// the plan token's stage and engaged readouts (`aux_p`).
+#[derive(Debug, Clone)]
+struct XNoteW {
+    n1: Dense,
+    n2: Dense,
+    null: Vec<f32>,
+    same: Vec<f32>,
+    slope: Vec<f32>,
+    no: Vec<Dense>,
+    rest: Dense,
+    reason: Dense,
+    free: Dense,
+    /// `aux_p` [[stage scale, shift], [engaged scale, shift]].
+    aux_p: [f32; 4],
+}
+
+/// MBN's note numbers: MN's and PLAN's engaged.
+const F_XNOTE: usize = F_NOTE + 1;
+const P_ENGAGED_N: usize = 10;
+
+/// The ablation of MBN's proof: the notes masked in every body (`ARMY_NET_NO_NOTES=1`).
+fn notes_masked() -> bool {
+    static NO: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *NO.get_or_init(|| std::env::var_os("ARMY_NET_NO_NOTES").is_some())
 }
 
 /// Variant MBH's history weights (`army/model_mb.py`, `MBHNet`): a fact's embedding `hx2(relu(hx1(fact, its age
@@ -259,11 +290,54 @@ pub struct NoteState {
     pub pull_age: [f32; SLOTS],
     /// The notes written at the last turn's end, for the trace (`PLAN(city, assault)`, ...).
     pub written: Vec<String>,
+    /// MBN: turns in the stage, the plan engaged (MBN keeps its resting units in `pull` / `pull_age`: a state).
+    pub stage_age: f32,
+    pub engaged: f32,
 }
 
 impl NoteState {
     fn new() -> NoteState {
-        NoteState { stage: [0.0; STAGES], waited: 0.0, free: [0.0; FREE], change_age: AGE_NONE, reason: [0.0; 4], pull: [0.0; SLOTS], pull_age: [0.0; SLOTS], written: Vec::new() }
+        NoteState { stage: [0.0; STAGES], waited: 0.0, free: [0.0; FREE], change_age: AGE_NONE, reason: [0.0; 4], pull: [0.0; SLOTS], pull_age: [0.0; SLOTS], written: Vec::new(), stage_age: 0.0, engaged: 0.0 }
+    }
+
+    /// MBN's note tokens in force (`MBNNet.note_tokens`, the masked ones left out): numbers, the unit's slot, age.
+    fn tokens_x(&self) -> Vec<([f32; F_XNOTE], i16, f32)> {
+        let tok = |kind: usize, stage: Option<&[f32; STAGES]>, reason: Option<&[f32; 4]>, waited: f32, age: f32, free: Option<&[f32; FREE]>, engaged: f32| {
+            let mut f = [0f32; F_XNOTE];
+            f[kind] = 1.0;
+            if let Some(st) = stage {
+                f[5..5 + STAGES].copy_from_slice(st);
+            }
+            if let Some(r) = reason {
+                f[11..15].copy_from_slice(r);
+            }
+            f[15] = waited * 0.1;
+            f[16] = age / 3.0;
+            if let Some(fr) = free {
+                f[17..17 + FREE].copy_from_slice(fr);
+            }
+            f[F_NOTE] = engaged;
+            f
+        };
+        let has_plan = self.stage.iter().sum::<f32>() > 0.0;
+        let (sa, ca) = (self.stage_age.min(9.0), self.change_age.min(9.0));
+        let mut out = Vec::new();
+        if has_plan {
+            out.push((tok(0, Some(&self.stage), None, 0.0, sa, Some(&self.free), self.engaged), -1, sa));
+        }
+        if self.change_age < CHANGE_SPAN {
+            out.push((tok(1, Some(&self.stage), Some(&self.reason), 0.0, ca, None, 0.0), -1, ca));
+        }
+        if has_plan && self.engaged < 0.5 {
+            out.push((tok(2, None, None, self.waited, 0.0, None, 0.0), -1, 0.0));
+        }
+        for s in 0..SLOTS {
+            if self.pull[s] > 0.5 {
+                let ra = self.pull_age[s].min(9.0);
+                out.push((tok(3, None, None, 0.0, ra, None, 0.0), s as i16, ra));
+            }
+        }
+        out
     }
 
     /// The note tokens in force (`MNNet.note_tokens`, the masked ones left out): numbers and the unit's slot.
@@ -332,6 +406,8 @@ pub struct Body {
 /// Unit slots of variant M's memory (a unit's index in `Orders::army`), its width, the plan tokens.
 pub const SLOTS: usize = 16;
 pub const U_DIM: usize = 16;
+/// The unit slot's "resting" number (`model_m.U_RESTING`).
+const U_RESTING_IDX: usize = 1;
 pub const PLANS: usize = 4;
 
 /// One GRU cell (PyTorch's convention, gates r, z, n): `wx` from the input, `wh` from the state, biases inside.
@@ -374,6 +450,10 @@ struct Memory {
     gp: Gru,
     /// `[plan][theta, kappa, w_event]`.
     hyst: Vec<f32>,
+    /// The plan token's readouts `aux_p` [[stage scale, shift], [engaged scale, shift]] (None: not exported).
+    aux_p: Option<[f32; 4]>,
+    /// The unit readout of "resting" (`aux_u[1]`: scale, shift on `u[U_RESTING]`; None: not exported).
+    aux_rest: Option<[f32; 2]>,
 }
 
 /// The memory of one play (variant M): every army slot's u, the plan tokens, the slots seen at the last update.
@@ -484,11 +564,13 @@ impl Net {
             };
             let gu = Gru { wx: mat("gu_wx", "gu_bx")?, wh: mat("gu_wh", "gu_bh")?, h: U_DIM };
             let gp = Gru { wx: mat("gp_wx", "gp_bx")?, wh: mat("gp_wh", "gp_bh")?, h: c.d };
-            Some(Memory { um: dense("um")?, plan0: raw("plan0")?, plan_bias: raw("plan_bias")?, gu, pq: dense("pq")?, pk: dense("pk")?, gp, hyst: raw("hyst")? })
+            let aux_p = t.get("aux_p").filter(|(s, _)| s.as_slice() == [2, 2]).map(|(_, v)| [v[0], v[1], v[2], v[3]]);
+            let aux_rest = t.get("aux_u").filter(|(s, _)| s.as_slice() == [4, 2]).map(|(_, v)| [v[2], v[3]]);
+            Some(Memory { um: dense("um")?, plan0: raw("plan0")?, plan_bias: raw("plan_bias")?, gu, pq: dense("pq")?, pk: dense("pk")?, gp, hyst: raw("hyst")?, aux_p, aux_rest })
         } else {
             None
         };
-        let notes = if t.contains_key("n1.weight") {
+        let notes = if t.contains_key("n1.weight") && !t.contains_key("nx_slope") {
             let aux = get("aux_p")?.1.clone();
             Some(NoteW { n1: dense("n1")?, n2: dense("n2")?, pull: dense("pull")?, ret: dense("ret")?, reason: dense("reason")?, free: dense("free")?, stage_scale: aux[0], stage_shift: aux[1] })
         } else {
@@ -507,6 +589,28 @@ impl Net {
         } else {
             None
         };
+        let xnotes = if t.contains_key("nx_slope") {
+            let raw = |name: &str| -> Result<Vec<f32>, String> { Ok(get(name)?.1.clone()) };
+            let no = (0..c.layers).map(|l| dense(&format!("no.{l}"))).collect::<Result<Vec<_>, _>>()?;
+            let aux = raw("aux_p")?;
+            if get("n1.weight")?.0.first() != Some(&F_XNOTE) {
+                return Err(format!("MBN notes of {:?} numbers, the code has {F_XNOTE}", get("n1.weight")?.0));
+            }
+            Some(XNoteW {
+                n1: dense("n1")?,
+                n2: dense("n2")?,
+                null: raw("nx_null")?,
+                same: raw("nx_same")?,
+                slope: raw("nx_slope")?,
+                no,
+                rest: dense("rest")?,
+                reason: dense("reason")?,
+                free: dense("free")?,
+                aux_p: [aux[0], aux[1], aux[2], aux[3]],
+            })
+        } else {
+            None
+        };
         let price = if t.contains_key("w_price") {
             let (shape, w) = get("w_price")?;
             if shape.as_slice() != [3, c.d] {
@@ -517,6 +621,7 @@ impl Net {
             None
         };
         Ok(Net {
+            xnotes,
             xhist,
             price,
             notes,
@@ -616,6 +721,99 @@ impl Net {
         ns
     }
 
+    /// MBN at our turn's end (after the memory's update): the net's own notes (`train_m.unroll_one_n`'s own path,
+    /// `MBNNet.note_heads`, `reason_logits`, `write_notes`).
+    #[allow(clippy::too_many_arguments)]
+    fn write_notes_x(&self, xw: &XNoteW, mut ns: NoteState, body: &Body, tokens: &Tokens, slots: &[i16], state: &MemoryState, event: f32) -> NoteState {
+        let d = self.config.d;
+        let argmax = |v: &[f32]| v.iter().enumerate().fold((0usize, f32::NEG_INFINITY), |b, (i, x)| if *x > b.1 { (i, *x) } else { b }).0;
+        let p0 = &state.p[..d];
+        let st: Vec<f32> = (0..STAGES).map(|k| xw.aux_p[0] * p0[k] + xw.aux_p[1]).collect();
+        let new = argmax(&st);
+        let engaged = if xw.aux_p[2] * p0[P_ENGAGED_N] + xw.aux_p[3] > 0.0 { 1.0 } else { 0.0 };
+        let mut rest = [0f32; SLOTS];
+        let mut x = vec![0.0; d + F_TOK + U_DIM + 1];
+        let mut y = [0f32; 1];
+        for i in 0..body.n {
+            let Ok(s) = usize::try_from(slots[i]) else { continue };
+            if s >= SLOTS {
+                continue;
+            }
+            x[..d].copy_from_slice(&body.h[i * d..(i + 1) * d]);
+            x[d..d + F_TOK].copy_from_slice(&tokens.feat[i]);
+            x[d + F_TOK..d + F_TOK + U_DIM].copy_from_slice(&state.u[s * U_DIM..(s + 1) * U_DIM]);
+            x[d + F_TOK + U_DIM] = ns.pull[s];
+            xw.rest.apply(&x, &mut y);
+            if y[0] > 0.0 {
+                rest[s] = 1.0;
+            }
+        }
+        let had = ns.stage.iter().sum::<f32>() > 0.0;
+        let old = argmax(&ns.stage);
+        let ind = [event, if new == STAGE_HEAL { 1.0 } else { 0.0 }, if had && new > old { 1.0 } else { 0.0 }, 0.0];
+        let mut rl = [0f32; 4];
+        xw.reason.apply(&ind, &mut rl);
+        let reason = argmax(&rl);
+        let changed = had && old != new;
+        let mut written = vec![format!("PLAN(objective, {}{})", STAGE_NAMES[new], if engaged > 0.5 { ", engaged" } else { "" })];
+        ns.stage_age = if had && !changed { ns.stage_age + 1.0 } else { 0.0 };
+        ns.change_age = if changed { 0.0 } else { ns.change_age + 1.0 };
+        if changed {
+            ns.reason = [0.0; 4];
+            ns.reason[reason] = 1.0;
+            written.push(format!("PLAN_CHANGE({})", REASONS[reason]));
+        }
+        for s in 0..SLOTS {
+            let was = ns.pull[s] > 0.5;
+            let now = rest[s] > 0.5;
+            ns.pull_age[s] = if now { if was { ns.pull_age[s] + 1.0 } else { 0.0 } } else { 0.0 };
+            if now && !was {
+                written.push(format!("PULL_BACK_HEAL(slot {s})"));
+            }
+            if was && !now {
+                written.push(format!("RETURN(slot {s})"));
+            }
+            ns.pull[s] = rest[s];
+        }
+        let mut stage = [0f32; STAGES];
+        stage[new] = 1.0;
+        ns.stage = stage;
+        ns.engaged = engaged;
+        ns.waited = (p0[P_WAITED] * 10.0).max(0.0);
+        if engaged < 0.5 {
+            written.push(format!("WAIT_STAGE({:.0})", ns.waited));
+        }
+        let mut fr = [0f32; FREE];
+        xw.free.apply(p0, &mut fr);
+        for v in fr.iter_mut() {
+            *v = v.tanh();
+        }
+        ns.free = fr;
+        ns.written = written;
+        ns
+    }
+
+    /// The plan's own stage and engaged (the aux readouts on P_0; the diagnosis of the stage per round), None
+    /// without memory or readouts.
+    pub fn plan_stage(&self, state: &MemoryState) -> Option<(usize, bool)> {
+        let a = self.mem.as_ref()?.aux_p?;
+        let p0 = &state.p[..self.config.d];
+        let st: Vec<f32> = (0..STAGES).map(|k| a[0] * p0[k] + a[1]).collect();
+        let s = st.iter().enumerate().fold((0usize, f32::NEG_INFINITY), |b, (i, x)| if *x > b.1 { (i, *x) } else { b }).0;
+        Some((s, a[2] * p0[P_ENGAGED_N] + a[3] > 0.0))
+    }
+
+    /// The memory's own "resting" per army slot (`aux_u[1]` on `u[U_RESTING]`, the unit readout the auxiliary loss trains): info for
+    /// the unit diagnosis, never read by the play. None without memory or without the readout.
+    pub fn resting_readout(&self, state: &MemoryState) -> Option<[bool; SLOTS]> {
+        let a = self.mem.as_ref()?.aux_rest?;
+        let mut out = [false; SLOTS];
+        for (s, o) in out.iter_mut().enumerate() {
+            *o = a[0] * state.u[s * U_DIM + U_RESTING_IDX] + a[1] > 0.0;
+        }
+        Some(out)
+    }
+
     pub fn has_memory(&self) -> bool {
         self.mem.is_some()
     }
@@ -623,7 +821,8 @@ impl Net {
     /// Variant M: the memory at a play's start (None: no memory).
     pub fn initial_memory(&self) -> Option<MemoryState> {
         let m = self.mem.as_ref()?;
-        Some(MemoryState { u: vec![0.0; SLOTS * U_DIM], p: m.plan0.clone(), alive: [0.0; SLOTS], p0_turns: Vec::new(), notes: self.notes.as_ref().map(|_| NoteState::new()) })
+        let notes = (self.notes.is_some() || self.xnotes.is_some()).then(NoteState::new);
+        Some(MemoryState { u: vec![0.0; SLOTS * U_DIM], p: m.plan0.clone(), alive: [0.0; SLOTS], p0_turns: Vec::new(), notes })
     }
 
     /// Variant M at our turn's end: `body` is this moment's body (read with `state`); every army token updates its
@@ -712,6 +911,9 @@ impl Net {
         }
         if let (Some(nw), Some(ns)) = (self.notes.as_ref(), state.notes.clone()) {
             state.notes = Some(self.write_notes(nw, ns, body, tokens, slots, &p_old0, state, event));
+        }
+        if let (Some(xw), Some(ns)) = (self.xnotes.as_ref(), state.notes.clone()) {
+            state.notes = Some(self.write_notes_x(xw, ns, body, tokens, slots, state, event));
         }
         state.alive = cover;
     }
@@ -843,12 +1045,37 @@ impl Net {
             }
             _ => None,
         };
+        // MBN: the notes in force (their embedding, slots, ages); none when masked (the ablation).
+        let nin = match (self.xnotes.as_ref(), mem) {
+            (Some(xw), Some(mi)) => {
+                let notes = if notes_masked() { Vec::new() } else { mi.state.notes.as_ref().map(|n| n.tokens_x()).unwrap_or_default() };
+                let mut e1 = vec![0.0; d];
+                let mut y = vec![0.0; d];
+                let mut he = Vec::with_capacity(notes.len() * d);
+                for (f, _, _) in &notes {
+                    xw.n1.apply(f, &mut e1);
+                    relu(&mut e1);
+                    xw.n2.apply(&e1, &mut y);
+                    he.extend_from_slice(&y);
+                }
+                let qslots = (0..n).map(|i| mi.slots[i]).chain(std::iter::repeat(-1).take(plans)).collect();
+                Some(XHistIn { he, slots: notes.iter().map(|x| x.1).collect(), ages: notes.iter().map(|x| x.2).collect(), qslots })
+            }
+            _ => None,
+        };
         let mut a = vec![0.0; total * d];
         let hist_in = if he.is_empty() { None } else { Some((he.as_slice(), hslots.as_slice(), qslots.as_slice())) };
         for (li, layer) in self.layers.iter().enumerate() {
             let q = self.attend(layer, li, &tokens.dist, n, total, &mut h, &mut a, hist_in);
             if let (Some(xw), Some(xi)) = (self.xhist.as_ref(), xin.as_ref()) {
-                self.cross(xw, layer, li, total, &q, &mut h, xi);
+                let heads = self.config.heads;
+                let r = li * heads..(li + 1) * heads;
+                self.cross(&xw.null[r.clone()], &xw.same[r.clone()], &xw.slope[r], &xw.ho[li], layer, total, &q, &mut h, xi);
+            }
+            if let (Some(xw), Some(xi)) = (self.xnotes.as_ref(), nin.as_ref()) {
+                let heads = self.config.heads;
+                let r = li * heads..(li + 1) * heads;
+                self.cross(&xw.null[r.clone()], &xw.same[r.clone()], &xw.slope[r], &xw.no[li], layer, total, &q, &mut h, xi);
             }
             self.feed(layer, total, &mut h, &mut a);
         }
@@ -932,10 +1159,10 @@ impl Net {
         q
     }
 
-    /// MBH: the cross-attention of the `n` stream tokens (queries `q`) to the facts, its own softmax over the null
-    /// key and the facts, through `ho[li]` into `h`.
+    /// MBH / MBN: the cross-attention of the `n` stream tokens (queries `q`) to the facts or the notes, its own
+    /// softmax over the null key and them (`null`, `same`, `slope`: this layer's per head), through `out` into `h`.
     #[allow(clippy::too_many_arguments)]
-    fn cross(&self, xw: &XHistW, layer: &Layer, li: usize, n: usize, q: &[f32], h: &mut [f32], xi: &XHistIn) {
+    fn cross(&self, nulls: &[f32], sames: &[f32], slopes: &[f32], out_proj: &Dense, layer: &Layer, n: usize, q: &[f32], h: &mut [f32], xi: &XHistIn) {
         let d = self.config.d;
         let heads = self.config.heads;
         let dh = d / heads;
@@ -950,7 +1177,7 @@ impl Net {
         let mut ctx = vec![0.0; n * d];
         let mut s = vec![0.0; nh];
         for hd in 0..heads {
-            let (null, same, slope) = (xw.null[li * heads + hd], xw.same[li * heads + hd], xw.slope[li * heads + hd]);
+            let (null, same, slope) = (nulls[hd], sames[hd], slopes[hd]);
             for i in 0..n {
                 let qi = &q[i * d + hd * dh..i * d + hd * dh + dh];
                 let mut max = null;
@@ -975,7 +1202,7 @@ impl Net {
                 }
             }
         }
-        let o = xw.ho[li].rows(&ctx, n);
+        let o = out_proj.rows(&ctx, n);
         for (x, y) in h.iter_mut().zip(o) {
             *x += y;
         }

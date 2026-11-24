@@ -27,9 +27,12 @@ def main():
     if a.cpu:
         mx.set_default_device(mx.cpu)
     rust = [json.loads(l) for l in open(a.rust)]
-    flat = read_into(Flat(), a.plays)
+    # The first plays only, streamed (the file is not read whole).
+    from .train_m import Stream
+    stream = Stream([a.plays])
+    flat = stream.flat(list(range(min(a.plays_limit, len(stream)))))
     w = mx.load(a.weights)
-    is_mn = 'n1.weight' in w
+    is_mn = 'n1.weight' in w and 'nx_slope' not in w
     if is_mn:
         from . import train_mn as TN
         from .model_mn import MNNet
@@ -38,8 +41,8 @@ def main():
         model = MNNet(promos=w['promo'].shape[0] - 1)
     elif 'm_in.weight' in w:
         # MB / MBA: the map encoded once per turn from the turn's first moment.
-        from .model_mb import MBANet, MBHNet, MBNet
-        cls = MBHNet if 'hx_slope' in w else (MBANet if 'w_price' in w else MBNet)
+        from .model_mb import MBANet, MBHNet, MBNet, MBNNet
+        cls = MBNNet if 'nx_slope' in w else (MBHNet if 'hx_slope' in w else (MBANet if 'w_price' in w else MBNet))
         model = cls(promos=w['promo'].shape[0] - 1, map_ch=w['m_in.weight'].shape[0])
     else:
         model = (MHNet if 'h1.weight' in w else MemNet)(promos=w['promo'].shape[0] - 1)
@@ -51,9 +54,10 @@ def main():
     worst_p = worst_a = 0.0
     checked = 0
     turns = 0
-    from .model_mb import MBANet, MBNet
-    from .train_m import map_feats
+    from .model_mb import MBANet, MBNet, MBNNet
+    from .train_m import map_feats, unroll_one_n
     has_map = isinstance(model, MBNet)
+    is_mbn = isinstance(model, MBNNet)
 
     def with_map(b, maps, k):
         if has_map:
@@ -67,7 +71,7 @@ def main():
             maps = mx.stack([model.encode_turn(*(lambda b: (b['statics'], b['tok'], b['pos']))(dev.batch_m(mx.array([j], mx.int32), tm, 1))) for j in fd])
         um, pm, alive = model.initial(1)
         Us, Ps = [um], [pm]
-        ns = model.initial_notes(1) if is_mn else None
+        ns = model.initial_notes(1) if (is_mn or is_mbn) else None
         NS = [ns]
         def hplan(b, k):
             return mx.stack([Ps[max(k - a, 0)][0, 0] for a in b['hage'][0].tolist()])[None]
@@ -76,6 +80,18 @@ def main():
             b = dev.batch_m(mx.array([i], mx.int32), tm, 1)
             b['hplan'] = hplan(b, k)
             with_map(b, maps, k)
+            if is_mbn:
+                # The net's own notes, as in play (no teacher forcing).
+                b['n_teacher'] = mx.zeros((1,), mx.int32)
+                for key in model.NOTE_STATE:
+                    b['ns_' + key] = ns[key]
+                b['ns_off'] = mx.array([False])
+                um, pm, alive, nst, _, _ = unroll_one_n(model, b, mx.array([True]), mx.array([False]), um, pm, alive, False)
+                ns = dict(zip(model.NOTE_STATE, nst))
+                Us.append(um)
+                Ps.append(pm)
+                NS.append(ns)
+                continue
             if is_mn:
                 b['n_teacher'] = mx.zeros((1,), mx.int32)  # the net's own notes, as in play
                 um, pm, alive, ns, _, _ = TN.unroll_one_mn(model, b, mx.array([True]), mx.array([False]), um, pm, alive, ns, None)
@@ -99,6 +115,10 @@ def main():
             k = P.turn[i]
             b['hplan'] = hplan(b, k)
             with_map(b, maps, k)
+            if is_mbn:
+                for key in model.NOTE_STATE:
+                    b['ns_' + key] = NS[k][key]
+                b['ns_off'] = mx.array([False])
             hf = model.body_mn(b['tok'], b['dist'], b['tmask'], b['slot'], Us[k], Ps[k], b['hist'], b['hmask'], b['hslot'], b['hplan'], NS[k]) if is_mn else body_any(model, b, Us[k], Ps[k])
             h = hf[:, :tm]
             pl = model.pointer_logits(h, b['sel'])[0].tolist()

@@ -318,6 +318,18 @@ fn combat_decision(d: &kernel::ai::plan::Decision<Classic>) -> bool {
     }
 }
 
+/// One army unit's row of a learner round in the unit log (`unit_log`).
+struct UnitRow {
+    slot: usize,
+    hp: u16,
+    rest_gov: bool,
+    rest_end: bool,
+    struck_city: bool,
+    struck_any: bool,
+    dist_start: i32,
+    dist_end: i32,
+}
+
 fn play_on<P: kernel::ai::mind::AiMind<Classic>>(rules: &CompiledRuleset, mut game: GameState, mut scene: Scene, player: &str, trace: bool, seat: Seat, mut driver: AiDriver<Classic, P>) -> Result<Row, String> {
     driver.set_trace_capacity(0);
     if !lab::mode::fog() {
@@ -360,6 +372,21 @@ fn play_on<P: kernel::ai::mind::AiMind<Classic>>(rules: &CompiledRuleset, mut ga
     }
     let rnd = Draw::new(lab::mix(0xa11d ^ (scene.instance as u64) << 8 ^ u64::from(scene.attempt) << 40 ^ (scene.fam as u64) << 48 ^ u64::from(scene.era) << 56));
     let mut verdict: Option<bool> = None;
+    // The round log of an assault play (`round_log`): per learner round its stage label (the staged teacher's own
+    // state; the net's plan readout after its turn end), the army units that ended our turn nearer the city than they
+    // began it, the army alive, and our units hit within the city's strike range in the enemy turn that followed.
+    let logged = assault::is_assault(scene.fam);
+    let city_t = scene.target.unwrap_or(scene.centre);
+    let snap = |game: &GameState, scene: &Scene| -> BTreeMap<EntityId, (TileId, u16)> { scene.mine_alive(game).iter().map(|(p, c)| (p.id, (c.tile, c.hp))).collect() };
+    let mut rlog: BTreeMap<u32, (String, usize, usize, usize)> = BTreeMap::new();
+    let mut r_pre: Option<(u32, BTreeMap<EntityId, (TileId, u16)>)> = None;
+    let mut r_post: Option<(u32, BTreeMap<EntityId, (TileId, u16)>)> = None;
+    // The unit log (`unit_log`, info only): per learner round and army unit (slot, hp at the turn's start, resting by the seat's own
+    // state in force for the turn's decisions and at its end, struck a city, struck anything, distance to the city at the turn's start and end).
+    let mut ulog: BTreeMap<u32, BTreeMap<usize, UnitRow>> = BTreeMap::new();
+    let mut rest_prev: BTreeSet<usize> = BTreeSet::new();
+    let slot_of = |id: &EntityId| orders.army.iter().position(|a| a == id);
+    let stage_label = |s: usize, e: bool| format!("{}{}", crate::army_net::model::STAGE_NAMES.get(s).copied().unwrap_or("?"), if e { "+e" } else { "" });
     let mut scripted_mine: Option<u32> = None;
     let mut scripted_theirs: Option<u32> = None;
     let mut guard = 0;
@@ -375,10 +402,47 @@ fn play_on<P: kernel::ai::mind::AiMind<Classic>>(rules: &CompiledRuleset, mut ga
                 if let Some(at) = crate::army_net::seat::save_at().filter(|a| now.saturating_sub(round0) == a.round && matches!(seat, Seat::Net | Seat::Script(_))) {
                     game = crate::army_net::seat::save_and_load(rules, &game, &orders, &mut scene, &at)?;
                 }
+                if logged {
+                    let pre = snap(&game, &scene);
+                    if let Some((r, post)) = r_post.take() {
+                        let hit = post.iter().filter(|(id, (t, hp))| lab::dist(&game, *t, city_t) <= classic_rules::combat::city::CITY_ATTACK_RANGE && pre.get(*id).is_none_or(|x| x.1 < *hp)).count();
+                        rlog.entry(r).or_default().3 = hit;
+                    }
+                    if let (Seat::Net, Some((r, _))) = (&seat, r_pre.as_ref()) {
+                        if let Some((s, e)) = crate::army_net::seat::take_stage() {
+                            rlog.entry(*r).or_default().0 = stage_label(s, e);
+                        }
+                        if let Some(rest) = crate::army_net::seat::take_rest() {
+                            rest_prev = rest.iter().enumerate().filter(|(_, b)| **b).map(|(s, _)| s).collect();
+                            for row in ulog.entry(*r).or_default().values_mut() {
+                                row.rest_end = row.slot < rest.len() && rest[row.slot];
+                            }
+                        }
+                    }
+                    let rnow = now.saturating_sub(round0);
+                    // The net decides with the resting set it wrote at the last turn's end; a staged teacher's is set below, after its turn.
+                    let gov = |slot: usize| matches!(seat, Seat::Net) && rest_prev.contains(&slot);
+                    let rows = ulog.entry(rnow).or_default();
+                    for (id, (tile, hp)) in &pre {
+                        if let Some(slot) = slot_of(id) {
+                            rows.insert(slot, UnitRow { slot, hp: *hp, rest_gov: gov(slot), rest_end: false, struck_city: false, struck_any: false, dist_start: lab::dist(&game, *tile, city_t), dist_end: -1 });
+                        }
+                    }
+                    r_pre = Some((rnow, pre));
+                }
                 match &seat {
                     Seat::Mind(_) => {}
                     Seat::Script(name) => {
                         families::reference_turn(rules, &mut game, &mut scene, name);
+                        if logged && assault::flags(name).is_some() {
+                            let ts = crate::army_net::seat::teacher_state(&game, &scene, &orders, &scene.track);
+                            rlog.entry(now.saturating_sub(round0)).or_default().0 = stage_label(ts[2].max(0) as usize, ts[0] > 0);
+                            for row in ulog.entry(now.saturating_sub(round0)).or_default().values_mut() {
+                                let rest = orders.army.get(row.slot).is_some_and(|id| scene.track.resting.contains(id));
+                                row.rest_gov = rest;
+                                row.rest_end = rest;
+                            }
+                        }
                         {
                             let l = scene.learner;
                             assault::sample(rules, &game, &mut scene, l);
@@ -411,6 +475,24 @@ fn play_on<P: kernel::ai::mind::AiMind<Classic>>(rules: &CompiledRuleset, mut ga
             }
             if active == scene.enemy && scripted_theirs != Some(now) && !game.is_over() {
                 scripted_theirs = Some(now);
+                if logged {
+                    if let Some((r, pre)) = r_pre.as_ref() {
+                        let post = snap(&game, &scene);
+                        let fwd = post.iter().filter(|(id, (t, _))| pre.get(*id).is_some_and(|(t0, _)| lab::dist(&game, *t, city_t) < lab::dist(&game, *t0, city_t))).count();
+                        let e = rlog.entry(*r).or_default();
+                        e.1 = fwd;
+                        e.2 = post.len();
+                        let (city_slots, any_slots) = crate::army_net::observe::struck_slots_of_round(now);
+                        for row in ulog.entry(*r).or_default().values_mut() {
+                            row.struck_city = city_slots.contains(&(row.slot as i16));
+                            row.struck_any = any_slots.contains(&(row.slot as i16));
+                            if let Some((t, _)) = orders.army.get(row.slot).and_then(|id| post.get(id)) {
+                                row.dist_end = lab::dist(&game, *t, city_t);
+                            }
+                        }
+                        r_post = Some((*r, post));
+                    }
+                }
                 families::enemy_turn(rules, &mut game, &mut scene);
             }
             let t_step = std::time::Instant::now();
@@ -461,6 +543,25 @@ fn play_on<P: kernel::ai::mind::AiMind<Classic>>(rules: &CompiledRuleset, mut ga
     if assault::is_assault(scene.fam) {
         scene.info.insert("picks".into(), scene.track.picks.join("; "));
         scene.info.insert("city_strikes".into(), crate::army_net::observe::city_strikes(round0));
+        if let (Seat::Net, Some((r, _))) = (&seat, r_pre.as_ref()) {
+            if let Some((s, e)) = crate::army_net::seat::take_stage() {
+                rlog.entry(*r).or_default().0 = stage_label(s, e);
+            }
+        }
+        if let (Seat::Net, Some((r, _))) = (&seat, r_pre.as_ref()) {
+            if let Some(rest) = crate::army_net::seat::take_rest() {
+                for row in ulog.entry(*r).or_default().values_mut() {
+                    row.rest_end = row.slot < rest.len() && rest[row.slot];
+                }
+            }
+        }
+        let unit_log = ulog
+            .iter()
+            .map(|(r, rows)| format!("{r}:{}", rows.values().map(|u| format!("{},{},{}{},{}{},{},{}", u.slot, u.hp, u8::from(u.rest_gov), u8::from(u.rest_end), u8::from(u.struck_city), u8::from(u.struck_any), u.dist_start, u.dist_end)).collect::<Vec<_>>().join("|")))
+            .collect::<Vec<_>>()
+            .join(";");
+        scene.info.insert("unit_log".into(), unit_log);
+        scene.info.insert("round_log".into(), rlog.iter().map(|(r, (l, f, a, h))| format!("{r}:{l}:{f}/{a}:{h}")).collect::<Vec<_>>().join(";"));
     }
     let mut measures = families::measures(rules, &game, &scene, rel);
     // Times are not measures of the play (they differ from run to run): they go to `info`.

@@ -1195,7 +1195,7 @@ impl Run {
                 }
             }
             // The unit's turn is over: `standard` plays the rest of the seat and must not move it.
-            stand(game, p.h);
+            stand(game, rules, p.h);
         }
         made
     }
@@ -1698,10 +1698,8 @@ fn ceiling_value(game: &GameState, run: &Run) -> f64 {
     mine - theirs + if run.win == Some(true) { 2.0 } else { 0.0 }
 }
 
-fn stand(game: &mut GameState, h: UnitHandle) {
-    if let Some(core) = game.world_mut().units.get_mut_core(h) {
-        core.moves_left = 0;
-    }
+fn stand(game: &mut GameState, rules: &CompiledRuleset, h: UnitHandle) {
+    crate::trainers::act::hold_unit(game, rules, h);
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -1716,12 +1714,12 @@ fn ceiling_rollout(rules: &CompiledRuleset, game: &GameState, run: &Run, saved: 
                 return f64::NEG_INFINITY;
             }
             if !matches!(cmd, Command::MoveUnit { .. }) {
-                stand(&mut g, unit);
+                stand(&mut g, rules, unit);
                 rest.retain(|h| *h != unit);
             }
         }
         Pick::Stand => {
-            stand(&mut g, unit);
+            stand(&mut g, rules, unit);
             rest.retain(|h| *h != unit);
         }
     }
@@ -1817,12 +1815,12 @@ fn ceiling_turn<P: AiMind<Classic>>(rules: &CompiledRuleset, game: &mut GameStat
                 if game.execute(rules, cmd).is_err() {
                     queue.remove(0);
                 } else if !is_move {
-                    stand(game, unit);
+                    stand(game, rules, unit);
                     queue.remove(0);
                 }
             }
             _ => {
-                stand(game, unit);
+                stand(game, rules, unit);
                 queue.remove(0);
             }
         }

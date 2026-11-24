@@ -508,17 +508,13 @@ impl Root<'_> {
                 // The net's fortify ends the unit's turn too (`hold_wait`): the fast policy
                 // never uses it again this turn, as the net's own unit does not.
                 if self.hold_wait && matches!(cmd, Command::Fortify { .. }) {
-                    if let Some(core) = g.world_mut().units.get_mut_core(rest[0]) {
-                        core.moves_left = 0;
-                    }
+                    crate::trainers::act::hold_unit(&mut g, rules, rest[0]);
                     rest.remove(0);
                 }
             }
             Choice::Wait => {
                 if self.hold_wait {
-                    if let Some(core) = g.world_mut().units.get_mut_core(rest[0]) {
-                        core.moves_left = 0;
-                    }
+                    crate::trainers::act::hold_unit(&mut g, rules, rest[0]);
                 }
                 rest.remove(0);
             }

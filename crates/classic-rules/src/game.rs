@@ -487,7 +487,12 @@ impl ClassicGame for GameState {
         let Some(core) = self.view().auth.units().get(unit).map(|u| *u.core) else {
             return;
         };
-        let heal = crate::systems::combat::heal::heal_amount(self.view().auth, rules, &core);
+        // A unit that heals even when it has moved (AlwaysHeal) gets its heal from the engine's own end of turn;
+        // granting it here too would heal it twice.
+        let mut moved = core;
+        moved.moves_left = 0;
+        let engine_heals_anyway = moved.has_moved() && crate::systems::combat::heal::heal_amount(self.view().auth, rules, &moved) > 0;
+        let heal = if engine_heals_anyway { 0 } else { crate::systems::combat::heal::heal_amount(self.view().auth, rules, &core) };
         if heal > 0 {
             self.debug_set_unit_hp(unit, core.hp.saturating_add(heal as u16));
         }

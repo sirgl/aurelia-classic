@@ -1067,7 +1067,7 @@ impl Run {
             _ => self.takecity_turn(rules, game),
         };
         for (p, _) in self.mine_alive(game) {
-            stand(game, p.h);
+            stand(game, rules, p.h);
         }
         made
     }

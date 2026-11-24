@@ -5,6 +5,7 @@
 use aurelia_qa::bench::modules::{BenchRules, ClassicBench};
 use aurelia_qa::trainers::families::{self, Fam};
 use aurelia_qa::trainers::{act, lab, play, suite};
+use classic_rules::ClassicGame;
 
 fn tiles(game: &classic_rules::GameState, sc: &aurelia_qa::trainers::Scene) -> Vec<(u32, u16, u32)> {
     sc.mine.iter().chain(&sc.theirs).filter_map(|p| act::core_of(game, p.h).map(|c| (c.tile.0, p.kind.0, u32::from(c.hp)))).collect()
@@ -196,4 +197,83 @@ fn the_citadel_stands_on_the_holders_land() {
         assert_eq!(map.owner(pass).flatten(), Some(sc.enemy), "instance {i}: the pass tile is the holders'");
         assert!(map.improvement(pass).flatten().is_some_and(|imp| rules.improvements[imp.0 as usize].nearby_enemy_damage > 0), "instance {i}: a citadel on the pass");
     }
+}
+
+// ---- The end of a unit's turn in a trainer (24 Nov: the army net's units never healed) ----
+
+/// The hit points of `h` after its owner ends the turn, when the unit was wounded to 40 first and `act` was applied.
+fn hp_after_turn_end(rules: &classic_rules::CompiledRuleset, game: &classic_rules::GameState, h: classic_rules::ids::UnitHandle, act: impl Fn(&mut classic_rules::GameState)) -> u16 {
+    let mut g = game.clone();
+    g.debug_set_unit_hp(h, 40);
+    act(&mut g);
+    let owner = g.view().auth.units().get(h).unwrap().core.owner;
+    g.execute(rules, classic_rules::Command::EndTurn { player: owner }).expect("the owner ends its turn");
+    g.view().auth.units().get(h).expect("the unit lives").core.hp
+}
+
+/// A unit that does not act heals what the rules give it, once, whoever ends its turn: the engine's own end of turn
+/// (the control: nobody touches the unit), the seat's stand (the army net, the scripted references), the teacher's
+/// rest. A unit that moved heals nothing, in every way of ending its turn. The old `stand` set `moves_left = 0`, so a
+/// unit that did not act counted as moved and never healed.
+#[test]
+fn a_unit_that_does_not_act_heals_by_the_rules_once_and_a_unit_that_moved_does_not() {
+    let rules = ClassicBench::rules();
+    let era = lab::era_index(&rules, "medieval").unwrap();
+    let (game, sc) = families::build(&rules, Fam::Duel, era, 0, 0).unwrap();
+    let side = game.view().auth.active_player();
+    let p = sc.mine.iter().chain(&sc.theirs).find(|p| act::core_of(&game, p.h).is_some_and(|c| c.owner == side)).expect("a unit of the active side").clone();
+    let h = p.h;
+    // The control: the engine's end of turn over an unmoved unit.
+    let engine = hp_after_turn_end(&rules, &game, h, |_| {});
+    assert!(engine > 40, "the rules heal a resting unit in this scene ({engine})");
+    // (a) the seat's stand (the net's `Done`, the end of the army) gives exactly that, once.
+    let stood = hp_after_turn_end(&rules, &game, h, |g| act::stand(g, &rules, h));
+    assert_eq!(stood, engine, "stand: an unmoved unit heals by the rules");
+    // Standing twice does not heal twice (the seat's end repeats the unit's own `Done`).
+    let twice = hp_after_turn_end(&rules, &game, h, |g| {
+        act::stand(g, &rules, h);
+        act::stand(g, &rules, h);
+    });
+    assert_eq!(twice, engine, "stand twice: once");
+    // (b) the teacher's rest.
+    let rested = hp_after_turn_end(&rules, &game, h, |g| aurelia_qa::trainers::assault::rest(g, &rules, side, h));
+    assert_eq!(rested, engine, "rest: an unmoved unit heals by the rules");
+    // (c) a unit that moved is not healed by the end of its turn, and a stand after the move does not give it either.
+    let start = act::core_of(&game, h).unwrap().tile;
+    let step = lab::tiles_within(&game, start, 1).into_iter().find(|t| *t != start && game.clone().accepts_order(&rules, side, &classic_rules::Command::MoveUnit { unit: h, destination: *t })).expect("a free neighbour");
+    let go = |g: &mut classic_rules::GameState| {
+        g.execute(&rules, classic_rules::Command::MoveUnit { unit: h, destination: step }).expect("the step");
+    };
+    let moved = hp_after_turn_end(&rules, &game, h, go);
+    assert_eq!(moved, 40, "a unit that moved does not heal");
+    let moved_stood = hp_after_turn_end(&rules, &game, h, |g| {
+        go(g);
+        act::stand(g, &rules, h);
+    });
+    assert_eq!(moved_stood, 40, "a unit that moved and stands does not heal");
+}
+
+/// The class: a trainer ends a unit's turn only through `act::hold_unit` / `act::stand`. Setting the moves to 0 by
+/// hand, or calling the harness hold directly, is how the army net's units lost their heal.
+#[test]
+fn no_trainer_ends_a_units_turn_outside_the_one_rule() {
+    fn walk(dir: &std::path::Path, hits: &mut Vec<String>) {
+        for e in std::fs::read_dir(dir).unwrap().flatten() {
+            let path = e.path();
+            if path.is_dir() {
+                walk(&path, hits);
+            } else if path.extension().is_some_and(|x| x == "rs") && !path.ends_with("trainers/act.rs") {
+                let text = std::fs::read_to_string(&path).unwrap();
+                for (i, line) in text.lines().enumerate() {
+                    let code = line.split("//").next().unwrap_or("");
+                    if code.contains("moves_left = 0") || code.contains("debug_hold_unit(") || code.contains("debug_set_unit_moves(") {
+                        hits.push(format!("{}:{}: {}", path.display(), i + 1, line.trim()));
+                    }
+                }
+            }
+        }
+    }
+    let mut hits = Vec::new();
+    walk(&std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src"), &mut hits);
+    assert!(hits.is_empty(), "a unit's turn ends through act::hold_unit only:\n{}", hits.join("\n"));
 }

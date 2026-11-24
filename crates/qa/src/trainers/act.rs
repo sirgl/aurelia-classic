@@ -55,12 +55,20 @@ fn execute(game: &mut GameState, rules: &CompiledRuleset, side: PlayerId, cmd: C
     ok
 }
 
-/// The unit's turn is over: the seat's mind plays the rest of the seat and must not move it.
+/// THE end of a unit's turn in a trainer harness (one rule): the seat's mind plays the rest of the seat and must
+/// not move the unit, and the unit gets what the rules' end of the turn gives it. A unit that has not moved heals
+/// now by `heal_amount` (the engine's own number, once: its moves are spent after, so the real end of the turn
+/// gives nothing more); a unit that moved gets nothing, as in the game. Setting `moves_left = 0` by hand instead
+/// made a unit that did not act count as moved and never heal. Every trainer, the seat of the army net and the
+/// search rollouts end a unit's turn here.
+pub fn hold_unit(game: &mut GameState, rules: &CompiledRuleset, h: UnitHandle) {
+    game.debug_hold_unit(rules, h);
+}
+
+/// The unit's turn is over (the recorder sees the "done" action first): see `hold_unit`.
 pub fn stand(game: &mut GameState, rules: &CompiledRuleset, h: UnitHandle) {
     crate::army_net::record::done(game, rules, h);
-    if let Some(core) = game.world_mut().units.get_mut_core(h) {
-        core.moves_left = 0;
-    }
+    hold_unit(game, rules, h);
 }
 
 /// The defence percent of a tile for `side` (the rules' number).

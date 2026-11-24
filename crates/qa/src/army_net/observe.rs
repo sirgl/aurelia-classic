@@ -333,6 +333,22 @@ pub fn facts_of_round(round: u32) -> RoundFacts {
     })
 }
 
+/// The army slots that struck a city this round (the condition of `city_strikes`), and those that attacked anything.
+pub fn struck_slots_of_round(round: u32) -> (Vec<i16>, Vec<i16>) {
+    HISTORY.with(|h| {
+        let (mut city, mut any) = (Vec::new(), Vec::new());
+        for e in h.borrow().events.iter().filter(|e| e.round == round && e.slot >= 0) {
+            if (e.f[2] > 0.5 || (e.f[3] > 0.5 && e.f[19] > 0.5)) && !city.contains(&e.slot) {
+                city.push(e.slot);
+            }
+            if (e.f[1] > 0.5 || e.f[2] > 0.5 || e.f[3] > 0.5) && !any.contains(&e.slot) {
+                any.push(e.slot);
+            }
+        }
+        (city, any)
+    })
+}
+
 /// No history (the ablation).
 pub fn mask_history(t: &mut Tokens) {
     t.hist.clear();
