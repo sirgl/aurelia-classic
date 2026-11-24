@@ -35,7 +35,7 @@
 //! - feint: ref-trace (last step of the leader), ref-split, ref-guess (nearest city: a tie goes to the lower tile),
 //!   ref-first (the first legs), ref-wait (ref-trace one round late);
 //! - scout-report: ref-extend (the road through the sightings), ref-spread, ref-stay (reacts when the enemy shows);
-//! - fog-sniper: ref-source, ref-search;
+//! - fog-sniper: ref-source, ref-sweep;
 //! - city-reinforced: ref-plan (the garrison the scout saw decides: careful `ref-planned` or `ref-burst`), ref-burst,
 //!   ref-planned (the assault planners with the scout set apart);
 //! - two-fronts: ref-share (the holders are as many as the enemy force), ref-pile (all on the siege), ref-even (half
@@ -94,7 +94,7 @@ pub fn teachers(f: Fam) -> &'static [&'static str] {
     match f {
         Fam::Feint => &["ref-trace", "ref-split", "ref-guess", "ref-first", "ref-wait"],
         Fam::ScoutReport => &["ref-extend", "ref-spread", "ref-stay"],
-        Fam::FogSniper => &["ref-source", "ref-search"],
+        Fam::FogSniper => &["ref-source", "ref-sweep"],
         Fam::CityReinforced => &["ref-plan", "ref-burst", "ref-planned"],
         Fam::TwoFronts => &["ref-share", "ref-pile", "ref-even", "ref-hold-first"],
         Fam::TwinSiege => &["ref-twin", "ref-serial", "ref-equal"],
@@ -292,7 +292,7 @@ fn build_feint(p: &mut Painter, lab: &Lab, instance: usize, attempt: u32) -> Res
     arms_me.extend(vec![(Arm::Ranged, "ranged"); 2]);
     let start = at(p, (-2, 4))?;
     s.mine = put_group_by(p, me, start, 2, &arms_me, true, true)?;
-    let arms_foe = foe_arms(5, 2);
+    let arms_foe = foe_arms(5, 1);
     let t0 = at(p, p0)?;
     s.theirs = put_group_by(p, foe, t0, 2, &arms_foe, true, true)?;
     let offs = march_offsets(p, t0, &s.theirs);
@@ -324,7 +324,7 @@ fn build_scout(p: &mut Painter, lab: &Lab, instance: usize, attempt: u32) -> Res
     for c in SCOUT_CITIES {
         let t = at(p, c)?;
         let h = p.city(me, t, pop, false);
-        weaken(p, h, 30);
+        weaken(p, h, 5);
         tiles.push(t);
     }
     // One outpost beside each possible road, where the road's first three stops are in its sight and the stop at the decision round is not.
@@ -390,7 +390,8 @@ fn march_enemy(rules: &CompiledRuleset, game: &mut GameState, sc: &mut Scene) {
     let sc2 = sc.clone();
     let friends: Vec<classic_rules::ids::UnitHandle> = theirs.iter().map(|p| p.h).collect();
     let ours = move |g: &GameState| -> Vec<TileId> {
-        let mut v: Vec<TileId> = sc2.mine_alive(g).iter().map(|(_, c)| c.tile).collect();
+        // The march ignores our field units: it fights only what stands at the city it is going to.
+        let mut v: Vec<TileId> = sc2.mine_alive(g).iter().map(|(_, c)| c.tile).filter(|t| dist(g, *t, goal) <= 1).collect();
         if owner_of_city(g, goal) == Some(sc2.learner) {
             v.push(goal);
         }
@@ -481,8 +482,8 @@ fn march_teacher(rules: &CompiledRuleset, game: &mut GameState, sc: &mut Scene, 
                 (Some(a), Some(b)) => Some(project(game, sc.centre, a, b, 1, &cities)),
                 _ => None,
             },
-            "ref-extend" if rel >= decide_at => {
-                let pts: Vec<(u32, TileId)> = (0..rel).filter_map(|r| sighted(sc, r).map(|t| (r, t))).collect();
+            "ref-extend" if rel >= 2 => {
+                let pts: Vec<(u32, TileId)> = (0..=rel).filter_map(|r| sighted(sc, r).map(|t| (r, t))).collect();
                 match (pts.first(), pts.last()) {
                     (Some(a), Some(b)) if b.0 > a.0 => Some(project(game, sc.centre, a.1, b.1, i64::from(b.0 - a.0), &cities)),
                     _ => None,
@@ -531,12 +532,17 @@ fn build_sniper(p: &mut Painter, lab: &Lab, instance: usize, attempt: u32) -> Re
     let (me, foe) = (lab.learner, lab.enemy);
     let rules = p.rules;
     let at = |p: &Painter, d: (i64, i64)| p.at(d.0, d.1).ok_or_else(|| "off the map".to_owned());
+    // A wall of hills (row 1, seven wide) with the sniper's row behind it (row 0, five wide); ours stand in the open in row 2.
     let k = p.d.range(0, 5) as usize;
-    let dirs = [DIRS[k], DIRS[(k + 1) % 6], DIRS[(k + 2) % 6]];
-    let z = at(p, (0, 0))?;
-    let mut ridge = vec![z];
-    for d in dirs {
-        ridge.push(at(p, d)?);
+    let (d, l) = (DIRS[k], DIRS[(k + 1) % 6]);
+    let tile = |row: i64, col: i64| (row * d.0 + col * l.0, row * d.1 + col * l.1);
+    let z = at(p, tile(0, 0))?;
+    let mut ridge = Vec::new();
+    for c in -2..=2 {
+        ridge.push(at(p, tile(0, c))?);
+    }
+    for c in -3..=3 {
+        ridge.push(at(p, tile(1, c))?);
     }
     let hills = lab.grounds.hills;
     p.paint(&ridge, hills);
@@ -544,9 +550,9 @@ fn build_sniper(p: &mut Painter, lab: &Lab, instance: usize, attempt: u32) -> Re
     let sniper = p.put(foe, z, sniper_kind, "sniper");
     s.theirs.push(sniper);
     let arms = [(Arm::Melee, "army"), (Arm::Ranged, "ranged"), (Arm::Melee, "army")];
-    for (d, (arm, role)) in dirs.iter().zip(arms) {
+    for (c, (arm, role)) in [-1i64, 0, 1].into_iter().zip(arms) {
         let kind = p.kind(arm).ok_or("no kind")?;
-        let piece = p.put(me, at(p, (2 * d.0, 2 * d.1))?, kind, role);
+        let piece = p.put(me, at(p, tile(2, c))?, kind, role);
         s.mine.push(piece);
     }
     // The ridge hides the sniper: none of ours sees his tile.
@@ -555,6 +561,10 @@ fn build_sniper(p: &mut Painter, lab: &Lab, instance: usize, attempt: u32) -> Re
         return Err("the sniper is in sight".into());
     }
     s.info.insert("sniper".into(), z.0.to_string());
+    // The objective token must not point at the sniper: it points at the middle of our three.
+    if let Some(m) = s.mine.get(1) {
+        s.centre = act::core_of(&p.game, m.h).map_or(s.centre, |c| c.tile);
+    }
     Ok(s)
 }
 
@@ -565,13 +575,26 @@ fn sniper_enemy(rules: &CompiledRuleset, game: &mut GameState, sc: &mut Scene) {
     let Some(c) = act::alive(game, &p, me) else { return };
     let ours: Vec<TileId> = sc.mine_alive(game).iter().map(|(_, u)| u.tile).collect();
     let _ = foe;
-    // The weakest unit in reach: a kill first, then the fewest hit points left.
+    // It shoots the weakest unit in reach (a kill first, then the fewest hit points left) ...
     if let Some((_, t)) = act::best_blow(game, rules, me, p.h, &ours, Nerve::Reckless) {
         if act::strike(game, rules, me, p.h, t) {
             sc.info.insert("src".into(), c.tile.0.to_string());
             sc.info.insert("src_round".into(), rel.to_string());
             let n: u32 = sc.info.get("hits").and_then(|v| v.parse().ok()).unwrap_or(0);
             sc.info.insert("hits".into(), (n + 1).to_string());
+        }
+    }
+    // ... and then relocates out of sight: a tile within 2 from which it hits one of ours and which none of ours sees
+    // (the farthest from them wins; none: it stays).
+    if let Some(range) = act::range_of(rules, c.kind) {
+        let view = game.player_view(rules, sc.learner);
+        let best = tiles_within(game, c.tile, 2)
+            .into_iter()
+            .filter(|t| *t != c.tile && crate::battle::standable(rules, game, *t) && game.view().auth.indexes().units_on(*t).is_empty() && game.view().auth.indexes().city_on_tile(*t).is_none())
+            .filter(|t| !view.is_visible(*t) && ours.iter().any(|o| can_hit(game, range, *t, *o)))
+            .max_by_key(|t| (ours.iter().map(|o| dist(game, *t, *o)).min().unwrap_or(0), std::cmp::Reverse(t.0)));
+        if let Some(goal) = best {
+            act::move_by(game, rules, me, p.h, |g, x, _| (dist(g, x, goal), x.0));
         }
     }
     act::stand(game, rules, p.h);
@@ -589,10 +612,13 @@ fn sniper_teacher(rules: &CompiledRuleset, game: &mut GameState, sc: &mut Scene,
     let mut order: Vec<Piece> = sc.mine.clone();
     order.sort_by_key(|p| (u8::from(act::range_of(rules, p.kind).is_some()), p.id.0));
     if name == "ref-source" {
-        let Some(z) = src else {
+        let Some(z0) = src else {
             hold_all(rules, game, sc);
             return;
         };
+        // The sniper keeps within 2 of where it last shot from: the informed units aim at that neighbourhood, at the
+        // tile he stands on if it is in it.
+        let z = sc.theirs.first().and_then(|p| act::alive(game, p, sc.enemy)).map(|c| c.tile).filter(|t| dist(game, *t, z0) <= 2).unwrap_or(z0);
         let target = [z];
         for p in order {
             let Some(c) = act::alive(game, &p, me) else { continue };
@@ -612,27 +638,33 @@ fn sniper_teacher(rules: &CompiledRuleset, game: &mut GameState, sc: &mut Scene,
         }
         return;
     }
-    // ref-search: blind. Each unit walks its own bearing outward from the start, a quarter turn every two rounds; whatever it sees it attacks.
+    // ref-sweep: blind, honest. The fog nearest to each unit that nobody has looked at yet is where it goes; whatever shows is attacked.
     let seen: Vec<TileId> = foes_seen(rules, game, sc).iter().map(|c| c.tile).collect();
-    for (i, p) in order.iter().enumerate() {
+    let view = game.player_view(rules, me);
+    let mut looked: std::collections::BTreeSet<TileId> = get_tiles(&sc.info, "looked").into_iter().collect();
+    for (_, u) in sc.mine_alive(game) {
+        for t in tiles_within(game, u.tile, 3) {
+            if view.is_visible(t) {
+                looked.insert(t);
+            }
+        }
+    }
+    put_tiles(&mut sc.info, "looked", &looked.iter().copied().collect::<Vec<_>>());
+    let mut claimed: Vec<TileId> = Vec::new();
+    for p in order.iter() {
         let Some(c) = act::alive(game, p, me) else { continue };
         if !seen.is_empty() {
             act::unit_turn(game, rules, me, sc.enemy, p.h, &Aim::Close, Nerve::Reckless, &|_g: &GameState| seen.clone(), &friends);
             continue;
         }
-        // Blind: away from the group's middle (every direction is as good as any other), a sixth of a turn each round.
-        let mine_now: Vec<(i64, i64)> = sc.mine_alive(game).iter().map(|(_, u)| rel_xy(game, sc.centre, u.tile)).collect();
-        let n = mine_now.len().max(1) as f64;
-        let (mq, mr) = (mine_now.iter().map(|t| t.0 as f64).sum::<f64>() / n, mine_now.iter().map(|t| t.1 as f64).sum::<f64>() / n);
-        let (uq, ur) = rel_xy(game, sc.centre, c.tile);
-        let away = (uq as f64 - mq, ur as f64 - mr);
-        let bearing = if away.0.abs() + away.1.abs() < 0.3 {
-            DIRS[(i + rel as usize) % 6]
-        } else {
-            *DIRS.iter().min_by(|a, b| hdf(a.0 as f64 - away.0 / 2.0, a.1 as f64 - away.1 / 2.0).total_cmp(&hdf(b.0 as f64 - away.0 / 2.0, b.1 as f64 - away.1 / 2.0))).expect("dirs")
-        };
-        let goal = tile_rel(game, c.tile, (bearing.0 * 4, bearing.1 * 4)).unwrap_or(c.tile);
-        act::move_by(game, rules, me, p.h, |g, x, _| (dist(g, x, goal), x.0));
+        let goal = tiles_within(game, c.tile, 5)
+            .into_iter()
+            .filter(|t| !looked.contains(t) && !claimed.contains(t) && crate::battle::standable(rules, game, *t))
+            .min_by_key(|t| (dist(game, c.tile, *t), t.0));
+        if let Some(goal) = goal {
+            claimed.push(goal);
+            act::move_by(game, rules, me, p.h, |g, x, _| (dist(g, x, goal), x.0));
+        }
         act::stand(game, rules, p.h);
     }
 }
