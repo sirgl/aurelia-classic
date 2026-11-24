@@ -408,7 +408,7 @@ class MBNNet(MBNet):
 
 
 # MBe: the hand-set term's numbers (M-HANDOFF.md, "Hand edit: wounded out of range (24 Nov)"; model.rs WW_LEN).
-WW = ('scale', 'hp_threshold', 'hp_slope', 'ranged_hp_threshold', 'resting_weight', 'city_low_threshold', 'city_low_slope', 'resting_slope', 'stay_scale', 'healing_weight', 'back_threshold')
+WW = ('scale', 'hp_threshold', 'hp_slope', 'ranged_hp_threshold', 'resting_weight', 'city_low_threshold', 'city_low_slope', 'resting_slope', 'stay_scale', 'healing_weight', 'back_threshold', 'strike_scale', 'ranged_strike_threshold')
 # Half the smallest step of a token's hit points (model.rs HEALING_STEP).
 HEALING_STEP = 0.005
 
@@ -423,7 +423,9 @@ class MBENet(MBNet):
                  gained = the token's number 46 (hit points gained since our last turn: the unit is healing, rests until back),
                  hp = the unit token's number 7, thr = ranged_hp_threshold for a unit with range (token number 13 > 0),
                  else hp_threshold; u = the unit's memory slot as the decision reads it;
-      city_low = sigmoid(city_low_slope (city_low_threshold - the objective city's hp share)) (token numbers 3, 43, 7).
+      city_low = sigmoid(city_low_slope (city_low_threshold - the objective city's hp share)) (token numbers 3, 43, 7);
+    and (3) a strike (kinds 2-4) loses `strike_scale x sigmoid(hp_slope (strike thr - hp)) x (1 - city_low)`, strike thr =
+    ranged_strike_threshold for a unit with range, else hp_threshold.
     `ww` = the numbers above (WW order). Zero scale = MB exactly. `crates/qa/src/army_net/model.rs` `actions_x` is the
     same arithmetic."""
 
@@ -433,7 +435,7 @@ class MBENet(MBNet):
         self.ww = mx.zeros((len(WW),))
 
     def wounded_gate(self, tok, unit, slot, um):
-        """[B]: wounded x (1 - city_low) of the acting unit."""
+        """([B], [B]): wounded x (1 - city_low) and the strike gate x (1 - city_low) of the acting unit."""
         from .model_m import U_RESTING
         b = tok.shape[0]
         w = self.ww
@@ -450,12 +452,16 @@ class MBENet(MBNet):
         city = mx.where(mx.any(is_city, axis=1), tok[ar, first, 7], 1.0)
         healing = w[9] * mx.sigmoid(w[2] * (w[10] - f[:, 7])) * mx.sigmoid(w[2] * (f[:, 46] - HEALING_STEP))
         low = mx.sigmoid(w[6] * (w[5] - city))
-        return mx.maximum(mx.maximum(hp, rest), healing) * (1.0 - low)
+        strike = mx.sigmoid(w[2] * (mx.where(f[:, 13] > 0.0, w[12], w[1]) - f[:, 7]))
+        return mx.maximum(mx.maximum(hp, rest), healing) * (1.0 - low), strike * (1.0 - low)
 
-    def wounded_term(self, cand, gate, out_of_fire):
-        """[B, C]: the terms subtracted from each candidate's logit (out_of_fire [B]: 1 - the unit token's number 36)."""
+    def wounded_term(self, cand, gates, out_of_fire):
+        """[B, C]: the terms subtracted from each candidate's logit (gates: `wounded_gate`; out_of_fire [B]: 1 - the unit token's
+        number 36)."""
+        gate, gs = gates
         f = cand[..., 16] * (cand[..., 0] + cand[..., 1] + cand[..., 5] + cand[..., 6])
-        return (self.ww[0] * f + self.ww[8] * cand[..., 1] * out_of_fire[:, None]) * gate[:, None]
+        strike = cand[..., 2] + cand[..., 3] + cand[..., 4]
+        return (self.ww[0] * f + self.ww[8] * cand[..., 1] * out_of_fire[:, None]) * gate[:, None] + self.ww[11] * strike * gs[:, None]
 
     def action_logits_g(self, h, unit, cand, promo, cmask, gcand, cand_ok, tok=None, slot=None, um=None):
         from .model import NEG

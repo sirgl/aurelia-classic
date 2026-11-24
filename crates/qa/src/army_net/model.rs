@@ -200,8 +200,8 @@ pub struct Net {
 
 /// The numbers of the hand-set term `ww` (`army/model_mb.py`, `MBENet`; M-HANDOFF.md, "Hand edit: wounded out of range"):
 /// [scale, hp threshold, hp slope, ranged hp threshold, resting weight, city-low threshold, city-low slope, resting slope,
-/// stay scale, healing weight, back threshold].
-pub const WW_LEN: usize = 11;
+/// stay scale, healing weight, back threshold, strike scale, ranged strike threshold].
+pub const WW_LEN: usize = 13;
 /// Half the smallest step of a token's hit points (1 / 100): "gained since our last turn" is number 46 above it.
 const HEALING_STEP: f32 = 0.005;
 
@@ -1300,21 +1300,24 @@ impl Net {
     /// loses `stay scale x g` (a unit that moves does not heal). wounded = max(sigmoid(hp slope (threshold - hp)), resting weight x
     /// sigmoid(resting slope x the memory's resting readout), healing weight x sigmoid(hp slope (back threshold - hp)) x
     /// sigmoid(hp slope (gained since our last turn - HEALING_STEP))), the threshold the ranged one for a unit with range; city_low =
-    /// sigmoid(slope (threshold - the objective city's hp share)). `MBENet.wounded_term` is the same arithmetic.
+    /// sigmoid(slope (threshold - the objective city's hp share)); (3) a strike (kinds 2-4) loses `strike scale x sigmoid(hp slope
+    /// (strike threshold - hp)) x (1 - city_low)`, the strike threshold the hp threshold, for a unit with range the ranged strike
+    /// threshold. `MBENet.wounded_term` is the same arithmetic.
     pub fn actions_x(&self, body: &Body, unit: usize, candidates: &[Candidate], map: Option<&MapState>, tokens: &Tokens, mem: Option<&MemIn>) -> Vec<f32> {
         let mut out = self.actions(body, unit, candidates, map);
         let Some(w) = self.ww else { return out };
-        let g = self.wounded_gate(&w, unit, tokens, mem);
+        let (g, gs) = self.wounded_gate(&w, unit, tokens, mem);
         let out_of_fire = 1.0 - tokens.feat[unit][36];
         for (o, c) in out.iter_mut().zip(candidates) {
             let f = c.feat[16] * (c.feat[0] + c.feat[1] + c.feat[5] + c.feat[6]);
-            *o -= (w[0] * f + w[8] * c.feat[1] * out_of_fire) * g;
+            let strike = c.feat[2] + c.feat[3] + c.feat[4];
+            *o -= (w[0] * f + w[8] * c.feat[1] * out_of_fire) * g + w[11] * strike * gs;
         }
         out
     }
 
-    /// The unit's factor of the `ww` term: wounded x (1 - city low).
-    fn wounded_gate(&self, w: &[f32; WW_LEN], unit: usize, tokens: &Tokens, mem: Option<&MemIn>) -> f32 {
+    /// The unit's factors of the `ww` terms: (wounded x (1 - city low), its strike gate x (1 - city low)).
+    fn wounded_gate(&self, w: &[f32; WW_LEN], unit: usize, tokens: &Tokens, mem: Option<&MemIn>) -> (f32, f32) {
         let sig = |v: f32| 1.0 / (1.0 + (-v).exp());
         let f = &tokens.feat[unit];
         let thr = if f[13] > 0.0 { w[3] } else { w[1] };
@@ -1329,7 +1332,8 @@ impl Net {
         let healing = w[9] * sig(w[2] * (w[10] - f[7])) * sig(w[2] * (f[46] - HEALING_STEP));
         let city = (0..tokens.len()).find(|i| tokens.feat[*i][3] > 0.5 && tokens.feat[*i][43] > 0.5).map_or(1.0, |i| tokens.feat[i][7]);
         let low = sig(w[6] * (w[5] - city));
-        hp.max(rest).max(healing) * (1.0 - low)
+        let strike = sig(w[2] * ((if f[13] > 0.0 { w[12] } else { w[1] }) - f[7]));
+        (hp.max(rest).max(healing) * (1.0 - low), strike * (1.0 - low))
     }
 
     pub fn has_ww(&self) -> bool {
