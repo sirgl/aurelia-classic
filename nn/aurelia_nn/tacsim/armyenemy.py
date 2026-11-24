@@ -99,7 +99,7 @@ def compare(g, rows, which, counts, show, ex):
         u2, c2 = after
         first = None
         # The scene's pieces only: a unit a home city trains in the window lives until the round's arena close.
-        n_pieces = len(g.plays[pi][0]["orders"]["roles"])
+        n_pieces = len(g.plays[pi][0]["orders"]["roles"]) + len(g.plays[pi][0]["scene"].get("reinforce", []))
         for k, u in enumerate(u2[:min(g.U, n_pieces)]):
             who = "enemy" if (u[8] if u[0] else side[b][k]) == 1 else "our"
             what = None

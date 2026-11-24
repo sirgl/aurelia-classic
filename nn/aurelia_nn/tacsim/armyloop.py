@@ -172,7 +172,7 @@ def greedy_pointer(logits, T):
     return mx.where(end | (best <= -1e8), -1, first)
 
 
-def replay(path, weights, group=200, limit=None, families=None, show=8, out=None, rust_memory=False):
+def replay(path, weights, group=200, limit=None, families=None, show=8, out=None, rust_memory=False, price_form=None, record=None):
     t0 = time.time()
     brain = Brain(load_net(weights))
     if rust_memory:
@@ -197,6 +197,10 @@ def replay(path, weights, group=200, limit=None, families=None, show=8, out=None
             statics = A.Obs(sim0, tab0).statics(s0)
             M = mx.zeros((P, 576, brain.m.config["map_ch"]))
         price = mx.array([sc["orders"]["price"] for sc, _, _ in plays], dtype=mx.float32)
+        if price_form:
+            # The probe of package 1: the same states under another price form (`armyprice.price_for`).
+            from . import armyprice
+            price = armyprice.price_for(price_form, plays)
         made = [collections.Counter() for _ in range(P)]
         diverged = [False] * P
         k = 0
@@ -289,6 +293,8 @@ def replay(path, weights, group=200, limit=None, families=None, show=8, out=None
                 fam[f]["decisions"] += 1
                 rp, ra = m.get("pick", -2), m.get("applied", -2)
                 mp = picks[r]
+                if record is not None:
+                    record[(plays[pi][0]["play"], m["round"], m["step"])] = (mp, acts.get(r))
                 ok_p = mp == rp
                 ok = ok_p and (mp < 0 or acts.get(r) == ra)
                 if ok:

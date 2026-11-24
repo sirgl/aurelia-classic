@@ -27,6 +27,7 @@ import mlx.core as mx
 
 from . import armyhist as H
 from . import armyobs as A
+from . import armyprice
 from . import exact
 from .armyloop import Brain, greedy_pointer, load_net, PER_UNIT
 from .sim import g1, gn, put1, I32, V_NONE, V_FORT, V_SETUP, V_MOVE, V_ATTACK, V_PROMOTE
@@ -175,7 +176,7 @@ class Game:
         self.row_ids = None
         self.verdict = mx.full((self.B,), -1, dtype=I32)
         self.city_low = mx.zeros((self.B,), dtype=mx.bool_)
-        self.cap_broken = mx.zeros((self.B,), dtype=mx.bool_)
+        self.pr = armyprice.attach(self, plays)
         self.counts = collections.Counter()
         self.cand_fn = self.obs.candidates
         self.legacy = False
@@ -850,6 +851,8 @@ class Game:
             self.s = sim.hold_units(self.s, (mx.arange(U)[None, :] == u) & mine[:, None], heal=self.hold_heals)
 
     def enemy_turn(self):
+        # The family script's first act (`assault::enemy_turn`): the reinforcements of assault-reinforce land.
+        armyprice.land_reinforcements(self, ~self.s["done"] & (self.verdict < 0))
         if self.scene_rule:
             from . import armyrule
             armyrule.enemy_turn(self)
@@ -982,13 +985,11 @@ class Game:
         W, L, N = 1, 0, -1
         v = mx.full((B,), N, dtype=I32)
         is_f = lambda names: mx.array([x in names for x in fam])
-        cap = mx.where(is_f({"assault-heal", "promotion-choice"}), n // 2, 1)
-        self.cap_broken = self.cap_broken | (is_f(ASSAULT) & (lost > cap))
         # siege, ram
         g = is_f({"siege", "ram"})
         v = mx.where(g, mx.where(taken, W, mx.where(limit | ~mil, L, N)), v)
-        g = is_f(ASSAULT)
-        v = mx.where(g, mx.where(self.cap_broken, L, mx.where(taken, W, mx.where(limit | ~mil, L, N))), v)
+        # The seven assault families: the loss cap, the deadline, the play-on past the cap (`armyprice`).
+        v = armyprice.assault_verdict(self, v, rel, taken, lost, mil, limit)
         g = is_f({"raid"})
         v = mx.where(g, mx.where((pill >= 3) & (lost <= 1), W, mx.where(limit | (lost >= 2), L, N)), v)
         g = is_f({"prey"})
@@ -1069,6 +1070,7 @@ def run(path, weights, copies=1, families=None, limit=None, rust=None, out=None,
             if b < len(gp):
                 rw = gp[b][2]["win"] if gp[b][2] else None
                 res.setdefault("plays", {})[sc["play"]] = [int(win), int(bool(rw))]
+                res.setdefault("rows", {})[sc["play"]] = armyprice.row(g, b)
                 per[key][2] += bool(rw)
                 per[key][3] += (rw == win)
                 per[key][4] += 1
@@ -1109,6 +1111,7 @@ def main(argv=None):
     ap.add_argument("--scene-rule", dest="scene_rule", action="store_true", default=True, help="the scene rule on both seats (the default, as in Rust)")
     ap.add_argument("--standard", dest="scene_rule", action="store_false", help="the port of standard instead of the rule (Rust ARMY_SCENE_RULE=standard)")
     ap.add_argument("--old-judge", action="store_true", help="judge after the enemy's turn (the G1 harness)")
+    ap.add_argument("--play-on-cap", action="store_true", help="a broken loss cap does not end the play (Rust ARMY_PLAY_ON_CAP=1)")
     ap.add_argument("--rust-memory", action="store_true", help="the memory's step in Rust's arithmetic order (armymem)")
     a = ap.parse_args(argv)
     if a.cpu:
@@ -1118,13 +1121,14 @@ def main(argv=None):
     def setup(g):
         g.enemy_rule, g.hold_heals, g.fort_rule, g.charge = a.enemy, not a.old_heal, a.fort, a.charge
         g.scene_rule = a.scene_rule
+        g.pr.play_on = a.play_on_cap
         g.judge_after_script = not a.old_judge
         if a.rust_memory:
             g.brain.use_rust_memory()
         if a.compile:
             g.enable_compile()
     res = run(a.dump, a.weights, copies=a.copies, families=a.families.split(",") if a.families else None, limit=a.limit, out=a.out, group=a.group, rounds=a.rounds, setup=setup)
-    res["setup"] = {"enemy": a.enemy, "old_heal": a.old_heal, "fort": a.fort, "charge": a.charge, "scene_rule": a.scene_rule, "old_judge": a.old_judge}
+    res["setup"] = {"play_on_cap": a.play_on_cap, "enemy": a.enemy, "old_heal": a.old_heal, "fort": a.fort, "charge": a.charge, "scene_rule": a.scene_rule, "old_judge": a.old_judge}
     if a.out:
         with open(a.out, "w") as fh:
             json.dump(res, fh, indent=1)

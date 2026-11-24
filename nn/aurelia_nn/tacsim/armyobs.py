@@ -32,6 +32,7 @@ import time
 
 import mlx.core as mx
 
+from . import armyprice
 from . import exact
 from .geometry import Geometry
 from .scene import Batch, N_CTX, FLAG_DELTA
@@ -1118,6 +1119,7 @@ def build_rows(plays, rows, templates=None):
         if k not in s:
             s[k] = v
     s = rebuild_profiles(sim, s, s0)
+    s = armyprice.spawn_profiles(sim, s, [plays[pi][0] for pi, _ in rows])
     U = tb.u
     ids, handles = [], []
     for _, m in rows:
@@ -1175,7 +1177,7 @@ def moment_inputs(plays, part, s, tab):
             skip[b] = skip[b] or "at peace (diplomacy: not in the simulator)"
         if [c[0] for c in m["state"]["cities"]] != [c[0] for c in plays[pi][0]["initial"]["cities"]]:
             skip[b] = skip[b] or "after a capture (the play is decided)"
-        if any(u[0] == 1 and u[1] >= 0 for u in st_units[len(plays[pi][0]["scene"]["profiles"]):]):
+        if any(u[0] == 1 and u[1] >= 0 for u in st_units[len(plays[pi][0]["scene"]["profiles"]):]) and not plays[pi][0]["scene"].get("reinforce"):
             skip[b] = skip[b] or "a unit the play created"
     s["u_far"] = mx.array(ufar); s["u_fq"] = mx.array(ufq, dtype=I32); s["u_fr"] = mx.array(ufr, dtype=I32)
     inp = {"rnd": mx.array([m["round"] for _, m in part], dtype=I32), "prev_has": mx.array(ph), "prev_tile_q": mx.array(pq, dtype=I32),

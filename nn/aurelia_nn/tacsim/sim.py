@@ -923,20 +923,24 @@ class Sim:
                           att=z, st=z, xp=z, kind=kind, level=mx.ones_like(new), icpt=z, mset=z)
         s["u_prom"] = put1(s["u_prom"], new, mx.zeros((self.B, s["u_prom"].shape[2]), dtype=mx.bool_), where)
         if profile_from is not None:
-            known = where & (profile_from >= 0)
-            s["u_prom"] = put1(s["u_prom"], new, self.tg(self.z["sp_prom"], profile_from), known)
-            s = self.set_unit(s, new, known, level=self.tg(self.z["sp_level"], profile_from))
-            ri = self.tg(self.sp_int, profile_from)  # [B, n]: one gather per table
-            for i, k in enumerate(self.sp_keys["int"]):
-                s["p_" + k] = put1(s["p_" + k], new, ri[:, i], known)
-            if self.sp_bool is not None:
-                rb = self.tg(self.sp_bool, profile_from)
-                for i, k in enumerate(self.sp_keys["bool"]):
-                    s["p_" + k] = put1(s["p_" + k], new, rb[:, i], known)
-            for k, tab in zip(self.sp_keys["vec"], self.sp_vec):
-                s["p_" + k] = put1(s["p_" + k], new, self.tg(tab, profile_from).astype(s["p_" + k].dtype), known)
+            s = self.put_spawn_profile(s, new, where & (profile_from >= 0), profile_from)
         s["n_slots"] = mx.where(where, new + 1, new)
         return s, new
+
+    def put_spawn_profile(self, s, slot, known, profile_from):
+        """The spawn table row `profile_from` [B] written to unit slot `slot` [B] where `known` (promotions, level, the profile)."""
+        s["u_prom"] = put1(s["u_prom"], slot, self.tg(self.z["sp_prom"], profile_from), known)
+        s = self.set_unit(s, slot, known, level=self.tg(self.z["sp_level"], profile_from))
+        ri = self.tg(self.sp_int, profile_from)  # [B, n]: one gather per table
+        for i, k in enumerate(self.sp_keys["int"]):
+            s["p_" + k] = put1(s["p_" + k], slot, ri[:, i], known)
+        if self.sp_bool is not None:
+            rb = self.tg(self.sp_bool, profile_from)
+            for i, k in enumerate(self.sp_keys["bool"]):
+                s["p_" + k] = put1(s["p_" + k], slot, rb[:, i], known)
+        for k, tab in zip(self.sp_keys["vec"], self.sp_vec):
+            s["p_" + k] = put1(s["p_" + k], slot, self.tg(tab, profile_from).astype(s["p_" + k].dtype), known)
+        return s
 
     def capture_civilians(self, s, captor, tile, where, civ):
         victim = gn(civ, tile[:, None])[:, 0]

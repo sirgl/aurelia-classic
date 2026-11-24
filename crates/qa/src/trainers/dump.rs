@@ -474,7 +474,7 @@ fn promotion_part(rules: &CompiledRuleset, game: &GameState, win: &Window, h: Un
     json!({"fit": fit.iter().map(|p| local(*p)).collect::<Vec<i32>>(), "delta": deltas, "pairs": pairs, "nonadditive": nonadditive})
 }
 
-fn stance_code(s: Stance) -> i32 {
+pub(crate) fn stance_code(s: Stance) -> i32 {
     match s {
         Stance::Ready => 0,
         Stance::Fortified { turns } => i32::from(turns),
@@ -711,6 +711,10 @@ fn scene_json(rules: &CompiledRuleset, game: &GameState, sc: &Scene, win: &Windo
         spawn[k]["civ_spawn"] = json!(c);
         k += 1;
     }
+    // The enemy's reinforcements (assault-reinforce) are spawned later in the play: the spawn row of each, for a simulator
+    // that lands them (an info-only field; the rows come after the capture spawns, whose indices stay).
+    let reinforce_at = pieces.first().and_then(|h| auth.units().get(*h)).map_or(TileId(0), |u| u.core.tile);
+    let reinforce: Vec<i32> = sc.reinforce.iter().map(|k| make(*k, sc.enemy, reinforce_at, &mut spawn)).collect();
     let city_list: Vec<Value> = cities
         .iter()
         .map(|t| {
@@ -764,7 +768,7 @@ fn scene_json(rules: &CompiledRuleset, game: &GameState, sc: &Scene, win: &Windo
         "city_counts": city_counts,
         "family": sc.fam.name(), "era": lab::era_names(rules).get(sc.era as usize), "era_index": sc.era, "instance": sc.instance, "attempt": sc.attempt,
         "window": {"q0": win.q0, "r0": win.r0, "w": win.w, "h": win.h, "map_w": win.map_w, "map_h": win.map_h},
-        "tiles": tiles, "profiles": profiles, "cities": city_list, "promotions": promotions, "spawn": spawn,
+        "tiles": tiles, "profiles": profiles, "cities": city_list, "promotions": promotions, "spawn": spawn, "reinforce": reinforce,
         "n_mine": sc.mine.len(), "n_theirs": sc.theirs.len(),
         "move_denominator": kernel::world::unit::MOVE_DENOMINATOR,
     })
@@ -777,6 +781,11 @@ pub struct Track {
     slots: Slots,
     cities: Vec<TileId>,
     sides: [PlayerId; 2],
+    /// The scene's third seat (the camp and third-party families): its player and its pieces' ids, info-only (the
+    /// twin's third side; the scene seats' slots and rows are the same as without it).
+    third: Option<(PlayerId, Vec<EntityId>)>,
+    /// The camp's tile (the camp families), whose countdown the third seat's rows carry.
+    camp: Option<TileId>,
 }
 
 impl Track {
@@ -786,17 +795,66 @@ impl Track {
         let win = Window::around(game, sc.centre);
         let mut cities: Vec<TileId> = game.view().auth.cities().iter().map(|(_, c)| c.tile).filter(|t| win.index(*t).is_some()).collect();
         cities.sort_by_key(|t| t.0);
-        let pieces: Vec<UnitHandle> = sc.mine.iter().chain(&sc.theirs).map(|p| p.h).collect();
+        let pieces: Vec<UnitHandle> = sc.mine.iter().chain(&sc.theirs).chain(&sc.third).map(|p| p.h).collect();
         let mut slots = Slots { ids: Vec::new(), promos: promotion_table(rules, game, &pieces) };
-        let scene = scene_json(rules, game, sc, &win, &cities, &mut slots);
+        let mut scene = scene_json(rules, game, sc, &win, &cities, &mut slots);
         let sides = [sc.learner, sc.enemy];
         let initial = state(rules, game, &win, &mut slots, sides, &cities);
-        (Track { win, slots, cities, sides }, scene, initial)
+        let third = sc.neutral.map(|n| (n, sc.third.iter().map(|p| p.id).collect::<Vec<EntityId>>()));
+        let camp = if super::camp::is_camp(sc.fam) { Some(super::camp::camp_tile(sc)) } else { None };
+        let mut track = Track { win, slots, cities, sides, third, camp };
+        scene["third"] = track.third_scene(rules, game, sc);
+        let mut initial = initial;
+        track.add_third(game, &mut initial);
+        (track, scene, initial)
+    }
+
+    /// Info-only: the third seat's pieces (profiles with their promotions, in the order of `sc.third`), the camp's spawn
+    /// kind. Null without a third seat.
+    fn third_scene(&self, rules: &CompiledRuleset, game: &GameState, sc: &Scene) -> Value {
+        if self.third.is_none() {
+            return Value::Null;
+        }
+        let mut profiles: Vec<Value> = sc.third.iter().map(|p| profile(rules, game, &self.win, p.h)).collect();
+        for (i, p) in sc.third.iter().enumerate() {
+            let part = promotion_part(rules, game, &self.win, p.h, &self.slots.promos, &profiles[i]);
+            profiles[i]["promo"] = part;
+        }
+        json!({"ids": sc.third.iter().map(|p| p.id.0).collect::<Vec<u64>>(), "profiles": profiles,
+               "kinds": sc.third.iter().map(|p| p.kind.0).collect::<Vec<u16>>(),
+               "camp": self.camp.map_or(-1, |t| self.win.index(t).map_or(-1, i64::from)),
+               "spawn_kind": self.camp.and_then(|_| classic_rules::barbarian_unit(game.view().auth, rules, sc.enemy, classic_rules::rules::content::Domain::Land)).map_or(-1, |k| i64::from(k.0))})
+    }
+
+    /// Info-only: the third seat's unit rows (the dump's unit record, side 2), its cities (a city of the third seat in the
+    /// window: its index), and the camp's countdown (-1: no camp) are added to a state record.
+    fn add_third(&self, game: &GameState, st: &mut Value) {
+        let Some((player, ids)) = &self.third else { return };
+        let auth = game.view().auth;
+        let by_id: BTreeMap<EntityId, UnitHandle> = auth.units().iter_handles().map(|(h, c)| (c.id, h)).collect();
+        let rows: Vec<Value> = ids
+            .iter()
+            .map(|id| match by_id.get(id).and_then(|h| auth.units().get(*h)) {
+                Some(u) => {
+                    let c = u.core;
+                    let bits: String = self.slots.promos.iter().map(|p| if c.promotions.contains(*p) { '1' } else { '0' }).collect();
+                    json!([1, self.win.index(c.tile).unwrap_or(-1), c.hp, c.moves_left, c.moves_max, c.attacks_made, stance_code(c.stance), c.experience, 2, c.kind.0, c.level, bits, c.interceptions_made])
+                }
+                None => json!([0, -1, 0, 0, 0, 0, 0, 0, -1, -1, 0, "", 0]),
+            })
+            .collect();
+        st["third"] = Value::Array(rows);
+        let held: Vec<bool> = self.cities.iter().map(|t| auth.indexes().city_on_tile(*t).and_then(|c| auth.cities().get(c)).is_some_and(|c| c.owner == *player)).collect();
+        st["third_cities"] = json!(held);
+        let spawn_in = self.camp.and_then(|t| auth.module().barbarians().camps().iter().find(|c| c.tile == t).map(|c| i64::from(c.spawn_in)));
+        st["camp"] = json!(spawn_in.unwrap_or(-1));
     }
 
     /// The state now (units by slot, cities, the RNG, both sides' sight, the owners).
     pub fn state(&mut self, rules: &CompiledRuleset, game: &GameState) -> Value {
-        state(rules, game, &self.win, &mut self.slots, self.sides, &self.cities)
+        let mut st = state(rules, game, &self.win, &mut self.slots, self.sides, &self.cities);
+        self.add_third(game, &mut st);
+        st
     }
 
     /// The slot of a unit (new units get the next slot).
