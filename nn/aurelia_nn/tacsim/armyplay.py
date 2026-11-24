@@ -25,6 +25,7 @@ import time
 
 import mlx.core as mx
 
+from . import armyhist as H
 from . import armyobs as A
 from . import exact
 from .armyloop import Brain, greedy_pointer, load_net, PER_UNIT
@@ -52,7 +53,7 @@ def trim_tokens(tok):
 class Game:
     """A batch of scene copies played on the device."""
 
-    def __init__(self, plays, copies, brain, seed=1, forced=None, salt=True):
+    def __init__(self, plays, copies, brain, seed=1, forced=None, salt=True, facts=None):
         """`forced`: [(play index, moment-like row)] instead of each play's initial state (the forced checks: the
         Rust state at a turn's start, one row each); then `copies` is ignored. `salt` False: every copy of a play keeps
         the play's combat stream (the GRPO groups: the copies differ only by the sampled decisions)."""
@@ -134,7 +135,29 @@ class Game:
             self.sched.append(by_round)
         self.far_rows = mx.take(mx.array(far, dtype=mx.float32), self.idx, axis=0)
         self.far_static = far
+        # A city's most hit points once it is ours (the conqueror's techs, the buildings that survived: exogenous, from the
+        # first Rust moment that has the city ours; -1 unknown): what the history's fact of the capturing strike reads.
+        C = self.sim.cs["tile"].shape[1]
+        cap = []
+        for scl, ms, _ in plays:
+            row = [-1] * C
+            for m in ms:
+                for k, c in enumerate(m["state"]["cities"][:C]):
+                    if c[0] == 0 and row[k] < 0 and k < len(m.get("cstr", [])):
+                        row[k] = m["cstr"][k][1]
+            cap.append(row)
+        self.cap_maxhp = mx.take(mx.array(cap, dtype=I32), self.idx, axis=0)
         self.um, self.pm, self.alive = brain.m.initial(self.B)
+        # MBN's notes (written at our turn's end, read in the next turn) and the history of facts (MBH reads it; on with
+        # either stream, `facts`); both live in the state dict, so the compacted steps carry them.
+        self.facts = (brain.notes or brain.hist) if facts is None else (facts or brain.hist)
+        if self.facts:
+            H.init(self.s, self.B, U, plan0=self.pm[0, 0])
+        if brain.notes:
+            for k, v in brain.initial_notes(self.B).items():
+                self.s["ns_" + k] = v
+        self.hist_cmp = collections.Counter()
+        self.hist_ex = []
         self.M = mx.zeros((self.B, 576, brain.m.config["map_ch"])) if brain.has_map else None
         self.statics = self.obs.statics(self.s) if brain.has_map else None
         self.price = mx.take(mx.array([x["orders"]["price"] for x in sc], dtype=mx.float32), self.idx, axis=0)
@@ -178,8 +201,8 @@ class Game:
         and the net's body. The batch's shapes are fixed for the whole play, so each compiles once."""
         b = self.brain
         if self.M is None:
-            body = mx.compile(lambda tok, um, pm, price: b.body(tok, um, pm, None, price))
-            self.body_fn = lambda tok, um, pm, M, price: body(tok, um, pm, price)
+            body = mx.compile(lambda tok, um, pm, price, x: b.body(tok, um, pm, None, price, x))
+            self.body_fn = lambda tok, um, pm, M, price, x=None: body(tok, um, pm, price, x)
         else:
             self.body_fn = mx.compile(b.body)
 
@@ -242,12 +265,25 @@ class Game:
         has, pq, pr, php = self.prev if self.prev is not None else (mx.zeros((self.B, self.U), dtype=mx.bool_),) + (mx.zeros((self.B, self.U), dtype=I32),) * 3
         return self.obs.tokens(self.s, mx.full((self.B,), rnd, dtype=I32) + self.start, has, pq, pr, php, self.far_rows)
 
+    def xin(self, rel):
+        """The streams the body reads besides the tokens and the memory (None: the net reads neither)."""
+        b, s = self.brain, self.s
+        if b.notes:
+            return {"ns": {k: s["ns_" + k] for k in b.m.NOTE_STATE}}
+        if b.hist:
+            return {"hist": H.tokens(s, mx.full((self.B,), rel, dtype=I32), self.pm)}
+        return None
+
     def learner_turn(self, rel):
         brain, s = self.brain, self.s
         B, U = self.B, self.U
         self.prev, self.this = self.this, self.snapshot()
         self.turn_tile = s["u_tile"]
+        self.cur_rel = rel
         active = ~s["done"] & (self.verdict < 0)
+        if self.facts:
+            # Our turn's first look: the enemy's events since our last turn's end become facts of this round.
+            H.turn_start(self, active, mx.full((B,), rel, dtype=I32))
         if self.compare:
             self.compare_state(rel)
         trace = [[] for _ in self.plays]
@@ -262,7 +298,7 @@ class Game:
                 self.row_ids = ids
                 saved = self._enter_rows(ids)
                 made_v, act_v = mx.take(made, ids, axis=0), mx.ones((n0,), dtype=mx.bool_)
-                pick, ai, act_v, made_v = self.decide(rel, step, act_v, made_v)
+                pick, ai, act_v, made_v = self.decide(rel, step, act_v, made_v, trace)
                 has = active
                 self.row_ids = None
                 self._leave_rows(saved, has, pos)
@@ -272,7 +308,7 @@ class Game:
                     pick = mx.where(has, mx.take(pick, pos, axis=0), -1)
                     ai = mx.where(has, mx.take(ai, pos, axis=0), 0)
             else:
-                pick, ai, active, made = self.decide(rel, step, active, made)
+                pick, ai, active, made = self.decide(rel, step, active, made, trace)
             if self.compare:
                 P = len(self.plays)
                 al_ = active[:P].tolist(); pk_ = pick[:P].tolist(); ai_ = ai[:P].tolist()
@@ -293,8 +329,18 @@ class Game:
             self.judge(rel)
         s = self.s
         tok = self.tokens(rel)
-        h = self.body_fn(tok, self.um, self.pm, self.M, self.price)
+        x = self.xin(rel)
+        if self.compare and self.facts:
+            self.compare_moment(rel, None, mx.arange(B, dtype=I32), x, trace)
+        h = self.body_fn(tok, self.um, self.pm, self.M, self.price, x)
         um2, pm2, al2 = brain.step(h, tok, self.um, self.pm, self.alive)
+        if brain.notes:
+            ns = {k: s["ns_" + k] for k in brain.m.NOTE_STATE}
+            for k, v in brain.write_notes(h, tok, ns, self.alive, um2, pm2, al2, live).items():
+                s["ns_" + k] = v
+        if self.facts:
+            H.push_plan(s, self.pm, live)
+            H.turn_end(self, live)
         self.um = mx.where(live[:, None, None], um2, self.um)
         self.pm = mx.where(live[:, None, None], pm2, self.pm)
         self.alive = mx.where(live[:, None], al2, self.alive)
@@ -302,7 +348,7 @@ class Game:
 
     compact = True
 
-    def decide(self, rel, step, active, made):
+    def decide(self, rel, step, active, made, trace=None):
         """One decision step over the current rows (all of them, or the compacted active ones): the tokens, the body, the
         pointer, the unit's candidates, the greedy action, applied. Returns (pick, action index, still active, made)."""
         brain, s = self.brain, self.s
@@ -312,7 +358,10 @@ class Game:
         sel = tok["selectable"] & ~stopped & active[:, None]
         if step == 0 and brain.has_map:
             self.M = mx.where(active[:, None, None], brain.encode(self.statics, tok), self.M)
-        h = self.body_fn(tok, self.um, self.pm, self.M, self.price)
+        x = self.xin(rel)
+        if self.compare and self.facts:
+            self.compare_moment(rel, step, self.row_ids if self.row_ids is not None else mx.arange(self.B, dtype=I32), x, trace, active)
+        h = self.body_fn(tok, self.um, self.pm, self.M, self.price, x)
         lg = brain.pointer(h, sel)
         smask = None
         if self.sample_plan is not None:
@@ -337,7 +386,7 @@ class Game:
         self.counts["net decisions"] += n_act
         if n_act == 0:
             if sampling:
-                self._record(active_in, tok, sel, pidx, pick, None, None, rel)
+                self._record(active_in, tok, sel, pidx, pick, None, None, rel, x)
             return pick, mx.zeros_like(pick), active, made
         pk = mx.maximum(pick, 0)
         me = mx.where(active, mx.take_along_axis(unit, pk[:, None], axis=1)[:, 0], 0)
@@ -350,12 +399,12 @@ class Game:
         kind = mx.take_along_axis(cand["kind"], ai[:, None], axis=1)[:, 0]
         tgt = mx.take_along_axis(cand["tgt"], ai[:, None], axis=1)[:, 0]
         if sampling:
-            self._record(active_in, tok, sel, pidx, pick, cand, ai, rel)
+            self._record(active_in, tok, sel, pidx, pick, cand, ai, rel, x)
         self.apply(me, kind, tgt, active, side=0, mk=None if self.legacy else cand["_mk"])
         made = put1(made, me, g1(made, me) + 1, active)
         return pick, ai, active, made
 
-    def _record(self, active_in, tok, sel, pidx, pick, cand, ai, rel=None):
+    def _record(self, active_in, tok, sel, pidx, pick, cand, ai, rel=None, x=None):
         """A sampled decision step for the gradient pass (`armygrpo`): the rows that were deciding, with their inputs (the
         trimmed tokens, the memory, the candidates' fields the action head reads), the sampled indices and the global row."""
         n = int(mx.sum(active_in).item())
@@ -367,6 +416,9 @@ class Game:
         tk = ("feat", "dist", "mask", "slot") + (("pos",) if self.brain.has_map else ())
         rec = {"gid": gid, "tok": {k: take(tok[k]) for k in tk}, "sel": take(sel), "rel": rel,
                "um": take(self.um), "pm": take(self.pm), "price": take(self.price), "pidx": take(pidx), "pick": take(pick)}
+        if x is not None:
+            # The streams as the decision read them (inputs of the gradient pass: no gradient through the writing).
+            rec["x"] = {k: {kk: take(vv) for kk, vv in v.items()} for k, v in x.items()}
         if cand is not None:
             ck = ("feat", "promo", "mask") + (("pos",) if self.brain.has_map else ())
             rec["cand"] = {k: take(cand[k]) for k in ck}
@@ -374,7 +426,7 @@ class Game:
         self.records.append(rec)
 
     # The compacted step: the rows `ids` of every per-row array, the simulator and the tables (exact: rows are independent).
-    ROW_ATTRS = ("B", "s", "tab", "far_rows", "start", "price", "um", "pm", "alive", "M", "pillaged", "prev")
+    ROW_ATTRS = ("B", "s", "tab", "far_rows", "start", "price", "um", "pm", "alive", "M", "pillaged", "prev", "cap_maxhp")
 
     def _compact(self, active, n):
         B = self.B
@@ -397,7 +449,7 @@ class Game:
         sim.cs, sim.tid, sim.n_pieces, sim.B = sub.cs, sub.tid, sub.n_pieces, sub.B
         self.tab = A._rows_tab(saved["tab"], ids)
         obs.tab, obs.t = self.tab, self.tab.t
-        for k in ("far_rows", "start", "price", "um", "pm", "alive", "M", "pillaged"):
+        for k in ("far_rows", "start", "price", "um", "pm", "alive", "M", "pillaged", "cap_maxhp"):
             setattr(self, k, take(saved[k]))
         self.prev = None if saved["prev"] is None else tuple(take(x) for x in saved["prev"])
         return saved
@@ -516,6 +568,87 @@ class Game:
                 if any(c[1] != dmg[pi][k] for k, c in enumerate(st["cities"])):
                     self.counts["first divergence: city damage"] += 1
 
+    def compare_moment(self, rel, step, gids, x, trace, active=None):
+        """Gate G7's parity of the streams (the first copy against the Rust dump): at a decision moment (`step`) or our
+        turn's end (`step` None), for each play still equal to Rust's (its state at every compared moment and its
+        decisions so far), the history tokens and the note stream against the dump's moment."""
+        P = len(self.plays)
+        if not hasattr(self, "mok"):
+            self.mok = [True] * P
+        s = self.s
+        gl = gids.tolist()
+        act = active.tolist() if active is not None else [True] * len(gl)
+        vd = self.verdict.tolist()
+        rows = [(j, b) for j, b in enumerate(gl) if b < P and act[j] and self.mok[b] and vd[b] < 0]
+        if not rows:
+            return
+        n = s["u_alive"].shape[0]
+        ht = H.tokens(s, mx.full((n,), rel, dtype=I32))
+        al, tl, hp, dmg = s["u_alive"].tolist(), s["u_tile"].tolist(), s["u_hp"].tolist(), s["c_dmg"].tolist()
+        hf, hm, hs, ha = ht["hist"].tolist(), ht["hmask"].tolist(), ht["hslot"].tolist(), ht["hage"].tolist()
+        notes = None
+        if self.brain.notes:
+            notes = {k: s["ns_" + k].tolist() for k in self.brain.m.NOTE_STATE}
+        c = self.hist_cmp
+        for j, pi in rows:
+            r = self.plays[pi][0]["orders"]["start_round"] + rel
+            ms = [m for m in self.plays[pi][1] if m["round"] == r]
+            dec = [m for m in ms if m["step"] < (1 << 32) - 1]
+            if step is None:
+                m = next((m for m in ms if m["step"] == (1 << 32) - 1), None)
+                want = [(mm["pick"], mm["applied"]) for mm in dec]
+                got = trace[pi]
+                if not (got == want[:len(got)] and len(got) == len([w for w in want if w[0] >= 0])):
+                    self.mok[pi] = False; c["stopped: decisions"] += 1
+                    continue
+            else:
+                m = next((mm for mm in dec if mm["step"] == step), None)
+                want = [(mm["pick"], mm["applied"]) for mm in dec if mm["step"] < step]
+                if trace[pi][:step] != want:
+                    self.mok[pi] = False; c["stopped: decisions"] += 1
+                    continue
+            if m is None:
+                # Rust's turn ended before this look (no selectable unit: its loop breaks before the moment; or the play
+                # was decided before our turn's end): nothing to compare here; the decisions are checked at the turn's end.
+                c["no Rust moment (turn or play over)"] += 1
+                continue
+            st = m["state"]
+            same = len(st["units"]) <= self.U and all((u[0] == 1) == bool(al[j][k]) and (u[0] != 1 or (u[1] == tl[j][k] and u[2] == hp[j][k]))
+                                                     for k, u in enumerate(st["units"]))
+            same = same and all(cc[1] == dmg[j][k] for k, cc in enumerate(st["cities"]))
+            if not same:
+                self.mok[pi] = False; c["stopped: state"] += 1
+                continue
+            c["moments compared"] += 1
+            c["moments compared (turn ends)" if step is None else "moments compared (decisions)"] += 1
+            rt = H.of_moment(m)
+            if rt is not None:
+                fs, sl, ag = rt
+                cnt = sum(hm[j])
+                ok = cnt == len(sl) and all(hs[j][i] == sl[i] and ha[j][i] == ag[i] and all(abs(a - b) <= 1e-6 for a, b in zip(hf[j][i], fs[i])) for i in range(min(cnt, len(sl))))
+                c["history equal" if ok else "history differs"] += 1
+                c["history tokens compared"] += len(sl)
+                if not ok and sum(1 for e in self.hist_ex if not e.startswith("NOTES")) < 40:
+                    first = next((i for i in range(min(cnt, len(sl))) if not (hs[j][i] == sl[i] and ha[j][i] == ag[i] and all(abs(a - b) <= 1e-6 for a, b in zip(hf[j][i], fs[i])))), None)
+                    det = "" if first is None else f" token {first}: mlx {[round(v, 4) for v in hf[j][first]]} s{hs[j][first]} a{ha[j][first]} | rust {[round(v, 4) for v in fs[first]]} s{sl[first]} a{ag[first]}"
+                    self.hist_ex.append(f"{self.plays[pi][0]['play']} rel {rel} step {step}: count mlx {cnt} rust {len(sl)}{det}")
+            rn = m.get("notes")
+            if notes is not None and rn is not None:
+                ok = True
+                why = ""
+                for k, tol in (("stage", 0), ("stage_age", 0), ("engaged", 0), ("change_age", 0), ("reason", 0), ("rest", 0), ("rest_age", 0), ("waited", 1e-4), ("free", 1e-4)):
+                    a, b = notes[k][j], rn[k]
+                    a = a if isinstance(a, list) else [a]
+                    b = b if isinstance(b, list) else [b]
+                    if len(a) != len(b) or any(abs(x - y) > tol + 1e-6 for x, y in zip(a, b)):
+                        ok = False
+                        c[f"notes differ in {k}"] += 1
+                        c["notes: largest difference x 1e6 in " + k] = max(c["notes: largest difference x 1e6 in " + k], int(1e6 * max(abs(x - y) for x, y in zip(a, b)))) if len(a) == len(b) else 10 ** 9
+                        why = why or f"{k}: mlx {[round(v, 4) for v in a]} rust {[round(v, 4) for v in b]}"
+                c["notes equal" if ok else "notes differ"] += 1
+                if not ok and sum(1 for e in self.hist_ex if e.startswith("NOTES")) < 20:
+                    self.hist_ex.append(f"NOTES {self.plays[pi][0]['play']} rel {rel} step {step}: {why}")
+
     def compare_turn(self, rel, trace):
         P = len(self.plays)
         for pi in range(P):
@@ -537,7 +670,23 @@ class Game:
                     self.ex.append(f"{self.plays[pi][0]['play']} rel {rel}: MLX {got[:8]} Rust {want[:8]}")
 
     def apply(self, me, kind, tgt, take, side, mk=None):
-        """The candidate's action in the simulator (`mk`: the unit's masks on this state, when the caller has them)."""
+        """The candidate's action in the simulator (`mk`: the unit's masks on this state, when the caller has them); our
+        army unit's command becomes a fact of the history (`armyhist`, when it is kept)."""
+        if side == 0 and self.facts:
+            H.log_cmd(self, me, H.fact_kind(kind), tgt, take, mx.full((self.B,), self.cur_rel, dtype=I32),
+                      lambda: self._apply(me, kind, tgt, take, side, mk))
+        else:
+            self._apply(me, kind, tgt, take, side, mk)
+
+    def _apply(self, me, kind, tgt, take, side, mk=None):
+        owner0 = self.s["c_owner"]
+        self._apply_raw(me, kind, tgt, take, side, mk)
+        s = self.s
+        if side == 0 and "c_maxhp" in s:
+            won = (owner0 != 0) & (s["c_owner"] == 0) & (self.cap_maxhp >= 0)
+            s["c_maxhp"] = mx.where(won, self.cap_maxhp, s["c_maxhp"])
+
+    def _apply_raw(self, me, kind, tgt, take, side, mk=None):
         s, sim = self.s, self.sim
         sd = mx.full((self.B,), side, dtype=I32)
         verb = mx.where(kind == A.K_MOVE, V_MOVE, mx.where((kind == A.K_UNIT) | (kind == A.K_CITY) | (kind == A.K_RANGED), V_ATTACK,
@@ -847,6 +996,9 @@ def run(path, weights, copies=1, families=None, limit=None, rust=None, out=None,
         res["counts"].update(g.counts)
         res.setdefault("examples", []).extend(getattr(g, "ex", []))
         res.setdefault("examples_stance", []).extend(getattr(g, "ex_st", []))
+        res.setdefault("streams", collections.Counter()).update(g.hist_cmp)
+        res.setdefault("examples_streams", []).extend(g.hist_ex)
+        res["dump_moments"] = res.get("dump_moments", 0) + sum(len(p[1]) for p in gp)
         res["seconds"] += g.seconds
         for b, verdict in enumerate(v):
             sc = gp[b % len(gp)][0]
@@ -868,6 +1020,8 @@ def run(path, weights, copies=1, families=None, limit=None, rust=None, out=None,
         res["families"][f] = {"plays": plays_n, "rust_win": round(100 * rw / max(plays_n, 1), 1), "mlx_win": round(100 * w1 / max(plays_n, 1), 1),
                               "same_verdict": same, "scenes": n, "mlx_win_all_copies": round(100 * w / max(n, 1), 1)}
     res["counts"] = dict(res["counts"])
+    if "streams" in res:
+        res["streams"] = dict(res["streams"])
     res["seconds"] = round(res["seconds"], 1)
     c = res["counts"]
     res["throughput"] = {"scenes": sum(v["scenes"] for v in res["families"].values()), "scene_rounds_per_s": round(c.get("scene-rounds", 0) / max(res["seconds"], 1e-9), 1),

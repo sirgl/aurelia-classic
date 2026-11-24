@@ -243,6 +243,7 @@ pub fn turn_end(game: &GameState, rules: &CompiledRuleset) {
         let slots = super::record::slots_of(game, &run.orders, &tokens);
         if super::obsdump::wanted() {
             super::obsdump::moment(rules, game, &run.orders, &tokens, &slots, u32::MAX, &[]);
+            super::obsdump::moment_notes(run.state.notes.as_ref());
             super::obsdump::choice(-2, -2);
         }
         if super::record::active() {
@@ -592,6 +593,7 @@ pub fn turn(rules: &CompiledRuleset, game: &mut GameState, orders: &Orders, scen
         if super::obsdump::wanted() {
             let slots = super::record::slots_of(game, orders, &tokens);
             super::obsdump::moment(rules, game, orders, &tokens, &slots, step, &made);
+            super::obsdump::moment_notes(memory.as_ref().and_then(|m| m.notes.as_ref()));
         }
         let body = net.body(&tokens, map.as_ref(), mem_in.as_ref());
         let (logits, end) = net.pointer(&body, &tokens);

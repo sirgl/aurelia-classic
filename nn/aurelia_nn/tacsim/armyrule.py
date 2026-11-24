@@ -16,6 +16,7 @@ The arena is closed, so a seat's units in the window are its scene pieces (slot 
 
 import mlx.core as mx
 
+from . import armyhist as H
 from . import armyobs as A
 from . import exact
 from .sim import g1, gn, I32, V_ATTACK, V_MOVE, V_SETUP
@@ -81,7 +82,12 @@ def promotions(game, side, live):
         pick = mx.where(low & (heal < BIG), heal, mx.where(plain < BIG, plain, anyp))
         take = anyp < BIG
         if bool(mx.any(take).item()):
-            game.s = sim.promote(s, me, mx.minimum(pick, NP - 1), take)
+            def run(s=s, me=me, pick=pick, take=take):
+                game.s = sim.promote(s, me, mx.minimum(pick, NP - 1), take)
+            if side == 0 and getattr(game, "facts", False):
+                H.log_cmd(game, me, mx.full((B,), H.HK_OTHER, dtype=I32), mx.full((B,), -1, dtype=I32), take, _rnd(game), run)
+            else:
+                run()
             game.counts["rule promotions"] += int(mx.sum(take).item())
         mx.eval(game.s)
 
@@ -186,7 +192,13 @@ def _shoot(game, side, u):
     take = best < NOKEY
     t = (best % 4096).astype(I32)
     mk = sim.masks(s, sd, me)
-    game.s = sim.apply_unit(s, sd, me, mx.full((B,), V_ATTACK, dtype=I32), mx.where(take, t, 0), mk, take)
+
+    def run():
+        game.s = sim.apply_unit(s, sd, me, mx.full((B,), V_ATTACK, dtype=I32), mx.where(take, t, 0), mk, take)
+    if side == 0 and getattr(game, "facts", False):
+        H.log_cmd(game, me, mx.full((B,), H.HK_RANGED, dtype=I32), mx.where(take, t, -1), take, _rnd(game), run)
+    else:
+        run()
     game.counts["rule shots"] += int(mx.sum(take).item())
 
 
@@ -202,6 +214,13 @@ def stand_fortify(game, side, live, heal=True):
     fort = stood & ~((st == 1) | (st == 2) | (st == 3)) & ~s["p_civilian"] & ~s["p_no_defensive_bonus"] & s["p_land"] & ~water
     s["u_st"] = mx.where(fort, 1, st)
     game.s = s
+    if side == 0 and getattr(game, "facts", False):
+        H.plain_facts(game, fort, H.HK_FORT, _rnd(game))
+
+
+def _rnd(game):
+    """[B] the round of the learner's turn now (the history's facts)."""
+    return mx.full((game.s["u_alive"].shape[0],), game.cur_rel, dtype=I32)
 
 
 def seat_turn(game, side, live):

@@ -124,9 +124,10 @@ def rec_inputs(rec, turn_M):
     return tok, c, M
 
 
-def logp_parts(brain, tok, um, pm, price, M, sel, pidx, pick, c, aidx):
-    """Full log-softmax of the pointer and of the actions (None without candidates) at the recorded decisions."""
-    h = brain.body(tok, um, pm, M, price)
+def logp_parts(brain, tok, um, pm, price, M, sel, pidx, pick, c, aidx, x=None):
+    """Full log-softmax of the pointer and of the actions (None without candidates) at the recorded decisions. `x`: the
+    notes / history the decision read (MBN / MBH), inputs: the gradient reaches their read path, not their writing."""
+    h = brain.body(tok, um, pm, M, price, x)
     lg = brain.pointer(h, sel)
     lp = lg - mx.logsumexp(lg, axis=-1, keepdims=True)
     la = None
@@ -137,8 +138,8 @@ def logp_parts(brain, tok, um, pm, price, M, sel, pidx, pick, c, aidx):
 
 
 def make_rl_grad(model, brain):
-    def loss_fn(tok, um, pm, price, M, sel, pidx, pick, w, c, aidx):
-        lp, la = logp_parts(brain, tok, um, pm, price, M, sel, pidx, pick, c, aidx)
+    def loss_fn(tok, um, pm, price, M, sel, pidx, pick, w, c, aidx, x):
+        lp, la = logp_parts(brain, tok, um, pm, price, M, sel, pidx, pick, c, aidx, x)
         l = mx.take_along_axis(lp, pidx[:, None], axis=1)[:, 0]
         if la is not None:
             l = l + mx.where(pick >= 0, mx.take_along_axis(la, aidx[:, None], axis=1)[:, 0], 0.0)
@@ -149,7 +150,7 @@ def make_rl_grad(model, brain):
 def kl_sum(brain, ref, rec, turn_M):
     """Sum over the record's rows of KL(policy || start) of the pointer, plus of the action where one was taken."""
     tok, c, M = rec_inputs(rec, turn_M)
-    args = (tok, rec["um"], rec["pm"], rec["price"], M, rec["sel"], rec["pidx"], rec["pick"], c, rec.get("aidx"))
+    args = (tok, rec["um"], rec["pm"], rec["price"], M, rec["sel"], rec["pidx"], rec["pick"], c, rec.get("aidx"), rec.get("x"))
     lp, la = logp_parts(brain, *args)
     lq, lb = logp_parts(ref, *args)
     p = mx.exp(lp)
@@ -346,7 +347,7 @@ def main(argv=None):
                 if not any(w):
                     continue
                 tok, c, M = rec_inputs(rec, g.turn_M)
-                l, gr = rl_grad(tok, rec["um"], rec["pm"], rec["price"], M, rec["sel"], rec["pidx"], rec["pick"], mx.array(w, dtype=mx.float32), c, rec.get("aidx"))
+                l, gr = rl_grad(tok, rec["um"], rec["pm"], rec["price"], M, rec["sel"], rec["pidx"], rec["pick"], mx.array(w, dtype=mx.float32), c, rec.get("aidx"), rec.get("x"))
                 total = gr if total is None else tree_map(lambda x, y: x + y, total, gr)
                 mx.eval(total, l)
                 loss_rl += l.item()

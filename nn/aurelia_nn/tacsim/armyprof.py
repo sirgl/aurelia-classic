@@ -45,13 +45,14 @@ def main(argv=None):
     ap.add_argument("--legacy", default="", help="parts of the step before the speed-up: nfo (foes counted per call, a host round-trip), mk (the masks twice); comma list")
     ap.add_argument("--scene-rule", dest="scene_rule", action="store_true", default=True)
     ap.add_argument("--standard", dest="scene_rule", action="store_false", help="Rust ARMY_SCENE_RULE=standard")
+    ap.add_argument("--facts", choices=["auto", "on", "off"], default="auto", help="the history's facts log (auto: on for MBN / MBH)")
     ap.add_argument("--out")
     a = ap.parse_args(argv)
     mx.set_memory_limit(16 << 30)
     mx.set_cache_limit(2 << 30)
     brain = Brain(load_net(a.weights))
     plays = A.load(a.dump, limit=a.limit, families=a.families.split(",") if a.families else None)
-    g = P.Game(plays, a.copies, brain)
+    g = P.Game(plays, a.copies, brain, facts=None if a.facts == "auto" else a.facts == "on")
     g.fort_rule = "old"
     g.scene_rule = a.scene_rule
     if a.compile:
@@ -83,7 +84,7 @@ def main(argv=None):
            "scene_rounds_per_s": round(g.counts["scene-rounds"] / wall, 1), "net_decisions": g.counts["net decisions"],
            "parts_s": parts, "calls": {k[2:]: v for k, v in acc.items() if k.startswith("n ")},
            "host_and_rest_s": round(wall - timed - acc["enemy turn"], 3) if acc else None,
-           "peak_gb": round(mx.get_peak_memory() / 1e9, 2)}
+           "peak_gb": round(mx.get_peak_memory() / 1e9, 2), "facts": g.facts, "notes": brain.notes, "history_read": brain.hist}
     print(json.dumps(res, indent=1))
     if a.out:
         json.dump(res, open(a.out, "w"), indent=1)

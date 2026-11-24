@@ -20,6 +20,7 @@ import time
 import mlx.core as mx
 
 from . import armyobs as A
+from . import armyhist as H
 
 TURN_END = (1 << 32) - 1
 PER_UNIT = 6
@@ -27,10 +28,11 @@ PER_UNIT = 6
 
 def load_net(path):
     from aurelia_nn.army.model_m import MemNet
-    from aurelia_nn.army.model_mb import MBANet, MBNet
+    from aurelia_nn.army.model_mb import MBANet, MBHNet, MBNet, MBNNet
     w = mx.load(path)
     if "m_in.weight" in w:
-        cls = MBANet if "w_price" in w else MBNet
+        # MBH (the history; an MBA net) and MBN (the notes; an MB net) by their own parameters.
+        cls = MBHNet if "hx_slope" in w else (MBNNet if "nx_slope" in w else (MBANet if "w_price" in w else MBNet))
         model = cls(promos=w["promo"].shape[0] - 1, map_ch=w["m_in.weight"].shape[0])
     else:
         model = MemNet(promos=w["promo"].shape[0] - 1)
@@ -43,17 +45,29 @@ class Brain:
     """The net's forward on twin observations, batched (memory per row passed in)."""
 
     def __init__(self, model):
-        from aurelia_nn.army.model_mb import MBANet, MBNet
+        from aurelia_nn.army.model_mb import MBANet, MBHNet, MBNet, MBNNet
         self.m = model
         self.has_map = isinstance(model, MBNet)
         self.price = isinstance(model, MBANet)
+        # MBN: the notes the net wrote at its last turn's end (`x["ns"]`); MBH: the history's tokens (`x["hist"]`).
+        self.notes = isinstance(model, MBNNet)
+        self.hist = isinstance(model, MBHNet)
 
-    def body(self, tok, um, pm, M, price):
+    def body(self, tok, um, pm, M, price, x=None):
+        """H. `x`: the streams of MBN / MBH ({"ns": the note state (MBNNet.NOTE_STATE keys), "hist": `armyhist.tokens`'
+        dict with the plan of each fact's turn}); a net without them ignores it."""
         m = self.m
         if self.has_map:
             pos = tok["pos"]
             gtok = M[mx.arange(M.shape[0])[:, None], mx.maximum(pos, 0)]
             mmean = mx.mean(M, axis=1)
+            if self.hist:
+                hx = x["hist"]
+                return m.body_mbh(tok["feat"], tok["dist"], tok["mask"], tok["slot"], um, pm, gtok, pos >= 0, mmean, price,
+                                  hx["hist"], hx["hmask"], hx["hslot"], hx["hage"], hx["hplan"])[0]
+            if self.notes:
+                off = mx.zeros((pos.shape[0],), dtype=mx.bool_)
+                return m.body_mbn(tok["feat"], tok["dist"], tok["mask"], tok["slot"], um, pm, gtok, pos >= 0, mmean, x["ns"], off)
             if self.price:
                 return m.body_mba(tok["feat"], tok["dist"], tok["mask"], tok["slot"], um, pm, gtok, pos >= 0, mmean, price)[0]
             return m.body_mbg(tok["feat"], tok["dist"], tok["mask"], tok["slot"], um, pm, gtok, pos >= 0, mmean)
@@ -78,6 +92,31 @@ class Brain:
     def step(self, h, tok, um, pm, alive):
         return self.m.step(h, tok["feat"], tok["slot"], tok["mask"], um, pm, alive)[:3]
 
+    def initial_notes(self, B):
+        return self.m.initial_notes(B)
+
+    def write_notes(self, h, tok, ns, alive, um2, pm2, al2, valid):
+        """MBN at our turn's end, after the memory's step (`train_m.unroll_one_n`'s own path; Rust `write_notes_x`): the
+        heads on the turn-end body `h` and the new memory, the notes written into the stream `ns` where `valid` [B]."""
+        from aurelia_nn.army.model_m import P_WAITED, SLOTS, STAGES
+        from aurelia_nn.army.model_mn import REASONS
+        m = self.m
+        event = mx.minimum(mx.sum(alive * (1.0 - al2), axis=-1), 1.0)
+        stage_lg, eng_lg, rest_lg = m.note_heads(h, tok["feat"], tok["slot"], tok["mask"], um2, pm2, ns)
+        stage_i = A.first_index_eq(stage_lg, mx.max(stage_lg, axis=1))
+        reason_lg = m.reason_logits(ns, stage_i, event)
+        reason_i = A.first_index_eq(reason_lg, mx.max(reason_lg, axis=1))
+        slot = tok["slot"]
+        has = (slot >= 0) & (slot < SLOTS) & tok["mask"]
+        onehot = ((mx.maximum(slot, 0)[..., None] == mx.arange(SLOTS)[None, None, :]) & has[..., None]).astype(mx.float32)
+        rest_s = mx.minimum(mx.einsum("bt,bts->bs", (rest_lg > 0).astype(mx.float32), onehot), 1.0)
+        stage_oh = (stage_i[:, None] == mx.arange(STAGES)[None]).astype(mx.float32)
+        reason_oh = (reason_i[:, None] == mx.arange(len(REASONS))[None]).astype(mx.float32)
+        waited = mx.maximum(pm2[:, 0, P_WAITED] * 10.0, 0.0)
+        free = mx.tanh(m.free(pm2[:, 0]))
+        engaged = (eng_lg > 0).astype(mx.float32)
+        return m.write_notes(ns, stage_oh, engaged, waited, reason_oh, rest_s, free, valid)
+
 
 def greedy_pointer(logits, T):
     """The first highest selectable logit, the end when its logit is at least that (seat.rs)."""
@@ -101,6 +140,8 @@ def replay(path, weights, group=200, limit=None, families=None, show=8, out=None
         tb = templates[0]
         U = tb.u
         um, pm, alive = brain.m.initial(P)
+        ns = brain.initial_notes(P) if brain.notes else None
+        ring = mx.broadcast_to(pm[:, 0][:, None, :], (P, H.H_TURNS, pm.shape[-1])) if brain.hist else None
         M = None
         statics = None
         if brain.has_map:
@@ -135,11 +176,26 @@ def replay(path, weights, group=200, limit=None, families=None, show=8, out=None
                 fr = mx.array(firsts)
                 M = M.at[pis].add(mx.where(fr[:, None, None], Mr_new - M[pis], 0.0))
             Mr = M[pis] if brain.has_map else None
-            h = brain.body(tok, um_r, pm_r, Mr, price[pis])
+            x = None
+            if brain.notes:
+                ns_r = {kk: v[pis] for kk, v in ns.items()}
+                x = {"ns": ns_r}
+            if brain.hist:
+                # MBH reads Rust's history tokens of the moment (the dump's), with the twin's plan of each fact's turn.
+                hx = H.dump_tokens([m for _, m in rows])
+                hx["hplan"] = H.plan_of(hx, pm_r, ring[pis])
+                x = {"hist": hx}
+            h = brain.body(tok, um_r, pm_r, Mr, price[pis], x)
             # Turn ends: the memory step.
             if any(ends):
                 um2, pm2, al2 = brain.step(h, tok, um_r, pm_r, al_r)
                 e = mx.array(ends)
+                if brain.notes:
+                    ns2 = brain.write_notes(h, tok, ns_r, al_r, um2, pm2, al2, e)
+                    ns = {kk: v.at[pis].add(mx.where(e.reshape((-1,) + (1,) * (v.ndim - 1)), ns2[kk] - ns_r[kk], 0.0)) for kk, v in ns.items()}
+                if brain.hist:
+                    new = mx.concatenate([pm_r[:, 0][:, None, :], ring[pis][:, :H.H_TURNS - 1]], axis=1)
+                    ring = ring.at[pis].add(mx.where(e[:, None, None], new - ring[pis], 0.0))
                 um = um.at[pis].add(mx.where(e[:, None, None], um2 - um_r, 0.0))
                 pm = pm.at[pis].add(mx.where(e[:, None, None], pm2 - pm_r, 0.0))
                 alive = alive.at[pis].add(mx.where(e[:, None], al2 - al_r, 0.0))

@@ -376,7 +376,25 @@ pub fn moment(rules: &CompiledRuleset, game: &GameState, orders: &Orders, tokens
             "handles": handles, "prev": prev, "made": made, "wm": wm, "war": war, "pillageable": pill, "cstr": cstr,
             "tok": {"n": n, "feat": hex16(&feat), "dist": dist, "pos": tokens.pos, "tile": tokens.tile.iter().map(|t| t.0).collect::<Vec<u32>>(), "slot": slots, "ref": refs},
             "cands": cands,
+            // The history tokens the net reads (MBH; every net's tokens carry them): numbers (f16 bits), army slots, ages.
+            "hist": {"f": hex16(&tokens.hist.iter().flat_map(|f| f.iter().copied()).collect::<Vec<f32>>()), "slot": tokens.hist_slot, "age": tokens.hist_age},
         }));
+    });
+}
+
+/// The note stream the moment's decision reads (MBN; `moment` first): written beside the moment, info only.
+pub fn moment_notes(ns: Option<&super::model::NoteState>) {
+    let Some(ns) = ns else { return };
+    if !wanted() {
+        return;
+    }
+    PLAY.with(|p| {
+        let mut p = p.borrow_mut();
+        let Some(play) = p.as_mut() else { return };
+        if let Some(m) = play.moment.as_mut() {
+            m["notes"] = json!({"stage": ns.stage, "stage_age": ns.stage_age, "engaged": ns.engaged, "waited": ns.waited, "free": ns.free,
+                "change_age": ns.change_age, "reason": ns.reason, "rest": ns.pull, "rest_age": ns.pull_age});
+        }
     });
 }
 
