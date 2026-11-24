@@ -68,7 +68,8 @@ def plan_shots(game, side=1):
     ranged = obs.kind(s, "range") >= 0
     shooter_ok = s["u_alive"] & (tile >= 0) & (s["u_side"] == side) & ranged & (s["u_mv"] > 0) & ~obs.kind(s, "civ")
     handles = s["u_handle"]
-    for u in range(U):
+    shooters_list = list(game.shooter_slots if getattr(game, "shooter_slots", None) is not None else range(U))
+    for u in shooters_list:
         me = mx.full((B,), u, dtype=I32)
         here = g1(tile, me)
         frm = mx.broadcast_to(here[:, None], (B, U))
@@ -153,7 +154,11 @@ def plan_shots(game, side=1):
     is_unit = out_s >= C
     k = mx.where(out_s < 0, 3 * S, mx.where(is_unit, S, 0)) + mx.arange(S)[None, :]
     o = mx.argsort(k, axis=1)
-    return mx.take_along_axis(out_s, o, axis=1), mx.take_along_axis(out_t, o, axis=1), C
+    out_s = mx.take_along_axis(out_s, o, axis=1)
+    # Shooter rows past the cities are the listed slots: back to slot numbers (C + slot).
+    slot_of = mx.array(list(range(C)) + [C + u for u in shooters_list], dtype=I32)
+    out_s = mx.where(out_s >= 0, mx.take(slot_of, mx.maximum(out_s, 0)), -1)
+    return out_s, mx.take_along_axis(out_t, o, axis=1), C
 
 
 def run_shots(game, side=1, live=None):
@@ -220,6 +225,27 @@ def enemy_turn(game, charge_on=False):
     live = ~s["done"] & (game.verdict < 0)
     game.field_script(live)
     run_shots(game, side, live)
+    if not charge_on:
+        # Vectorised over the slots (the same as the slot loop below without the charge): the marches, then every
+        # holder fortifies where `Sim.masks`'s fortify condition holds (`Fortify` costs no move and touches no other unit).
+        s = game.s
+        mine = live[:, None] & s["u_alive"] & (s["u_side"] == side) & (s["u_tile"] >= 0) & ~game.obs.kind(s, "civ") & ~game.field
+        walker = mine & game.walker
+        R = game.walks.shape[1]
+        r = mx.clip(game.rel_now, 0, R - 1)
+        to = mx.take_along_axis(game.walks, mx.broadcast_to(r[:, None, None], (B, 1, U)), axis=1)[:, 0]
+        to = mx.where(game.has_walks, to, -1)
+        mil, _ = sim.occupancy(s)
+        free = gn(mil, mx.maximum(to, 0)) < 0
+        go = walker & (to >= 0) & (to != s["u_tile"]) & free
+        s["u_tile"] = mx.where(go, to, s["u_tile"])
+        s["u_mv"] = mx.where(go, 0, s["u_mv"])
+        holder = mine & ~walker
+        water = sim.mg("water", s["u_tile"]) > 0
+        fort = holder & ~((s["u_st"] == 1) | (s["u_st"] == 2)) & ~s["p_civilian"] & ~s["p_no_defensive_bonus"] & s["p_land"] & ~water
+        s["u_st"] = mx.where(fort, 1, s["u_st"])
+        game.s = sim.end_turn(s, sd, live)
+        return
     for u in range(U):
         s = game.s
         me = mx.full((B,), u, dtype=I32)

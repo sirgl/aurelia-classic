@@ -64,16 +64,21 @@ def turn_rows(plays, which):
             if which == "ours" and e["side"] == 0 and e["src"] == "end":
                 # The last event of the net (src act) before this end, else the turn's start.
                 j = i - 1
-                while j >= 0 and st[j][0]["side"] == 0 and st[j][0]["src"] == "mind":
+                while j >= 0 and ((st[j][0]["side"] == 0 and st[j][0]["src"] == "mind") or st[j][0]["src"] == "arena"):
                     j -= 1
                 if j >= 0 and st[j][0]["side"] == 0 and st[j][0]["src"] == "act":
                     pe, pu, pc = st[j]
-                    rows.append((pi, (pu, pc, pe["rng"], pe["round"]), (st[i - 1][1], st[i - 1][2]), by_round))
+                    # The turn's start: the state before its first command of the net.
+                    j0 = j
+                    while j0 > 0 and st[j0 - 1][0]["side"] == 0 and st[j0 - 1][0]["src"] == "act":
+                        j0 -= 1
+                    t0 = [u[1] for u in (st[j0 - 1][1] if j0 > 0 else sc["initial"]["units"])]
+                    rows.append((pi, (pu, pc, pe["rng"], pe["round"], t0), (st[i - 1][1], st[i - 1][2]), by_round))
     return rows
 
 
 def as_row(plays, pi, start, by_round, U):
-    units, cities, rng, rnd = start
+    units, cities, rng, rnd = start[:4]
     m = by_round.get(rnd) or min(by_round.values(), key=lambda x: abs(x["round"] - rnd))
     state = {"units": [u for u in units[:U]], "cities": cities, "rng": rng, "owner": m["state"]["owner"]}
     row = {"state": state, "ids": m.get("ids", []), "handles": m.get("handles", []), "pillageable": m.get("pillageable") or plays[pi][0]["orders"]["pillageable"]}
@@ -94,14 +99,18 @@ def compare(g, rows, which, counts, show, ex):
         first = None
         for k, u in enumerate(u2[:g.U]):
             who = "enemy" if (u[8] if u[0] else side[b][k]) == 1 else "our"
+            what = None
             if (u[0] == 1) != bool(al[b][k]):
-                first = first or f"{who} unit alive/dead"
+                what = f"{who} unit alive/dead"
             elif u[0] and u[1] != tl[b][k]:
-                first = first or f"{who} unit's tile"
+                what = f"{who} unit's tile"
             elif u[0] and u[2] != hp[b][k]:
-                first = first or f"{who} unit's hp"
+                what = f"{who} unit's hp"
             elif u[0] and which == "ours" and (u[6] in (1, 2)) != (st[b][k] in (1, 2)):
-                first = first or f"{who} unit's fortify"
+                what = f"{who} unit's fortify"
+            if what and first is None:
+                first = what
+                detail = f" slot {k} rust {u[:7]} mlx {[int(al[b][k]), tl[b][k], hp[b][k], st[b][k]]}"
         if first is None and any(c[1] != dmg[b][k] for k, c in enumerate(c2)):
             first = "city damage"
         counts[(fam, "turns")] += 1
@@ -110,10 +119,10 @@ def compare(g, rows, which, counts, show, ex):
         else:
             counts[(fam, first)] += 1
             if len(ex[fam]) < show:
-                ex[fam].append(f"{g.plays[pi][0]['play']} r{start[3]}: {first}")
+                ex[fam].append(f"{g.plays[pi][0]['play']} r{start[3]}: {first}" + (detail if first != "city damage" else ""))
 
 
-def run(path, weights, families=None, which="enemy", show=3, out=None, group=400, rule="std", charge=False):
+def run(path, weights, families=None, which="enemy", show=3, out=None, group=400, rule="std", charge=False, debug=None):
     brain = Brain(load_net(weights))
     counts = collections.Counter()
     ex = collections.defaultdict(list)
@@ -130,8 +139,21 @@ def run(path, weights, families=None, which="enemy", show=3, out=None, group=400
         g.charge = charge
         g.rel_now = mx.array([st[3] - gp[pi][0]["orders"]["start_round"] for pi, st, _, _ in rows], dtype=mx.int32)
         if which == "enemy":
+            if debug:
+                from . import armystd
+                sh, tg, C = armystd.plan_shots(g)
+                sh, tg = sh.tolist(), tg.tolist()
+                for b, (pi, st, _, _) in enumerate(rows):
+                    name = gp[pi][0]["play"]
+                    if f"{name}:{st[3]}" in debug:
+                        evs = [e for e in gp[pi][0]["events"] if e["round"] in (st[3], st[3] + 1) and e["side"] == 1 and e["src"] == "mind" and e["cmd"] in ("CityStrike", "RangedAttack", "AttackUnit", "MoveUnit", "Fortify")]
+                        print("DEBUG", name, st[3], "MLX plan", [(x - C if x >= C else f"c{x}", t) for x, t in zip(sh[b], tg[b]) if x >= 0])
+                        print("DEBUG   Rust", [(e["cmd"], e["who"], e["tgt"], [(k, u[2]) for k, u in e["u"] if u[8] == 0]) for e in evs])
+                        print("DEBUG   units", [(k, u[1], u[2], u[8]) for k, u in enumerate(st[0]) if u[0]])
             g.enemy_turn()
         else:
+            U = g.U
+            g.turn_tile = mx.array([(st[4] + [-1] * U)[:U] for _, st, _, _ in rows], dtype=mx.int32)
             g.our_turn_end(mx.ones((g.B,), dtype=mx.bool_))
         mx.eval(g.s)
         compare(g, rows, which, counts, show, ex)
@@ -161,10 +183,11 @@ def main(argv=None):
     ap.add_argument("--out")
     ap.add_argument("--rule", default="std", choices=["std", "approx"])
     ap.add_argument("--charge", action="store_true")
+    ap.add_argument("--debug", help="PLAY:ROUND,... print the MLX shot plan and the Rust commands of those turns")
     a = ap.parse_args(argv)
     mx.set_memory_limit(16 << 30)
     mx.set_cache_limit(2 << 30)
-    run(a.dump, a.weights, families=a.families.split(",") if a.families else None, which=a.which, out=a.out, group=a.group, rule=a.rule, charge=a.charge)
+    run(a.dump, a.weights, families=a.families.split(",") if a.families else None, which=a.which, out=a.out, group=a.group, rule=a.rule, charge=a.charge, debug=a.debug.split(',') if a.debug else None)
 
 
 if __name__ == "__main__":

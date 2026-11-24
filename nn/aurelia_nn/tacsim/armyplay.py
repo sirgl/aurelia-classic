@@ -31,6 +31,8 @@ from .armyloop import Brain, greedy_pointer, load_net, PER_UNIT
 from .sim import g1, gn, put1, I32, V_NONE, V_FORT, V_SETUP, V_MOVE, V_ATTACK, V_PROMOTE
 
 PER_TURN = 96
+# The foes a candidate list's blow previews look at (the nearest to the unit; see `Obs.candidates`).
+NFO = None  # counted per call: the per-batch count is small, a fixed 6 doubled the step (measured)
 ASSAULT = {"assault-heal", "promotion-choice", "hill-archers", "city-fire", "planned-assault"}
 
 
@@ -73,6 +75,9 @@ class Game:
         s["n_unmodelled"] = mx.zeros((self.B,), dtype=I32)
         self.s = s
         self.obs = A.Obs(self.sim, self.tab)
+        # The foe slots of the candidates' previews: the most enemy units a scene starts with, two more for the new ones.
+        self.obs.nfo = NFO
+        self.compare = forced is None and copies == 1
         self.U = U
         sc = [p[0] for p in plays]
         take = lambda v, dt=I32: mx.take(mx.array(v, dtype=dt), self.idx)
@@ -124,9 +129,30 @@ class Game:
         self.city_low = mx.zeros((self.B,), dtype=mx.bool_)
         self.cap_broken = mx.zeros((self.B,), dtype=mx.bool_)
         self.counts = collections.Counter()
+        self.cand_fn = self.obs.candidates
+        self.legacy = False
+        self.body_fn = brain.body
         self.enemy_rule = "std"
+        # The trainers' end of a unit's turn heals an unmoved unit (`act::hold_unit`, nn/army-net ed9e453); False: the
+        # harness before it (moves spent by hand, no heal), for the dumps made before.
+        self.hold_heals = True
+        self.turn_tile = None
+        self.fort_rule = "fit"
         self.charge = False
         self.build_walks(plays, idx, U)
+        # The slots that may hold an enemy ranged unit (the advisor's shooters): any scene's enemy ranged unit at the start.
+        rk = self.tab.k["range"].tolist()
+        self.shooter_slots = sorted({k for p in plays for k, u in enumerate(p[0]["initial"]["units"][:U]) if u[0] and u[8] == 1 and rk[u[9]] >= 0})
+
+    def enable_compile(self):
+        """`mx.compile` the decision step's two heavy parts: the candidates (the masks and the blow previews inside)
+        and the net's body. The batch's shapes are fixed for the whole play, so each compiles once."""
+        b = self.brain
+        if self.M is None:
+            body = mx.compile(lambda tok, um, pm, price: b.body(tok, um, pm, None, price))
+            self.body_fn = lambda tok, um, pm, M, price: body(tok, um, pm, price)
+        else:
+            self.body_fn = mx.compile(b.body)
 
     # -------------------------------------------------------------- the economy's schedule
 
@@ -176,8 +202,10 @@ class Game:
         brain, s = self.brain, self.s
         B, U = self.B, self.U
         self.prev, self.this = self.this, self.snapshot()
+        self.turn_tile = s["u_tile"]
         active = ~s["done"] & (self.verdict < 0)
-        self.compare_state(rel)
+        if self.compare:
+            self.compare_state(rel)
         trace = [[] for _ in self.plays]
         made = mx.zeros((B, U), dtype=I32)
         army = self.tab.t["army"] >= 0
@@ -188,7 +216,7 @@ class Game:
             sel = tok["selectable"] & ~stopped & active[:, None]
             if step == 0 and brain.has_map:
                 self.M = mx.where(active[:, None, None], brain.encode(self.statics, tok), self.M)
-            h = brain.body(tok, self.um, self.pm, self.M, self.price)
+            h = self.body_fn(tok, self.um, self.pm, self.M, self.price)
             pick = greedy_pointer(brain.pointer(h, sel), sel.shape[1])
             active = active & (pick >= 0)
             n_act = int(mx.sum(active).item())
@@ -196,27 +224,29 @@ class Game:
                 break
             pk = mx.maximum(pick, 0)
             me = mx.where(active, mx.take_along_axis(unit, pk[:, None], axis=1)[:, 0], 0)
-            cand = self.obs.candidates(s, me)
+            cand = self.cand_fn(s, me)
             al = brain.actions(h, pk, cand, self.M)
             ai = A.first_index_eq(al, mx.max(al, axis=1))
             kind = mx.take_along_axis(cand["kind"], ai[:, None], axis=1)[:, 0]
             tgt = mx.take_along_axis(cand["tgt"], ai[:, None], axis=1)[:, 0]
-            P = len(self.plays)
-            al_ = active[:P].tolist(); pk_ = pick[:P].tolist(); ai_ = ai[:P].tolist()
-            for b in range(P):
-                if al_[b]:
-                    trace[b].append((pk_[b], ai_[b]))
-            self.apply(me, kind, tgt, active, side=0)
+            if self.compare:
+                P = len(self.plays)
+                al_ = active[:P].tolist(); pk_ = pick[:P].tolist(); ai_ = ai[:P].tolist()
+                for b in range(P):
+                    if al_[b]:
+                        trace[b].append((pk_[b], ai_[b]))
+            self.apply(me, kind, tgt, active, side=0, mk=None if self.legacy else cand["_mk"])
             made = put1(made, me, g1(made, me) + 1, active)
             self.counts["net decisions"] += n_act
         self.counts["net turns"] += int(mx.sum(~s["done"] & (self.verdict < 0)).item())
-        self.compare_turn(rel, trace)
+        if self.compare:
+            self.compare_turn(rel, trace)
         # Every army unit stands, the seat's mind ends our turn; the memory steps on the turn's last tokens.
         live = ~s["done"] & (self.verdict < 0)
         self.our_turn_end(live)
         s = self.s
         tok = self.tokens(rel)
-        h = brain.body(tok, self.um, self.pm, self.M, self.price)
+        h = self.body_fn(tok, self.um, self.pm, self.M, self.price)
         um2, pm2, al2 = brain.step(h, tok, self.um, self.pm, self.alive)
         self.um = mx.where(live[:, None, None], um2, self.um)
         self.pm = mx.where(live[:, None, None], pm2, self.pm)
@@ -228,15 +258,29 @@ class Game:
         fortifies some of them (`planner_units::hold` through its decision tree)."""
         s = self.s
         army = self.tab.t["army"] >= 0
-        s["u_mv"] = mx.where(army & (s["u_side"] == 0) & live[:, None], 0, s["u_mv"])
-        # The rule measured on the dump (not a port): a melee unit, a ranged one only next to a foe; `Sim.masks`'s
-        # fortify condition.
+        s = self.sim.hold_units(s, army & (s["u_side"] == 0) & live[:, None] & (s["u_mv"] > 0), heal=self.hold_heals)
+        # Which of them the mind fortifies hangs on its tasks and operations (`decide_military` -> `follow_task` ->
+        # `hold`), which are not ported. The rule FITTED on the event dump (not a port; 72 % of the army unit-turns
+        # right, never fortifying 69 %, the earlier rule 64 %): a melee unit that moved this turn and ends within 2 of
+        # an enemy city, a ranged one that moved and struck; with `Sim.masks`'s fortify condition.
         water = self.sim.mg("water", s["u_tile"]) > 0
-        fd = self.obs.field(s, 0)
-        d = A.hexd(fd["uq"][:, :, None] - fd["uq"][:, None, :], fd["ur"][:, :, None] - fd["ur"][:, None, :])
-        near = A.min_or(fd["foes"][:, None, :], d, 2, 99)
-        can_fort = s["u_alive"] & (s["u_tile"] >= 0) & (s["u_side"] == 0) & army & live[:, None] & ~((s["u_st"] == 1) | (s["u_st"] == 2)) \
-            & ~s["p_civilian"] & ~s["p_no_defensive_bonus"] & s["p_land"] & ~water & (~s["p_is_ranged"] | (near <= 1))
+        tile = s["u_tile"]
+        ct = self.sim.cs["tile"]
+        foe_city = self.sim.cs["alive"] & (s["c_owner"] == 1) & (ct >= 0)
+        dc = self.sim.geo.distance(mx.broadcast_to(tile[:, :, None], tile.shape + (ct.shape[1],)), mx.broadcast_to(ct[:, None, :], tile.shape + (ct.shape[1],)))
+        dcity = mx.min(mx.where(foe_city[:, None, :], dc, 99), axis=2)
+        moved = tile != (self.turn_tile if self.turn_tile is not None else tile)
+        ranged = self.obs.kind(s, "range") >= 0
+        fits = moved & mx.where(ranged, s["u_att"] > 0, dcity <= 2)
+        if self.fort_rule == "old":
+            fd = self.obs.field(s, 0)
+            d = A.hexd(fd["uq"][:, :, None] - fd["uq"][:, None, :], fd["ur"][:, :, None] - fd["ur"][:, None, :])
+            near = A.min_or(fd["foes"][:, None, :], d, 2, 99)
+            fits = ~s["p_is_ranged"] | (near <= 1)
+        elif self.fort_rule == "none":
+            fits = mx.zeros_like(fits)
+        can_fort = s["u_alive"] & (tile >= 0) & (s["u_side"] == 0) & army & live[:, None] & ~((s["u_st"] == 1) | (s["u_st"] == 2)) \
+            & ~s["p_civilian"] & ~s["p_no_defensive_bonus"] & s["p_land"] & ~water & fits
         s["u_st"] = mx.where(can_fort, 1, s["u_st"])
         self.s = s
 
@@ -304,18 +348,19 @@ class Game:
                 if len(self.ex) < 6:
                     self.ex.append(f"{self.plays[pi][0]['play']} rel {rel}: MLX {got[:8]} Rust {want[:8]}")
 
-    def apply(self, me, kind, tgt, take, side):
-        """The candidate's action in the simulator."""
+    def apply(self, me, kind, tgt, take, side, mk=None):
+        """The candidate's action in the simulator (`mk`: the unit's masks on this state, when the caller has them)."""
         s, sim = self.s, self.sim
         sd = mx.full((self.B,), side, dtype=I32)
         verb = mx.where(kind == A.K_MOVE, V_MOVE, mx.where((kind == A.K_UNIT) | (kind == A.K_CITY) | (kind == A.K_RANGED), V_ATTACK,
                         mx.where(kind == A.K_FORT, V_FORT, mx.where(kind == A.K_SETUP, V_SETUP, mx.where(kind == A.K_PROMO, V_PROMOTE, V_NONE)))))
         sim_take = take & (verb != V_NONE)
         if bool(mx.any(sim_take).item()):
-            mk = sim.masks(s, sd, me)
+            mk = mk if mk is not None else sim.masks(s, sd, me)
             s = sim.apply_unit(s, sd, me, verb, tgt, mk, sim_take)
-        # Done: the unit's turn is over.
-        s = sim.set_unit(s, me, take & (kind == A.K_DONE), mv=mx.zeros_like(me))
+        # Done: the unit's turn is over (`act::stand`).
+        done = take & (kind == A.K_DONE)
+        s = sim.hold_units(s, (mx.arange(self.U)[None, :] == me[:, None]) & done[:, None], heal=self.hold_heals)
         # Intercept: on duty.
         s = sim.set_unit(s, me, take & (kind == A.K_OTHER), st=mx.full(me.shape, 4, dtype=I32))
         # Pillage (`Transaction::pillage`): the improvement (else the road) goes, 25 HP from an improvement, a move.
@@ -409,6 +454,8 @@ class Game:
                 if bool(mx.any(hit2).item()):
                     mk = sim.masks(self.s, sd, me)
                     self.s = sim.apply_unit(self.s, sd, me, mx.full((B,), V_ATTACK, dtype=I32), t2, mk, hit2)
+            # The script's unit stands (`act::stand`).
+            self.s = sim.hold_units(self.s, (mx.arange(U)[None, :] == u) & mine[:, None], heal=self.hold_heals)
 
     def enemy_turn(self):
         if self.enemy_rule == "std":
@@ -587,7 +634,7 @@ class Game:
         return self.verdict
 
 
-def run(path, weights, copies=1, families=None, limit=None, rust=None, out=None, group=None, rounds=None):
+def run(path, weights, copies=1, families=None, limit=None, rust=None, out=None, group=None, rounds=None, setup=None):
     brain = Brain(load_net(weights))
     plays = A.load(path, limit=limit, families=families)
     res = {"families": {}, "counts": collections.Counter(), "seconds": 0.0}
@@ -601,6 +648,8 @@ def run(path, weights, copies=1, families=None, limit=None, rust=None, out=None,
     per = collections.defaultdict(lambda: [0, 0, 0, 0, 0, 0])  # MLX wins, n, Rust wins, same verdict, plays, MLX wins (first copy)
     for gp in groups:
         g = Game(gp, copies, brain)
+        if setup:
+            setup(g)
         v = g.play(rounds).tolist()
         res["counts"].update(g.counts)
         res.setdefault("examples", []).extend(getattr(g, "ex", []))
@@ -646,12 +695,25 @@ def main(argv=None):
     ap.add_argument("--out")
     ap.add_argument("--rounds", type=int, help="stop after this many rounds (the throughput runs)")
     ap.add_argument("--cpu", action="store_true")
+    ap.add_argument("--enemy", default="std", choices=["std", "approx"])
+    ap.add_argument("--old-heal", action="store_true", help="the harness before act::hold_unit (no heal at a stand)")
+    ap.add_argument("--fort", default="fit", choices=["fit", "old", "none"])
+    ap.add_argument("--charge", action="store_true")
+    ap.add_argument("--compile", action="store_true")
     a = ap.parse_args(argv)
     if a.cpu:
         mx.set_default_device(mx.cpu)
     mx.set_memory_limit(16 << 30)
     mx.set_cache_limit(2 << 30)
-    run(a.dump, a.weights, copies=a.copies, families=a.families.split(",") if a.families else None, limit=a.limit, out=a.out, group=a.group, rounds=a.rounds)
+    def setup(g):
+        g.enemy_rule, g.hold_heals, g.fort_rule, g.charge = a.enemy, not a.old_heal, a.fort, a.charge
+        if a.compile:
+            g.enable_compile()
+    res = run(a.dump, a.weights, copies=a.copies, families=a.families.split(",") if a.families else None, limit=a.limit, out=a.out, group=a.group, rounds=a.rounds, setup=setup)
+    res["setup"] = {"enemy": a.enemy, "old_heal": a.old_heal, "fort": a.fort, "charge": a.charge}
+    if a.out:
+        with open(a.out, "w") as fh:
+            json.dump(res, fh, indent=1)
 
 
 if __name__ == "__main__":

@@ -159,6 +159,10 @@ class Obs:
     def __init__(self, sim, tab):
         self.sim, self.tab, self.geo = sim, tab, sim.geo
         self.t = tab.t
+        # Static per batch (no host round-trip per call): any scene under fog; the most foe slots a row may have in
+        # the candidates' blow previews (None: counted per call).
+        self.fog_any = bool(mx.any(tab.t["fog"]).item())
+        self.nfo = None
 
     # ------------------------------------------------------------------ shared facts
 
@@ -189,7 +193,7 @@ class Obs:
         civ = self.kind(s, "civ")
         own = alive & (s["u_side"] == side)
         foes = alive & (s["u_side"] == foe)
-        if bool(mx.any(t["fog"]).item()):
+        if self.fog_any:
             seen = sim.seen_by(s, mx.full((B,), side, dtype=I32), mx.where(alive, s["u_tile"], -1))
             foes = foes & (seen | ~t["fog"][:, None])
         moves = self.kind(s, "moves")
@@ -768,8 +772,16 @@ class Obs:
         reach = mx.where(rng_k >= 0, rng_k, 1)
         # Only the foes' slots (the most any row has), not every slot: the pairs are [B, L, NF].
         foes_all = fd["foes"]
-        NFo = max(1, int(mx.max(mx.sum(foes_all, axis=1)).item()))
-        fidx = mx.argsort(mx.where(foes_all, 0, 1) * U + mx.arange(U)[None, :], axis=1)[:, :NFo].astype(I32)
+        if self.nfo is None:
+            NFo = max(1, int(mx.max(mx.sum(foes_all, axis=1)).item()))
+            fidx = mx.argsort(mx.where(foes_all, 0, 1) * U + mx.arange(U)[None, :], axis=1)[:, :NFo].astype(I32)
+        else:
+            # A fixed number of foe slots (no host round-trip): the nearest foes to the unit, then by slot; a foe out of
+            # every destination's reach adds nothing, so only more foes than `nfo` within the unit's move and reach
+            # would change the result.
+            NFo = min(self.nfo, U)
+            dme = hexd(fd["uq"] - mq[:, None], fd["ur"] - mr[:, None])
+            fidx = mx.argsort(mx.where(foes_all, mx.minimum(dme, 63), 64) * U + mx.arange(U)[None, :], axis=1)[:, :NFo].astype(I32)
         foes = mx.take_along_axis(foes_all, fidx, axis=1)
         fq_, fr_ = mx.take_along_axis(fd["uq"], fidx, axis=1), mx.take_along_axis(fd["ur"], fidx, axis=1)
         ftile = mx.take_along_axis(s["u_tile"], fidx, axis=1)
@@ -777,9 +789,22 @@ class Obs:
         inr = foes[:, None, :] & (dlf <= reach[:, None, None]) & move_ok[:, :, None]
         frm = mx.broadcast_to(lt[:, :, None], (B, L, NFo)).reshape(B, L * NFo)
         tot = mx.broadcast_to(ftile[:, None, :], (B, L, NFo)).reshape(B, L * NFo)
-        dealt, _, dhp, pok = self.preview(s, me, frm, tot, inr.reshape(B, L * NFo), False)
-        share = mx.minimum(dealt.astype(F32) / mx.maximum(dhp, 1).astype(F32), 1.0)
-        best = mx.max(mx.where(pok & inr.reshape(B, L * NFo), share, 0.0).reshape(B, L, NFo), axis=2)
+        inr_f = inr.reshape(B, L * NFo)
+        # The previews only of the pairs in reach (the rest give 0): the pairs packed first, as many columns as the
+        # row with the most such pairs has (one count per call), then the best share scattered back per destination.
+        N = L * NFo
+        K = max(1, int(mx.max(mx.sum(inr_f, axis=1)).item()))
+        if K < N:
+            pk = mx.argsort(mx.where(inr_f, 0, 1) * N + mx.arange(N)[None, :], axis=1)[:, :K].astype(I32)
+            inr_k = mx.take_along_axis(inr_f, pk, axis=1)
+            dealt, _, dhp, pok = self.preview(s, me, mx.take_along_axis(frm, pk, axis=1), mx.take_along_axis(tot, pk, axis=1), inr_k, False)
+            share = mx.where(pok & inr_k, mx.minimum(dealt.astype(F32) / mx.maximum(dhp, 1).astype(F32), 1.0), 0.0)
+            dest = (mx.arange(B)[:, None] * L + pk // NFo).reshape(-1)
+            best = mx.zeros((B * L,), dtype=F32).at[dest].maximum(share.reshape(-1)).reshape(B, L)
+        else:
+            dealt, _, dhp, pok = self.preview(s, me, frm, tot, inr_f, False)
+            share = mx.minimum(dealt.astype(F32) / mx.maximum(dhp, 1).astype(F32), 1.0)
+            best = mx.max(mx.where(pok & inr_f, share, 0.0).reshape(B, L, NFo), axis=2)
         dlc = hexd(lq[:, :, None] - fd["cq"][:, None, :], lr[:, :, None] - fd["cr"][:, None, :])
         count = mx.sum(inr, axis=2) + mx.sum(fd["foe_city"][:, None, :] & (dlc <= reach[:, None, None]), axis=2)
         fm = [mx.zeros((B, L), dtype=F32)] * F_ACT
@@ -807,7 +832,20 @@ class Obs:
         c_side = mx.where(c_sl >= 0, gn(s["u_side"], c_sl), -1)
         enemy = 1 - side
         seen = sim.seen_by(s, sd, tgt)
-        dealt, taken, dhp, sok = self.preview(s, me, mx.broadcast_to(tile[:, None], tgt.shape), tgt, tgt >= 0, True)
+        # The previews only where a foe's unit or city stands (elsewhere `plan_attack` has no defender: not ok), packed.
+        has_foe = (tgt >= 0) & ((m_side == enemy) | (c_side == enemy) | (is_city & (c_owner == enemy)))
+        K = max(1, int(mx.max(mx.sum(has_foe, axis=1)).item()))
+        if K < OA:
+            pk = mx.argsort(mx.where(has_foe, 0, 1) * OA + mx.arange(OA)[None, :], axis=1)[:, :K].astype(I32)
+            hk = mx.take_along_axis(has_foe, pk, axis=1)
+            tk = mx.take_along_axis(tgt, pk, axis=1)
+            d_k, t_k, h_k, o_k = self.preview(s, me, mx.broadcast_to(tile[:, None], tk.shape), tk, hk, True)
+            flat = (mx.arange(B)[:, None] * OA + pk).reshape(-1)
+            back = lambda v, z: mx.full((B * OA,), z, dtype=v.dtype).at[flat].add(mx.where(hk, v, z).reshape(-1) - z).reshape(B, OA)
+            dealt, taken, dhp = back(d_k, 0), back(t_k, 0), back(h_k, 0)
+            sok = back((o_k & hk).astype(I32), 0) > 0
+        else:
+            dealt, taken, dhp, sok = self.preview(s, me, mx.broadcast_to(tile[:, None], tgt.shape), tgt, tgt >= 0, True)
         att_ok = sok
         tq, tr_ = self.mapq(tgt)
         ssp = self.spot(s, fd, me, tq, tr_, tgt)
@@ -899,7 +937,7 @@ class Obs:
         promo = mx.concatenate([mx.zeros((B, 1), dtype=I32), promo], axis=1)
         tgt = mx.concatenate([tile[:, None], tgt], axis=1)
         return {"tgt": tgt, "feat": feat, "mask": cmask, "n": mx.sum(cmask, axis=1), "kind": mx.where(cmask, kind, -1), "pos": mx.where(cmask, pos, -1),
-                "promo": mx.where(cmask, promo, 0)}
+                "promo": mx.where(cmask, promo, 0), "_mk": mk}
 
 
 def expected_damage(me, opp, my_damage, wounded_mod):

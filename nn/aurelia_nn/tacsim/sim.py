@@ -1285,17 +1285,13 @@ class Sim:
 
     # ------------------------------------------------------------------ the turn
 
-    def end_turn(self, s, side, take):
-        """The end of `side`'s turn: heal its units, the citadels' and mountains' damage, restore moves,
-        attacks and interceptions, its cities heal and may strike again; then the other side's turn
-        starts (fortification +1)."""
+    def heal_dose(self, s, moved):
+        """`heal::heal_amount` of every slot [B, U] (0 where `moved`): the rate by place, the medic next to it."""
         tiles = s["u_tile"]
-        mine = s["u_alive"] & (tiles >= 0) & (s["u_side"] == side[:, None]) & take[:, None]
         water = self.mg("water", tiles) > 0
         owner = gn(s["owner"], tiles)
         friendly = owner == s["u_side"]
         cityt = self.city_on(s, tiles) >= 0
-        moved = (s["u_mv"] < s["u_mmax"]) & ~s["p_always_heal"]
         no = (s["u_hp"] >= 100) | (s["p_land"] & water) | moved | (s["p_sea"] & ~friendly & ~s["p_heal_outside_friendly"])
         no = no | (s["p_air"] & ~cityt)
         enemy_host = (owner >= 0) & (owner != s["u_side"]) & (owner < 2)
@@ -1305,8 +1301,29 @@ class Sim:
         dd = self.geo.distance(tiles[:, :, None], tiles[:, None, :])
         same = (s["u_side"][:, :, None] == s["u_side"][:, None, :]) & s["u_alive"][:, None, :] & (tiles[:, None, :] >= 0)
         medic = mx.max(mx.where(same & (dd == 1), s["p_heal_adjacent"][:, None, :], 0), axis=2)
-        dose = mx.where(no, 0, rate + medic)
+        return mx.where(no, 0, rate + medic)
+
+    def hold_units(self, s, which, heal=True):
+        """`act::hold_unit` of the units `which` [B, U] (the trainers' one end of a unit's turn): a unit that has not
+        moved heals now by `heal_amount` (not an AlwaysHeal one: the end of the turn heals it), then its moves are
+        spent. `heal=False`: the old harness (moves spent by hand, no heal)."""
+        if heal:
+            unmoved = which & (s["u_mv"] >= s["u_mmax"]) & ~s["p_always_heal"] & s["u_alive"] & (s["u_tile"] >= 0)
+            dose = self.heal_dose(s, ~unmoved)
+            s["u_hp"] = mx.where(unmoved & (dose > 0), mx.clip(s["u_hp"] + dose, 1, 100), s["u_hp"])
+        s["u_mv"] = mx.where(which, 0, s["u_mv"])
+        return s
+
+    def end_turn(self, s, side, take):
+        """The end of `side`'s turn: heal its units, the citadels' and mountains' damage, restore moves,
+        attacks and interceptions, its cities heal and may strike again; then the other side's turn
+        starts (fortification +1)."""
+        tiles = s["u_tile"]
+        mine = s["u_alive"] & (tiles >= 0) & (s["u_side"] == side[:, None]) & take[:, None]
+        moved = (s["u_mv"] < s["u_mmax"]) & ~s["p_always_heal"]
+        dose = self.heal_dose(s, moved)
         s["u_hp"] = mx.where(mine, mx.clip(s["u_hp"] + dose, 1, 100), s["u_hp"])
+        water = self.mg("water", tiles) > 0
         if self.f["citadel"]:
             # Citadels (`citadel_damage`): the strongest intact citadel of the enemy next to the unit.
             nb = mx.take(self.geo.nbr, mx.maximum(tiles, 0), axis=0)  # [B, U, 6]

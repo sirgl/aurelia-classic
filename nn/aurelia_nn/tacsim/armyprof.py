@@ -41,6 +41,8 @@ def main(argv=None):
     ap.add_argument("--rounds", type=int, default=3)
     ap.add_argument("--families")
     ap.add_argument("--untimed", action="store_true", help="only the wall time")
+    ap.add_argument("--compile", action="store_true")
+    ap.add_argument("--legacy", default="", help="parts of the step before the speed-up: nfo (foes counted per call, a host round-trip), mk (the masks twice); comma list")
     ap.add_argument("--out")
     a = ap.parse_args(argv)
     mx.set_memory_limit(16 << 30)
@@ -48,11 +50,22 @@ def main(argv=None):
     brain = Brain(load_net(a.weights))
     plays = A.load(a.dump, limit=a.limit, families=a.families.split(",") if a.families else None)
     g = P.Game(plays, a.copies, brain)
+    g.fort_rule = "old"
+    if a.compile:
+        g.enable_compile()
+    if "mk" in a.legacy:
+        g.legacy = True
+    if "nfo" in a.legacy:
+        g.obs.nfo = None
     acc = collections.Counter()
     if not a.untimed:
         wrap(g.obs, "tokens", acc, "tokens")
-        wrap(g.obs, "candidates", acc, "candidates")
-        wrap(brain, "body", acc, "body")
+        wrap(g.sim, "masks", acc, "  masks (all callers)")
+        wrap(g.obs, "preview", acc, "  previews (all callers)")
+        wrap(g.obs, "spot", acc, "  spots (all callers)")
+        wrap(g.obs, "field", acc, "  field (all callers)")
+        wrap(g, "cand_fn", acc, "candidates")
+        wrap(g, "body_fn", acc, "body")
         wrap(brain, "pointer", acc, "pointer")
         wrap(brain, "actions", acc, "actions")
         wrap(brain, "step", acc, "memory step")
