@@ -1,6 +1,6 @@
 [package]
 name = "classic-android"
-version = "0.3.0"
+version = "0.4.0"
 edition = "2021"
 license = "MIT OR Apache-2.0"
 authors = ["The Aurelia contributors"]
@@ -25,9 +25,9 @@ classic-ui = { path = "../../crates/classic-ui" }
 # cargo-apk 0.10 reads this table. Version names are in docs/android.md.
 [package.metadata.android]
 package = "org.aurelia.classic"
-# versionName is the crate version (0.3.0); versionCode grows with it: major * 10000 + minor * 100 + patch
+# versionName is the crate version (0.4.0); versionCode grows with it: major * 10000 + minor * 100 + patch
 # (tests/release_version.rs of classic-ui checks it). Play and Android compare the code, not the name.
-version_code = 300
+version_code = 400
 apk_name = "aurelia-classic"
 build_targets = ["aarch64-linux-android"]
 # Staged by platform/tools/launcher/android-build.sh: fonts, audio and the art pack, with FILES.txt (the NDK

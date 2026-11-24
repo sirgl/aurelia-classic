@@ -490,7 +490,7 @@ dependencies = [
 
 [[package]]
 name = "classic-android"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "aurelia-launcher-core",
  "classic-ui",
@@ -509,7 +509,7 @@ dependencies = [
 
 [[package]]
 name = "classic-desktop"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "aurelia-client",
  "aurelia-kernel",
@@ -553,7 +553,7 @@ dependencies = [
 
 [[package]]
 name = "classic-web"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "aurelia-launcher-core",
  "classic-ui",
