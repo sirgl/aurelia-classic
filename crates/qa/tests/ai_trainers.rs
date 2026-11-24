@@ -402,3 +402,52 @@ fn the_camp_families_are_proven_and_the_neutral_clearing_loses() {
         assert_eq!(by_neutral > 0.0, fam == Fam::CampRace, "{}: the neutral takes the camp from a passive learner", fam.name());
     }
 }
+
+/// The third-party trainers (`trainers::third_party`, its module doc): the third nation is at peace with the learner, the enemy at
+/// war with it, and the scenes of the seven families build in every era sampled. A teacher wins one of six of each family and the
+/// passive control never wins one (defend-friend excepted: the ally's own garrison holds some scenes alone).
+#[test]
+fn the_third_party_families_build_and_the_teachers_beat_the_passive_control() {
+    use aurelia_qa::trainers::third_party;
+    let rules = ClassicBench::rules();
+    for era_name in ["ancient", "industrial"] {
+        let era = lab::era_index(&rules, era_name).unwrap();
+        for fam in Fam::ALL.iter().copied().filter(|f| third_party::is_third(*f)) {
+            let mut built = 0;
+            let mut won = 0;
+            let mut passive_won = 0;
+            for i in 0..6usize {
+                let Ok((g, sc)) = families::build(&rules, fam, era, i, 0) else { continue };
+                built += 1;
+                let (me, n) = (sc.learner, sc.neutral.expect("a third nation"));
+                assert!(g.view().auth.diplomacy().at_war(me, sc.enemy), "{}: the learner is at war with the enemy", fam.name());
+                if !matches!(fam, Fam::NeutralJoinsWar) {
+                    assert!(!g.view().auth.diplomacy().at_war(me, n), "{}: the third nation is at peace with the learner at the start", fam.name());
+                }
+                if fam.solvers().iter().take(1).any(|s| play(&rules, g.clone(), sc.clone(), s, false).is_ok_and(|r| r.win)) {
+                    won += 1;
+                }
+                if play(&rules, g, sc, "passive", false).is_ok_and(|r| r.win) {
+                    passive_won += 1;
+                }
+            }
+            assert!(built >= 4, "{} {era_name}: the scene builds ({built} of 6)", fam.name());
+            assert!(won >= 1, "{} {era_name}: the right teacher wins one of six", fam.name());
+            let allowed = if fam == Fam::DefendFriend { 2 } else { 0 };
+            assert!(passive_won <= allowed, "{} {era_name}: the passive control wins {passive_won}", fam.name());
+        }
+    }
+}
+
+/// The net's blindness is a fact the third-party trainers rest on: the foe set of the third families holds the enemy and,
+/// where the third nation is at war with the learner, nothing of the third (`orders.foe` is the enemy's pieces only).
+#[test]
+fn the_third_nation_is_no_foe_token_until_it_is_at_war() {
+    use aurelia_qa::trainers::scene_rule::foe_tiles;
+    let rules = ClassicBench::rules();
+    let era = lab::era_index(&rules, "medieval").unwrap();
+    let (g, sc) = families::build(&rules, Fam::NeutralPath, era, 2, 0).unwrap();
+    let foes = foe_tiles(&g, &sc, sc.learner);
+    let third: Vec<_> = sc.third.iter().filter_map(|p| act::core_of(&g, p.h)).map(|c| c.tile).collect();
+    assert!(!third.is_empty() && third.iter().all(|t| !foes.contains(t)), "the neutral's tiles are no foe tiles");
+}
