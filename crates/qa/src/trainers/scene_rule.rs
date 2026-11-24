@@ -56,21 +56,22 @@ pub fn rule_of(value: Option<&str>) -> bool {
     }
 }
 
-/// The rule's version (`ARMY_SCENE_RULE_VERSION`): 1 (unset) is the rule above; 2 adds step 0b, the learner's civilians:
+/// The rule's version (`ARMY_SCENE_RULE_VERSION`): 2 (unset, the default) adds step 0b, the learner's civilians; 1 is the rule above alone:
 /// after the seat's script and before steps 1-4 the rule plays them by the family teacher's civilian script (walk to
 /// the site and found the city, or walk to the refuge; `families::civilians_turn`), and a net or a teacher commands the
-/// army only. The version is written into every row's `info` (`rule_version`).
+/// army only. Version 1 (`ARMY_SCENE_RULE_VERSION=1`) plays the old convoy and guard scenes: their `kept` files are
+/// `kept-r`'s, the version 2 ones `kept-r2`'s. The version is written into every row's `info` (`rule_version`).
 pub fn version() -> u8 {
     static V: std::sync::OnceLock<u8> = std::sync::OnceLock::new();
     *V.get_or_init(|| version_of(std::env::var("ARMY_SCENE_RULE_VERSION").ok().as_deref()))
 }
 
-/// The version's value: `None` (unset) or `1` is the first rule, `2` the rule with our civilians; anything else stops
+/// The version's value: `None` (unset) or `2` is the rule with our civilians, `1` the first rule; anything else stops
 /// the run, so a misspelt switch never plays the other world.
 pub fn version_of(value: Option<&str>) -> u8 {
     match value {
-        None | Some("1") => 1,
-        Some("2") => 2,
+        Some("1") => 1,
+        None | Some("2") => 2,
         Some(other) => panic!("ARMY_SCENE_RULE_VERSION={other}: expected 1 or 2"),
     }
 }

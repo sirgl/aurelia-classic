@@ -312,12 +312,12 @@ fn the_scene_rule_is_the_trainers_default_and_standard_is_the_only_way_off() {
     assert!(std::panic::catch_unwind(|| rule_of(Some("simpel"))).is_err(), "an unknown value stops the run");
 }
 
-/// The scene rule's version: 1 (unset) is the rule of before, 2 plays the learner's civilians; a misspelt value stops the
+/// The scene rule's version: 2 (unset) plays the learner's civilians, 1 is the rule of before; a misspelt value stops the
 /// run; and the civilians' pass of version 2 walks a convoy's settler (the world where nobody moves it is version 1).
 #[test]
-fn the_scene_rule_version_is_one_by_default_and_two_plays_the_civilians() {
+fn the_scene_rule_version_is_two_by_default_and_one_is_the_old_rule() {
     use aurelia_qa::trainers::scene_rule::version_of;
-    assert_eq!(version_of(None), 1, "unset: version 1");
+    assert_eq!(version_of(None), 2, "unset: version 2");
     assert_eq!(version_of(Some("1")), 1);
     assert_eq!(version_of(Some("2")), 2);
     for bad in ["3", "", "two", "0"] {
