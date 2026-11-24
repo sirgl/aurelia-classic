@@ -178,3 +178,115 @@ fn a_price_set_from_outside_is_careful_or_any_cost_per_scene() {
     assert_eq!(price_set("anycostly", "duel", 3, 12, None), None);
     assert_eq!(price_set("cheap", "duel", 3, 12, None), None);
 }
+
+/// The export format as tensors: (config, [(name, shape, data)]).
+fn read_weights(bytes: &[u8]) -> (serde_json::Value, Vec<(String, Vec<usize>, Vec<f32>)>) {
+    let len = u32::from_le_bytes(bytes[4..8].try_into().expect("len")) as usize;
+    let head: serde_json::Value = serde_json::from_slice(&bytes[8..8 + len]).expect("json");
+    let floats: Vec<f32> = bytes[8 + len..].chunks_exact(4).map(|b| f32::from_le_bytes([b[0], b[1], b[2], b[3]])).collect();
+    let tensors = head["tensors"]
+        .as_array()
+        .expect("tensors")
+        .iter()
+        .map(|e| {
+            let shape: Vec<usize> = e["shape"].as_array().expect("shape").iter().map(|v| v.as_u64().expect("dim") as usize).collect();
+            let at = e["offset"].as_u64().expect("offset") as usize;
+            (e["name"].as_str().expect("name").to_owned(), shape.clone(), floats[at..at + shape.iter().product::<usize>()].to_vec())
+        })
+        .collect();
+    (head["config"].clone(), tensors)
+}
+
+fn write_weights(config: &serde_json::Value, tensors: &[(String, Vec<usize>, Vec<f32>)]) -> Vec<u8> {
+    let mut data: Vec<f32> = Vec::new();
+    let mut entries = Vec::new();
+    for (name, shape, v) in tensors {
+        entries.push(serde_json::json!({"name": name, "shape": shape, "offset": data.len()}));
+        data.extend_from_slice(v);
+    }
+    let head = serde_json::to_vec(&serde_json::json!({"config": config, "tensors": entries})).expect("json");
+    let mut out = Vec::new();
+    out.extend_from_slice(&u32::from_le_bytes(*b"ARMW").to_le_bytes());
+    out.extend_from_slice(&(head.len() as u32).to_le_bytes());
+    out.extend_from_slice(&head);
+    for x in data {
+        out.extend_from_slice(&x.to_le_bytes());
+    }
+    out
+}
+
+/// The base weights plus one modern layer at the end (kinds "cccm"): random, except `o` and `w2` which are zero when `zero`.
+fn with_modern_layer(base: &[u8], zero: bool) -> Vec<u8> {
+    let (mut config, mut tensors) = read_weights(base);
+    let d = config["d"].as_u64().expect("d") as usize;
+    let heads = config["heads"].as_u64().expect("heads") as usize;
+    let dmax = config["dmax"].as_u64().expect("dmax") as usize;
+    let l = config["layers"].as_u64().expect("layers") as usize;
+    let (dh, ff) = (d / heads, 86usize);
+    config["layers"] = serde_json::json!(l + 1);
+    config["kinds"] = serde_json::json!(format!("{}m", "c".repeat(l)));
+    for (name, shape, v) in tensors.iter_mut() {
+        if name == "plan_bias" {
+            shape[0] += 1;
+            v.extend((0..heads).map(|h| 0.05 * h as f32 - 0.1));
+        }
+    }
+    let mut state = 99u64;
+    let mut next = move |n: usize, scale: f32, shift: f32| -> Vec<f32> {
+        (0..n)
+            .map(|_| {
+                state = state.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+                shift + ((state >> 33) as f32 / (1u64 << 31) as f32 * 2.0 - 1.0) * scale
+            })
+            .collect()
+    };
+    let p = format!("layers.{l}");
+    let mut add = |n: &str, shape: Vec<usize>, v: Vec<f32>| tensors.push((format!("{p}.{n}"), shape, v));
+    add("rms1.weight", vec![d], next(d, 0.1, 1.0));
+    for n in ["q", "k", "v", "g", "o"] {
+        let w = if n == "o" && zero { vec![0.0; d * d] } else { next(d * d, 0.2, 0.0) };
+        add(&format!("{n}.weight"), vec![d, d], w);
+        add(&format!("{n}.bias"), vec![d], if n == "o" && zero { vec![0.0; d] } else { next(d, 0.1, 0.0) });
+    }
+    add("qn.weight", vec![dh], next(dh, 0.1, 1.0));
+    add("kn.weight", vec![dh], next(dh, 0.1, 1.0));
+    add("dist_bias", vec![heads, dmax + 1], next(heads * (dmax + 1), 0.1, 0.0));
+    add("rms2.weight", vec![d], next(d, 0.1, 1.0));
+    add("w1.weight", vec![d, ff], next(d * ff, 0.2, 0.0));
+    add("w3.weight", vec![d, ff], next(d * ff, 0.2, 0.0));
+    add("w2.weight", vec![ff, d], if zero { vec![0.0; ff * d] } else { next(ff * d, 0.2, 0.0) });
+    add("w2.bias", vec![d], if zero { vec![0.0; d] } else { next(d, 0.1, 0.0) });
+    write_weights(&config, &tensors)
+}
+
+/// A modern layer with zero `o` and `w2` adds nothing: the net's body is the base net's, bit for bit; with them
+/// random it moves.
+#[test]
+fn a_modern_layer_with_zero_outputs_is_the_identity_of_the_base_forward() {
+    use aurelia_qa::army_net::model::{MemIn, Net};
+    let rules = ClassicBench::rules();
+    let era = lab::era_index(&rules, "classical").expect("the classical era");
+    let (game, scene) = families::build(&rules, Fam::PlannedAssault, era, 1, 0).expect("the scene builds");
+    record::want(true);
+    play(&rules, game, scene, "ref-planned", false).expect("the scene plays");
+    record::want(false);
+    let (bytes, _) = record::take_last().expect("the play was recorded");
+    let decisions = parity::read(&bytes, 12).expect("the record reads");
+    assert!(!decisions.is_empty());
+
+    let base = random_m_weights(11);
+    let plain = Net::from_bytes(&base).expect("base loads");
+    let identity = Net::from_bytes(&with_modern_layer(&base, true)).expect("the zero modern layer loads");
+    let moved = Net::from_bytes(&with_modern_layer(&base, false)).expect("the random modern layer loads");
+    let state = plain.initial_memory().expect("memory");
+    let mut moves = 0.0f32;
+    for dec in &decisions {
+        let mi = MemIn { slots: &dec.slots, state: &state };
+        let a = plain.body(&dec.tokens, None, Some(&mi));
+        let b = identity.body(&dec.tokens, None, Some(&mi));
+        let c = moved.body(&dec.tokens, None, Some(&mi));
+        assert_eq!(a.h, b.h, "zero o and w2: the modern layer is the identity");
+        moves = moves.max(a.h.iter().zip(&c.h).map(|(x, y)| (x - y).abs()).fold(0.0, f32::max));
+    }
+    assert!(moves > 1e-3, "random o and w2 move the body ({moves})");
+}
