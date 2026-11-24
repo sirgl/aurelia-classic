@@ -253,6 +253,26 @@ class Game:
         if moved:
             self._apply_economy(last)
 
+    def our_mind_economy(self, rel):
+        """Our seat's mind runs at our turn's end, after the net's last moment: a tenet adopted there changes our units'
+        wounded modifier for the enemy's strikes of this round (neutral-path's forced enemy turns, 4 of 47 left). Our
+        units' modifier from the next round's first Rust moment (no other seat changes ours before then) where the play
+        has one and the unit lives in it; the other seats' and the rest of the economy stay."""
+        U = self.U
+        nw, has = [], []
+        for pi in range(len(self.plays)):
+            m = self.sched[pi].get(self.plays[pi][0]["orders"]["start_round"] + rel + 1)
+            ok = m is not None and "wm" in m
+            nu = m["state"]["units"] if ok else []
+            nw.append((m.get("wm", []) + [0] * U)[:U] if ok else [0] * U)
+            has.append([ok and k < len(nu) and nu[k][0] == 1 for k in range(U)])
+        if not any(any(h) for h in has):
+            return
+        tk = lambda v, dt=I32: mx.take(mx.array(v, dtype=dt), self.idx, axis=0)
+        s = self.s
+        ours = tk(has, mx.bool_) & s["u_alive"] & (s["u_side"] == 0)
+        s["p_wounded_mod"] = mx.where(ours, tk(nw), s["p_wounded_mod"])
+
     def _apply_economy(self, last):
         s = self.s
         own, pop, cs0, cmax, wm, have = [], [], [], [], [], []
@@ -1063,6 +1083,7 @@ class Game:
             self.learner_turn(rel)
             mx.eval(self.s)
             tb_ = time.time()
+            self.our_mind_economy(rel)
             self.enemy_turn()
             mx.eval(self.s)
             self.counts["ms learner turns"] += int(1000 * (tb_ - ta))

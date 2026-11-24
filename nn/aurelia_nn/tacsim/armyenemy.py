@@ -93,7 +93,7 @@ def turn_rows(plays, which):
     return rows
 
 
-def as_row(plays, pi, start, by_round, U):
+def as_row(plays, pi, start, by_round, U, which="enemy"):
     units, cities, rng, rnd = start[:4]
     m = by_round.get(rnd) or min(by_round.values(), key=lambda x: abs(x["round"] - rnd))
     state = {"units": [u for u in units[:U]], "cities": cities, "rng": rng, "owner": m["state"]["owner"]}
@@ -101,6 +101,16 @@ def as_row(plays, pi, start, by_round, U):
     for k in ("wm", "cstr"):
         if k in m:
             row[k] = m[k]
+    if which != "ours" and "wm" in row:
+        # Our seat's mind runs at our turn's end, after the net's last moment (a tenet adopted there changes our units'
+        # wounded modifier for the enemy's strikes of this round): our units' modifier from the next round's first moment
+        # (no other seat changes it before then), the other seats' from this round's. Where the play has no moment in
+        # the next round the change's round is unknown and this round's stands; a unit dead by then keeps this round's.
+        nxt = min((x for x in plays[pi][1] if x["round"] == rnd + 1 and "wm" in x), key=lambda x: x["step"], default=None)
+        if nxt is not None:
+            nu = nxt["state"]["units"]
+            row["wm"] = [nw if k < len(units) and units[k][0] and units[k][8] == 0 and k < len(nu) and nu[k][0] == 1 else w
+                         for k, (w, nw) in enumerate(zip(row["wm"], nxt["wm"]))]
     # The ruins and the arrival order at the end of our turn: the round's last moment (the turn end), not its first.
     last = max((x for x in plays[pi][1] if x["round"] == rnd), key=lambda x: x["step"], default=m)
     for k in ("ruins", "upos"):
@@ -169,7 +179,7 @@ def run(path, weights, families=None, which="enemy", show=3, out=None, group=400
             continue
         tb = A.build_templates(gp)[0]
         U = tb.u
-        forced = [(pi, as_row(gp, pi, start, br, U)) for pi, start, _, br in rows]
+        forced = [(pi, as_row(gp, pi, start, br, U, which)) for pi, start, _, br in rows]
         g = P.Game(gp, 1, brain, forced=forced)
         g.enemy_rule = rule
         g.charge = charge
