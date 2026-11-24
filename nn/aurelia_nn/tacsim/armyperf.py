@@ -293,6 +293,48 @@ def play(a):
         json.dump(res, open(a.out, "w"), indent=1)
 
 
+# ---------------------------------------------------------------------------------------------------- the net's parts
+
+def netbench(a):
+    """The net's parts alone on the GPU at several batch sizes (the real tokens of round 0, trimmed): the body, the map
+    encoder, the action head (20 candidates); median of 5, f32; plain and compiled (`armyfast.compile_net`)."""
+    from . import armyobs as A
+    from . import armyplay as P
+    from . import armyfast
+    from .armyloop import Brain, load_net
+    mx.set_memory_limit(16 << 30)
+    mx.set_cache_limit(2 << 30)
+    brain = Brain(load_net(a.weights))
+    plays = A.load(a.dump, limit=a.limit)
+    g = P.Game(plays, a.copies, brain)
+    tok = P.trim_tokens(g.tokens(0))
+    mx.eval(tok, g.statics)
+    out = {"machine_before": machine(), "T": int(tok["feat"].shape[1]), "rows": []}
+    for comp in (False, True):
+        if comp:
+            armyfast.compile_net(g)
+        for B in (1000, 3000, 10000):
+            if B > g.B:
+                continue
+            sub = {k: v[:B] for k, v in tok.items()}
+            um, pm, price, M = g.um[:B], g.pm[:B], g.price[:B], g.M[:B]
+            st = g.statics[:B]
+            C = 20
+            cand = {"feat": mx.random.normal((B, C, 40)).astype(mx.float16), "promo": mx.zeros((B, C), dtype=mx.int32),
+                    "mask": mx.ones((B, C), dtype=mx.bool_), "pos": mx.random.randint(0, 576, (B, C)).astype(mx.int32)}
+            h = g.body_fn(sub, um, pm, M, price, None)
+            mx.eval(cand, h)
+            unit = mx.zeros((B,), dtype=mx.int32)
+            row = {"compiled": comp, "B": B,
+                   "body_ms": 1000 * timeit(lambda: mx.eval(g.body_fn(sub, um, pm, M, price, None))),
+                   "encode_ms": 1000 * timeit(lambda: mx.eval(brain.encode(st, sub))),
+                   "action_ms": 1000 * timeit(lambda: mx.eval(brain.actions(h, unit, cand, M)))}
+            out["rows"].append({k: (round(v, 3) if isinstance(v, float) else v) for k, v in row.items()})
+            print(json.dumps(out["rows"][-1]), flush=True)
+    if a.out:
+        json.dump(out, open(a.out, "w"), indent=1)
+
+
 # ---------------------------------------------------------------------------------------------------- one RL update
 
 def rl(a):
@@ -511,12 +553,18 @@ def main(argv=None):
     r.add_argument("--mode", choices=["wall", "time"], default="wall")
     r.add_argument("--fast", default="")
     r.add_argument("--out")
-    for q in (c, p, r):
+    nb = sp.add_parser("netbench")
+    nb.add_argument("dump")
+    nb.add_argument("--weights", required=True)
+    nb.add_argument("--limit", type=int, default=200)
+    nb.add_argument("--copies", type=int, default=50)
+    nb.add_argument("--out")
+    for q in (c, p, r, nb):
         q.add_argument("--cpu", action="store_true", help="the CPU device (a smoke test without the GPU)")
     a = ap.parse_args(argv)
     if a.cpu:
         mx.set_default_device(mx.cpu)
-    {"constants": constants, "play": play, "rl": rl}[a.cmd](a)
+    {"constants": constants, "play": play, "rl": rl, "netbench": netbench}[a.cmd](a)
 
 
 if __name__ == "__main__":
