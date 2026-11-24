@@ -1,0 +1,11 @@
+{
+ "pinned_py": ".venv-m5/bin/python",
+ "pinned_mlx": "mlx 0.32.4, mlx-metal 0.32.4",
+ "new_py": ".venv-m5-new/bin/python",
+ "new_mlx": "mlx 0.32.4, mlx-metal 0.32.4",
+ "ok": true,
+ "note": "",
+ "macos": "27.2.1",
+ "macos_build": "26B131",
+ "chip": "Apple M5 Max"
+}

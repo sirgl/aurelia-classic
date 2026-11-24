@@ -1,0 +1,98 @@
+{
+ "label": "pinned-f32",
+ "py": ".venv-m5/bin/python",
+ "tf32": "0",
+ "bf16": false,
+ "dps_steady": 4564,
+ "table": {
+  "pinned-f32": {
+   "dps_steady": 4564,
+   "dps_mean": 5305,
+   "speedup": 1.0,
+   "loss_late": 1.34698,
+   "loss_rel_diff": 0.0,
+   "loss_curve_max_rel_diff": 0.0,
+   "loss_curve_mean_rel_diff": 0.0,
+   "hold_acc_both": 0.6503,
+   "acc_diff": 0.0,
+   "correct": true,
+   "peak_ram_gb": 36.6
+  },
+  "pinned-tf32": {
+   "dps_steady": 4608,
+   "dps_mean": 5349,
+   "speedup": 1.01,
+   "loss_late": 1.28629,
+   "loss_rel_diff": 0.0451,
+   "loss_curve_max_rel_diff": 0.1382,
+   "loss_curve_mean_rel_diff": 0.048,
+   "hold_acc_both": 0.6541,
+   "acc_diff": 0.0038,
+   "correct": false,
+   "peak_ram_gb": 37.6
+  },
+  "pinned-bf16": {
+   "dps_steady": 4707,
+   "dps_mean": 5421,
+   "speedup": 1.031,
+   "loss_late": 1.382,
+   "loss_rel_diff": 0.026,
+   "loss_curve_max_rel_diff": 0.0998,
+   "loss_curve_mean_rel_diff": 0.0377,
+   "hold_acc_both": 0.6449,
+   "acc_diff": 0.0054,
+   "correct": true,
+   "peak_ram_gb": 32.2
+  },
+  "new-f32": {
+   "dps_steady": 4576,
+   "dps_mean": 5325,
+   "speedup": 1.003,
+   "loss_late": 1.29554,
+   "loss_rel_diff": 0.0382,
+   "loss_curve_max_rel_diff": 0.1174,
+   "loss_curve_mean_rel_diff": 0.037,
+   "hold_acc_both": 0.6527,
+   "acc_diff": 0.0024,
+   "correct": false,
+   "peak_ram_gb": 36.7
+  },
+  "new-tf32": {
+   "dps_steady": 4630,
+   "dps_mean": 5368,
+   "speedup": 1.014,
+   "loss_late": 1.3821,
+   "loss_rel_diff": 0.0261,
+   "loss_curve_max_rel_diff": 0.0861,
+   "loss_curve_mean_rel_diff": 0.0237,
+   "hold_acc_both": 0.6475,
+   "acc_diff": 0.0028,
+   "correct": true,
+   "peak_ram_gb": 37.0
+  },
+  "new-bf16": {
+   "dps_steady": 4757,
+   "dps_mean": 5496,
+   "speedup": 1.042,
+   "loss_late": 1.37877,
+   "loss_rel_diff": 0.0236,
+   "loss_curve_max_rel_diff": 0.0793,
+   "loss_curve_mean_rel_diff": 0.0271,
+   "hold_acc_both": 0.6432,
+   "acc_diff": 0.0071,
+   "correct": true,
+   "peak_ram_gb": 32.0
+  }
+ },
+ "versions": {
+  "pinned_py": ".venv-m5/bin/python",
+  "pinned_mlx": "mlx 0.32.4, mlx-metal 0.32.4",
+  "new_py": ".venv-m5-new/bin/python",
+  "new_mlx": "mlx 0.32.4, mlx-metal 0.32.4",
+  "ok": true,
+  "note": "",
+  "macos": "27.2.1",
+  "macos_build": "26B131",
+  "chip": "Apple M5 Max"
+ }
+}

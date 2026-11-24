@@ -4,7 +4,7 @@
 
 [train]                 # the recipe shared by every net (tools/m5/train.sh)
 epochs = 2
-plays = 128             # plays a step
+plays = 256             # plays a step
 lr = 1e-3
 chunk_min = 30          # minutes of one GPU job; a chunk ends with a checkpoint
 
@@ -34,3 +34,12 @@ layers = 4
 [[ladder]]
 d = 128
 layers = 6
+
+# --- auto-tune (written by campaign.py) ---
+[tune]
+when = "2026-11-23 23:02:26"
+mlx_limit_gb = 76.8
+chosen_plays = 256
+# plays 128: {'dps': 8826, 'peak_ram_gb': 10.4, 'mean_loss': 3.8699, 'ok': True}
+# plays 256: {'dps': 9441, 'peak_ram_gb': 26.9, 'mean_loss': 3.8104, 'ok': True}
+# plays 512: {'dps': 9159, 'peak_ram_gb': 51.8, 'mean_loss': 3.7026, 'ok': True}

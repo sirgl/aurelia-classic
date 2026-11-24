@@ -1,0 +1,1610 @@
+{
+ "rows": [
+  {
+   "family": "airstrike",
+   "n": 27,
+   "rates": {
+    "ref-air": 1.0,
+    "unciv": 0.5185185185185185
+   },
+   "counts": {
+    "ref-air": [
+     27,
+     27,
+     0,
+     6.0
+    ],
+    "unciv": [
+     14,
+     27,
+     0,
+     9.0
+    ]
+   },
+   "capture": {
+    "ref-air": 0.0,
+    "unciv": 0.0
+   },
+   "losses": {
+    "ref-air": 0.2222222222222222,
+    "unciv": 0.3333333333333333
+   },
+   "best": "ref-air",
+   "best_rate": 1.0,
+   "share": {
+    "m0-s2-d64-l3": 0.0
+   },
+   "pass": {
+    "m0-s2-d64-l3": false
+   }
+  },
+  {
+   "family": "ambush-fog",
+   "n": 160,
+   "rates": {
+    "ref-recall": 1.0,
+    "unciv": 0.0
+   },
+   "counts": {
+    "ref-recall": [
+     160,
+     160,
+     0,
+     0.0
+    ],
+    "unciv": [
+     0,
+     160,
+     0,
+     108.0
+    ]
+   },
+   "capture": {
+    "ref-recall": 0.0,
+    "unciv": 0.0
+   },
+   "losses": {
+    "ref-recall": 0.0,
+    "unciv": 0.675
+   },
+   "best": "ref-recall",
+   "best_rate": 1.0,
+   "share": {
+    "m0-s2-d64-l3": 0.0
+   },
+   "pass": {
+    "m0-s2-d64-l3": false
+   }
+  },
+  {
+   "family": "assault-heal",
+   "n": 140,
+   "rates": {
+    "ref-rotate": 0.9928571428571429,
+    "ref-planned": 1.0,
+    "unciv": 0.6,
+    "m0-s2-d64-l3": 0.6714285714285714
+   },
+   "counts": {
+    "ref-rotate": [
+     139,
+     140,
+     139,
+     97.0
+    ],
+    "ref-planned": [
+     140,
+     140,
+     140,
+     94.0
+    ],
+    "unciv": [
+     84,
+     140,
+     84,
+     476.0
+    ],
+    "m0-s2-d64-l3": [
+     94,
+     140,
+     94,
+     216.0
+    ]
+   },
+   "capture": {
+    "ref-rotate": 0.9928571428571429,
+    "ref-planned": 1.0,
+    "unciv": 0.6,
+    "m0-s2-d64-l3": 0.6714285714285714
+   },
+   "losses": {
+    "ref-rotate": 0.6928571428571428,
+    "ref-planned": 0.6714285714285714,
+    "unciv": 3.4,
+    "m0-s2-d64-l3": 1.542857142857143
+   },
+   "best": "ref-planned",
+   "best_rate": 1.0,
+   "share": {
+    "m0-s2-d64-l3": 0.6714285714285714
+   },
+   "pass": {
+    "m0-s2-d64-l3": false
+   }
+  },
+  {
+   "family": "bait",
+   "n": 153,
+   "rates": {
+    "ref-post": 0.9607843137254902,
+    "ref-fight": 0.6470588235294118,
+    "unciv": 0.8300653594771242
+   },
+   "counts": {
+    "ref-post": [
+     147,
+     153,
+     0,
+     117.0
+    ],
+    "ref-fight": [
+     99,
+     153,
+     0,
+     187.0
+    ],
+    "unciv": [
+     127,
+     153,
+     0,
+     128.0
+    ]
+   },
+   "capture": {
+    "ref-post": 0.0,
+    "ref-fight": 0.0,
+    "unciv": 0.0
+   },
+   "losses": {
+    "ref-post": 0.7647058823529411,
+    "ref-fight": 1.2222222222222223,
+    "unciv": 0.8366013071895425
+   },
+   "best": "ref-post",
+   "best_rate": 0.9607843137254902,
+   "share": {
+    "m0-s2-d64-l3": 0.0
+   },
+   "pass": {
+    "m0-s2-d64-l3": false
+   }
+  },
+  {
+   "family": "bombard",
+   "n": 59,
+   "rates": {
+    "ref-bombard": 1.0,
+    "unciv": 0.0
+   },
+   "counts": {
+    "ref-bombard": [
+     59,
+     59,
+     23,
+     74.0
+    ],
+    "unciv": [
+     0,
+     59,
+     0,
+     0.0
+    ]
+   },
+   "capture": {
+    "ref-bombard": 0.3898305084745763,
+    "unciv": 0.0
+   },
+   "losses": {
+    "ref-bombard": 1.2542372881355932,
+    "unciv": 0.0
+   },
+   "best": "ref-bombard",
+   "best_rate": 1.0,
+   "share": {
+    "m0-s2-d64-l3": 0.0
+   },
+   "pass": {
+    "m0-s2-d64-l3": false
+   }
+  },
+  {
+   "family": "choke",
+   "n": 125,
+   "rates": {
+    "ref-choke": 0.6,
+    "ref-fight": 0.8,
+    "unciv": 0.776
+   },
+   "counts": {
+    "ref-choke": [
+     75,
+     125,
+     0,
+     179.0
+    ],
+    "ref-fight": [
+     100,
+     125,
+     0,
+     220.0
+    ],
+    "unciv": [
+     97,
+     125,
+     0,
+     84.0
+    ]
+   },
+   "capture": {
+    "ref-choke": 0.0,
+    "ref-fight": 0.0,
+    "unciv": 0.0
+   },
+   "losses": {
+    "ref-choke": 1.432,
+    "ref-fight": 1.76,
+    "unciv": 0.672
+   },
+   "best": "ref-fight",
+   "best_rate": 0.8,
+   "share": {
+    "m0-s2-d64-l3": 0.0
+   },
+   "pass": {
+    "m0-s2-d64-l3": false
+   }
+  },
+  {
+   "family": "citadel",
+   "n": 142,
+   "rates": {
+    "ref-choke": 0.6197183098591549,
+    "ref-fight": 0.5915492957746479,
+    "unciv": 0.2605633802816901
+   },
+   "counts": {
+    "ref-choke": [
+     88,
+     142,
+     0,
+     260.0
+    ],
+    "ref-fight": [
+     84,
+     142,
+     0,
+     247.0
+    ],
+    "unciv": [
+     37,
+     142,
+     0,
+     176.0
+    ]
+   },
+   "capture": {
+    "ref-choke": 0.0,
+    "ref-fight": 0.0,
+    "unciv": 0.0
+   },
+   "losses": {
+    "ref-choke": 1.8309859154929577,
+    "ref-fight": 1.7394366197183098,
+    "unciv": 1.2394366197183098
+   },
+   "best": "ref-choke",
+   "best_rate": 0.6197183098591549,
+   "share": {
+    "m0-s2-d64-l3": 0.0
+   },
+   "pass": {
+    "m0-s2-d64-l3": false
+   }
+  },
+  {
+   "family": "city-fire",
+   "n": 140,
+   "rates": {
+    "ref-fire": 0.6785714285714286,
+    "ref-planned": 0.9642857142857143,
+    "unciv": 0.2714285714285714,
+    "m0-s2-d64-l3": 0.9428571428571428
+   },
+   "counts": {
+    "ref-fire": [
+     95,
+     140,
+     118,
+     169.0
+    ],
+    "ref-planned": [
+     135,
+     140,
+     138,
+     89.0
+    ],
+    "unciv": [
+     38,
+     140,
+     38,
+     241.0
+    ],
+    "m0-s2-d64-l3": [
+     132,
+     140,
+     139,
+     93.0
+    ]
+   },
+   "capture": {
+    "ref-fire": 0.8428571428571429,
+    "ref-planned": 0.9857142857142858,
+    "unciv": 0.2714285714285714,
+    "m0-s2-d64-l3": 0.9928571428571429
+   },
+   "losses": {
+    "ref-fire": 1.207142857142857,
+    "ref-planned": 0.6357142857142857,
+    "unciv": 1.7214285714285715,
+    "m0-s2-d64-l3": 0.6642857142857143
+   },
+   "best": "ref-planned",
+   "best_rate": 0.9642857142857143,
+   "share": {
+    "m0-s2-d64-l3": 0.9777777777777777
+   },
+   "pass": {
+    "m0-s2-d64-l3": true
+   }
+  },
+  {
+   "family": "convoy",
+   "n": 158,
+   "rates": {
+    "ref-convoy": 1.0,
+    "unciv": 0.8291139240506329
+   },
+   "counts": {
+    "ref-convoy": [
+     158,
+     158,
+     15,
+     158.0
+    ],
+    "unciv": [
+     131,
+     158,
+     0,
+     160.0
+    ]
+   },
+   "capture": {
+    "ref-convoy": 0.0949367088607595,
+    "unciv": 0.0
+   },
+   "losses": {
+    "ref-convoy": 1.0,
+    "unciv": 1.0126582278481013
+   },
+   "best": "ref-convoy",
+   "best_rate": 1.0,
+   "share": {
+    "m0-s2-d64-l3": 0.0
+   },
+   "pass": {
+    "m0-s2-d64-l3": false
+   }
+  },
+  {
+   "family": "counter",
+   "n": 133,
+   "rates": {
+    "ref-hunt": 0.9097744360902256,
+    "ref-fight": 0.6390977443609023,
+    "unciv": 0.3609022556390977
+   },
+   "counts": {
+    "ref-hunt": [
+     121,
+     133,
+     133,
+     21.0
+    ],
+    "ref-fight": [
+     85,
+     133,
+     133,
+     19.0
+    ],
+    "unciv": [
+     48,
+     133,
+     133,
+     11.0
+    ]
+   },
+   "capture": {
+    "ref-hunt": 1.0,
+    "ref-fight": 1.0,
+    "unciv": 1.0
+   },
+   "losses": {
+    "ref-hunt": 0.15789473684210525,
+    "ref-fight": 0.14285714285714285,
+    "unciv": 0.08270676691729323
+   },
+   "best": "ref-hunt",
+   "best_rate": 0.9097744360902256,
+   "share": {
+    "m0-s2-d64-l3": 0.0
+   },
+   "pass": {
+    "m0-s2-d64-l3": false
+   }
+  },
+  {
+   "family": "duel",
+   "n": 160,
+   "rates": {
+    "ref-fight": 0.90625,
+    "ref-hold": 0.29375,
+    "ref-careful": 0.6875,
+    "unciv": 0.525
+   },
+   "counts": {
+    "ref-fight": [
+     145,
+     160,
+     0,
+     225.0
+    ],
+    "ref-hold": [
+     47,
+     160,
+     0,
+     213.0
+    ],
+    "ref-careful": [
+     110,
+     160,
+     0,
+     251.0
+    ],
+    "unciv": [
+     84,
+     160,
+     0,
+     113.0
+    ]
+   },
+   "capture": {
+    "ref-fight": 0.0,
+    "ref-hold": 0.0,
+    "ref-careful": 0.0,
+    "unciv": 0.0
+   },
+   "losses": {
+    "ref-fight": 1.40625,
+    "ref-hold": 1.33125,
+    "ref-careful": 1.56875,
+    "unciv": 0.70625
+   },
+   "best": "ref-fight",
+   "best_rate": 0.90625,
+   "share": {
+    "m0-s2-d64-l3": 0.0
+   },
+   "pass": {
+    "m0-s2-d64-l3": false
+   }
+  },
+  {
+   "family": "flank",
+   "n": 153,
+   "rates": {
+    "ref-flank": 0.5490196078431373,
+    "ref-press": 0.9411764705882353,
+    "unciv": 0.6143790849673203
+   },
+   "counts": {
+    "ref-flank": [
+     84,
+     153,
+     0,
+     10.0
+    ],
+    "ref-press": [
+     144,
+     153,
+     0,
+     13.0
+    ],
+    "unciv": [
+     94,
+     153,
+     0,
+     6.0
+    ]
+   },
+   "capture": {
+    "ref-flank": 0.0,
+    "ref-press": 0.0,
+    "unciv": 0.0
+   },
+   "losses": {
+    "ref-flank": 0.06535947712418301,
+    "ref-press": 0.08496732026143791,
+    "unciv": 0.0392156862745098
+   },
+   "best": "ref-press",
+   "best_rate": 0.9411764705882353,
+   "share": {
+    "m0-s2-d64-l3": 0.0
+   },
+   "pass": {
+    "m0-s2-d64-l3": false
+   }
+  },
+  {
+   "family": "focus",
+   "n": 160,
+   "rates": {
+    "ref-focus": 1.0,
+    "ref-fight": 1.0,
+    "unciv": 0.9375,
+    "m0-s2-d64-l3": 0.96875
+   },
+   "counts": {
+    "ref-focus": [
+     160,
+     160,
+     0,
+     77.0
+    ],
+    "ref-fight": [
+     160,
+     160,
+     0,
+     77.0
+    ],
+    "unciv": [
+     150,
+     160,
+     0,
+     39.0
+    ],
+    "m0-s2-d64-l3": [
+     155,
+     160,
+     0,
+     63.0
+    ]
+   },
+   "capture": {
+    "ref-focus": 0.0,
+    "ref-fight": 0.0,
+    "unciv": 0.0,
+    "m0-s2-d64-l3": 0.0
+   },
+   "losses": {
+    "ref-focus": 0.48125,
+    "ref-fight": 0.48125,
+    "unciv": 0.24375,
+    "m0-s2-d64-l3": 0.39375
+   },
+   "best": "ref-focus",
+   "best_rate": 1.0,
+   "share": {
+    "m0-s2-d64-l3": 0.96875
+   },
+   "pass": {
+    "m0-s2-d64-l3": true
+   }
+  },
+  {
+   "family": "general",
+   "n": 160,
+   "rates": {
+    "ref-fight": 0.925,
+    "ref-careful": 0.26875,
+    "unciv": 0.63125
+   },
+   "counts": {
+    "ref-fight": [
+     148,
+     160,
+     0,
+     221.0
+    ],
+    "ref-careful": [
+     43,
+     160,
+     0,
+     204.0
+    ],
+    "unciv": [
+     101,
+     160,
+     0,
+     69.0
+    ]
+   },
+   "capture": {
+    "ref-fight": 0.0,
+    "ref-careful": 0.0,
+    "unciv": 0.0
+   },
+   "losses": {
+    "ref-fight": 1.38125,
+    "ref-careful": 1.275,
+    "unciv": 0.43125
+   },
+   "best": "ref-fight",
+   "best_rate": 0.925,
+   "share": {
+    "m0-s2-d64-l3": 0.0
+   },
+   "pass": {
+    "m0-s2-d64-l3": false
+   }
+  },
+  {
+   "family": "guard",
+   "n": 160,
+   "rates": {
+    "ref-guard": 1.0,
+    "ref-guard-strike": 1.0,
+    "unciv": 0.1625
+   },
+   "counts": {
+    "ref-guard": [
+     160,
+     160,
+     0,
+     0.0
+    ],
+    "ref-guard-strike": [
+     160,
+     160,
+     0,
+     0.0
+    ],
+    "unciv": [
+     26,
+     160,
+     0,
+     142.0
+    ]
+   },
+   "capture": {
+    "ref-guard": 0.0,
+    "ref-guard-strike": 0.0,
+    "unciv": 0.0
+   },
+   "losses": {
+    "ref-guard": 0.0,
+    "ref-guard-strike": 0.0,
+    "unciv": 0.8875
+   },
+   "best": "ref-guard",
+   "best_rate": 1.0,
+   "share": {
+    "m0-s2-d64-l3": 0.0
+   },
+   "pass": {
+    "m0-s2-d64-l3": false
+   }
+  },
+  {
+   "family": "harass",
+   "n": 40,
+   "rates": {
+    "ref-screen": 0.125,
+    "ref-fight": 1.0,
+    "unciv": 0.45
+   },
+   "counts": {
+    "ref-screen": [
+     5,
+     40,
+     0,
+     47.0
+    ],
+    "ref-fight": [
+     40,
+     40,
+     0,
+     28.0
+    ],
+    "unciv": [
+     18,
+     40,
+     0,
+     12.0
+    ]
+   },
+   "capture": {
+    "ref-screen": 0.0,
+    "ref-fight": 0.0,
+    "unciv": 0.0
+   },
+   "losses": {
+    "ref-screen": 1.175,
+    "ref-fight": 0.7,
+    "unciv": 0.3
+   },
+   "best": "ref-fight",
+   "best_rate": 1.0,
+   "share": {
+    "m0-s2-d64-l3": 0.0
+   },
+   "pass": {
+    "m0-s2-d64-l3": false
+   }
+  },
+  {
+   "family": "hill-archers",
+   "n": 140,
+   "rates": {
+    "ref-hills": 0.7642857142857142,
+    "ref-planned": 0.8857142857142857,
+    "unciv": 0.17142857142857143,
+    "m0-s2-d64-l3": 0.7571428571428571
+   },
+   "counts": {
+    "ref-hills": [
+     107,
+     140,
+     121,
+     148.0
+    ],
+    "ref-planned": [
+     124,
+     140,
+     125,
+     78.0
+    ],
+    "unciv": [
+     24,
+     140,
+     25,
+     219.0
+    ],
+    "m0-s2-d64-l3": [
+     106,
+     140,
+     126,
+     124.0
+    ]
+   },
+   "capture": {
+    "ref-hills": 0.8642857142857143,
+    "ref-planned": 0.8928571428571429,
+    "unciv": 0.17857142857142858,
+    "m0-s2-d64-l3": 0.9
+   },
+   "losses": {
+    "ref-hills": 1.0571428571428572,
+    "ref-planned": 0.5571428571428572,
+    "unciv": 1.5642857142857143,
+    "m0-s2-d64-l3": 0.8857142857142857
+   },
+   "best": "ref-planned",
+   "best_rate": 0.8857142857142857,
+   "share": {
+    "m0-s2-d64-l3": 0.8548387096774194
+   },
+   "pass": {
+    "m0-s2-d64-l3": false
+   }
+  },
+  {
+   "family": "hold",
+   "n": 118,
+   "rates": {
+    "ref-hold": 0.8389830508474576,
+    "ref-hold-even": 0.423728813559322,
+    "unciv": 0.3474576271186441
+   },
+   "counts": {
+    "ref-hold": [
+     99,
+     118,
+     0,
+     106.0
+    ],
+    "ref-hold-even": [
+     50,
+     118,
+     0,
+     121.0
+    ],
+    "unciv": [
+     41,
+     118,
+     0,
+     193.0
+    ]
+   },
+   "capture": {
+    "ref-hold": 0.0,
+    "ref-hold-even": 0.0,
+    "unciv": 0.0
+   },
+   "losses": {
+    "ref-hold": 0.8983050847457628,
+    "ref-hold-even": 1.0254237288135593,
+    "unciv": 1.6355932203389831
+   },
+   "best": "ref-hold",
+   "best_rate": 0.8389830508474576,
+   "share": {
+    "m0-s2-d64-l3": 0.0
+   },
+   "pass": {
+    "m0-s2-d64-l3": false
+   }
+  },
+  {
+   "family": "hunt-fog",
+   "n": 160,
+   "rates": {
+    "ref-recall": 1.0,
+    "unciv": 0.0
+   },
+   "counts": {
+    "ref-recall": [
+     160,
+     160,
+     0,
+     0.0
+    ],
+    "unciv": [
+     0,
+     160,
+     0,
+     28.0
+    ]
+   },
+   "capture": {
+    "ref-recall": 0.0,
+    "unciv": 0.0
+   },
+   "losses": {
+    "ref-recall": 0.0,
+    "unciv": 0.175
+   },
+   "best": "ref-recall",
+   "best_rate": 1.0,
+   "share": {
+    "m0-s2-d64-l3": 0.0
+   },
+   "pass": {
+    "m0-s2-d64-l3": false
+   }
+  },
+  {
+   "family": "kite",
+   "n": 130,
+   "rates": {
+    "ref-kite": 1.0,
+    "ref-kite-careful": 0.09230769230769231,
+    "unciv": 0.5
+   },
+   "counts": {
+    "ref-kite": [
+     130,
+     130,
+     0,
+     0.0
+    ],
+    "ref-kite-careful": [
+     12,
+     130,
+     0,
+     0.0
+    ],
+    "unciv": [
+     65,
+     130,
+     0,
+     3.0
+    ]
+   },
+   "capture": {
+    "ref-kite": 0.0,
+    "ref-kite-careful": 0.0,
+    "unciv": 0.0
+   },
+   "losses": {
+    "ref-kite": 0.0,
+    "ref-kite-careful": 0.0,
+    "unciv": 0.023076923076923078
+   },
+   "best": "ref-kite",
+   "best_rate": 1.0,
+   "share": {
+    "m0-s2-d64-l3": 0.0
+   },
+   "pass": {
+    "m0-s2-d64-l3": false
+   }
+  },
+  {
+   "family": "planned-assault",
+   "n": 136,
+   "rates": {
+    "ref-planned": 0.8897058823529411,
+    "ref-rotate": 0.8088235294117647,
+    "unciv": 0.18382352941176472,
+    "m0-s2-d64-l3": 0.21323529411764705
+   },
+   "counts": {
+    "ref-planned": [
+     121,
+     136,
+     130,
+     110.0
+    ],
+    "ref-rotate": [
+     110,
+     136,
+     120,
+     115.0
+    ],
+    "unciv": [
+     25,
+     136,
+     25,
+     243.0
+    ],
+    "m0-s2-d64-l3": [
+     29,
+     136,
+     57,
+     306.0
+    ]
+   },
+   "capture": {
+    "ref-planned": 0.9558823529411765,
+    "ref-rotate": 0.8823529411764706,
+    "unciv": 0.18382352941176472,
+    "m0-s2-d64-l3": 0.41911764705882354
+   },
+   "losses": {
+    "ref-planned": 0.8088235294117647,
+    "ref-rotate": 0.8455882352941176,
+    "unciv": 1.786764705882353,
+    "m0-s2-d64-l3": 2.25
+   },
+   "best": "ref-planned",
+   "best_rate": 0.8897058823529411,
+   "share": {
+    "m0-s2-d64-l3": 0.2396694214876033
+   },
+   "pass": {
+    "m0-s2-d64-l3": false
+   }
+  },
+  {
+   "family": "prey-either",
+   "n": 151,
+   "rates": {
+    "ref-siege": 0.9271523178807947,
+    "ref-hold": 1.0,
+    "unciv": 0.0728476821192053,
+    "m0-s2-d64-l3": 0.9668874172185431
+   },
+   "counts": {
+    "ref-siege": [
+     140,
+     151,
+     2,
+     43.0
+    ],
+    "ref-hold": [
+     151,
+     151,
+     0,
+     0.0
+    ],
+    "unciv": [
+     11,
+     151,
+     0,
+     279.0
+    ],
+    "m0-s2-d64-l3": [
+     146,
+     151,
+     0,
+     20.0
+    ]
+   },
+   "capture": {
+    "ref-siege": 0.013245033112582781,
+    "ref-hold": 0.0,
+    "unciv": 0.0,
+    "m0-s2-d64-l3": 0.0
+   },
+   "losses": {
+    "ref-siege": 0.2847682119205298,
+    "ref-hold": 0.0,
+    "unciv": 1.8476821192052981,
+    "m0-s2-d64-l3": 0.13245033112582782
+   },
+   "best": "ref-hold",
+   "best_rate": 1.0,
+   "share": {
+    "m0-s2-d64-l3": 0.9668874172185431
+   },
+   "pass": {
+    "m0-s2-d64-l3": true
+   }
+  },
+  {
+   "family": "prey-land",
+   "n": 9,
+   "rates": {
+    "ref-siege": 1.0,
+    "ref-hold": 0.0,
+    "unciv": 0.0,
+    "m0-s2-d64-l3": 0.6666666666666666
+   },
+   "counts": {
+    "ref-siege": [
+     9,
+     9,
+     9,
+     2.0
+    ],
+    "ref-hold": [
+     0,
+     9,
+     0,
+     0.0
+    ],
+    "unciv": [
+     0,
+     9,
+     0,
+     5.0
+    ],
+    "m0-s2-d64-l3": [
+     6,
+     9,
+     6,
+     10.0
+    ]
+   },
+   "capture": {
+    "ref-siege": 1.0,
+    "ref-hold": 0.0,
+    "unciv": 0.0,
+    "m0-s2-d64-l3": 0.6666666666666666
+   },
+   "losses": {
+    "ref-siege": 0.2222222222222222,
+    "ref-hold": 0.0,
+    "unciv": 0.5555555555555556,
+    "m0-s2-d64-l3": 1.1111111111111112
+   },
+   "best": "ref-siege",
+   "best_rate": 1.0,
+   "share": {
+    "m0-s2-d64-l3": 0.6666666666666666
+   },
+   "pass": {
+    "m0-s2-d64-l3": false
+   }
+  },
+  {
+   "family": "promotion-choice",
+   "n": 140,
+   "rates": {
+    "ref-promo": 0.9785714285714285,
+    "ref-planned": 0.8357142857142857,
+    "unciv": 0.6714285714285714,
+    "m0-s2-d64-l3": 0.8714285714285714
+   },
+   "counts": {
+    "ref-promo": [
+     137,
+     140,
+     138,
+     198.0
+    ],
+    "ref-planned": [
+     117,
+     140,
+     117,
+     94.0
+    ],
+    "unciv": [
+     94,
+     140,
+     94,
+     305.0
+    ],
+    "m0-s2-d64-l3": [
+     122,
+     140,
+     125,
+     252.0
+    ]
+   },
+   "capture": {
+    "ref-promo": 0.9857142857142858,
+    "ref-planned": 0.8357142857142857,
+    "unciv": 0.6714285714285714,
+    "m0-s2-d64-l3": 0.8928571428571429
+   },
+   "losses": {
+    "ref-promo": 1.4142857142857144,
+    "ref-planned": 0.6714285714285714,
+    "unciv": 2.1785714285714284,
+    "m0-s2-d64-l3": 1.8
+   },
+   "best": "ref-promo",
+   "best_rate": 0.9785714285714285,
+   "share": {
+    "m0-s2-d64-l3": 0.8905109489051095
+   },
+   "pass": {
+    "m0-s2-d64-l3": false
+   }
+  },
+  {
+   "family": "raid",
+   "n": 160,
+   "rates": {
+    "ref-pillage": 1.0,
+    "unciv": 0.0,
+    "m0-s2-d64-l3": 0.5
+   },
+   "counts": {
+    "ref-pillage": [
+     160,
+     160,
+     0,
+     2.0
+    ],
+    "unciv": [
+     0,
+     160,
+     0,
+     115.0
+    ],
+    "m0-s2-d64-l3": [
+     80,
+     160,
+     0,
+     49.0
+    ]
+   },
+   "capture": {
+    "ref-pillage": 0.0,
+    "unciv": 0.0,
+    "m0-s2-d64-l3": 0.0
+   },
+   "losses": {
+    "ref-pillage": 0.0125,
+    "unciv": 0.71875,
+    "m0-s2-d64-l3": 0.30625
+   },
+   "best": "ref-pillage",
+   "best_rate": 1.0,
+   "share": {
+    "m0-s2-d64-l3": 0.5
+   },
+   "pass": {
+    "m0-s2-d64-l3": false
+   }
+  },
+  {
+   "family": "ram",
+   "n": 40,
+   "rates": {
+    "ref-siege": 0.325,
+    "ref-press": 1.0,
+    "unciv": 0.575,
+    "m0-s2-d64-l3": 0.875
+   },
+   "counts": {
+    "ref-siege": [
+     13,
+     40,
+     13,
+     114.0
+    ],
+    "ref-press": [
+     40,
+     40,
+     40,
+     63.0
+    ],
+    "unciv": [
+     23,
+     40,
+     23,
+     66.0
+    ],
+    "m0-s2-d64-l3": [
+     35,
+     40,
+     35,
+     73.0
+    ]
+   },
+   "capture": {
+    "ref-siege": 0.325,
+    "ref-press": 1.0,
+    "unciv": 0.575,
+    "m0-s2-d64-l3": 0.875
+   },
+   "losses": {
+    "ref-siege": 2.85,
+    "ref-press": 1.575,
+    "unciv": 1.65,
+    "m0-s2-d64-l3": 1.825
+   },
+   "best": "ref-press",
+   "best_rate": 1.0,
+   "share": {
+    "m0-s2-d64-l3": 0.875
+   },
+   "pass": {
+    "m0-s2-d64-l3": false
+   }
+  },
+  {
+   "family": "retreat",
+   "n": 126,
+   "rates": {
+    "ref-flee": 1.0,
+    "unciv": 0.0
+   },
+   "counts": {
+    "ref-flee": [
+     126,
+     126,
+     0,
+     106.0
+    ],
+    "unciv": [
+     0,
+     126,
+     0,
+     288.0
+    ]
+   },
+   "capture": {
+    "ref-flee": 0.0,
+    "unciv": 0.0
+   },
+   "losses": {
+    "ref-flee": 0.8412698412698413,
+    "unciv": 2.2857142857142856
+   },
+   "best": "ref-flee",
+   "best_rate": 1.0,
+   "share": {
+    "m0-s2-d64-l3": 0.0
+   },
+   "pass": {
+    "m0-s2-d64-l3": false
+   }
+  },
+  {
+   "family": "rush",
+   "n": 137,
+   "rates": {
+    "ref-defend": 0.9708029197080292,
+    "ref-fight": 0.3795620437956204,
+    "unciv": 0.145985401459854,
+    "m0-s2-d64-l3": 0.9197080291970803
+   },
+   "counts": {
+    "ref-defend": [
+     133,
+     137,
+     0,
+     108.0
+    ],
+    "ref-fight": [
+     52,
+     137,
+     0,
+     217.0
+    ],
+    "unciv": [
+     20,
+     137,
+     0,
+     208.0
+    ],
+    "m0-s2-d64-l3": [
+     126,
+     137,
+     0,
+     113.0
+    ]
+   },
+   "capture": {
+    "ref-defend": 0.0,
+    "ref-fight": 0.0,
+    "unciv": 0.0,
+    "m0-s2-d64-l3": 0.0
+   },
+   "losses": {
+    "ref-defend": 0.7883211678832117,
+    "ref-fight": 1.583941605839416,
+    "unciv": 1.5182481751824817,
+    "m0-s2-d64-l3": 0.8248175182481752
+   },
+   "best": "ref-defend",
+   "best_rate": 0.9708029197080292,
+   "share": {
+    "m0-s2-d64-l3": 0.9473684210526315
+   },
+   "pass": {
+    "m0-s2-d64-l3": true
+   }
+  },
+  {
+   "family": "siege",
+   "n": 126,
+   "rates": {
+    "ref-siege": 0.30158730158730157,
+    "ref-press": 0.873015873015873,
+    "unciv": 0.5158730158730159,
+    "m0-s2-d64-l3": 0.7063492063492064
+   },
+   "counts": {
+    "ref-siege": [
+     38,
+     126,
+     38,
+     162.0
+    ],
+    "ref-press": [
+     110,
+     126,
+     110,
+     298.0
+    ],
+    "unciv": [
+     65,
+     126,
+     65,
+     261.0
+    ],
+    "m0-s2-d64-l3": [
+     89,
+     126,
+     89,
+     361.0
+    ]
+   },
+   "capture": {
+    "ref-siege": 0.30158730158730157,
+    "ref-press": 0.873015873015873,
+    "unciv": 0.5158730158730159,
+    "m0-s2-d64-l3": 0.7063492063492064
+   },
+   "losses": {
+    "ref-siege": 1.2857142857142858,
+    "ref-press": 2.365079365079365,
+    "unciv": 2.0714285714285716,
+    "m0-s2-d64-l3": 2.865079365079365
+   },
+   "best": "ref-press",
+   "best_rate": 0.873015873015873,
+   "share": {
+    "m0-s2-d64-l3": 0.8090909090909091
+   },
+   "pass": {
+    "m0-s2-d64-l3": false
+   }
+  },
+  {
+   "family": "sink",
+   "n": 140,
+   "rates": {
+    "ref-fight": 1.0,
+    "unciv": 0.9785714285714285
+   },
+   "counts": {
+    "ref-fight": [
+     140,
+     140,
+     0,
+     0.0
+    ],
+    "unciv": [
+     137,
+     140,
+     0,
+     1.0
+    ]
+   },
+   "capture": {
+    "ref-fight": 0.0,
+    "unciv": 0.0
+   },
+   "losses": {
+    "ref-fight": 0.0,
+    "unciv": 0.007142857142857143
+   },
+   "best": "ref-fight",
+   "best_rate": 1.0,
+   "share": {
+    "m0-s2-d64-l3": 0.0
+   },
+   "pass": {
+    "m0-s2-d64-l3": false
+   }
+  },
+  {
+   "family": "snipe",
+   "n": 140,
+   "rates": {
+    "ref-snipe": 1.0,
+    "unciv": 0.5928571428571429,
+    "m0-s2-d64-l3": 0.9571428571428572
+   },
+   "counts": {
+    "ref-snipe": [
+     140,
+     140,
+     0,
+     0.0
+    ],
+    "unciv": [
+     83,
+     140,
+     0,
+     5.0
+    ],
+    "m0-s2-d64-l3": [
+     134,
+     140,
+     0,
+     1.0
+    ]
+   },
+   "capture": {
+    "ref-snipe": 0.0,
+    "unciv": 0.0,
+    "m0-s2-d64-l3": 0.0
+   },
+   "losses": {
+    "ref-snipe": 0.0,
+    "unciv": 0.03571428571428571,
+    "m0-s2-d64-l3": 0.007142857142857143
+   },
+   "best": "ref-snipe",
+   "best_rate": 1.0,
+   "share": {
+    "m0-s2-d64-l3": 0.9571428571428572
+   },
+   "pass": {
+    "m0-s2-d64-l3": true
+   }
+  },
+  {
+   "family": "surrounded",
+   "n": 160,
+   "rates": {
+    "ref-break": 0.275,
+    "ref-flee": 0.96875,
+    "unciv": 0.00625
+   },
+   "counts": {
+    "ref-break": [
+     44,
+     160,
+     0,
+     116.0
+    ],
+    "ref-flee": [
+     155,
+     160,
+     0,
+     5.0
+    ],
+    "unciv": [
+     1,
+     160,
+     0,
+     159.0
+    ]
+   },
+   "capture": {
+    "ref-break": 0.0,
+    "ref-flee": 0.0,
+    "unciv": 0.0
+   },
+   "losses": {
+    "ref-break": 0.725,
+    "ref-flee": 0.03125,
+    "unciv": 0.99375
+   },
+   "best": "ref-flee",
+   "best_rate": 0.96875,
+   "share": {
+    "m0-s2-d64-l3": 0.0
+   },
+   "pass": {
+    "m0-s2-d64-l3": false
+   }
+  },
+  {
+   "family": "wounded",
+   "n": 160,
+   "rates": {
+    "ref-flee-wounded": 1.0,
+    "ref-fight": 0.0,
+    "unciv": 0.19375
+   },
+   "counts": {
+    "ref-flee-wounded": [
+     160,
+     160,
+     0,
+     99.0
+    ],
+    "ref-fight": [
+     0,
+     160,
+     0,
+     354.0
+    ],
+    "unciv": [
+     31,
+     160,
+     0,
+     295.0
+    ]
+   },
+   "capture": {
+    "ref-flee-wounded": 0.0,
+    "ref-fight": 0.0,
+    "unciv": 0.0
+   },
+   "losses": {
+    "ref-flee-wounded": 0.61875,
+    "ref-fight": 2.2125,
+    "unciv": 1.84375
+   },
+   "best": "ref-flee-wounded",
+   "best_rate": 1.0,
+   "share": {
+    "m0-s2-d64-l3": 0.0
+   },
+   "pass": {
+    "m0-s2-d64-l3": false
+   }
+  }
+ ],
+ "summary": {
+  "families": 32,
+  "variants": [
+   "m0-s2-d64-l3"
+  ],
+  "m0-s2-d64-l3": {
+   "passed": 5,
+   "gate_win": false
+  }
+ }
+}
