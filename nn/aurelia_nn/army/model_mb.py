@@ -408,7 +408,7 @@ class MBNNet(MBNet):
 
 
 # MBe: the hand-set term's numbers (M-HANDOFF.md, "Hand edit: wounded out of range (24 Nov)"; model.rs WW_LEN).
-WW = ('scale', 'hp_threshold', 'hp_slope', 'ranged_hp_threshold', 'resting_weight', 'city_low_threshold', 'city_low_slope', 'resting_slope', 'stay_scale', 'healing_weight', 'back_threshold', 'strike_scale', 'ranged_strike_threshold', 'stay_escape', 'ranged_engaged_threshold')
+WW = ('scale', 'hp_threshold', 'hp_slope', 'ranged_hp_threshold', 'resting_weight', 'city_low_threshold', 'city_low_slope', 'resting_slope', 'stay_scale', 'healing_weight', 'back_threshold', 'strike_scale', 'ranged_strike_threshold', 'stay_escape', 'ranged_engaged_threshold', 'foe_city_only')
 # Half the smallest step of a token's hit points (model.rs HEALING_STEP), of the threat numbers (THREAT_STEP).
 HEALING_STEP = 0.005
 THREAT_STEP = 0.125
@@ -429,7 +429,8 @@ class MBENet(MBNet):
     ranged_strike_threshold for a unit with range, else hp_threshold. With stay_escape = 1 the stay term spares a move to a tile
     less threatened than the unit's own (candidate number 19 below the token's 39 by more than THREAT_STEP). A unit with range
     reads ranged_engaged_threshold instead of ranged_hp_threshold while the plan token says engaged (aux_p[1] on
-    P_0[P_ENGAGED] > 0, model.rs `plan_stage`: the teacher's shooters fire down to ROTATE_BURST once the assault went in).
+    P_0[P_ENGAGED] > 0, model.rs `plan_stage`: the teacher's shooters fire down to ROTATE_BURST once the assault went in). With
+    foe_city_only = 1 both gates are 0 unless the objective is a foe city (the first city token with number 43, its 45 < 0.5).
     `ww` = the numbers above (WW order). Zero scale = MB exactly. `crates/qa/src/army_net/model.rs` `actions_x` is the
     same arithmetic."""
 
@@ -456,11 +457,13 @@ class MBENet(MBNet):
         rest = mx.where(s >= 0, w[4] * mx.sigmoid(w[7] * (a[0] * u + a[1])), 0.0)
         is_city = (tok[..., 3] > 0.5) & (tok[..., 43] > 0.5)
         first = mx.argmax(is_city.astype(mx.int32), axis=1)
-        city = mx.where(mx.any(is_city, axis=1), tok[ar, first, 7], 1.0)
+        has = mx.any(is_city, axis=1)
+        city = mx.where(has, tok[ar, first, 7], 1.0)
+        scope = mx.where((w[15] > 0.5) & ~(has & (tok[ar, first, 45] < 0.5)), 0.0, 1.0)
         healing = w[9] * mx.sigmoid(w[2] * (w[10] - f[:, 7])) * mx.sigmoid(w[2] * (f[:, 46] - HEALING_STEP))
         low = mx.sigmoid(w[6] * (w[5] - city))
         strike = mx.sigmoid(w[2] * (mx.where(f[:, 13] > 0.0, w[12], w[1]) - f[:, 7]))
-        return mx.maximum(mx.maximum(hp, rest), healing) * (1.0 - low), strike * (1.0 - low)
+        return mx.maximum(mx.maximum(hp, rest), healing) * (1.0 - low) * scope, strike * (1.0 - low) * scope
 
     def wounded_term(self, cand, gates, out_of_fire, here_threat):
         """[B, C]: the terms subtracted from each candidate's logit (gates: `wounded_gate`; out_of_fire [B]: 1 - the unit token's
