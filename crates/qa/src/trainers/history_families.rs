@@ -14,19 +14,22 @@
 //! - scout-report (fog): three cities of ours 4 tiles from the army (mutually 4 apart); the enemy force marches
 //!   along the ray to one of them; a small outpost of ours beside each of the three possible roads sees it in rounds
 //!   0-2 only; at round 3 it is in the fog, 4 tiles from its target. WIN: as feint.
-//! - fog-sniper (fog): an enemy bowman on a hill, hidden by a ridge, shoots the weakest of our three units 2 tiles
-//!   behind the ridge every round and is never seen from where our units stand. WIN: the sniper killed within 7
-//!   rounds. The strike log (`src`: the tile the last strike came from) is what the informed teacher reads.
-//! - city-reinforced (fog): our army marches on a walled city (one garrison); a scout on a hill sees it for three
-//!   rounds. Half the instances: in the enemy's turn of round 0 two strong defenders enter the city's side (WIN:
-//!   the city taken within 16 rounds with at most 1 of the army lost, the scout apart). Half: nothing enters but a
-//!   wave of 2-3 strong melee lands at round N (7-9) (WIN: the city taken before N; no loss cap). The round limit is
-//!   16 in both, so the net's price token does not tell the two apart.
-//! - two-fronts (no fog): eight of ours, an enemy walled city to take (4 tiles... 5 east of the army) and our walled city
-//!   to hold (4 west) against a force of 2-4 strong melee that marches on it from round 0 and strikes in round 4. WIN:
-//!   the city taken and the force dead, our city ours, within 20 rounds.
-//! - second-city (no fog): the siege of the same walled city by seven; at round K (3-5) a force of three strong melee
-//!   appears 9 tiles west of our second city and marches on it. WIN: as two-fronts, within 22 rounds.
+//! - fog-sniper (fog): an enemy bowman (the weakest ranged kind of range 2) on a hill, hidden by a ridge, shoots the
+//!   weakest of our three units 2 tiles behind the ridge every round and is never seen from where our units stand.
+//!   WIN: the sniper killed within 3 rounds. The strike log (`src`: the tile the last strike came from) is what the
+//!   informed teacher reads; the blind one walks away from the group.
+//! - city-reinforced (fog): our army marches on a worn-down city (55 % left, one garrison); a scout on a hill sees it
+//!   for three rounds. Half the instances: in the enemy's turn of round 0 three strong melee enter the city (WIN: the
+//!   city taken within 24 rounds with at most 2 of the army lost, the scout apart). Half: nothing enters but a wave
+//!   of 2-3 strong melee lands at round N (5-7) (WIN: the city taken before N). The round limit is 24 in both.
+//! - two-fronts (no fog): eight of ours, an enemy city worn down to 20 % to take (5 tiles east) and our capital (3 %
+//!   left, 4 west) to hold against a force of three strong melee that appears 7 tiles west. WIN: our city kept, the
+//!   enemy city taken and the force dead, within 7 rounds.
+//! - second-city (no fog): the siege of the same city by seven; at round K (3-5) a force of four strong melee appears
+//!   7 tiles west of our second city (a town). WIN: as two-fronts, within 16 rounds.
+//! - twin-siege (no fog): two enemy cities 10 tiles apart, a strong one (walls, worn down to 40 %) and a weak one (5 %
+//!   left), either west; our eleven stand between; a relief force of two strong melee marches to the city where more
+//!   of ours stand. WIN: both cities taken within 12 rounds with at most 3 of ours lost.
 //!
 //! THE REFERENCES. Right teacher first (`Fam::solvers`), the wrong ones are played with `--players`:
 //! - feint: ref-trace (last step of the leader), ref-split, ref-guess (nearest city: a tie goes to the lower tile),
@@ -37,7 +40,9 @@
 //!   ref-planned (the assault planners with the scout set apart);
 //! - two-fronts: ref-share (the holders are as many as the enemy force), ref-pile (all on the siege), ref-even (half
 //!   and half), ref-hold-first (all on the defence first);
-//! - second-city: ref-detach (as many holders as the force, the rest go on), ref-ignore, ref-abandon.
+//! - second-city: ref-detach (all go home while the force lives, then back to the siege), ref-ignore, ref-abandon (home for good);
+//! - twin-siege: ref-twin (two armies split 6/8 to the strong city, a capturer at each), ref-serial (all on one city, then
+//!   the other), ref-equal (alternate units).
 
 use std::collections::BTreeMap;
 
