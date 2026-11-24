@@ -106,13 +106,13 @@ def compare(g, rows, which, counts, show, ex):
         first = None
         # The scene's pieces only: a unit a home city trains in the window lives until the round's arena close.
         n_pieces = len(g.plays[pi][0]["orders"]["roles"]) + len(g.plays[pi][0]["scene"].get("reinforce", []))
+        if g.plays[pi][0]["scene"].get("n_main") is not None:
+            n_pieces = len(g.plays[pi][0]["scene"]["profiles"])  # the third seat's layout: pieces, spare slots, the third's pieces
         for k, u in enumerate(u2[:min(g.U, n_pieces)]):
             who = "enemy" if (u[8] if u[0] else side[b][k]) == 1 else "our"
             what = None
             if (u[0] == 1) != bool(al[b][k]):
                 what = f"{who} unit alive/dead"
-        if g.plays[pi][0]["scene"].get("n_main") is not None:
-            n_pieces = len(g.plays[pi][0]["scene"]["profiles"])  # the third seat's layout: pieces, spare slots, the third's pieces
             elif u[0] and u[1] != tl[b][k]:
                 what = f"{who} unit's tile"
             elif u[0] and u[2] != hp[b][k]:

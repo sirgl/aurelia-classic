@@ -1109,13 +1109,13 @@ def build_templates(plays):
     kw = dict(move_radius=max(mr, 4), has_near_imp=has_near, dest_pool=tb.dest_pool, withdraw_pool=tb.withdraw_pool, has_air=has_air, features=tb.features())
     tsim = Sim(geo, tb.m, tb.cost_pool, tb.cstatic, tb.n_pieces, extra=tb.extra(), **kw)
     tb.s0_all = tb.initial_state()
+    armythird.template_slots(tb, [sc for sc, _, _ in plays])
     return tb, tsim, kw
 
 
 def build_rows(plays, rows, templates=None):
     """A simulator over the plays' scenes (templates) and a state over `rows` [(play index, moment)]."""
     tb, tsim, kw = templates or build_templates(plays)
-    armythird.template_slots(tb, [sc for sc, _, _ in plays])
     geo = tsim.geo
     idx = mx.array([pi for pi, _ in rows], dtype=I32)
     take = lambda a: mx.take(a, idx, axis=0)
@@ -1129,13 +1129,13 @@ def build_rows(plays, rows, templates=None):
             s[k] = v
     s = rebuild_profiles(sim, s, s0)
     s = armyprice.spawn_profiles(sim, s, [plays[pi][0] for pi, _ in rows])
+    s = armythird.setup_rows(sim, s, [(plays[pi][0], m) for pi, m in rows])
     U = tb.u
     ids, handles = [], []
     for _, m in rows:
         ids.append((m["ids"] + [10 ** 6 + i for i in range(U)])[:U])
         handles.append((m["handles"] + [-1] * U)[:U])
     # Player-level effects the state record does not carry (an exogenous schedule from Rust): the wounded modifier.
-    s = armythird.setup_rows(sim, s, [(plays[pi][0], m) for pi, m in rows])
     wm = [(m.get("wm", []) + [0] * U)[:U] for _, m in rows]
     if any(any(x) for x in wm):
         s["p_wounded_mod"] = mx.array(wm, dtype=s["p_wounded_mod"].dtype)

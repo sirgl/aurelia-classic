@@ -737,11 +737,11 @@ class Sim:
             raise_ = f["ctx"][:, CTX_FLANKING]
             fl = mx.where(raise_ > 0, fl * (100 + raise_) // 100, fl)
             m = m + mx.where(other["valid"], fl, 0)
-        return m
-
         if other is not None and "barb" in s:
             # A non-barbarian fighting the barbarians (the camp scenes: side 1): `strength.rs::barbarian_combat_bonus`.
             m = m + mx.where(s["barb"] & other["valid"] & (other["side"] == 1) & (f["side"] != 1), BARBARIAN_BONUS, 0)
+        return m
+
     def friendly_adjacent(self, s, f):
         U = s["u_alive"].shape[1]
         tiles = s["u_tile"]

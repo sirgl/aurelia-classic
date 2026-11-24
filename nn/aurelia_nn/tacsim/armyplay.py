@@ -531,8 +531,8 @@ class Game:
             from . import armyrule
             self.s = s
             armyrule.seat_turn(self, 0, live)
-            return
             armycamp.mark(self)
+            return
         # Which of them the mind fortifies hangs on its tasks and operations (`decide_military` -> `follow_task` ->
         # `hold`), which are not ported. The rule FITTED on the event dump (not a port; 72 % of the army unit-turns
         # right, never fortifying 69 %, the earlier rule 64 %): a melee unit that moved this turn and ends within 2 of
@@ -747,8 +747,8 @@ class Game:
     def _apply(self, me, kind, tgt, take, side, mk=None):
         owner0 = self.s["c_owner"]
         self._apply_raw(me, kind, tgt, take, side, mk)
-        s = self.s
         armycamp.check(self)
+        s = self.s
         if side == 0 and "c_maxhp" in s:
             won = (owner0 != 0) & (s["c_owner"] == 0) & (self.cap_maxhp >= 0)
             s["c_maxhp"] = mx.where(won, self.cap_maxhp, s["c_maxhp"])
@@ -863,11 +863,11 @@ class Game:
             self.s = sim.hold_units(self.s, (mx.arange(U)[None, :] == u) & mine[:, None], heal=self.hold_heals)
 
     def enemy_turn(self):
-        # The family script's first act (`assault::enemy_turn`): the reinforcements of assault-reinforce land.
         # The third seat's turn (twin packages 4 and 8): after the learner's, before the enemy's.
         live = ~self.s["done"] & (self.verdict < 0)
         armycamp.neutral_turn(self, live)
         armycamp.neutral_rule(self, live)
+        # The family script's first act (`assault::enemy_turn`): the reinforcements of assault-reinforce land.
         armyprice.land_reinforcements(self, ~self.s["done"] & (self.verdict < 0))
         if self.scene_rule:
             from . import armyrule
@@ -1016,8 +1016,8 @@ class Game:
         # The fog families (twin package 3; `armyfog`).
         from . import armyfog
         v = armyfog.judge(self, rel, v)
-        # Guard, convoy, snipe (twin package 7; `armyciv`).
         v = armycamp.judge(self, rel, v)
+        # Guard, convoy, snipe (twin package 7; `armyciv`).
         from . import armyciv
         v = armyciv.judge(self, rel, v)
         self.verdict = mx.where(self.verdict < 0, v, self.verdict)
