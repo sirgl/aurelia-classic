@@ -158,3 +158,23 @@ fn a_scenes_price_is_its_loss_cap_or_its_army_and_one_over_the_round_that_matter
     let p = Orders::of_scene(&rules, &game, &scene).price;
     assert_eq!(p, [scene.mine.len() as f32 / 8.0, 1.0 / d as f32, 1.0], "assault-peace: worth the army, pressed by the deadline {d}");
 }
+
+/// The stake set from outside (`ARMY_PRICE`, the paired data teach7p and P3): "careful" is the loss cap and the round
+/// limit (one unit where the rule sets no cap), "any cost" the whole army and the deadline given (else the scene's own).
+/// A careful scene's own price equals its "careful" form, so the careful half of the paired data is the scene's play.
+#[test]
+fn a_price_set_from_outside_is_careful_or_any_cost_per_scene() {
+    use aurelia_qa::army_net::{price_of, price_set};
+    let r = 1.0 / 30.0;
+    assert_eq!(price_set("careful", "planned-assault", 9, 30, None), Some([1.0 / 8.0, r, 1.0]));
+    assert_eq!(price_set("careful", "planned-assault", 9, 30, None), Some(price_of("planned-assault", 9, Some(30))), "careful = the scene's own");
+    assert_eq!(price_set("careful", "assault-heal", 8, 30, None), Some([4.0 / 8.0, r, 1.0]), "half the army");
+    assert_eq!(price_set("careful", "siege", 7, 20, None), Some([1.0 / 8.0, 1.0 / 20.0, 1.0]), "no cap: one unit");
+    assert_eq!(price_set("anycost:7", "planned-assault", 9, 30, None), Some([9.0 / 8.0, 1.0 / 7.0, 1.0]));
+    assert_eq!(price_set("anycost", "assault-peace", 10, 8, Some(8)), Some(price_of("assault-peace", 10, Some(8))), "any cost = an any-cost scene's own");
+    assert_eq!(price_set("anycost", "planned-assault", 9, 30, None), Some([9.0 / 8.0, r, 1.0]), "no deadline: the limit");
+    assert_eq!(price_set("0.125,0.0833,1", "duel", 3, 12, None), Some([0.125, 0.0833, 1.0]));
+    assert_eq!(price_set("anycost:x", "duel", 3, 12, None), None);
+    assert_eq!(price_set("anycostly", "duel", 3, 12, None), None);
+    assert_eq!(price_set("cheap", "duel", 3, 12, None), None);
+}

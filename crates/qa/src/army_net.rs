@@ -107,11 +107,38 @@ fn loss_cap(family: &str) -> Option<Option<usize>> {
     }
 }
 
-/// `ARMY_PRICE=worth/8,pressure,given`: the stake given to the net instead of the scene's (the conditional test P3:
-/// the same scenes told "careful" or "any cost").
-fn price_override() -> Option<[f32; 3]> {
-    let v = std::env::var("ARMY_PRICE").ok()?;
-    let x: Vec<f32> = v.split(',').filter_map(|p| p.trim().parse().ok()).collect();
+/// `ARMY_PRICE`: the stake given to the net instead of the scene's (the conditional test P3 and the paired data teach7p:
+/// the same scenes told "careful" or "any cost"). `price_set` reads it (None: the scene's own price).
+fn price_override() -> Option<String> {
+    std::env::var("ARMY_PRICE").ok().filter(|v| !v.trim().is_empty())
+}
+
+/// The stake `ARMY_PRICE` sets for a scene of `family` (`units` ours, `rounds` its limit, `deadline` its own), or None
+/// (no such form). Forms:
+/// - `worth/8,pressure,given`: these three numbers, every scene alike;
+/// - `careful`: worth = the loss cap (half the army where the rule says half; ONE unit where the rule sets no cap),
+///   pressure = 1 / the round limit;
+/// - `anycost` / `anycost:D`: worth = the whole army, pressure = 1 / D (no D: the scene's deadline, else its limit).
+pub fn price_set(form: &str, family: &str, units: usize, rounds: u32, deadline: Option<u32>) -> Option<[f32; 3]> {
+    let form = form.trim();
+    let press = |d: u32| 1.0 / d.max(1) as f32;
+    if form == "careful" {
+        let worth = match loss_cap(family) {
+            Some(None) => units / 2,
+            Some(Some(cap)) => cap,
+            None => 1,
+        };
+        return Some([(worth as f32).max(0.5) / 8.0, press(rounds), 1.0]);
+    }
+    if let Some(rest) = form.strip_prefix("anycost") {
+        let d = match rest.strip_prefix(':') {
+            Some(d) => d.trim().parse().ok()?,
+            None if rest.is_empty() => deadline.unwrap_or(rounds),
+            None => return None,
+        };
+        return Some([(units as f32).max(0.5) / 8.0, press(d), 1.0]);
+    }
+    let x: Vec<f32> = form.split(',').filter_map(|p| p.trim().parse().ok()).collect();
     <[f32; 3]>::try_from(x.as_slice()).ok()
 }
 
@@ -215,7 +242,7 @@ impl Orders {
         let start_round = game.view().auth.turn().round;
         let window = MapWindow::around(game, scene.centre);
         let statics = statics_of(rules, game, &window, scene.learner, scene.enemy, tile, scene.refuge);
-        Orders { side: scene.learner, foe: scene.enemy, aim, tile, refuge: scene.refuge, optional, start_round, rounds: scene.rounds, army, mean_strength: mean_strength.max(1.0), window, statics, fog: crate::trainers::memory::is_memory(scene.fam), price: price_override().unwrap_or_else(|| price_of(scene.fam.name(), scene.mine.len(), Some(scene.deadline.unwrap_or(scene.rounds)))) }
+        Orders { side: scene.learner, foe: scene.enemy, aim, tile, refuge: scene.refuge, optional, start_round, rounds: scene.rounds, army, mean_strength: mean_strength.max(1.0), window, statics, fog: crate::trainers::memory::is_memory(scene.fam), price: price_override().map(|f| price_set(&f, scene.fam.name(), scene.mine.len(), scene.rounds, scene.deadline).unwrap_or_else(|| panic!("ARMY_PRICE={f}: not a price form (a,b,c | careful | anycost[:D])"))).unwrap_or_else(|| price_of(scene.fam.name(), scene.mine.len(), Some(scene.deadline.unwrap_or(scene.rounds)))) }
     }
 }
 

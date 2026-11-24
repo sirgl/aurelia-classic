@@ -400,6 +400,11 @@ pub fn finish(mut meta: serde_json::Value) -> Option<(Vec<u8>, Counts)> {
     meta["ends"] = serde_json::json!(rec.counts.ends);
     meta["dropped"] = serde_json::json!(rec.counts.dropped);
     meta["price"] = serde_json::json!(rec.orders.price);
+    // The stake was set from outside (`ARMY_PRICE`, the paired data teach7p): `potential.py` then accepts a worth
+    // other than the family's own.
+    if let Some(form) = std::env::var("ARMY_PRICE").ok().filter(|v| !v.trim().is_empty()) {
+        meta["price_set"] = serde_json::json!(form);
+    }
     let json = serde_json::to_vec(&meta).ok()?;
     let mut out = Vec::new();
     put_u32(&mut out, PLAY_MAGIC4);

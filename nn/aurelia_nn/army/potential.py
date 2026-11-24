@@ -34,7 +34,8 @@ def price_of(meta):
     rule = family_price(meta)
     if 'price' in meta:
         got = list(meta['price'])
-        if abs(got[0] - rule[0]) > 1e-6:
+        # `price_set`: the stake was given from outside (ARMY_PRICE, the paired data teach7p), not the family's own.
+        if abs(got[0] - rule[0]) > 1e-6 and not meta.get('price_set'):
             raise ValueError(f"{meta['family']}: recorded price {got} disagrees with the rule {rule}")
         return got
     return rule
