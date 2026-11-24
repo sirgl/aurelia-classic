@@ -40,15 +40,15 @@ texts are its own (see [LICENSE-ART](LICENSE-ART)), and the rule data that comes
 
 ## The computer opponents
 
-The AI is a set of planners for cities, workers, armies, sieges and diplomacy, steered by a small strategy net whose
-266 weights are written by hand, each with its reason ([docs/ai-strategy-net.md](docs/ai-strategy-net.md)): it chooses
-the research, the policies and what the cities build. It runs on the CPU and downloads nothing.
+The AI is a set of planners for cities, workers, armies, sieges and diplomacy, steered by strategy nets whose
+weights are written by hand, each with its reason ([docs/ai-strategy-net.md](docs/ai-strategy-net.md), [docs/ai-net2.md](docs/ai-net2.md)): they choose
+the research, the policies, the wars and what the cities build. It runs on the CPU and downloads nothing.
 
 ## Plans
 
 What each release changed: [CHANGELOG.md](CHANGELOG.md).
 
-Not in 0.3:
+Not in 0.4:
 
 - Network play: several people in one game, with simultaneous turns and chat. The protocol and the match logic exist in the platform (`net`); the server program and the screens do not.
 - A trained neural-network AI. The strategy net of the computer opponents is written by hand and no weight is trained; the unit and end-to-end nets exist only in the bench.

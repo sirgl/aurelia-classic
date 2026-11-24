@@ -1,44 +1,62 @@
 # Changelog
 
-## Unreleased
+## 0.4.0
+
+What changed since 0.3.0 (15 November 2026). Saves made by 0.3.0 still load and play on with the new computer players.
+
+Highlights: **computer opponents that plan wars, peace and the race to the spaceship as one, and win by science much
+more often**, **a computer turn that takes less time**, **a new policies screen**, and **rules fixes** (one capital per
+nation, nothing left behind by a destroyed nation, offers that wait for your answer).
 
 ### Computer opponents
 
-- **One mind for the big decisions.** The computer players now decide their wars, peace, deals, gifts to city-states,
-  Congress votes and the defence of their cities together, from one reading of every rival: who is weak and within reach,
-  who is massing an army at the border, who is about to win. They go to war for a named target and build the army for it
-  first, try to retake what they lost, guard the cities a rival threatens, deny help and trade to a nation that is running
-  away with the game, and keep their research on the way to the spaceship once they aim for a science victory.
-- **An army at the border stays a threat once the war starts.** A computer player that saw a neighbour's army gather
-  by its cities raised its guard and its defenders' worth, and dropped both on the turn that army declared war. It now
-  keeps answering that army through the war.
-- **How much stronger.** In 800 test games at Quick speed against the default AI described in the next point, the new one
-  takes about 66 % of the points (a real victory counts in full, a win on the turn limit as a quarter) and wins 342 games
-  by a real victory against 136. A computer turn takes no longer than before. Saves made by the previous version still
-  load.
-- **A new default AI.** The computer players now prefer fewer, larger cities, and spread wide only when they have a
-  strong reason. They pick city sites farther from rivals' borders and from enemy armies, and they do not send a settler
-  on a long, unprotected walk. They win more often by science and by diplomacy, and their cities rise in revolt less often.
-- **How much stronger.** In 800 test games at Quick speed against the previous default AI, the new one takes about 63 %
-  of the points (counting a win by a real victory in full and a win on the turn limit as a quarter) and wins 238 games by
-  a real victory against 113. A computer turn takes no longer than before.
-- Saves made by the previous version still load.
-- A finished spaceship part no longer waits outside its capital behind the computer player's own workers, settlers
-  and caravans: they step aside, and caravans go to another city.
+The default computer player was replaced three times since 0.3.0, each time after test games against the one before it
+(Quick speed, 400 to 800 games each; a real victory counts in full, a win on the turn limit as a quarter of the points).
+
+- **Fewer, larger cities, and sites chosen with care.** The computer players prefer a few large cities and spread wide only
+  when they have a strong reason. They pick city sites farther from rivals' borders and from enemy armies, and they do not
+  send a settler on a long, unprotected walk. They win more often by science and by diplomacy, and their cities rise in
+  revolt less often. Against the 0.3.0 player the new one took about 63 % of the points and won 238 games by a real
+  victory against 113.
+- **One mind for the big decisions.** They decide their wars, peace, deals, gifts to city-states, Congress votes and the
+  defence of their cities together, from one reading of every rival: who is weak and within reach, who is massing an army
+  at the border, who is about to win. They go to war for a named target and build the army for it first, try to retake
+  what they lost, guard the cities a rival threatens (a city in danger now builds a defender at once), deny help and
+  trade to a nation that is running away with the game, and keep their research on the way to the spaceship once they aim
+  for a science victory. Against the player before it, it took about 66 % of the points and won 342 games by a real
+  victory against 136.
+- **A faster start and a faster race to space (the default now).** The computer players open with more cities, keep a
+  garrison in a young city near a rival, buy growth, and, when they race for the spaceship, hire scientists and make
+  research agreements. In 400 games against the player before it, they took about 62 % of the points and won 211 games by a
+  real victory against 126; **197 of those wins were by science, against 91 for the older player.** Their science is about 10
+  to 13 % higher from the middle of the game; their treasury and their happiness are leaner, the cost of a bigger empire.
+- **Beliefs and ideology** are chosen by what they actually do for the nation, not by name.
+- An army at the border stays a threat once the war starts: a computer player that saw a neighbour's army gather by its
+  cities raised its guard, and dropped it on the turn that army declared war. It now keeps answering that army through
+  the war.
+- They keep the capital for the spaceship: a finished part no longer waits outside its capital behind the player's own
+  workers, settlers and caravans, which step aside, and caravans go to another city.
+- They were tried against scripted human tricks (a wonder sniped at the last turn, Congress votes bought by gifts, a
+  city-state taken away from its ally, an army that gathers just out of the cities' reach and then closes in) and fixed
+  where they failed.
+- They make peace through deals, drop a war that no longer pays, and a seat in Congress that abstains on everything casts
+  no vote.
 - A loaded game now plays on exactly as it would have without the save: the computer players keep no memory outside it.
+- **A computer turn takes less time.** Two rounds of speed-ups, each with the same moves as before and about 15 %
+  less processor time. The new default player thinks about 17 % longer per turn than
+  the one it replaced, because its empires are bigger.
 
 ### Rules
 
-- **One capital per nation.** A city you buy from a city-state, receive in a deal or liberate no longer brings its old palace,
-  so a nation can no longer end up with several capitals (the game took the first one, which could be a bought city overseas,
-  and the spaceship parts could not be installed). As in Unciv, a city that changes hands leaves its palace behind; when the
-  capital itself is lost, the palace goes to the largest remaining city that is not a puppet. Saves with several palaces
-  (or none) are repaired when they load.
+- **One capital per nation.** A city you buy from a city-state, receive in a deal or liberate no longer brings its old
+  palace, so a nation can no longer end up with several capitals (the game took the first one, which could be a bought
+  city overseas, and the spaceship parts could not be installed). When the capital itself is lost, the palace goes to the
+  largest remaining city that is not a puppet. Saves with several palaces (or none) are repaired when they load.
 - **A destroyed nation leaves nothing behind.** When a nation or city-state loses its last city, every tie with it ends at
   once: wars, treaties, deals and gold per turn, offers, embassies, open borders, research agreements, its spies, its votes
   and seats in the World Congress, and the World Leader title. A city-state that was its ally picks its next ally at once.
-- A holy city can no longer be razed or destroyed by a nuke, as in Unciv; a burning city that becomes a holy city
-  keeps its last citizen.
+- A holy city can no longer be razed or destroyed by a nuke; a burning city that becomes a holy city keeps its last
+  citizen, and a burning city that becomes the capital stops burning. A razed city leaves no record behind.
 - **World Congress:** when the host is destroyed, the league passes to the living nation with the most delegates; a
   destroyed nation can no longer win a vote.
 - **Nations remember wrongs.** Taking a neighbour's land with a citadel costs its opinion of you (10 per tile). Declaring
@@ -60,14 +78,21 @@
   the price, and says when the next policy will cost more. Every branch shows what it is for and its progress, every policy
   its effect and why it is locked. Arrow keys and Enter adopt without the mouse; a short pause after each adoption stops a
   double click from buying the next card. On a phone the screen has two tabs, and a tap shows the whole text of a card.
-- Sharper text on phones on every screen: thin letters and the "…" of a cut line no longer fade.
+  The keys of the screen are named in its tooltips.
+- Sharper text on phones on every screen: thin letters and the "..." of a cut line no longer fade.
 - Technologies you cannot research yet look locked and say what they need; the ones you can start now are marked.
 - A new or loaded game opens with the map zoomed to the land you know.
 - The panel of met nations lists nations only (city-states are one row that opens their screen), with the reasons in
   tooltips; notices stay inside their panel.
 - An error during play, such as a failed autosave, shows as a message over the game instead of on the main menu.
 - The End turn button also reminds you of Congress votes to cast, offers waiting for an answer and spies with no task.
-- The arrow symbol is no longer missing from texts in any language.
+- The arrow symbol is no longer missing from texts in any language, and the new Japanese and Chinese lines use characters
+  the shipped fonts have.
+
+### Builds and tests
+
+- The tests run in two tiers: a fast one for every change (about half a minute on four threads) and the full one for a
+  release. A test loads saves made by 0.3.0 and plays them on.
 
 ## 0.3.0
 
