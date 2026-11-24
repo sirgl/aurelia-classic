@@ -94,6 +94,15 @@ pub trait ClassicGame {
     #[cfg(any(test, feature = "harness"))]
     fn debug_force_peace(&mut self, rules: &CompiledRuleset, player: PlayerId, enemy: PlayerId);
 
+    /// Harness-only: the tiles nobody owns yet, among `tiles`, claimed for `city` (a trainer's border: a city founded
+    /// by the harness owns its founding ring only, culture grows it over turns).
+    #[cfg(any(test, feature = "harness"))]
+    fn debug_claim_tiles(&mut self, rules: &CompiledRuleset, city: CityHandle, tiles: &[TileId]);
+
+    /// Harness-only: `host` opens its borders to `guest` (the grant of a deal; directed).
+    #[cfg(any(test, feature = "harness"))]
+    fn debug_open_borders(&mut self, rules: &CompiledRuleset, host: PlayerId, guest: PlayerId);
+
     #[cfg(any(test, feature = "harness"))]
     fn debug_set_influence(&mut self, rules: &CompiledRuleset, city_state: PlayerId, major: PlayerId, influence: i32);
 
@@ -345,6 +354,26 @@ impl ClassicGame for GameState {
         self.commit_journal(rules, &journal);
     }
 
+
+    #[cfg(any(test, feature = "harness"))]
+    fn debug_claim_tiles(&mut self, rules: &CompiledRuleset, city: CityHandle, tiles: &[TileId]) {
+        let mut tx = WorldTransaction::new(self.world_mut());
+        for t in tiles {
+            if tx.world.map.owner(*t) == Some(None) {
+                crate::transaction::journal::claim_tile(&mut *tx.0.world, &mut tx.0.journal, city, *t);
+            }
+        }
+        let journal = tx.commit(rules).expect("debug_claim_tiles commit");
+        self.commit_journal(rules, &journal);
+    }
+
+    #[cfg(any(test, feature = "harness"))]
+    fn debug_open_borders(&mut self, rules: &CompiledRuleset, host: PlayerId, guest: PlayerId) {
+        let mut tx = WorldTransaction::new(self.world_mut());
+        let _ = tx.open_borders(host, guest, rules);
+        let journal = tx.commit(rules).expect("debug_open_borders commit");
+        self.commit_journal(rules, &journal);
+    }
 
     #[cfg(any(test, feature = "harness"))]
     fn debug_set_influence(&mut self, rules: &CompiledRuleset, city_state: PlayerId, major: PlayerId, influence: i32) {

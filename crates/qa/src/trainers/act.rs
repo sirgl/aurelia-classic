@@ -313,6 +313,9 @@ pub enum Aim {
     Guard(UnitHandle),
     /// Ranged support: within range of the nearest foe, behind a friendly melee unit when one is near.
     Support,
+    /// Walk a precomputed field (the length of the LEGAL way to the goal, by tile id: borders closed to the unit's
+    /// player count; `trainers/third_party.rs`): the reachable tile with the lowest value.
+    Field(std::rc::Rc<Vec<i32>>),
 }
 
 /// One unit's turn of a script: strike (before and, for hit-and-run units, after moving), else move by
@@ -376,6 +379,10 @@ pub fn unit_turn(game: &mut GameState, rules: &CompiledRuleset, side: PlayerId, 
             Aim::Guard(ward) => {
                 let ward_tile = core_of(game, *ward).map_or(me.tile, |c| c.tile);
                 move_by(game, rules, side, unit, |g, x, _| (dist(g, x, ward_tile), -nearest(g, x, &foes).min(3), -defence(g, rules, x, side)))
+            }
+            Aim::Field(field) => {
+                let field = field.clone();
+                move_by(game, rules, side, unit, |g, x, _| (field.get(x.0 as usize).copied().unwrap_or(i32::MAX), -defence(g, rules, x, side)))
             }
             Aim::Support => {
                 let melee: Vec<TileId> = friends.iter().filter_map(|h| core_of(game, *h)).filter(|c| c.owner == side && range_of(rules, c.kind).is_none() && !is_civilian(rules, c.kind)).map(|c| c.tile).collect();

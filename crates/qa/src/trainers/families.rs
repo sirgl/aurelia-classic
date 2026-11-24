@@ -69,6 +69,7 @@ use serde::{Deserialize, Serialize};
 use super::act::{self, Aim, Nerve};
 use super::assault;
 use super::camp;
+use super::third_party;
 use super::memory;
 use super::lab::{self, dist, Arm, Draw, Lab};
 use super::{Piece, Scene};
@@ -116,10 +117,18 @@ pub enum Fam {
     // The camp trainers (`camp.rs`; appended again: the older families keep their seeds).
     Camp,
     CampRace,
+    // The third-party trainers (`third_party.rs`; appended again: the older families keep their seeds).
+    NeutralPath,
+    AllySiege,
+    DefendFriend,
+    ClosedBorders,
+    SpareFriends,
+    NeutralJoinsWar,
+    CapitalRace,
 }
 
 impl Fam {
-    pub const ALL: [Fam; 36] = [
+    pub const ALL: [Fam; 43] = [
         Fam::Duel,
         Fam::Focus,
         Fam::Hold,
@@ -156,6 +165,13 @@ impl Fam {
         Fam::AssaultPeace,
         Fam::Camp,
         Fam::CampRace,
+        Fam::NeutralPath,
+        Fam::AllySiege,
+        Fam::DefendFriend,
+        Fam::ClosedBorders,
+        Fam::SpareFriends,
+        Fam::NeutralJoinsWar,
+        Fam::CapitalRace,
     ];
 
     pub fn name(self) -> &'static str {
@@ -196,6 +212,13 @@ impl Fam {
             Fam::AssaultPeace => "assault-peace",
             Fam::Camp => "camp",
             Fam::CampRace => "camp-race",
+            Fam::NeutralPath => "neutral-path",
+            Fam::AllySiege => "ally-siege",
+            Fam::DefendFriend => "defend-friend",
+            Fam::ClosedBorders => "closed-borders",
+            Fam::SpareFriends => "spare-friends",
+            Fam::NeutralJoinsWar => "neutral-joins-war",
+            Fam::CapitalRace => "capital-race",
         }
     }
 
@@ -217,6 +240,7 @@ impl Fam {
             Fam::Surrounded => 4,
             f if memory::is_memory(f) => memory::rounds(f),
             f if camp::is_camp(f) => camp::rounds(f),
+            f if third_party::is_third(f) => third_party::rounds(f),
             f => assault::rounds(f),
         }
     }
@@ -249,6 +273,7 @@ impl Fam {
             Fam::Surrounded => &["ref-break", "ref-flee"],
             f if memory::is_memory(f) => memory::solvers(f),
             f if camp::is_camp(f) => camp::solvers(f),
+            f if third_party::is_third(f) => third_party::solvers(f),
             f => assault::solvers(f),
         }
     }
@@ -282,7 +307,7 @@ impl Fam {
             Fam::Harass => &[("MO12", 'D')],
             Fam::Snipe => &[("MO7", 'U'), ("MT8", 'U'), ("E1", 'U'), ("M4", 'U'), ("CS4", 'U')],
             Fam::Surrounded => &[("MT4", 'D')],
-            f if memory::is_memory(f) || camp::is_camp(f) => &[],
+            f if memory::is_memory(f) || camp::is_camp(f) || third_party::is_third(f) => &[],
             f => assault::tricks(f),
         }
     }
@@ -317,6 +342,7 @@ impl Fam {
             Fam::Surrounded => "a strong unit of ours about to be surrounded: break out or survive",
             f if memory::is_memory(f) => memory::task(f),
             f if camp::is_camp(f) => camp::task(f),
+            f if third_party::is_third(f) => third_party::task(f),
             f => assault::task(f),
         }
     }
@@ -353,7 +379,7 @@ pub fn citadel(rules: &CompiledRuleset) -> Option<kernel::ids::ImprovementId> {
 }
 
 /// An improvement to pillage: valid on open land, with yields, the most food (a farm by data).
-fn farm(rules: &CompiledRuleset, open: usize) -> Option<kernel::ids::ImprovementId> {
+pub(super) fn farm(rules: &CompiledRuleset, open: usize) -> Option<kernel::ids::ImprovementId> {
     rules
         .improvements
         .iter()
@@ -547,7 +573,13 @@ pub(super) fn kinds_label(rules: &CompiledRuleset, ps: &[Piece]) -> String {
 /// Builds attempt `attempt` of `instance` of `fam` in `era`.
 pub fn build(rules: &CompiledRuleset, fam: Fam, era: u8, instance: usize, attempt: u32) -> Result<(GameState, Scene), String> {
     // The camp families have a world of their own (the barbarians on, a neutral nation); every other family's lab is unchanged.
-    let lab = if camp::is_camp(fam) { lab::camp_lab(rules, era)? } else { lab::lab(rules, era)? };
+    let lab = if camp::is_camp(fam) {
+        lab::camp_lab(rules, era)?
+    } else if third_party::is_third(fam) {
+        lab::third_lab(rules, era)?
+    } else {
+        lab::lab(rules, era)?
+    };
     if !fam.claims(rules, &lab.kinds) {
         return Err(format!("{} does not claim era {era}", fam.name()));
     }
@@ -561,6 +593,11 @@ pub fn build(rules: &CompiledRuleset, fam: Fam, era: u8, instance: usize, attemp
     }
     if camp::is_camp(fam) {
         let mut s = camp::build(&mut p, fam, &lab, instance, attempt)?;
+        s.info.insert("attempt".into(), attempt.to_string());
+        return Ok((p.game, s));
+    }
+    if third_party::is_third(fam) {
+        let mut s = third_party::build(&mut p, fam, &lab, instance, attempt)?;
         s.info.insert("attempt".into(), attempt.to_string());
         return Ok((p.game, s));
     }
@@ -1166,6 +1203,7 @@ pub fn build(rules: &CompiledRuleset, fam: Fam, era: u8, instance: usize, attemp
         Fam::AssaultHeal | Fam::PromotionChoice | Fam::HillArchers | Fam::CityFire | Fam::PlannedAssault | Fam::AssaultReinforce | Fam::AssaultPeace => unreachable!("built by assault::build"),
         Fam::AmbushFog | Fam::HuntFog => unreachable!("built by memory::build"),
         Fam::Camp | Fam::CampRace => unreachable!("built by camp::build"),
+        Fam::NeutralPath | Fam::AllySiege | Fam::DefendFriend | Fam::ClosedBorders | Fam::SpareFriends | Fam::NeutralJoinsWar | Fam::CapitalRace => unreachable!("built by third_party::build"),
         Fam::Airstrike => {
             let home_t = at(&p, -3, 0)?;
             p.city(me, home_t, 4, false);
@@ -1246,7 +1284,7 @@ fn targets_of(scene: &Scene, of_enemy: bool, city: bool) -> impl Fn(&GameState) 
     }
 }
 
-fn city_hp(rules: &CompiledRuleset, game: &GameState, t: TileId) -> Option<(i64, i64)> {
+pub(super) fn city_hp(rules: &CompiledRuleset, game: &GameState, t: TileId) -> Option<(i64, i64)> {
     let auth = game.view().auth;
     let c = auth.indexes().city_on_tile(t).and_then(|c| auth.cities().get(c))?;
     let max = i64::from(classic_rules::combat::city::max_hit_points(auth, rules, c));
@@ -1261,6 +1299,10 @@ pub fn reference_turn(rules: &CompiledRuleset, game: &mut GameState, scene: &mut
     }
     if camp::is_camp(scene.fam) && matches!(name, "ref-camp" | "ref-camp-race") {
         camp::reference_turn(rules, game, scene, name);
+        return;
+    }
+    if third_party::is_third(scene.fam) && third_party::is_reference(name) {
+        third_party::reference_turn(rules, game, scene, name);
         return;
     }
     if memory::is_memory(scene.fam) && matches!(name, "ref-recall" | "ref-forget") {
@@ -1512,6 +1554,10 @@ pub fn enemy_turn(rules: &CompiledRuleset, game: &mut GameState, scene: &mut Sce
         camp::enemy_turn(rules, game, scene);
         return;
     }
+    if third_party::is_third(scene.fam) {
+        third_party::enemy_turn(rules, game, scene);
+        return;
+    }
     let (me, foe) = (scene.enemy, scene.learner);
     let sc = scene.clone();
     let friends = handles(&sc.theirs);
@@ -1694,6 +1740,7 @@ pub fn judge(rules: &CompiledRuleset, game: &GameState, sc: &mut Scene, rel: u32
     let v = match sc.fam {
         Fam::AmbushFog | Fam::HuntFog => memory::judge(rules, game, sc, rel),
         Fam::Camp | Fam::CampRace => camp::judge(rules, game, sc, rel),
+        Fam::NeutralPath | Fam::AllySiege | Fam::DefendFriend | Fam::ClosedBorders | Fam::SpareFriends | Fam::NeutralJoinsWar | Fam::CapitalRace => third_party::judge(rules, game, sc, rel),
         Fam::Duel => {
             if combat_theirs == 0 && !mine.is_empty() {
                 Some(true)
@@ -1990,6 +2037,9 @@ pub fn measures(rules: &CompiledRuleset, game: &GameState, sc: &Scene, rel: u32)
         m.insert("camp_lost_to_neutral".into(), f64::from(u8::from(sc.info.contains_key("lost_to"))));
         m.insert("lost_at_clear".into(), sc.info.get("lost_at_clear").and_then(|v| v.parse().ok()).unwrap_or(-1.0));
         m.insert("cap_broken".into(), sc.cap_broken.map_or(-1.0, f64::from));
+    }
+    if third_party::is_third(sc.fam) {
+        third_party::measures(rules, game, sc, &mut m);
     }
     if sc.fam == Fam::Convoy {
         m.insert("founded".into(), sc.founded.map_or(-1.0, f64::from));

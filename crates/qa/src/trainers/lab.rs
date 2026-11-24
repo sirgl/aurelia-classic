@@ -306,7 +306,7 @@ pub struct Lab {
     pub centre: TileId,
     pub homes: [TileId; 2],
     /// The camp families' third nation (at peace with the learner); None in every other lab. There `enemy` is the
-    /// barbarian player.
+    /// barbarian player. In the third-party lab (`third_lab`) the third nation too, with a real enemy nation.
     pub neutral: Option<PlayerId>,
 }
 
@@ -326,18 +326,28 @@ pub fn tiles_within(game: &GameState, centre: TileId, reach: i32) -> Vec<TileId>
 
 /// The lab of `era` (deterministic: the same for every scene of the era).
 pub fn build_lab(rules: &CompiledRuleset, era: u8) -> Result<Lab, String> {
-    build_lab_in(rules, era, false)
+    build_lab_in(rules, era, 0)
 }
 
 /// The camp families' lab: the same world with the barbarians on (Normal) and a second nation at peace with the
 /// learner (`neutral`); `enemy` is the barbarian player.
 pub fn build_camp_lab(rules: &CompiledRuleset, era: u8) -> Result<Lab, String> {
-    build_lab_in(rules, era, true)
+    build_lab_in(rules, era, 1)
 }
 
-fn build_lab_in(rules: &CompiledRuleset, era: u8, camp: bool) -> Result<Lab, String> {
+/// The third-party families' lab (`trainers/third_party.rs`): three nations, no barbarians: the learner, the enemy (at
+/// war with the learner) and a third nation (`neutral`; at peace with both: a scene may change that), each with a home
+/// city (the third one's at the top of the map, far from the arena).
+pub fn build_third_lab(rules: &CompiledRuleset, era: u8) -> Result<Lab, String> {
+    build_lab_in(rules, era, 2)
+}
+
+/// `kind`: 0 the plain lab, 1 the camp lab, 2 the third-party lab.
+fn build_lab_in(rules: &CompiledRuleset, era: u8, kind: u8) -> Result<Lab, String> {
+    let camp = kind == 1;
+    let third = kind == 2;
     let mut spec = GameSpec::new(MapScript::Pangaea, match mode::world() { 1 => WorldSize::Tiny, 2 => WorldSize::Duel, _ => WorldSize::Small }, 0x7a1e_5ab0);
-    spec.nations = 2;
+    spec.nations = if third { 3 } else { 2 };
     spec.city_states = 0;
     spec.barbarians = if camp { classic_rules::world::barbarians::BarbarianMode::Normal } else { classic_rules::world::barbarians::BarbarianMode::None };
     let speed = rules.speed_named("quick").ok_or("no speed quick")?;
@@ -356,10 +366,11 @@ fn build_lab_in(rules: &CompiledRuleset, era: u8, camp: bool) -> Result<Lab, Str
         }
     }
     let majors = crate::bench::modules::majors(&game);
-    if majors.len() < 2 {
-        return Err("the lab needs two nations".to_owned());
+    if majors.len() < 2 || third && majors.len() < 3 {
+        return Err("the lab needs two nations (the third-party lab three)".to_owned());
     }
     let (learner, other) = (majors[0], majors[1]);
+    let third_nation = if third { Some(majors[2]) } else { None };
     // The camp lab's enemy is the barbarian player, the second nation the neutral.
     let barbarian = game.view().auth.players().barbarian();
     let (enemy, neutral) = if camp { (barbarian.ok_or("the camp lab has no barbarian player")?, Some(other)) } else { (other, None) };
@@ -377,8 +388,12 @@ fn build_lab_in(rules: &CompiledRuleset, era: u8, camp: bool) -> Result<Lab, Str
     for (p, t) in [(learner, homes[0]), (other, homes[1])] {
         game.debug_found_city(rules, p, t);
     }
+    if let Some(n) = third_nation {
+        game.debug_found_city(rules, n, at(w / 2, 2));
+    }
     // The era's technologies.
-    for p in [learner, other] {
+    let nations: Vec<PlayerId> = [Some(learner), Some(other), third_nation].into_iter().flatten().collect();
+    for p in nations.iter().copied() {
         for (i, t) in rules.technologies.iter().enumerate() {
             let e = t.content_era.and_then(|e| rules.eras.get(e.0 as usize)).map_or(0, |e| e.index);
             if e <= era && !t.repeatable {
@@ -388,7 +403,18 @@ fn build_lab_in(rules: &CompiledRuleset, era: u8, camp: bool) -> Result<Lab, Str
         game.debug_earn(p, CHEST);
     }
     game.debug_meet(learner, other);
-    if camp {
+    if let Some(n) = third_nation {
+        // Three nations: all met, at peace but the learner and the enemy (the nations start at war with whom they meet).
+        game.debug_meet(learner, n);
+        game.debug_meet(other, n);
+        game.debug_force_peace(rules, learner, n);
+        game.debug_force_peace(rules, other, n);
+        game.debug_force_war(rules, learner, other);
+        let d = game.view().auth.diplomacy();
+        if !d.at_war(learner, other) || d.at_war(learner, n) || d.at_war(other, n) {
+            return Err("the third-party lab's relations are not (learner at war with the enemy, the third at peace with both)".to_owned());
+        }
+    } else if camp {
         game.debug_force_peace(rules, learner, other);
         if game.view().auth.diplomacy().at_war(learner, other) || !game.view().auth.diplomacy().at_war(learner, enemy) {
             return Err("the camp lab's nations are not at peace, or not at war with the barbarians".to_owned());
@@ -400,22 +426,28 @@ fn build_lab_in(rules: &CompiledRuleset, era: u8, camp: bool) -> Result<Lab, Str
         }
     }
     let kinds = EraKinds::of(rules, era);
+    let neutral = if third { third_nation } else { neutral };
     Ok(Lab { game, learner, enemy, era, grounds, kinds, centre, homes, neutral })
 }
 
 /// The lab of an era, built once per thread and cloned for each scene.
 pub fn lab(rules: &CompiledRuleset, era: u8) -> Result<Lab, String> {
-    cached(rules, era, false)
+    cached(rules, era, 0)
 }
 
 /// The camp lab of an era (`build_camp_lab`), cached like the lab.
 pub fn camp_lab(rules: &CompiledRuleset, era: u8) -> Result<Lab, String> {
-    cached(rules, era, true)
+    cached(rules, era, 1)
 }
 
-fn cached(rules: &CompiledRuleset, era: u8, camp: bool) -> Result<Lab, String> {
+/// The third-party lab of an era (`build_third_lab`), cached like the lab.
+pub fn third_lab(rules: &CompiledRuleset, era: u8) -> Result<Lab, String> {
+    cached(rules, era, 2)
+}
+
+fn cached(rules: &CompiledRuleset, era: u8, camp: u8) -> Result<Lab, String> {
     thread_local! {
-        static LABS: std::cell::RefCell<BTreeMap<(u8, bool), Result<Lab, String>>> = const { std::cell::RefCell::new(BTreeMap::new()) };
+        static LABS: std::cell::RefCell<BTreeMap<(u8, u8), Result<Lab, String>>> = const { std::cell::RefCell::new(BTreeMap::new()) };
     }
     LABS.with(|cell| {
         let mut m = cell.borrow_mut();

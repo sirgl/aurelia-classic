@@ -24,6 +24,7 @@ pub mod lab;
 pub mod memory;
 pub mod scene_rule;
 pub mod suite;
+pub mod third_party;
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -484,7 +485,11 @@ fn play_on<P: kernel::ai::mind::AiMind<Classic>>(rules: &CompiledRuleset, mut ga
             let now = game.view().auth.turn().round;
             let active = game.view().auth.active_player();
             assault::keep_war(rules, &mut game, &scene);
-            camp::keep_world(rules, &mut game, &mut scene);
+            if third_party::is_third(scene.fam) {
+                third_party::keep_world(rules, &mut game, &mut scene);
+            } else {
+                camp::keep_world(rules, &mut game, &mut scene);
+            }
             if active == scene.learner && scripted_mine != Some(now) && !game.is_over() {
                 scripted_mine = Some(now);
                 if scene_rule::on() {
@@ -575,15 +580,23 @@ fn play_on<P: kernel::ai::mind::AiMind<Classic>>(rules: &CompiledRuleset, mut ga
                 }
                 if camp::is_camp(scene.fam) {
                     camp::mark(&game, &mut scene);
+                } else if third_party::is_third(scene.fam) {
+                    third_party::mark(&game, &mut scene);
                 }
             }
             if scene.neutral == Some(active) && scripted_third != Some(now) && !game.is_over() {
                 // The camp families' neutral nation: a scripted human, then the scene rule's part (as the seats').
                 scripted_third = Some(now);
                 close_arena(rules, &mut game, &scene);
-                camp::neutral_turn(rules, &mut game, &mut scene);
-                camp::neutral_rule(rules, &mut game, &scene);
-                camp::mark(&game, &mut scene);
+                if third_party::is_third(scene.fam) {
+                    third_party::third_turn(rules, &mut game, &mut scene);
+                    third_party::third_rule(rules, &mut game, &scene);
+                    third_party::mark(&game, &mut scene);
+                } else {
+                    camp::neutral_turn(rules, &mut game, &mut scene);
+                    camp::neutral_rule(rules, &mut game, &scene);
+                    camp::mark(&game, &mut scene);
+                }
             }
             if active == scene.enemy && scripted_theirs != Some(now) && !game.is_over() {
                 scripted_theirs = Some(now);

@@ -146,8 +146,13 @@ pub fn foe_tiles(game: &GameState, scene: &Scene, side: PlayerId) -> Vec<TileId>
     let foes = if side == scene.learner { scene.theirs_alive(game) } else { scene.mine_alive(game) };
     let mut v: Vec<TileId> = foes.iter().map(|(_, c)| c.tile).collect();
     // The camp families: the barbarians are at war with the neutral nation's pieces too.
-    if side == scene.enemy {
+    if side == scene.enemy && super::camp::is_camp(scene.fam) {
         v.extend(super::camp::third_alive(game, scene).iter().map(|(_, c)| c.tile));
+    }
+    // The third-party families: the third nation's pieces are foes of the seat it is at war with (the ally of the
+    // learner is at war with the enemy; a neutral that declared war is at war with the learner).
+    if super::third_party::is_third(scene.fam) {
+        v.extend(super::third_party::third_foes_of(game, scene, side));
     }
     v.sort_by_key(|t| t.0);
     v.dedup();

@@ -56,11 +56,11 @@ impl Aim {
     /// The aim a trainer family gives the army: what a commander above would say for that scene.
     pub fn of(fam: Fam) -> Aim {
         match fam {
-            Fam::Duel | Fam::Focus | Fam::Kite | Fam::Flank | Fam::General | Fam::Sink | Fam::Airstrike | Fam::Harass | Fam::Choke | Fam::Citadel | Fam::Bait => Aim::Destroy,
+            Fam::Duel | Fam::Focus | Fam::Kite | Fam::Flank | Fam::General | Fam::Sink | Fam::Airstrike | Fam::Harass | Fam::Choke | Fam::Citadel | Fam::Bait | Fam::NeutralPath | Fam::NeutralJoinsWar => Aim::Destroy,
             Fam::Hold | Fam::Rush => Aim::Hold,
-            Fam::Siege | Fam::Ram | Fam::Bombard | Fam::Prey | Fam::AssaultHeal | Fam::PromotionChoice | Fam::HillArchers | Fam::CityFire | Fam::PlannedAssault | Fam::AssaultReinforce | Fam::AssaultPeace | Fam::Camp | Fam::CampRace => Aim::TakeCity,
-            Fam::Guard | Fam::Counter => Aim::Protect,
-            Fam::Raid => Aim::Pillage,
+            Fam::Siege | Fam::Ram | Fam::Bombard | Fam::Prey | Fam::AssaultHeal | Fam::PromotionChoice | Fam::HillArchers | Fam::CityFire | Fam::PlannedAssault | Fam::AssaultReinforce | Fam::AssaultPeace | Fam::Camp | Fam::CampRace | Fam::AllySiege | Fam::ClosedBorders | Fam::CapitalRace => Aim::TakeCity,
+            Fam::Guard | Fam::Counter | Fam::DefendFriend => Aim::Protect,
+            Fam::Raid | Fam::SpareFriends => Aim::Pillage,
             Fam::Retreat | Fam::Wounded | Fam::Surrounded | Fam::AmbushFog => Aim::Survive,
             Fam::Snipe | Fam::HuntFog => Aim::Catch,
             Fam::Convoy => Aim::Escort,
@@ -106,6 +106,9 @@ fn loss_cap(family: &str) -> Option<Option<usize>> {
         "kite" => Some(Some(0)),
         "camp" => Some(Some(1)),
         "camp-race" => Some(Some(2)),
+        "neutral-path" | "spare-friends" | "neutral-joins-war" | "ally-siege" => Some(Some(1)),
+        "defend-friend" | "closed-borders" => Some(Some(2)),
+        "capital-race" => Some(Some(5)),
         _ => None,
     }
 }
