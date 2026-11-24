@@ -43,6 +43,7 @@ def main(argv=None):
     ap.add_argument("--untimed", action="store_true", help="only the wall time")
     ap.add_argument("--compile", action="store_true")
     ap.add_argument("--legacy", default="", help="parts of the step before the speed-up: nfo (foes counted per call, a host round-trip), mk (the masks twice); comma list")
+    ap.add_argument("--scene-rule", action="store_true")
     ap.add_argument("--out")
     a = ap.parse_args(argv)
     mx.set_memory_limit(16 << 30)
@@ -51,6 +52,7 @@ def main(argv=None):
     plays = A.load(a.dump, limit=a.limit, families=a.families.split(",") if a.families else None)
     g = P.Game(plays, a.copies, brain)
     g.fort_rule = "old"
+    g.scene_rule = a.scene_rule
     if a.compile:
         g.enable_compile()
     if "mk" in a.legacy:
