@@ -25,6 +25,7 @@ import time
 
 import mlx.core as mx
 
+from . import armycamp
 from . import armyhist as H
 from . import armyobs as A
 from . import armyprice
@@ -66,7 +67,7 @@ class Game:
             m0 = ms[0] if ms else {"ids": [], "handles": []}
             row = {"state": sc["initial"], "ids": m0.get("ids", []), "handles": m0.get("handles", []), "pillageable": sc["orders"]["pillageable"]}
             if ms:
-                row.update({k: m0[k] for k in ("wm", "cstr") if k in m0})
+                row.update({k: m0[k] for k in ("wm", "cstr", "upos") if k in m0})
             rows.append((pi, row))
         self.templates = A.build_templates(plays)
         if forced is None:
@@ -530,6 +531,7 @@ class Game:
             self.s = s
             armyrule.seat_turn(self, 0, live)
             return
+            armycamp.mark(self)
         # Which of them the mind fortifies hangs on its tasks and operations (`decide_military` -> `follow_task` ->
         # `hold`), which are not ported. The rule FITTED on the event dump (not a port; 72 % of the army unit-turns
         # right, never fortifying 69 %, the earlier rule 64 %): a melee unit that moved this turn and ends within 2 of
@@ -745,6 +747,7 @@ class Game:
         owner0 = self.s["c_owner"]
         self._apply_raw(me, kind, tgt, take, side, mk)
         s = self.s
+        armycamp.check(self)
         if side == 0 and "c_maxhp" in s:
             won = (owner0 != 0) & (s["c_owner"] == 0) & (self.cap_maxhp >= 0)
             s["c_maxhp"] = mx.where(won, self.cap_maxhp, s["c_maxhp"])
@@ -860,6 +863,10 @@ class Game:
 
     def enemy_turn(self):
         # The family script's first act (`assault::enemy_turn`): the reinforcements of assault-reinforce land.
+        # The third seat's turn (twin packages 4 and 8): after the learner's, before the enemy's.
+        live = ~self.s["done"] & (self.verdict < 0)
+        armycamp.neutral_turn(self, live)
+        armycamp.neutral_rule(self, live)
         armyprice.land_reinforcements(self, ~self.s["done"] & (self.verdict < 0))
         if self.scene_rule:
             from . import armyrule
@@ -1009,6 +1016,7 @@ class Game:
         from . import armyfog
         v = armyfog.judge(self, rel, v)
         # Guard, convoy, snipe (twin package 7; `armyciv`).
+        v = armycamp.judge(self, rel, v)
         from . import armyciv
         v = armyciv.judge(self, rel, v)
         self.verdict = mx.where(self.verdict < 0, v, self.verdict)
