@@ -200,8 +200,9 @@ pub struct Net {
 
 /// The numbers of the hand-set term `ww` (`army/model_mb.py`, `MBENet`; M-HANDOFF.md, "Hand edit: wounded out of range"):
 /// [scale, hp threshold, hp slope, ranged hp threshold, resting weight, city-low threshold, city-low slope, resting slope,
-/// stay scale, healing weight, back threshold, strike scale, ranged strike threshold, stay escape, ranged engaged threshold].
-pub const WW_LEN: usize = 15;
+/// stay scale, healing weight, back threshold, strike scale, ranged strike threshold, stay escape, ranged engaged threshold,
+/// foe city only].
+pub const WW_LEN: usize = 16;
 /// Half the smallest step of a token's hit points (1 / 100): "gained since our last turn" is number 46 above it.
 const HEALING_STEP: f32 = 0.005;
 /// Half the step of the threat numbers (a count / 4): a candidate's threat (19) is below the unit's (39) by more than it.
@@ -1306,6 +1307,8 @@ impl Net {
     /// (strike threshold - hp)) x (1 - city_low)`, the strike threshold the hp threshold, for a unit with range the ranged strike
     /// threshold. A unit with range reads the ranged engaged threshold instead of the ranged one while the memory's plan says
     /// engaged (`plan_stage`'s readout: the teacher's shooters fire down to `ROTATE_BURST` once the assault went in). With
+    /// `foe city only` = 1 both gates are 0 unless the objective is a foe city (a city token with number 43, not 45: the terms
+    /// are the city assault's rotation, not a rule of the field). With
     /// `stay escape` = 1 the stay term spares a move to a tile less threatened than the unit's own (candidate
     /// number 19 below the token's 39: the teacher's rest moves only to a safer or better healing tile). `MBENet.wounded_term` is
     /// the same arithmetic.
@@ -1350,7 +1353,12 @@ impl Net {
             _ => 0.0,
         };
         let healing = w[9] * sig(w[2] * (w[10] - f[7])) * sig(w[2] * (f[46] - HEALING_STEP));
-        let city = (0..tokens.len()).find(|i| tokens.feat[*i][3] > 0.5 && tokens.feat[*i][43] > 0.5).map_or(1.0, |i| tokens.feat[i][7]);
+        let objective = (0..tokens.len()).find(|i| tokens.feat[*i][3] > 0.5 && tokens.feat[*i][43] > 0.5);
+        let city = objective.map_or(1.0, |i| tokens.feat[i][7]);
+        let foe_city = objective.is_some_and(|i| tokens.feat[i][45] < 0.5);
+        if w[15] > 0.5 && !foe_city {
+            return (0.0, 0.0);
+        }
         let low = sig(w[6] * (w[5] - city));
         let strike = sig(w[2] * ((if f[13] > 0.0 { w[12] } else { w[1] }) - f[7]));
         (hp.max(rest).max(healing) * (1.0 - low), strike * (1.0 - low))
