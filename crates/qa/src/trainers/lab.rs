@@ -15,6 +15,8 @@ use classic_rules::{ClassicGame, CompiledRuleset, GameState};
 use kernel::ids::{FeatureId, TerrainId};
 use kernel::rules::content::{Domain, UnitRole};
 
+use classic_rules::world::player::ClassicPlayers;
+
 use crate::spec::{GameSpec, WorldSize};
 
 /// SplitMix64's finaliser.
@@ -303,6 +305,9 @@ pub struct Lab {
     /// The arena centre (the scene's units stand within ARENA of it).
     pub centre: TileId,
     pub homes: [TileId; 2],
+    /// The camp families' third nation (at peace with the learner); None in every other lab. There `enemy` is the
+    /// barbarian player.
+    pub neutral: Option<PlayerId>,
 }
 
 /// The arena's reach around its centre (tiles a scene may paint and place on).
@@ -321,10 +326,20 @@ pub fn tiles_within(game: &GameState, centre: TileId, reach: i32) -> Vec<TileId>
 
 /// The lab of `era` (deterministic: the same for every scene of the era).
 pub fn build_lab(rules: &CompiledRuleset, era: u8) -> Result<Lab, String> {
+    build_lab_in(rules, era, false)
+}
+
+/// The camp families' lab: the same world with the barbarians on (Normal) and a second nation at peace with the
+/// learner (`neutral`); `enemy` is the barbarian player.
+pub fn build_camp_lab(rules: &CompiledRuleset, era: u8) -> Result<Lab, String> {
+    build_lab_in(rules, era, true)
+}
+
+fn build_lab_in(rules: &CompiledRuleset, era: u8, camp: bool) -> Result<Lab, String> {
     let mut spec = GameSpec::new(MapScript::Pangaea, match mode::world() { 1 => WorldSize::Tiny, 2 => WorldSize::Duel, _ => WorldSize::Small }, 0x7a1e_5ab0);
     spec.nations = 2;
     spec.city_states = 0;
-    spec.barbarians = classic_rules::world::barbarians::BarbarianMode::None;
+    spec.barbarians = if camp { classic_rules::world::barbarians::BarbarianMode::Normal } else { classic_rules::world::barbarians::BarbarianMode::None };
     let speed = rules.speed_named("quick").ok_or("no speed quick")?;
     spec = spec.speed(&speed.key);
     let mut game = crate::record::new_game(rules, &spec);
@@ -344,7 +359,10 @@ pub fn build_lab(rules: &CompiledRuleset, era: u8) -> Result<Lab, String> {
     if majors.len() < 2 {
         return Err("the lab needs two nations".to_owned());
     }
-    let (learner, enemy) = (majors[0], majors[1]);
+    let (learner, other) = (majors[0], majors[1]);
+    // The camp lab's enemy is the barbarian player, the second nation the neutral.
+    let barbarian = game.view().auth.players().barbarian();
+    let (enemy, neutral) = if camp { (barbarian.ok_or("the camp lab has no barbarian player")?, Some(other)) } else { (other, None) };
     // The map's corners: home cities far from the centre.
     let dims = game.view().auth.map().dimensions;
     let (w, h) = (dims.width as i64, dims.height as i64);
@@ -356,11 +374,11 @@ pub fn build_lab(rules: &CompiledRuleset, era: u8) -> Result<Lab, String> {
     for u in units {
         game.debug_remove_unit(rules, u);
     }
-    for (p, t) in [(learner, homes[0]), (enemy, homes[1])] {
+    for (p, t) in [(learner, homes[0]), (other, homes[1])] {
         game.debug_found_city(rules, p, t);
     }
     // The era's technologies.
-    for p in [learner, enemy] {
+    for p in [learner, other] {
         for (i, t) in rules.technologies.iter().enumerate() {
             let e = t.content_era.and_then(|e| rules.eras.get(e.0 as usize)).map_or(0, |e| e.index);
             if e <= era && !t.repeatable {
@@ -369,22 +387,38 @@ pub fn build_lab(rules: &CompiledRuleset, era: u8) -> Result<Lab, String> {
         }
         game.debug_earn(p, CHEST);
     }
-    game.debug_meet(learner, enemy);
-    game.debug_force_war(rules, learner, enemy);
-    if !game.view().auth.diplomacy().at_war(learner, enemy) {
-        return Err("the lab's nations could not go to war".to_owned());
+    game.debug_meet(learner, other);
+    if camp {
+        game.debug_force_peace(rules, learner, other);
+        if game.view().auth.diplomacy().at_war(learner, other) || !game.view().auth.diplomacy().at_war(learner, enemy) {
+            return Err("the camp lab's nations are not at peace, or not at war with the barbarians".to_owned());
+        }
+    } else {
+        game.debug_force_war(rules, learner, enemy);
+        if !game.view().auth.diplomacy().at_war(learner, enemy) {
+            return Err("the lab's nations could not go to war".to_owned());
+        }
     }
     let kinds = EraKinds::of(rules, era);
-    Ok(Lab { game, learner, enemy, era, grounds, kinds, centre, homes })
+    Ok(Lab { game, learner, enemy, era, grounds, kinds, centre, homes, neutral })
 }
 
 /// The lab of an era, built once per thread and cloned for each scene.
 pub fn lab(rules: &CompiledRuleset, era: u8) -> Result<Lab, String> {
+    cached(rules, era, false)
+}
+
+/// The camp lab of an era (`build_camp_lab`), cached like the lab.
+pub fn camp_lab(rules: &CompiledRuleset, era: u8) -> Result<Lab, String> {
+    cached(rules, era, true)
+}
+
+fn cached(rules: &CompiledRuleset, era: u8, camp: bool) -> Result<Lab, String> {
     thread_local! {
-        static LABS: std::cell::RefCell<BTreeMap<u8, Result<Lab, String>>> = const { std::cell::RefCell::new(BTreeMap::new()) };
+        static LABS: std::cell::RefCell<BTreeMap<(u8, bool), Result<Lab, String>>> = const { std::cell::RefCell::new(BTreeMap::new()) };
     }
     LABS.with(|cell| {
         let mut m = cell.borrow_mut();
-        m.entry(era).or_insert_with(|| build_lab(rules, era)).clone()
+        m.entry((era, camp)).or_insert_with(|| build_lab_in(rules, era, camp)).clone()
     })
 }

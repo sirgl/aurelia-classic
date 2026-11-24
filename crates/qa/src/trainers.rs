@@ -17,6 +17,7 @@
 
 pub mod act;
 pub mod assault;
+pub mod camp;
 pub mod dump;
 pub mod families;
 pub mod lab;
@@ -86,6 +87,9 @@ pub struct Scene {
     pub taken: Option<u32>,
     /// The round the learner's losses first passed the family's loss cap (the assault families).
     pub cap_broken: Option<u32>,
+    /// The camp families' neutral nation (at peace with the learner) and its pieces; None / empty elsewhere.
+    pub neutral: Option<PlayerId>,
+    pub third: Vec<Piece>,
     pub founded: Option<u32>,
     pub crossed: bool,
     pub city_low: bool,
@@ -166,6 +170,9 @@ fn reveal(game: &mut GameState, scene: &Scene) {
     let tiles: Vec<TileId> = (0..game.view().auth.map().tile_count() as u32).map(TileId).collect();
     game.debug_reveal(scene.learner, &tiles);
     game.debug_reveal(scene.enemy, &tiles);
+    if let Some(n) = scene.neutral {
+        game.debug_reveal(n, &tiles);
+    }
 }
 
 /// The war memory a side's AI has before the first round: the objective city (a declaration of war
@@ -191,12 +198,18 @@ fn hunt<P: kernel::ai::mind::AiMind<Classic>>(driver: &mut AiDriver<Classic, P>,
     }
 }
 
-/// The closed arena: every unit of the two seats that is not a scene piece is taken off.
+/// The closed arena: every unit of the two seats that is not a scene piece is taken off. (The camp families: the
+/// barbarians' units the scene camp spawned stay for the barbarians' script to adopt, the camps their own turn placed in the fog and
+/// those camps' defenders go, and the neutral's units that are not scene pieces go too.)
 fn close_arena(rules: &CompiledRuleset, game: &mut GameState, scene: &Scene) {
-    let ids: BTreeSet<EntityId> = scene.mine.iter().chain(&scene.theirs).map(|p| p.id).collect();
+    let camp = camp::is_camp(scene.fam);
+    if camp {
+        camp::clean(rules, game, scene);
+    }
+    let ids: BTreeSet<EntityId> = scene.mine.iter().chain(&scene.theirs).chain(&scene.third).map(|p| p.id).collect();
     let gone: Vec<UnitHandle> = {
         let auth = game.view().auth;
-        auth.units().iter_handles().filter(|(_, c)| (c.owner == scene.learner || c.owner == scene.enemy) && !ids.contains(&c.id)).map(|(h, _)| h).collect()
+        auth.units().iter_handles().filter(|(_, c)| (c.owner == scene.learner || (c.owner == scene.enemy && !camp) || Some(c.owner) == scene.neutral) && !ids.contains(&c.id)).map(|(h, _)| h).collect()
     };
     for h in gone {
         game.debug_remove_unit(rules, h);
@@ -222,6 +235,7 @@ pub fn play(rules: &CompiledRuleset, mut game: GameState, mut scene: Scene, play
     if scene_rule::on() {
         // The scene rule's seats: the enemy's, and the learner's unless an AI variant plays it.
         let mut ruled = vec![scene.enemy];
+        ruled.extend(scene.neutral);
         if !matches!(seat, Seat::Mind(_)) {
             ruled.push(scene.learner);
         }
@@ -462,6 +476,7 @@ fn play_on<P: kernel::ai::mind::AiMind<Classic>>(rules: &CompiledRuleset, mut ga
     let mut poslog: BTreeMap<u32, Vec<(usize, u32)>> = BTreeMap::new();
     let mut scripted_mine: Option<u32> = None;
     let mut scripted_theirs: Option<u32> = None;
+    let mut scripted_third: Option<u32> = None;
     let mut guard = 0;
     while verdict.is_none() && !game.is_over() && guard < 120 {
         guard += 1;
@@ -469,6 +484,7 @@ fn play_on<P: kernel::ai::mind::AiMind<Classic>>(rules: &CompiledRuleset, mut ga
             let now = game.view().auth.turn().round;
             let active = game.view().auth.active_player();
             assault::keep_war(rules, &mut game, &scene);
+            camp::keep_world(rules, &mut game, &mut scene);
             if active == scene.learner && scripted_mine != Some(now) && !game.is_over() {
                 scripted_mine = Some(now);
                 if scene_rule::on() {
@@ -557,6 +573,17 @@ fn play_on<P: kernel::ai::mind::AiMind<Classic>>(rules: &CompiledRuleset, mut ga
                 if scene_rule::on() && !matches!(seat, Seat::Mind(_)) {
                     scene_rule::turn(rules, &mut game, &scene, scene.learner);
                 }
+                if camp::is_camp(scene.fam) {
+                    camp::mark(&game, &mut scene);
+                }
+            }
+            if scene.neutral == Some(active) && scripted_third != Some(now) && !game.is_over() {
+                // The camp families' neutral nation: a scripted human, then the scene rule's part (as the seats').
+                scripted_third = Some(now);
+                close_arena(rules, &mut game, &scene);
+                camp::neutral_turn(rules, &mut game, &mut scene);
+                camp::neutral_rule(rules, &mut game, &scene);
+                camp::mark(&game, &mut scene);
             }
             if active == scene.enemy && scripted_theirs != Some(now) && !game.is_over() {
                 scripted_theirs = Some(now);

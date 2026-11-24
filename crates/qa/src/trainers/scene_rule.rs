@@ -145,6 +145,10 @@ pub fn fortifies(game: &GameState, rules: &CompiledRuleset, side: PlayerId, unit
 pub fn foe_tiles(game: &GameState, scene: &Scene, side: PlayerId) -> Vec<TileId> {
     let foes = if side == scene.learner { scene.theirs_alive(game) } else { scene.mine_alive(game) };
     let mut v: Vec<TileId> = foes.iter().map(|(_, c)| c.tile).collect();
+    // The camp families: the barbarians are at war with the neutral nation's pieces too.
+    if side == scene.enemy {
+        v.extend(super::camp::third_alive(game, scene).iter().map(|(_, c)| c.tile));
+    }
     v.sort_by_key(|t| t.0);
     v.dedup();
     v

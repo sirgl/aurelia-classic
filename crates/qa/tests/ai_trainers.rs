@@ -311,3 +311,94 @@ fn the_scene_rule_is_the_trainers_default_and_standard_is_the_only_way_off() {
     assert!(!rule_of(Some("standard")));
     assert!(std::panic::catch_unwind(|| rule_of(Some("simpel"))).is_err(), "an unknown value stops the run");
 }
+
+/// The camp rules the camp trainers stand on (`trainers::camp`, its module doc): a camp is cleared by a unit that ENTERS its
+/// tile (killing the keeper does not clear it), the neutral nation at peace with the learner cannot be struck by it and cannot
+/// stop on a tile of ours, the rules' record says who cleared, and the win rules read that record.
+#[test]
+fn the_camp_is_cleared_by_entering_and_the_neutral_is_at_peace() {
+    use aurelia_qa::trainers::camp;
+    use classic_rules::Command;
+    let rules = ClassicBench::rules();
+    let era = lab::era_index(&rules, "medieval").unwrap();
+    let (mut g, mut sc) = families::build(&rules, Fam::CampRace, era, 5, 0).unwrap();
+    let (me, n) = (sc.learner, sc.neutral.expect("a neutral"));
+    assert!(!g.view().auth.diplomacy().at_war(me, n), "the neutral is at peace with the learner");
+    assert!(g.view().auth.diplomacy().at_war(me, sc.enemy) && g.view().auth.diplomacy().at_war(n, sc.enemy), "both are at war with the barbarians");
+    assert!(camp::standing(&g, &sc) && camp::cleared_by(&g, &sc).is_none());
+    let camp_t = camp::camp_tile(&sc);
+    // Only the keeper is left, at 1 hit point; our scene units and the neutral's are replaced by one melee unit each, ours beside the camp.
+    let keeper = sc.theirs.iter().find(|p| act::core_of(&g, p.h).is_some_and(|c| c.tile == camp_t)).cloned().expect("a keeper on the camp");
+    for p in sc.theirs.iter().chain(&sc.mine).chain(&sc.third).cloned().collect::<Vec<_>>() {
+        if p.id != keeper.id {
+            g.debug_remove_unit(&rules, p.h);
+        }
+    }
+    g.debug_set_unit_hp(keeper.h, 1);
+    let melee = |s: &aurelia_qa::trainers::Scene| s.mine.iter().find(|p| act::range_of(&rules, p.kind).is_none()).map(|p| p.kind).unwrap();
+    let kind = melee(&sc);
+    let free: Vec<_> = lab::tiles_within(&g, camp_t, 2).into_iter().filter(|t| *t != camp_t && g.view().auth.indexes().units_on(*t).is_empty() && g.view().auth.indexes().city_on_tile(*t).is_none()).collect();
+    let beside = *free.iter().find(|t| lab::dist(&g, **t, camp_t) == 1).expect("a free tile beside the camp");
+    let ours = g.debug_spawn_unit(&rules, me, beside, kind);
+    let next = *free.iter().find(|t| **t != beside && lab::dist(&g, **t, beside) == 1 && lab::dist(&g, **t, camp_t) >= 1).expect("a tile beside ours");
+    let theirs = g.debug_spawn_unit(&rules, n, next, kind);
+    assert!(!act::try_cmd(&mut g, &rules, me, Command::AttackUnit { attacker: ours, defender: theirs }), "peace: a strike at the neutral is refused");
+    assert!(classic_rules::world::stacking::can_stop_at(g.view().auth, &rules, n, kind, None, beside).is_err(), "the neutral's unit cannot stop on a tile of ours");
+    assert!(act::try_cmd(&mut g, &rules, me, Command::AttackUnit { attacker: ours, defender: keeper.h }), "the keeper is struck");
+    assert!(act::alive(&g, &keeper, sc.enemy).is_none(), "the keeper (1 hp) is dead");
+    // A melee kill of the last defender advances into the tile (rules 2.3) and so clears the camp with the blow.
+    assert_eq!(act::core_of(&g, ours).map(|c| c.tile), Some(camp_t), "the melee killer advanced onto the camp");
+    assert_eq!(camp::cleared_by(&g, &sc).map(|c| c.0), Some(me));
+    assert!(!camp::standing(&g, &sc));
+    sc.mine.clear();
+    sc.mine.push(aurelia_qa::trainers::Piece { h: ours, id: act::core_of(&g, ours).unwrap().id, kind, role: "melee" });
+    assert_eq!(families::judge(&rules, &g, &mut sc, 1), Some(true));
+    // A RANGED kill leaves the camp standing and empty: it is cleared only when a unit walks onto the tile.
+    let (mut g, mut sc) = families::build(&rules, Fam::Camp, era, 5, 0).unwrap();
+    let keeper = sc.theirs.iter().find(|p| act::core_of(&g, p.h).is_some_and(|c| c.tile == camp_t)).cloned().expect("a keeper on the camp");
+    for p in sc.theirs.iter().chain(&sc.mine).cloned().collect::<Vec<_>>() {
+        if p.id != keeper.id {
+            g.debug_remove_unit(&rules, p.h);
+        }
+    }
+    g.debug_set_unit_hp(keeper.h, 1);
+    let archer = lab::EraKinds::of(&rules, era).by_arm.get(&lab::Arm::Ranged).and_then(|v| v.first().copied()).unwrap();
+    let range = act::range_of(&rules, archer).unwrap() as i32;
+    let at = *lab::tiles_within(&g, camp_t, range).iter().find(|t| lab::dist(&g, **t, camp_t) == range && g.view().auth.indexes().units_on(**t).is_empty()).unwrap();
+    let shooter = g.debug_spawn_unit(&rules, me, at, archer);
+    sc.mine = vec![aurelia_qa::trainers::Piece { h: shooter, id: act::core_of(&g, shooter).unwrap().id, kind: archer, role: "ranged" }];
+    assert!(act::try_cmd(&mut g, &rules, me, Command::RangedAttack { unit: shooter, target: camp_t }), "the keeper is shot");
+    assert!(act::alive(&g, &keeper, sc.enemy).is_none());
+    assert!(camp::standing(&g, &sc) && camp::cleared_by(&g, &sc).is_none(), "a ranged kill leaves the camp standing");
+    assert_eq!(families::judge(&rules, &g, &mut sc.clone(), 1), None, "an empty camp is not a cleared one");
+    let walker = g.debug_spawn_unit(&rules, me, beside, kind);
+    g.debug_set_unit_moves(walker, 2);
+    assert!(act::try_cmd(&mut g, &rules, me, Command::MoveUnit { unit: walker, destination: camp_t }), "a unit walks onto the empty camp");
+    assert_eq!(camp::cleared_by(&g, &sc).map(|c| c.0), Some(me));
+    sc.mine.clear();
+    sc.mine.push(aurelia_qa::trainers::Piece { h: walker, id: act::core_of(&g, walker).unwrap().id, kind, role: "melee" });
+    assert_eq!(families::judge(&rules, &g, &mut sc, 1), Some(true));
+}
+
+#[test]
+fn the_camp_families_are_proven_and_the_neutral_clearing_loses() {
+    let rules = ClassicBench::rules();
+    let era = lab::era_index(&rules, "ancient").unwrap();
+    // A sample of both families: a teacher wins at least one of six, the passive control never does.
+    for fam in [Fam::Camp, Fam::CampRace] {
+        let won = (0..6usize).any(|i| {
+            let Ok((g, sc)) = families::build(&rules, fam, era, i, 0) else { return false };
+            fam.solvers().iter().any(|s| play(&rules, g.clone(), sc.clone(), s, false).is_ok_and(|r| r.win))
+        });
+        assert!(won, "{}: a teacher wins one of six", fam.name());
+        let mut by_neutral = 0.0;
+        for i in 0..6usize {
+            let (g, sc) = families::build(&rules, fam, era, i, 0).unwrap();
+            let row = play(&rules, g, sc, "passive", false).unwrap();
+            assert!(!row.win, "{} #{i}: the passive control does not win", fam.name());
+            by_neutral += row.measures["camp_lost_to_neutral"];
+        }
+        // The neutral clears the camp the passive learner leaves (a clearing by the neutral is a loss).
+        assert_eq!(by_neutral > 0.0, fam == Fam::CampRace, "{}: the neutral takes the camp from a passive learner", fam.name());
+    }
+}

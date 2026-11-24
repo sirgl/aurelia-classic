@@ -85,6 +85,15 @@ pub trait ClassicGame {
     #[cfg(any(test, feature = "harness"))]
     fn debug_place_camp(&mut self, rules: &CompiledRuleset, tile: TileId);
 
+    /// Harness-only: the camp on `tile` removed with no gold for anybody (a trainer's closed arena takes the
+    /// camps the barbarians' own turn places away).
+    #[cfg(any(test, feature = "harness"))]
+    fn debug_remove_camp(&mut self, rules: &CompiledRuleset, tile: TileId);
+
+    /// Harness-only: peace between two players at war (nothing when they are not).
+    #[cfg(any(test, feature = "harness"))]
+    fn debug_force_peace(&mut self, rules: &CompiledRuleset, player: PlayerId, enemy: PlayerId);
+
     #[cfg(any(test, feature = "harness"))]
     fn debug_set_influence(&mut self, rules: &CompiledRuleset, city_state: PlayerId, major: PlayerId, influence: i32);
 
@@ -317,6 +326,22 @@ impl ClassicGame for GameState {
         let mut tx = WorldTransaction::new(self.world_mut());
         tx.place_empty_camp(tile, rules);
         let journal = tx.commit(rules).expect("debug_place_camp commit");
+        self.commit_journal(rules, &journal);
+    }
+
+    #[cfg(any(test, feature = "harness"))]
+    fn debug_remove_camp(&mut self, rules: &CompiledRuleset, tile: TileId) {
+        let mut tx = WorldTransaction::new(self.world_mut());
+        tx.remove_camp_at(tile);
+        let journal = tx.commit(rules).expect("debug_remove_camp commit");
+        self.commit_journal(rules, &journal);
+    }
+
+    #[cfg(any(test, feature = "harness"))]
+    fn debug_force_peace(&mut self, rules: &CompiledRuleset, player: PlayerId, enemy: PlayerId) {
+        let mut tx = WorldTransaction::new(self.world_mut());
+        let _ = tx.make_peace(player, enemy, rules);
+        let journal = tx.commit(rules).expect("debug_force_peace commit");
         self.commit_journal(rules, &journal);
     }
 

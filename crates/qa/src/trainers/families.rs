@@ -68,6 +68,7 @@ use serde::{Deserialize, Serialize};
 
 use super::act::{self, Aim, Nerve};
 use super::assault;
+use super::camp;
 use super::memory;
 use super::lab::{self, dist, Arm, Draw, Lab};
 use super::{Piece, Scene};
@@ -112,10 +113,13 @@ pub enum Fam {
     // The "at any cost" assault trainers (`assault.rs`; appended again: the older families keep their seeds).
     AssaultReinforce,
     AssaultPeace,
+    // The camp trainers (`camp.rs`; appended again: the older families keep their seeds).
+    Camp,
+    CampRace,
 }
 
 impl Fam {
-    pub const ALL: [Fam; 34] = [
+    pub const ALL: [Fam; 36] = [
         Fam::Duel,
         Fam::Focus,
         Fam::Hold,
@@ -150,6 +154,8 @@ impl Fam {
         Fam::HuntFog,
         Fam::AssaultReinforce,
         Fam::AssaultPeace,
+        Fam::Camp,
+        Fam::CampRace,
     ];
 
     pub fn name(self) -> &'static str {
@@ -188,6 +194,8 @@ impl Fam {
             Fam::HuntFog => "hunt-fog",
             Fam::AssaultReinforce => "assault-reinforce",
             Fam::AssaultPeace => "assault-peace",
+            Fam::Camp => "camp",
+            Fam::CampRace => "camp-race",
         }
     }
 
@@ -208,6 +216,7 @@ impl Fam {
             Fam::Snipe => 8,
             Fam::Surrounded => 4,
             f if memory::is_memory(f) => memory::rounds(f),
+            f if camp::is_camp(f) => camp::rounds(f),
             f => assault::rounds(f),
         }
     }
@@ -239,6 +248,7 @@ impl Fam {
             Fam::Snipe => &["ref-snipe"],
             Fam::Surrounded => &["ref-break", "ref-flee"],
             f if memory::is_memory(f) => memory::solvers(f),
+            f if camp::is_camp(f) => camp::solvers(f),
             f => assault::solvers(f),
         }
     }
@@ -272,7 +282,7 @@ impl Fam {
             Fam::Harass => &[("MO12", 'D')],
             Fam::Snipe => &[("MO7", 'U'), ("MT8", 'U'), ("E1", 'U'), ("M4", 'U'), ("CS4", 'U')],
             Fam::Surrounded => &[("MT4", 'D')],
-            f if memory::is_memory(f) => &[],
+            f if memory::is_memory(f) || camp::is_camp(f) => &[],
             f => assault::tricks(f),
         }
     }
@@ -306,6 +316,7 @@ impl Fam {
             Fam::Snipe => "catch an escorted civilian (worker, Great General) of the enemy",
             Fam::Surrounded => "a strong unit of ours about to be surrounded: break out or survive",
             f if memory::is_memory(f) => memory::task(f),
+            f if camp::is_camp(f) => camp::task(f),
             f => assault::task(f),
         }
     }
@@ -505,6 +516,8 @@ pub(super) fn blank(fam: Fam, lab: &Lab, instance: usize, attempt: u32) -> Scene
         pillaged: Default::default(),
         taken: None,
         cap_broken: None,
+        neutral: None,
+        third: Vec::new(),
         founded: None,
         crossed: false,
         city_low: false,
@@ -533,7 +546,8 @@ pub(super) fn kinds_label(rules: &CompiledRuleset, ps: &[Piece]) -> String {
 
 /// Builds attempt `attempt` of `instance` of `fam` in `era`.
 pub fn build(rules: &CompiledRuleset, fam: Fam, era: u8, instance: usize, attempt: u32) -> Result<(GameState, Scene), String> {
-    let lab = lab::lab(rules, era)?;
+    // The camp families have a world of their own (the barbarians on, a neutral nation); every other family's lab is unchanged.
+    let lab = if camp::is_camp(fam) { lab::camp_lab(rules, era)? } else { lab::lab(rules, era)? };
     if !fam.claims(rules, &lab.kinds) {
         return Err(format!("{} does not claim era {era}", fam.name()));
     }
@@ -542,6 +556,11 @@ pub fn build(rules: &CompiledRuleset, fam: Fam, era: u8, instance: usize, attemp
     let mut p = Painter { rules, lab: &lab, game: lab.game.clone(), d: Draw::new(seed(fam, era, instance, attempt)), w, h, cx: w / 2, cy: h / 2 };
     if assault::is_assault(fam) {
         let mut s = assault::build(&mut p, fam, &lab, instance, attempt)?;
+        s.info.insert("attempt".into(), attempt.to_string());
+        return Ok((p.game, s));
+    }
+    if camp::is_camp(fam) {
+        let mut s = camp::build(&mut p, fam, &lab, instance, attempt)?;
         s.info.insert("attempt".into(), attempt.to_string());
         return Ok((p.game, s));
     }
@@ -1146,6 +1165,7 @@ pub fn build(rules: &CompiledRuleset, fam: Fam, era: u8, instance: usize, attemp
         }
         Fam::AssaultHeal | Fam::PromotionChoice | Fam::HillArchers | Fam::CityFire | Fam::PlannedAssault | Fam::AssaultReinforce | Fam::AssaultPeace => unreachable!("built by assault::build"),
         Fam::AmbushFog | Fam::HuntFog => unreachable!("built by memory::build"),
+        Fam::Camp | Fam::CampRace => unreachable!("built by camp::build"),
         Fam::Airstrike => {
             let home_t = at(&p, -3, 0)?;
             p.city(me, home_t, 4, false);
@@ -1237,6 +1257,10 @@ fn city_hp(rules: &CompiledRuleset, game: &GameState, t: TileId) -> Option<(i64,
 pub fn reference_turn(rules: &CompiledRuleset, game: &mut GameState, scene: &mut Scene, name: &str) {
     if let Some(f) = assault::flags(name) {
         assault::turn(rules, game, scene, f);
+        return;
+    }
+    if camp::is_camp(scene.fam) && matches!(name, "ref-camp" | "ref-camp-race") {
+        camp::reference_turn(rules, game, scene, name);
         return;
     }
     if memory::is_memory(scene.fam) && matches!(name, "ref-recall" | "ref-forget") {
@@ -1484,6 +1508,10 @@ pub fn enemy_turn(rules: &CompiledRuleset, game: &mut GameState, scene: &mut Sce
         memory::enemy_turn(rules, game, scene);
         return;
     }
+    if camp::is_camp(scene.fam) {
+        camp::enemy_turn(rules, game, scene);
+        return;
+    }
     let (me, foe) = (scene.enemy, scene.learner);
     let sc = scene.clone();
     let friends = handles(&sc.theirs);
@@ -1665,6 +1693,7 @@ pub fn judge(rules: &CompiledRuleset, game: &GameState, sc: &mut Scene, rel: u32
     let civ_ok = sc.mine.iter().filter(|p| p.role == "civilian").all(|p| act::alive(game, p, sc.learner).is_some());
     let v = match sc.fam {
         Fam::AmbushFog | Fam::HuntFog => memory::judge(rules, game, sc, rel),
+        Fam::Camp | Fam::CampRace => camp::judge(rules, game, sc, rel),
         Fam::Duel => {
             if combat_theirs == 0 && !mine.is_empty() {
                 Some(true)
@@ -1956,6 +1985,12 @@ pub fn measures(rules: &CompiledRuleset, game: &GameState, sc: &Scene, rel: u32)
         m.insert("rested".into(), f64::from(t.rested));
         m.insert("picks".into(), t.picks.len() as f64);
     }
+    if camp::is_camp(sc.fam) {
+        m.insert("camp_taken".into(), sc.taken.map_or(-1.0, f64::from));
+        m.insert("camp_lost_to_neutral".into(), f64::from(u8::from(sc.info.contains_key("lost_to"))));
+        m.insert("lost_at_clear".into(), sc.info.get("lost_at_clear").and_then(|v| v.parse().ok()).unwrap_or(-1.0));
+        m.insert("cap_broken".into(), sc.cap_broken.map_or(-1.0, f64::from));
+    }
     if sc.fam == Fam::Convoy {
         m.insert("founded".into(), sc.founded.map_or(-1.0, f64::from));
     }
@@ -1983,5 +2018,6 @@ pub fn line(rules: &CompiledRuleset, game: &GameState, sc: &Scene, rel: u32) -> 
             .join(" ")
     };
     let city = sc.target.and_then(|t| city_hp(rules, game, t).map(|(hp, max)| format!(" city@{} p{} hp{hp}/{max}", t.0, owner_of_city(game, t).map_or(9, |o| o.0))));
-    format!("r+{rel}{} | mine: {} | foe: {} | pillaged {}", city.unwrap_or_default(), part(&sc.mine, sc.learner), part(&sc.theirs, sc.enemy), sc.pillaged.len())
+    let third = sc.neutral.map(|n| format!(" | neutral: {}", part(&sc.third, n))).unwrap_or_default();
+    format!("r+{rel}{} | mine: {} | foe: {}{third} | pillaged {}", city.unwrap_or_default(), part(&sc.mine, sc.learner), part(&sc.theirs, sc.enemy), sc.pillaged.len())
 }
