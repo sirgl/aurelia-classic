@@ -240,18 +240,28 @@ class Game:
         last = getattr(self, "_last", None)
         if last is None:
             return
-        econ = lambda m: (m["state"]["owner"], [c[3] for c in m["state"]["cities"]], m.get("cstr"), m.get("wm"))
+        # The far cities (outside the window, only their token rows in the dump) grow inside a turn too: their rows count.
+        econ = lambda pi, m: (m["state"]["owner"], [c[3] for c in m["state"]["cities"]], m.get("cstr"), m.get("wm"), self._far_hex(pi, m))
         moved = False
         for pi in range(len(self.plays)):
             m = self.sched[pi].get((self.plays[pi][0]["orders"]["start_round"] + rel, key))
             if m is None or m is last[pi]:
                 continue
-            if last[pi] is None or econ(m) != econ(last[pi]):
+            if last[pi] is None or econ(pi, m) != econ(pi, last[pi]):
                 moved = True
                 self.counts["economy moved inside a turn"] += 1
             last[pi] = m
         if moved:
             self._apply_economy(last)
+
+    def _far_hex(self, pi, m):
+        """The far cities' token rows of moment `m` (hex, as the dump has them)."""
+        ftiles = {f[0] for f in self.plays[pi][0]["orders"]["far_cities"]}
+        if not ftiles:
+            return ()
+        W = 4 * A.F_TOK
+        h = m["tok"]["feat"]
+        return tuple((v, h[i * W:(i + 1) * W]) for i, (k, v) in enumerate(m["tok"]["ref"]) if k == "c" and v in ftiles)
 
     def our_mind_economy(self, rel):
         """Our seat's mind runs at our turn's end, after the net's last moment: a tenet adopted there changes our units'
