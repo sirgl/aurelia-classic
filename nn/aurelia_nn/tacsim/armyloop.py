@@ -52,6 +52,12 @@ class Brain:
         # MBN: the notes the net wrote at its last turn's end (`x["ns"]`); MBH: the history's tokens (`x["hist"]`).
         self.notes = isinstance(model, MBNNet)
         self.hist = isinstance(model, MBHNet)
+        # The memory's step in Rust's arithmetic order on the CPU (`armymem`; `use_rust_memory`), None: MLX's own.
+        self.rust_memory = None
+
+    def use_rust_memory(self):
+        from .armymem import RustMemory
+        self.rust_memory = RustMemory(self.m)
 
     def body(self, tok, um, pm, M, price, x=None):
         """H. `x`: the streams of MBN / MBH ({"ns": the note state (MBNNet.NOTE_STATE keys), "hist": `armyhist.tokens`'
@@ -90,6 +96,8 @@ class Brain:
         return m.action_logits(h, unit_tok, cand["feat"], cand["promo"], cand["mask"])
 
     def step(self, h, tok, um, pm, alive):
+        if self.rust_memory is not None:
+            return self.rust_memory.step(h, tok["feat"], tok["slot"], tok["mask"], um, pm, alive)
         return self.m.step(h, tok["feat"], tok["slot"], tok["mask"], um, pm, alive)[:3]
 
     def initial_notes(self, B):
@@ -113,9 +121,46 @@ class Brain:
         stage_oh = (stage_i[:, None] == mx.arange(STAGES)[None]).astype(mx.float32)
         reason_oh = (reason_i[:, None] == mx.arange(len(REASONS))[None]).astype(mx.float32)
         waited = mx.maximum(pm2[:, 0, P_WAITED] * 10.0, 0.0)
-        free = mx.tanh(m.free(pm2[:, 0]))
+        free = mx.tanh(m.free(pm2[:, 0])) if self.rust_memory is None else self.rust_memory.free_note(pm2[:, 0])
         engaged = (eng_lg > 0).astype(mx.float32)
         return m.write_notes(ns, stage_oh, engaged, waited, reason_oh, rest_s, free, valid)
+
+
+NOTE_TOL = (("stage", 0), ("stage_age", 0), ("engaged", 0), ("change_age", 0), ("reason", 0), ("rest", 0), ("rest_age", 0), ("waited", 1e-4), ("free", 1e-4))
+
+
+def compare_notes(st, examples, plays, rows, ns_r, keys):
+    """Gate G7 line 2a's measure on Rust's states: the note stream the twin's memory wrote (along Rust's states) against
+    the dump's stream at each moment that has one; the largest float difference per moment counted by size."""
+    got = {k: ns_r[k].tolist() for k in keys}
+    for r, (pi, m) in enumerate(rows):
+        rn = m.get("notes")
+        if rn is None:
+            continue
+        st["notes compared"] += 1
+        ok = True
+        worst = 0.0
+        for k, tol in NOTE_TOL:
+            a, b = got[k][r], rn[k]
+            a = a if isinstance(a, list) else [a]
+            b = b if isinstance(b, list) else [b]
+            if len(a) != len(b):
+                ok = False
+                st[f"notes differ in {k} (length)"] += 1
+                continue
+            dif = max((abs(x - y) for x, y in zip(a, b)), default=0.0)
+            if tol > 0:
+                worst = max(worst, dif)
+                st["notes: largest difference x 1e6 in " + k] = max(st["notes: largest difference x 1e6 in " + k], int(1e6 * dif))
+            if dif > tol + 1e-6:
+                ok = False
+                st[f"notes differ in {k}"] += 1
+                if len(examples) < 40:
+                    examples.append(f"{plays[pi][0]['play']} r{m['round']} s{m['step']}: {k} mlx {[round(v, 5) for v in a]} rust {[round(v, 5) for v in b]}")
+        st["notes equal" if ok else "notes differ"] += 1
+        for lim in (1e-6, 1e-5, 1e-4, 1e-3):
+            if worst > lim:
+                st[f"notes: float difference > {lim:g}"] += 1
 
 
 def greedy_pointer(logits, T):
@@ -127,12 +172,15 @@ def greedy_pointer(logits, T):
     return mx.where(end | (best <= -1e8), -1, first)
 
 
-def replay(path, weights, group=200, limit=None, families=None, show=8, out=None):
+def replay(path, weights, group=200, limit=None, families=None, show=8, out=None, rust_memory=False):
     t0 = time.time()
     brain = Brain(load_net(weights))
+    if rust_memory:
+        brain.use_rust_memory()
     st = collections.Counter()
     fam = collections.defaultdict(collections.Counter)
     examples = []
+    examples_notes = []
     t_net = t_obs = 0.0
     for plays in A.stream(path, limit=limit, families=families, group=group):
         templates = A.build_templates(plays)
@@ -186,6 +234,8 @@ def replay(path, weights, group=200, limit=None, families=None, show=8, out=None
                 hx["hplan"] = H.plan_of(hx, pm_r, ring[pis])
                 x = {"hist": hx}
             h = brain.body(tok, um_r, pm_r, Mr, price[pis], x)
+            if brain.notes:
+                compare_notes(st, examples_notes, plays, rows, ns_r, brain.m.NOTE_STATE)
             # Turn ends: the memory step.
             if any(ends):
                 um2, pm2, al2 = brain.step(h, tok, um_r, pm_r, al_r)
@@ -256,7 +306,7 @@ def replay(path, weights, group=200, limit=None, families=None, show=8, out=None
                     made[pi][unit[r][mp]] += 1
             st["memory steps"] += sum(ends)
         st["plays"] += P
-    res = {"stats": dict(st), "families": {f: dict(c) for f, c in sorted(fam.items())}, "examples": examples,
+    res = {"stats": dict(st), "families": {f: dict(c) for f, c in sorted(fam.items())}, "examples": examples, "examples_notes": examples_notes,
            "seconds": {"observe": round(t_obs, 1), "net": round(t_net, 1), "all": round(time.time() - t0, 1)}}
     print(json.dumps(res, indent=1))
     if out:
@@ -275,12 +325,14 @@ def main(argv=None):
     ap.add_argument("--show", type=int, default=8)
     ap.add_argument("--out")
     ap.add_argument("--cpu", action="store_true")
+    ap.add_argument("--rust-memory", action="store_true", help="the memory's step in Rust's arithmetic order (armymem)")
     a = ap.parse_args(argv)
     if a.cpu:
         mx.set_default_device(mx.cpu)
     mx.set_memory_limit(12 << 30)
     mx.set_cache_limit(2 << 30)
-    replay(a.dump, a.weights, group=a.group, limit=a.limit, families=a.families.split(",") if a.families else None, show=a.show, out=a.out)
+    replay(a.dump, a.weights, group=a.group, limit=a.limit, families=a.families.split(",") if a.families else None, show=a.show, out=a.out,
+           rust_memory=a.rust_memory)
 
 
 if __name__ == "__main__":

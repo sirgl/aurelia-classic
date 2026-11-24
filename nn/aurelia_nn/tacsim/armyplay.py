@@ -132,6 +132,7 @@ class Game:
             by_round = {}
             for m in ms:
                 by_round.setdefault(m["round"], m)
+                by_round.setdefault((m["round"], m["step"]), m)
             self.sched.append(by_round)
         self.far_rows = mx.take(mx.array(far, dtype=mx.float32), self.idx, axis=0)
         self.far_static = far
@@ -221,6 +222,34 @@ class Game:
         self._last = last
         if not any(last):
             return
+        self._apply_economy(last)
+
+    def schedule_step(self, rel, step):
+        """The economy at Rust's moment (round, step) of each play where it differs from the one in force: Rust's
+        economy can change inside our turn (a far city of ours grows between two decisions), the round's first moment
+        alone left the city's token behind for the rest of the turn (G7 2a's drift of the notes). `step` None: our turn's
+        end (the memory's step reads that moment's tokens)."""
+        key = (1 << 32) - 1 if step is None else step
+        last = getattr(self, "_last", None)
+        if last is None:
+            return
+        econ = lambda m: (m["state"]["owner"], [c[3] for c in m["state"]["cities"]], m.get("cstr"), m.get("wm"))
+        moved = False
+        for pi in range(len(self.plays)):
+            m = self.sched[pi].get((self.plays[pi][0]["orders"]["start_round"] + rel, key))
+            if m is None or m is last[pi]:
+                continue
+            if last[pi] is None or econ(m) != econ(last[pi]):
+                moved = True
+                self.counts["economy moved inside a turn"] += 1
+            last[pi] = m
+        if moved:
+            self._apply_economy(last)
+
+    def _apply_economy(self, last):
+        s = self.s
+        own, pop, cs0, cmax, wm, have = [], [], [], [], [], []
+        T, C, U = self.sim.T, s["c_pop"].shape[1], self.U
         for pi, m in enumerate(last):
             ok = m is not None
             have.append(ok)
@@ -289,6 +318,8 @@ class Game:
         trace = [[] for _ in self.plays]
         made = mx.zeros((B, U), dtype=I32)
         for step in range(PER_TURN):
+            if step > 0:
+                self.schedule_step(rel, step)
             # Only the rows still deciding are computed (step 0: every live row; later: the active ones, compacted).
             n0 = int(mx.sum(active).item())
             if n0 == 0:
@@ -320,6 +351,8 @@ class Game:
         if self.compare:
             self.compare_turn(rel, trace)
         # Every army unit stands, the seat's mind ends our turn; the memory steps on the turn's last tokens.
+        self.schedule_step(rel, None)
+        s = self.s
         live = ~s["done"] & (self.verdict < 0)
         self.our_turn_end(live)
         if self.judge_after_script and rel >= 1:
@@ -331,7 +364,7 @@ class Game:
         tok = self.tokens(rel)
         x = self.xin(rel)
         if self.compare and self.facts:
-            self.compare_moment(rel, None, mx.arange(B, dtype=I32), x, trace)
+            self.compare_moment(rel, None, mx.arange(B, dtype=I32), x, trace, tok=tok)
         h = self.body_fn(tok, self.um, self.pm, self.M, self.price, x)
         um2, pm2, al2 = brain.step(h, tok, self.um, self.pm, self.alive)
         if brain.notes:
@@ -360,7 +393,7 @@ class Game:
             self.M = mx.where(active[:, None, None], brain.encode(self.statics, tok), self.M)
         x = self.xin(rel)
         if self.compare and self.facts:
-            self.compare_moment(rel, step, self.row_ids if self.row_ids is not None else mx.arange(self.B, dtype=I32), x, trace, active)
+            self.compare_moment(rel, step, self.row_ids if self.row_ids is not None else mx.arange(self.B, dtype=I32), x, trace, active, tok=tok)
         h = self.body_fn(tok, self.um, self.pm, self.M, self.price, x)
         lg = brain.pointer(h, sel)
         smask = None
@@ -568,7 +601,7 @@ class Game:
                 if any(c[1] != dmg[pi][k] for k, c in enumerate(st["cities"])):
                     self.counts["first divergence: city damage"] += 1
 
-    def compare_moment(self, rel, step, gids, x, trace, active=None):
+    def compare_moment(self, rel, step, gids, x, trace, active=None, tok=None):
         """Gate G7's parity of the streams (the first copy against the Rust dump): at a decision moment (`step`) or our
         turn's end (`step` None), for each play still equal to Rust's (its state at every compared moment and its
         decisions so far), the history tokens and the note stream against the dump's moment."""
@@ -589,6 +622,8 @@ class Game:
         notes = None
         if self.brain.notes:
             notes = {k: s["ns_" + k].tolist() for k in self.brain.m.NOTE_STATE}
+        tfeat = tok["feat"].tolist() if tok is not None else None
+        tn = tok["n"].tolist() if tok is not None else None
         c = self.hist_cmp
         for j, pi in rows:
             r = self.plays[pi][0]["orders"]["start_round"] + rel
@@ -621,6 +656,8 @@ class Game:
                 continue
             c["moments compared"] += 1
             c["moments compared (turn ends)" if step is None else "moments compared (decisions)"] += 1
+            if tfeat is not None:
+                self.compare_tokens(c, pi, rel, step, m, tfeat[j], tn[j])
             rt = H.of_moment(m)
             if rt is not None:
                 fs, sl, ag = rt
@@ -648,6 +685,23 @@ class Game:
                 c["notes equal" if ok else "notes differ"] += 1
                 if not ok and sum(1 for e in self.hist_ex if e.startswith("NOTES")) < 20:
                     self.hist_ex.append(f"NOTES {self.plays[pi][0]['play']} rel {rel} step {step}: {why}")
+
+    def compare_tokens(self, c, pi, rel, step, m, feat, n):
+        """The tokens of a compared moment against the dump's (G7 2a's diagnosis: the state check covers the units'
+        alive / tile / hp and the cities' damage only; a token number outside it moves the memory)."""
+        rf = A._unhex_tok(m["tok"]["feat"], m["tok"]["n"])
+        if n != len(rf):
+            c["tokens differ: count"] += 1
+            return
+        bad = [(i, k, feat[i][k], rf[i][k]) for i in range(n) for k in range(len(rf[i])) if abs(feat[i][k] - rf[i][k]) > 1e-6]
+        if not bad:
+            c["tokens equal"] += 1
+            return
+        c["tokens differ"] += 1
+        for k in sorted({b[1] for b in bad}):
+            c[f"tokens differ in number {k}"] += 1
+        if sum(1 for e in self.hist_ex if e.startswith("TOK")) < 30:
+            self.hist_ex.append(f"TOK {self.plays[pi][0]['play']} rel {rel} step {step}: " + "; ".join(f"t{i} #{k} mlx {a:.5f} rust {b:.5f}" for i, k, a, b in bad[:6]))
 
     def compare_turn(self, rel, trace):
         P = len(self.plays)
@@ -1052,6 +1106,7 @@ def main(argv=None):
     ap.add_argument("--scene-rule", dest="scene_rule", action="store_true", default=True, help="the scene rule on both seats (the default, as in Rust)")
     ap.add_argument("--standard", dest="scene_rule", action="store_false", help="the port of standard instead of the rule (Rust ARMY_SCENE_RULE=standard)")
     ap.add_argument("--old-judge", action="store_true", help="judge after the enemy's turn (the G1 harness)")
+    ap.add_argument("--rust-memory", action="store_true", help="the memory's step in Rust's arithmetic order (armymem)")
     a = ap.parse_args(argv)
     if a.cpu:
         mx.set_default_device(mx.cpu)
@@ -1061,6 +1116,8 @@ def main(argv=None):
         g.enemy_rule, g.hold_heals, g.fort_rule, g.charge = a.enemy, not a.old_heal, a.fort, a.charge
         g.scene_rule = a.scene_rule
         g.judge_after_script = not a.old_judge
+        if a.rust_memory:
+            g.brain.use_rust_memory()
         if a.compile:
             g.enable_compile()
     res = run(a.dump, a.weights, copies=a.copies, families=a.families.split(",") if a.families else None, limit=a.limit, out=a.out, group=a.group, rounds=a.rounds, setup=setup)
