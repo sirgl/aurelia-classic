@@ -33,6 +33,7 @@ from .scene import N_CTX, CTX_FLANKING, CTX_INTERCEPTION, FLAG_DELTA, STAT_NAMES
 
 I32 = mx.int32
 MOVE = 60
+MAX_XP_FROM_BARBARIANS = 30  # combat/experience.rs
 BARBARIAN_BONUS = 33  # percent: `BARBARIAN_COMBAT_BONUS` of the default level (the camp scenes carry no level)
 # Contexts (kernel `combat_slot`).
 ANY, ATTACK, DEFENSE, VS_CITY, ATT_OPEN, ATT_ROUGH, DEF_OPEN, DEF_ROUGH, RATT_OPEN, RATT_ROUGH, DEF_VS_RANGED, RANGED_ATTACK, \
@@ -893,6 +894,17 @@ class Sim:
     def xp_gain(self, base, pct):
         return mx.where(pct != 0, base * mx.maximum(100 + pct, 0) // 100, base)
 
+    def xp_after(self, s, slot, base, pct, other_side):
+        """The experience of unit `slot` after one combat against a unit of `other_side` (`combat_experience`): a barbarian gets
+        none, fighting barbarians gives at most `MAX_XP_FROM_BARBARIANS` in all (the camp scenes: side 1 is the barbarians)."""
+        cur = g1(s["u_xp"], slot)
+        gain = self.xp_gain(base, pct)
+        if "barb" in s:
+            mine = g1(s["u_side"], slot)
+            gain = mx.where(s["barb"] & (other_side == 1) & (mine != 1), mx.minimum(gain, mx.maximum(MAX_XP_FROM_BARBARIANS - cur, 0)), gain)
+            gain = mx.where(s["barb"] & (mine == 1), 0, gain)
+        return cur + gain
+
     def strike_unit(self, s, slot, dmg, where):
         """Damage (or destroy) unit `slot`; returns (state, killed)."""
         hp = g1(s["u_hp"], slot)
@@ -935,12 +947,19 @@ class Sim:
         s = armyruin.enter(self, s, slot, to, ok)
         return self.refresh_allowance(s, slot, frm, to, ok)
 
-    def new_unit(self, s, side, tile, where, hp, mmax, kind, profile_from=None):
+    def new_unit(self, s, side, tile, where, hp, mmax, kind, profile_from=None, spare=False):
         """A unit the play creates, in the next free slot (`n_slots`): its state, and its profile from
         the spawn table row `profile_from` [B] (else the slot keeps the converter's captured-civilian
         profile). Returns (state, slot)."""
         U = s["u_alive"].shape[1]
         new = s["n_slots"]
+        if spare:
+            # A camp's spawn takes the lowest dead spare slot, as Rust's `Slots` recycle the dead ones (`dump.rs`).
+            pos = mx.arange(U)[None, :]
+            free = (pos >= s["n_first"][:, None]) & (pos < s["n_cap"][:, None]) & ~s["u_alive"]
+            new = mx.min(mx.where(free, pos, 1 << 20), axis=1)
+            where = where & (new < (1 << 20))
+            new = mx.minimum(new, U - 1)
         where = where & (new < s.get("n_cap", U))
         z = mx.zeros_like(new)
         s = self.set_unit(s, new, where, alive=mx.ones(new.shape, dtype=mx.bool_), side=side, tile=tile, hp=hp, mv=z, mmax=mmax,
@@ -948,7 +967,8 @@ class Sim:
         s["u_prom"] = put1(s["u_prom"], new, mx.zeros((self.B, s["u_prom"].shape[2]), dtype=mx.bool_), where)
         if profile_from is not None:
             s = self.put_spawn_profile(s, new, where & (profile_from >= 0), profile_from)
-        s["n_slots"] = mx.where(where, new + 1, new)
+        if not spare:
+            s["n_slots"] = mx.where(where, new + 1, new)
         return s, new
 
     def put_spawn_profile(self, s, slot, known, profile_from):
@@ -1147,13 +1167,11 @@ class Sim:
         to_def, to_att = exact.resolve_mutual_kill(d1, d["hp"], d2, a["hp"])
         s, d_killed = self.strike_unit(s, d["slot"], to_def, melee_unit)
         s, a_killed = self.strike_unit(s, slot, to_att, melee_unit)
-        a_xp = g1(s["u_xp"], slot)
-        s = self.set_unit(s, slot, melee_unit & ~a_killed, xp=a_xp + self.xp_gain(XP_ATT_MELEE, a["xp_percent"]))
-        d_xp = g1(s["u_xp"], d["slot"])
-        s = self.set_unit(s, d["slot"], melee_unit & ~d_killed, xp=d_xp + self.xp_gain(XP_DEF_MELEE, d["xp_percent"]))
+        s = self.set_unit(s, slot, melee_unit & ~a_killed, xp=self.xp_after(s, slot, XP_ATT_MELEE, a["xp_percent"], d["side"]))
+        s = self.set_unit(s, d["slot"], melee_unit & ~d_killed, xp=self.xp_after(s, d["slot"], XP_DEF_MELEE, d["xp_percent"], a["side"]))
         # A kill heals the killer (HealOnKill).
-        s = self.heal_on_kill(s, d["slot"], melee_unit & a_killed & ~d_killed, d["heal_on_kill"])
-        s = self.heal_on_kill(s, slot, melee_unit & d_killed & ~a_killed, a["heal_on_kill"])
+        s = self.heal_on_kill(s, d["slot"], melee_unit & a_killed & ~d_killed, d["heal_on_kill"], a["side"])
+        s = self.heal_on_kill(s, slot, melee_unit & d_killed & ~a_killed, a["heal_on_kill"], d["side"])
         win = melee_unit & d_killed & ~a_killed
         # CaptureDefeatedEnemy (`try_capture_defeated`): the roll, then the defeated kind joins the
         # attacker with half HP next to it.
@@ -1195,10 +1213,10 @@ class Sim:
         s["c_dmg"] = put1(s["c_dmg"], cslot, g1(s["c_dmg"], cslot) + r_city, city_target)
         s, rk = self.strike_unit(s, d["slot"], r_unit, unit_target | civ_target)
         dxp = mx.where(air, XP_DEF_AIR, XP_DEF_RANGED)
-        s = self.set_unit(s, d["slot"], unit_target & ~rk, xp=g1(s["u_xp"], d["slot"]) + self.xp_gain(dxp, d["xp_percent"]))
-        s = self.heal_on_kill(s, slot, (unit_target | civ_target) & rk, a["heal_on_kill"])
+        s = self.set_unit(s, d["slot"], unit_target & ~rk, xp=self.xp_after(s, d["slot"], dxp, d["xp_percent"], a["side"]))
+        s = self.heal_on_kill(s, slot, (unit_target | civ_target) & rk, a["heal_on_kill"], d["side"])
         axp = mx.where(city_target, mx.where(air, XP_ATT_CITY_AIR, XP_ATT_CITY_RANGED), mx.where(air, XP_ATT_AIR, XP_ATT_RANGED))
-        s = self.set_unit(s, slot, ranged_any, xp=g1(s["u_xp"], slot) + self.xp_gain(axp, a["xp_percent"]))
+        s = self.set_unit(s, slot, ranged_any, xp=self.xp_after(s, slot, axp, a["xp_percent"], mx.where(city_target, -1, d["side"])))
         # The aircraft takes the target's answer (a surviving target) and the interception.
         air_dead = mx.zeros_like(take)
         if self.has_air:
@@ -1276,8 +1294,10 @@ class Sim:
         s, _ = self.new_unit(s, a["side"], spot, got, mx.full((B,), CAPTURED_UNIT_HP, dtype=I32), mmax, self.tg(self.z["sp_kind"], sp), profile_from=sp)
         return s, got, spot
 
-    def heal_on_kill(self, s, slot, where, heal):
+    def heal_on_kill(self, s, slot, where, heal, victim_side=None):
         hp = g1(s["u_hp"], slot)
+        if "barb" in s and victim_side is not None and "p_heal_on_kill_not_barbarians" in s:
+            where = where & ~(s["barb"] & (victim_side == 1) & g1(s["p_heal_on_kill_not_barbarians"], slot))  # `unit_killed`
         return self.set_unit(s, slot, where & (heal > 0), hp=mx.minimum(hp + heal, 100))
 
     def capture_city(self, s, slot, cslot, tile, where, mil):
@@ -1336,6 +1356,8 @@ class Sim:
         cityt = self.city_on(s, tiles) >= 0
         no = (s["u_hp"] >= 100) | (s["p_land"] & water) | moved | (s["p_sea"] & ~friendly & ~s["p_heal_outside_friendly"])
         no = no | (s["p_air"] & ~cityt)
+        if "barb" in s:
+            no = no | (s["barb"][:, None] & (s["u_side"] == 1))  # `heal_amount`: barbarians never heal
         enemy_host = (owner >= 0) & self.is_foe(s, s["u_side"], owner)
         rate = mx.where(cityt, 25 + mx.where(friendly, s["p_heal_friendly"], s["p_heal_neutral"]),
                         mx.where(~friendly, mx.where(enemy_host, 10 + s["p_heal_enemy"], 10 + s["p_heal_neutral"]), 20 + s["p_heal_friendly"]))
@@ -1392,7 +1414,14 @@ class Sim:
         cmine = self.cs["alive"] & (s["c_owner"] == side[:, None]) & take[:, None]
         s["c_dmg"] = mx.where(cmine, mx.maximum(s["c_dmg"] - 20, 0), s["c_dmg"])
         s["c_strike"] = mx.where(cmine, False, s["c_strike"])
-        nxt = s["u_alive"] & self.is_foe(s, side[:, None], s["u_side"]) & take[:, None] & ((s["u_st"] == 1) | (s["u_st"] == 2))
+        if "war" in s:
+            # A third seat plays between ours and the enemy's: the turn passes 0 -> 2 -> 1 -> 0 and the fortification of the
+            # side whose turn starts counts one more turn.
+            nxt_side = mx.where(side == 0, 2, mx.where(side == 2, 1, 0))
+            nxt = s["u_alive"] & (s["u_side"] == nxt_side[:, None])
+        else:
+            nxt = s["u_alive"] & self.is_foe(s, side[:, None], s["u_side"])
+        nxt = nxt & take[:, None] & ((s["u_st"] == 1) | (s["u_st"] == 2))
         s["u_st"] = mx.where(nxt, mx.minimum(s["u_st"] + 1, 2), s["u_st"])
         return s
 

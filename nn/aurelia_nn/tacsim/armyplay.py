@@ -189,6 +189,7 @@ class Game:
         # The trainers' end of a unit's turn heals an unmoved unit (`act::hold_unit`, nn/army-net ed9e453); False: the
         # harness before it (moves spent by hand, no heal), for the dumps made before.
         self.hold_heals = True
+        self.third_played = False  # forced runs of `armyenemy`: the third seat's turn is already in the state
         # The judge where Rust's looks (after our script; see `learner_turn`); False: after the enemy's turn (G1).
         self.judge_after_script = True
         self.turn_tile = None
@@ -862,11 +863,18 @@ class Game:
             # The script's unit stands (`act::stand`).
             self.s = sim.hold_units(self.s, (mx.arange(U)[None, :] == u) & mine[:, None], heal=self.hold_heals)
 
-    def enemy_turn(self):
-        # The third seat's turn (twin packages 4 and 8): after the learner's, before the enemy's.
-        live = ~self.s["done"] & (self.verdict < 0)
+    def third_turn(self, live):
+        """The third seat's turn (twin packages 4 and 8): after the learner's, before the enemy's. At its end its units' moves
+        are back and the enemy's fortification counts one more turn."""
         armycamp.neutral_turn(self, live)
         armycamp.neutral_rule(self, live)
+        if "war" in self.s:
+            self.s = self.sim.end_turn(self.s, mx.full((self.B,), 2, dtype=I32), live)
+
+    def enemy_turn(self):
+        live = ~self.s["done"] & (self.verdict < 0)
+        if not self.third_played:  # `armyenemy` forces the state after the third seat's turn
+            self.third_turn(live)
         # The family script's first act (`assault::enemy_turn`): the reinforcements of assault-reinforce land.
         armyprice.land_reinforcements(self, ~self.s["done"] & (self.verdict < 0))
         if self.scene_rule:

@@ -121,6 +121,7 @@ def remap_play(play):
             m["ids"] = fix_list(m["ids"], -1, ids3)
         if "handles" in m:
             m["handles"] = fix_list(m["handles"], -1, None)
+    standing = set()  # the Rust slots that hold a spawn of the camp now (not a stray of the arena)
     for e in sc.get("events", []):
         if "t" not in e:
             continue
@@ -129,6 +130,14 @@ def remap_play(play):
             if k < P:
                 u.append([k, row])
             elif k in smap:
+                # The fog camps' strays (placed at the barbarians' turn end, taken off before our next command) reuse the
+                # recycled slots: a row of a spare slot counts only while the camp's own spawn lives in it.
+                if not row[0]:
+                    standing.discard(k)
+                elif _near(row[1], camp):
+                    standing.add(k)
+                elif k not in standing:
+                    continue
                 u.append([P + smap[k], row])
         u += [[P + spare + k, row] for k, row in e["t"]]
         e["u"] = u
@@ -159,13 +168,16 @@ def template_slots(tb, scenes):
     seat starts its spawns at P and may fill the spare slots only."""
     n = tb.s0_all["n_slots"].tolist()
     cap = [tb.u] * len(n)
+    first = [0] * len(n)
     for i, sc in enumerate(scenes):
         if has_third(sc):
             P = sc["scene"]["n_main"]
             n[i] = P
             cap[i] = P + sc["scene"]["n_spare"]
+            first[i] = P
     tb.s0_all["n_slots"] = mx.array(n, dtype=I32)
     tb.s0_all["n_cap"] = mx.array(cap, dtype=I32)
+    tb.s0_all["n_first"] = mx.array(first, dtype=I32)
 
 
 def setup_rows(sim, s, rows):

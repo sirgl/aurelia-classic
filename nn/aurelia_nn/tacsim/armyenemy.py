@@ -55,7 +55,16 @@ def turn_rows(plays, which):
         U = None
         for i, (e, units, cities) in enumerate(st):
             if which in ("enemy", "third") and e["side"] == 0 and e["src"] == "end":
-                start = (units, cities, e["rng"], e["round"])
+                start = (units, cities, e["rng"], e["round"], None, e.get("camp"))
+                if which == "enemy":
+                    # A third seat plays between ours and the enemy's: the enemy's turn starts after the third seat's end
+                    # (its units' fortification advances there).
+                    for e1, u1, c1 in st[i + 1:]:
+                        if e1["side"] == -1 and e1["src"] == "end":
+                            start = (u1, c1, e1["rng"], e1["round"], None, e1.get("camp"))
+                            break
+                        if e1["side"] == 1:
+                            break
                 # The enemy's (or, `third`, the third seat's) turn end that follows.
                 for e2, u2, c2 in st[i + 1:]:
                     if e2["side"] == (1 if which == "enemy" else -1) and e2["src"] == "end":
@@ -73,7 +82,7 @@ def turn_rows(plays, which):
                     while j0 > 0 and st[j0 - 1][0]["side"] == 0 and st[j0 - 1][0]["src"] == "act":
                         j0 -= 1
                     t0 = [u[1] for u in (st[j0 - 1][1] if j0 > 0 else sc["initial"]["units"])]
-                    rows.append((pi, (pu, pc, pe["rng"], pe["round"], t0), (st[i - 1][1], st[i - 1][2]), by_round))
+                    rows.append((pi, (pu, pc, pe["rng"], pe["round"], t0, pe.get("camp")), (st[i - 1][1], st[i - 1][2]), by_round))
     return rows
 
 
@@ -91,6 +100,9 @@ def as_row(plays, pi, start, by_round, U):
         if k in last:
             row[k] = last[k]
     row["round"] = rnd
+    if len(start) > 5 and start[5] is not None:
+        # The camp's countdown at this moment of the play (the moment of the round's start holds the one of the turn's start).
+        row["state"]["camp"] = start[5]
     return row
 
 
@@ -139,12 +151,12 @@ def compare(g, rows, which, counts, show, ex):
                 ex[fam].append(f"{g.plays[pi][0]['play']} r{start[3]}: {first}" + (detail if first != "city damage" else ""))
 
 
-def run(path, weights, families=None, which="enemy", show=3, out=None, group=400, rule="std", charge=False, debug=None, scene_rule=True):
+def run(path, weights, families=None, which="enemy", show=3, out=None, group=400, rule="std", charge=False, debug=None, scene_rule=True, limit=None):
     brain = Brain(load_net(weights))
     counts = collections.Counter()
     ex = collections.defaultdict(list)
     t0 = time.time()
-    for gp in A.stream(path, families=families, group=group):
+    for gp in A.stream(path, limit=limit, families=families, group=group):
         rows = turn_rows(gp, which)
         if not rows:
             continue
@@ -155,12 +167,10 @@ def run(path, weights, families=None, which="enemy", show=3, out=None, group=400
         g.enemy_rule = rule
         g.charge = charge
         g.scene_rule = scene_rule
+        g.third_played = which == "enemy"
         g.rel_now = mx.array([st[3] - gp[pi][0]["orders"]["start_round"] for pi, st, _, _ in rows], dtype=mx.int32)
         if which == "third":
-            from . import armycamp
-            live = ~g.s["done"] & (g.verdict < 0)
-            armycamp.neutral_turn(g, live)
-            armycamp.neutral_rule(g, live)
+            g.third_turn(~g.s["done"] & (g.verdict < 0))
         elif which == "enemy":
             if debug:
                 from . import armystd
@@ -208,11 +218,15 @@ def main(argv=None):
     ap.add_argument("--charge", action="store_true")
     ap.add_argument("--scene-rule", dest="scene_rule", action="store_true", default=True)
     ap.add_argument("--standard", dest="scene_rule", action="store_false", help="Rust ARMY_SCENE_RULE=standard")
+    ap.add_argument("--limit", type=int)
+    ap.add_argument("--cpu", action="store_true")
     ap.add_argument("--debug", help="PLAY:ROUND,... print the MLX shot plan and the Rust commands of those turns")
     a = ap.parse_args(argv)
+    if a.cpu:
+        mx.set_default_device(mx.cpu)
     mx.set_memory_limit(16 << 30)
     mx.set_cache_limit(2 << 30)
-    run(a.dump, a.weights, families=a.families.split(",") if a.families else None, which=a.which, out=a.out, group=a.group, rule=a.rule, charge=a.charge, debug=a.debug.split(',') if a.debug else None, scene_rule=a.scene_rule)
+    run(a.dump, a.weights, families=a.families.split(",") if a.families else None, which=a.which, out=a.out, group=a.group, rule=a.rule, charge=a.charge, debug=a.debug.split(',') if a.debug else None, scene_rule=a.scene_rule, limit=a.limit)
 
 
 if __name__ == "__main__":

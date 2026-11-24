@@ -26,7 +26,7 @@ NEAR_CAMP = 3
 LOSS_CAP = {"camp": 1, "camp-race": 2}
 AFTER_FIRST = 6
 MAX_NEARBY, NEARBY_RANGE, EARLIEST_RELEASE = 2, 4, 10  # `systems/barbarians.rs`
-ROUND_SHIFT = 1  # the world's round of a dump's round (to be checked against the data)
+ROUND_SHIFT = 0  # the world's round of a dump's round: the wandering spawn of camp/0/82/0 comes at our turn of label 10
 
 
 def active(s):
@@ -89,7 +89,7 @@ def barbarian_end(game, live):
     cd = mx.where(rows, s["camp_cd"] - 1, s["camp_cd"])
     zero = rows & (cd <= 0) & (s["camp_row"] >= 0)
     guard = guarded(s)
-    rnd = game.start + game.cur_rel + ROUND_SHIFT
+    rnd = game.start + game.rel_now + ROUND_SHIFT
     sd1 = s["u_alive"] & (s["u_side"] == 1) & (s["u_tile"] >= 0)
     near = mx.sum(sd1 & (sim.geo.distance(mx.maximum(s["u_tile"], 0), mx.broadcast_to(mx.maximum(s["camp_tile"], 0)[:, None], s["u_tile"].shape)) <= NEARBY_RANGE), axis=1)
     wander = zero & guard & (rnd >= EARLIEST_RELEASE) & (near <= MAX_NEARBY)
@@ -105,7 +105,7 @@ def barbarian_end(game, live):
     spawn = spawn & (ok_stop | due)
     s["camp_cd"] = mx.where(spawn, AFTER_FIRST, mx.where(zero, 1, cd))
     s, slot = sim.new_unit(s, mx.ones((B,), dtype=I32), where_tile, spawn, mx.full((B,), 100, dtype=I32), mmax, sim.tg(sim.z["sp_kind"], sp),
-                           profile_from=mx.where(spawn, s["camp_row"], -1))
+                           profile_from=mx.where(spawn, s["camp_row"], -1), spare=True)
     s = sim.set_unit(s, slot, spawn & (slot < s["u_alive"].shape[1]), mv=mmax)
     game.counts["camp spawns"] += int(mx.sum(due).item())
     game.counts["camp wandering spawns"] += int(mx.sum(wander & spawn).item())
@@ -214,6 +214,7 @@ def enemy_turn(game, live, side=1):
     slots = mx.arange(U)[None, :]
     camp = s["camp_tile"]
     game.script_threat = 0
+    game.script_sorted = True  # `camp::enemy_turn`'s targets: tiles sorted and deduplicated
     for u in range(U):
         me = mx.full((B,), u, dtype=I32)
         s = game.s
@@ -228,6 +229,7 @@ def enemy_turn(game, live, side=1):
         aim = mx.where(on, 1, mx.where(near, 0, 2))
         unit_turn(game, me, side, mine, aim, camp)
     game.script_threat = None
+    game.script_sorted = False
 
 
 def _can_enter(game, side_slots, camp):
@@ -286,6 +288,7 @@ def neutral_turn(game, live):
     rk = game.obs.kind(game.s, "range")
     game.script_only = game.s["camp_tile"]
     game.script_threat = 1
+    game.script_sorted = True  # `act::foe_tiles`: sorted and deduplicated
     # Ranged first, then melee, each in slot order (= id order). The kinds are the template's: static per slot.
     ranged_of = lambda u: g1(rk, mx.full((B,), u, dtype=I32))
     order = []
@@ -296,7 +299,9 @@ def neutral_turn(game, live):
         me = mx.full((B,), u, dtype=I32)
         s = game.s
         is_r = ranged_of(u) >= 0
-        sel = rows & (is_r == pass_ranged)
+        # Only the row's own pieces take a turn of the loop (a dead one too: its turn is the chance of an entry).
+        first, count = third_span(game)
+        sel = rows & (is_r == pass_ranged) & (u >= first) & (u < first + count)
         if not bool(mx.any(sel).item()):
             continue
         entered = _enter(game, sel, third_slots)
@@ -307,6 +312,7 @@ def neutral_turn(game, live):
     _enter(game, rows, third_slots)
     game.script_only = None
     game.script_threat = None
+    game.script_sorted = False
     mark(game)
 
 
@@ -321,6 +327,16 @@ def third_slot_list(game):
         top = max(a + b for a, b in ks)
         v = list(range(min(a for a, _ in ks), top))
         setattr(game, key, v)
+    return v
+
+
+def third_span(game):
+    """[B], [B]: the first slot of each row's third pieces and how many (the plays of a batch have different layouts)."""
+    v = getattr(game, "_third_span", None)
+    if v is None:
+        first = mx.array([sc["scene"].get("third_slot0", 0) for sc, _, _ in game.plays], dtype=I32)
+        count = mx.array([len(sc["scene"]["third"]["ids"]) if sc["scene"].get("third") else 0 for sc, _, _ in game.plays], dtype=I32)
+        v = game._third_span = (mx.take(first, game.idx), mx.take(count, game.idx))
     return v
 
 

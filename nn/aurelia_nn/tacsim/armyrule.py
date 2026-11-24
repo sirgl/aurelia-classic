@@ -296,7 +296,8 @@ def _lex_min(keys, mask):
 
 
 def _blow(game, me, side, take):
-    """`act::best_blow` (Even) from where `me` stands on our units: (has one, the target tile) [B]."""
+    """`act::best_blow` (Even) from where `me` stands on our units: (has one, the target tile) [B]. The ties go to the first
+    target of the script's list: the pieces' order, or the lowest tile where the script's targets are sorted (`game.script_sorted`)."""
     s, obs = game.s, game.obs
     B, U = s["u_alive"].shape
     tile = g1(s["u_tile"], me)
@@ -309,7 +310,8 @@ def _blow(game, me, side, take):
     capt = ~obs.kind(s, "civ") & (obs.kind(s, "range") < 0)
     score = mx.where(kills, 10000, 0) + (100 - mx.maximum(dhp - dealt, 0)) * 10 + mx.where(capt, 50, 0) - taken
     # Ties: the first target in the pieces' order (Rust's `ours` is `mine_alive`, not sorted).
-    j, has = _lex_min([-score, mx.broadcast_to(mx.arange(U, dtype=I32)[None, :], (B, U))], fine)
+    tie = to if getattr(game, "script_sorted", False) else mx.broadcast_to(mx.arange(U, dtype=I32)[None, :], (B, U))
+    j, has = _lex_min([-score, tie], fine)
     return has, mx.take_along_axis(to, j[:, None], axis=1)[:, 0]
 
 
@@ -366,7 +368,8 @@ def _approach(game, me, side, take):
     kills = dealt >= dhp
     fine = ok & valid & (kills | ((dealt >= taken) & (taken < hp)))
     score = mx.where(kills, 10000, 0) + (100 - mx.maximum(dhp - dealt, 0)) * 10 - taken
-    j, has = _lex_min([_threat(game, s, side, frm), -score, frm, idx % U], fine)
+    tie = to if getattr(game, "script_sorted", False) else idx % U
+    j, has = _lex_min([_threat(game, s, side, frm), -score, frm, tie], fine)
     pick = lambda a: mx.take_along_axis(a, j[:, None], axis=1)[:, 0]
     return has, pick(frm), pick(to)
 
