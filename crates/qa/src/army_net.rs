@@ -116,7 +116,8 @@ fn price_override() -> Option<[f32; 3]> {
 }
 
 /// The play's stake: [the capture's worth in units / 8 (the loss cap; the whole army without one), the time
-/// pressure (1 / the deadline's round, 0 none), 1]. `army/potential.py::price_of` reads it from the recording.
+/// pressure (1 / the round that matters: the deadline of the "at any cost" families, else the scene's round limit;
+/// None: 0, a recording older than the field), 1]. `army/potential.py::price_of` reads it from the recording.
 pub fn price_of(family: &str, units: usize, deadline: Option<u32>) -> [f32; 3] {
     let worth = match loss_cap(family) {
         Some(None) => units / 2,
@@ -214,7 +215,7 @@ impl Orders {
         let start_round = game.view().auth.turn().round;
         let window = MapWindow::around(game, scene.centre);
         let statics = statics_of(rules, game, &window, scene.learner, scene.enemy, tile, scene.refuge);
-        Orders { side: scene.learner, foe: scene.enemy, aim, tile, refuge: scene.refuge, optional, start_round, rounds: scene.rounds, army, mean_strength: mean_strength.max(1.0), window, statics, fog: crate::trainers::memory::is_memory(scene.fam), price: price_override().unwrap_or_else(|| price_of(scene.fam.name(), scene.mine.len(), scene.deadline)) }
+        Orders { side: scene.learner, foe: scene.enemy, aim, tile, refuge: scene.refuge, optional, start_round, rounds: scene.rounds, army, mean_strength: mean_strength.max(1.0), window, statics, fog: crate::trainers::memory::is_memory(scene.fam), price: price_override().unwrap_or_else(|| price_of(scene.fam.name(), scene.mine.len(), Some(scene.deadline.unwrap_or(scene.rounds)))) }
     }
 }
 

@@ -1,7 +1,8 @@
 """The price of a capture and the potential Phi of a moment (M-HANDOFF.md, addition 8).
 
-The price (per play, 3 numbers): the capture's worth in units / 8, the time pressure (1 / rounds until the deadline
-that matters; 0 none), and 1 ("price given"). A recording from `record.rs` carries it in the play's json (`price`);
+The price (per play, 3 numbers): the capture's worth in units / 8, the time pressure (1 / the round that matters: the
+deadline of the "at any cost" families, else the scene's round limit; 0 in recordings older than h27, whose careful
+families were recorded without it), and 1 ("price given"). A recording from `record.rs` carries it in the play's json (`price`);
 an older recording gets it from the family by the same rule as `Scene::price` (`trainers.rs`): the worth is the
 number of units the win rule lets us lose (the loss cap), the whole army where the rule sets no cap.
 

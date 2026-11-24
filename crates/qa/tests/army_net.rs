@@ -140,3 +140,21 @@ fn the_army_nets_memory_survives_a_save_and_load_mid_siege() {
     let _ = std::fs::remove_dir_all(&dir);
     assert!(differs_without > 0, "without the sidecar the memory starts fresh and the play changes (in some scene)");
 }
+
+/// The stake of a trainer scene (M-HANDOFF.md, addition 8): a careful family is worth its loss cap and pressed by its
+/// round limit; an "at any cost" family is worth the whole army and pressed by its deadline. The careful pressure was
+/// 0 before (no deadline), which the addition does not say.
+#[test]
+fn a_scenes_price_is_its_loss_cap_or_its_army_and_one_over_the_round_that_matters() {
+    use aurelia_qa::army_net::Orders;
+    let rules = ClassicBench::rules();
+    let era = lab::era_index(&rules, "classical").expect("the classical era");
+    let (game, scene) = families::build(&rules, Fam::PlannedAssault, era, 1, 0).expect("the scene builds");
+    assert!(scene.deadline.is_none());
+    let p = Orders::of_scene(&rules, &game, &scene).price;
+    assert_eq!(p, [1.0 / 8.0, 1.0 / scene.rounds as f32, 1.0], "planned-assault: worth one unit, pressed by the round limit {}", scene.rounds);
+    let (game, scene) = families::build(&rules, Fam::AssaultPeace, era, 1, 0).expect("the scene builds");
+    let d = scene.deadline.expect("the peace has a deadline");
+    let p = Orders::of_scene(&rules, &game, &scene).price;
+    assert_eq!(p, [scene.mine.len() as f32 / 8.0, 1.0 / d as f32, 1.0], "assault-peace: worth the army, pressed by the deadline {d}");
+}
