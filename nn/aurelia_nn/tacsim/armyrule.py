@@ -25,6 +25,23 @@ BIG = 1 << 20
 NOKEY = 1 << 30
 
 
+def on_rows(game, rows, fn):
+    """`fn(take)` on the rows where `rows` [B] holds (the others are not touched): the game's per-row state is swapped for
+    those rows' for the call and merged back (`Game._enter_rows`); `take` maps a full-size [B, ...] array to the
+    rows in view. Where most rows are in, nothing is swapped. Rows are independent, so the result is the same."""
+    n = int(mx.sum(rows).item())
+    if n == 0:
+        return
+    if 4 * n >= 3 * game.B:
+        fn(lambda a: a)
+        return
+    ids, pos = game._compact(rows, n)
+    saved = game._enter_rows(ids)
+    fn(lambda a: mx.take(a, ids, axis=0))
+    game._leave_rows(saved, rows, pos)
+    mx.eval(game.s)
+
+
 def city_order(game):
     """[B, C]: the window's cities by handle (absent cities last)."""
     if getattr(game, "_city_order", None) is None:
@@ -66,38 +83,51 @@ def promotions(game, side, live):
         if bool(mx.any(take).item()):
             game.s = sim.promote(s, me, mx.minimum(pick, NP - 1), take)
             game.counts["rule promotions"] += int(mx.sum(take).item())
+        mx.eval(game.s)
 
 
 def city_strikes(game, side, live):
-    s, sim, obs = game.s, game.sim, game.obs
-    B = s["u_alive"].shape[0]
-    T = sim.T
+    sim = game.sim
     C = sim.cs["tile"].shape[1]
-    sd = mx.full((B,), side, dtype=I32)
     order = city_order(game)
-    tiles = mx.broadcast_to(mx.arange(T, dtype=I32)[None], (B, T))
     for j in range(C):
         s = game.s
+        B = s["u_alive"].shape[0]
         cs = order[:, j]
-        ok = sim.city_mask(s, sd, cs) & live[:, None]
-        if not bool(mx.any(ok).item()):
-            continue
-        mil, civ = sim.occupancy(s)
-        ms, cv = gn(mil, tiles), gn(civ, tiles)
-        is_unit = ms >= 0
-        dsl = mx.where(is_unit, ms, cv)
-        hp = mx.where(dsl >= 0, gn(s["u_hp"], mx.maximum(dsl, 0)), 0)
-        _, c_rstr = sim.city_strength(s, cs, mil)
-        dfn = obs.defense_vs_ranged(s, obs.fighter_n_slots(s, dsl, dsl >= 0), obs.fighter_n_slots(s, mx.full((B, T), -1, dtype=I32), mx.zeros((B, T), dtype=mx.bool_)))
-        dmg = A.expected_damage(mx.broadcast_to(c_rstr[:, None], (B, T)), dfn, mx.zeros((B, T), dtype=I32), mx.zeros((B, T), dtype=I32)).astype(I32)
-        dmg = mx.where(is_unit, dmg, exact.CIVILIAN_DAMAGE)
-        left = mx.maximum(hp - mx.minimum(dmg, hp), 0)
-        key = mx.where(ok, left * 4096 + tiles, NOKEY)
-        best = mx.min(key, axis=1)
-        take = best < NOKEY
-        t = (best % 4096).astype(I32)
-        game.s = sim.city_strike(s, sd, cs, mx.where(take, t, 0), take)
-        game.counts["rule city strikes"] += int(mx.sum(take).item())
+        ready = g1(sim.cs["alive"], cs) & (g1(s["c_owner"], cs) == side) & (g1(sim.cs["tile"], cs) >= 0) & ~s["done"] \
+            & ~g1(s["c_strike"], cs) & (g1(s["c_dmg"], cs) < sim.city_maxhp(s, cs))
+        on_rows(game, ready & live, lambda take, j=j: _city_strike(game, side, take(order)[:, j]))
+        mx.eval(game.s)
+
+
+def _city_strike(game, side, cs):
+    """City `cs` [B] strikes in every row in view (the city is ready in each; the target may be none)."""
+    s, sim, obs = game.s, game.sim, game.obs
+    B, U = s["u_alive"].shape
+    T = sim.T
+    sd = mx.full((B,), side, dtype=I32)
+    tiles = mx.broadcast_to(mx.arange(T, dtype=I32)[None], (B, T))
+    ok = sim.city_mask(s, sd, cs)
+    mil, civ = sim.occupancy(s)
+    ms, cv = gn(mil, tiles), gn(civ, tiles)
+    is_unit = ms >= 0
+    dsl = mx.where(is_unit, ms, cv)
+    hp = mx.where(dsl >= 0, gn(s["u_hp"], mx.maximum(dsl, 0)), 0)
+    _, c_rstr = sim.city_strength(s, cs, mil)
+    # The damage to each unit slot (a military unit on the tile; the tile gathers its slot's): per slot, not per tile
+    # (the fighters' gathers over every window tile were the 18 GB peak of a 10 000 scene batch).
+    slots = mx.broadcast_to(mx.arange(U, dtype=I32)[None], (B, U))
+    dfn = obs.defense_vs_ranged(s, obs.fighter_n_slots(s, slots, mx.ones((B, U), dtype=mx.bool_)), obs.fighter_n_slots(s, mx.full((B, U), -1, dtype=I32), mx.zeros((B, U), dtype=mx.bool_)))
+    dmg_u = A.expected_damage(mx.broadcast_to(c_rstr[:, None], (B, U)), dfn, mx.zeros((B, U), dtype=I32), mx.zeros((B, U), dtype=I32)).astype(I32)
+    dmg = gn(dmg_u, mx.maximum(ms, 0))
+    dmg = mx.where(is_unit, dmg, exact.CIVILIAN_DAMAGE)
+    left = mx.maximum(hp - mx.minimum(dmg, hp), 0)
+    key = mx.where(ok, left * 4096 + tiles, NOKEY)
+    best = mx.min(key, axis=1)
+    take = best < NOKEY
+    t = (best % 4096).astype(I32)
+    game.s = sim.city_strike(s, sd, cs, mx.where(take, t, 0), take)
+    game.counts["rule city strikes"] += int(mx.sum(take).item())
 
 
 def shooter_slots(game, side):
@@ -120,35 +150,44 @@ def shooter_slots(game, side):
 
 
 def shots(game, side, live):
-    sim, obs = game.sim, game.obs
-    B, U = game.s["u_alive"].shape
-    sd = mx.full((B,), side, dtype=I32)
+    obs = game.obs
     for u in shooter_slots(game, side):
         s = game.s
+        B = s["u_alive"].shape[0]
         me = mx.full((B,), u, dtype=I32)
         can = live & g1(s["u_alive"], me) & (g1(s["u_side"], me) == side) & (g1(s["u_tile"], me) >= 0) & (g1(obs.kind(s, "range"), me) >= 0) \
             & (g1(s["u_mv"], me) > 0) & ~g1(obs.kind(s, "civ"), me)
-        if not bool(mx.any(can).item()):
-            continue
-        tile = s["u_tile"]
-        mil, civ = sim.occupancy(s)
-        tl = mx.maximum(tile, 0)
-        slots = mx.arange(U, dtype=I32)[None, :]
-        foe = s["u_alive"] & (tile >= 0) & (s["u_side"] == 1 - side)
-        # One mark a tile: the defender (its military unit, else the civilian).
-        dm, dc = gn(mil, tl), gn(civ, tl)
-        mark = foe & ((dm == slots) | ((dm < 0) & (dc == slots)))
-        frm = mx.broadcast_to(g1(tile, me)[:, None], (B, U))
-        dealt, _, dhp, ok = obs.preview(s, me, frm, tile, mark & can[:, None], True)
-        ok = ok & mark & can[:, None]
-        left = mx.maximum(dhp - dealt, 0)
-        key = mx.where(ok, left * 4096 + tl, NOKEY)
-        best = mx.min(key, axis=1)
-        take = best < NOKEY
-        t = (best % 4096).astype(I32)
-        mk = sim.masks(s, sd, me)
-        game.s = sim.apply_unit(s, sd, me, mx.full((B,), V_ATTACK, dtype=I32), mx.where(take, t, 0), mk, take)
-        game.counts["rule shots"] += int(mx.sum(take).item())
+        on_rows(game, can, lambda take, u=u: _shoot(game, side, u))
+        mx.eval(game.s)
+
+
+def _shoot(game, side, u):
+    """Slot `u`'s shot in every row in view (each holds a ranged unit of `side` with moves left in that slot)."""
+    sim, obs = game.sim, game.obs
+    s = game.s
+    B, U = s["u_alive"].shape
+    sd = mx.full((B,), side, dtype=I32)
+    me = mx.full((B,), u, dtype=I32)
+    can = mx.ones((B,), dtype=mx.bool_)
+    tile = s["u_tile"]
+    mil, civ = sim.occupancy(s)
+    tl = mx.maximum(tile, 0)
+    slots = mx.arange(U, dtype=I32)[None, :]
+    foe = s["u_alive"] & (tile >= 0) & (s["u_side"] == 1 - side)
+    # One mark a tile: the defender (its military unit, else the civilian).
+    dm, dc = gn(mil, tl), gn(civ, tl)
+    mark = foe & ((dm == slots) | ((dm < 0) & (dc == slots)))
+    frm = mx.broadcast_to(g1(tile, me)[:, None], (B, U))
+    dealt, _, dhp, ok = obs.preview(s, me, frm, tile, mark & can[:, None], True, ranged_only=True)
+    ok = ok & mark & can[:, None]
+    left = mx.maximum(dhp - dealt, 0)
+    key = mx.where(ok, left * 4096 + tl, NOKEY)
+    best = mx.min(key, axis=1)
+    take = best < NOKEY
+    t = (best % 4096).astype(I32)
+    mk = sim.masks(s, sd, me)
+    game.s = sim.apply_unit(s, sd, me, mx.full((B,), V_ATTACK, dtype=I32), mx.where(take, t, 0), mk, take)
+    game.counts["rule shots"] += int(mx.sum(take).item())
 
 
 def stand_fortify(game, side, live, heal=True):
@@ -356,3 +395,4 @@ def field_turn(game, live, side=1):
             if bool(mx.any(h3).item()):
                 _strike(game, me, side, t3, h3)
         game.s = sim.hold_units(game.s, (mx.arange(U)[None, :] == u) & mine[:, None], heal=game.hold_heals)
+        mx.eval(game.s)

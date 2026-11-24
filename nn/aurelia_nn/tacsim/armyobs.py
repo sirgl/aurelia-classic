@@ -261,13 +261,19 @@ class Obs:
         f[26] = sp["own_land"].astype(F32)
 
     def promo_any(self, s):
-        """[B, U, NP]: the promotions every slot may take now (`Sim.promo_mask` per slot)."""
+        """[B, U]: the slots that may take a promotion now (`Sim.promo_mask` has one). A slot without the experience for its
+        level has none, so only the slots some row holds ready are looked at (one host read)."""
         sim = self.sim
         B, U = s["u_alive"].shape
+        level = mx.maximum(s["u_level"], 1)
+        pct = mx.maximum(s["p_xp_needed_pct"], -100)
+        need = mx.maximum((10 * level * (level + 1) // 2) * (100 + pct) // 100, 1)
+        ready = s["u_alive"] & (s["u_xp"] >= need)
+        rd = mx.any(ready, axis=0).tolist()
         out = []
         for u in range(U):
             slot = mx.full((B,), u, dtype=I32)
-            out.append(sim.promo_mask(s, slot, g1(s["u_alive"], slot)))
+            out.append(mx.any(sim.promo_mask(s, slot, g1(s["u_alive"], slot)), axis=1) if rd[u] else mx.zeros((B,), dtype=mx.bool_))
         return mx.stack(out, axis=1)
 
     def statics(self, s, side=0):
@@ -303,8 +309,8 @@ class Obs:
         uq, ur = fd["uq"], fd["ur"]
         mean = t["mean"][:, None]
         rng = self.kind(s, "range")
-        promos = self.promo_any(s) if sim.f["promo"] else mx.zeros((B, U, 1), dtype=mx.bool_)
-        promotable = own & in_army & mx.any(promos, axis=2)
+        promos = self.promo_any(s) if sim.f["promo"] else mx.zeros((B, U), dtype=mx.bool_)
+        promotable = own & in_army & promos
         may_shoot = (rng >= 0) & (s["u_att"] == 0)
         selectable = own & in_army & ((s["u_mv"] > 0) | promotable | may_shoot)
         # Unit rows [B, U, F_TOK].
@@ -447,9 +453,10 @@ class Obs:
 
     # ------------------------------------------------------------------ the strike preview
 
-    def preview(self, s, me, frm, to, valid, from_real):
+    def preview(self, s, me, frm, to, valid, from_real, ranged_only=False):
         """`act::preview` of unit `me` [B] striking the tiles `to` [B, N] from `frm` [B, N] (`plan_attack_from`;
-        `from_real`: from where it stands, `plan_attack`): (dealt, taken, defender hp, ok) [B, N], expected roll."""
+        `from_real`: from where it stands, `plan_attack`): (dealt, taken, defender hp, ok) [B, N], expected roll.
+        `ranged_only`: every row's unit is a ranged one (the melee strengths and the answer are not computed)."""
         sim, geo = self.sim, self.geo
         B, U = s["u_alive"].shape
         N = to.shape[1]
@@ -504,24 +511,30 @@ class Obs:
         # Strengths.
         a = self.fighter_n(s, me, frm, st_me, N)
         dd = self.fighter_n_slots(s, dslot, unit_def)
-        att_m = self.melee_attack_strength(s, a, dd, to, is_city & city_def)
         att_r = self.ranged_strength(s, a, dd, is_city & city_def, to, True)
-        ranged_atk = how_ranged
-        def_m = self.defense_strength(s, dd, a, False)
         def_r = self.defense_vs_ranged(s, dd, a)
         cstr = self.city_strength_n(s, city, mil)
         c_max = gn(s.get("c_maxhp", sim.cs["max_hp"]), mx.maximum(city, 0))
         c_hp = c_max - gn(s["c_dmg"], mx.maximum(city, 0))
-        att = mx.where(ranged_atk, att_r, att_m)
-        dfn = mx.where(city_def, cstr, mx.where(ranged_atk, def_r, def_m))
+        ranged_atk = how_ranged
+        if ranged_only:
+            att, dfn = att_r, mx.where(city_def, cstr, def_r)
+        else:
+            att_m = self.melee_attack_strength(s, a, dd, to, is_city & city_def)
+            def_m = self.defense_strength(s, dd, a, False)
+            att = mx.where(ranged_atk, att_r, att_m)
+            dfn = mx.where(city_def, cstr, mx.where(ranged_atk, def_r, def_m))
         my_dmg = 100 - g1(s["u_hp"], me)[:, None]
         wm = P("wounded_mod")
         dealt = expected_damage(att, dfn, mx.broadcast_to(my_dmg, att.shape), mx.broadcast_to(wm, att.shape))
         d_hp = mx.where(city_def, c_hp, gn(s["u_hp"], mx.maximum(dslot, 0)))
         d_wm = gn(s["p_wounded_mod"], mx.maximum(dslot, 0))
-        ans_city = expected_damage(cstr, att_m, mx.zeros_like(att), mx.zeros_like(att))
-        ans_unit = expected_damage(def_m, att_m, 100 - d_hp, d_wm)
-        taken = mx.where(ranged_atk | civ_def, 0, mx.where(city_def, ans_city, ans_unit))
+        if ranged_only:
+            taken = mx.zeros_like(att)
+        else:
+            ans_city = expected_damage(cstr, att_m, mx.zeros_like(att), mx.zeros_like(att))
+            ans_unit = expected_damage(def_m, att_m, 100 - d_hp, d_wm)
+            taken = mx.where(ranged_atk | civ_def, 0, mx.where(city_def, ans_city, ans_unit))
         dealt = mx.where(civ_def, mx.where(ranged_atk, exact.CIVILIAN_DAMAGE, 0), dealt)
         return dealt.astype(I32), taken.astype(I32), d_hp.astype(I32), ok
 
@@ -534,9 +547,11 @@ class Obs:
             f[k[2:]] = mx.broadcast_to(g1(s[k], me)[:, None], (B, N))
         for k in Sim.FIGHTER_KEYS:
             f[k] = mx.broadcast_to(g1(s["p_" + k], me)[:, None], (B, N))
-        for k, src in (("ctx", "p_ctx"), ("tctx", "p_tctx"), ("ttype", "p_ttype"), ("targ", "p_targ"), ("targ2", "p_targ2"), ("tpct", "p_tpct"), ("tprom", "p_tprom"), ("prom", "u_prom")):
+        for k, src in (("ctx", "p_ctx"), ("tctx", "p_tctx"), ("ttype", "p_ttype"), ("targ", "p_targ"), ("targ2", "p_targ2"), ("tpct", "p_tpct"), ("tprom", "p_tprom")):
             v = grow(s[src], me)
             f[k] = mx.broadcast_to(v[:, None], (B, N) + v.shape[1:])
+        # The held promotions are read only where a context gates on one: by (row of the slot, promotion), not gathered whole.
+        f["prom_row"] = (s["u_prom"], mx.broadcast_to((mx.arange(B, dtype=I32) * s["u_prom"].shape[1] + mx.maximum(me, 0))[:, None], (B, N)))
         f["water"] = self.sim.mg("water", frm) > 0
         f["embarked"] = f["land"] & f["water"]
         return f
@@ -549,12 +564,13 @@ class Obs:
         for k in Sim.FIGHTER_KEYS:
             f[k] = gn(s["p_" + k], sl)
         B, N = slots.shape
-        for k, src in (("ctx", "p_ctx"), ("tctx", "p_tctx"), ("ttype", "p_ttype"), ("targ", "p_targ"), ("targ2", "p_targ2"), ("tpct", "p_tpct"), ("tprom", "p_tprom"), ("prom", "u_prom")):
+        U = s["u_alive"].shape[1]
+        row = mx.arange(B, dtype=I32)[:, None] * U + sl
+        for k, src in (("ctx", "p_ctx"), ("tctx", "p_tctx"), ("ttype", "p_ttype"), ("targ", "p_targ"), ("targ2", "p_targ2"), ("tpct", "p_tpct"), ("tprom", "p_tprom")):
             arr = s[src]
             rest = arr.shape[2:]
-            idx = sl.reshape(B, N, *([1] * len(rest)))
-            idx = mx.broadcast_to(idx, (B, N) + rest)
-            f[k] = mx.take_along_axis(arr, idx, axis=1)
+            f[k] = mx.take(arr.reshape((B * U,) + rest), row.reshape(-1), axis=0).reshape((B, N) + rest)
+        f["prom_row"] = (s["u_prom"], row)
         f["water"] = self.sim.mg("water", f["tile"]) > 0
         f["embarked"] = f["land"] & f["water"]
         return f
@@ -582,7 +598,8 @@ class Obs:
         if sim.has_near_imp:
             holds = holds | ((tt == 7) & self.near_improvement(s, f))
         tp = f["tprom"]
-        gate = (tp < 0) | mx.take_along_axis(f["prom"], mx.maximum(tp, 0), axis=-1)
+        up, row = f["prom_row"]
+        gate = (tp < 0) | mx.take(up.reshape(-1), row[..., None] * up.shape[2] + mx.maximum(tp, 0))
         return total + mx.sum(mx.where(in_ctx & holds & gate, f["tpct"], 0), axis=-1)
 
     def near_improvement(self, s, f):
@@ -808,7 +825,6 @@ class Obs:
         dlc = hexd(lq[:, :, None] - fd["cq"][:, None, :], lr[:, :, None] - fd["cr"][:, None, :])
         count = mx.sum(inr, axis=2) + mx.sum(fd["foe_city"][:, None, :] & (dlc <= reach[:, None, None]), axis=2)
         fm = [mx.zeros((B, L), dtype=F32)] * F_ACT
-        fm[K_MOVE] = mx.ones((B, L), dtype=F32)
         self.write_spot(msp, here, fm)
         fm[27] = mx.where(mmax[:, None] > 0, mx.maximum(left, 0).astype(F32) / mx.maximum(mmax, 1).astype(F32)[:, None], 0.0)
         fm[28] = best
@@ -867,19 +883,20 @@ class Obs:
         fa[39] = (~sok).astype(F32)
         handle = s["u_handle"]
         c_handle = t["c_handle"]
-        groups = []  # (feat [B, N, F], key [B, N], valid, kind, pos, promo)
-        groups.append((move_feat, move_key, move_ok, K_MOVE, lt, None))
-        base_strike = fa
+        # The groups of candidates: (base array, rows of it, key, valid, kind, pos, promo, local target). The numbers of a
+        # candidate come from one of three base arrays (the moves', the strikes', the unit's own tile's), the same for every
+        # kind of its group: they are gathered after the sort, and the kind's one-hot (columns 0..9) is added then.
+        groups = []
+        groups.append((0, None, move_key, move_ok, K_MOVE, lt, None, None))
         foe_city = is_city & (c_owner == enemy)
+        strike_feat = mx.stack(fa, axis=2)
         for kind, ok, key in (
                 (K_UNIT, att_ok & (m_side == enemy) & seen, GROUP[K_UNIT] * (1 << 20) + gn(handle, mx.maximum(m_sl, 0))),
                 (K_UNIT, att_ok & (c_side == enemy) & seen, GROUP[K_UNIT] * (1 << 20) + gn(handle, mx.maximum(c_sl, 0))),
                 (K_CITY, att_ok & foe_city, GROUP[K_CITY] * (1 << 20) + gn(c_handle, mx.maximum(city, 0))),
                 (K_RANGED, att_ok & ranged_kind[:, None] & (foe_city | (((m_side == enemy) | (c_side == enemy)) & seen)),
                  GROUP[K_RANGED] * (1 << 20) + mx.where(tgt >= 0, tr_ * t["mw"][:, None] + tq, 0))):
-            ff = list(base_strike)
-            ff[kind] = mx.ones((B, OA), dtype=F32)
-            groups.append((mx.stack(ff, axis=2), key, ok, kind, tgt, None))
+            groups.append((1, None, key, ok, kind, tgt, None, None))
         # Fortify, set up, promotions: the unit's own tile.
         hf = [mx.zeros((B, 1), dtype=F32)] * F_ACT
         self.write_spot(here, here, hf)
@@ -893,36 +910,42 @@ class Obs:
             & (gn(s["owner"], mx.maximum(tile, 0)[:, None])[:, 0] != side)
         icpt_ok = alive & (g1(self.kind(s, "icpt_range"), me) > 0) & (g1(s["u_st"], me) != 4)
         for kind, ok in ((K_FORT, mk["fort"]), (K_SETUP, mk["setup"]), (K_PILLAGE, pill_ok), (K_OTHER, icpt_ok)):
-            ff = list(hf)
-            ff[kind] = mx.ones((B, 1), dtype=F32)
-            groups.append((mx.stack(ff, axis=2), mx.full((B, 1), GROUP[kind] * (1 << 20), dtype=I32), ok[:, None], kind, tile[:, None], None))
+            groups.append((2, None, mx.full((B, 1), GROUP[kind] * (1 << 20), dtype=I32), ok[:, None], kind, tile[:, None], None, None))
         if sim.f["promo"]:
-            NP = mk["promo"].shape[1]
-            ff = [mx.broadcast_to(x, (B, NP)) for x in hf]
-            ff[K_PROMO] = mx.ones((B, NP), dtype=F32)
-            gid = t["promo_gid"][:, :NP]
-            groups.append((mx.stack(ff, axis=2), GROUP[K_PROMO] * (1 << 20) + gid, mk["promo"], K_PROMO, mx.broadcast_to(tile[:, None], (B, NP)), gid + 1))
-        feats, keys, kinds, poss, promos, tgts = [], [], [], [], [], []
-        for feat, key, ok, kind, pos, promo in groups:
+            # Only the promotion columns some row may take (the others would be padding: a key past the legal ones).
+            pc = [j for j, a_ in enumerate(mx.any(mk["promo"], axis=0).tolist()) if a_]
+            if pc:
+                pcol = mx.array(pc, dtype=I32)
+                NP = len(pc)
+                gid = mx.take(t["promo_gid"], pcol, axis=1)
+                groups.append((2, None, GROUP[K_PROMO] * (1 << 20) + gid, mx.take(mk["promo"], pcol, axis=1), K_PROMO, mx.broadcast_to(tile[:, None], (B, NP)), gid + 1, pcol))
+        hfeat = mx.stack(hf, axis=2)
+        big = mx.concatenate([move_feat, strike_feat, hfeat], axis=1)  # [B, L + OA + 1, F_ACT]
+        base_at = [0, L, L + OA]
+        keys, kinds, poss, promos, tgts, srcs = [], [], [], [], [], []
+        for bi, _, key, ok, kind, pos, promo, loc in groups:
             n = key.shape[1]
-            feats.append(feat)
             keys.append(mx.where(ok, key, BIG))
             kinds.append(mx.full((B, n), kind, dtype=I32))
             poss.append(pos)
             promos.append(promo if promo is not None else mx.zeros((B, n), dtype=I32))
             # The simulator's target of the action: the tile, or the promotion's local index.
-            tgts.append(mx.broadcast_to(mx.arange(n, dtype=I32)[None], (B, n)) if kind == K_PROMO else pos)
+            tgts.append(mx.broadcast_to(loc[None], (B, n)) if kind == K_PROMO else pos)
+            srcs.append(base_at[bi] + (mx.arange(n, dtype=I32) if bi < 2 else mx.zeros((n,), dtype=I32)))
         key = mx.concatenate(keys, axis=1)
-        feat = mx.concatenate(feats, axis=1)
+        src = mx.concatenate(srcs)
         kind = mx.concatenate(kinds, axis=1)
         pos = mx.concatenate(poss, axis=1)
         promo = mx.concatenate(promos, axis=1)
         tgt = mx.concatenate(tgts, axis=1)
-        n_list = min(key.shape[1], C_MAX - 1)
+        # Only as many columns as the row with the most legal actions has (the sort puts the legal ones first; the rest are
+        # padding that `cmask` masks): one host read.
+        n_list = min(key.shape[1], C_MAX - 1, max(1, int(mx.max(mx.sum(key < BIG, axis=1)).item())))
         order = mx.argsort(key, axis=1)[:, :n_list]
         valid = mx.take_along_axis(key, order, axis=1) < BIG
-        feat = mx.take_along_axis(feat, order[:, :, None], axis=1)
         kind = mx.take_along_axis(kind, order, axis=1)
+        feat = mx.take_along_axis(big, mx.take(src, order)[:, :, None], axis=1)
+        feat = feat + mx.pad((kind[:, :, None] == mx.arange(K_OTHER + 1, dtype=I32)[None, None, :]).astype(F32), [(0, 0), (0, 0), (0, F_ACT - K_OTHER - 1)])
         pos = mx.take_along_axis(pos, order, axis=1)
         promo = mx.take_along_axis(promo, order, axis=1)
         tgt = mx.take_along_axis(tgt, order, axis=1)

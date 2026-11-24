@@ -36,6 +36,19 @@ NFO = None  # counted per call: the per-batch count is small, a fixed 6 doubled 
 ASSAULT = {"assault-heal", "promotion-choice", "hill-archers", "city-fire", "planned-assault"}
 
 
+def trim_tokens(tok):
+    """The tokens without the padding columns past the row with the most tokens (they are masked: no weight in the body,
+    never selectable). One host read."""
+    T = max(1, int(mx.max(tok["n"]).item()))
+    if T >= tok["mask"].shape[1]:
+        return tok
+    out = dict(tok)
+    for k in ("feat", "mask", "pos", "slot", "unit", "ent", "selectable"):
+        out[k] = tok[k][:, :T]
+    out["dist"] = tok["dist"][:, :T, :T]
+    return out
+
+
 class Game:
     """A batch of scene copies played on the device."""
 
@@ -228,36 +241,32 @@ class Game:
             self.compare_state(rel)
         trace = [[] for _ in self.plays]
         made = mx.zeros((B, U), dtype=I32)
-        army = self.tab.t["army"] >= 0
         for step in range(PER_TURN):
-            tok = self.tokens(rel)
-            unit = tok["unit"]
-            stopped = mx.where(unit >= 0, gn(made, mx.maximum(unit, 0)) >= PER_UNIT, False)
-            sel = tok["selectable"] & ~stopped & active[:, None]
-            if step == 0 and brain.has_map:
-                self.M = mx.where(active[:, None, None], brain.encode(self.statics, tok), self.M)
-            h = self.body_fn(tok, self.um, self.pm, self.M, self.price)
-            pick = greedy_pointer(brain.pointer(h, sel), sel.shape[1])
-            active = active & (pick >= 0)
-            n_act = int(mx.sum(active).item())
-            if n_act == 0:
+            # Only the rows still deciding are computed (step 0: every live row; later: the active ones, compacted).
+            n0 = int(mx.sum(active).item())
+            if n0 == 0:
                 break
-            pk = mx.maximum(pick, 0)
-            me = mx.where(active, mx.take_along_axis(unit, pk[:, None], axis=1)[:, 0], 0)
-            cand = self.cand_fn(s, me)
-            al = brain.actions(h, pk, cand, self.M)
-            ai = A.first_index_eq(al, mx.max(al, axis=1))
-            kind = mx.take_along_axis(cand["kind"], ai[:, None], axis=1)[:, 0]
-            tgt = mx.take_along_axis(cand["tgt"], ai[:, None], axis=1)[:, 0]
+            if step > 0 and n0 < B and self.compact:
+                ids, pos = self._compact(active, n0)
+                saved = self._enter_rows(ids)
+                made_v, act_v = mx.take(made, ids, axis=0), mx.ones((n0,), dtype=mx.bool_)
+                pick, ai, act_v, made_v = self.decide(rel, step, act_v, made_v)
+                has = active
+                self._leave_rows(saved, has, pos)
+                made = self._merge(made, made_v, has, pos)
+                active = mx.where(has, mx.take(act_v, pos, axis=0), False)
+                if self.compare:
+                    pick = mx.where(has, mx.take(pick, pos, axis=0), -1)
+                    ai = mx.where(has, mx.take(ai, pos, axis=0), 0)
+            else:
+                pick, ai, active, made = self.decide(rel, step, active, made)
             if self.compare:
                 P = len(self.plays)
                 al_ = active[:P].tolist(); pk_ = pick[:P].tolist(); ai_ = ai[:P].tolist()
                 for b in range(P):
                     if al_[b]:
                         trace[b].append((pk_[b], ai_[b]))
-            self.apply(me, kind, tgt, active, side=0, mk=None if self.legacy else cand["_mk"])
-            made = put1(made, me, g1(made, me) + 1, active)
-            self.counts["net decisions"] += n_act
+        s = self.s
         self.counts["net turns"] += int(mx.sum(~s["done"] & (self.verdict < 0)).item())
         if self.compare:
             self.compare_turn(rel, trace)
@@ -277,6 +286,87 @@ class Game:
         self.pm = mx.where(live[:, None, None], pm2, self.pm)
         self.alive = mx.where(live[:, None], al2, self.alive)
         self.s = self.sim.end_turn(s, mx.zeros((B,), dtype=I32), live)
+
+    compact = True
+
+    def decide(self, rel, step, active, made):
+        """One decision step over the current rows (all of them, or the compacted active ones): the tokens, the body, the
+        pointer, the unit's candidates, the greedy action, applied. Returns (pick, action index, still active, made)."""
+        brain, s = self.brain, self.s
+        tok = trim_tokens(self.tokens(rel))
+        unit = tok["unit"]
+        stopped = mx.where(unit >= 0, gn(made, mx.maximum(unit, 0)) >= PER_UNIT, False)
+        sel = tok["selectable"] & ~stopped & active[:, None]
+        if step == 0 and brain.has_map:
+            self.M = mx.where(active[:, None, None], brain.encode(self.statics, tok), self.M)
+        h = self.body_fn(tok, self.um, self.pm, self.M, self.price)
+        pick = greedy_pointer(brain.pointer(h, sel), sel.shape[1])
+        active = active & (pick >= 0)
+        n_act = int(mx.sum(active).item())
+        self.counts["net decisions"] += n_act
+        if n_act == 0:
+            return pick, mx.zeros_like(pick), active, made
+        pk = mx.maximum(pick, 0)
+        me = mx.where(active, mx.take_along_axis(unit, pk[:, None], axis=1)[:, 0], 0)
+        cand = self.cand_fn(s, me)
+        al = brain.actions(h, pk, cand, self.M)
+        ai = A.first_index_eq(al, mx.max(al, axis=1))
+        kind = mx.take_along_axis(cand["kind"], ai[:, None], axis=1)[:, 0]
+        tgt = mx.take_along_axis(cand["tgt"], ai[:, None], axis=1)[:, 0]
+        self.apply(me, kind, tgt, active, side=0, mk=None if self.legacy else cand["_mk"])
+        made = put1(made, me, g1(made, me) + 1, active)
+        return pick, ai, active, made
+
+    # The compacted step: the rows `ids` of every per-row array, the simulator and the tables (exact: rows are independent).
+    ROW_ATTRS = ("B", "s", "tab", "far_rows", "start", "price", "um", "pm", "alive", "M", "pillaged", "prev")
+
+    def _compact(self, active, n):
+        B = self.B
+        ids = mx.argsort(mx.where(active, 0, B) + mx.arange(B, dtype=I32))[:n].astype(I32)
+        pos = mx.maximum(mx.cumsum(active.astype(I32)) - 1, 0)
+        return ids, pos
+
+    def _enter_rows(self, ids):
+        obs = self.obs
+        saved = {k: getattr(self, k) for k in self.ROW_ATTRS}
+        sim = self.sim
+        saved["obs"] = (obs.tab, obs.t)
+        saved["simrows"] = (sim.cs, sim.tid, sim.n_pieces, sim.B)
+        take = lambda a: None if a is None else mx.take(a, ids, axis=0)
+        self.B = ids.shape[0]
+        self.s = {k: take(v) for k, v in saved["s"].items()}
+        self._entered = dict(self.s)
+        # The simulator and the observer stay the same objects (callers hold their methods): their row arrays swap.
+        sub = A._rows_sim(sim, ids)
+        sim.cs, sim.tid, sim.n_pieces, sim.B = sub.cs, sub.tid, sub.n_pieces, sub.B
+        self.tab = A._rows_tab(saved["tab"], ids)
+        obs.tab, obs.t = self.tab, self.tab.t
+        for k in ("far_rows", "start", "price", "um", "pm", "alive", "M", "pillaged"):
+            setattr(self, k, take(saved[k]))
+        self.prev = None if saved["prev"] is None else tuple(take(x) for x in saved["prev"])
+        return saved
+
+    def _merge(self, full, sub, has, pos):
+        if full is None:
+            return None
+        sel = has.reshape((-1,) + (1,) * (full.ndim - 1))
+        return mx.where(sel, mx.take(sub, pos, axis=0), full)
+
+    def _leave_rows(self, saved, has, pos):
+        sub_s, entered = self.s, self._entered
+        full = dict(saved["s"])
+        for k, v in sub_s.items():
+            if k not in entered or v is not entered[k]:
+                full[k] = self._merge(full[k], v, has, pos) if k in full else v
+        pillaged = self._merge(saved["pillaged"], self.pillaged, has, pos)
+        obs = self.obs
+        obs.tab, obs.t = saved["obs"]
+        sim = self.sim
+        sim.cs, sim.tid, sim.n_pieces, sim.B = saved["simrows"]
+        for k in self.ROW_ATTRS:
+            setattr(self, k, saved[k])
+        self.s, self.pillaged = full, pillaged
+        self._entered = None
 
     def our_turn_end(self, live):
         """The end of the net's turn: every army unit stands (`act::stand`: no moves left), then the seat's AI mind

@@ -1010,11 +1010,15 @@ class Sim:
         hit = lt == tgt[:, None]
         left_t = mx.max(mx.where(hit, left, -1), axis=1)
         mvv = mvv & (left_t >= 0)
-        end_tile, end_left = self.walk(s, slot, mk, tgt, mk["foreign_l"])
-        s = self.set_unit(s, slot, mvv, tile=end_tile, mv=mx.maximum(end_left, 0), st=mx.zeros_like(slot))
-        s = self.refresh_allowance(s, slot, tile, end_tile, mvv)
+        # (the walk and the attack are the heavy parts: skipped where no row moves or strikes)
+        if bool(mx.any(mvv).item()):
+            end_tile, end_left = self.walk(s, slot, mk, tgt, mk["foreign_l"])
+            s = self.set_unit(s, slot, mvv, tile=end_tile, mv=mx.maximum(end_left, 0), st=mx.zeros_like(slot))
+            s = self.refresh_allowance(s, slot, tile, end_tile, mvv)
         # Attack.
-        s = self.attack(s, side, slot, tgt, take & (verb == V_ATTACK))
+        atk = take & (verb == V_ATTACK)
+        if bool(mx.any(atk).item()):
+            s = self.attack(s, side, slot, tgt, atk)
         return s
 
     def promote(self, s, slot, p, where):
