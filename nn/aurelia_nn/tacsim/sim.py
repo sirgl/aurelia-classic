@@ -634,7 +634,7 @@ class Sim:
         ct = g1(self.cs["tile"], cslot)
         owner = g1(s["c_owner"], cslot)
         mine = g1(self.cs["alive"], cslot) & (owner == side) & (ct >= 0) & ~s["done"]
-        maxhp = g1(self.cs["max_hp"], cslot)
+        maxhp = self.city_maxhp(s, cslot)
         ready = mine & ~g1(s["c_strike"], cslot) & (g1(s["c_dmg"], cslot) < maxhp)
         block, ctrl, vis, mil, civ, mil_side, civ_side, city, city_owner = self.controls_and_blocks(s, side)
         tgt = mx.take(geo.att_tile, mx.maximum(ct, 0), axis=0)
@@ -828,10 +828,18 @@ class Sim:
         ds = self.defense_strength(s, d, a, True)
         return mx.where(d["embarked"], d["embarked_defense"], mx.where(ranged_land, rs, ds))
 
+    def city_maxhp(self, s, cslot):
+        """The city's most hit points: the army twin's schedule (`c_maxhp`, buildings) where the state has it."""
+        return g1(s["c_maxhp"] if "c_maxhp" in s else self.cs["max_hp"], cslot)
+
     def city_strength(self, s, cslot, mil):
         ct = g1(self.cs["tile"], cslot)
         owner = g1(s["c_owner"], cslot)
-        base = g1(self.cs["str0"], cslot) + (g1(s["c_pop"], cslot) - g1(self.cs["pop0"], cslot)) * 40
+        if "c_str0" in s:
+            # The army twin's schedule of the city's strength without the garrison (techs, buildings, population).
+            base = g1(s["c_str0"], cslot)
+        else:
+            base = g1(self.cs["str0"], cslot) + (g1(s["c_pop"], cslot) - g1(self.cs["pop0"], cslot)) * 40
         gslot = gn(mil, ct[:, None])[:, 0]
         has_g = (gslot >= 0) & (ct >= 0)
         g_side = g1(s["u_side"], gslot)
@@ -1057,7 +1065,7 @@ class Sim:
         air = take & a["air"]
         d = self.fighter(s, mx.where(is_unit, dslot, cvslot), is_unit)
         c_str, c_rstr = self.city_strength(s, cslot, mil)
-        c_maxhp = g1(self.cs["max_hp"], cslot)
+        c_maxhp = self.city_maxhp(s, cslot)
         c_hp = c_maxhp - g1(s["c_dmg"], cslot)
         a_dmg_taken = 100 - a["hp"]
         # Strengths: one of each kind per scene (the target, unit or city, is a per-scene flag).
@@ -1257,7 +1265,7 @@ class Sim:
         out = s["u_alive"] & (s["u_side"] == owner[:, None]) & gone[:, None]
         s["u_alive"] = s["u_alive"] & ~out
         s["u_tile"] = mx.where(out, -1, s["u_tile"])
-        maxhp = g1(self.cs["max_hp"], cslot)
+        maxhp = self.city_maxhp(s, cslot)
         s["c_dmg"] = put1(s["c_dmg"], cslot, mx.minimum(g1(s["c_dmg"], cslot), maxhp * 50 // 100), where)
         s["c_strike"] = put1(s["c_strike"], cslot, mx.ones(cslot.shape, dtype=mx.bool_), where)
         s = self.advance(s, slot, tile, where)

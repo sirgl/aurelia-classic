@@ -378,11 +378,14 @@ pub fn step<P: kernel::ai::mind::AiMind<Classic>>(driver: &mut AiDriver<Classic,
             let pending = before(game, rules, side, &command);
             let fact = observe::log_before(game, rules, side, &command);
             let seen = super::obsdump::events_wanted().then(|| command.clone());
+            super::obsdump::shadow(rules, game, Some(&command));
             let result = game.execute(rules, command);
             observe::log_after(game, rules, fact, result.is_ok());
             after(game, pending, result.is_ok());
             if let (Some(c), true) = (seen, result.is_ok()) {
                 super::obsdump::event(rules, game, side, "mind", Some(&c));
+            } else {
+                super::obsdump::shadow_clear();
             }
             driver.executed(result)
         }
@@ -391,6 +394,7 @@ pub fn step<P: kernel::ai::mind::AiMind<Classic>>(driver: &mut AiDriver<Classic,
             observe::note_turn_end(game, rules);
             end_turn(game, rules);
             let side = game.view().auth.active_player();
+            super::obsdump::shadow(rules, game, None);
             let result = game.execute(rules, command);
             super::obsdump::event(rules, game, side, "end", None);
             driver.executed(result)

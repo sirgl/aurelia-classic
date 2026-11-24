@@ -21,6 +21,7 @@ pub mod dump;
 pub mod families;
 pub mod lab;
 pub mod memory;
+pub mod scene_rule;
 pub mod suite;
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -218,13 +219,33 @@ pub fn play(rules: &CompiledRuleset, mut game: GameState, mut scene: Scene, play
     }
     let settings = ClassicBench::settings(rules);
     let seated = kernel::ai::seats::Seated::new(mind("standard")?, seats);
+    if scene_rule::on() {
+        // The scene rule's seats: the enemy's, and the learner's unless an AI variant plays it.
+        let mut ruled = vec![scene.enemy];
+        if !matches!(seat, Seat::Mind(_)) {
+            ruled.push(scene.learner);
+        }
+        scene_rule::set_ruled(&ruled);
+    }
     let played = play_seated(rules, game, scene, player, trace, seat, settings, seated);
+    scene_rule::set_ruled(&[]);
     crate::army_net::record::close(played.as_ref().ok());
     played
 }
 
 #[allow(clippy::too_many_arguments)]
 fn play_seated(rules: &CompiledRuleset, game: GameState, scene: Scene, player: &str, trace: bool, seat: Seat, settings: kernel::ai::plan::AiSettings, seated: kernel::ai::seats::Seated<ClassicMind>) -> Result<Row, String> {
+    type S = kernel::ai::seats::Seated<ClassicMind>;
+    if scene_rule::on() {
+        // The scene rule (default off): the minds give no command to the ruled seats' units and cities.
+        return if lab::mode::combat_only() {
+            let driver = AiDriver::<Classic, scene_rule::Ruled<CombatOnly<S>>>::with_mind(settings, Vec::new(), scene_rule::Ruled(CombatOnly(seated)));
+            play_on(rules, game, scene, player, trace, seat, driver)
+        } else {
+            let driver = AiDriver::<Classic, scene_rule::Ruled<S>>::with_mind(settings, Vec::new(), scene_rule::Ruled(seated));
+            play_on(rules, game, scene, player, trace, seat, driver)
+        };
+    }
     if lab::mode::combat_only() {
         let driver = AiDriver::<Classic, CombatOnly<kernel::ai::seats::Seated<ClassicMind>>>::with_mind(settings, Vec::new(), CombatOnly(seated));
         play_on(rules, game, scene, player, trace, seat, driver)
@@ -398,6 +419,11 @@ fn play_on<P: kernel::ai::mind::AiMind<Classic>>(rules: &CompiledRuleset, mut ga
             assault::keep_war(rules, &mut game, &scene);
             if active == scene.learner && scripted_mine != Some(now) && !game.is_over() {
                 scripted_mine = Some(now);
+                if scene_rule::on() {
+                    // The scene rule closes the arena at each seat's turn start too: a unit a home city finished at the
+                    // turn's start is gone before the seat looks (the net saw it as a far unit's token).
+                    close_arena(rules, &mut game, &scene);
+                }
                 // The memory's persistence guard: save and load here (the game, and the net's memory beside it).
                 if let Some(at) = crate::army_net::seat::save_at().filter(|a| now.saturating_sub(round0) == a.round && matches!(seat, Seat::Net | Seat::Script(_))) {
                     game = crate::army_net::seat::save_and_load(rules, &game, &orders, &mut scene, &at)?;
@@ -472,9 +498,15 @@ fn play_on<P: kernel::ai::mind::AiMind<Classic>>(rules: &CompiledRuleset, mut ga
                         net_time.turns += 1;
                     }
                 }
+                if scene_rule::on() && !matches!(seat, Seat::Mind(_)) {
+                    scene_rule::turn(rules, &mut game, &scene, scene.learner);
+                }
             }
             if active == scene.enemy && scripted_theirs != Some(now) && !game.is_over() {
                 scripted_theirs = Some(now);
+                if scene_rule::on() {
+                    close_arena(rules, &mut game, &scene);
+                }
                 if logged {
                     if let Some((r, pre)) = r_pre.as_ref() {
                         let post = snap(&game, &scene);
@@ -494,6 +526,9 @@ fn play_on<P: kernel::ai::mind::AiMind<Classic>>(rules: &CompiledRuleset, mut ga
                     }
                 }
                 families::enemy_turn(rules, &mut game, &mut scene);
+                if scene_rule::on() {
+                    scene_rule::turn(rules, &mut game, &scene, scene.enemy);
+                }
             }
             let t_step = std::time::Instant::now();
             // The recorder and the army net's memory (its turn-end hook) see the learner's commands through `record::step`

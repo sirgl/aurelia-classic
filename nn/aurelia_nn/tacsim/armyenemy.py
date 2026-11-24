@@ -64,7 +64,7 @@ def turn_rows(plays, which):
             if which == "ours" and e["side"] == 0 and e["src"] == "end":
                 # The last event of the net (src act) before this end, else the turn's start.
                 j = i - 1
-                while j >= 0 and ((st[j][0]["side"] == 0 and st[j][0]["src"] == "mind") or st[j][0]["src"] == "arena"):
+                while j >= 0 and ((st[j][0]["side"] == 0 and st[j][0]["src"] in ("mind", "rule")) or st[j][0]["src"] == "arena"):
                     j -= 1
                 if j >= 0 and st[j][0]["side"] == 0 and st[j][0]["src"] == "act":
                     pe, pu, pc = st[j]
@@ -91,13 +91,16 @@ def as_row(plays, pi, start, by_round, U):
 def compare(g, rows, which, counts, show, ex):
     s = g.s
     al, tl, hp, st = s["u_alive"].tolist(), s["u_tile"].tolist(), s["u_hp"].tolist(), s["u_st"].tolist()
+    xp, lv = s["u_xp"].tolist(), s["u_level"].tolist()
     dmg = s["c_dmg"].tolist()
     side = s["u_side"].tolist()
     for b, (pi, start, after, _) in enumerate(rows):
         fam = g.fam[b]
         u2, c2 = after
         first = None
-        for k, u in enumerate(u2[:g.U]):
+        # The scene's pieces only: a unit a home city trains in the window lives until the round's arena close.
+        n_pieces = len(g.plays[pi][0]["orders"]["roles"])
+        for k, u in enumerate(u2[:min(g.U, n_pieces)]):
             who = "enemy" if (u[8] if u[0] else side[b][k]) == 1 else "our"
             what = None
             if (u[0] == 1) != bool(al[b][k]):
@@ -108,9 +111,15 @@ def compare(g, rows, which, counts, show, ex):
                 what = f"{who} unit's hp"
             elif u[0] and which == "ours" and (u[6] in (1, 2)) != (st[b][k] in (1, 2)):
                 what = f"{who} unit's fortify"
+            elif u[0] and g.scene_rule and u[6] != st[b][k]:
+                what = f"{who} unit's stance"
+            elif u[0] and g.scene_rule and u[7] != xp[b][k]:
+                what = f"{who} unit's xp"
+            elif u[0] and g.scene_rule and u[10] != lv[b][k]:
+                what = f"{who} unit's level"
             if what and first is None:
                 first = what
-                detail = f" slot {k} rust {u[:7]} mlx {[int(al[b][k]), tl[b][k], hp[b][k], st[b][k]]}"
+                detail = f" slot {k} rust {u[:11]} mlx {[int(al[b][k]), tl[b][k], hp[b][k], st[b][k], xp[b][k], lv[b][k]]}"
         if first is None and any(c[1] != dmg[b][k] for k, c in enumerate(c2)):
             first = "city damage"
         counts[(fam, "turns")] += 1
@@ -122,7 +131,7 @@ def compare(g, rows, which, counts, show, ex):
                 ex[fam].append(f"{g.plays[pi][0]['play']} r{start[3]}: {first}" + (detail if first != "city damage" else ""))
 
 
-def run(path, weights, families=None, which="enemy", show=3, out=None, group=400, rule="std", charge=False, debug=None):
+def run(path, weights, families=None, which="enemy", show=3, out=None, group=400, rule="std", charge=False, debug=None, scene_rule=False):
     brain = Brain(load_net(weights))
     counts = collections.Counter()
     ex = collections.defaultdict(list)
@@ -137,6 +146,7 @@ def run(path, weights, families=None, which="enemy", show=3, out=None, group=400
         g = P.Game(gp, 1, brain, forced=forced)
         g.enemy_rule = rule
         g.charge = charge
+        g.scene_rule = scene_rule
         g.rel_now = mx.array([st[3] - gp[pi][0]["orders"]["start_round"] for pi, st, _, _ in rows], dtype=mx.int32)
         if which == "enemy":
             if debug:
@@ -157,7 +167,7 @@ def run(path, weights, families=None, which="enemy", show=3, out=None, group=400
             g.our_turn_end(mx.ones((g.B,), dtype=mx.bool_))
         mx.eval(g.s)
         compare(g, rows, which, counts, show, ex)
-    res = {"check": which, "rule": rule, "charge": charge, "seconds": round(time.time() - t0, 1), "families": {}}
+    res = {"check": which, "rule": rule, "charge": charge, "scene_rule": scene_rule, "seconds": round(time.time() - t0, 1), "families": {}}
     fams = sorted({f for f, _ in counts})
     for f in fams:
         n = counts[(f, "turns")]
@@ -183,11 +193,12 @@ def main(argv=None):
     ap.add_argument("--out")
     ap.add_argument("--rule", default="std", choices=["std", "approx"])
     ap.add_argument("--charge", action="store_true")
+    ap.add_argument("--scene-rule", action="store_true")
     ap.add_argument("--debug", help="PLAY:ROUND,... print the MLX shot plan and the Rust commands of those turns")
     a = ap.parse_args(argv)
     mx.set_memory_limit(16 << 30)
     mx.set_cache_limit(2 << 30)
-    run(a.dump, a.weights, families=a.families.split(",") if a.families else None, which=a.which, out=a.out, group=a.group, rule=a.rule, charge=a.charge, debug=a.debug.split(',') if a.debug else None)
+    run(a.dump, a.weights, families=a.families.split(",") if a.families else None, which=a.which, out=a.out, group=a.group, rule=a.rule, charge=a.charge, debug=a.debug.split(',') if a.debug else None, scene_rule=a.scene_rule)
 
 
 if __name__ == "__main__":

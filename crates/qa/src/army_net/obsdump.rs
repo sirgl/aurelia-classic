@@ -33,6 +33,68 @@ struct Play {
 
 thread_local! {
     static PLAY: RefCell<Option<Play>> = const { RefCell::new(None) };
+    /// The source the events of `act`'s commands carry ("act"; "rule" while the scene rule plays).
+    static ACT_SRC: std::cell::Cell<&'static str> = const { std::cell::Cell::new("act") };
+}
+
+thread_local! {
+    /// What the scene rule would have chosen for the next mind event (the shadow, a measurement).
+    static SHADOW: RefCell<Option<Value>> = const { RefCell::new(None) };
+}
+
+/// The scene rule's shadow (rule off, events on; a MEASUREMENT): what `trainers::scene_rule` would choose for the
+/// actor of the mind's command about to run, on the state before it: a city strike's target (the rule's key and
+/// the most-damage key), a shot's target, a promotion; at a seat's turn end, its pieces the rule would still
+/// fortify, promote or let shoot.
+pub fn shadow(rules: &CompiledRuleset, game: &GameState, cmd: Option<&classic_rules::Command>) {
+    use crate::trainers::scene_rule as r;
+    if !events_wanted() || r::on() {
+        return;
+    }
+    let v = PLAY.with(|p| {
+        let mut p = p.borrow_mut();
+        let play = p.as_mut()?;
+        let auth = game.view().auth;
+        let side = auth.active_player();
+        if play.track.side_of(side) < 0 {
+            return None;
+        }
+        let ids: Vec<kernel::ids::EntityId> = play.track.ids().to_vec();
+        let by_id: std::collections::BTreeMap<kernel::ids::EntityId, (classic_rules::ids::UnitHandle, kernel::world::unit::UnitCore)> =
+            auth.units().iter_handles().filter(|(_, c)| ids.contains(&c.id)).map(|(h, c)| (c.id, (h, *c))).collect();
+        let mut foes: Vec<classic_rules::ids::TileId> = by_id.values().filter(|(_, c)| c.owner != side && play.track.side_of(c.owner) >= 0).map(|(_, c)| c.tile).collect();
+        foes.sort_by_key(|t| t.0);
+        foes.dedup();
+        let win = |t: Option<classic_rules::ids::TileId>| t.map_or(-1, |t| i64::from(play.track.index(t)));
+        use classic_rules::Command as C;
+        match cmd {
+            Some(C::CityStrike { city, .. }) => Some(json!([win(r::city_target(game, rules, side, *city, &foes)), win(r::city_target_by(game, rules, side, *city, &foes, true))])),
+            Some(C::RangedAttack { unit, .. }) => Some(json!([win(r::shot_target(game, rules, side, *unit, &foes))])),
+            Some(C::Promote { unit, .. }) => act::core_of(game, *unit).map(|c| json!([r::promotion_pick(game, rules, &c).map_or(-1, |p| i64::from(p.0))])),
+            Some(_) => None,
+            None => {
+                let mine: Vec<(usize, classic_rules::ids::UnitHandle, kernel::world::unit::UnitCore)> =
+                    ids.iter().enumerate().filter_map(|(k, id)| by_id.get(id).filter(|(_, c)| c.owner == side).map(|(h, c)| (k, *h, *c))).collect();
+                let fort: Vec<usize> = mine.iter().filter(|(_, h, _)| r::fortifies(game, rules, side, *h)).map(|x| x.0).collect();
+                let promo: Vec<usize> = mine.iter().filter(|(_, _, c)| r::promotion_pick(game, rules, c).is_some()).map(|x| x.0).collect();
+                let shot: Vec<usize> = mine.iter().filter(|(_, h, _)| r::shot_target(game, rules, side, *h, &foes).is_some()).map(|x| x.0).collect();
+                Some(json!({"fort": fort, "promo": promo, "shot": shot}))
+            }
+        }
+    });
+    SHADOW.with(|x| *x.borrow_mut() = v);
+}
+
+pub fn shadow_clear() {
+    SHADOW.with(|x| x.borrow_mut().take());
+}
+
+pub fn set_act_src(src: &'static str) {
+    ACT_SRC.with(|c| c.set(src));
+}
+
+pub fn act_src() -> &'static str {
+    ACT_SRC.with(|c| c.get())
 }
 
 static OUT: Mutex<Option<std::fs::File>> = Mutex::new(None);
@@ -152,7 +214,11 @@ pub fn event(rules: &CompiledRuleset, game: &GameState, side: classic_rules::ids
             }
         };
         let rel = play.track.side_of(side);
-        play.lines.push(json!({"type": "ev", "round": auth.turn().round, "side": rel, "src": src, "cmd": name, "who": who, "tgt": tgt, "u": du, "c": dc, "rng": state["rng"], "vis": state["vis"]}).to_string());
+        let mut line = json!({"type": "ev", "round": auth.turn().round, "side": rel, "src": src, "cmd": name, "who": who, "tgt": tgt, "u": du, "c": dc, "rng": state["rng"], "vis": state["vis"]});
+        if let Some(r) = SHADOW.with(|x| x.borrow_mut().take()) {
+            line["rule"] = r;
+        }
+        play.lines.push(line.to_string());
     });
 }
 
@@ -166,15 +232,19 @@ pub fn step<P: kernel::ai::mind::AiMind<classic_rules::classic::Classic>>(driver
         Advance::Waiting => StepOutcome::Waiting,
         Advance::Command(command) => {
             let side = game.view().auth.active_player();
+            shadow(rules, game, Some(&command));
             let seen = command.clone();
             let result = game.execute(rules, command);
             if result.is_ok() {
                 event(rules, game, side, "mind", Some(&seen));
+            } else {
+                shadow_clear();
             }
             driver.executed(result)
         }
         Advance::EndTurn(command) => {
             let side = game.view().auth.active_player();
+            shadow(rules, game, None);
             let result = game.execute(rules, command);
             event(rules, game, side, "end", None);
             driver.executed(result)

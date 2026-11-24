@@ -49,7 +49,7 @@ fn execute(game: &mut GameState, rules: &CompiledRuleset, side: PlayerId, cmd: C
     let ok = game.execute(rules, cmd).is_ok();
     crate::army_net::observe::log_after(game, rules, fact, ok);
     if let (Some(c), true) = (seen, ok) {
-        crate::army_net::obsdump::event(rules, game, side, "act", Some(&c));
+        crate::army_net::obsdump::event(rules, game, side, crate::army_net::obsdump::act_src(), Some(&c));
     }
     crate::army_net::record::after(game, pending, ok);
     ok

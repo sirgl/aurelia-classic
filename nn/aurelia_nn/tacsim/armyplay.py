@@ -119,6 +119,7 @@ class Game:
                 by_round.setdefault(m["round"], m)
             self.sched.append(by_round)
         self.far_rows = mx.take(mx.array(far, dtype=mx.float32), self.idx, axis=0)
+        self.far_static = far
         self.um, self.pm, self.alive = brain.m.initial(self.B)
         self.M = mx.zeros((self.B, 576, brain.m.config["map_ch"])) if brain.has_map else None
         self.statics = self.obs.statics(self.s) if brain.has_map else None
@@ -136,8 +137,12 @@ class Game:
         # The trainers' end of a unit's turn heals an unmoved unit (`act::hold_unit`, nn/army-net ed9e453); False: the
         # harness before it (moves spent by hand, no heal), for the dumps made before.
         self.hold_heals = True
+        # The judge where Rust's looks (after our script; see `learner_turn`); False: after the enemy's turn (G1).
+        self.judge_after_script = True
         self.turn_tile = None
         self.fort_rule = "fit"
+        # The scene rule (`armyrule`): both seats' pieces besides the net and the family script; off: the port of standard.
+        self.scene_rule = False
         self.charge = False
         self.build_walks(plays, idx, U)
         # The slots that may hold an enemy ranged unit (the advisor's shooters): any scene's enemy ranged unit at the start.
@@ -186,6 +191,21 @@ class Game:
             s["c_str0"] = mx.where(h[:, None], tk(cs0), s["c_str0"])
             s["c_maxhp"] = mx.where(h[:, None], tk(cmax), s["c_maxhp"])
         s["p_wounded_mod"] = mx.where(h[:, None], tk(wm), s["p_wounded_mod"])
+        # The far cities' rows (outside the window: their population and strength grow) from the same moment.
+        NF = self.tab.t["far_tile"].shape[1]
+        far = []
+        for pi, m in enumerate(last):
+            rows_f = [list(r) for r in self.far_static[pi]]
+            if m is not None and NF:
+                ftiles = self.plays[pi][0]["orders"]["far_cities"]
+                feat = None
+                for i, (k, v) in enumerate(m["tok"]["ref"]):
+                    for j, f in enumerate(ftiles):
+                        if k == "c" and v == f[0]:
+                            feat = feat or A._unhex_tok(m["tok"]["feat"], m["tok"]["n"])
+                            rows_f[j] = feat[i]
+            far.append(rows_f)
+        self.far_rows = mx.take(mx.array(far, dtype=mx.float32), self.idx, axis=0)
 
     # -------------------------------------------------------------- the learner: the net
 
@@ -244,6 +264,11 @@ class Game:
         # Every army unit stands, the seat's mind ends our turn; the memory steps on the turn's last tokens.
         live = ~s["done"] & (self.verdict < 0)
         self.our_turn_end(live)
+        if self.judge_after_script and rel >= 1:
+            # Rust's round boundary (`trainers::play_on`): the driver reports the round done at the learner's first step,
+            # after the seat's script (and the scene rule's part): the arena closes and the judge looks there, before
+            # the mind's part of our turn and the enemy's turn (a city low after our strikes, before its heal).
+            self.judge(rel)
         s = self.s
         tok = self.tokens(rel)
         h = self.body_fn(tok, self.um, self.pm, self.M, self.price)
@@ -259,6 +284,12 @@ class Game:
         s = self.s
         army = self.tab.t["army"] >= 0
         s = self.sim.hold_units(s, army & (s["u_side"] == 0) & live[:, None] & (s["u_mv"] > 0), heal=self.hold_heals)
+        if self.scene_rule:
+            # The scene rule (`armyrule`, Rust `ARMY_SCENE_RULE=simple`) plays the rest of our seat's pieces.
+            from . import armyrule
+            self.s = s
+            armyrule.seat_turn(self, 0, live)
+            return
         # Which of them the mind fortifies hangs on its tasks and operations (`decide_military` -> `follow_task` ->
         # `hold`), which are not ported. The rule FITTED on the event dump (not a port; 72 % of the army unit-turns
         # right, never fortifying 69 %, the earlier rule 64 %): a melee unit that moved this turn and ends within 2 of
@@ -293,6 +324,7 @@ class Game:
         s = self.s
         P = len(self.plays)
         al, tl, hp = s["u_alive"][:P].tolist(), s["u_tile"][:P].tolist(), s["u_hp"][:P].tolist()
+        xp, stv, lv = s["u_xp"][:P].tolist(), s["u_st"][:P].tolist(), s["u_level"][:P].tolist()
         dmg = s["c_dmg"][:P].tolist()
         self.state_ok = getattr(self, "state_ok", [True] * P)
         for pi in range(P):
@@ -300,7 +332,9 @@ class Game:
             if not ms or not self.state_ok[pi] or self.verdict[pi].item() >= 0:
                 continue
             st = ms[0]["state"]
-            same = all((u[0] == 1) == bool(al[pi][k]) and (not u[0] or (u[1] == tl[pi][k] and u[2] == hp[pi][k])) for k, u in enumerate(st["units"]) if k < self.U)
+            npc = len(self.plays[pi][0]["orders"]["roles"])
+            same = all((u[0] == 1) == bool(al[pi][k]) and (not u[0] or (u[1] == tl[pi][k] and u[2] == hp[pi][k] and u[7] == xp[pi][k] and u[6] == stv[pi][k] and u[10] == lv[pi][k]))
+                       for k, u in enumerate(st["units"]) if k < min(self.U, npc))
             same = same and all(c[1] == dmg[pi][k] for k, c in enumerate(st["cities"]))
             self.counts["round starts compared"] += 1
             if same and exact.u64_to_ints(s["rng"][pi:pi + 1])[0] != int(st["rng"]):
@@ -325,6 +359,14 @@ class Game:
                         self.counts[f"first divergence: {who} unit's tile"] += 1
                     elif u[0] and u[2] != hp[pi][k]:
                         self.counts[f"first divergence: {who} unit's hp"] += 1
+                    elif u[0] and k < npc and u[7] != xp[pi][k]:
+                        self.counts[f"first divergence: {who} unit's xp"] += 1
+                    elif u[0] and k < npc and u[10] != lv[pi][k]:
+                        self.counts[f"first divergence: {who} unit's level"] += 1
+                    elif u[0] and k < npc and u[6] != stv[pi][k]:
+                        self.counts[f"first divergence: {who} unit's stance"] += 1
+                        if len(getattr(self, "ex_st", [])) < 6:
+                            self.ex_st = getattr(self, "ex_st", []) + [f"{self.plays[pi][0]['play']} rel {rel} slot {k} rust {u[:11]} mlx st {stv[pi][k]}"]
                 if any(c[1] != dmg[pi][k] for k, c in enumerate(st["cities"])):
                     self.counts["first divergence: city damage"] += 1
 
@@ -458,7 +500,10 @@ class Game:
             self.s = sim.hold_units(self.s, (mx.arange(U)[None, :] == u) & mine[:, None], heal=self.hold_heals)
 
     def enemy_turn(self):
-        if self.enemy_rule == "std":
+        if self.scene_rule:
+            from . import armyrule
+            armyrule.enemy_turn(self)
+        elif self.enemy_rule == "std":
             from . import armystd
             armystd.enemy_turn(self, charge_on=self.charge)
         else:
@@ -625,7 +670,8 @@ class Game:
             self.counts["ms enemy turns"] += int(1000 * (time.time() - tb_))
             self.s = self.sim.round_end(self.s, ~self.s["done"])
             rel += 1
-            self.judge(rel)
+            if not self.judge_after_script:
+                self.judge(rel)
             mx.eval(self.s, self.verdict)
         # A capture ends the scene (the simulator's `done`): judge it.
         self.judge(rel)
@@ -653,6 +699,7 @@ def run(path, weights, copies=1, families=None, limit=None, rust=None, out=None,
         v = g.play(rounds).tolist()
         res["counts"].update(g.counts)
         res.setdefault("examples", []).extend(getattr(g, "ex", []))
+        res.setdefault("examples_stance", []).extend(getattr(g, "ex_st", []))
         res["seconds"] += g.seconds
         for b, verdict in enumerate(v):
             sc = gp[b % len(gp)][0]
@@ -665,6 +712,7 @@ def run(path, weights, copies=1, families=None, limit=None, rust=None, out=None,
             per[key][1] += 1
             if b < len(gp):
                 rw = gp[b][2]["win"] if gp[b][2] else None
+                res.setdefault("plays", {})[sc["play"]] = [int(win), int(bool(rw))]
                 per[key][2] += bool(rw)
                 per[key][3] += (rw == win)
                 per[key][4] += 1
@@ -700,6 +748,8 @@ def main(argv=None):
     ap.add_argument("--fort", default="fit", choices=["fit", "old", "none"])
     ap.add_argument("--charge", action="store_true")
     ap.add_argument("--compile", action="store_true")
+    ap.add_argument("--scene-rule", action="store_true", help="the scene rule (Rust ARMY_SCENE_RULE=simple) on both seats")
+    ap.add_argument("--old-judge", action="store_true", help="judge after the enemy's turn (the G1 harness)")
     a = ap.parse_args(argv)
     if a.cpu:
         mx.set_default_device(mx.cpu)
@@ -707,10 +757,12 @@ def main(argv=None):
     mx.set_cache_limit(2 << 30)
     def setup(g):
         g.enemy_rule, g.hold_heals, g.fort_rule, g.charge = a.enemy, not a.old_heal, a.fort, a.charge
+        g.scene_rule = a.scene_rule
+        g.judge_after_script = not a.old_judge
         if a.compile:
             g.enable_compile()
     res = run(a.dump, a.weights, copies=a.copies, families=a.families.split(",") if a.families else None, limit=a.limit, out=a.out, group=a.group, rounds=a.rounds, setup=setup)
-    res["setup"] = {"enemy": a.enemy, "old_heal": a.old_heal, "fort": a.fort, "charge": a.charge}
+    res["setup"] = {"enemy": a.enemy, "old_heal": a.old_heal, "fort": a.fort, "charge": a.charge, "scene_rule": a.scene_rule, "old_judge": a.old_judge}
     if a.out:
         with open(a.out, "w") as fh:
             json.dump(res, fh, indent=1)
