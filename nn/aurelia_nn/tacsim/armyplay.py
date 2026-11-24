@@ -143,6 +143,10 @@ class Game:
         # GRPO (`armygrpo`): at this round the net's picks and actions are sampled (temperature 1) and recorded; None: greedy.
         self.sample_rel = None
         self.sample_key = None
+        # Multi-turn GRPO (`armyrl`): {round: [B] bool} the rows that sample their picks and actions at that round (the
+        # copies of a play share it); the map of the turn (MB nets) is kept per sampled round for the gradient pass.
+        self.sample_plan = None
+        self.turn_M = {}
         self.records = []
         self.row_ids = None
         self.verdict = mx.full((self.B,), -1, dtype=I32)
@@ -310,12 +314,22 @@ class Game:
             self.M = mx.where(active[:, None, None], brain.encode(self.statics, tok), self.M)
         h = self.body_fn(tok, self.um, self.pm, self.M, self.price)
         lg = brain.pointer(h, sel)
-        sampling = self.sample_rel is not None and self.sample_rel == rel
+        smask = None
+        if self.sample_plan is not None:
+            if rel in self.sample_plan:
+                smask = self.sample_plan[rel]
+                if self.row_ids is not None:
+                    smask = mx.take(smask, self.row_ids)
+                if step == 0 and brain.has_map:
+                    self.turn_M[rel] = self.M
+        elif self.sample_rel is not None and self.sample_rel == rel:
+            smask = mx.ones(active.shape, dtype=mx.bool_)
+        sampling = smask is not None
         if sampling:
-            active_in = active
+            active_in = active & smask
             self.sample_key, k1, k2 = mx.random.split(self.sample_key, 3)
             pidx = mx.random.categorical(lg, axis=-1, key=k1).astype(I32)
-            pick = mx.where(pidx >= sel.shape[1], -1, pidx)
+            pick = mx.where(smask, mx.where(pidx >= sel.shape[1], -1, pidx), greedy_pointer(lg, sel.shape[1]))
         else:
             pick = greedy_pointer(lg, sel.shape[1])
         active = active & (pick >= 0)
@@ -323,25 +337,25 @@ class Game:
         self.counts["net decisions"] += n_act
         if n_act == 0:
             if sampling:
-                self._record(active_in, tok, sel, pidx, pick, None, None)
+                self._record(active_in, tok, sel, pidx, pick, None, None, rel)
             return pick, mx.zeros_like(pick), active, made
         pk = mx.maximum(pick, 0)
         me = mx.where(active, mx.take_along_axis(unit, pk[:, None], axis=1)[:, 0], 0)
         cand = self.cand_fn(s, me)
         al = brain.actions(h, pk, cand, self.M)
         if sampling:
-            ai = mx.random.categorical(al, axis=-1, key=k2).astype(I32)
+            ai = mx.where(smask, mx.random.categorical(al, axis=-1, key=k2).astype(I32), A.first_index_eq(al, mx.max(al, axis=1)))
         else:
             ai = A.first_index_eq(al, mx.max(al, axis=1))
         kind = mx.take_along_axis(cand["kind"], ai[:, None], axis=1)[:, 0]
         tgt = mx.take_along_axis(cand["tgt"], ai[:, None], axis=1)[:, 0]
         if sampling:
-            self._record(active_in, tok, sel, pidx, pick, cand, ai)
+            self._record(active_in, tok, sel, pidx, pick, cand, ai, rel)
         self.apply(me, kind, tgt, active, side=0, mk=None if self.legacy else cand["_mk"])
         made = put1(made, me, g1(made, me) + 1, active)
         return pick, ai, active, made
 
-    def _record(self, active_in, tok, sel, pidx, pick, cand, ai):
+    def _record(self, active_in, tok, sel, pidx, pick, cand, ai, rel=None):
         """A sampled decision step for the gradient pass (`armygrpo`): the rows that were deciding, with their inputs (the
         trimmed tokens, the memory, the candidates' fields the action head reads), the sampled indices and the global row."""
         n = int(mx.sum(active_in).item())
@@ -350,10 +364,12 @@ class Game:
         ids, _ = self._compact(active_in, n)
         take = lambda a: mx.take(a, ids, axis=0)
         gid = take(self.row_ids if self.row_ids is not None else mx.arange(active_in.shape[0], dtype=I32))
-        rec = {"gid": gid, "tok": {k: take(tok[k]) for k in ("feat", "dist", "mask", "slot")}, "sel": take(sel),
+        tk = ("feat", "dist", "mask", "slot") + (("pos",) if self.brain.has_map else ())
+        rec = {"gid": gid, "tok": {k: take(tok[k]) for k in tk}, "sel": take(sel), "rel": rel,
                "um": take(self.um), "pm": take(self.pm), "price": take(self.price), "pidx": take(pidx), "pick": take(pick)}
         if cand is not None:
-            rec["cand"] = {k: take(cand[k]) for k in ("feat", "promo", "mask")}
+            ck = ("feat", "promo", "mask") + (("pos",) if self.brain.has_map else ())
+            rec["cand"] = {k: take(cand[k]) for k in ck}
             rec["aidx"] = take(ai)
         self.records.append(rec)
 
