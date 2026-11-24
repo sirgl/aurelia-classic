@@ -206,4 +206,7 @@ fn the_third_parties_are_tokens_of_their_own_with_their_relation() {
     assert!(!ally.is_empty() && ally.iter().all(|r| *r == usize::from(observe::R_ALLY)), "ally-siege: the ally {ally:?}");
     let neutral = rel_of(Fam::NeutralPath);
     assert!(!neutral.is_empty() && neutral.iter().all(|r| *r == usize::from(observe::R_PEACE)), "neutral-path: at peace {neutral:?}");
+    // The camp's neutral is at war with the barbarians, as every nation: no ally for that.
+    let camp = rel_of(Fam::CampRace);
+    assert!(!camp.is_empty() && camp.iter().all(|r| *r == usize::from(observe::R_PEACE)), "camp-race: the neutral at peace {camp:?}");
 }

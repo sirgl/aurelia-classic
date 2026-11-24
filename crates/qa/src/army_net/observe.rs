@@ -148,7 +148,8 @@ impl Third {
 }
 
 /// The relation of `owner`'s pieces to `side` (`orders.foe` is the side's foe of the orders): barbarian, at war, a
-/// city-state, an ally (at peace and a defensive pact, a declaration of friendship, or at war with the foe), at peace.
+/// city-state, an ally (at peace and a defensive pact, a declaration of friendship, or at war with the foe, unless the
+/// foe is the barbarians: every nation is at war with them), at peace.
 pub fn relation(game: &GameState, rules: &CompiledRuleset, side: PlayerId, foe: PlayerId, owner: PlayerId) -> u8 {
     use classic_rules::world::player::ClassicPlayers;
     let _ = rules;
@@ -167,7 +168,8 @@ pub fn relation(game: &GameState, rules: &CompiledRuleset, side: PlayerId, foe: 
     }
     let round = auth.turn().round;
     let rel = auth.module().relations();
-    if (owner != foe && auth.diplomacy().at_war(owner, foe)) || rel.has_pact(side, owner, round) || rel.are_friends(side, owner, round) {
+    let co_belligerent = owner != foe && !auth.players().is_barbarian(foe) && auth.diplomacy().at_war(owner, foe);
+    if co_belligerent || rel.has_pact(side, owner, round) || rel.are_friends(side, owner, round) {
         return R_ALLY;
     }
     R_PEACE
