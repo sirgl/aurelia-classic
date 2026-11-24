@@ -30,6 +30,7 @@ import mlx.nn as nn
 import mlx.optimizers as optim
 from mlx.utils import tree_flatten, tree_map
 
+from . import armymemgrad
 from . import armyobs as A
 from .armyloop import Brain, load_net
 from .armyplay import Game
@@ -147,6 +148,36 @@ def make_rl_grad(model, brain):
     return nn.value_and_grad(model, loss_fn)
 
 
+def memory_rl_gradient(g, adv, n_live, rl_grad, turn_grad, window):
+    """The RL gradient of a play with the memory unrolled over `window` turns (`armymemgrad`): the records of a turn
+    that has earlier turns go through `turn_grad`, those of turn 0 (nothing before them) through `rl_grad` as always.
+    Returns (loss, the summed gradient or None, the largest drift of the recomputed memory from the recorded one)."""
+    by_turn = collections.defaultdict(list)
+    for rec in g.records:
+        by_turn[rec["rel"]].append(rec)
+    total, loss, drift = None, 0.0, 0.0
+    for rel, recs in sorted(by_turn.items()):
+        live = [(rec, [adv[i] / max(n_live, 1) for i in rec["gid"].tolist()]) for rec in recs]
+        live = [(rec, mx.array(w, dtype=mx.float32)) for rec, w in live if any(w)]
+        if not live:
+            continue
+        if rel == 0:
+            parts = []
+            for rec, w in live:
+                tok, c, M = rec_inputs(rec, g.turn_M)
+                l, gr = rl_grad(tok, rec["um"], rec["pm"], rec["price"], M, rec["sel"], rec["pidx"], rec["pick"], w, c, rec.get("aidx"), rec.get("x"))
+                mx.eval(gr, l)
+                parts.append((l.item(), gr))
+        else:
+            l, gr, d = turn_grad(g.mem_tape, rel, window, [r for r, _ in live], [w for _, w in live], lambda rec: rec_inputs(rec, g.turn_M))
+            parts, drift = [(l, gr)], max(drift, d)
+        for l, gr in parts:
+            total = gr if total is None else tree_map(lambda x, y: x + y, total, gr)
+            loss += l
+        mx.eval(total)
+    return loss, total, drift
+
+
 def kl_sum(brain, ref, rec, turn_M):
     """Sum over the record's rows of KL(policy || start) of the pointer, plus of the action where one was taken."""
     tok, c, M = rec_inputs(rec, turn_M)
@@ -236,6 +267,7 @@ def main(argv=None):
     ap.add_argument("--probe", action="store_true", help="no update: only the play and the share of groups with a gradient")
     ap.add_argument("--anchor-only", action="store_true", help="the control: no play, no RL; each update is the anchor's step alone")
     ap.add_argument("--no-eval0", action="store_true")
+    ap.add_argument("--mem-grad", type=int, default=0, help="the RL gradient through the memory's last W turns' steps (armymemgrad); 0: the memory is an input")
     ap.add_argument("--split", type=int, default=70, help="training scenes: instances below it; the rest of --train is the validation set")
     a = ap.parse_args(argv)
     mx.set_memory_limit(16 << 30)
@@ -285,6 +317,7 @@ def main(argv=None):
         held_eval(0)
     opt = optim.Adam(learning_rate=a.lr)
     rl_grad = make_rl_grad(model, brain)
+    turn_grad = armymemgrad.make_turn_gradient(model, brain, logp_parts) if a.mem_grad else None
     rate = {}
     lam = a.anchor_w
     t_train = time.time()
@@ -320,6 +353,8 @@ def main(argv=None):
                     plan[r][pi + P * k] = True
         g = Game(sub, G, brain, salt=False)
         setup(g)
+        if a.mem_grad:
+            g.mem_tape = armymemgrad.Tape(armymemgrad.wanted_turns(plan, a.mem_grad))
         g.sample_plan = {r: mx.array(m) for r, m in plan.items()}
         g.sample_key = mx.random.key(a.seed * 100003 + u)
         g.play()
@@ -341,17 +376,23 @@ def main(argv=None):
                "weights": {f: round(w, 3) for f, w in wts.items()}}
         if True:
             total, loss_rl = None, 0.0
-            for rec in g.records:
-                gid = rec["gid"].tolist()
-                w = [adv[i] / max(n_live, 1) for i in gid]
-                if not any(w):
-                    continue
-                tok, c, M = rec_inputs(rec, g.turn_M)
-                l, gr = rl_grad(tok, rec["um"], rec["pm"], rec["price"], M, rec["sel"], rec["pidx"], rec["pick"], mx.array(w, dtype=mx.float32), c, rec.get("aidx"), rec.get("x"))
-                total = gr if total is None else tree_map(lambda x, y: x + y, total, gr)
-                mx.eval(total, l)
-                loss_rl += l.item()
+            if a.mem_grad:
+                loss_rl, total, drift = memory_rl_gradient(g, adv, n_live, rl_grad, turn_grad, a.mem_grad)
+                row["memory_drift"] = round(drift, 7)
+            else:
+                for rec in g.records:
+                    gid = rec["gid"].tolist()
+                    w = [adv[i] / max(n_live, 1) for i in gid]
+                    if not any(w):
+                        continue
+                    tok, c, M = rec_inputs(rec, g.turn_M)
+                    l, gr = rl_grad(tok, rec["um"], rec["pm"], rec["price"], M, rec["sel"], rec["pidx"], rec["pick"], mx.array(w, dtype=mx.float32), c, rec.get("aidx"), rec.get("x"))
+                    total = gr if total is None else tree_map(lambda x, y: x + y, total, gr)
+                    mx.eval(total, l)
+                    loss_rl += l.item()
             n_rl = norm_of(total) if total is not None else 0.0
+            if total is not None:
+                row["grad_memory_rl"] = armymemgrad.group_norms(total)[0]
             if a.kl_every and u % a.kl_every == 0 and g.records:
                 ks = [kl_sum(brain, ref, rec, g.turn_M) for rec in g.records]
                 row["kl_to_start"] = round(sum(x for x, _ in ks) / max(sum(n for _, n in ks), 1), 5)

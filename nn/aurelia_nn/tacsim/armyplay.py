@@ -172,6 +172,8 @@ class Game:
         # copies of a play share it); the map of the turn (MB nets) is kept per sampled round for the gradient pass.
         self.sample_plan = None
         self.turn_M = {}
+        # The inputs of the memory's step at the end of some turns (`armymemgrad.Tape`, the RL gradient through the memory); None: not kept.
+        self.mem_tape = None
         self.records = []
         self.row_ids = None
         self.verdict = mx.full((self.B,), -1, dtype=I32)
@@ -366,6 +368,8 @@ class Game:
         x = self.xin(rel)
         if self.compare and self.facts:
             self.compare_moment(rel, None, mx.arange(B, dtype=I32), x, trace, tok=tok)
+        if self.mem_tape is not None:
+            self.mem_tape.note(self, rel, tok, x, live)
         h = self.body_fn(tok, self.um, self.pm, self.M, self.price, x)
         um2, pm2, al2 = brain.step(h, tok, self.um, self.pm, self.alive)
         if brain.notes:
