@@ -325,6 +325,8 @@ def third_slot_list(game):
 
 
 def neutral_rule(game, live):
+    if not active(game.s):   # no camp in this batch (as neutral_turn): every play of the other families
+        return
     rows = _rows(game, live) & mx.array([f == "camp-race" for f in game.fam])
     if bool(mx.any(rows).item()):
         R.seat_turn(game, 2, rows)
