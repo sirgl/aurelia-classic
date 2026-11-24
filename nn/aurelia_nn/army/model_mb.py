@@ -408,7 +408,9 @@ class MBNNet(MBNet):
 
 
 # MBe: the hand-set term's numbers (M-HANDOFF.md, "Hand edit: wounded out of range (24 Nov)"; model.rs WW_LEN).
-WW = ('scale', 'hp_threshold', 'hp_slope', 'ranged_hp_threshold', 'resting_weight', 'city_low_threshold', 'city_low_slope', 'resting_slope', 'stay_scale')
+WW = ('scale', 'hp_threshold', 'hp_slope', 'ranged_hp_threshold', 'resting_weight', 'city_low_threshold', 'city_low_slope', 'resting_slope', 'stay_scale', 'healing_weight', 'back_threshold')
+# Half the smallest step of a token's hit points (model.rs HEALING_STEP).
+HEALING_STEP = 0.005
 
 
 class MBENet(MBNet):
@@ -416,7 +418,9 @@ class MBENet(MBNet):
     acting unit's gate g = wounded x (1 - city_low): (1) a candidate that does not strike (done, move, fortify, set up) and whose
     tile is in a foe city's strike range (candidate number 16) loses `scale x g` from its logit; (2) a move of a unit that stands
     out of that range (its token's number 36) loses `stay_scale x g` (a unit that moves does not heal); where
-      wounded  = max(sigmoid(hp_slope (thr - hp)), resting_weight x sigmoid(resting_slope (aux_u[1] on u[U_RESTING]))),
+      wounded  = max(sigmoid(hp_slope (thr - hp)), resting_weight x sigmoid(resting_slope (aux_u[1] on u[U_RESTING])),
+                 healing_weight x sigmoid(hp_slope (back_threshold - hp)) x sigmoid(hp_slope (gained - HEALING_STEP))),
+                 gained = the token's number 46 (hit points gained since our last turn: the unit is healing, rests until back),
                  hp = the unit token's number 7, thr = ranged_hp_threshold for a unit with range (token number 13 > 0),
                  else hp_threshold; u = the unit's memory slot as the decision reads it;
       city_low = sigmoid(city_low_slope (city_low_threshold - the objective city's hp share)) (token numbers 3, 43, 7).
@@ -444,8 +448,9 @@ class MBENet(MBNet):
         is_city = (tok[..., 3] > 0.5) & (tok[..., 43] > 0.5)
         first = mx.argmax(is_city.astype(mx.int32), axis=1)
         city = mx.where(mx.any(is_city, axis=1), tok[ar, first, 7], 1.0)
+        healing = w[9] * mx.sigmoid(w[2] * (w[10] - f[:, 7])) * mx.sigmoid(w[2] * (f[:, 46] - HEALING_STEP))
         low = mx.sigmoid(w[6] * (w[5] - city))
-        return mx.maximum(hp, rest) * (1.0 - low)
+        return mx.maximum(mx.maximum(hp, rest), healing) * (1.0 - low)
 
     def wounded_term(self, cand, gate, out_of_fire):
         """[B, C]: the terms subtracted from each candidate's logit (out_of_fire [B]: 1 - the unit token's number 36)."""

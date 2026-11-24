@@ -473,7 +473,8 @@ pub struct Timing {
 /// The decision trace (`ARMY_NET_DECISION_TRACE=file.jsonl`, info only: the play is unchanged): per decision of the net, the
 /// play, the round, the unit (army slot, hp, ranged, distance to the objective, the memory's resting readout in force), the
 /// pointer's logits (the unit's, the end's, the best other unit's) and every candidate (kind, ends in a foe city's strike range,
-/// distance of its tile to the objective, threat, logit), the candidate applied.
+/// distance of its tile to the objective, threat, the change of that distance, logit, a move's moves left share and targets in reach
+/// from its tile), the candidate applied.
 fn decision_trace_on() -> bool {
     trace_file().is_some()
 }
@@ -498,7 +499,7 @@ fn trace_decision(scene: &Scene, orders: &Orders, tokens: &observe::Tokens, memo
         .zip(scores)
         .map(|(c, s)| {
             let kind = (0..10).find(|k| c.feat[*k] > 0.5).unwrap_or(9);
-            serde_json::json!([kind, c.feat[16], (c.feat[22] * 12.0).round(), (c.feat[19] * 4.0).round(), c.feat[23] * 5.0, s])
+            serde_json::json!([kind, c.feat[16], (c.feat[22] * 12.0).round(), (c.feat[19] * 4.0).round(), c.feat[23] * 5.0, s, c.feat[27], (c.feat[29] * 3.0).round()])
         })
         .collect();
     let _ = slots;

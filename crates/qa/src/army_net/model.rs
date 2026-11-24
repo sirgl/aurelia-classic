@@ -200,8 +200,10 @@ pub struct Net {
 
 /// The numbers of the hand-set term `ww` (`army/model_mb.py`, `MBENet`; M-HANDOFF.md, "Hand edit: wounded out of range"):
 /// [scale, hp threshold, hp slope, ranged hp threshold, resting weight, city-low threshold, city-low slope, resting slope,
-/// stay scale].
-pub const WW_LEN: usize = 9;
+/// stay scale, healing weight, back threshold].
+pub const WW_LEN: usize = 11;
+/// Half the smallest step of a token's hit points (1 / 100): "gained since our last turn" is number 46 above it.
+const HEALING_STEP: f32 = 0.005;
 
 /// Variant MBN's note weights (`army/model_mb.py`, `MBNNet`): a note's embedding `n2(relu(n1(note)))`; per layer a
 /// cross-attention like MBH's (`null`, `same`, `slope` per layer and head; its context through `no[layer]`); the heads
@@ -1296,7 +1298,8 @@ impl Net {
     /// g = wounded x (1 - city_low): (1) a non-strike candidate (done, move, fortify, set up) whose tile is in a foe city's strike
     /// range (candidate number 16) loses `scale x g`; (2) a move of a unit that stands out of that range (its token's number 36)
     /// loses `stay scale x g` (a unit that moves does not heal). wounded = max(sigmoid(hp slope (threshold - hp)), resting weight x
-    /// sigmoid(resting slope x the memory's resting readout)), the threshold the ranged one for a unit with range; city_low =
+    /// sigmoid(resting slope x the memory's resting readout), healing weight x sigmoid(hp slope (back threshold - hp)) x
+    /// sigmoid(hp slope (gained since our last turn - HEALING_STEP))), the threshold the ranged one for a unit with range; city_low =
     /// sigmoid(slope (threshold - the objective city's hp share)). `MBENet.wounded_term` is the same arithmetic.
     pub fn actions_x(&self, body: &Body, unit: usize, candidates: &[Candidate], map: Option<&MapState>, tokens: &Tokens, mem: Option<&MemIn>) -> Vec<f32> {
         let mut out = self.actions(body, unit, candidates, map);
@@ -1323,9 +1326,10 @@ impl Net {
             },
             _ => 0.0,
         };
+        let healing = w[9] * sig(w[2] * (w[10] - f[7])) * sig(w[2] * (f[46] - HEALING_STEP));
         let city = (0..tokens.len()).find(|i| tokens.feat[*i][3] > 0.5 && tokens.feat[*i][43] > 0.5).map_or(1.0, |i| tokens.feat[i][7]);
         let low = sig(w[6] * (w[5] - city));
-        hp.max(rest) * (1.0 - low)
+        hp.max(rest).max(healing) * (1.0 - low)
     }
 
     pub fn has_ww(&self) -> bool {
