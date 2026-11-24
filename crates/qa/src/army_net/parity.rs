@@ -9,13 +9,15 @@ use std::time::Instant;
 use classic_rules::ids::TileId;
 
 use super::model::Net;
-use super::observe::{f16_to_f32, Action, Candidate, Tokens, F_ACT, F_TOK};
-use super::record::{DECISION_MAGIC, MEMORY_STATE, PLAY_MAGIC, PLAY_MAGIC3, PLAY_MAGIC4, TRACK};
+use super::observe::{f16_to_f32, Action, Candidate, Third, Tokens, F_ACT, F_TOK, X_ACT, X_TOK};
+use super::record::{DECISION_MAGIC, MEMORY_STATE, PLAY_MAGIC, PLAY_MAGIC3, PLAY_MAGIC4, PLAY_MAGIC5, TRACK};
 
 /// One recorded decision, as the net reads it.
 pub struct Recorded {
     /// The play's static planes (shared by its decisions).
     pub statics: std::rc::Rc<Vec<f32>>,
+    /// Record v5: the play's relation planes (zeros before).
+    pub statics_rel: std::rc::Rc<Vec<f32>>,
     pub play: usize,
     pub round: u16,
     pub tokens: Tokens,
@@ -58,15 +60,17 @@ pub fn read(bytes: &[u8], limit: usize) -> Result<Vec<Recorded>, String> {
     let mut out = Vec::new();
     while r.at < bytes.len() && out.len() < limit {
         let magic = r.u32()?;
-        if magic != PLAY_MAGIC && magic != PLAY_MAGIC3 && magic != PLAY_MAGIC4 {
+        if magic != PLAY_MAGIC && magic != PLAY_MAGIC3 && magic != PLAY_MAGIC4 && magic != PLAY_MAGIC5 {
             return Err(format!("no play at {}", r.at - 4));
         }
-        let v4 = magic == PLAY_MAGIC4;
+        let v5 = magic == PLAY_MAGIC5;
+        let v4 = magic == PLAY_MAGIC4 || v5;
         let v3 = magic == PLAY_MAGIC3 || v4;
         let jl = r.u32()? as usize;
         let meta: serde_json::Value = serde_json::from_slice(r.take(jl)?).map_err(|e| format!("play json: {e}"))?;
         let price = play_price(&meta);
         let statics = std::rc::Rc::new(r.f16s(super::W * super::W * super::S_CH)?);
+        let statics_rel = std::rc::Rc::new(if v5 { r.f16s(super::W * super::W * super::S_REL)? } else { vec![0.0; super::W * super::W * super::S_REL] });
         let play = out.last().map_or(0, |d: &Recorded| d.play + 1);
         let n = r.u32()?;
         for _ in 0..n {
@@ -106,11 +110,22 @@ pub fn read(bytes: &[u8], limit: usize) -> Result<Vec<Recorded>, String> {
                 hist_slot = (0..h).map(|_| r.u16().map(|x| x as i16)).collect::<Result<_, _>>()?;
                 hist_age = r.take(h)?.to_vec();
             }
+            let (mut xfeat, mut cx, mut third) = (vec![[0f32; X_TOK]; t], vec![[0f32; X_ACT]; c], Third::default());
+            if v5 {
+                xfeat = r.f16s(t * X_TOK)?.chunks_exact(X_TOK).map(|x| x.try_into().expect("chunks of X_TOK")).collect();
+                cx = r.f16s(c * X_ACT)?.chunks_exact(X_ACT).map(|x| x.try_into().expect("chunks of X_ACT")).collect();
+                let x = r.u16()? as usize;
+                third.feat = r.f16s(x * F_TOK)?.chunks_exact(F_TOK).map(|v| v.try_into().expect("chunks of F_TOK")).collect();
+                third.x = r.f16s(x * X_TOK)?.chunks_exact(X_TOK).map(|v| v.try_into().expect("chunks of X_TOK")).collect();
+                third.pos = (0..x).map(|_| r.u16().map(|v| v as i16)).collect::<Result<_, _>>()?;
+                third.tile = vec![TileId(0); x];
+                third.dist = r.take(t * x)?.to_vec();
+            }
             let feat: Vec<[f32; F_TOK]> = tf.chunks_exact(F_TOK).map(|x| x.try_into().expect("chunks of F_TOK")).collect();
-            let tokens = Tokens { feat, dist, selectable, unit: vec![None; t], tile: vec![TileId(0); t], pos, price, hist, hist_slot, hist_age };
-            let candidates = cf.chunks_exact(F_ACT).zip(promos).zip(cpos).map(|((x, promo), pos)| Candidate { feat: x.try_into().expect("chunks of F_ACT"), promo, pos, action: Action::Done }).collect();
+            let tokens = Tokens { feat, dist, selectable, unit: vec![None; t], tile: vec![TileId(0); t], pos, price, hist, hist_slot, hist_age, xfeat, third };
+            let candidates = cf.chunks_exact(F_ACT).zip(promos).zip(cpos).zip(cx).map(|(((f, promo), pos), x)| Candidate { feat: f.try_into().expect("chunks of F_ACT"), x, promo, pos, action: Action::Done }).collect();
             if out.len() < limit {
-                out.push(Recorded { statics: statics.clone(), play, round, tokens, candidates, pointer, action, flags, slots, track });
+                out.push(Recorded { statics: statics.clone(), statics_rel: statics_rel.clone(), play, round, tokens, candidates, pointer, action, flags, slots, track });
             }
         }
     }
@@ -168,14 +183,14 @@ pub fn main(args: &[String]) -> Result<(), String> {
         }
         let map = if net.has_map() && net.has_memory() {
             if turn_map.as_ref().is_none_or(|(p, k, _)| *p != d.play || *k != turn_of) {
-                let planes = super::model::planes(&d.statics, &d.tokens);
+                let planes = net.planes(&d.statics, &d.statics_rel, &d.tokens);
                 let te = Instant::now();
                 turn_map = net.map_full(planes).map(|m| (d.play, turn_of, m));
                 encode_ns += te.elapsed().as_nanos();
             }
             turn_map.as_ref().map(|(_, _, m)| m.clone())
         } else if net.has_map() {
-            let planes = super::model::planes(&d.statics, &d.tokens);
+            let planes = net.planes(&d.statics, &d.statics_rel, &d.tokens);
             let te = Instant::now();
             let full = net.map_full(planes.clone());
             let ns = te.elapsed().as_nanos();
@@ -210,6 +225,7 @@ pub fn main(args: &[String]) -> Result<(), String> {
         let (ptr, end) = net.pointer(&body, &d.tokens);
         let acts = if d.pointer >= 0 { net.actions_x(&body, d.pointer as usize, &d.candidates, map.as_ref(), &d.tokens, mem_in.as_ref()) } else { Vec::new() };
         forward_ns += t0.elapsed().as_nanos();
+        let mut mem_after = serde_json::Value::Null;
         if d.flags & MEMORY_STATE != 0 {
             if let Some((_, m)) = memory.as_mut() {
                 let tm = Instant::now();
@@ -217,16 +233,27 @@ pub fn main(args: &[String]) -> Result<(), String> {
                 memory_ns += tm.elapsed().as_nanos();
                 memory_steps += 1;
                 turn_of += 1;
+                // `ARMY_PARITY_MEMORY=1`: the memory after the step (u, p, alive), so that the MLX side can read each turn
+                // with Rust's memory (`parity_m --forced-memory`: one step of the forward, without the drift of the recurrence).
+                if std::env::var_os("ARMY_PARITY_MEMORY").is_some() {
+                    mem_after = serde_json::json!(m.u.iter().chain(&m.p).chain(&m.alive).collect::<Vec<_>>());
+                }
             }
         }
         if d.pointer >= 0 {
             unit_decisions += 1;
         }
         let ptr: Vec<serde_json::Value> = ptr.iter().map(|x| x.map_or(serde_json::Value::Null, |v| serde_json::json!(v))).chain(std::iter::once(serde_json::json!(end))).collect();
-        writeln!(file, "{}", serde_json::json!({"ptr": ptr, "act": acts, "label_ptr": d.pointer, "label_act": d.action})).map_err(|e| e.to_string())?;
+        let mut line = serde_json::json!({"ptr": ptr, "act": acts, "label_ptr": d.pointer, "label_act": d.action});
+        if !mem_after.is_null() {
+            line["mem"] = mem_after;
+        }
+        writeln!(file, "{line}").map_err(|e| e.to_string())?;
     }
     let n = decisions.len().max(1) as f64;
     println!("{} decisions ({} with a unit), forward {:.1} us per decision (body + pointer + its unit's scorer), one thread", decisions.len(), unit_decisions, forward_ns as f64 / 1000.0 / n);
+    let (hits, misses) = super::model::cache_stats();
+    println!("key / value cache: {hits} hits, {misses} misses");
     if net.has_memory() {
         println!("memory: {memory_steps} updates, {:.1} us each (one thread)", memory_ns as f64 / 1000.0 / memory_steps.max(1) as f64);
     }

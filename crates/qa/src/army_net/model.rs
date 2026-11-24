@@ -6,8 +6,8 @@
 
 use std::collections::BTreeMap;
 
-use super::observe::{Candidate, Tokens, D_MAX, F_ACT, F_TOK};
-use super::{S_CH, W};
+use super::observe::{Candidate, Tokens, D_MAX, F_ACT, F_TOK, X_ACT, X_DECLARES, X_TOK};
+use super::{S_CH, S_REL, W};
 
 pub const WEIGHTS_MAGIC: u32 = u32::from_le_bytes(*b"ARMW");
 
@@ -50,14 +50,23 @@ pub use super::map_conv::MapState;
 
 /// The map planes of a moment: the static planes and the tokens' local facts on their tiles (summed).
 pub fn planes(statics: &[f32], tokens: &Tokens) -> Vec<f32> {
-    let mut p = vec![0f32; TILES * M_IN];
+    planes_with(statics, None, tokens)
+}
+
+/// `planes`, and (typed tokens: a map encoder of `M_IN + S_REL` planes) the relation planes after the tokens' facts.
+fn planes_with(statics: &[f32], rel: Option<&[f32]>, tokens: &Tokens) -> Vec<f32> {
+    let np = M_IN + if rel.is_some() { S_REL } else { 0 };
+    let mut p = vec![0f32; TILES * np];
     for i in 0..TILES {
-        p[i * M_IN..i * M_IN + S_CH].copy_from_slice(&statics[i * S_CH..(i + 1) * S_CH]);
+        p[i * np..i * np + S_CH].copy_from_slice(&statics[i * S_CH..(i + 1) * S_CH]);
+        if let Some(r) = rel {
+            p[i * np + M_IN..(i + 1) * np].copy_from_slice(&r[i * S_REL..(i + 1) * S_REL]);
+        }
     }
     for (t, f) in tokens.feat.iter().enumerate() {
         let Ok(i) = usize::try_from(tokens.pos[t]) else { continue };
         for (k, src) in LOCAL.iter().enumerate() {
-            p[i * M_IN + S_CH + k] += f[*src];
+            p[i * np + S_CH + k] += f[*src];
         }
     }
     p
@@ -163,9 +172,87 @@ struct Layer {
     f2: Dense,
 }
 
+/// The cache of the key / value tokens (plan 11.5, step 1.5: "history, notes, summaries encoded once per turn"): the
+/// embedding of a fact, a note or a third token and its key and value at each layer are kept by CONTENT (the input
+/// numbers' bits, the net's id), so a token unchanged since an earlier decision is not encoded again. The numbers are
+/// those the same code computed then, bit for bit (`ARMY_NET_NO_CACHE=1` recomputes them: the guard of the equality).
+/// A fact's keys live while the fact lives; a note's and a summary's for the turn; a third token's while its numbers
+/// stand. Per thread (a play runs on one thread); emptied when it holds `KV_MAX` rows.
+#[derive(Default)]
+struct KvCache {
+    rows: std::collections::HashMap<Vec<u32>, std::rc::Rc<Vec<f32>>>,
+    hits: u64,
+    misses: u64,
+}
+
+const KV_MAX: usize = 1 << 14;
+const KV_FACT: u32 = 1;
+const KV_NOTE: u32 = 2;
+const KV_THIRD: u32 = 3;
+const KV_LAYER: u32 = 16;
+
+thread_local! {
+    static KV: std::cell::RefCell<KvCache> = std::cell::RefCell::new(KvCache::default());
+}
+
+fn kv_off() -> bool {
+    static OFF: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *OFF.get_or_init(|| std::env::var_os("ARMY_NET_NO_CACHE").is_some())
+}
+
+/// The cache's hits and misses on this thread so far.
+pub fn cache_stats() -> (u64, u64) {
+    KV.with(|c| {
+        let c = c.borrow();
+        (c.hits, c.misses)
+    })
+}
+
+/// The cache key of numbers `parts` of kind `tag` for net `id`.
+fn kv_key(id: u64, tag: u32, parts: &[&[f32]]) -> Vec<u32> {
+    let mut k = Vec::with_capacity(3 + parts.iter().map(|p| p.len() + 1).sum::<usize>());
+    k.extend([id as u32, (id >> 32) as u32, tag]);
+    for p in parts {
+        k.push(p.len() as u32);
+        k.extend(p.iter().map(|x| x.to_bits()));
+    }
+    k
+}
+
+/// The row of `key`: cached, or `make` (then cached).
+fn kv_get(key: Vec<u32>, make: impl FnOnce() -> Vec<f32>) -> std::rc::Rc<Vec<f32>> {
+    if kv_off() {
+        return std::rc::Rc::new(make());
+    }
+    if let Some(v) = KV.with(|c| {
+        let mut c = c.borrow_mut();
+        let v = c.rows.get(&key).cloned();
+        if v.is_some() {
+            c.hits += 1;
+        }
+        v
+    }) {
+        return v;
+    }
+    let v = std::rc::Rc::new(make());
+    KV.with(|c| {
+        let mut c = c.borrow_mut();
+        if c.rows.len() >= KV_MAX {
+            c.rows.clear();
+        }
+        c.misses += 1;
+        c.rows.insert(key, v.clone());
+    });
+    v
+}
+
+static NET_IDS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
+
 /// The loaded net.
 #[derive(Debug, Clone)]
 pub struct Net {
+    /// This load's id (the cache's keys).
+    id: u64,
     pub config: Config,
     e1: Dense,
     e2: Dense,
@@ -196,6 +283,67 @@ pub struct Net {
     xnotes: Option<XNoteW>,
     /// MBe: the hand-set term "a wounded unit does not end its turn in the city's strike range" (`ww`, None: none).
     ww: Option<[f32; WW_LEN]>,
+    /// MBT: typed tokens and the third parties' path (None: none; the third tokens are not read).
+    typed: Option<TypedW>,
+}
+
+/// Token types of MBT (`army/model_mb.py` `MBTNet`): the objective, a unit of the main stream, a city of it, a third
+/// party's unit, a third party's city.
+pub const TYPES: usize = 5;
+const TY_OBJ: usize = 0;
+const TY_UNIT: usize = 1;
+const TY_CITY: usize = 2;
+const TY_TUNIT: usize = 3;
+const TY_TCITY: usize = 4;
+
+/// MBT's weights (`work/nets/net-types/GATES.md` "gate T1"): the objective's and the city's encoders (`ty_obj1/2`,
+/// `ty_city1/2`; the unit's is `e1`/`e2`), the type embedding `ty_emb` [TYPES][d], the extras' projection `ty_x`
+/// [X_TOK][d]; the third tokens' encoders (`tp_u1/2` units, `tp_c1/2` cities), their extras' projection `tp_x`, and per
+/// layer a separate cross-attention of the stream to them (the layer's q / k / v, norm1 on their embedding, a null key
+/// `tp_null[l][h]`, the distance bias `tp_dist[l][h][d]` for a main-token query, 0 for a plan token's) whose context
+/// enters through `tp_o[l]`; the candidates' extras' projection `cx` [X_ACT][d] into the scorer's first layer and the
+/// shift `c_new` of the new candidate kind ("declares war").
+#[derive(Debug, Clone)]
+struct TypedW {
+    obj1: Dense,
+    obj2: Dense,
+    city1: Dense,
+    city2: Dense,
+    emb: Vec<f32>,
+    x: Vec<f32>,
+    u1: Dense,
+    u2: Dense,
+    c1: Dense,
+    c2: Dense,
+    tx: Vec<f32>,
+    null: Vec<f32>,
+    dist: Vec<f32>,
+    o: Vec<Dense>,
+    cx: Vec<f32>,
+    c_new: f32,
+}
+
+/// The type of main token `i` (by its kind numbers).
+fn main_type(f: &[f32; F_TOK]) -> usize {
+    if f[super::observe::TOK_OBJECTIVE] > 0.5 {
+        TY_OBJ
+    } else if f[super::observe::TOK_CITY] > 0.5 {
+        TY_CITY
+    } else {
+        TY_UNIT
+    }
+}
+
+/// `y += x M` for a row `x` and a matrix `M` stored `[in][out]`.
+fn add_proj(x: &[f32], m: &[f32], y: &mut [f32]) {
+    let d = y.len();
+    for (k, v) in x.iter().enumerate() {
+        if *v != 0.0 {
+            for c in 0..d {
+                y[c] += v * m[k * d + c];
+            }
+        }
+    }
 }
 
 /// The numbers of the hand-set term `ww` (`army/model_mb.py`, `MBENet`; M-HANDOFF.md, "Hand edit: wounded out of range"):
@@ -628,6 +776,36 @@ impl Net {
             Some((shape, _)) => return Err(format!("ww is {shape:?}, not [{WW_LEN}]")),
             None => None,
         };
+        let typed = if t.contains_key("ty_emb") {
+            let raw = |name: &str, shape: &[usize]| -> Result<Vec<f32>, String> {
+                let (s, v) = get(name)?;
+                if s.as_slice() != shape {
+                    return Err(format!("{name} is {s:?}, not {shape:?}"));
+                }
+                Ok(v.clone())
+            };
+            let nb = c.dmax + 1;
+            Some(TypedW {
+                obj1: dense("ty_obj1")?,
+                obj2: dense("ty_obj2")?,
+                city1: dense("ty_city1")?,
+                city2: dense("ty_city2")?,
+                emb: raw("ty_emb", &[TYPES, c.d])?,
+                x: raw("ty_x", &[X_TOK, c.d])?,
+                u1: dense("tp_u1")?,
+                u2: dense("tp_u2")?,
+                c1: dense("tp_c1")?,
+                c2: dense("tp_c2")?,
+                tx: raw("tp_x", &[X_TOK, c.d])?,
+                null: raw("tp_null", &[c.layers, c.heads])?,
+                dist: raw("tp_dist", &[c.layers, c.heads, nb])?,
+                o: (0..c.layers).map(|l| dense(&format!("tp_o.{l}"))).collect::<Result<Vec<_>, _>>()?,
+                cx: raw("cx", &[X_ACT, c.d])?,
+                c_new: raw("c_new", &[1])?[0],
+            })
+        } else {
+            None
+        };
         let price = if t.contains_key("w_price") {
             let (shape, w) = get("w_price")?;
             if shape.as_slice() != [3, c.d] {
@@ -638,6 +816,8 @@ impl Net {
             None
         };
         Ok(Net {
+            id: NET_IDS.fetch_add(1, std::sync::atomic::Ordering::Relaxed),
+            typed,
             ww,
             xnotes,
             xhist,
@@ -665,6 +845,18 @@ impl Net {
 
     pub fn has_map(&self) -> bool {
         self.map.is_some()
+    }
+
+    /// MBT: typed tokens and the third parties' path.
+    pub fn has_typed(&self) -> bool {
+        self.typed.is_some()
+    }
+
+    /// The map planes this net's encoder reads: the old `planes`, plus the relation planes `rel` when the encoder has
+    /// `M_IN + S_REL` inputs (MBT).
+    pub fn planes(&self, statics: &[f32], rel: &[f32], tokens: &Tokens) -> Vec<f32> {
+        let wide = self.map.as_ref().is_some_and(|e| e.conv.planes() == M_IN + S_REL);
+        planes_with(statics, wide.then_some(rel), tokens)
     }
 
     /// MN at our turn's end (after the memory's update): the heads and the stream (`MNNet.note_heads`, `write_notes`).
@@ -959,9 +1151,37 @@ impl Net {
         let n = tokens.len();
         let d = self.config.d;
         let flat: Vec<f32> = tokens.feat.iter().flat_map(|f| f.iter().copied()).collect();
-        let mut e = self.e1.rows(&flat, n);
-        relu(&mut e);
-        let mut h = self.e2.rows(&e, n);
+        let mut h = match self.typed.as_ref() {
+            None => {
+                let mut e = self.e1.rows(&flat, n);
+                relu(&mut e);
+                self.e2.rows(&e, n)
+            }
+            // MBT: each type its encoder, then its type embedding and its extras' projection.
+            Some(tw) => {
+                let mut h = vec![0.0; n * d];
+                let mut e = vec![0.0; d];
+                for i in 0..n {
+                    let ty = main_type(&tokens.feat[i]);
+                    let (a, b) = match ty {
+                        TY_OBJ => (&tw.obj1, &tw.obj2),
+                        TY_CITY => (&tw.city1, &tw.city2),
+                        _ => (&self.e1, &self.e2),
+                    };
+                    a.apply(&tokens.feat[i], &mut e);
+                    relu(&mut e);
+                    let row = &mut h[i * d..(i + 1) * d];
+                    b.apply(&e, row);
+                    for c in 0..d {
+                        row[c] += tw.emb[ty * d + c];
+                    }
+                    if let Some(x) = tokens.xfeat.get(i) {
+                        add_proj(x, &tw.x, row);
+                    }
+                }
+                h
+            }
+        };
         // Variant M: each unit's slot memory enters its token; the plan tokens follow the tokens.
         let mut plans = 0;
         if let (Some(m), Some(mi)) = (self.mem.as_ref(), mem) {
@@ -1052,11 +1272,15 @@ impl Net {
                 for (k, fact) in tokens.hist.iter().enumerate() {
                     f.copy_from_slice(fact);
                     f[HX_AGE_COL] = 0.0;
-                    xw.h1.apply(&f, &mut e1);
-                    relu(&mut e1);
-                    xw.h2.apply(&e1, &mut y);
-                    xw.hp.apply(mi.state.p0_at(tokens.hist_age[k], d), &mut z);
-                    he.extend(y.iter().zip(&z).map(|(a, b)| a + b));
+                    let p0 = mi.state.p0_at(tokens.hist_age[k], d);
+                    let row = kv_get(kv_key(self.id, KV_FACT, &[&f, p0]), || {
+                        xw.h1.apply(&f, &mut e1);
+                        relu(&mut e1);
+                        xw.h2.apply(&e1, &mut y);
+                        xw.hp.apply(p0, &mut z);
+                        y.iter().zip(&z).map(|(a, b)| a + b).collect()
+                    });
+                    he.extend_from_slice(&row);
                 }
                 let qslots = (0..n).map(|i| mi.slots[i]).chain(std::iter::repeat(-1).take(plans)).collect();
                 Some(XHistIn { he, slots: tokens.hist_slot.clone(), ages: tokens.hist_age.iter().map(|a| f32::from(*a)).collect(), qslots })
@@ -1071,16 +1295,57 @@ impl Net {
                 let mut y = vec![0.0; d];
                 let mut he = Vec::with_capacity(notes.len() * d);
                 for (f, _, _) in &notes {
-                    xw.n1.apply(f, &mut e1);
-                    relu(&mut e1);
-                    xw.n2.apply(&e1, &mut y);
-                    he.extend_from_slice(&y);
+                    let row = kv_get(kv_key(self.id, KV_NOTE, &[f]), || {
+                        xw.n1.apply(f, &mut e1);
+                        relu(&mut e1);
+                        xw.n2.apply(&e1, &mut y);
+                        y.clone()
+                    });
+                    he.extend_from_slice(&row);
                 }
                 let qslots = (0..n).map(|i| mi.slots[i]).chain(std::iter::repeat(-1).take(plans)).collect();
                 Some(XHistIn { he, slots: notes.iter().map(|x| x.1).collect(), ages: notes.iter().map(|x| x.2).collect(), qslots })
             }
             _ => None,
         };
+        // MBT: the third tokens' embedding (their encoder, type, extras, the map at their tile).
+        let te: Option<Vec<f32>> = self.typed.as_ref().map(|tw| {
+            let th = &tokens.third;
+            let m = th.len();
+            let mut te = vec![0.0; m * d];
+            let mut e = vec![0.0; d];
+            let mut y = vec![0.0; d];
+            for j in 0..m {
+                let city = th.is_city(j);
+                let (a, b, ty) = if city { (&tw.c1, &tw.c2, TY_TCITY) } else { (&tw.u1, &tw.u2, TY_TUNIT) };
+                let at = match (self.map.as_ref(), map, usize::try_from(th.pos[j])) {
+                    (Some(enc), Some(st), Ok(p)) => {
+                        let mc = enc.conv.channels();
+                        Some(&st.out()[p * mc..(p + 1) * mc])
+                    }
+                    _ => None,
+                };
+                let cached = kv_get(kv_key(self.id, KV_THIRD, &[&th.feat[j], &th.x[j], at.unwrap_or(&[])]), || {
+                    let mut row = vec![0.0; d];
+                    a.apply(&th.feat[j], &mut e);
+                    relu(&mut e);
+                    b.apply(&e, &mut row);
+                    for c in 0..d {
+                        row[c] += tw.emb[ty * d + c];
+                    }
+                    add_proj(&th.x[j], &tw.tx, &mut row);
+                    if let (Some(enc), Some(mrow)) = (self.map.as_ref(), at) {
+                        enc.tok.apply(mrow, &mut y);
+                        for c in 0..d {
+                            row[c] += y[c];
+                        }
+                    }
+                    row
+                });
+                te[j * d..(j + 1) * d].copy_from_slice(&cached);
+            }
+            te
+        });
         let mut a = vec![0.0; total * d];
         let hist_in = if he.is_empty() { None } else { Some((he.as_slice(), hslots.as_slice(), qslots.as_slice())) };
         for (li, layer) in self.layers.iter().enumerate() {
@@ -1094,6 +1359,9 @@ impl Net {
                 let heads = self.config.heads;
                 let r = li * heads..(li + 1) * heads;
                 self.cross(&xw.null[r.clone()], &xw.same[r.clone()], &xw.slope[r], &xw.no[li], layer, total, &q, &mut h, xi);
+            }
+            if let (Some(tw), Some(te)) = (self.typed.as_ref(), te.as_ref()) {
+                self.cross_third(tw, li, layer, n, total, &q, &mut h, te, &tokens.third.dist);
             }
             self.feed(layer, total, &mut h, &mut a);
         }
@@ -1185,12 +1453,8 @@ impl Net {
         let heads = self.config.heads;
         let dh = d / heads;
         let nh = xi.he.len() / d;
-        let mut ah = vec![0.0; xi.he.len()];
-        for j in 0..nh {
-            layer.norm1.apply(&xi.he[j * d..(j + 1) * d], &mut ah[j * d..(j + 1) * d]);
-        }
-        let kh = layer.k.rows(&ah, nh);
-        let vh = layer.v.rows(&ah, nh);
+        let li = self.layers.iter().position(|l| std::ptr::eq(l, layer)).unwrap_or(usize::MAX);
+        let (kh, vh) = self.key_values(li, layer, &xi.he);
         let scale = 1.0 / (dh as f32).sqrt();
         let mut ctx = vec![0.0; n * d];
         let mut s = vec![0.0; nh];
@@ -1224,6 +1488,86 @@ impl Net {
         for (x, y) in h.iter_mut().zip(o) {
             *x += y;
         }
+    }
+
+    /// MBT: the cross-attention of the `total` stream tokens (queries `q`; the first `n` are the main tokens) to the third
+    /// tokens (embedding `te`, distances `dist` [n][m]): its own softmax over the null key and them, the distance bias for
+    /// a main token's query, through `tp_o[li]` into `h`.
+    #[allow(clippy::too_many_arguments)]
+    fn cross_third(&self, tw: &TypedW, li: usize, layer: &Layer, n: usize, total: usize, q: &[f32], h: &mut [f32], te: &[f32], dist: &[u8]) {
+        let d = self.config.d;
+        let heads = self.config.heads;
+        let dh = d / heads;
+        let nb = self.config.dmax + 1;
+        let m = te.len() / d;
+        let mut ctx = vec![0.0; total * d];
+        if m > 0 {
+            let (kh, vh) = self.key_values(li, layer, te);
+            let scale = 1.0 / (dh as f32).sqrt();
+            let mut s = vec![0.0; m];
+            for hd in 0..heads {
+                let null = tw.null[li * heads + hd];
+                let bias = &tw.dist[(li * heads + hd) * nb..(li * heads + hd + 1) * nb];
+                for i in 0..total {
+                    let qi = &q[i * d + hd * dh..i * d + hd * dh + dh];
+                    let mut max = null;
+                    for j in 0..m {
+                        let kj = &kh[j * d + hd * dh..j * d + hd * dh + dh];
+                        s[j] = dot(qi, kj) * scale + if i < n { bias[usize::from(dist[i * m + j])] } else { 0.0 };
+                        max = max.max(s[j]);
+                    }
+                    let mut sum = (null - max).exp();
+                    for x in s.iter_mut() {
+                        *x = (*x - max).exp();
+                        sum += *x;
+                    }
+                    let out = &mut ctx[i * d + hd * dh..i * d + hd * dh + dh];
+                    for j in 0..m {
+                        let w = s[j] / sum;
+                        let vj = &vh[j * d + hd * dh..j * d + hd * dh + dh];
+                        for c in 0..dh {
+                            out[c] += w * vj[c];
+                        }
+                    }
+                }
+            }
+        }
+        if m == 0 {
+            // No third token: the context is zero and the output its bias (the same numbers as the product).
+            for i in 0..total {
+                for (x, b) in h[i * d..(i + 1) * d].iter_mut().zip(&tw.o[li].b) {
+                    *x += b;
+                }
+            }
+            return;
+        }
+        let o = tw.o[li].rows(&ctx, total);
+        for (x, y) in h.iter_mut().zip(o) {
+            *x += y;
+        }
+    }
+
+    /// The keys and values `[rows][d]` at layer `li` of the key / value tokens `e` (`[rows][d]`, a fact's, a note's, a third
+    /// token's embedding): the layer's norm1, then its k and v, each row through the cache.
+    fn key_values(&self, li: usize, layer: &Layer, e: &[f32]) -> (Vec<f32>, Vec<f32>) {
+        let d = self.config.d;
+        let rows = e.len() / d;
+        let mut kh = Vec::with_capacity(e.len());
+        let mut vh = Vec::with_capacity(e.len());
+        let mut a = vec![0.0; d];
+        for j in 0..rows {
+            let ej = &e[j * d..(j + 1) * d];
+            let kv = kv_get(kv_key(self.id, KV_LAYER + li as u32, &[ej]), || {
+                layer.norm1.apply(ej, &mut a);
+                let mut out = vec![0.0; 2 * d];
+                layer.k.apply(&a, &mut out[..d]);
+                layer.v.apply(&a, &mut out[d..]);
+                out
+            });
+            kh.extend_from_slice(&kv[..d]);
+            vh.extend_from_slice(&kv[d..]);
+        }
+        (kh, vh)
     }
 
     fn feed(&self, layer: &Layer, n: usize, h: &mut [f32], a: &mut [f32]) {
@@ -1278,6 +1622,9 @@ impl Net {
                     c1[i] += y[i];
                 }
             }
+            if let Some(tw) = self.typed.as_ref() {
+                add_proj(&cand.x, &tw.cx, &mut c1);
+            }
             let p = usize::from(cand.promo);
             for i in 0..d {
                 c1[i] = (c1[i] + self.promo[p * d + i]).max(0.0);
@@ -1292,7 +1639,10 @@ impl Net {
             self.s1.apply(&joint, &mut s1);
             relu(&mut s1);
             self.s2.apply(&s1, &mut y);
-            out.push(y[0]);
+            match self.typed.as_ref() {
+                Some(tw) => out.push(y[0] + tw.c_new * cand.x[X_DECLARES]),
+                None => out.push(y[0]),
+            }
         }
         out
     }

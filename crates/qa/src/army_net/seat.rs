@@ -128,14 +128,59 @@ pub fn install_net(net: Net) -> bool {
     NET.set(Ok(net)).is_ok()
 }
 
+thread_local! {
+    /// The net of this thread's plays instead of the process's (`set_thread_net`; `SaveAt::then` after a load).
+    static THREAD_NET: std::cell::Cell<Option<&'static Net>> = const { std::cell::Cell::new(None) };
+    /// `SaveAt::compare`: whether the tokens after the last load equalled those before the save.
+    static LOAD_SAME: std::cell::Cell<Option<bool>> = const { std::cell::Cell::new(None) };
+}
+
+/// This thread's plays use `net` (None: the process's net again).
+pub fn set_thread_net(net: Option<&'static Net>) {
+    THREAD_NET.with(|t| t.set(net));
+}
+
+/// `SaveAt::compare`: whether the tokens after the last load equalled those before the save (taken).
+pub fn take_load_same() -> Option<bool> {
+    LOAD_SAME.with(|c| c.take())
+}
+
+/// The numbers of the tokens (main, extras, third, history), without the handles a load renumbers.
+fn token_numbers(t: &observe::Tokens) -> Vec<u32> {
+    let mut v: Vec<u32> = Vec::new();
+    let f = |v: &mut Vec<u32>, x: &[f32]| v.extend(x.iter().map(|y| y.to_bits()));
+    for (a, b) in t.feat.iter().zip(&t.xfeat) {
+        f(&mut v, a);
+        f(&mut v, b);
+    }
+    for (a, b) in t.third.feat.iter().zip(&t.third.x) {
+        f(&mut v, a);
+        f(&mut v, b);
+    }
+    for h in &t.hist {
+        f(&mut v, h);
+    }
+    v.extend(t.dist.iter().chain(&t.third.dist).map(|d| u32::from(*d)));
+    v.extend(t.pos.iter().chain(&t.third.pos).map(|p| *p as u32));
+    v.extend(t.selectable.iter().map(|s| u32::from(*s)));
+    v.push(t.len() as u32);
+    v.push(t.third.len() as u32);
+    v
+}
+
 /// Save and load in the middle of a play (the guard of the memory's persistence, `tests/army_net.rs`): at the
 /// learner's turn of this round (relative), the game goes through the save format, and the net's memory through
 /// its sidecar file beside the save (`sidecar`: false = the sidecar is not written, the memory starts fresh).
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct SaveAt {
     pub round: u32,
     pub dir: std::path::PathBuf,
     pub sidecar: bool,
+    /// The net that plays on after the load (None: the same): a save of one net played on by another (the old net's
+    /// save by its typed conversion, `tests/army_net_types.rs`).
+    pub then: Option<&'static Net>,
+    /// Compare the tokens before the save and after the load (`take_load_same`).
+    pub compare: bool,
 }
 
 thread_local! {
@@ -205,6 +250,7 @@ pub fn save_and_load(rules: &CompiledRuleset, game: &GameState, orders: &Orders,
     std::fs::create_dir_all(&at.dir).map_err(|e| e.to_string())?;
     let save = at.dir.join(format!("{id}.aurelia"));
     let side = at.dir.join(format!("{id}.aurelia.army-memory"));
+    let before = at.compare.then(|| token_numbers(&observe::tokens(game, rules, orders)));
     std::fs::write(&save, classic_rules::save_codec::to_bytes(&classic_rules::persistence::encode::encode(game, rules))).map_err(|e| e.to_string())?;
     let _ = std::fs::remove_file(&side);
     if at.sidecar {
@@ -216,12 +262,20 @@ pub fn save_and_load(rules: &CompiledRuleset, game: &GameState, orders: &Orders,
     MEMORY.with(|m| *m.borrow_mut() = None);
     let bytes = std::fs::read(&save).map_err(|e| e.to_string())?;
     let loaded = classic_rules::persistence::decode::decode(&classic_rules::save_codec::from_bytes(&bytes).map_err(|e| format!("{e:?}"))?, rules).map_err(|e| format!("{e:?}"))?;
-    // A load gives the units new handles: the scene's pieces are found again by their entity ids.
+    // A load gives the units new handles: the scene's pieces are found again by their entity ids (every piece list:
+    // ours, theirs, the third nation's of the camp and third-party families).
     let auth = loaded.view().auth;
-    for p in scene.mine.iter_mut().chain(scene.theirs.iter_mut()) {
+    for p in scene.mine.iter_mut().chain(scene.theirs.iter_mut()).chain(scene.third.iter_mut()) {
         if let Some((h, _)) = auth.units().iter_handles().find(|(_, c)| c.id == p.id) {
             p.h = h;
         }
+    }
+    if let Some(n) = at.then {
+        set_thread_net(Some(n));
+    }
+    if let Some(b) = before {
+        let after = token_numbers(&observe::tokens(&loaded, rules, orders));
+        LOAD_SAME.with(|c| c.set(Some(b == after)));
     }
     let side_bytes = std::fs::read(&side).unwrap_or_default();
     restore_memory(&id, &side_bytes, orders, scene);
@@ -452,6 +506,9 @@ thread_local! {
 }
 
 pub fn net() -> Result<&'static Net, String> {
+    if let Some(n) = THREAD_NET.with(|t| t.get()) {
+        return Ok(n);
+    }
     let loaded = NET.get_or_init(|| {
         let path = std::env::var_os("ARMY_NET").ok_or("set ARMY_NET to the weights of the army net")?;
         Net::load(std::path::Path::new(&path))
@@ -570,7 +627,7 @@ pub fn turn(rules: &CompiledRuleset, game: &mut GameState, orders: &Orders, scen
         }
         let t_map = Instant::now();
         if net.has_map() {
-            let planes = super::model::planes(&orders.statics, &tokens);
+            let planes = net.planes(&orders.statics, &orders.statics_rel, &tokens);
             let tm = Instant::now();
             match map.as_mut() {
                 None => {

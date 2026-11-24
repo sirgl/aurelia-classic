@@ -5,6 +5,12 @@
 //! both sides. Each token is `F_TOK` numbers (the layout below); `dist` holds the hex distance between
 //! the tokens' tiles (the attention bias). Candidates: the legal actions of one of our units, each
 //! `F_ACT` numbers and a promotion id.
+//!
+//! Typed tokens and the third parties (step 1.5 of the general-AI plan, `work/nets/net-types/GATES.md` "gate T1"):
+//! every token and candidate also has its EXTRAS (`X_TOK`, `X_ACT` numbers: the relation one-hot and the threat of the
+//! third parties at war with us), and the units and cities of the players other than the side and `orders.foe` inside
+//! the map window are the THIRD tokens (`Tokens::third`), read by the net through a separate path. The main stream and
+//! its numbers are exactly the old ones, so a net without the new parts plays as before.
 
 use classic_rules::combat::city::{city_strength, hit_points, max_hit_points, CITY_ATTACK_RANGE};
 use classic_rules::ids::{PlayerId, TileId, UnitHandle};
@@ -24,6 +30,26 @@ pub const F_ACT: usize = 40;
 pub const T_MAX: usize = 40;
 /// Distances in the attention bias are clipped here.
 pub const D_MAX: u8 = 15;
+/// A token's extras: the relation one-hot (`R_*`), then (our units) the third parties' war threat on its tile: those
+/// that reach it next turn / 4, adjacent / 3, the nearest / 12.
+pub const X_TOK: usize = 9;
+/// A candidate's extras: its strike target's relation one-hot, "declares war" (a strike on a player not at war with
+/// us), the third parties' war threat on its tile / 4, adjacent / 3.
+pub const X_ACT: usize = 9;
+/// The relations (`relation`).
+pub const REL: usize = 6;
+pub const R_OWN: u8 = 0;
+pub const R_ALLY: u8 = 1;
+pub const R_PEACE: u8 = 2;
+pub const R_WAR: u8 = 3;
+pub const R_CS: u8 = 4;
+pub const R_BARB: u8 = 5;
+pub const REL_NAMES: [&str; REL] = ["own", "ally", "peace", "war", "city-state", "barbarian"];
+/// The candidate extra "declares war" (the new candidate kind of the plan: its logit shift starts at -10).
+pub const X_DECLARES: usize = 6;
+/// The field's token budget at stage 64 (plan 11.1): the third tokens fill what the main stream leaves, at most `X_CAP`.
+pub const FIELD_BUDGET: usize = 32;
+pub const X_CAP: usize = 16;
 /// The observation radius of a unit's legal actions.
 const RADIUS: i32 = 12;
 
@@ -59,6 +85,8 @@ pub enum Action {
 #[derive(Debug, Clone)]
 pub struct Candidate {
     pub feat: [f32; F_ACT],
+    /// The extras (`X_ACT`).
+    pub x: [f32; X_ACT],
     /// Promotion id + 1 (0: not a promotion).
     pub promo: u16,
     /// The window index of the candidate's tile (its destination, its target, the unit's own); -1 outside.
@@ -85,6 +113,69 @@ pub struct Tokens {
     pub hist: Vec<[f32; F_HIST]>,
     pub hist_slot: Vec<i16>,
     pub hist_age: Vec<u8>,
+    /// The main tokens' extras (`X_TOK`; zeros in a recording before v5).
+    pub xfeat: Vec<[f32; X_TOK]>,
+    /// The third parties' tokens (none in a recording before v5).
+    pub third: Third,
+}
+
+/// The tokens of the third parties: units and cities of the players other than the side and `orders.foe` in the map
+/// window (the fog families: only those the side sees), at most `FIELD_BUDGET` with the main stream and `X_CAP`, the
+/// nearest to the objective first (dropped first when over the budget: the farthest).
+#[derive(Debug, Clone, Default)]
+pub struct Third {
+    /// The token numbers (a unit: kind 2 and the foe's view of numbers 37, 39, 40; a city: kind 3, number 45 = 0).
+    pub feat: Vec<[f32; F_TOK]>,
+    /// The extras: the relation one-hot (numbers 6-8 zero).
+    pub x: Vec<[f32; X_TOK]>,
+    pub pos: Vec<i16>,
+    pub tile: Vec<TileId>,
+    /// `main × third` hex distances, row-major, clipped at `D_MAX`.
+    pub dist: Vec<u8>,
+}
+
+impl Third {
+    pub fn len(&self) -> usize {
+        self.feat.len()
+    }
+    pub fn is_empty(&self) -> bool {
+        self.feat.is_empty()
+    }
+    /// Whether third token `j` is a city.
+    pub fn is_city(&self, j: usize) -> bool {
+        self.feat[j][TOK_CITY] > 0.5
+    }
+}
+
+/// The relation of `owner`'s pieces to `side` (`orders.foe` is the side's foe of the orders): barbarian, at war, a
+/// city-state, an ally (at peace and a defensive pact, a declaration of friendship, or at war with the foe), at peace.
+pub fn relation(game: &GameState, rules: &CompiledRuleset, side: PlayerId, foe: PlayerId, owner: PlayerId) -> u8 {
+    use classic_rules::world::player::ClassicPlayers;
+    let _ = rules;
+    let auth = game.view().auth;
+    if owner == side {
+        return R_OWN;
+    }
+    if auth.players().is_barbarian(owner) {
+        return R_BARB;
+    }
+    if auth.diplomacy().at_war(side, owner) {
+        return R_WAR;
+    }
+    if auth.players().is_city_state(owner) {
+        return R_CS;
+    }
+    let round = auth.turn().round;
+    let rel = auth.module().relations();
+    if (owner != foe && auth.diplomacy().at_war(owner, foe)) || rel.has_pact(side, owner, round) || rel.are_friends(side, owner, round) {
+        return R_ALLY;
+    }
+    R_PEACE
+}
+
+/// Hostile to the side: at war or the barbarians.
+fn hostile(r: u8) -> bool {
+    r == R_WAR || r == R_BARB
 }
 
 impl Tokens {
@@ -528,6 +619,9 @@ struct Field {
     foes: Vec<UnitCore>,
     foe_cities: Vec<TileId>,
     own_cities: Vec<TileId>,
+    /// The third parties' units (with their relation; the fog families: those seen) and cities.
+    third: Vec<(UnitCore, u8)>,
+    third_cities: Vec<(TileId, u8)>,
 }
 
 impl Field {
@@ -544,11 +638,50 @@ impl Field {
             v
         };
         let mut foes = units_of(orders.foe);
+        let others: Vec<PlayerId> = (0..auth.players().count() as u8).map(PlayerId).filter(|p| *p != orders.side && *p != orders.foe).collect();
+        let mut third: Vec<(UnitCore, u8)> = Vec::new();
+        let mut third_cities: Vec<(TileId, u8)> = Vec::new();
+        for p in &others {
+            let units = units_of(*p);
+            let cities = cities_of(*p);
+            if units.is_empty() && cities.is_empty() {
+                continue;
+            }
+            let r = relation(game, rules, orders.side, orders.foe, *p);
+            third.extend(units.into_iter().map(|u| (u, r)));
+            third_cities.extend(cities.into_iter().map(|c| (c, r)));
+        }
         if orders.fog {
             let view = game.player_view(rules, orders.side);
             foes.retain(|c| view.sees_unit(c));
+            third.retain(|(c, _)| view.sees_unit(c));
         }
-        Field { own: units_of(orders.side), foes, foe_cities: cities_of(orders.foe), own_cities: cities_of(orders.side) }
+        third.sort_by_key(|(c, _)| c.id);
+        third_cities.sort_by_key(|(t, _)| t.0);
+        Field { own: units_of(orders.side), foes, foe_cities: cities_of(orders.foe), own_cities: cities_of(orders.side), third, third_cities }
+    }
+
+    /// The third parties' military units at war with the side (their threat enters the extras, not the old numbers).
+    fn war_third<'a>(&'a self, rules: &'a CompiledRuleset) -> impl Iterator<Item = &'a UnitCore> + 'a {
+        self.third.iter().filter(move |(u, r)| hostile(*r) && !act::is_civilian(rules, u.kind)).map(|(u, _)| u)
+    }
+
+    /// The third parties' war threat on tile `t`: (reach it next turn, adjacent, the nearest's distance).
+    fn war_third_threat(&self, game: &GameState, rules: &CompiledRuleset, t: TileId) -> (i32, i32, i32) {
+        let mut reach = 0;
+        let mut adj = 0;
+        let mut near = 30;
+        for u in self.war_third(rules) {
+            let d = dist(game, u.tile, t);
+            if d <= act::moves_of(rules, u.kind) + act::range_of(rules, u.kind).unwrap_or(1) {
+                reach += 1;
+            }
+            if d == 1 {
+                adj += 1;
+            }
+            near = near.min(d);
+        }
+        (reach, adj, near)
     }
 
     fn military_foes<'a>(&'a self, rules: &'a CompiledRuleset) -> impl Iterator<Item = &'a UnitCore> + 'a {
@@ -601,7 +734,7 @@ pub fn tokens(game: &GameState, rules: &CompiledRuleset, orders: &Orders) -> Tok
     remember_turn_start(game, &field, round);
     let (ox, oy) = col_row(game, orders.tile);
     let (hist, hist_slot, hist_age) = history_tokens(round);
-    let mut t = Tokens { feat: Vec::new(), dist: Vec::new(), selectable: Vec::new(), unit: Vec::new(), tile: Vec::new(), pos: Vec::new(), price: orders.price, hist, hist_slot, hist_age };
+    let mut t = Tokens { feat: Vec::new(), dist: Vec::new(), selectable: Vec::new(), unit: Vec::new(), tile: Vec::new(), pos: Vec::new(), price: orders.price, hist, hist_slot, hist_age, xfeat: Vec::new(), third: Third::default() };
     // The objective.
     let mut f = [0f32; F_TOK];
     f[TOK_OBJECTIVE] = 1.0;
@@ -616,10 +749,12 @@ pub fn tokens(game: &GameState, rules: &CompiledRuleset, orders: &Orders) -> Tok
     f[12 + AIMS] = own_army.iter().map(|u| f32::from(u.hp)).sum::<f32>() / 800.0;
     f[13 + AIMS] = field.military_foes(rules).map(|u| f32::from(u.hp)).sum::<f32>() / 800.0;
     t.feat.push(f);
+    t.xfeat.push([0.0; X_TOK]);
     t.selectable.push(false);
     t.unit.push(None);
     t.tile.push(orders.tile);
     let view = game.player_view(rules, orders.side);
+    let foe_rel = relation(game, rules, orders.side, orders.foe, orders.foe);
     // Units: ours, then theirs.
     for (own, list) in [(true, &field.own), (false, &field.foes)] {
         for u in list.iter() {
@@ -633,12 +768,21 @@ pub fn tokens(game: &GameState, rules: &CompiledRuleset, orders: &Orders) -> Tok
             let selectable = own && orders.army.contains(&u.id) && (u.moves_left > 0 || promotable || may_shoot);
             let mut f = [0f32; F_TOK];
             f[if own { TOK_OWN } else { TOK_FOE }] = 1.0;
-            unit_features(game, rules, orders, &field, u, own, promotable, (ox, oy), &mut f);
+            unit_features(game, rules, orders, &field, u, own, if own { orders.side } else { orders.foe }, promotable, (ox, oy), &mut f);
             f[42] = if selectable { 1.0 } else { 0.0 };
             let (gained, moved) = since_last_turn(u);
             f[46] = gained;
             f[47] = moved;
+            let mut x = [0f32; X_TOK];
+            x[usize::from(if own { R_OWN } else { foe_rel })] = 1.0;
+            if own {
+                let (reach, adj, near) = field.war_third_threat(game, rules, u.tile);
+                x[6] = reach as f32 / 4.0;
+                x[7] = adj as f32 / 3.0;
+                x[8] = near as f32 / 12.0;
+            }
             t.feat.push(f);
+            t.xfeat.push(x);
             t.selectable.push(selectable);
             t.unit.push(Some(h));
             t.tile.push(u.tile);
@@ -651,19 +795,11 @@ pub fn tokens(game: &GameState, rules: &CompiledRuleset, orders: &Orders) -> Tok
                 break;
             }
             let Some(city) = auth.indexes().city_on_tile(*c).and_then(|h| auth.cities().get(h)) else { continue };
-            let mut f = [0f32; F_TOK];
-            f[TOK_CITY] = 1.0;
-            let (x, y) = col_row(game, *c);
-            f[4] = (x - ox) / 12.0;
-            f[5] = (y - oy) / 12.0;
-            f[6] = dist(game, *c, orders.tile) as f32 / 12.0;
-            f[7] = f32::from(hit_points(auth, rules, city)) / f32::from(max_hit_points(auth, rules, city).max(1));
-            f[11] = city_strength(auth, rules, city) as f32 / 100.0 / orders.mean_strength;
-            f[12] = if city.strike_made { 0.0 } else { 1.0 };
-            f[43] = if *c == orders.tile { 1.0 } else { 0.0 };
-            f[44] = city.population as f32 / 10.0;
-            f[45] = if own { 1.0 } else { 0.0 };
+            let f = city_features(game, rules, orders, city, *c, own, (ox, oy));
+            let mut x = [0f32; X_TOK];
+            x[usize::from(if own { R_OWN } else { foe_rel })] = 1.0;
             t.feat.push(f);
+            t.xfeat.push(x);
             t.selectable.push(false);
             t.unit.push(None);
             t.tile.push(*c);
@@ -671,6 +807,9 @@ pub fn tokens(game: &GameState, rules: &CompiledRuleset, orders: &Orders) -> Tok
     }
     for f in t.feat.iter_mut() {
         round_all(f);
+    }
+    for x in t.xfeat.iter_mut() {
+        round_all(x);
     }
     t.pos = t.tile.iter().map(|x| pos_of(orders, *x)).collect();
     let n = t.len();
@@ -680,11 +819,86 @@ pub fn tokens(game: &GameState, rules: &CompiledRuleset, orders: &Orders) -> Tok
             t.dist[i * n + j] = dist(game, t.tile[i], t.tile[j]).clamp(0, i32::from(D_MAX)) as u8;
         }
     }
+    t.third = third_tokens(game, rules, orders, &field, &t, (ox, oy));
     t
 }
 
+/// A city's token numbers (`own`: the side's; else number 45 is 0).
+fn city_features(game: &GameState, rules: &CompiledRuleset, orders: &Orders, city: &classic_rules::world::city::CityCore, c: TileId, own: bool, (ox, oy): (f32, f32)) -> [f32; F_TOK] {
+    let auth = game.view().auth;
+    let mut f = [0f32; F_TOK];
+    f[TOK_CITY] = 1.0;
+    let (x, y) = col_row(game, c);
+    f[4] = (x - ox) / 12.0;
+    f[5] = (y - oy) / 12.0;
+    f[6] = dist(game, c, orders.tile) as f32 / 12.0;
+    f[7] = f32::from(hit_points(auth, rules, city)) / f32::from(max_hit_points(auth, rules, city).max(1));
+    f[11] = city_strength(auth, rules, city) as f32 / 100.0 / orders.mean_strength;
+    f[12] = if city.strike_made { 0.0 } else { 1.0 };
+    f[43] = if c == orders.tile { 1.0 } else { 0.0 };
+    f[44] = city.population as f32 / 10.0;
+    f[45] = if own { 1.0 } else { 0.0 };
+    f
+}
+
+/// The third tokens of the moment (`Third`): in the window, nearest to the objective first, within the budget.
+fn third_tokens(game: &GameState, rules: &CompiledRuleset, orders: &Orders, field: &Field, main: &Tokens, origin: (f32, f32)) -> Third {
+    let auth = game.view().auth;
+    let budget = X_CAP.min(FIELD_BUDGET.saturating_sub(main.len()));
+    let mut out = Third::default();
+    if budget == 0 {
+        return out;
+    }
+    // (distance to the objective, unit 0 / city 1, order key, index).
+    let mut pick: Vec<(i32, u8, u64, usize)> = Vec::new();
+    for (k, (u, _)) in field.third.iter().enumerate() {
+        if orders.window.index(u.tile).is_some() {
+            pick.push((dist(game, u.tile, orders.tile), 0, u.id.0, k));
+        }
+    }
+    for (k, (c, _)) in field.third_cities.iter().enumerate() {
+        if orders.window.index(*c).is_some() {
+            pick.push((dist(game, *c, orders.tile), 1, u64::from(c.0), k));
+        }
+    }
+    pick.sort_unstable();
+    pick.truncate(budget);
+    for (_, kind, _, k) in pick {
+        let (f, tile, r) = if kind == 0 {
+            let (u, r) = &field.third[k];
+            let mut f = [0f32; F_TOK];
+            f[TOK_FOE] = 1.0;
+            unit_features(game, rules, orders, field, u, false, u.owner, false, origin, &mut f);
+            let (gained, moved) = since_last_turn(u);
+            f[46] = gained;
+            f[47] = moved;
+            (f, u.tile, *r)
+        } else {
+            let (c, r) = field.third_cities[k];
+            let Some(city) = auth.indexes().city_on_tile(c).and_then(|h| auth.cities().get(h)) else { continue };
+            (city_features(game, rules, orders, city, c, false, origin), c, r)
+        };
+        let mut f = f;
+        round_all(&mut f);
+        let mut x = [0f32; X_TOK];
+        x[usize::from(r)] = 1.0;
+        out.feat.push(f);
+        out.x.push(x);
+        out.pos.push(pos_of(orders, tile));
+        out.tile.push(tile);
+    }
+    let (n, m) = (main.len(), out.len());
+    out.dist = vec![0; n * m];
+    for i in 0..n {
+        for j in 0..m {
+            out.dist[i * m + j] = dist(game, main.tile[i], out.tile[j]).clamp(0, i32::from(D_MAX)) as u8;
+        }
+    }
+    out
+}
+
 #[allow(clippy::too_many_arguments)]
-fn unit_features(game: &GameState, rules: &CompiledRuleset, orders: &Orders, field: &Field, u: &UnitCore, own: bool, promotable: bool, (ox, oy): (f32, f32), f: &mut [f32; F_TOK]) {
+fn unit_features(game: &GameState, rules: &CompiledRuleset, orders: &Orders, field: &Field, u: &UnitCore, own: bool, owner: PlayerId, promotable: bool, (ox, oy): (f32, f32), f: &mut [f32; F_TOK]) {
     let auth = game.view().auth;
     let d = &rules.units[u.kind.0 as usize];
     let (x, y) = col_row(game, u.tile);
@@ -705,8 +919,7 @@ fn unit_features(game: &GameState, rules: &CompiledRuleset, orders: &Orders, fie
     f[30] = f32::from(u.level) / 5.0;
     f[31] = u.experience as f32 / 60.0;
     f[32] = if promotable { 1.0 } else { 0.0 };
-    let side = if own { orders.side } else { orders.foe };
-    f[33] = act::defence(game, rules, u.tile, side) as f32 / 100.0;
+    f[33] = act::defence(game, rules, u.tile, owner) as f32 / 100.0;
     f[34] = if is_hills(auth.map(), u.tile) { 1.0 } else { 0.0 };
     f[35] = if is_rough(rules, auth.map(), u.tile) { 1.0 } else { 0.0 };
     if own {
@@ -737,7 +950,7 @@ pub fn candidates(game: &GameState, rules: &CompiledRuleset, orders: &Orders, un
     let Some(me) = act::core_of(game, unit) else { return out };
     let field = Field::gather(game, rules, orders);
     let here = Spot::of(game, rules, orders, &field, &me, me.tile);
-    let mut done = Candidate { feat: [0.0; F_ACT], promo: 0, pos: pos_of(orders, me.tile), action: Action::Done };
+    let mut done = Candidate { feat: [0.0; F_ACT], x: cand_extras(game, rules, orders, &field, me.tile, None), promo: 0, pos: pos_of(orders, me.tile), action: Action::Done };
     done.feat[Kind::Done as usize] = 1.0;
     here.write(&here, &mut done.feat);
     out.push(done);
@@ -749,8 +962,33 @@ pub fn candidates(game: &GameState, rules: &CompiledRuleset, orders: &Orders, un
     }
     for c in out.iter_mut() {
         round_all(&mut c.feat);
+        round_all(&mut c.x);
     }
     out
+}
+
+/// A candidate's extras (`X_ACT`): the relation of the strike's target (`target`: its owner) and "declares war", the
+/// third parties' war threat on the candidate's tile `t`.
+fn cand_extras(game: &GameState, rules: &CompiledRuleset, orders: &Orders, field: &Field, t: TileId, target: Option<PlayerId>) -> [f32; X_ACT] {
+    let mut x = [0f32; X_ACT];
+    if let Some(owner) = target {
+        let r = relation(game, rules, orders.side, orders.foe, owner);
+        x[usize::from(r)] = 1.0;
+        x[X_DECLARES] = if hostile(r) || r == R_OWN { 0.0 } else { 1.0 };
+    }
+    let (reach, adj, _) = field.war_third_threat(game, rules, t);
+    x[7] = reach as f32 / 4.0;
+    x[8] = adj as f32 / 3.0;
+    x
+}
+
+/// The owner of what a strike at `t` hits: the city's, else the first unit's not of the side.
+fn target_owner(game: &GameState, orders: &Orders, t: TileId) -> Option<PlayerId> {
+    let auth = game.view().auth;
+    if let Some(c) = auth.indexes().city_on_tile(t).and_then(|c| auth.cities().get(c)) {
+        return Some(c.owner);
+    }
+    auth.indexes().units_on(t).iter().filter_map(|h| auth.units().get(*h)).map(|u| u.core.owner).find(|o| *o != orders.side)
 }
 
 /// The facts of one tile for one of our units.
@@ -852,6 +1090,7 @@ fn candidate(game: &GameState, rules: &CompiledRuleset, orders: &Orders, field: 
     f[kind as usize] = 1.0;
     let mut promo = 0u16;
     let mut subject = here.tile;
+    let mut target = None;
     match &cmd {
         Command::MoveUnit { destination, .. } => {
             let spot = Spot::of(game, rules, orders, field, me, *destination);
@@ -870,13 +1109,14 @@ fn candidate(game: &GameState, rules: &CompiledRuleset, orders: &Orders, field: 
         Command::AttackUnit { .. } | Command::AttackCity { .. } | Command::RangedAttack { .. } | Command::AirSweep { .. } => {
             let t = target_tile(game, &cmd)?;
             subject = t;
+            target = target_owner(game, orders, t);
             let spot = Spot::of(game, rules, orders, field, me, t);
             spot.write(here, &mut f);
             strike_features(game, rules, orders, me, t, &mut f);
         }
         _ => here.write(here, &mut f),
     }
-    Some(Candidate { feat: f, promo, pos: pos_of(orders, subject), action: Action::Command(cmd) })
+    Some(Candidate { feat: f, x: cand_extras(game, rules, orders, field, subject, target), promo, pos: pos_of(orders, subject), action: Action::Command(cmd) })
 }
 
 fn field_unit(game: &GameState, me: &UnitCore) -> Option<UnitHandle> {

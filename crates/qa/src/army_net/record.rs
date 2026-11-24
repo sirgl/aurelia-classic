@@ -19,6 +19,10 @@
 //! C × F_ACT f16 | C u16 promotion + 1 | T i16 window index | C i16 window index | T i16 army slot (-1: none) |
 //! TRACK i16 the teacher's own state | H u16 | H × F_HIST f16 history tokens | H i16 their army slot | H u8 their
 //! age` (version 4, `"ARM4"`; version 3 ends at the track). Version 2 (`"ARMP"`) had no slots and no track, and 0 for the flags.
+//! Version 5 (`"ARM5"`, typed tokens and the third parties, `work/nets/net-types/GATES.md` "gate T1"): after the static
+//! planes `W × W × S_REL f16` relation planes; a decision ends with `T × X_TOK f16 the tokens' extras | C × X_ACT f16 the
+//! candidates' extras | X u16 | X × F_TOK f16 the third tokens | X × X_TOK f16 their extras | X i16 their window index |
+//! T × X u8 distances main token -> third token`. T + X is the decision's field token count.
 //!
 //! Variant M's memory (M-HANDOFF.md) updates at our turn's end: the decision there has the flag
 //! `MEMORY_STATE`. A teacher's play: its end of the turn. The net's own play (DAgger): an unlabelled decision
@@ -44,6 +48,8 @@ pub const PLAY_MAGIC: u32 = u32::from_le_bytes(*b"ARMP");
 pub const PLAY_MAGIC3: u32 = u32::from_le_bytes(*b"ARM3");
 /// Version 4: v3 and the history tokens (variant MH).
 pub const PLAY_MAGIC4: u32 = u32::from_le_bytes(*b"ARM4");
+/// Version 5: v4 and the typed tokens' extras, the third tokens, the relation planes.
+pub const PLAY_MAGIC5: u32 = u32::from_le_bytes(*b"ARM5");
 /// A decision's flag: our turn ends here, the memory updates.
 pub const MEMORY_STATE: u16 = 1;
 /// The teacher's state numbers of a decision: engaged, waited, stage, resting slots (bits).
@@ -417,10 +423,13 @@ pub fn finish(mut meta: serde_json::Value) -> Option<(Vec<u8>, Counts)> {
     }
     let json = serde_json::to_vec(&meta).ok()?;
     let mut out = Vec::new();
-    put_u32(&mut out, PLAY_MAGIC4);
+    put_u32(&mut out, PLAY_MAGIC5);
     put_u32(&mut out, json.len() as u32);
     out.extend_from_slice(&json);
     for x in &rec.orders.statics {
+        put_u16(&mut out, f32_to_f16(*x));
+    }
+    for x in &rec.orders.statics_rel {
         put_u16(&mut out, f32_to_f16(*x));
     }
     put_u32(&mut out, rec.decisions.len() as u32);
@@ -509,6 +518,25 @@ fn write_decision(out: &mut Vec<u8>, d: &Decision, orders: &Orders) {
         out.extend_from_slice(&s.to_le_bytes());
     }
     out.extend_from_slice(&d.tokens.hist_age);
+    // v5.
+    for x in d.tokens.xfeat.iter().flatten() {
+        put_u16(out, f32_to_f16(*x));
+    }
+    for x in d.candidates.iter().flat_map(|c| c.x.iter()) {
+        put_u16(out, f32_to_f16(*x));
+    }
+    let th = &d.tokens.third;
+    put_u16(out, th.len() as u16);
+    for x in th.feat.iter().flatten() {
+        put_u16(out, f32_to_f16(*x));
+    }
+    for x in th.x.iter().flatten() {
+        put_u16(out, f32_to_f16(*x));
+    }
+    for p in &th.pos {
+        out.extend_from_slice(&p.to_le_bytes());
+    }
+    out.extend_from_slice(&th.dist);
 }
 
 thread_local! {

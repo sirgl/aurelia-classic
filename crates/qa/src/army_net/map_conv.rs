@@ -197,6 +197,11 @@ impl Encoder {
         self.ch
     }
 
+    /// The input planes per tile.
+    pub fn planes(&self) -> usize {
+        self.n_planes
+    }
+
     /// `w_in` is `[planes, channels]` (MLX's `x @ W`); `convs` are (weight `[out, 3, 3, in]`, its shape, bias,
     /// dilation) in the order c1, c2 of each block; the grid is `gw x gh` tiles.
     pub fn new(w_in: &[f32], w_in_shape: &[usize], b_in: &[f32], convs: &[(&[f32], &[usize], &[f32], i32)], gw: usize, gh: usize) -> Result<Encoder, String> {

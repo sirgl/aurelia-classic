@@ -25,7 +25,10 @@ HEALTHY = 0.6
 
 # The loss caps of the win rules (trainers/families.rs, assault.rs): units we may lose; None = half the army.
 CAP = {'assault-heal': None, 'promotion-choice': None, 'choke': None, 'citadel': None, 'hill-archers': 1, 'city-fire': 1,
-       'planned-assault': 1, 'focus': 1, 'bait': 1, 'raid': 1, 'flank': 1, 'wounded': 1, 'harass': 1, 'kite': 0}
+       'planned-assault': 1, 'focus': 1, 'bait': 1, 'raid': 1, 'flank': 1, 'wounded': 1, 'harass': 1, 'kite': 0,
+       # The camp and the third-party families (army_net.rs `loss_cap`; this table had not followed them).
+       'camp': 1, 'camp-race': 2, 'neutral-path': 1, 'spare-friends': 1, 'neutral-joins-war': 1, 'ally-siege': 1,
+       'defend-friend': 2, 'closed-borders': 2, 'capital-race': 5}
 
 
 def price_of(meta):

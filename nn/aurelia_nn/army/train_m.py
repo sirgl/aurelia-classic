@@ -28,7 +28,8 @@ from .model_m import AIMS, P_ENGAGED, P_ETA, P_STAGE, P_TURNS, P_WAITED, PLANS, 
 from .train import Device, best_teachers, decision_weights
 from .data import F_HIST
 from .model_mh import H_MAX, MHNet
-from .model_mb import HX_PARAMS, NX_PARAMS, MBANet, MBENet, MBHNet, MBNet, MBNNet
+from .model_mb import HX_PARAMS, NX_PARAMS, X_CAP, MBANet, MBENet, MBHNet, MBNet, MBNNet, MBTNet
+from .data import F_TOK, S_REL, W, X_ACT, X_TOK
 from .potential import potential, price_of
 
 u16 = lambda b: mx.array(memoryview(b).cast('H'))
@@ -162,6 +163,21 @@ class DeviceM(Device):
         self.hist_age = mx.array(memoryview(flat.hist_age).cast('B')) if self.has_hist else mx.zeros((1,), mx.uint8)
         self.n_hist = self.hist.shape[0]
         self.h_list = list(flat.h)
+        # Record v5 (zeros before): the extras, the third tokens, the relation planes.
+        self.xtok = u16(flat.xtok).view(mx.float16).reshape(-1, X_TOK) if len(flat.xtok) else mx.zeros((1, X_TOK), mx.float16)
+        self.xcand = u16(flat.xcand).view(mx.float16).reshape(-1, X_ACT) if len(flat.xcand) else mx.zeros((1, X_ACT), mx.float16)
+        has3 = len(flat.third_pos) > 0
+        self.third = u16(flat.third).view(mx.float16).reshape(-1, F_TOK) if has3 else mx.zeros((1, F_TOK), mx.float16)
+        self.third_x = u16(flat.third_x).view(mx.float16).reshape(-1, X_TOK) if has3 else mx.zeros((1, X_TOK), mx.float16)
+        self.third_pos = mx.array(memoryview(flat.third_pos).cast('h')) if has3 else mx.zeros((1,), mx.int16)
+        self.tdist = mx.array(memoryview(flat.tdist).cast('B')) if len(flat.tdist) else mx.zeros((1,), mx.uint8)
+        self.x = mx.array(list(flat.x), mx.int32)
+        self.x_list = list(flat.x)
+        self.third_off = mx.array(list(flat.third_off), mx.int32)
+        self.tdist_off = mx.array(list(flat.tdist_off), mx.int32)
+        self.n_third = self.third.shape[0]
+        self.n_tdist = self.tdist.shape[0]
+        self.statics_rel = u16(flat.statics_rel).view(mx.float16).reshape(-1, W * W, S_REL)
         self.flags_list = list(flat.flags)
         self.round_list = list(flat.round)
         self.outcome_targets(flat)
@@ -257,7 +273,36 @@ class DeviceM(Device):
         b['dphi'] = self.dphi[idx]
         for k in NOTE_LABELS:
             b[k] = getattr(self, k)[idx]
+        self.batch_t(b, idx, tm, cm)
         return b
+
+    def batch_t(self, b, idx, tm, cm, xm=X_CAP):
+        """Record v5's fields of a batch (MBT): the extras of the tokens and the candidates, the third tokens (padded to
+        xm, masked), their distances from the main tokens, the relation planes."""
+        t = self.t[idx]
+        ar = mx.arange(tm)
+        tmask = ar[None, :] < t[:, None]
+        ti = mx.minimum(self.tok_off[idx][:, None] + mx.minimum(ar[None, :], t[:, None] - 1), self.n_tok - 1)
+        b['xtok'] = mx.where(tmask[..., None], self.xtok[ti].astype(mx.float32), 0.0)
+        c = self.c[idx]
+        arc = mx.arange(cm)
+        cmask = arc[None, :] < c[:, None]
+        ci = mx.minimum(self.cand_off[idx][:, None] + mx.minimum(arc[None, :], mx.maximum(c[:, None] - 1, 0)), self.n_cand - 1)
+        b['xcand'] = mx.where(cmask[..., None], self.xcand[ci].astype(mx.float32), 0.0)
+        x = mx.minimum(self.x[idx], xm)
+        ax = mx.arange(xm)
+        xmask = ax[None, :] < x[:, None]
+        xi = mx.minimum(self.third_off[idx][:, None] + mx.minimum(ax[None, :], mx.maximum(x[:, None] - 1, 0)), self.n_third - 1)
+        b['third'] = mx.where(xmask[..., None], self.third[xi].astype(mx.float32), 0.0)
+        b['third_x'] = mx.where(xmask[..., None], self.third_x[xi].astype(mx.float32), 0.0)
+        b['tpos'] = mx.where(xmask, self.third_pos[xi].astype(mx.int32), -1)
+        b['xmask'] = xmask
+        xr = self.x[idx][:, None, None]
+        ii = mx.minimum(ar[None, :, None], t[:, None, None] - 1)
+        jj = mx.minimum(ax[None, None, :], mx.maximum(xr - 1, 0))
+        di = mx.minimum(self.tdist_off[idx][:, None, None] + ii * xr + jj, self.n_tdist - 1)
+        b['tdist'] = mx.where(tmask[:, :, None] & xmask[:, None, :], self.tdist[di].astype(mx.int32), 0)
+        b['srel'] = self.statics_rel[self.play[idx]].astype(mx.float32)
 
 
 NOTE_LABELS = ('n_known', 'n_teacher', 'n_stage', 'n_waited', 'n_rest', 'n_reason')
@@ -280,12 +325,18 @@ class TurnMaps:
         for j, (k, col, _) in enumerate(pairs):
             rows[k][col] = j
         self.rows = mx.array(rows, mx.int32)
-        enc = compiled_fn(model, 'encode', lambda st, tok, pos: model.encode_turn(st, tok, pos))
+        typed = isinstance(model, MBTNet)
+        if typed:
+            enc = compiled_fn(model, 'encode', lambda st, tok, pos, srel: model.encode_turn(st, tok, pos, srel))
+        else:
+            enc = compiled_fn(model, 'encode', lambda st, tok, pos: model.encode_turn(st, tok, pos))
         idx = [i for _, _, i in pairs]
         idx += idx[:1] * ((-n) % MAP_CHUNK)
         out = []
         for s in range(0, len(idx), MAP_CHUNK):
-            out.append(enc(*dev.map_inputs(mx.array(idx[s:s + MAP_CHUNK], mx.int32), tm)))
+            ids = mx.array(idx[s:s + MAP_CHUNK], mx.int32)
+            extra = (dev.statics_rel[dev.play[ids]].astype(mx.float32),) if typed else ()
+            out.append(enc(*dev.map_inputs(ids, tm), *extra))
         m = mx.concatenate(out)[:n]
         self.m = mx.concatenate([m, mx.zeros((1,) + m.shape[1:], m.dtype)])
         self.mean = mx.mean(self.m, axis=1)
@@ -311,6 +362,9 @@ def map_feats(b, Ms, tt, cc):
     if 'cpos' in b:
         b['gcand'] = Ms[tt2, cc2, mx.maximum(b['cpos'], 0)]
         b['cand_ok'] = b['cpos'] >= 0
+    if 'tpos' in b:
+        b['gthird'] = Ms[tt2, cc2, mx.maximum(b['tpos'], 0)]
+        b['third_ok'] = b['tpos'] >= 0
 
 
 def map_feats_rows(b, maps, rows):
@@ -322,6 +376,9 @@ def map_feats_rows(b, maps, rows):
     if 'cpos' in b:
         b['gcand'] = maps.m[r2, mx.maximum(b['cpos'], 0)]
         b['cand_ok'] = b['cpos'] >= 0
+    if 'tpos' in b:
+        b['gthird'] = maps.m[r2, mx.maximum(b['tpos'], 0)]
+        b['third_ok'] = b['tpos'] >= 0
 
 
 def compiled_fn(model, name, fn):
@@ -336,6 +393,8 @@ def compiled_fn(model, name, fn):
 def body_any(model, b, um, pm):
     """M's body, or MH's with the history (b['hplan']: P_0 of each history token's turn), or MB's with the map
     (MBN: with the notes b['ns_*'])."""
+    if isinstance(model, MBTNet):
+        return model.body_t(b, um, pm)
     if isinstance(model, (MBANet, MBNNet)):
         return model.body_b(b, um, pm)[0]
     if isinstance(model, MBNet):
@@ -381,7 +440,9 @@ def decision_losses(model, b, um, pm):
     t = b['tok'].shape[1]
     h = hfull[:, :t]
     pl = model.pointer_logits(h, b['sel'])
-    if isinstance(model, MBENet):
+    if isinstance(model, MBTNet):
+        al = model.action_logits_t(h, b)
+    elif isinstance(model, MBENet):
         al = model.action_logits_g(h, b['unit'], b['cand'], b['promo'], b['cmask'], b['gcand'], b['cand_ok'], b['tok'], b['slot'], um, pm)
     elif isinstance(model, MBNet):
         al = model.action_logits_g(h, b['unit'], b['cand'], b['promo'], b['cmask'], b['gcand'], b['cand_ok'])
