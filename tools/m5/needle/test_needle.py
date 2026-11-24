@@ -60,8 +60,8 @@ class Generator(unittest.TestCase):
 class Slow(unittest.TestCase):
     def test_learns_above_chance(self):
         held = nd.heldout(1, 64, 1, 512)
-        r = nd.train_net(64, 1, 64, 3, 400, 200, 1, held)
-        self.assertGreater(r['best_acc'], 3 / 32)
+        r = nd.train_net(64, 1, 64, 3, 1500, 250, 1, held)
+        self.assertGreater(r['best_acc'], 0.5)  # a plateau of ~800 steps, then a jump
 
 
 if __name__ == '__main__':
