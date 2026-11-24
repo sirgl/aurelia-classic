@@ -158,6 +158,9 @@ pub fn start(rules: &CompiledRuleset, game: &GameState, scene: &Scene, orders: &
         "roles": scene.mine.iter().chain(&scene.theirs).map(|p| p.role).collect::<Vec<&str>>(),
         "deadline": scene.deadline,
     });
+    let mut o = o;
+    // Typed tokens (step 1.5): the window's relation planes.
+    o["statics_rel"] = json!(hex16(&orders.statics_rel));
     let line = json!({"type": "scene", "play": name, "scene": sc, "initial": initial, "orders": o, "kinds": kinds});
     PLAY.with(|p| *p.borrow_mut() = Some(Play { name, track, lines: vec![line.to_string()], moment: None, last: Some(units_cities(&initial)) }));
 }
@@ -342,7 +345,8 @@ pub fn moment(rules: &CompiledRuleset, game: &GameState, orders: &Orders, tokens
             let list = observe::candidates(game, rules, orders, h);
             let feat: Vec<f32> = list.iter().flat_map(|c| c.feat.iter().copied()).collect();
             let acts: Vec<Value> = list.iter().map(|c| action_of(rules, game, &mut play.track, c)).collect();
-            cands.insert(i.to_string(), json!({"feat": hex16(&feat), "act": acts}));
+            let x: Vec<f32> = list.iter().flat_map(|c| c.x.iter().copied()).collect();
+            cands.insert(i.to_string(), json!({"feat": hex16(&feat), "act": acts, "x": hex16(&x)}));
         }
         let wm: Vec<i64> = ids
             .iter()
@@ -377,6 +381,15 @@ pub fn moment(rules: &CompiledRuleset, game: &GameState, orders: &Orders, tokens
             "tok": {"n": n, "feat": hex16(&feat), "dist": dist, "pos": tokens.pos, "tile": tokens.tile.iter().map(|t| t.0).collect::<Vec<u32>>(), "slot": slots, "ref": refs},
             "cands": cands,
         }));
+        // Typed tokens (step 1.5): the main tokens' extras and the third tokens (numbers, extras, window index, tile,
+        // the main x third distances), as the net reads them.
+        if let Some(m) = play.moment.as_mut() {
+            let th = &tokens.third;
+            let xf: Vec<f32> = tokens.xfeat.iter().flat_map(|x| x.iter().copied()).collect();
+            let tf: Vec<f32> = th.feat.iter().flat_map(|x| x.iter().copied()).collect();
+            let tx: Vec<f32> = th.x.iter().flat_map(|x| x.iter().copied()).collect();
+            m["typed"] = json!({"xfeat": hex16(&xf), "third": {"n": th.len(), "feat": hex16(&tf), "x": hex16(&tx), "pos": th.pos, "tile": th.tile.iter().map(|t| t.0).collect::<Vec<u32>>(), "dist": th.dist.iter().map(|d| format!("{d:02x}")).collect::<String>()}});
+        }
     });
 }
 
