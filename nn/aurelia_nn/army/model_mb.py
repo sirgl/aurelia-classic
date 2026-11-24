@@ -408,7 +408,7 @@ class MBNNet(MBNet):
 
 
 # MBe: the hand-set term's numbers (M-HANDOFF.md, "Hand edit: wounded out of range (24 Nov)"; model.rs WW_LEN).
-WW = ('scale', 'hp_threshold', 'hp_slope', 'ranged_hp_threshold', 'resting_weight', 'city_low_threshold', 'city_low_slope', 'resting_slope', 'stay_scale', 'healing_weight', 'back_threshold', 'strike_scale', 'ranged_strike_threshold', 'stay_escape')
+WW = ('scale', 'hp_threshold', 'hp_slope', 'ranged_hp_threshold', 'resting_weight', 'city_low_threshold', 'city_low_slope', 'resting_slope', 'stay_scale', 'healing_weight', 'back_threshold', 'strike_scale', 'ranged_strike_threshold', 'stay_escape', 'ranged_engaged_threshold')
 # Half the smallest step of a token's hit points (model.rs HEALING_STEP), of the threat numbers (THREAT_STEP).
 HEALING_STEP = 0.005
 THREAT_STEP = 0.125
@@ -427,7 +427,9 @@ class MBENet(MBNet):
       city_low = sigmoid(city_low_slope (city_low_threshold - the objective city's hp share)) (token numbers 3, 43, 7);
     and (3) a strike (kinds 2-4) loses `strike_scale x sigmoid(hp_slope (strike thr - hp)) x (1 - city_low)`, strike thr =
     ranged_strike_threshold for a unit with range, else hp_threshold. With stay_escape = 1 the stay term spares a move to a tile
-    less threatened than the unit's own (candidate number 19 below the token's 39 by more than THREAT_STEP).
+    less threatened than the unit's own (candidate number 19 below the token's 39 by more than THREAT_STEP). A unit with range
+    reads ranged_engaged_threshold instead of ranged_hp_threshold while the plan token says engaged (aux_p[1] on
+    P_0[P_ENGAGED] > 0, model.rs `plan_stage`: the teacher's shooters fire down to ROTATE_BURST once the assault went in).
     `ww` = the numbers above (WW order). Zero scale = MB exactly. `crates/qa/src/army_net/model.rs` `actions_x` is the
     same arithmetic."""
 
@@ -436,14 +438,17 @@ class MBENet(MBNet):
         self.config['ww'] = list(WW)
         self.ww = mx.zeros((len(WW),))
 
-    def wounded_gate(self, tok, unit, slot, um):
+    def wounded_gate(self, tok, unit, slot, um, pm):
         """([B], [B]): wounded x (1 - city_low) and the strike gate x (1 - city_low) of the acting unit."""
         from .model_m import U_RESTING
         b = tok.shape[0]
         w = self.ww
         ar = mx.arange(b)
         f = tok[ar, unit]
-        thr = mx.where(f[:, 13] > 0.0, w[3], w[1])
+        from .model_m import P_ENGAGED
+        ap = self.aux_p[1]
+        engaged = ap[0] * pm[:, 0, P_ENGAGED] + ap[1] > 0.0
+        thr = mx.where(f[:, 13] > 0.0, mx.where(engaged, w[14], w[3]), w[1])
         hp = mx.sigmoid(w[2] * (thr - f[:, 7]))
         s = slot[ar, unit]
         u = um[ar, mx.maximum(s, 0), U_RESTING]
@@ -467,11 +472,11 @@ class MBENet(MBNet):
         escape = mx.where(cand[..., 19] < here_threat[:, None] - THREAT_STEP, w[13], 0.0)
         return (w[0] * f + w[8] * cand[..., 1] * out_of_fire[:, None] * (1.0 - escape)) * gate[:, None] + w[11] * strike * gs[:, None]
 
-    def action_logits_g(self, h, unit, cand, promo, cmask, gcand, cand_ok, tok=None, slot=None, um=None):
+    def action_logits_g(self, h, unit, cand, promo, cmask, gcand, cand_ok, tok=None, slot=None, um=None, pm=None):
         from .model import NEG
-        if tok is None:
-            raise ValueError('MBENet scores read the tokens, the slots and the memory (tok, slot, um)')
+        if tok is None or pm is None:
+            raise ValueError('MBENet scores read the tokens, the slots and the memory (tok, slot, um, pm)')
         s = MBNet.action_logits_g(self, h, unit, cand, promo, cmask, gcand, cand_ok)
         fu = tok[mx.arange(tok.shape[0]), unit]
-        s = s - self.wounded_term(cand, self.wounded_gate(tok, unit, slot, um), 1.0 - fu[:, 36], fu[:, 39])
+        s = s - self.wounded_term(cand, self.wounded_gate(tok, unit, slot, um, pm), 1.0 - fu[:, 36], fu[:, 39])
         return mx.where(cmask, s, NEG)

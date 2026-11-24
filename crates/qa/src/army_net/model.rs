@@ -200,8 +200,8 @@ pub struct Net {
 
 /// The numbers of the hand-set term `ww` (`army/model_mb.py`, `MBENet`; M-HANDOFF.md, "Hand edit: wounded out of range"):
 /// [scale, hp threshold, hp slope, ranged hp threshold, resting weight, city-low threshold, city-low slope, resting slope,
-/// stay scale, healing weight, back threshold, strike scale, ranged strike threshold, stay escape].
-pub const WW_LEN: usize = 14;
+/// stay scale, healing weight, back threshold, strike scale, ranged strike threshold, stay escape, ranged engaged threshold].
+pub const WW_LEN: usize = 15;
 /// Half the smallest step of a token's hit points (1 / 100): "gained since our last turn" is number 46 above it.
 const HEALING_STEP: f32 = 0.005;
 /// Half the step of the threat numbers (a count / 4): a candidate's threat (19) is below the unit's (39) by more than it.
@@ -1304,7 +1304,9 @@ impl Net {
     /// sigmoid(hp slope (gained since our last turn - HEALING_STEP))), the threshold the ranged one for a unit with range; city_low =
     /// sigmoid(slope (threshold - the objective city's hp share)); (3) a strike (kinds 2-4) loses `strike scale x sigmoid(hp slope
     /// (strike threshold - hp)) x (1 - city_low)`, the strike threshold the hp threshold, for a unit with range the ranged strike
-    /// threshold. With `stay escape` = 1 the stay term spares a move to a tile less threatened than the unit's own (candidate
+    /// threshold. A unit with range reads the ranged engaged threshold instead of the ranged one while the memory's plan says
+    /// engaged (`plan_stage`'s readout: the teacher's shooters fire down to `ROTATE_BURST` once the assault went in). With
+    /// `stay escape` = 1 the stay term spares a move to a tile less threatened than the unit's own (candidate
     /// number 19 below the token's 39: the teacher's rest moves only to a safer or better healing tile). `MBENet.wounded_term` is
     /// the same arithmetic.
     pub fn actions_x(&self, body: &Body, unit: usize, candidates: &[Candidate], map: Option<&MapState>, tokens: &Tokens, mem: Option<&MemIn>) -> Vec<f32> {
@@ -1326,7 +1328,19 @@ impl Net {
     fn wounded_gate(&self, w: &[f32; WW_LEN], unit: usize, tokens: &Tokens, mem: Option<&MemIn>) -> (f32, f32) {
         let sig = |v: f32| 1.0 / (1.0 + (-v).exp());
         let f = &tokens.feat[unit];
-        let thr = if f[13] > 0.0 { w[3] } else { w[1] };
+        let engaged = match (mem, self.mem.as_ref().and_then(|m| m.aux_p)) {
+            (Some(m), Some(a)) => a[2] * m.state.p[P_ENGAGED_N] + a[3] > 0.0,
+            _ => false,
+        };
+        let thr = if f[13] > 0.0 {
+            if engaged {
+                w[14]
+            } else {
+                w[3]
+            }
+        } else {
+            w[1]
+        };
         let hp = sig(w[2] * (thr - f[7]));
         let rest = match (mem, self.mem.as_ref().and_then(|m| m.aux_rest)) {
             (Some(m), Some(a)) => match usize::try_from(m.slots.get(unit).copied().unwrap_or(-1)) {

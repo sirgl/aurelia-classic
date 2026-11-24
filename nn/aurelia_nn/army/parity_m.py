@@ -132,7 +132,7 @@ def main():
                 if isinstance(model, MBANet):
                     al = model.action_logits_a(h, b['unit'], b['cand'], b['promo'], b['cmask'], b['gcand'], b['cand_ok'])[0][0].tolist()
                 elif 'ww' in w:
-                    al = model.action_logits_g(h, b['unit'], b['cand'], b['promo'], b['cmask'], b['gcand'], b['cand_ok'], b['tok'], b['slot'], Us[k])[0].tolist()
+                    al = model.action_logits_g(h, b['unit'], b['cand'], b['promo'], b['cmask'], b['gcand'], b['cand_ok'], b['tok'], b['slot'], Us[k], Ps[k])[0].tolist()
                 elif has_map:
                     al = model.action_logits_g(h, b['unit'], b['cand'], b['promo'], b['cmask'], b['gcand'], b['cand_ok'])[0].tolist()
                 else:

@@ -362,7 +362,7 @@ def decision_losses(model, b, um, pm):
     h = hfull[:, :t]
     pl = model.pointer_logits(h, b['sel'])
     if isinstance(model, MBENet):
-        al = model.action_logits_g(h, b['unit'], b['cand'], b['promo'], b['cmask'], b['gcand'], b['cand_ok'], b['tok'], b['slot'], um)
+        al = model.action_logits_g(h, b['unit'], b['cand'], b['promo'], b['cmask'], b['gcand'], b['cand_ok'], b['tok'], b['slot'], um, pm)
     elif isinstance(model, MBNet):
         al = model.action_logits_g(h, b['unit'], b['cand'], b['promo'], b['cmask'], b['gcand'], b['cand_ok'])
     else:
