@@ -6,6 +6,7 @@
 #   tools/m5/campaign3.sh stop      between jobs (the STOP file; a running job ends first)
 #   tools/m5/campaign3.sh status    status.json + the last results       tools/m5/campaign3.sh summary
 #   tools/m5/campaign3.sh smoke     every job kind once with tiny budgets, in its own lab (lab-smoke/), foreground
+#                                   (M5_ONLY=job,job,... runs only those jobs and the summary)
 # Start again after a crash or a reboot: finished jobs are skipped, a training resumes from its checkpoint.
 set -eu
 . "$(dirname "$0")/env.sh"
@@ -17,7 +18,7 @@ case "${1:-run}" in
   run) m5_res_up; rm -f "$M5_RUNS/campaign3/STOP"; exec $C3 run --config "$CFG" ;;
   smoke)   # its own lab (lab-smoke/): the real run never sees the smoke's tiny recordings, dumps or nets
     export AURELIA_LAB=${M5_SMOKE_LAB:-$M5_REPO/lab-smoke}; mkdir -p "$AURELIA_LAB/runs" "$AURELIA_LAB/logs" "$AURELIA_LAB/data"
-    m5_res_up; rm -f "$AURELIA_LAB/runs/campaign3-smoke/STOP"; exec $C3 run --smoke --config "$CFG" ;;
+    m5_res_up; rm -f "$AURELIA_LAB/runs/campaign3-smoke/STOP"; exec $C3 run --smoke --config "$CFG" ${M5_ONLY:+--only "$M5_ONLY"} ;;
   smoke-summary) export AURELIA_LAB=${M5_SMOKE_LAB:-$M5_REPO/lab-smoke}; exec $C3 summary --smoke --config "$CFG" ;;
   start)
     if [ -f "$PIDF" ] && kill -0 "$(cat "$PIDF")" 2>/dev/null; then echo "stage 3 already running (pid $(cat "$PIDF"))"; exit 0; fi

@@ -71,8 +71,8 @@ def perf_cores() -> int:
 
 
 class Campaign:
-    def __init__(self, cfg: dict, smoke: bool):
-        self.cfg, self.smoke = cfg, smoke
+    def __init__(self, cfg: dict, smoke: bool, only: list[str] | None = None):
+        self.cfg, self.smoke, self.only = cfg, smoke, only
         self.c = dict(cfg["campaign"])
         self.data = dict(cfg["data"])
         self.imit = dict(cfg.get("imit", {}))
@@ -98,6 +98,10 @@ class Campaign:
         jobs = [dict(j) for j in self.cfg["job"]]
         names = [j["name"] for j in jobs]
         assert len(names) == len(set(names)), "job names must be unique"
+        if self.only:   # a subset of the queue (a short re-check): the named jobs and the summary, in the queue's order
+            unknown = [n for n in self.only if n not in names]
+            assert not unknown, f"--only names unknown jobs {unknown}"
+            jobs = [j for j in jobs if j["name"] in self.only or j["kind"] == "summary"]
         if self.smoke:
             ov = self.cfg.get("smoke", {})
             for j in jobs:
@@ -463,7 +467,7 @@ class Campaign:
                 if s_["step"] >= s_["steps"]:
                     return 0
                 resume = ["--resume"]
-            if self.py(f"train-{name}", [*base, *resume, "--max-minutes", chunk], gpu=True, cpu="2", ram=gb):
+            if self.py(f"train-{name}", [*base, *resume, "--max-minutes", chunk], gpu=True, cpu="1" if self.smoke else "2", ram=gb):
                 return 1
             if im.get("max_steps"):
                 return 0
@@ -598,7 +602,7 @@ class Campaign:
             for k in ("P", "G", "split", "min_per_family"):
                 if k in rc_:
                     args += [f"--{k.replace('_', '-')}", rc_[k]]
-            if self.py(f"rl-{name}", args, gpu=True, cpu="2", ram=max(gb, 16) if not self.smoke else gb):
+            if self.py(f"rl-{name}", args, gpu=True, cpu="1" if self.smoke else "2", ram=max(gb, 16) if not self.smoke else gb):
                 return {"status": "failed", "why": f"armyrl failed (lab/logs/rl-{name}.log)"}
             (out / ".done").touch()
         c = json.loads(curve.read_text())
@@ -630,6 +634,15 @@ class Campaign:
         return {"status": "ok", "update": u, "quick": self.family_wins(rows[0]), "full": self.family_wins(rows[1]),
                 "full_mean": self.mean_rate(self.family_wins(rows[1])), "vs_MBf6c": g, "vs_u175": g2}
 
+    @staticmethod
+    def brief(g: dict | None) -> str:
+        """A gate's families that moved beyond noise: 'up: a, b; down: c' (or 'none moved')."""
+        st = (g or {}).get("status") or {}
+        parts = [f"{k}: {', '.join(st[k])}" for k in ("up", "down", "DROP") if st.get(k)]
+        if (g or {}).get("gate_error"):
+            return "gate error"
+        return "; ".join(parts) if parts else "none moved beyond noise"
+
     # ---- summary -----------------------------------------------------------------------------------------------
     def job_summary(self, j: dict | None = None) -> dict:
         res = self.results()
@@ -652,7 +665,7 @@ class Campaign:
             if jj["kind"] == "rust_eval" and r.get("status") == "ok":
                 note = (f"quick mean {r.get('quick_mean')}, full mean {r.get('full_mean')}; vs the M4's rows: "
                         f"{'MATCH within noise' if r.get('matches_m4') else str(r.get('families_changed_beyond_noise')) + ' families differ beyond noise'}"
-                        f" {json.dumps((r.get('vs_m4') or {}).get('status'))}")
+                        f" ({self.brief(r.get('vs_m4'))})")
             elif jj["kind"] == "teach" and r.get("status") == "ok":
                 note = f"train {r.get('train_plays')} plays ({r.get('train_gb')} GB), hold {r.get('hold_plays')} plays"
             elif jj["kind"] == "twin" and r.get("status") == "ok":
@@ -706,7 +719,8 @@ class Campaign:
                 g1, g2 = rr.get("vs_MBf6c") or {}, rr.get("vs_u175") or {}
                 L.append(f"| {jj['name']} | {r.get('status', 'not run')} / {rr.get('status', 'not run')} | {r.get('minutes', '')} + {rr.get('minutes', '')} | {r.get('lambda', '')} | "
                          f"{(r.get('done') or {}).get('updates', '')} | {sel.get('update', '')} | {sel.get('start_mean', '')} -> {sel.get('val_mean', '')} | {rr.get('full_mean', '')} | "
-                         f"pass {g1.get('pass')} {json.dumps(g1.get('status'))} | {json.dumps(g2.get('status'))} |")
+                         f"gate pass {g1.get('pass')}; {self.brief(g1)}; mean {json.dumps(((g1.get('summary') or {}).get('mean') or {}).get('delta'))} | "
+                         f"{self.brief(g2)}; mean delta {json.dumps(((g2.get('summary') or {}).get('mean') or {}).get('delta'))} |")
         # time, cuts, failures
         cut = [r for r in res if r.get("status") == "skipped_deadline"]
         dep = [r for r in res if r.get("status") == "skipped_dep"]
@@ -815,12 +829,13 @@ def main() -> int:
     ap.add_argument("cmd", choices=["run", "plan", "status", "summary"])
     ap.add_argument("--config", default=str(M5 / "campaign3.toml"))
     ap.add_argument("--smoke", action="store_true")
+    ap.add_argument("--only", default="", help="comma-separated job names: run only these (and the summary)")
     a = ap.parse_args()
     cfg = tomllib.loads(Path(a.config).read_text())
     if a.smoke and "smoke" not in LAB.name and not os.environ.get("M5_SMOKE_ANY_LAB"):
         print(f"campaign3: --smoke needs its own lab (AURELIA_LAB=.../lab-smoke), not {LAB}: use tools/m5/campaign3.sh smoke", file=sys.stderr)
         return 2
-    c = Campaign(cfg, a.smoke)
+    c = Campaign(cfg, a.smoke, [x for x in a.only.split(",") if x] or None)
     if a.cmd == "plan":
         c.plan()
         return 0
