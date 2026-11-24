@@ -131,7 +131,7 @@ def compare(g, rows, which, counts, show, ex):
                 ex[fam].append(f"{g.plays[pi][0]['play']} r{start[3]}: {first}" + (detail if first != "city damage" else ""))
 
 
-def run(path, weights, families=None, which="enemy", show=3, out=None, group=400, rule="std", charge=False, debug=None, scene_rule=False):
+def run(path, weights, families=None, which="enemy", show=3, out=None, group=400, rule="std", charge=False, debug=None, scene_rule=True):
     brain = Brain(load_net(weights))
     counts = collections.Counter()
     ex = collections.defaultdict(list)
@@ -193,7 +193,8 @@ def main(argv=None):
     ap.add_argument("--out")
     ap.add_argument("--rule", default="std", choices=["std", "approx"])
     ap.add_argument("--charge", action="store_true")
-    ap.add_argument("--scene-rule", action="store_true")
+    ap.add_argument("--scene-rule", dest="scene_rule", action="store_true", default=True)
+    ap.add_argument("--standard", dest="scene_rule", action="store_false", help="Rust ARMY_SCENE_RULE=standard")
     ap.add_argument("--debug", help="PLAY:ROUND,... print the MLX shot plan and the Rust commands of those turns")
     a = ap.parse_args(argv)
     mx.set_memory_limit(16 << 30)

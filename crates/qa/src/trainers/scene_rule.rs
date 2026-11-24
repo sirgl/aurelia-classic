@@ -1,4 +1,5 @@
-//! The scene rule (`ARMY_SCENE_RULE=simple`; default OFF, and then nothing here runs): a small explicit rule
+//! The scene rule (the trainers' default; `ARMY_SCENE_RULE=standard` turns it off, and then nothing here runs and the
+//! AI `standard` plays the scene's pieces besides the seats' scripts, as before the rule): a small explicit rule
 //! that plays what the AI `standard` plays of the scene's pieces besides the seat's own script, so that the
 //! world of a trainer scene is owned by the trainer and is the same in the MLX twin
 //! (`nn/aurelia_nn/tacsim/armyrule.py`). With the rule on, at the end of a seat's scripted part (the net, a
@@ -10,8 +11,11 @@
 //!    points (a kill leaves 0; ties: the lowest tile).
 //! 3. Shots: each of its ranged pieces with moves left (piece order) shoots from where it stands, by the same
 //!    key, when the rules accept the shot (no set-up, no move first).
-//! 4. Stand and fortify: each of its pieces ends its turn (`act::hold_unit`) and fortifies where the rules
-//!    accept it, unless it is set up for a ranged attack.
+//! 4. Stand and fortify: each of its pieces ends its turn (`act::hold_unit`); a piece that did not move or act
+//!    this turn (its moves full when the step starts: the pieces the stand heals) fortifies where the rules accept
+//!    it, unless it is set up for a ranged attack. (Amended 24 Nov: before, every piece fortified, also a hunter
+//!    that had just closed in, which `standard` never did; kite's hit-and-run against fortified melee was then
+//!    unwinnable: the solvable sample's guard failed, kite industrial 0 / 8.)
 //!
 //! 0. (before the seat's script) The arena closes at the turn's start too: a unit a home city finished then is
 //!    taken off before the seat looks (`trainers::close_arena`; else the net sees it as a far unit's token).
@@ -36,10 +40,20 @@ use kernel::world::unit::{Stance, UnitCore};
 use super::act;
 use super::Scene;
 
-/// The rule's switch: `ARMY_SCENE_RULE=simple` (anything else, or unset: off).
+/// The rule's switch: on unless `ARMY_SCENE_RULE=standard` (unset or `simple`: on; any other value stops the run,
+/// so a misspelt switch never plays the other world).
 pub fn on() -> bool {
     static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
-    *ON.get_or_init(|| std::env::var("ARMY_SCENE_RULE").is_ok_and(|v| v == "simple"))
+    *ON.get_or_init(|| rule_of(std::env::var("ARMY_SCENE_RULE").ok().as_deref()))
+}
+
+/// The switch's value: `None` (unset) or `simple` is the rule, `standard` the old world.
+pub fn rule_of(value: Option<&str>) -> bool {
+    match value {
+        None | Some("simple") => true,
+        Some("standard") => false,
+        Some(other) => panic!("ARMY_SCENE_RULE={other}: expected simple (the default) or standard"),
+    }
 }
 
 thread_local! {
@@ -166,13 +180,15 @@ pub fn turn(rules: &CompiledRuleset, game: &mut GameState, scene: &Scene, side: 
             act::try_cmd(game, rules, side, Command::RangedAttack { unit: p.h, target });
         }
     }
-    // 4. Stand and fortify.
+    // 4. Stand and fortify: only a piece that did not move or act this turn (its moves full: the pieces the stand
+    // heals) fortifies; a piece that marched or struck stays as it is (a hunter closing in is not dug in).
     for p in pieces {
         let Some(c) = act::alive(game, p, side) else { continue };
+        let stood = c.moves_left > 0 && !c.has_moved();
         if c.moves_left > 0 {
             act::hold_unit(game, rules, p.h);
         }
-        if fortifies(game, rules, side, p.h) {
+        if stood && fortifies(game, rules, side, p.h) {
             act::try_cmd(game, rules, side, Command::Fortify { unit: p.h });
         }
     }

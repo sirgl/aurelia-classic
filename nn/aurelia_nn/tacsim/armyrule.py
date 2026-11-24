@@ -1,4 +1,4 @@
-"""The scene rule (`ARMY_SCENE_RULE=simple` in Rust: `crates/qa/src/trainers/scene_rule.rs`) in MLX, batched over
+"""The scene rule (the trainers' default; Rust `ARMY_SCENE_RULE=standard` turns it off: `crates/qa/src/trainers/scene_rule.rs`) in MLX, batched over
 scenes. At the end of a seat's scripted part (the net on the learner's seat, the family script on the enemy's), for
 that seat's units in every scene, in this order:
 
@@ -8,8 +8,8 @@ that seat's units in every scene, in this order:
    leaves 0; ties: the lowest tile), expected roll;
 3. shots: each ranged unit with moves left (slot order) shoots from where it stands, same key, when the rules accept
    the shot (`Obs.preview`'s ok: no set-up, reach, sight);
-4. stand and fortify: each unit ends its turn (`Sim.hold_units`: an unmoved one heals) and fortifies where
-   `Sim.masks`'s fortify condition holds, unless it is set up.
+4. stand and fortify: each unit ends its turn (`Sim.hold_units`: an unmoved one heals); an unmoved one (moves full
+   when the step starts) fortifies where `Sim.masks`'s fortify condition holds, unless it is set up.
 
 The arena is closed, so a seat's units in the window are its scene pieces (slot order = piece order).
 """
@@ -193,10 +193,13 @@ def _shoot(game, side, u):
 def stand_fortify(game, side, live, heal=True):
     s, sim = game.s, game.sim
     mine = live[:, None] & s["u_alive"] & (s["u_side"] == side) & (s["u_tile"] >= 0)
+    # Only a piece that did not move or act this turn fortifies (its moves full when the step starts: the pieces the
+    # stand heals); Rust `scene_rule::turn` step 4, amended 24 Nov.
+    stood = mine & (s["u_mv"] > 0) & (s["u_mv"] >= s["u_mmax"])
     s = sim.hold_units(s, mine & (s["u_mv"] > 0), heal=heal)
     water = sim.mg("water", s["u_tile"]) > 0
     st = s["u_st"]
-    fort = mine & ~((st == 1) | (st == 2) | (st == 3)) & ~s["p_civilian"] & ~s["p_no_defensive_bonus"] & s["p_land"] & ~water
+    fort = stood & ~((st == 1) | (st == 2) | (st == 3)) & ~s["p_civilian"] & ~s["p_no_defensive_bonus"] & s["p_land"] & ~water
     s["u_st"] = mx.where(fort, 1, st)
     game.s = s
 

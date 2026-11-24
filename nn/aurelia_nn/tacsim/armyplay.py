@@ -160,8 +160,9 @@ class Game:
         self.judge_after_script = True
         self.turn_tile = None
         self.fort_rule = "fit"
-        # The scene rule (`armyrule`): both seats' pieces besides the net and the family script; off: the port of standard.
-        self.scene_rule = False
+        # The scene rule (`armyrule`, the trainers' default): both seats' pieces besides the net and the family script;
+        # False: the port of standard (Rust ARMY_SCENE_RULE=standard).
+        self.scene_rule = True
         self.charge = False
         self.build_walks(plays, idx, U)
         # The slots that may hold an enemy ranged unit (the advisor's shooters): any scene's enemy ranged unit at the start.
@@ -878,7 +879,8 @@ def main(argv=None):
     ap.add_argument("--fort", default="fit", choices=["fit", "old", "none"])
     ap.add_argument("--charge", action="store_true")
     ap.add_argument("--compile", action="store_true")
-    ap.add_argument("--scene-rule", action="store_true", help="the scene rule (Rust ARMY_SCENE_RULE=simple) on both seats")
+    ap.add_argument("--scene-rule", dest="scene_rule", action="store_true", default=True, help="the scene rule on both seats (the default, as in Rust)")
+    ap.add_argument("--standard", dest="scene_rule", action="store_false", help="the port of standard instead of the rule (Rust ARMY_SCENE_RULE=standard)")
     ap.add_argument("--old-judge", action="store_true", help="judge after the enemy's turn (the G1 harness)")
     a = ap.parse_args(argv)
     if a.cpu:

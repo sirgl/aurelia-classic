@@ -237,7 +237,7 @@ pub fn play(rules: &CompiledRuleset, mut game: GameState, mut scene: Scene, play
 fn play_seated(rules: &CompiledRuleset, game: GameState, scene: Scene, player: &str, trace: bool, seat: Seat, settings: kernel::ai::plan::AiSettings, seated: kernel::ai::seats::Seated<ClassicMind>) -> Result<Row, String> {
     type S = kernel::ai::seats::Seated<ClassicMind>;
     if scene_rule::on() {
-        // The scene rule (default off): the minds give no command to the ruled seats' units and cities.
+        // The scene rule (the trainers' default; ARMY_SCENE_RULE=standard: off): the minds give no command to the ruled seats' units and cities.
         return if lab::mode::combat_only() {
             let driver = AiDriver::<Classic, scene_rule::Ruled<CombatOnly<S>>>::with_mind(settings, Vec::new(), scene_rule::Ruled(CombatOnly(seated)));
             play_on(rules, game, scene, player, trace, seat, driver)

@@ -300,3 +300,14 @@ fn the_choke_reference_does_not_wait_for_holders_that_heal() {
     assert!(n >= 40, "the sample builds ({n})");
     assert!(choke * 10 >= fight * 9, "ref-choke wins {choke} of {n}, ref-fight {fight}: the reference waits again");
 }
+
+/// The scene rule is the trainers' world: on when the switch is unset or `simple`, off only for `standard`, and a
+/// misspelt value stops the run instead of playing the other world.
+#[test]
+fn the_scene_rule_is_the_trainers_default_and_standard_is_the_only_way_off() {
+    use aurelia_qa::trainers::scene_rule::rule_of;
+    assert!(rule_of(None), "unset: the rule");
+    assert!(rule_of(Some("simple")));
+    assert!(!rule_of(Some("standard")));
+    assert!(std::panic::catch_unwind(|| rule_of(Some("simpel"))).is_err(), "an unknown value stops the run");
+}
