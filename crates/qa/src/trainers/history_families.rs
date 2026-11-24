@@ -11,9 +11,11 @@
 //!   three rounds along a path whose last step points at A or at B (half the instances: the first legs pointed at the
 //!   other city, a feint) and stands, at the decision round (round 3), 4 tiles from both. It then attacks the
 //!   city its last step pointed at. WIN: no city of ours lost when the enemy is dead or 9 rounds end.
-//! - scout-report (fog): three cities of ours 4 tiles from the army (mutually 4 apart); the enemy force marches
-//!   along the ray to one of them; a small outpost of ours beside each of the three possible roads sees it in rounds
-//!   0-2 only; at round 3 it is in the fog, 4 tiles from its target. WIN: as feint.
+//! - scout-report (fog): three cities of ours 6 tiles from the army (three rounds of foot movement; 6 apart); the enemy
+//!   force (4 melee, 1 ranged) marches along the ray to one of them; a small outpost of ours beside each of the three
+//!   possible roads sees it in rounds 0-2 only; at round 3 it is in the fog, 4 tiles from its target. The decision
+//!   round is 2: a defender that leaves then arrives with the enemy; one that waits for the enemy to show arrives two
+//!   rounds after it. WIN: as feint.
 //! - fog-sniper (fog): an enemy bowman (the weakest ranged kind of range 2) on a hill, hidden by a ridge, shoots the
 //!   weakest of our three units 2 tiles behind the ridge every round and is never seen from where our units stand.
 //!   WIN: the sniper killed within 3 rounds. The strike log (`src`: the tile the last strike came from) is what the
@@ -22,14 +24,16 @@
 //!   for three rounds. Half the instances: in the enemy's turn of round 0 three strong melee enter the city (WIN: the
 //!   city taken within 24 rounds with at most 2 of the army lost, the scout apart). Half: nothing enters but a wave
 //!   of 2-3 strong melee lands at round N (5-7) (WIN: the city taken before N). The round limit is 24 in both.
-//! - two-fronts (no fog): eight of ours, an enemy city worn down to 20 % to take (5 tiles east) and our capital (3 %
-//!   left, 4 west) to hold against a force of three strong melee that appears 7 tiles west. WIN: our city kept, the
-//!   enemy city taken and the force dead, within 7 rounds.
+//! - two-fronts (no fog): eight of ours (5 capturers, 1 ranged, 2 siege), an enemy walled city at 45 % to take (5 tiles
+//!   east) and our walled capital (3 % left, 4 west) to hold against a force of three strong melee that stands 8 tiles
+//!   west. The home needs three strong melee in its walls, the siege needs both siege units: the even split sends one
+//!   siege and too few melee to each. WIN: our city kept, the enemy city taken and the force dead, within 9 rounds.
 //! - second-city (no fog): the siege of the same city by seven; at round K (3-5) a force of four strong melee appears
 //!   7 tiles west of our second city (a town). WIN: as two-fronts, within 16 rounds.
-//! - twin-siege (no fog): two enemy cities 10 tiles apart, a strong one (walls, worn down to 40 %) and a weak one (5 %
-//!   left), either west; our eleven stand between; a relief force of two strong melee marches to the city where more
-//!   of ours stand. WIN: both cities taken within 12 rounds with at most 3 of ours lost.
+//! - twin-siege (no fog): two enemy cities 6 tiles apart, a strong one (walls, full hit points) and a weak one (5 % left),
+//!   either west; our eleven (3 capturers, 3 ranged, 5 siege) stand between; a relief strong melee marches to the city
+//!   where more of ours stand. Only all the siege takes the strong city in time; one capturer and one ranged unit take
+//!   the weak one. WIN: both cities taken within 9 rounds with at most 3 of ours lost.
 //!
 //! THE REFERENCES. Right teacher first (`Fam::solvers`), the wrong ones are played with `--players`:
 //! - feint: ref-trace (last step of the leader), ref-split, ref-guess (nearest city: a tie goes to the lower tile),
@@ -41,7 +45,7 @@
 //! - two-fronts: ref-share (the holders are as many as the enemy force), ref-pile (all on the siege), ref-even (half
 //!   and half), ref-hold-first (all on the defence first);
 //! - second-city: ref-detach (all go home while the force lives, then back to the siege), ref-ignore, ref-abandon (home for good);
-//! - twin-siege: ref-twin (two armies split 6/8 to the strong city, a capturer at each), ref-serial (all on one city, then
+//! - twin-siege: ref-twin (all the siege and all but one capturer and one ranged unit to the strong city, those two to the weak one), ref-serial (all on one city, then
 //!   the other), ref-equal (alternate units).
 
 use std::collections::BTreeMap;
@@ -71,8 +75,8 @@ pub fn rounds(f: Fam) -> u32 {
         Fam::Feint | Fam::ScoutReport => 9,
         Fam::FogSniper => 3,
         Fam::CityReinforced => 24,
-        Fam::TwoFronts => 7,
-        Fam::TwinSiege => 12,
+        Fam::TwoFronts => 9,
+        Fam::TwinSiege => 9,
         _ => 16,
     }
 }
@@ -307,7 +311,15 @@ fn build_feint(p: &mut Painter, lab: &Lab, instance: usize, attempt: u32) -> Res
 
 /// The three cities of the scout scene stand at the corners (4, -4), (0, -4), (-4, 0) of the ring of radius 4 round the army;
 /// the enemy walks the ray to one of them from 3.5 times as far.
-const SCOUT_CITIES: [(i64, i64); 3] = [(4, -4), (0, -4), (-4, 0)];
+/// The army stands at the centre; the three cities at the corners of the ring of radius `SCOUT_RING` round it. Six tiles
+/// are three rounds of foot movement: a report acted on at the decision round arrives with the enemy, one that waits for
+/// the enemy to show (within 3 of a city) arrives two rounds after it.
+const SCOUT_RING: i64 = 6;
+
+fn scout_cities() -> [(i64, i64); 3] {
+    let r = SCOUT_RING;
+    [(r, -r), (0, -r), (-r, 0)]
+}
 
 fn build_scout(p: &mut Painter, lab: &Lab, instance: usize, attempt: u32) -> Result<Scene, String> {
     let mut s = blank(Fam::ScoutReport, lab, instance, attempt);
@@ -315,22 +327,22 @@ fn build_scout(p: &mut Painter, lab: &Lab, instance: usize, attempt: u32) -> Res
     let rules = p.rules;
     let at = |p: &Painter, d: (i64, i64)| p.at(d.0, d.1).ok_or_else(|| "off the map".to_owned());
     let real = p.d.range(0, 2) as usize;
-    let x = SCOUT_CITIES[real];
-    let waypoints = |k2: i64| (x.0 * k2 / 2, x.1 * k2 / 2);
-    // E = 2X (4 beyond the city), P2 = 2.5X, P1 = 3X, P0 = 3.5X.
-    let (e, p2, p1, p0) = (waypoints(4), waypoints(5), waypoints(6), waypoints(7));
+    let x = scout_cities()[real];
+    let ring = SCOUT_RING;
+    // The road's stops lie 4, 6, 8, 10 tiles beyond the city on the ray from the army through it.
+    let along = |c: (i64, i64), d: i64| (c.0 * (ring + d) / ring, c.1 * (ring + d) / ring);
+    let (e, p2, p1, p0) = (along(x, 4), along(x, 6), along(x, 8), along(x, 10));
     let pop = p.d.range(2, 3) as u32;
     let mut tiles = Vec::new();
-    for c in SCOUT_CITIES {
+    for c in scout_cities() {
         let t = at(p, c)?;
         let h = p.city(me, t, pop, false);
         weaken(p, h, 5);
         tiles.push(t);
     }
     // One outpost beside each possible road, where the road's first three stops are in its sight and the stop at the decision round is not.
-    for c in SCOUT_CITIES {
-        let w = |k2: i64| (c.0 * k2 / 2, c.1 * k2 / 2);
-        let (pe, q2, q1, q0) = (w(4), w(5), w(6), w(7));
+    for c in scout_cities() {
+        let (pe, q2, q1, q0) = (along(c, 4), along(c, 6), along(c, 8), along(c, 10));
         let tq = |d: (i64, i64)| at(p, d);
         let (t0, t1, t2, te) = (tq(q0)?, tq(q1)?, tq(q2)?, tq(pe)?);
         let cand: Vec<TileId> = tiles_within(&p.game, t1, 3)
@@ -344,7 +356,7 @@ fn build_scout(p: &mut Painter, lab: &Lab, instance: usize, attempt: u32) -> Res
     let start = at(p, (0, 0))?;
     let arms_me = [(Arm::Melee, "army"), (Arm::Melee, "army"), (Arm::Ranged, "ranged"), (Arm::Ranged, "ranged")];
     s.mine = put_group(p, me, start, 1, &arms_me, true)?;
-    let arms_foe = foe_arms(5, 2);
+    let arms_foe = foe_arms(4, 1);
     let t0 = at(p, p0)?;
     s.theirs = put_group_by(p, foe, t0, 2, &arms_foe, true, true)?;
     // The checks the scene stands on: the road's first three stops are seen by the outposts, the fourth is not, and nobody else sees it.
@@ -882,8 +894,8 @@ fn reinforced_judge(game: &GameState, sc: &Scene, rel: u32) -> Option<bool> {
 const FRONT_CITY: (i64, i64) = (5, 0);
 const HOME_CITY: (i64, i64) = (-4, 0);
 /// Where the force of the two-fronts scenes stands (and appears, in second-city): 7 tiles west of the centre.
-fn force_at(_fam: Fam) -> (i64, i64) {
-    (-7, 0)
+fn force_at(fam: Fam) -> (i64, i64) {
+    (if fam == Fam::TwoFronts { -8 } else { -7 }, 0)
 }
 
 fn build_fronts(p: &mut Painter, fam: Fam, lab: &Lab, instance: usize, attempt: u32) -> Result<Scene, String> {
@@ -893,9 +905,10 @@ fn build_fronts(p: &mut Painter, fam: Fam, lab: &Lab, instance: usize, attempt: 
     let at = |p: &Painter, d: (i64, i64)| p.at(d.0, d.1).ok_or_else(|| "off the map".to_owned());
     let city_t = at(p, FRONT_CITY)?;
     let pop = p.d.range(5, 8) as u32;
-    let city = p.city(foe, city_t, pop, false);
-    // The city to take is worn down to 20 % and has no walls: the deadline, not the walls, sets the pace.
-    weaken(p, city, 20);
+    let two0 = fam == Fam::TwoFronts;
+    // Two-fronts: a walled city at 45 % that only both siege units and a capturer take in time; second-city: worn to 20 %, no walls.
+    let city = p.city(foe, city_t, pop, two0);
+    weaken(p, city, if two0 { 45 } else { 20 });
     let home_t = at(p, HOME_CITY)?;
     // Two-fronts: a capital worn down to 3 %; second-city: a small town at full strength.
     let two = fam == Fam::TwoFronts;
@@ -905,7 +918,7 @@ fn build_fronts(p: &mut Painter, fam: Fam, lab: &Lab, instance: usize, attempt: 
     let gk = p.kind(if p.d.chance(50) { Arm::Ranged } else { Arm::Melee }).ok_or("no garrison")?;
     s.theirs.push(p.put(foe, city_t, gk, "garrison"));
     let mut plan: Vec<(Arm, &'static str)> = Vec::new();
-    let (n_cap, n_rng, n_sg) = if fam == Fam::TwoFronts { (4, 2, 2) } else { (2, 3, 2) };
+    let (n_cap, n_rng, n_sg) = if fam == Fam::TwoFronts { (5, 1, 2) } else { (2, 3, 2) };
     for _ in 0..n_cap {
         plan.push((Arm::Melee, "capturer"));
     }
@@ -995,9 +1008,16 @@ fn pick_holders(sc: &Scene, n: usize) -> Vec<Piece> {
     };
     let caps = by("capturer");
     let rng = by("ranged");
-    out.extend(rng.iter().cloned());
-    out.extend(caps.iter().skip(2).cloned());
-    out.extend(caps.iter().take(2).cloned());
+    if sc.fam == Fam::TwoFronts {
+        // Strong melee hold the walls: the capturers beyond the first two, then the ranged; two capturers stay with the siege.
+        out.extend(caps.iter().skip(2).cloned());
+        out.extend(rng.iter().cloned());
+        out.extend(caps.iter().take(2).cloned());
+    } else {
+        out.extend(rng.iter().cloned());
+        out.extend(caps.iter().skip(2).cloned());
+        out.extend(caps.iter().take(2).cloned());
+    }
     out.truncate(n);
     out
 }
@@ -1083,7 +1103,7 @@ fn fronts_judge(game: &GameState, sc: &Scene, rel: u32) -> Option<bool> {
 /// force of two strong melee, 3 tiles off the middle, marches to the city where more of ours stand within 3.
 /// WIN: both cities ours within the round limit with at most `TWK` of ours lost.
 fn twin_at() -> [(i64, i64); 2] {
-    let x = 5;
+    let x = 3;
     [(-x, 0), (x, 0)]
 }
 
@@ -1102,30 +1122,27 @@ fn build_twin(p: &mut Painter, lab: &Lab, instance: usize, attempt: u32) -> Resu
             for b in defences(rules, lab.era) {
                 p.game.debug_add_building(rules, city, b);
             }
-            weaken(p, city, 40);
+            weaken(p, city, 100);
         } else {
             weaken(p, city, 5);
         }
         tiles.push((t, strong));
     }
     p.clutter(p.d.range(1, 3) as usize, &[tiles[0].0, tiles[1].0]);
-    for (t, strong) in &tiles {
-        let n = if *strong { 1 } else { 1 };
-        for _ in 0..n {
-            let gk = p.kind(if p.d.chance(50) { Arm::Ranged } else { Arm::Melee }).ok_or("no garrison")?;
-            let spot = p.spots(*t, 1, 1).ok().and_then(|v| v.first().copied()).unwrap_or(*t);
-            let at_t = if s.theirs.iter().any(|q| act::core_of(&p.game, q.h).is_some_and(|c| c.tile == *t)) { spot } else { *t };
-            s.theirs.push(p.put(foe, at_t, gk, "garrison"));
-        }
+    for (t, _) in &tiles {
+        let gk = p.kind(if p.d.chance(50) { Arm::Ranged } else { Arm::Melee }).ok_or("no garrison")?;
+        let spot = p.spots(*t, 1, 1).ok().and_then(|v| v.first().copied()).unwrap_or(*t);
+        let at_t = if s.theirs.iter().any(|q| act::core_of(&p.game, q.h).is_some_and(|c| c.tile == *t)) { spot } else { *t };
+        s.theirs.push(p.put(foe, at_t, gk, "garrison"));
     }
     let mut plan: Vec<(Arm, &'static str)> = Vec::new();
-    for _ in 0..4 {
+    for _ in 0..3 {
         plan.push((Arm::Melee, "capturer"));
     }
-    for _ in 0..4 {
+    for _ in 0..3 {
         plan.push((Arm::Ranged, "ranged"));
     }
-    for _ in 0..3 {
+    for _ in 0..5 {
         plan.push((Arm::Siege, "siege"));
     }
     let anchor = at(p, (0, 0))?;
@@ -1136,7 +1153,7 @@ fn build_twin(p: &mut Painter, lab: &Lab, instance: usize, attempt: u32) -> Resu
     }
     let strong_kind = strongest_melee(p)?;
     let relief_at = at(p, (0, if p.d.chance(50) { -3 } else { 3 }))?;
-    for t in p.spots(relief_at, 1, 2)? {
+    for t in p.spots(relief_at, 1, 1)? {
         s.theirs.push(p.put(foe, t, strong_kind, "relief"));
     }
     put_tiles(&mut s.info, "cities", &[tiles[0].0, tiles[1].0]);
@@ -1187,7 +1204,8 @@ fn twin_groups(sc: &Scene, name: &str) -> (Vec<Piece>, Vec<Piece>) {
     }
     for role in ["capturer", "ranged", "siege"] {
         let v = by(role);
-        let k = ((v.len() * 6 + 4) / 8).clamp(1, v.len().saturating_sub(1).max(1));
+        // All the siege goes to the strong city; the weak one gets one capturer and one ranged unit.
+        let k = if role == "siege" { v.len() } else { v.len().saturating_sub(1).max(1) };
         a.extend(v.iter().take(k).cloned());
         b.extend(v.iter().skip(k).cloned());
     }
