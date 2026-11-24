@@ -457,3 +457,191 @@ fn the_owner_part_of_unit_modifiers_from_the_memo_is_the_one_from_the_sources() 
     }
     assert!(compared >= 12 && not_empty >= 6 && combat + deferred > 0, "real modifiers were compared ({compared} {not_empty} {combat} {deferred})");
 }
+
+// ---- The key of the worker offer memo: what the snapshots of the tile and its neighbours do not show. ----
+//
+// `Around` holds the snapshots of seven tiles, the pillage of the tile, the coast of the tile and the lake
+// bits of its neighbours; `Ctx` holds the ruleset, the map's size, the player, the nation, the techs and the
+// repair switch of the brief. A water body's size makes a tile a lake (at most 10) or a coast (at least 10), so
+// a tile far from the seven can flip them without a snapshot changing; a pillage shows in no snapshot at all.
+// Each case below changes one such thing and nothing else the snapshots show, and fails when that part is not
+// in the key.
+
+mod offer_key {
+    use super::*;
+    use classic_rules::ai::planner_workers::WorkersFit;
+    use classic_rules::ids::{ImprovementId, TechId, TerrainId, UnitKindId};
+    use classic_rules::math::{hex_disc, HexCoord};
+    use classic_rules::{ClassicGame, Command, GameConfig};
+
+    const P0: PlayerId = PlayerId(0);
+    const P1: PlayerId = PlayerId(1);
+
+    fn terrain(rules: &CompiledRuleset, key: &str) -> TerrainId {
+        // The map's terrain code, not the index in the table.
+        TerrainId(rules.terrains.iter().find(|t| t.key == key).and_then(|t| t.map_code).unwrap())
+    }
+
+    fn grass(rules: &CompiledRuleset) -> TerrainId {
+        terrain(rules, "core:terrain/grassland")
+    }
+
+    /// The one map code water has.
+    fn water(game: &GameState) -> TerrainId {
+        let map = game.view().auth.map();
+        TerrainId((0..64).find(|c| map.terrain_kinds().is_water(*c)).unwrap())
+    }
+
+    type Offer = Option<(WorkerJob, i32, i32)>;
+
+    /// A 30x20 grassland of two players, every technology known, P0's city at (14, 10).
+    fn arena(rules: &CompiledRuleset) -> (GameState, TileId) {
+        let mut game = GameState::new(rules, GameConfig { players: 2, width: 30, height: 20, rng_seed: 4 });
+        let all: Vec<_> = (0..600).map(|i| (TileId(i), grass(rules))).collect();
+        game.debug_set_terrain_batch(rules, &all);
+        for tech in 0..rules.technologies.len() {
+            for p in [P0, P1] {
+                game.debug_learn(rules, p, TechId(tech as u16));
+            }
+        }
+        // Polynesia: its moai stands on the coast only.
+        let nation = rules.nations.iter().position(|n| n.key == "core:nation/polynesia").unwrap();
+        game.debug_set_player_nation(P0, nation as u8);
+        let city = game.view().auth.map().dimensions.to_tile(HexCoord { q: 14, r: 10 }).unwrap();
+        game.debug_found_city(rules, P0, city);
+        (game, city)
+    }
+
+    /// What the memo answers, what `best_job` computes, and the key of the offer, for P0 and `tile`.
+    fn ask(game: &GameState, rules: &CompiledRuleset, workers: WorkersFit, tile: TileId) -> (Offer, Offer, classic_rules::ai::planner_workers::OfferKey) {
+        let (obs, _) = AIObservation::for_player(game.view().auth, game.view().derived, rules, P0);
+        let mut brief = TurnBrief::from_observation(&obs, rules);
+        brief.workers = workers;
+        let (memo, fresh) = offer_memo_and_fresh(&obs.view, rules, &brief, Strategy::Expand, tile);
+        (memo, fresh, offer_key(&obs.view, tile))
+    }
+
+    fn same_as_fresh(what: &str, answer: &(Offer, Offer, classic_rules::ai::planner_workers::OfferKey)) {
+        assert_eq!(answer.0, answer.1, "{what}: the memo answers as the job finder does");
+    }
+
+    const REPAIR: WorkersFit = WorkersFit::ALL;
+    const NO_REPAIR: WorkersFit = WorkersFit::NONE;
+
+    /// A pillaged own farm (the snapshot of it unchanged: the farm still stands) offers its repair with the switch
+    /// on and not without it; the memo, warm from before the pillage and from the other switch, says so.
+    #[test]
+    fn the_offer_memo_sees_a_pillage_and_the_repair_switch_that_no_snapshot_shows() {
+        let rules = compile_rules(core_rules()).unwrap();
+        let (mut game, city) = arena(&rules);
+        let farm = ImprovementId(rules.improvements.iter().position(|i| i.key == "core:improvement/farm").unwrap() as u16);
+        let warrior = UnitKindId(rules.units.iter().position(|u| u.key == "core:unit/warrior").unwrap() as u16);
+        let dims = game.view().auth.map().dimensions;
+        // P1 has no city: it takes its turns only while it has a unit.
+        let pillagers: Vec<_> = dims.neighbors(city).into_iter().map(|tile| (tile, game.debug_spawn_unit(&rules, P1, tile, warrior))).collect();
+        game.debug_force_war(&rules, P1, P0);
+        for _ in 0..4 {
+            let active = game.view().auth.active_player();
+            if active == P1 {
+                break;
+            }
+            game.execute(&rules, Command::EndTurn { player: active }).unwrap();
+        }
+        assert_eq!(game.view().auth.active_player(), P1);
+        let (mut pillaged, mut key_changed, mut repair_offered, mut switch_decides) = (0, 0, 0, 0);
+        for (tile, unit) in pillagers {
+            game.debug_set_improvement_batch(&rules, &[(tile, farm)]);
+            // The memo is left warm with the switch on (a change of the switch starts it over).
+            let before_off = ask(&game, &rules, NO_REPAIR, tile);
+            same_as_fresh("a farm standing, repair off", &before_off);
+            let before = ask(&game, &rules, REPAIR, tile);
+            same_as_fresh("a farm standing, repair on", &before);
+            game.execute(&rules, Command::Pillage { unit }).unwrap();
+            if !game.view().auth.map().pillaged(tile) {
+                continue;
+            }
+            pillaged += 1;
+            // The memo is warm from before the pillage with the switch on; then the switch is turned off, and on again.
+            let on = ask(&game, &rules, REPAIR, tile);
+            same_as_fresh("pillaged, repair on", &on);
+            let off = ask(&game, &rules, NO_REPAIR, tile);
+            same_as_fresh("pillaged, repair off", &off);
+            let on_again = ask(&game, &rules, REPAIR, tile);
+            same_as_fresh("pillaged, repair on again", &on_again);
+            key_changed += usize::from(on.2 != before.2);
+            repair_offered += usize::from(on.1.is_some() && on.1 != before.1);
+            switch_decides += usize::from(on.1 != off.1);
+        }
+        eprintln!("pillaged {pillaged}, key changed {key_changed}, repair offered {repair_offered}, switch decides {switch_decides}");
+        assert!(pillaged >= 4, "tiles were pillaged: {pillaged}");
+        assert_eq!(key_changed, pillaged, "a pillage changes the key of the tile's offer");
+        assert!(repair_offered >= 4, "a repair job was offered where the farm was pillaged: {repair_offered}");
+        assert!(switch_decides >= 4, "the repair switch decides the offer: {switch_decides}");
+    }
+
+    /// A pond of nine tiles beside the tile is a lake and no sea; of ten, both; of eleven, a sea and no lake.
+    /// Each tile added is two or more tiles from the tile asked, so no snapshot of its seven changes. The key of the
+    /// offer must differ at the first step by the coast alone and at the second by the lake alone.
+    #[test]
+    fn the_offer_memo_sees_a_lake_and_a_coast_made_by_a_water_body_far_from_the_tile() {
+        let rules = compile_rules(core_rules()).unwrap();
+        let (mut game, city) = arena(&rules);
+        let dims = game.view().auth.map().dimensions;
+        let tile = dims.neighbors(city).into_iter().next().unwrap();
+        let pond = dims.neighbors(tile).into_iter().find(|n| *n != city && !dims.adjacent(*n, city)).unwrap_or_else(|| dims.neighbors(tile).into_iter().find(|n| *n != city).unwrap());
+        let near: std::collections::HashSet<TileId> = hex_disc(dims, tile, 1).collect();
+        // The body grows from a tile next to the pond, outward, in an order that keeps it one body.
+        let first = dims.neighbors(pond).into_iter().find(|n| !near.contains(n)).unwrap();
+        let mut order = vec![first];
+        let mut i = 0;
+        while order.len() < 12 {
+            for n in dims.neighbors(order[i]) {
+                if !near.contains(&n) && n != pond && !order.contains(&n) && hex_disc(dims, tile, 9).any(|t| t == n) {
+                    order.push(n);
+                }
+            }
+            i += 1;
+        }
+        assert_eq!(hex_disc(dims, tile, 9).count(), 271, "the disc is whole");
+        let lands: Vec<TerrainId> = rules.terrains.iter().filter(|t| !t.water).filter_map(|t| t.map_code).map(TerrainId).collect();
+        let (mut coast_decides, mut lake_decides) = (0, 0);
+        for terrain in lands {
+            let disc: Vec<_> = hex_disc(dims, tile, 9).map(|t| (t, grass(&rules))).collect();
+            game.debug_set_terrain_batch(&rules, &disc);
+            game.debug_set_terrain_batch(&rules, &[(tile, terrain)]);
+            let sea = water(&game);
+            let water = |tiles: &[TileId]| tiles.iter().map(|t| (*t, sea)).collect::<Vec<_>>();
+            let reveal = |game: &mut GameState| game.debug_reveal(P0, &hex_disc(dims, tile, 9).collect::<Vec<_>>());
+            let mut body: Vec<TileId> = vec![pond];
+            body.extend(order.iter().take(8));
+            game.debug_set_terrain_batch(&rules, &water(&body));
+            reveal(&mut game);
+            let map = game.view().auth.map();
+            assert!(map.lake(pond) && !map.coastal_land(tile), "nine water tiles: a lake, no coast");
+            let nine = ask(&game, &rules, REPAIR, tile);
+            same_as_fresh("a pond of nine", &nine);
+
+            game.debug_set_terrain_batch(&rules, &water(&order[8..9]));
+            reveal(&mut game);
+            let map = game.view().auth.map();
+            assert!(map.lake(pond) && map.coastal_land(tile), "ten water tiles: a lake and a coast");
+            let ten = ask(&game, &rules, REPAIR, tile);
+            same_as_fresh("a pond of ten", &ten);
+            assert_ne!(nine.2, ten.2, "{terrain:?}: the coast of the tile is in the key");
+
+            game.debug_set_terrain_batch(&rules, &water(&order[9..10]));
+            reveal(&mut game);
+            let map = game.view().auth.map();
+            assert!(!map.lake(pond) && map.coastal_land(tile), "eleven water tiles: no lake, a coast");
+            let eleven = ask(&game, &rules, REPAIR, tile);
+            same_as_fresh("a pond of eleven", &eleven);
+            assert_ne!(ten.2, eleven.2, "{terrain:?}: the lake bit of the neighbour is in the key");
+            coast_decides += usize::from(nine.1 != ten.1);
+            lake_decides += usize::from(ten.1 != eleven.1);
+        }
+        eprintln!("the coast decided the offer on {coast_decides} terrains, the lake on {lake_decides}");
+        // The lake changes a job's offer (fresh water makes a terrain valid); the coast only lets the moai
+        // be built, which the AI never values above its other jobs, so for the coast the key is the proof.
+        assert!(lake_decides > 0, "the offers differ where only the lake changed: {lake_decides}");
+    }
+}
