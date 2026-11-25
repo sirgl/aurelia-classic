@@ -64,7 +64,38 @@ pub fn rule_of(value: Option<&str>) -> bool {
 /// `kept-r`'s, the version 2 ones `kept-r2`'s. The version is written into every row's `info` (`rule_version`).
 pub fn version() -> u8 {
     static V: std::sync::OnceLock<u8> = std::sync::OnceLock::new();
+    if let Some(v) = OVERRIDE.with(std::cell::Cell::get) {
+        return v;
+    }
     *V.get_or_init(|| version_of(std::env::var("ARMY_SCENE_RULE_VERSION").ok().as_deref()))
+}
+
+thread_local! {
+    /// The version this thread plays under, whatever the environment says (tests build a scene under both versions).
+    static OVERRIDE: std::cell::Cell<Option<u8>> = const { std::cell::Cell::new(None) };
+}
+
+/// Runs `f` with the rule version of this thread set to `v` (1 or 2); the previous setting comes back afterwards.
+pub fn with_version<T>(v: u8, f: impl FnOnce() -> T) -> T {
+    assert!(v == 1 || v == 2, "rule version {v}: expected 1 or 2");
+    let before = OVERRIDE.with(|o| o.replace(Some(v)));
+    let out = f();
+    OVERRIDE.with(|o| o.set(before));
+    out
+}
+
+/// The families whose scene (what is built, what an era claims, what the teacher's script does) depends on the rule
+/// version: a row, a record or a kept set of one of them is comparable only inside one version. One list for Rust and
+/// for the Python gate tools (`rule_dependent.json`); the test `the_families_that_depend_on_the_rule_version_are_the_listed_ones`
+/// rebuilds every family under both versions and fails when the list is not exactly the families that differ.
+pub fn dependent_families() -> Vec<String> {
+    let v: serde_json::Value = serde_json::from_str(include_str!("rule_dependent.json")).expect("rule_dependent.json");
+    v["families"].as_array().expect("families").iter().map(|f| f.as_str().expect("family name").to_owned()).collect()
+}
+
+/// The value written into rows, records and kept sets: the rule's version, 0 with the rule off.
+pub fn written_version() -> u8 {
+    if on() { version() } else { 0 }
 }
 
 /// The version's value: `None` (unset) or `2` is the rule with our civilians, `1` the first rule; anything else stops

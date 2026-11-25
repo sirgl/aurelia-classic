@@ -44,6 +44,38 @@ pub struct Kept {
     /// Attempts dropped because the passive control won them.
     pub passive_won: u32,
     pub unbuilt: u32,
+    /// The scene rule version the attempt was proven under (`scene_rule::written_version`); absent in the files written
+    /// before this field existed (`kept-r`: version 1, `kept-r2`: version 2; see `check_kept`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rule_version: Option<u8>,
+}
+
+/// A kept set may be played only under the rule version it was proven under, for the families whose scene depends on
+/// the version (`scene_rule::dependent_families`): with another version the same (era, instance, attempt) is another
+/// scene. An entry without `rule_version` (an old file) needs `legacy`, the version the caller names for it
+/// (`--kept-version N`); `now` is the version this run plays.
+pub fn check_kept(entries: &[Kept], playing: &[&str], now: u8, legacy: Option<u8>) -> Result<(), String> {
+    let dependent = super::scene_rule::dependent_families();
+    for k in entries {
+        if !playing.contains(&k.family.as_str()) || !dependent.contains(&k.family) {
+            continue;
+        }
+        match k.rule_version.or(legacy) {
+            Some(v) if v == now => {}
+            Some(v) => return Err(format!("the kept set holds {} attempts proven under rule version {v}, this run plays version {now}: the same (era, instance, attempt) is another scene (ARMY_SCENE_RULE_VERSION)", k.family)),
+            None => return Err(format!("the kept set has no rule_version for {} (an old file): name the version it was proven under with --kept-version 1 or 2 (kept-r: 1, kept-r2: 2)", k.family)),
+        }
+    }
+    Ok(())
+}
+
+/// The identity of a file's bytes (FNV-1a 64, hex): written into the rows a `--kept` run plays, so that a row says which kept set it came from.
+pub fn file_id(text: &str) -> String {
+    let mut h: u64 = 0xcbf29ce484222325;
+    for b in text.bytes() {
+        h = (h ^ u64::from(b)).wrapping_mul(0x100000001b3);
+    }
+    format!("{h:016x}")
 }
 
 pub const ATTEMPTS: u32 = 12;
@@ -58,6 +90,8 @@ struct Opts {
     jobs: usize,
     attempts: u32,
     kept: Option<PathBuf>,
+    /// The rule version a kept file without `rule_version` was proven under (`--kept-version`).
+    kept_version: Option<u8>,
     family: Option<Fam>,
     era: Option<String>,
     instance: usize,
@@ -68,7 +102,7 @@ struct Opts {
 }
 
 fn opts(args: &[String]) -> Result<Opts, String> {
-    let mut o = Opts { out: PathBuf::from("trainers"), families: Fam::ALL.to_vec(), eras: None, instances: 100, from: 0, players: vec!["standard".to_owned()], jobs: 4, attempts: ATTEMPTS, kept: None, family: None, era: None, instance: 0, attempt: 0, player: "standard".to_owned(), record: None };
+    let mut o = Opts { out: PathBuf::from("trainers"), families: Fam::ALL.to_vec(), eras: None, instances: 100, from: 0, players: vec!["standard".to_owned()], jobs: 4, attempts: ATTEMPTS, kept: None, kept_version: None, family: None, era: None, instance: 0, attempt: 0, player: "standard".to_owned(), record: None };
     let mut it = args.iter();
     while let Some(a) = it.next() {
         let mut v = || it.next().cloned().ok_or(format!("{a} needs a value"));
@@ -82,6 +116,7 @@ fn opts(args: &[String]) -> Result<Opts, String> {
             "--jobs" => o.jobs = v()?.parse().map_err(|e| format!("{e}"))?,
             "--attempts" => o.attempts = v()?.parse().map_err(|e| format!("{e}"))?,
             "--kept" => o.kept = Some(PathBuf::from(v()?)),
+            "--kept-version" => o.kept_version = Some(match v()?.as_str() { "1" => 1, "2" => 2, w => return Err(format!("--kept-version 1|2, not {w}")) }),
             "--family" => o.family = Some(Fam::parse(&v()?)?),
             "--era" => o.era = Some(v()?),
             "--instance" => o.instance = v()?.parse().map_err(|e| format!("{e}"))?,
@@ -105,7 +140,7 @@ fn tag(mut row: Row, stage: &str) -> Row {
 /// The proof of one instance: attempts until one is kept. Returns the kept record and every row played.
 pub fn prove(rules: &CompiledRuleset, fam: Fam, era: u8, instance: usize, attempts: u32) -> (Kept, Vec<Row>) {
     let names = lab::era_names(rules);
-    let mut k = Kept { family: fam.name().to_owned(), era: names.get(era as usize).cloned().unwrap_or_default(), instance, attempt: None, solver: None, tried: 0, passive_won: 0, unbuilt: 0 };
+    let mut k = Kept { family: fam.name().to_owned(), era: names.get(era as usize).cloned().unwrap_or_default(), instance, attempt: None, solver: None, tried: 0, passive_won: 0, unbuilt: 0, rule_version: Some(super::scene_rule::written_version()) };
     let mut rows = Vec::new();
     for a in 0..attempts {
         k.tried = a + 1;
@@ -207,21 +242,34 @@ fn run(rules: &CompiledRuleset, o: &Opts) -> Result<(), String> {
     let kept_path = o.out.join("kept.jsonl");
     // What is done already.
     let mut done_rows: BTreeSet<(String, String, usize, u32, String)> = BTreeSet::new();
+    let dependent = super::scene_rule::dependent_families();
+    let now = super::scene_rule::written_version();
     if let Ok(text) = std::fs::read_to_string(&rows_path) {
         for l in text.lines() {
             if let Ok(r) = serde_json::from_str::<Row>(l) {
+                // A resume plays into the rows it finds: rows of a rule-dependent family under another version would mix two worlds.
+                if dependent.contains(&r.family) && r.info.get("rule_version").map(String::as_str) != Some(now.to_string().as_str()) {
+                    return Err(format!("{} holds {} rows of rule version {} and this run plays version {now}: use a new --out", rows_path.display(), r.family, r.info.get("rule_version").map_or("(none)", String::as_str)));
+                }
                 done_rows.insert((r.family, r.era, r.instance, r.attempt, r.player));
             }
         }
     }
     let mut kept: BTreeMap<(String, String, usize), Kept> = BTreeMap::new();
     let source = o.kept.clone().unwrap_or_else(|| kept_path.clone());
+    let mut kept_id = None;
     if let Ok(text) = std::fs::read_to_string(&source) {
         for l in text.lines() {
             if let Ok(k) = serde_json::from_str::<Kept>(l) {
                 kept.insert((k.family.clone(), k.era.clone(), k.instance), k);
             }
         }
+        if o.kept.is_some() {
+            kept_id = Some(file_id(&text));
+        }
+        let names_playing: Vec<&str> = o.families.iter().map(|f| f.name()).collect();
+        let entries: Vec<Kept> = kept.values().cloned().collect();
+        check_kept(&entries, &names_playing, super::scene_rule::version(), o.kept_version)?;
     }
     let prove_here = o.kept.is_none();
     let mut cells: Vec<(Fam, u8, usize)> = Vec::new();
@@ -248,7 +296,11 @@ fn run(rules: &CompiledRuleset, o: &Opts) -> Result<(), String> {
     let started = std::time::Instant::now();
     let count = std::sync::atomic::AtomicUsize::new(0);
     let write_row = |r: &Row| {
-        let line = serde_json::to_string(r).unwrap();
+        let mut r = r.clone();
+        if let Some(id) = &kept_id {
+            r.info.insert("kept_id".into(), id.clone());
+        }
+        let line = serde_json::to_string(&r).unwrap();
         let _ = writeln!(rows_out.lock().unwrap(), "{line}");
     };
     let indexes: Vec<usize> = (0..cells.len()).collect();
