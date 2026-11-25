@@ -357,3 +357,42 @@ fn the_input_module_cannot_name_the_full_state() {
         }
     }
 }
+
+/// The scene guard: a family that is not a fog family starts with the side seeing at least one enemy unit (and one unit of its
+/// third party), else the net is scored on a skill that needs the enemy in view while it sees nothing. Prints the share of blind
+/// starts per family. IGNORED until the scenes are fixed (40 of 52 non-fog families fail it today: GATES.md has the list);
+/// run with `--ignored` to see the list, and take the `#[ignore]` off when the scene fix lands.
+#[test]
+#[ignore = "scene fix pending: see GATES.md"]
+fn a_family_that_is_not_a_fog_family_starts_with_the_enemy_in_sight() {
+    let mut bad = Vec::new();
+    let rules = ClassicBench::rules();
+    let era = lab::era_index(&rules, "classical").expect("the classical era");
+    for fam in Fam::ALL {
+        let (mut n, mut blind, mut third_n, mut third_blind) = (0, 0, 0, 0);
+        let mut fog = false;
+        for i in 0..8 {
+            let Ok((mut game, scene)) = families::build(&rules, fam, era, i, 0) else { continue };
+            reveal(&mut game, scene.learner, scene.enemy, scene.neutral);
+            fog = Orders::of_scene(&rules, &game, &scene).fog;
+            let k = Known::new(&game, &rules, scene.learner);
+            if !scene.theirs.is_empty() {
+                n += 1;
+                if k.seen_units(scene.enemy).is_empty() {
+                    blind += 1;
+                }
+            }
+            if let (Some(nb), false) = (scene.neutral, scene.third.is_empty()) {
+                third_n += 1;
+                if k.seen_units(nb).is_empty() {
+                    third_blind += 1;
+                }
+            }
+        }
+        eprintln!("LIST {} fog={} foe_blind={}/{} third_blind={}/{}", fam.name(), fog, blind, n, third_blind, third_n);
+        if !fog && (blind > 0 || third_blind > 0) {
+            bad.push(format!("{} ({blind}/{n}, third {third_blind}/{third_n})", fam.name()));
+        }
+    }
+    assert!(bad.is_empty(), "families that start with the enemy out of sight: {bad:?}");
+}

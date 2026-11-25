@@ -120,8 +120,11 @@ fn the_army_nets_memory_survives_a_save_and_load_mid_siege() {
     seat::install_net(net);
     let dir = std::env::temp_dir().join(format!("army-net-save-{}", std::process::id()));
     let mut differs_without = 0;
-    for instance in 0..4 {
-        let (game, scene) = families::build(&rules, Fam::PlannedAssault, era, instance, 0).expect("the scene builds");
+    let mut compared = 0;
+    // The memory is fed by the foes the army SEES (the net reads only what its side knows), so the scenes are the ones with the
+    // foe in sight at the start (focus), and the planned assault, where it is met on the way.
+    for (fam, reference, instance) in [(Fam::Focus, "ref-focus", 0), (Fam::Focus, "ref-focus", 1), (Fam::Focus, "ref-focus", 2), (Fam::PlannedAssault, "ref-planned", 0), (Fam::PlannedAssault, "ref-planned", 1)] {
+        let (game, scene) = families::build(&rules, fam, era, instance, 0).expect("the scene builds");
         let run = |player: &str, at: Option<seat::SaveAt>| {
             seat::set_save_at(at);
             let row = play(&rules, game.clone(), scene.clone(), player, true).expect("the scene plays");
@@ -129,15 +132,19 @@ fn the_army_nets_memory_survives_a_save_and_load_mid_siege() {
             (row.win, row.rounds, row.trace)
         };
         let at = |sidecar| Some(seat::SaveAt { round: 3, dir: dir.clone(), sidecar, ..Default::default() });
-        assert_eq!(run("ref-planned", at(true)), run("ref-planned", None), "#{instance}: the save format keeps the scene (the reference plays the same)");
+        assert_eq!(run(reference, at(true)), run(reference, None), "#{instance}: the save format keeps the scene (the reference plays the same)");
         let plain = run("army-net", None);
-        assert!(plain.1 > 3, "#{instance}: the play lasts past the save");
+        if plain.1 <= 3 {
+            continue; // a play that ends before the save has nothing to keep
+        }
+        compared += 1;
         assert_eq!(run("army-net", at(true)), plain, "#{instance}: with the sidecar the net plays as without the save");
         if run("army-net", at(false)) != plain {
             differs_without += 1;
         }
     }
     let _ = std::fs::remove_dir_all(&dir);
+    assert!(compared >= 2, "the play lasts past the save in some scenes ({compared})");
     assert!(differs_without > 0, "without the sidecar the memory starts fresh and the play changes (in some scene)");
 }
 
