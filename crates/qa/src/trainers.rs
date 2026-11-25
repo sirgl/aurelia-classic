@@ -739,6 +739,8 @@ fn play_on<P: kernel::ai::mind::AiMind<Classic>>(rules: &CompiledRuleset, mut ga
     let mut info = scene.info.clone();
     info.insert("learner_mind_us".into(), learner_us.to_string());
     info.insert("rule_version".into(), scene_rule::written_version().to_string());
+    // What the net observed (`army_net::known`): rows of different observation versions are not comparable (gatestats).
+    info.insert("obs_version".into(), crate::army_net::known::OBS_VERSION.to_string());
     if seat == Seat::Net {
         measures.insert("net_decisions".into(), net_time.decisions as f64);
         measures.insert("net_updates".into(), net_time.updates as f64);

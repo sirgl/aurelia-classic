@@ -1069,7 +1069,7 @@ pub fn dump_one(rules: &CompiledRuleset, fam: Fam, era: u8, instance: usize, att
         }
     }
     Ok(json!({"scene": scene, "initial": initial, "steps": steps, "stop": stop, "seed": seed, "slots": slots.ids.len(), "planted": planted, "paths": paths,
-        "play_s": play_started.elapsed().as_secs_f64(), "actions": actions, "rounds_played": rounds_played, "rule_version": super::scene_rule::written_version()}))
+        "play_s": play_started.elapsed().as_secs_f64(), "actions": actions, "rounds_played": rounds_played, "rule_version": super::scene_rule::written_version(), "obs_version": crate::army_net::known::OBS_VERSION}))
 }
 
 /// The multi-turn path cost of each piece to `n` goals spread over the window (every k-th tile, a
