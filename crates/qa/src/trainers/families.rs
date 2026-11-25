@@ -70,6 +70,8 @@ use super::act::{self, Aim, Nerve};
 use super::assault;
 use super::camp;
 use super::third_party;
+use super::history_families as history;
+use super::look_families as look;
 use super::memory;
 use super::sea_air_families as sea_air;
 use super::lab::{self, dist, Arm, Draw, Lab};
@@ -131,6 +133,21 @@ pub enum Fam {
     LandingEscort,
     AirIntercept,
     AirRecon,
+    // The history and multi-front trainers (`history_families.rs`; appended again: the older families keep their seeds).
+    Feint,
+    FogSniper,
+    CityReinforced,
+    ScoutReport,
+    TwoFronts,
+    SecondCity,
+    TwinSiege,
+    // The "where to look" trainers (`look_families.rs`; appended again: the older families keep their seeds).
+    AirThreat,
+    SurpriseAttack,
+    NavalApproach,
+    BlindSector,
+    SecondFront,
+    BaitLook,
 }
 
 impl Fam {
@@ -144,11 +161,24 @@ impl Fam {
             Fam::LandingEscort => 35,
             Fam::AirIntercept => 36,
             Fam::AirRecon => 37,
+            Fam::Feint => 34,
+            Fam::FogSniper => 35,
+            Fam::CityReinforced => 36,
+            Fam::ScoutReport => 37,
+            Fam::TwoFronts => 38,
+            Fam::SecondCity => 39,
+            Fam::TwinSiege => 40,
+            Fam::AirThreat => 41,
+            Fam::SurpriseAttack => 42,
+            Fam::NavalApproach => 43,
+            Fam::BlindSector => 44,
+            Fam::SecondFront => 45,
+            Fam::BaitLook => 46,
             f => f as u64,
         }
     }
 
-    pub const ALL: [Fam; 47] = [
+    pub const ALL: [Fam; 60] = [
         Fam::Duel,
         Fam::Focus,
         Fam::Hold,
@@ -196,6 +226,19 @@ impl Fam {
         Fam::LandingEscort,
         Fam::AirIntercept,
         Fam::AirRecon,
+        Fam::Feint,
+        Fam::FogSniper,
+        Fam::CityReinforced,
+        Fam::ScoutReport,
+        Fam::TwoFronts,
+        Fam::SecondCity,
+        Fam::TwinSiege,
+        Fam::AirThreat,
+        Fam::SurpriseAttack,
+        Fam::NavalApproach,
+        Fam::BlindSector,
+        Fam::SecondFront,
+        Fam::BaitLook,
     ];
 
     pub fn name(self) -> &'static str {
@@ -247,6 +290,19 @@ impl Fam {
             Fam::LandingEscort => "landing-escort",
             Fam::AirIntercept => "air-intercept",
             Fam::AirRecon => "air-recon",
+            Fam::Feint => "feint",
+            Fam::FogSniper => "fog-sniper",
+            Fam::CityReinforced => "city-reinforced",
+            Fam::ScoutReport => "scout-report",
+            Fam::TwoFronts => "two-fronts",
+            Fam::SecondCity => "second-city",
+            Fam::TwinSiege => "twin-siege",
+            Fam::AirThreat => "air-threat",
+            Fam::SurpriseAttack => "surprise-attack",
+            Fam::NavalApproach => "naval-approach",
+            Fam::BlindSector => "blind-sector",
+            Fam::SecondFront => "second-front",
+            Fam::BaitLook => "bait-look",
         }
     }
 
@@ -270,6 +326,7 @@ impl Fam {
             f if memory::is_memory(f) => memory::rounds(f),
             f if camp::is_camp(f) => camp::rounds(f),
             f if third_party::is_third(f) => third_party::rounds(f),
+            f if history::is_history(f) => history::rounds(f),
             f => assault::rounds(f),
         }
     }
@@ -304,6 +361,7 @@ impl Fam {
             f if memory::is_memory(f) => memory::solvers(f),
             f if camp::is_camp(f) => camp::solvers(f),
             f if third_party::is_third(f) => third_party::solvers(f),
+            f if history::is_history(f) => history::solvers(f),
             f => assault::solvers(f),
         }
     }
@@ -339,6 +397,7 @@ impl Fam {
             Fam::Surrounded => &[("MT4", 'D')],
             f if sea_air::is_sea_air(f) => sea_air::tricks(f),
             f if memory::is_memory(f) || camp::is_camp(f) || third_party::is_third(f) => &[],
+            f if history::is_history(f) => &[],
             f => assault::tricks(f),
         }
     }
@@ -375,6 +434,7 @@ impl Fam {
             f if memory::is_memory(f) => memory::task(f),
             f if camp::is_camp(f) => camp::task(f),
             f if third_party::is_third(f) => third_party::task(f),
+            f if history::is_history(f) => history::task(f),
             f => assault::task(f),
         }
     }
@@ -400,6 +460,8 @@ impl Fam {
             // The assault families need the era's siege unit (a city of any era wears down the archers of the era before it).
             f if sea_air::is_sea_air(f) => sea_air::claims(f, rules, k),
             f if assault::is_assault(f) => land && k.has(Arm::Siege),
+            f if look::is_look(f) => look::claims(f, rules, k),
+            f if history::is_history(f) => history::claims(f, k),
             _ => land,
         }
     }
@@ -587,6 +649,7 @@ pub(super) fn blank(fam: Fam, lab: &Lab, instance: usize, attempt: u32) -> Scene
         first_kill: None,
         kills_by: BTreeMap::new(),
         track: Default::default(),
+        track2: Default::default(),
         deadline: None,
         reinforce: Vec::new(),
     }
@@ -644,6 +707,11 @@ pub fn build(rules: &CompiledRuleset, fam: Fam, era: u8, instance: usize, attemp
     }
     if memory::is_memory(fam) {
         let mut s = memory::build(&mut p, fam, &lab, instance, attempt)?;
+        s.info.insert("attempt".into(), attempt.to_string());
+        return Ok((p.game, s));
+    }
+    if history::is_history(fam) {
+        let mut s = history::build(&mut p, fam, &lab, instance, attempt)?;
         s.info.insert("attempt".into(), attempt.to_string());
         return Ok((p.game, s));
     }
@@ -1253,6 +1321,7 @@ pub fn build(rules: &CompiledRuleset, fam: Fam, era: u8, instance: usize, attemp
         Fam::Camp | Fam::CampRace => unreachable!("built by camp::build"),
         Fam::NeutralPath | Fam::AllySiege | Fam::DefendFriend | Fam::ClosedBorders | Fam::SpareFriends | Fam::NeutralJoinsWar | Fam::CapitalRace => unreachable!("built by third_party::build"),
         Fam::NavalDuel | Fam::LandingEscort | Fam::AirIntercept | Fam::AirRecon => unreachable!("built by sea_air_families::build"),
+        Fam::Feint | Fam::FogSniper | Fam::CityReinforced | Fam::ScoutReport | Fam::TwoFronts | Fam::SecondCity | Fam::TwinSiege | Fam::AirThreat | Fam::SurpriseAttack | Fam::NavalApproach | Fam::BlindSector | Fam::SecondFront | Fam::BaitLook => unreachable!("built by history_families::build"),
         Fam::Airstrike => {
             let home_t = at(&p, -3, 0)?;
             p.city(me, home_t, 4, false);
@@ -1342,6 +1411,9 @@ pub(super) fn city_hp(rules: &CompiledRuleset, game: &GameState, t: TileId) -> O
 
 /// The learner's reference `name` plays the scene units of the learner's seat for this turn.
 pub fn reference_turn(rules: &CompiledRuleset, game: &mut GameState, scene: &mut Scene, name: &str) {
+    if history::is_history(scene.fam) && history::reference_turn(rules, game, scene, name) {
+        return;
+    }
     if let Some(f) = assault::flags(name) {
         assault::turn(rules, game, scene, f);
         return;
@@ -1673,6 +1745,10 @@ pub fn enemy_turn(rules: &CompiledRuleset, game: &mut GameState, scene: &mut Sce
     if sea_air::enemy_turn(rules, game, scene) {
         return;
     }
+    if history::is_history(scene.fam) {
+        history::enemy_turn(rules, game, scene);
+        return;
+    }
     let (me, foe) = (scene.enemy, scene.learner);
     let sc = scene.clone();
     let friends = handles(&sc.theirs);
@@ -1857,6 +1933,7 @@ pub fn judge(rules: &CompiledRuleset, game: &GameState, sc: &mut Scene, rel: u32
         Fam::Camp | Fam::CampRace => camp::judge(rules, game, sc, rel),
         Fam::NeutralPath | Fam::AllySiege | Fam::DefendFriend | Fam::ClosedBorders | Fam::SpareFriends | Fam::NeutralJoinsWar | Fam::CapitalRace => third_party::judge(rules, game, sc, rel),
         Fam::NavalDuel | Fam::LandingEscort | Fam::AirIntercept | Fam::AirRecon => sea_air::judge(rules, game, sc, rel),
+        Fam::Feint | Fam::FogSniper | Fam::CityReinforced | Fam::ScoutReport | Fam::TwoFronts | Fam::SecondCity | Fam::TwinSiege | Fam::AirThreat | Fam::SurpriseAttack | Fam::NavalApproach | Fam::BlindSector | Fam::SecondFront | Fam::BaitLook => history::judge(rules, game, sc, rel),
         Fam::Duel => {
             if combat_theirs == 0 && !mine.is_empty() {
                 Some(true)
@@ -2156,6 +2233,9 @@ pub fn measures(rules: &CompiledRuleset, game: &GameState, sc: &Scene, rel: u32)
     }
     if third_party::is_third(sc.fam) {
         third_party::measures(rules, game, sc, &mut m);
+    }
+    if look::is_look(sc.fam) {
+        look::measures(sc, rel, &mut m);
     }
     if sc.fam == Fam::Convoy {
         m.insert("founded".into(), sc.founded.map_or(-1.0, f64::from));

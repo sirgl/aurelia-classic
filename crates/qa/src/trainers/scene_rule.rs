@@ -11,7 +11,7 @@
 //!    points (a kill leaves 0; ties: the lowest tile).
 //! 3. Shots: each of its ranged pieces with moves left (piece order) shoots from where it stands, by the same
 //!    key, when the rules accept the shot (no set-up, no move first).
-//! (A piece on interception duty, the stance of the air-intercept family, is left out of 3 and 4.)
+//! (A piece on interception duty, the stance of the air-intercept and air-threat families, is left out of 3 and 4.)
 //! 4. Stand and fortify: each of its pieces ends its turn (`act::hold_unit`); a piece that did not move or act
 //!    this turn (its moves full when the step starts: the pieces the stand heals) fortifies where the rules accept
 //!    it, unless it is set up for a ranged attack. (Amended 24 Nov: before, every piece fortified, also a hunter
@@ -206,7 +206,7 @@ pub fn turn(rules: &CompiledRuleset, game: &mut GameState, scene: &Scene, side: 
         }
     }
     // 3. Shots. (A piece on interception duty stays as it is: a unit that shot or ended its turn by hand has moved and
-    // cannot intercept; only the air-intercept family sets the stance.)
+    // cannot intercept; only the air-intercept and air-threat families set the stance.)
     for p in pieces {
         if act::alive(game, p, side).is_none_or(|c| super::sea_air_families::on_duty(&c)) {
             continue;

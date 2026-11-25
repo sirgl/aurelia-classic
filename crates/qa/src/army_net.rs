@@ -56,9 +56,11 @@ impl Aim {
     /// The aim a trainer family gives the army: what a commander above would say for that scene.
     pub fn of(fam: Fam) -> Aim {
         match fam {
-            Fam::Duel | Fam::Focus | Fam::Kite | Fam::Flank | Fam::General | Fam::Sink | Fam::Airstrike | Fam::Harass | Fam::Choke | Fam::Citadel | Fam::Bait | Fam::NeutralPath | Fam::NeutralJoinsWar => Aim::Destroy,
-            Fam::Hold | Fam::Rush => Aim::Hold,
-            Fam::Siege | Fam::Ram | Fam::Bombard | Fam::Prey | Fam::AssaultHeal | Fam::PromotionChoice | Fam::HillArchers | Fam::CityFire | Fam::PlannedAssault | Fam::AssaultReinforce | Fam::AssaultPeace | Fam::Camp | Fam::CampRace | Fam::AllySiege | Fam::ClosedBorders | Fam::CapitalRace => Aim::TakeCity,
+            // The history families (Feint .. TwinSiege) and the look families (SurpriseAttack .. NavalApproach): the order is the
+            // operation (the siege, a hold, a kill), the home is marked as the refuge; the net must look beyond it.
+            Fam::Duel | Fam::Focus | Fam::Kite | Fam::Flank | Fam::General | Fam::Sink | Fam::Airstrike | Fam::Harass | Fam::Choke | Fam::Citadel | Fam::Bait | Fam::NeutralPath | Fam::NeutralJoinsWar | Fam::FogSniper => Aim::Destroy,
+            Fam::Hold | Fam::Rush | Fam::Feint | Fam::ScoutReport | Fam::AirThreat | Fam::NavalApproach => Aim::Hold,
+            Fam::Siege | Fam::Ram | Fam::Bombard | Fam::Prey | Fam::AssaultHeal | Fam::PromotionChoice | Fam::HillArchers | Fam::CityFire | Fam::PlannedAssault | Fam::AssaultReinforce | Fam::AssaultPeace | Fam::Camp | Fam::CampRace | Fam::AllySiege | Fam::ClosedBorders | Fam::CapitalRace | Fam::CityReinforced | Fam::TwoFronts | Fam::SecondCity | Fam::TwinSiege | Fam::SurpriseAttack | Fam::BlindSector | Fam::SecondFront | Fam::BaitLook => Aim::TakeCity,
             Fam::Guard | Fam::Counter | Fam::DefendFriend => Aim::Protect,
             Fam::Raid | Fam::SpareFriends => Aim::Pillage,
             Fam::Retreat | Fam::Wounded | Fam::Surrounded | Fam::AmbushFog => Aim::Survive,
@@ -286,7 +288,7 @@ impl Orders {
         let window = MapWindow::around(game, scene.centre);
         let statics = statics_of(rules, game, &window, scene.learner, scene.enemy, tile, scene.refuge);
         let statics_rel = statics_rel_of(rules, game, &window, scene.learner, scene.enemy);
-        Orders { side: scene.learner, foe: scene.enemy, aim, tile, refuge: scene.refuge, optional, start_round, rounds: scene.rounds, army, mean_strength: mean_strength.max(1.0), window, statics, statics_rel, fog: crate::trainers::memory::is_memory(scene.fam) || scene.fam == Fam::AirRecon, price: price_override().map(|f| price_set(&f, scene.fam.name(), scene.mine.len(), scene.rounds, scene.deadline).unwrap_or_else(|| panic!("ARMY_PRICE={f}: not a price form (a,b,c | careful | anycost[:D])"))).unwrap_or_else(|| price_of(scene.fam.name(), scene.mine.len(), Some(scene.deadline.unwrap_or(scene.rounds)))) }
+        Orders { side: scene.learner, foe: scene.enemy, aim, tile, refuge: scene.refuge, optional, start_round, rounds: scene.rounds, army, mean_strength: mean_strength.max(1.0), window, statics, statics_rel, fog: crate::trainers::memory::is_memory(scene.fam) || scene.fam == Fam::AirRecon || crate::trainers::history_families::is_fog(scene.fam), price: price_override().map(|f| price_set(&f, scene.fam.name(), scene.mine.len(), scene.rounds, scene.deadline).unwrap_or_else(|| panic!("ARMY_PRICE={f}: not a price form (a,b,c | careful | anycost[:D])"))).unwrap_or_else(|| price_of(scene.fam.name(), scene.mine.len(), Some(scene.deadline.unwrap_or(scene.rounds)))) }
     }
 }
 
