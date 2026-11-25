@@ -114,6 +114,7 @@ def main(argv=None):
     ap.add_argument("--val-to", type=int, default=80)
     ap.add_argument("--actor-minutes", type=float, default=20.0)
     ap.add_argument("--seed", type=int, default=1)
+    ap.add_argument("--parity-every", type=int, default=25, help="gate line 6 inside the run: the learner's log-probs against Rust's on this update's record, at update 1 and every N (0: off; off with --overlap)")
     ap.add_argument("--overlap", action="store_true", help="the actor of update u+1 plays while the learner learns update u (weights one update behind)")
     ap.add_argument("--keep-records", action="store_true")
     ap.add_argument("--resume", action="store_true")
@@ -180,6 +181,11 @@ def main(argv=None):
         loss, g, info, bt = learner.step(model, stream, a.window)
         row.update({k: info[k] for k in ("plays", "scenes", "decisions", "live_decisions", "groups_with_gradient", "memory_drift", "read_s", "gradient_s", "states")})
         row["learner_s"] = round(time.time() - t1, 2)
+        if a.parity_every and not a.overlap and (u == 1 or u % a.parity_every == 0):
+            par = learner.check(model, bt)  # the weights are still the actor's: the record and the learner must agree
+            row["parity"] = {k: par[k] for k in ("values", "max", "over_1e-4", "over_1e-2")}
+            if par["over_1e-2"]:
+                print(f"WARNING parity: {par['over_1e-2']} values off by more than 1e-2 at update {u}: {par['worst'][:3]}", flush=True)
         n_rl = armyrl.norm_of(g) if g is not None else 0.0
         rows = rows_of(udir)
         per = collections.defaultdict(lambda: [0, 0])
