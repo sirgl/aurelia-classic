@@ -470,7 +470,7 @@ fn beta_turn(game: &GameState, scene: &Scene) -> bool {
     if beta <= 0.0 {
         return false;
     }
-    let h = crate::trainers::lab::mix((scene.instance as u64) << 20 ^ u64::from(game.view().auth.turn().round) << 4 ^ scene.fam as u64 ^ u64::from(scene.era) << 40);
+    let h = crate::trainers::lab::mix((scene.instance as u64) << 20 ^ u64::from(game.view().auth.turn().round) << 4 ^ scene.fam.seed_id() ^ u64::from(scene.era) << 40);
     (h % 10_000) as f64 / 10_000.0 < beta
 }
 

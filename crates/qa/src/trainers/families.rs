@@ -71,6 +71,7 @@ use super::assault;
 use super::camp;
 use super::third_party;
 use super::memory;
+use super::sea_air_families as sea_air;
 use super::lab::{self, dist, Arm, Draw, Lab};
 use super::{Piece, Scene};
 
@@ -125,10 +126,29 @@ pub enum Fam {
     SpareFriends,
     NeutralJoinsWar,
     CapitalRace,
+    // The sea and air trainers (`sea_air_families.rs`; appended again: the older families keep their seeds).
+    NavalDuel,
+    LandingEscort,
+    AirIntercept,
+    AirRecon,
 }
 
 impl Fam {
-    pub const ALL: [Fam; 43] = [
+    /// The number a family's scenes and rules are seeded with. The families of the integrated lanes keep the number they
+    /// had on their own lane (a kept file and the lane's gates name scenes by seed), so merging lanes that each appended
+    /// families after the same base does not redraw any lane's scenes; the numbers of different lanes may coincide, which
+    /// only correlates the random streams of two different builders. The rest: the position in the enum, as always.
+    pub fn seed_id(self) -> u64 {
+        match self {
+            Fam::NavalDuel => 34,
+            Fam::LandingEscort => 35,
+            Fam::AirIntercept => 36,
+            Fam::AirRecon => 37,
+            f => f as u64,
+        }
+    }
+
+    pub const ALL: [Fam; 47] = [
         Fam::Duel,
         Fam::Focus,
         Fam::Hold,
@@ -172,6 +192,10 @@ impl Fam {
         Fam::SpareFriends,
         Fam::NeutralJoinsWar,
         Fam::CapitalRace,
+        Fam::NavalDuel,
+        Fam::LandingEscort,
+        Fam::AirIntercept,
+        Fam::AirRecon,
     ];
 
     pub fn name(self) -> &'static str {
@@ -219,6 +243,10 @@ impl Fam {
             Fam::SpareFriends => "spare-friends",
             Fam::NeutralJoinsWar => "neutral-joins-war",
             Fam::CapitalRace => "capital-race",
+            Fam::NavalDuel => "naval-duel",
+            Fam::LandingEscort => "landing-escort",
+            Fam::AirIntercept => "air-intercept",
+            Fam::AirRecon => "air-recon",
         }
     }
 
@@ -238,6 +266,7 @@ impl Fam {
             Fam::Harass => 12,
             Fam::Snipe => 8,
             Fam::Surrounded => 4,
+            f if sea_air::is_sea_air(f) => sea_air::rounds(f),
             f if memory::is_memory(f) => memory::rounds(f),
             f if camp::is_camp(f) => camp::rounds(f),
             f if third_party::is_third(f) => third_party::rounds(f),
@@ -271,6 +300,7 @@ impl Fam {
             Fam::Harass => &["ref-screen", "ref-fight"],
             Fam::Snipe => &["ref-snipe"],
             Fam::Surrounded => &["ref-break", "ref-flee"],
+            f if sea_air::is_sea_air(f) => sea_air::solvers(f),
             f if memory::is_memory(f) => memory::solvers(f),
             f if camp::is_camp(f) => camp::solvers(f),
             f if third_party::is_third(f) => third_party::solvers(f),
@@ -307,6 +337,7 @@ impl Fam {
             Fam::Harass => &[("MO12", 'D')],
             Fam::Snipe => &[("MO7", 'U'), ("MT8", 'U'), ("E1", 'U'), ("M4", 'U'), ("CS4", 'U')],
             Fam::Surrounded => &[("MT4", 'D')],
+            f if sea_air::is_sea_air(f) => sea_air::tricks(f),
             f if memory::is_memory(f) || camp::is_camp(f) || third_party::is_third(f) => &[],
             f => assault::tricks(f),
         }
@@ -340,6 +371,7 @@ impl Fam {
             Fam::Harass => "slow melee and a ranged unit against a human's hit-and-run horse (keshik)",
             Fam::Snipe => "catch an escorted civilian (worker, Great General) of the enemy",
             Fam::Surrounded => "a strong unit of ours about to be surrounded: break out or survive",
+            f if sea_air::is_sea_air(f) => sea_air::task(f),
             f if memory::is_memory(f) => memory::task(f),
             f if camp::is_camp(f) => camp::task(f),
             f if third_party::is_third(f) => third_party::task(f),
@@ -366,6 +398,7 @@ impl Fam {
             Fam::Sink => (k.has(Arm::NavalMelee) || k.has(Arm::NavalRanged)) && embark_known(rules, k.era),
             Fam::Airstrike => k.has(Arm::Bomber),
             // The assault families need the era's siege unit (a city of any era wears down the archers of the era before it).
+            f if sea_air::is_sea_air(f) => sea_air::claims(f, rules, k),
             f if assault::is_assault(f) => land && k.has(Arm::Siege),
             _ => land,
         }
@@ -562,7 +595,7 @@ pub(super) fn blank(fam: Fam, lab: &Lab, instance: usize, attempt: u32) -> Scene
 /// The seed of an attempt of an instance (the redraw rule: attempt a of instance i of a family and
 /// era is drawn from these four numbers alone).
 pub fn seed(fam: Fam, era: u8, instance: usize, attempt: u32) -> u64 {
-    lab::mix(lab::mix(lab::mix((fam as u64) << 32 ^ u64::from(era)) ^ instance as u64) ^ u64::from(attempt) << 17)
+    lab::mix(lab::mix(lab::mix(fam.seed_id() << 32 ^ u64::from(era)) ^ instance as u64) ^ u64::from(attempt) << 17)
 }
 
 pub(super) fn kinds_label(rules: &CompiledRuleset, ps: &[Piece]) -> String {
@@ -601,6 +634,11 @@ pub fn build(rules: &CompiledRuleset, fam: Fam, era: u8, instance: usize, attemp
     }
     if third_party::is_third(fam) {
         let mut s = third_party::build(&mut p, fam, &lab, instance, attempt)?;
+        s.info.insert("attempt".into(), attempt.to_string());
+        return Ok((p.game, s));
+    }
+    if sea_air::is_sea_air(fam) {
+        let mut s = sea_air::build(&mut p, fam, &lab, instance, attempt)?;
         s.info.insert("attempt".into(), attempt.to_string());
         return Ok((p.game, s));
     }
@@ -1214,6 +1252,7 @@ pub fn build(rules: &CompiledRuleset, fam: Fam, era: u8, instance: usize, attemp
         Fam::AmbushFog | Fam::HuntFog => unreachable!("built by memory::build"),
         Fam::Camp | Fam::CampRace => unreachable!("built by camp::build"),
         Fam::NeutralPath | Fam::AllySiege | Fam::DefendFriend | Fam::ClosedBorders | Fam::SpareFriends | Fam::NeutralJoinsWar | Fam::CapitalRace => unreachable!("built by third_party::build"),
+        Fam::NavalDuel | Fam::LandingEscort | Fam::AirIntercept | Fam::AirRecon => unreachable!("built by sea_air_families::build"),
         Fam::Airstrike => {
             let home_t = at(&p, -3, 0)?;
             p.city(me, home_t, 4, false);
@@ -1313,6 +1352,9 @@ pub fn reference_turn(rules: &CompiledRuleset, game: &mut GameState, scene: &mut
     }
     if third_party::is_third(scene.fam) && third_party::is_reference(name) {
         third_party::reference_turn(rules, game, scene, name);
+        return;
+    }
+    if sea_air::is_sea_air(scene.fam) && name != "passive" && sea_air::reference_turn(rules, game, scene, name) {
         return;
     }
     if memory::is_memory(scene.fam) && matches!(name, "ref-recall" | "ref-forget") {
@@ -1628,6 +1670,9 @@ pub fn enemy_turn(rules: &CompiledRuleset, game: &mut GameState, scene: &mut Sce
         third_party::enemy_turn(rules, game, scene);
         return;
     }
+    if sea_air::enemy_turn(rules, game, scene) {
+        return;
+    }
     let (me, foe) = (scene.enemy, scene.learner);
     let sc = scene.clone();
     let friends = handles(&sc.theirs);
@@ -1811,6 +1856,7 @@ pub fn judge(rules: &CompiledRuleset, game: &GameState, sc: &mut Scene, rel: u32
         Fam::AmbushFog | Fam::HuntFog => memory::judge(rules, game, sc, rel),
         Fam::Camp | Fam::CampRace => camp::judge(rules, game, sc, rel),
         Fam::NeutralPath | Fam::AllySiege | Fam::DefendFriend | Fam::ClosedBorders | Fam::SpareFriends | Fam::NeutralJoinsWar | Fam::CapitalRace => third_party::judge(rules, game, sc, rel),
+        Fam::NavalDuel | Fam::LandingEscort | Fam::AirIntercept | Fam::AirRecon => sea_air::judge(rules, game, sc, rel),
         Fam::Duel => {
             if combat_theirs == 0 && !mine.is_empty() {
                 Some(true)

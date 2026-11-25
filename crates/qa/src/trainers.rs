@@ -23,6 +23,7 @@ pub mod families;
 pub mod lab;
 pub mod memory;
 pub mod scene_rule;
+pub mod sea_air_families;
 pub mod suite;
 pub mod third_party;
 
@@ -454,7 +455,7 @@ fn play_on<P: kernel::ai::mind::AiMind<Classic>>(rules: &CompiledRuleset, mut ga
     if trace {
         rows_trace.push(families::line(rules, &game, &scene, 0));
     }
-    let rnd = Draw::new(lab::mix(0xa11d ^ (scene.instance as u64) << 8 ^ u64::from(scene.attempt) << 40 ^ (scene.fam as u64) << 48 ^ u64::from(scene.era) << 56));
+    let rnd = Draw::new(lab::mix(0xa11d ^ (scene.instance as u64) << 8 ^ u64::from(scene.attempt) << 40 ^ scene.fam.seed_id() << 48 ^ u64::from(scene.era) << 56));
     let mut verdict: Option<bool> = None;
     // The round log of an assault play (`round_log`): per learner round its stage label (the staged teacher's own
     // state; the net's plan readout after its turn end), the army units that ended our turn nearer the city than they
