@@ -101,6 +101,13 @@ class Campaign:
                 jobs.append({"name": f"rl-{run}", "kind": "rl", "run": run, "arm": arm, "seed": s, "after": ["teach", "lengths"] + ([f"rl-base-s{s}"] if arm != "base" else []),
                              "est_min": n["est_rl_min"] if not self.smoke else 1})
                 jobs.append({"name": f"tables-{run}", "kind": "tables", "run": run, "after": [f"rl-{run}"], "est_min": n["est_tables_min"] if not self.smoke else 1})
+        for s in n.get("ext_seeds", []):   # the continuation of the 600-update runs to ext_updates (resume from the newest checkpoint, same seed stream)
+            for arm in n["arms"]:
+                run = f"{arm}-s{s}"
+                jobs.append({"name": f"rl-ext-{run}", "kind": "rl", "run": run, "arm": arm, "seed": s, "ext": True, "after": [f"rl-{run}", f"tables-{run}"],
+                             "est_min": n.get("est_rl_ext_min", 130) if not self.smoke else 1})
+                jobs.append({"name": f"tables-ext-{run}", "kind": "tables", "run": run, "ckpts": n["ext_table_ckpts"], "after": [f"rl-ext-{run}"],
+                             "est_min": n["est_tables_min"] if not self.smoke else 1})
         jobs.append({"name": "summary", "kind": "summary", "est_min": 1})
         names = [j["name"] for j in jobs]
         assert len(names) == len(set(names)), "job names must be unique"
@@ -424,10 +431,13 @@ class Campaign:
         run, arm, seed = j["run"], j["arm"], int(j["seed"])
         out = self.run_dir(run)
         t = self.threads()
+        target = int(n["ext_updates"]) if j.get("ext") else int(n["updates"])
+        if j.get("ext"):
+            (out / "done").unlink(missing_ok=True)   # the loop resumes from latest.json and plays on to the new target
         args = ["-m", "aurelia_nn.rl3.loop", "--out", out, "--weights", self.R / "net-N175T" / "weights.safetensors", "--actor-bin", EXAM,
                 "--kept", D / "kept-all.jsonl", "--lengths", D / "lengths-h" / "rows.jsonl",
                 "--anchor", D / "anchor" / "teach-r-train.bin", "--anchor-v2", D / "anchor" / "p7-teach-train.bin",
-                "--jobs", t, "--window", n["window"], "--updates", n["updates"], "--ckpt-every", n["ckpt_every"], "--val-every", n["val_every"], "--seed", seed]
+                "--jobs", t, "--window", n["window"], "--updates", target, "--ckpt-every", n["ckpt_every"], "--val-every", n["val_every"], "--seed", seed]
         for k, flag in (("P", "--P"), ("G", "--G"), ("K", "--K"), ("val_to", "--val-to")):
             if k in n:
                 args += [flag, n[k]]
@@ -444,7 +454,7 @@ class Campaign:
         rc = self.res(f"rl-{run}", cmd, cpu=t, gpu=True, env=extra, cwd=NN, logname=f"rl-{run}")
         if rc or not (out / "done").exists():
             return {"status": "failed", "why": f"the loop did not finish (rc {rc}; lab/logs/rl-{run}.log, {out.name}/log.jsonl)"}
-        keep = {int(x) for x in n["keep_ckpts"]} | {int(n["updates"])}
+        keep = {int(x) for x in n["keep_ckpts"]} | {int(x) for x in n.get("ext_table_ckpts", [])} | {target}
         removed = 0
         for p in out.glob("ckpt-*.safetensors"):
             u = int(p.name.split("-")[1].split(".")[0])
@@ -465,7 +475,7 @@ class Campaign:
         rd = self.run_dir(run)
         t = self.threads()
         out: dict = {}
-        for u in self.night["table_ckpts"]:
+        for u in j.get("ckpts") or self.night["table_ckpts"]:
             u = int(u)
             ck = rd / f"ckpt-{u:04d}.safetensors"
             td = self.R / "tables" / f"{run}-u{u:04d}"

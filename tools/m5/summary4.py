@@ -126,7 +126,7 @@ def write_summary(lab: Path, cdir: Path, cfg: dict, smoke: bool) -> None:
     last = {}
     for r in results:
         last[r["job"]] = r
-    ckpts = [int(u) for u in night["table_ckpts"]]
+    ckpts = [int(u) for u in night["table_ckpts"]] + [int(u) for u in night.get("ext_table_ckpts", [])]
     out: list[str] = []
     js: dict = {"runs": {}, "pairs": {}}
     P = out.append
@@ -216,6 +216,8 @@ def write_summary(lab: Path, cdir: Path, cfg: dict, smoke: bool) -> None:
         for s in night["seeds"]:
             b, x = tables.get(f"base-s{s}", {}), tables.get(f"boost-s{s}", {})
             for u in ckpts:
+                if u not in b and u not in x:
+                    continue
                 if u not in b or u not in x:
                     P(f"| {s} | {u} | - | - | pair incomplete | | |")
                     continue
@@ -241,7 +243,7 @@ def write_summary(lab: Path, cdir: Path, cfg: dict, smoke: bool) -> None:
                 f = lambda t: "-" if t is None else f"{t[0]:+.1f} [{t[1]:+.1f}, {t[2]:+.1f}]"
                 P(f"| {u} | {len(prs)} | {f(d)} | {f(d47)} |")
         P("\nPer family, held-out at the last checkpoint, boost minus base (points), seeds side by side:\n")
-        last_u = ckpts[-1]
+        last_u = int(night['table_ckpts'][-1])
         P("| family | " + " | ".join(f"s{s}" for s in night["seeds"]) + " |\n|---|" + "---|" * len(night["seeds"]))
         for f in fams:
             cells = []

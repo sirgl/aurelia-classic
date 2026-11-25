@@ -13,10 +13,10 @@ Numbers are from `docs/m5/night4/summary.md` and `results.jsonl`. Fill the brack
 ## 3. The jobs
 [the Jobs table of the summary: status, estimated and actual minutes; which jobs the deadline cut]
 
-## 4. Per run (base-s1, boost-s1, base-s2, boost-s2, base-s3, boost-s3)
+## 4. Per run (base / boost, seeds 1 to 5; the continuations of seed 1 and 2 to 1 500)
 For each: lambda, median seconds per update, validation curve (mean47 and siege group at 0, 50, ..., 600), parity warnings, plays with a refused sampled action.
 
-## 5. Held-out (instances 80-99) at 185, 400, 600
+## 5. Held-out (instances 80-99) at 185, 400, 600 (1 000, 1 500)
 For each run: siege-group mean, mean47, mean32, new-to-RL mean, quick mean; the families that moved most against the honest N175; the gatestats DROP lines.
 
 ## 6. Paired comparison, boost against base, by seed
