@@ -50,7 +50,7 @@ def enter(sim, s, slot, tile, where):
         hit = hit & (s["rl"] >= 1)
     if "camp_tile" in s:  # the barbarians of a camp scene are no major: no reward
         hit = hit & ~((s["camp_tile"] >= 0) & (side == 1))
-    if not bool(mx.any(hit).item()):
+    if not sim.branchless and not bool(mx.any(hit).item()):  # (branchless, compiled: no host read; every update is masked by `hit`)
         return s
     s = dict(s)
     s["ruin"] = put1(s["ruin"], tile, mx.zeros_like(tile), hit)
@@ -68,10 +68,10 @@ def enter_path(sim, s, slot, path, walked):
     if "ruin" not in s:
         return s
     on = walked & (path >= 0) & (gn(s["ruin"], path) > 0) & (s["rl"] >= 1)[:, None] if "rl" in s else walked & (path >= 0) & (gn(s["ruin"], path) > 0)
-    if not bool(mx.any(on).item()):
+    if not sim.branchless and not bool(mx.any(on).item()):
         return s
     for j in range(path.shape[1]):
-        if not bool(mx.any(on[:, j]).item()):
+        if not sim.branchless and not bool(mx.any(on[:, j]).item()):
             continue
         s = enter(sim, s, slot, path[:, j], on[:, j])
     return s

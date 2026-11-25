@@ -41,13 +41,14 @@ class RowCompiled:
         self.sim, self.obs, self.fn = sim, obs, fn
         self.compiled = mx.compile(self.inner)
 
-    def inner(self, rows, *args, **kw):
+    def inner(self, state_rows, *args, **kw):
+        # (not named `rows`: `Sim.masks(..., rows=)` is a keyword of the wrapped functions)
         sim, obs = self.sim, self.obs
         saved = (sim.cs, sim.tid, sim.n_pieces, obs.tab, obs.t)
         tab = A.Tables.__new__(A.Tables)
         tab.k = obs.tab.k
-        tab.t = rows["t"]
-        sim.cs, sim.tid, sim.n_pieces = rows["cs"], rows["tid"], rows["n_pieces"]
+        tab.t = state_rows["t"]
+        sim.cs, sim.tid, sim.n_pieces = state_rows["cs"], state_rows["tid"], state_rows["n_pieces"]
         obs.tab, obs.t = tab, tab.t
         try:
             return self.fn(*args, **kw)
@@ -91,7 +92,9 @@ def install(game, names):
         elif name == "net":
             compile_net(game)
         elif name == "masks":
-            sim.masks = RowCompiled(sim, obs, sim.masks)
+            # The compiled masks compute every row: `rows=` (the row subset of `Sim.masks`) reads a count on the host.
+            masks = RowCompiled(sim, obs, sim.masks)
+            sim.masks = lambda s, side, slot, rows=None: masks(s, side, slot)
         elif name == "preview":
             obs.preview = RowCompiled(sim, obs, obs.preview)
         else:
