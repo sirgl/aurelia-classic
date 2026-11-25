@@ -2193,7 +2193,7 @@ Tuning numbers of the computer players (`classic/crates/classic-rules/src/ai`). 
 | `WAR_KEEP` | `(350, "the order is kept below its start (hysteresis) while the reason lasts")` |  | own value (source not recorded) | `weights.rs` |
 | `PEACE` | `(500, "the peace wish wins over the war's inertia")` |  | own value (source not recorded) | `weights.rs` |
 | `DENY_HELP` | `(500, "a rival more likely than not to run away gets no help (lane A T4/T1: science win...` |  | own value (source not recorded) | `weights.rs` |
-| `EMBARGO` | `(600, "the embargo, the cheap brake, only on a clear runaway (W2, VP #8)")` |  | own value (source not recorded) | `weights.rs` |
+| `EMBARGO` | `(600, "the embargo, the cheap brake, only on a clear runaway (W2)")` |  | own value (source not recorded) | `weights.rs` |
 | `BLOCK` | `(500, "the ballot goes against a rival only when it would win the vote")` |  | own value (source not recorded) | `weights.rs` |
 | `SPACE_RESEARCH` | `(500, "the research keeps to the ship's way when the science aim and the way gone say s...` |  | own value (source not recorded) | `weights.rs` |
 | `CAPITAL_GATE` | `(500, "the capital is kept for the parts when a part outside it says so more likely tha...` |  | own value (source not recorded) | `weights.rs` |
