@@ -99,7 +99,7 @@ def _move_by(game, me, side, take, keys_of):
     s = game.s
     B = game.B
     sd = mx.full((B,), side, dtype=I32)
-    mk = sim.masks(s, sd, me)
+    mk = sim.masks(s, sd, me, rows=take)
     lt = mk["lt"]
     own = (mx.arange(lt.shape[1])[None, :] == 0) & (lt >= 0)
     opt = (mk["move_l"] | own) & take[:, None]
@@ -217,12 +217,12 @@ def _city_owner(game, city):
     return R._city_owner_at(game, game.s, city)
 
 
-def _reach_kills(game, me, side, city):
+def _reach_kills(game, me, side, city, rows=None):
     """`reach_blow(city)`'s `dealt >= hp`: what `me` deals to the city from where it stands (in reach) or from a tile it can
     reach with a move left to strike, against the defender's hit points."""
     s, sim, obs = game.s, game.sim, game.obs
     B = game.B
-    mk = sim.masks(s, mx.full((B,), side, dtype=I32), me)
+    mk = sim.masks(s, mx.full((B,), side, dtype=I32), me, rows=rows)
     lt, left, ok_l = mk["lt"], mk["left"], mk["move_l"]
     tile = g1(s["u_tile"], me)
     rng = g1(obs.kind(s, "range"), me)
@@ -230,9 +230,13 @@ def _reach_kills(game, me, side, city):
     geo = sim.geo
     to = mx.broadcast_to(mx.maximum(city, 0)[:, None], lt.shape)
     own_ok = (geo.distance(tile, city) <= reach)[:, None]
-    d1, _, h1, ok1 = obs.preview(s, me, tile[:, None], mx.maximum(city, 0)[:, None], own_ok, True)
+    if rows is not None:
+        own_ok = own_ok & rows[:, None]  # the rows the caller reads: the others' masks are copies, not previewed
+    d1, _, h1, ok1 = obs.preview_packed(s, me, tile[:, None], mx.maximum(city, 0)[:, None], own_ok, True)
     mv_ok = ok_l & (left > 0) & (geo.distance(lt, to) <= reach[:, None])
-    d2, _, h2, ok2 = obs.preview(s, me, lt, to, mv_ok, False)
+    if rows is not None:
+        mv_ok = mv_ok & rows[:, None]
+    d2, _, h2, ok2 = obs.preview_packed(s, me, lt, to, mv_ok, False)
     best = mx.maximum(mx.max(mx.where(ok1 & own_ok, d1, -1), axis=1), mx.max(mx.where(ok2 & mv_ok, d2, -1), axis=1))
     hp = mx.maximum(mx.max(mx.where(ok1 & own_ok, h1, 0), axis=1), mx.max(mx.where(ok2 & mv_ok, h2, 0), axis=1))
     return (best >= 0) & (best >= hp)
@@ -242,7 +246,8 @@ def race_melee(game, me, sel, city):
     """`race_turn`'s melee unit: the capture (a blow that takes the city, struck or approached), else a kill near the city, else
     two tiles off the city; then it stands."""
     B = game.B
-    cap = sel & (_city_owner(game, city) == 1) & _reach_kills(game, me, 2, city)
+    pre = sel & (_city_owner(game, city) == 1)
+    cap = pre & _reach_kills(game, me, 2, city, rows=pre)
     done = mx.zeros((B,), dtype=mx.bool_)
     if bool(mx.any(cap).item()):
         _script(game, 1, city=city, nerve="reckless", only_city=True)
@@ -254,7 +259,7 @@ def race_melee(game, me, sel, city):
         ok2, frm, t2 = R._approach(game, me, 2, rest)
         ap = rest & ok2
         if bool(mx.any(ap).item()):
-            mk = game.sim.masks(game.s, mx.full((B,), 2, dtype=I32), me)
+            mk = game.sim.masks(game.s, mx.full((B,), 2, dtype=I32), me, rows=ap)
             game.s = game.sim.apply_unit(game.s, mx.full((B,), 2, dtype=I32), me, mx.full((B,), V_MOVE, dtype=I32), frm, mk, ap)
             armycamp.check(game)
             R._strike(game, me, 2, t2, ap)

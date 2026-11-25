@@ -130,7 +130,7 @@ def _camp_move(game, me, side, take, goal, kind):
     s = game.s
     B = game.B
     sd = mx.full((B,), side, dtype=I32)
-    mk = sim.masks(s, sd, me)
+    mk = sim.masks(s, sd, me, rows=take)
     lt = mk["lt"]
     own = (mx.arange(lt.shape[1])[None, :] == 0) & (lt >= 0)
     opt = (mk["move_l"] | own) & take[:, None]
@@ -169,7 +169,7 @@ def unit_turn(game, me, side, rows, aim, goal):
         ok2, frm, t2 = R._approach(game, me, side, rest)
         ap = rest & ok2
         if bool(mx.any(ap).item()):
-            mk = sim.masks(game.s, sd, me)
+            mk = sim.masks(game.s, sd, me, rows=ap)
             game.s = sim.apply_unit(game.s, sd, me, mx.full((B,), V_MOVE, dtype=I32), frm, mk, ap)
             check(game)
             R._strike(game, me, side, t2, ap)
@@ -183,7 +183,7 @@ def unit_turn(game, me, side, rows, aim, goal):
         if bool(mx.any(close).item()):
             go, tile = R._move_by_aim(game, me, side, close)
             if bool(mx.any(go).item()):
-                mk = sim.masks(game.s, sd, me)
+                mk = sim.masks(game.s, sd, me, rows=go)
                 game.s = sim.apply_unit(game.s, sd, me, mx.full((B,), V_MOVE, dtype=I32), tile, mk, go)
         _camp_move(game, me, side, walk & (aim == 1), goal, "hold")
         _camp_move(game, me, side, walk & (aim == 2), goal, "to")
@@ -197,7 +197,7 @@ def unit_turn(game, me, side, rows, aim, goal):
     s = game.s
     on = hold & g1(s["u_alive"], me) & (g1(s["u_tile"], me) == goal) & (g1(s["u_mv"], me) > 0)
     if bool(mx.any(on).item()):
-        mk = sim.masks(s, sd, me)
+        mk = sim.masks(s, sd, me, rows=on)
         game.s = sim.apply_unit(s, sd, me, mx.full((B,), V_FORT, dtype=I32), mx.zeros((B,), dtype=I32), mk, on & mk["fort"])
     game.s = sim.hold_units(game.s, (mx.arange(U)[None, :] == me[:, None]) & mine[:, None], heal=game.hold_heals)
     mx.eval(game.s)
@@ -234,7 +234,7 @@ def enemy_turn(game, live, side=1):
     game.script_sorted = False
 
 
-def _can_enter(game, side_slots, camp):
+def _can_enter(game, side_slots, camp, rows=None):
     """[B, K] whether each third-seat slot can reach the empty camp this turn, and its distance to it."""
     s, sim = game.s, game.sim
     B = game.B
@@ -242,7 +242,7 @@ def _can_enter(game, side_slots, camp):
     for u in side_slots:
         me = mx.full((B,), u, dtype=I32)
         alive = g1(s["u_alive"], me) & (g1(s["u_side"], me) == 2) & (g1(s["u_tile"], me) >= 0) & (g1(s["u_mv"], me) > 0)
-        mk = sim.masks(s, mx.full((B,), 2, dtype=I32), me)
+        mk = sim.masks(s, mx.full((B,), 2, dtype=I32), me, rows=alive if rows is None else alive & rows)
         reach = mx.any((mk["lt"] == camp[:, None]) & mk["move_l"], axis=1)
         flags.append(alive & reach)
         dists.append(_dist(game, g1(s["u_tile"], me), camp))
@@ -257,7 +257,7 @@ def _enter(game, rows, third_slots):
     ready = rows & s["camp_up"] & ~guarded(s)
     if not bool(mx.any(ready).item()):
         return mx.zeros((game.B,), dtype=mx.bool_)
-    flags, dists = _can_enter(game, third_slots, camp)
+    flags, dists = _can_enter(game, third_slots, camp, rows=ready)
     key = mx.where(flags, dists * 64 + mx.arange(len(third_slots))[None, :], 1 << 20)
     best = mx.argmin(key, axis=1)
     did = ready & (mx.min(key, axis=1) < (1 << 20))
@@ -268,7 +268,7 @@ def _enter(game, rows, third_slots):
         pick = did & (best == k)
         if not bool(mx.any(pick).item()):
             continue
-        mk = sim.masks(game.s, mx.full((B,), 2, dtype=I32), me)
+        mk = sim.masks(game.s, mx.full((B,), 2, dtype=I32), me, rows=pick)
         game.s = sim.apply_unit(game.s, mx.full((B,), 2, dtype=I32), me, mx.full((B,), V_MOVE, dtype=I32), camp, mk, pick)
         game.s = sim.hold_units(game.s, (mx.arange(game.U)[None, :] == me[:, None]) & pick[:, None], heal=game.hold_heals)
     check(game)

@@ -18,6 +18,7 @@ import hashlib
 import io
 import json
 import re
+import sys
 import time
 import types
 
@@ -99,6 +100,8 @@ class Probe:
         self.counter = None
         self.done = set()
         self.keep = []
+        self.callers = False
+        self.deep = False
 
     def nodes(self, arrs):
         if not arrs:
@@ -125,7 +128,7 @@ class Probe:
         c["syncs"] += 1
         self.nodes(arrs)
 
-    def wrap(self, owner, name, label):
+    def wrap(self, owner, name, label, by_caller=False):
         if isinstance(owner, types.ModuleType) or owner is getattr(self.game, "brain", None):
             # a module's function or the net, shared by the games of a batch: wrapped once (the owner is kept, so its id stays)
             if (id(owner), name) in self.done:
@@ -138,7 +141,16 @@ class Probe:
         def g(*a, **k):
             if probe.mode != "wall":
                 probe.fence(a, k, probe.game.s)
-            probe.stack.append(label)
+            lab = label
+            if by_caller:
+                # `--callers`: the part is split by who calls it (the function and its caller, outside this file)
+                fr, names = sys._getframe(1), []
+                while fr is not None and len(names) < 2:
+                    if fr.f_code.co_filename != __file__:
+                        names.append("%s.%s:%d" % (fr.f_code.co_filename.rsplit("/", 1)[-1][:-3], fr.f_code.co_name, fr.f_lineno))
+                    fr = fr.f_back
+                lab = label + " <- " + " <- ".join(names)
+            probe.stack.append(lab)
             c = probe.st[tuple(probe.stack)]
             c["calls"] += 1
             t = time.perf_counter()
@@ -203,8 +215,27 @@ def instrument(g, probe):
     w(armyparty, "third_turn", "third: party third_turn")
     w(g.sim, "end_turn", "sim: end turn")
     w(g.sim, "round_end", "sim: round end")
-    w(g.sim, "masks", "sim: masks")
-    w(g.obs, "preview", "sim: previews")
+    # the pieces of the scripts (`--deep`): where the exclusive time of a family's pass goes
+    if probe.deep:
+        w(g.sim, "apply_unit", "script: apply_unit")
+        w(g.sim, "hold_units", "script: hold_units")
+        w(g.sim, "walk", "apply: walk")
+        w(g.sim, "attack", "apply: attack")
+        w(g.sim, "set_unit", "apply: set_unit")
+        w(g.sim, "refresh_allowance", "apply: refresh_allowance")
+        w(armyrule, "_threat", "script: threat")
+        w(armyrule, "_blow", "script: blow")
+        w(armyrule, "_approach", "script: approach")
+        w(armyrule, "_strike", "script: strike")
+        w(armyrule, "_move_by_aim", "script: move by aim")
+        w(armycamp, "unit_turn", "script: unit_turn")
+        w(armycamp, "_camp_move", "script: camp move")
+        w(armycamp, "check", "script: camp check")
+        w(armyparty, "race_melee", "script: race_melee")
+        w(armyparty, "_move_by", "script: party move_by")
+    w(g.sim, "masks", "sim: masks", by_caller=probe.callers)
+    w(g.obs, "preview", "sim: previews", by_caller=probe.callers)
+    w(g.obs, "preview_packed", "sim: previews (packing)", by_caller=probe.callers)
     # the judges
     w(g, "judge", "judges")
     w(armyfog, "judge", "judges: fog")
@@ -261,6 +292,8 @@ def main(argv=None):
     ap.add_argument("--facts", choices=["auto", "on", "off"], default="auto")
     ap.add_argument("--cpu", action="store_true")
     ap.add_argument("--split", choices=["auto", "on", "off"], default="off", help="one game per family group (`armyplay.Batch`)")
+    ap.add_argument("--callers", action="store_true", help="split `sim: masks` / `sim: previews` by the calling function")
+    ap.add_argument("--deep", action="store_true", help="also time the scripts' own pieces (apply_unit, hold_units, blow, approach, strike ...)")
     ap.add_argument("--out")
     a = ap.parse_args(argv)
     if a.cpu:
@@ -273,6 +306,8 @@ def main(argv=None):
     shared = collections.defaultdict(collections.Counter)
     ctr = SyncCounter()
     probe = Probe(None, a.mode)
+    probe.callers = a.callers
+    probe.deep = a.deep
     probe.st = shared
     probe.counter = ctr
     ctr.on_sync = probe.on_sync if a.mode == "count" else None

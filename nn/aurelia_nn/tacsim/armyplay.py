@@ -857,7 +857,7 @@ class Game:
                         mx.where(kind == A.K_FORT, V_FORT, mx.where(kind == A.K_SETUP, V_SETUP, mx.where(kind == A.K_PROMO, V_PROMOTE, V_NONE)))))
         sim_take = take & (verb != V_NONE)
         if bool(mx.any(sim_take).item()):
-            mk = mk if mk is not None else sim.masks(s, sd, me)
+            mk = mk if mk is not None else sim.masks(s, sd, me, rows=sim_take)
             s = sim.apply_unit(s, sd, me, verb, tgt, mk, sim_take)
         # Done: the unit's turn is over (`act::stand`).
         done = take & (kind == A.K_DONE)
@@ -934,12 +934,12 @@ class Game:
             ok, t = self.best_blow(me, side)
             hit = mine & ok
             if bool(mx.any(hit).item()):
-                mk = sim.masks(self.s, sd, me)
+                mk = sim.masks(self.s, sd, me, rows=hit)
                 self.s = sim.apply_unit(self.s, sd, me, mx.full((B,), V_ATTACK, dtype=I32), t, mk, hit)
             fld = mine & ~hit
             if bool(mx.any(fld).item()):
                 s = self.s
-                mk = sim.masks(s, sd, me)
+                mk = sim.masks(s, sd, me, rows=fld)
                 fd = self.obs.field(s, side)
                 lq, lr = self.obs.mapq(mk["lt"])
                 d = A.hexd(lq[:, :, None] - fd["uq"][:, None, :], lr[:, :, None] - fd["ur"][:, None, :])
@@ -954,7 +954,7 @@ class Game:
                 ok2, t2 = self.best_blow(me, side)
                 hit2 = go & ok2
                 if bool(mx.any(hit2).item()):
-                    mk = sim.masks(self.s, sd, me)
+                    mk = sim.masks(self.s, sd, me, rows=hit2)
                     self.s = sim.apply_unit(self.s, sd, me, mx.full((B,), V_ATTACK, dtype=I32), t2, mk, hit2)
             # The script's unit stands (`act::stand`).
             self.s = sim.hold_units(self.s, (mx.arange(U)[None, :] == u) & mine[:, None], heal=self.hold_heals)
@@ -1043,13 +1043,13 @@ class Game:
             ok, t = self.best_blow(me, side)
             hit = mine & ok
             if bool(mx.any(hit).item()):
-                mk = sim.masks(self.s, sd, me)
+                mk = sim.masks(self.s, sd, me, rows=hit)
                 self.s = sim.apply_unit(self.s, sd, me, mx.full((B,), V_ATTACK, dtype=I32), t, mk, hit)
             # The field units of the assault families close in on the nearest of ours, then strike.
             fld = mine & ~hit & g1(self.field, me) & mx.array([f in ASSAULT for f in self.fam])
             if bool(mx.any(fld).item()):
                 s = self.s
-                mk = sim.masks(s, sd, me)
+                mk = sim.masks(s, sd, me, rows=fld)
                 fd = self.obs.field(s, side)
                 lq, lr = self.obs.mapq(mk["lt"])
                 d = A.hexd(lq[:, :, None] - fd["uq"][:, None, :], lr[:, :, None] - fd["ur"][:, None, :])
@@ -1064,13 +1064,13 @@ class Game:
                 ok2, t2 = self.best_blow(me, side)
                 hit2 = go & ok2
                 if bool(mx.any(hit2).item()):
-                    mk = sim.masks(self.s, sd, me)
+                    mk = sim.masks(self.s, sd, me, rows=hit2)
                     self.s = sim.apply_unit(self.s, sd, me, mx.full((B,), V_ATTACK, dtype=I32), t2, mk, hit2)
             # The rest hold: fortify where the rules let them.
             s = self.s
             rest = mine & ~hit & ~fld
             if bool(mx.any(rest).item()):
-                mk = sim.masks(s, sd, me)
+                mk = sim.masks(s, sd, me, rows=rest)
                 self.s = sim.apply_unit(s, sd, me, mx.full((B,), V_FORT, dtype=I32), mx.zeros((B,), dtype=I32), mk, rest & mk["fort"])
         # Each enemy city strikes the unit of ours it hurts most (a kill first).
         C = self.sim.cs["tile"].shape[1]

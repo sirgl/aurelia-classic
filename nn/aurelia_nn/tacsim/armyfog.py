@@ -123,7 +123,7 @@ def _walk(game, me, side, take, goal):
         return
     sim = game.sim
     sd = mx.full((game.B,), side, dtype=I32)
-    mk = sim.masks(game.s, sd, me)
+    mk = sim.masks(game.s, sd, me, rows=take)
     lt = mk["lt"]
     own = (mx.arange(lt.shape[1])[None, :] == 0) & (lt >= 0)
     options = (mk["move_l"] | own) & take[:, None]
@@ -136,7 +136,7 @@ def _fortify(game, me, side, take):
     if not bool(mx.any(take).item()):
         return
     sd = mx.full((game.B,), side, dtype=I32)
-    mk = game.sim.masks(game.s, sd, me)
+    mk = game.sim.masks(game.s, sd, me, rows=take)
     game.s = game.sim.apply_unit(game.s, sd, me, mx.full((game.B,), V_FORT, dtype=I32), mx.zeros((game.B,), dtype=I32), mk, take & mk["fort"])
 
 

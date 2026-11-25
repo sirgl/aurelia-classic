@@ -543,7 +543,7 @@ class Obs:
         dealt = mx.where(civ_def, mx.where(ranged_atk, exact.CIVILIAN_DAMAGE, 0), dealt)
         return dealt.astype(I32), taken.astype(I32), d_hp.astype(I32), ok
 
-    def preview_packed(self, s, me, frm, to, valid, from_real):
+    def preview_packed(self, s, me, frm, to, valid, from_real, ranged_only=False):
         """`preview` of the pairs where `valid` [B, N] holds, packed: each valid pair is a row of its own (the state gathered
         for it), not a column of a padded [B, N] (most rows have none or one). The results are zero where not valid."""
         B, N = valid.shape
@@ -553,7 +553,7 @@ class Obs:
         if P == 0:
             return zero, zero, zero, mx.zeros((B, N), dtype=mx.bool_)
         if 2 * P >= B * N:
-            return self.preview(s, me, frm, to, valid, from_real)
+            return self.preview(s, me, frm, to, valid, from_real, ranged_only)
         idx = mx.argsort(mx.where(flat, 0, B * N) + mx.arange(B * N, dtype=I32))[:P].astype(I32)
         row = idx // N
         sub = {k: mx.take(v, row, axis=0) for k, v in s.items()}
@@ -565,7 +565,7 @@ class Obs:
         self.t = self.tab.t
         try:
             dealt, taken, dhp, ok = self.preview(sub, mx.take(me, row), mx.take(frm.reshape(-1), idx)[:, None], mx.take(to.reshape(-1), idx)[:, None],
-                                                 mx.ones((P, 1), dtype=mx.bool_), from_real)
+                                                 mx.ones((P, 1), dtype=mx.bool_), from_real, ranged_only)
         finally:
             sim.cs, sim.tid, sim.n_pieces, sim.B, self.tab, self.t = saved
         back = lambda v: mx.zeros((B * N,), dtype=I32).at[idx].add(v[:, 0].astype(I32)).reshape(B, N)
@@ -1417,6 +1417,9 @@ def _rows_sim(sim, bi):
     cs = {k: (mx.take(v, bi, axis=0) if k not in ("tile_t", "alive_t") else v) for k, v in sim.cs.items()}
     out = Sim.__new__(Sim)
     out.__dict__.update(sim.__dict__)
+    # a method replaced on the instance (the profiler's wrappers) is bound to the whole batch's sim: the view uses the class's
+    for k in [k for k in out.__dict__ if callable(getattr(Sim, k, None))]:
+        del out.__dict__[k]
     out.cs = cs
     out.tid = mx.take(sim.tid, bi, axis=0)
     out.B = out.tid.shape[0]

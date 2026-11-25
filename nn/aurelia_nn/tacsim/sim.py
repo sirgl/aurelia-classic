@@ -565,9 +565,36 @@ class Sim:
         ready = alive & (g1(s["u_xp"], slot) >= need)
         return ready[:, None] & fit & ~held & req_ok & any_ok
 
-    def masks(self, s, side, slot):
+    ROWS_MIN = 8
+
+    def masks(self, s, side, slot, rows=None):
         """Legal options of unit `slot` of `side` in every scene: fortify, set up, found [B]; promote
-        [B, NP]; move and attack [B, T] (window tiles). Also returns what `apply` needs (the wavefront)."""
+        [B, NP]; move and attack [B, T] (window tiles). Also returns what `apply` needs (the wavefront).
+
+        `rows` [B] bool: the rows the caller reads (a unit's turn: the rows where it acts). The wavefront, the zones of control
+        and the attack disc are computed on those rows only and put back by position; the other rows hold the values of some
+        computed row (valid indices, never read: the caller masks them). Cost = one host read of the count, and the passes
+        of a family's script then pay for the family's rows, not for the whole game (line 8)."""
+        if rows is not None and self.B >= self.ROWS_MIN:
+            n = int(mx.sum(rows).item())
+            if 2 * n < self.B:
+                return self._masks_rows(s, side, slot, rows, max(n, 1))
+        return self._masks_full(s, side, slot)
+
+    def _masks_rows(self, s, side, slot, rows, n):
+        from .armyobs import _rows_sim
+        B = self.B
+        ids = mx.argsort(mx.where(rows, 0, B) + mx.arange(B, dtype=I32))[:n].astype(I32)
+        pos = mx.maximum(mx.cumsum(rows.astype(I32)) - 1, 0)
+        sub = _rows_sim(self, ids)
+        take = lambda a: mx.take(a, ids, axis=0)
+        mk = sub._masks_full({k: take(v) for k, v in s.items()}, take(side), take(slot))
+        back = lambda a: mx.take(a, pos, axis=0)
+        out = {k: (tuple(back(x) for x in v) if isinstance(v, tuple) else back(v)) for k, v in mk.items()}
+        self._edges = out["edges"]
+        return out
+
+    def _masks_full(self, s, side, slot):
         B, T = self.B, self.T
         geo = self.geo
         block, ctrl, vis, mil, civ, mil_side, civ_side, city, city_owner = self.controls_and_blocks(s, side)
@@ -1075,7 +1102,8 @@ class Sim:
         return mx.where(best < (1 << 20), best, -1)
 
     def apply_unit(self, s, side, slot, verb, tgt, mk, take):
-        """One unit action in every scene where `take`."""
+        """One unit action in every scene where `take`. (Computing it on the acting rows only was measured: the gather and the
+        merge of the state cost what the whole-batch reads did; line 8, not kept.)"""
         alive = g1(s["u_alive"], slot)
         take = take & alive
         tile = g1(s["u_tile"], slot)

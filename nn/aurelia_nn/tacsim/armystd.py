@@ -73,7 +73,7 @@ def plan_shots(game, side=1):
         me = mx.full((B,), u, dtype=I32)
         here = g1(tile, me)
         frm = mx.broadcast_to(here[:, None], (B, U))
-        dealt, _, dhp, ok = obs.preview(s, me, frm, tile, mark & g1(shooter_ok, me)[:, None], True)
+        dealt, _, dhp, ok = obs.preview_packed(s, me, frm, tile, mark & g1(shooter_ok, me)[:, None], True)
         rows_d.append(dealt)
         rows_ok.append(ok & mark)
         keys.append((1 << 20) + mx.maximum(g1(handles, me), 0))
@@ -187,7 +187,7 @@ def run_shots(game, side=1, live=None):
         if bool(mx.any(unit).item()):
             s = game.s
             me = mx.where(unit, sh - C, 0)
-            mk = sim.masks(s, sd, me)
+            mk = sim.masks(s, sd, me, rows=unit)
             game.s = sim.apply_unit(s, sd, me, mx.full((B,), V_ATTACK, dtype=I32), mx.maximum(tgt_tile, 0), mk, unit)
             game.counts["enemy shots"] += int(mx.sum(unit).item())
 
@@ -200,7 +200,7 @@ def charge(game, me, side=1):
     to = s["u_tile"]
     foe = s["u_alive"] & (to >= 0) & (s["u_side"] == 1 - side)
     adj = sim.geo.distance(mx.broadcast_to(tile[:, None], (B, U)), to) == 1
-    dealt, taken, dhp, ok = obs.preview(s, me, mx.broadcast_to(tile[:, None], (B, U)), to, foe & adj, True)
+    dealt, taken, dhp, ok = obs.preview_packed(s, me, mx.broadcast_to(tile[:, None], (B, U)), to, foe & adj, True)
     hp = g1(s["u_hp"], me)[:, None]
     civ = game.obs.kind(s, "civ")
     worth = worth_of(game)
@@ -269,11 +269,11 @@ def enemy_turn(game, charge_on=False):
             ok, t = charge(game, me, side)
             hit = holder & ~ranged & ok
             if bool(mx.any(hit).item()):
-                mk = sim.masks(game.s, sd, me)
+                mk = sim.masks(game.s, sd, me, rows=hit)
                 game.s = sim.apply_unit(game.s, sd, me, mx.full((B,), V_ATTACK, dtype=I32), t, mk, hit)
                 game.counts["enemy charges"] += int(mx.sum(hit).item())
         s = game.s
         if bool(mx.any(holder).item()):
-            mk = sim.masks(s, sd, me)
+            mk = sim.masks(s, sd, me, rows=holder)
             game.s = sim.apply_unit(s, sd, me, mx.full((B,), V_FORT, dtype=I32), mx.zeros((B,), dtype=I32), mk, holder & mk["fort"])
     game.s = sim.end_turn(game.s, sd, live)

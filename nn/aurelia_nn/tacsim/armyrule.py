@@ -186,14 +186,14 @@ def _shoot(game, side, u):
     dm, dc = gn(mil, tl), gn(civ, tl)
     mark = foe & ((dm == slots) | ((dm < 0) & (dc == slots)))
     frm = mx.broadcast_to(g1(tile, me)[:, None], (B, U))
-    dealt, _, dhp, ok = obs.preview(s, me, frm, tile, mark & can[:, None], True, ranged_only=True)
+    dealt, _, dhp, ok = obs.preview_packed(s, me, frm, tile, mark & can[:, None], True, ranged_only=True)
     ok = ok & mark & can[:, None]
     left = mx.maximum(dhp - dealt, 0)
     key = mx.where(ok, left * 4096 + tl, NOKEY)
     best = mx.min(key, axis=1)
     take = best < NOKEY
     t = (best % 4096).astype(I32)
-    mk = sim.masks(s, sd, me)
+    mk = sim.masks(s, sd, me, rows=take)
 
     def run():
         game.s = sim.apply_unit(s, sd, me, mx.full((B,), V_ATTACK, dtype=I32), mx.where(take, t, 0), mk, take)
@@ -345,7 +345,7 @@ def _blow(game, me, side, take):
     to, mark = _cols(game, s, side)
     N = to.shape[1]
     mark = mark & take[:, None] & (g1(s["u_mv"], me) > 0)[:, None]
-    dealt, taken, dhp, ok = obs.preview(s, me, mx.broadcast_to(tile[:, None], (B, N)), to, mark, True)
+    dealt, taken, dhp, ok = obs.preview_packed(s, me, mx.broadcast_to(tile[:, None], (B, N)), to, mark, True)
     hp = g1(s["u_hp"], me)[:, None]
     kills = dealt >= dhp
     fine = ok & mark & _nerve(game, kills, dealt, taken, hp)
@@ -376,9 +376,9 @@ def _strike(game, me, side, tile, take):
     s = game.s
     need = take & g1(s["p_must_set_up"], me) & (g1(s["u_st"], me) != 3)
     if bool(mx.any(need).item()):
-        mk = sim.masks(s, sd, me)
+        mk = sim.masks(s, sd, me, rows=need)
         game.s = sim.apply_unit(s, sd, me, mx.full((B,), V_SETUP, dtype=I32), mx.zeros((B,), dtype=I32), mk, need & mk["setup"])
-    mk = sim.masks(game.s, sd, me)
+    mk = sim.masks(game.s, sd, me, rows=take)
     # The set-up spends a move: a unit that walked first and sets up has none left, and Rust refuses its strike.
     take = take & (g1(game.s["u_mv"], me) > 0)
     game.s = sim.apply_unit(game.s, sd, me, mx.full((B,), V_ATTACK, dtype=I32), mx.maximum(tile, 0), mk, take)
@@ -402,7 +402,7 @@ def _approach(game, me, side, take):
     """`act::approach_strike`: (has one, the tile to move to, the target tile) [B]."""
     s, sim, obs, geo = game.s, game.sim, game.obs, game.sim.geo
     B, U = s["u_alive"].shape
-    mk = sim.masks(s, mx.full((B,), side, dtype=I32), me)
+    mk = sim.masks(s, mx.full((B,), side, dtype=I32), me, rows=take)
     lt, left, ok_l = mk["lt"], mk["left"], mk["move_l"]
     L = lt.shape[1]
     rng = g1(obs.kind(s, "range"), me)
@@ -419,7 +419,7 @@ def _approach(game, me, side, take):
     valid = mx.take_along_axis(flat, idx, axis=1)
     frm = mx.take_along_axis(lt, idx // N, axis=1)
     to = mx.take_along_axis(tiles, idx % N, axis=1)
-    dealt, taken, dhp, ok = obs.preview(s, me, frm, to, valid, False)
+    dealt, taken, dhp, ok = obs.preview_packed(s, me, frm, to, valid, False)
     hp = g1(s["u_hp"], me)[:, None]
     kills = dealt >= dhp
     fine = ok & valid & _nerve(game, kills, dealt, taken, hp)
@@ -434,7 +434,7 @@ def _move_by_aim(game, me, side, take):
     """`act::move_by` with Close (melee) or Support (ranged): (moves, the tile) [B]; the own tile best: no move."""
     s, sim, obs = game.s, game.sim, game.obs
     B, U = s["u_alive"].shape
-    mk = sim.masks(s, mx.full((B,), side, dtype=I32), me)
+    mk = sim.masks(s, mx.full((B,), side, dtype=I32), me, rows=take)
     lt, left, ok_l = mk["lt"], mk["left"], mk["move_l"]
     L = lt.shape[1]
     own = (mx.arange(L)[None, :] == 0) & (lt >= 0)
@@ -508,7 +508,7 @@ def close_unit(game, me, side, mine):
         ok2, frm, t2 = _approach(game, me, side, rest)
         ap = rest & ok2
         if bool(mx.any(ap).item()):
-            mk = sim.masks(game.s, sd, me)
+            mk = sim.masks(game.s, sd, me, rows=ap)
             game.s = sim.apply_unit(game.s, sd, me, mx.full((B,), V_MOVE, dtype=I32), frm, mk, ap)
             _strike(game, me, side, t2, ap)
         walk = mine & ~hit & ~ap
@@ -519,7 +519,7 @@ def close_unit(game, me, side, mine):
         walk = walk & (g1(s["u_mv"], me) > 0)
         go, tile = _move_by_aim(game, me, side, walk)
         if bool(mx.any(go).item()):
-            mk = sim.masks(game.s, sd, me)
+            mk = sim.masks(game.s, sd, me, rows=go)
             game.s = sim.apply_unit(game.s, sd, me, mx.full((B,), V_MOVE, dtype=I32), tile, mk, go)
         ok3, t3 = _blow(game, me, side, walk & ~civ)
         h3 = walk & ~civ & ok3

@@ -83,7 +83,7 @@ def _stand(game, me, which):
 def _move(game, me, side, tile, go):
     if _any(go):
         sd = mx.full((game.B,), side, dtype=I32)
-        mk = game.sim.masks(game.s, sd, me)
+        mk = game.sim.masks(game.s, sd, me, rows=go)
         game.s = game.sim.apply_unit(game.s, sd, me, mx.full((game.B,), V_MOVE, dtype=I32), tile, mk, go)
 
 
@@ -124,7 +124,7 @@ def blow(game, me, side, take):
     valid = valid & take[:, None] & (g1(s["u_mv"], me) > 0)[:, None]
     K = tiles.shape[1]
     here = g1(s["u_tile"], me)
-    dealt, taken, dhp, ok = obs.preview(s, me, mx.broadcast_to(here[:, None], (B, K)), mx.maximum(tiles, 0), valid, True)
+    dealt, taken, dhp, ok = obs.preview_packed(s, me, mx.broadcast_to(here[:, None], (B, K)), mx.maximum(tiles, 0), valid, True)
     hp = g1(s["u_hp"], me)[:, None]
     fine, kills = _fine_careful(dealt, taken, dhp, hp)
     fine = fine & ok & valid
@@ -142,7 +142,7 @@ def approach(game, me, side, take):
     """`act::approach_strike` Careful: (has one, the tile to move to, the target tile) [B]."""
     s, sim, obs, geo = game.s, game.sim, game.obs, game.sim.geo
     B = me.shape[0]
-    mk = sim.masks(s, mx.full((B,), side, dtype=I32), me)
+    mk = sim.masks(s, mx.full((B,), side, dtype=I32), me, rows=take)
     lt, left, ok_l = mk["lt"], mk["left"], mk["move_l"]
     L = lt.shape[1]
     tiles, valid = _targets(game, side)
@@ -160,7 +160,7 @@ def approach(game, me, side, take):
     ok_p = mx.take_along_axis(flat, idx, axis=1)
     frm = mx.take_along_axis(lt, idx // K, axis=1)
     to = mx.take_along_axis(tiles, idx % K, axis=1)
-    dealt, taken, dhp, ok = obs.preview(s, me, mx.maximum(frm, 0), mx.maximum(to, 0), ok_p, False)
+    dealt, taken, dhp, ok = obs.preview_packed(s, me, mx.maximum(frm, 0), mx.maximum(to, 0), ok_p, False)
     hp = g1(s["u_hp"], me)[:, None]
     fine, kills = _fine_careful(dealt, taken, dhp, hp)
     fine = fine & ok & ok_p
@@ -175,7 +175,7 @@ def move_aim(game, me, side, take, aim, aim_tile):
     -defence); Close: (melee: max(nearest - 1, 0), ranged: |nearest - reach|; -defence)), the tile last: (moves, the tile) [B]."""
     s, sim, obs = game.s, game.sim, game.obs
     B = me.shape[0]
-    mk = sim.masks(s, mx.full((B,), side, dtype=I32), me)
+    mk = sim.masks(s, mx.full((B,), side, dtype=I32), me, rows=take)
     lt, ok_l = mk["lt"], mk["move_l"]
     L = lt.shape[1]
     own = (mx.arange(L)[None, :] == 0) & (lt >= 0)
@@ -256,7 +256,7 @@ def learner_pass(game, live):
         site = st["site"]
         conv = can & (st["code"] == CONVOY) & (site >= 0)
         sd = mx.zeros((B,), dtype=I32)
-        mk = sim.masks(s, sd, me)
+        mk = sim.masks(s, sd, me, rows=conv)
         near = conv & ((tile == site) | (mk["found"] & (_dist_tiles(game, tile, site) <= 1)))
         if _any(near):
             game.s = sim.apply_unit(s, sd, me, mx.full((B,), V_FOUND, dtype=I32), mx.zeros((B,), dtype=I32), mk, near)
@@ -310,7 +310,7 @@ def hunt_turn(game, live):
                 acted = acted | adj
             rest = cand & ~adj
             if _any(rest):
-                mk = sim.masks(game.s, mx.full((B,), 1, dtype=I32), me)
+                mk = sim.masks(game.s, mx.full((B,), 1, dtype=I32), me, rows=rest)
                 lt, left, ok_l = mk["lt"], mk["left"], mk["move_l"]
                 nb = ok_l & (left > 0) & (_dist_tiles(game, lt, ct[:, None]) == 1) & rest[:, None]
                 j, has = _lex_min([lt], nb)
@@ -338,7 +338,7 @@ def hunt_turn(game, live):
                 key2 = mx.where(calive & (dgoal == best[:, None]), ctile, 1 << 20)
                 goal = mx.min(key2, axis=1)
                 has_goal = walk & mx.any(calive, axis=1)
-                mk = sim.masks(s, mx.full((B,), 1, dtype=I32), me)
+                mk = sim.masks(s, mx.full((B,), 1, dtype=I32), me, rows=has_goal)
                 lt, ok_l = mk["lt"], mk["move_l"]
                 L = lt.shape[1]
                 own = (mx.arange(L)[None, :] == 0) & (lt >= 0)
