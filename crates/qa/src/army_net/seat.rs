@@ -759,7 +759,15 @@ pub fn turn(rules: &CompiledRuleset, game: &mut GameState, orders: &Orders, scen
                 if lp_act.is_some() && first_pick.is_some_and(|f| f as i16 != applied) {
                     super::sample::note_fallback();
                 }
-                let i = super::record::push_net(ids, &tokens, &candidates, at as i16, applied, rel);
+                // The record carries what the policy DECIDED (the sampled action, whose log-probability `lp_act` is), not what the rules then
+                // executed: on the honest input the candidates are built from what the side knows, so the true world can refuse a sampled
+                // action and the next one in the order runs (a fallback). Labelling the executed action with the sampled one's log-probability
+                // made the learner's value differ from Rust's (parity, gate G1.10h); the refusal is the environment's, the decision is the policy's.
+                let label = match (lp_act, first_pick) {
+                    (Some(_), Some(f)) => f as i16,
+                    _ => applied,
+                };
+                let i = super::record::push_net(ids, &tokens, &candidates, at as i16, label, rel);
                 super::sample::note(i, lp_ptr, lp_act);
             }
         }
