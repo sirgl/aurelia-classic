@@ -239,6 +239,13 @@ def play_rule_version(meta, default=1):
     return default if v is None else int(v)
 
 
+def play_obs_version(meta):
+    """What the net observed in a recorded play (Rust's `known::OBS_VERSION`): 1 the full state of the game (a record without
+    the field, made before the check of 25 Nov 2026), 2 only what its side knows."""
+    v = meta.get("obs_version")
+    return 1 if v is None else int(v)
+
+
 class _AllBut:
     """A set-like `skip` of `train_m.Stream`: every family but `keep` is left out of that file."""
 
@@ -259,7 +266,7 @@ class Anchor:
     A play without `rule_version` counts as version 1 (in `v2_path`: as `v2_unmarked_version` when that is given). A `v2_path` play of another version than the current one is refused.
     The plays of the families in `exclude` are never drawn (they are not checked)."""
 
-    def __init__(self, path, plays, seed, model, exclude=(), v2_path=None, legacy_version=None, v2_unmarked_version=None):
+    def __init__(self, path, plays, seed, model, exclude=(), v2_path=None, legacy_version=None, v2_unmarked_version=None, obs_version=None):
         from aurelia_nn.army import train_m as TM
         from aurelia_nn.army.train import SIEGE, best_teachers, decision_weights
         self.TM = TM
@@ -280,6 +287,7 @@ class Anchor:
         # The plays the anchor draws from: all, or those of the families not in `exclude` (the ones RL does not train).
         self.pool = [i for i, m in enumerate(self.stream.metas) if m["family"] not in set(exclude)]
         self.check_versions(dep, v2_path, legacy_version, v2_unmarked_version)
+        self.check_obs_versions(obs_version)
 
         def fn(m, dev, plan):
             loss, main, aux, parts, accs = TM.run_step(m, dev, plan, self.tm, 0.3)
@@ -304,6 +312,17 @@ class Anchor:
                 f"anchor: rule-dependent plays of another scene rule version than the current {self.current} ({what}). "
                 f"Give the version-{self.current} record as the second source (--anchor-v2), exclude these families "
                 f"(--anchor-exclude), or name the legacy version knowingly (--anchor-legacy-version N, only without --anchor-v2).")
+
+    def check_obs_versions(self, expected):
+        """The plays of one anchor are tokens of ONE observation version (what the net saw when they were recorded): two
+        versions in one anchor, or a version other than `expected` (when given), are refused: a net trained on inputs of the
+        full state is not told what its side knows. The plays' meta carries `obs_version` (unmarked: version 1)."""
+        have = collections.Counter(play_obs_version(self.stream.metas[i]) for i in self.pool)
+        if len(have) > 1:
+            raise SystemExit(f"anchor: plays of different observation versions ({dict(sorted(have.items()))}): record them again under one version")
+        self.obs_version = next(iter(have), expected)
+        if expected is not None and have and self.obs_version != expected:
+            raise SystemExit(f"anchor: the plays were recorded under observation version {self.obs_version}, the run expects {expected}")
 
     def device(self, ids):
         flat = self.stream.flat(ids)
@@ -351,6 +370,7 @@ def main(argv=None):
     ap.add_argument("--anchor-auto", type=float, default=0.0, help="lambda = this x ||g_RL|| / ||g_anchor|| of the first update (one digit); 0: --anchor-w")
     ap.add_argument("--anchor-v2", default=None, help="teacher recordings made under the current scene rule version; the rule-dependent families (guard, convoy: rule_dependent.json) are taken only from it, the rest only from --anchor")
     ap.add_argument("--anchor-v2-unmarked-version", type=int, default=None, help="the version of the plays of --anchor-v2 that have no rule_version in their meta (p7-teach-train.bin: 2, see play_rule_version); without it they count as version 1 and are refused")
+    ap.add_argument("--anchor-obs-version", type=int, default=None, help="the observation version the anchor's plays must carry (1 the full state, 2 what the side knows); without it the plays must agree among themselves")
     ap.add_argument("--anchor-legacy-version", type=int, default=None, help="names the version of the plays of --anchor knowingly (only without --anchor-v2): rule-dependent plays of that version are taken instead of refused")
     ap.add_argument("--anchor-exclude", default="", help="comma-separated families the anchor never draws")
     ap.add_argument("--anchor-plays", type=int, default=32)
@@ -415,7 +435,7 @@ def main(argv=None):
     if a.anchor_v2 and a.anchor_legacy_version is not None:
         raise SystemExit("--anchor-legacy-version is for a single --anchor; with --anchor-v2 the legacy plays are dropped")
     anchor = Anchor(a.anchor, a.anchor_plays, a.seed, model, exclude=tuple(sorted(excl)), v2_path=a.anchor_v2, legacy_version=a.anchor_legacy_version,
-                    v2_unmarked_version=a.anchor_v2_unmarked_version) if a.anchor else None
+                    v2_unmarked_version=a.anchor_v2_unmarked_version, obs_version=a.anchor_obs_version) if a.anchor else None
     curve = {"settings": {k: v for k, v in vars(a).items()}, "bars": {f: list(bars[f]) for f in fams}, "train_plays": {f: len(by_fam[f]) for f in fams_f},
              "held_plays": len(held), "val_plays": len(val), "held": [], "val": [], "updates": []}
     if anchor:

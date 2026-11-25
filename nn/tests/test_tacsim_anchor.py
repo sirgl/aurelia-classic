@@ -137,3 +137,21 @@ def test_a_single_source_without_dependent_families_draws_as_before():
                 want, order = order[:4], order[4:]
                 got = a.draw()
                 assert got == want
+
+
+def test_plays_of_two_observation_versions_are_not_one_anchor():
+    """The net's input changed (obs_version 2: only what its side knows). An anchor holds tokens of ONE observation version:
+    a record without the field counts as version 1 (the full state), two versions together are refused, and a run that
+    names the version it expects refuses plays of another."""
+    with tempfile.TemporaryDirectory() as tmp:
+        duel = _plays(R, 4, only=["duel"])["duel"]
+        v1 = _write(tmp, "v1.bin", duel)
+        v2 = _write(tmp, "v2.bin", [_with_meta(x, obs_version=2) for x in duel])
+        mixed = _write(tmp, "mixed.bin", duel[:2] + [_with_meta(x, obs_version=2) for x in duel[2:]])
+        assert _refused(lambda: _anchor(v1)) is None and _anchor(v1).obs_version == 1
+        assert _refused(lambda: _anchor(v2)) is None and _anchor(v2).obs_version == 2
+        msg = _refused(lambda: _anchor(mixed))
+        assert msg and "different observation versions" in msg, msg
+        assert _refused(lambda: _anchor(v2, obs_version=2)) is None
+        msg = _refused(lambda: _anchor(v1, obs_version=2))
+        assert msg and "observation version 1" in msg, msg

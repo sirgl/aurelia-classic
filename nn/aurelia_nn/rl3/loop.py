@@ -140,7 +140,7 @@ def main(argv=None):
         opt.init(model.trainable_parameters())
         opt.state = tree_unflatten(list(mx.load(os.path.join(a.out, f"{name}.opt.safetensors")).items()))
         print(f"resumed from {name}: update {state['update']}", flush=True)
-    anchor = armyrl.Anchor(a.anchor, a.anchor_plays, a.seed, model, exclude=tuple(x for x in a.anchor_exclude.split(",") if x), v2_path=a.anchor_v2, v2_unmarked_version=2 if a.anchor_v2 else None)
+    anchor = armyrl.Anchor(a.anchor, a.anchor_plays, a.seed, model, exclude=tuple(x for x in a.anchor_exclude.split(",") if x), v2_path=a.anchor_v2, v2_unmarked_version=2 if a.anchor_v2 else None, obs_version=scenes.OBS_VERSION)
     t_run = time.time()
     pending = None  # the overlapped actor: (process, start time, udir)
 

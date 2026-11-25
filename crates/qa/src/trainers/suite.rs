@@ -251,6 +251,11 @@ fn run(rules: &CompiledRuleset, o: &Opts) -> Result<(), String> {
                 if dependent.contains(&r.family) && r.info.get("rule_version").map(String::as_str) != Some(now.to_string().as_str()) {
                     return Err(format!("{} holds {} rows of rule version {} and this run plays version {now}: use a new --out", rows_path.display(), r.family, r.info.get("rule_version").map_or("(none)", String::as_str)));
                 }
+                // The same for what the net observed: its plays of two observation versions are not one set of rows.
+                let obs_now = crate::army_net::known::OBS_VERSION.to_string();
+                if r.player == "army-net" && r.info.get("obs_version").map(String::as_str) != Some(obs_now.as_str()) {
+                    return Err(format!("{} holds army-net rows of observation version {} and this run observes version {obs_now}: use a new --out", rows_path.display(), r.info.get("obs_version").map_or("(none)", String::as_str)));
+                }
                 done_rows.insert((r.family, r.era, r.instance, r.attempt, r.player));
             }
         }

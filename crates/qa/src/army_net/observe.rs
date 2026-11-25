@@ -1,6 +1,11 @@
 //! What the army net sees (DESIGN.md, «Inputs»). Every number is rounded through f16, the precision
 //! the recorder stores, so the player's input equals the training input bit for bit.
 //!
+//! The net sees what its side KNOWS and no more (observation version 2, `known::OBS_VERSION`): this module reads the game
+//! only through `known::Known` (units the side sees, cities in sight or as last sighted, explored tiles, the interface's
+//! combat preview), in every family and in every game, fog or not. It cannot name the full state: the guard test
+//! `tests/army_net_known.rs` fails on a `game.view()` here and, bit for bit, on any input that reads what the side does not know.
+//!
 //! Tokens, in this order: the objective; the units of both sides (ours first, by id); the cities of
 //! both sides. Each token is `F_TOK` numbers (the layout below); `dist` holds the hex distance between
 //! the tokens' tiles (the attention bias). Candidates: the legal actions of one of our units, each
@@ -12,14 +17,12 @@
 //! the map window are the THIRD tokens (`Tokens::third`), read by the net through a separate path. The main stream and
 //! its numbers are exactly the old ones, so a net without the new parts plays as before.
 
-use classic_rules::combat::city::{city_strength, hit_points, max_hit_points, CITY_ATTACK_RANGE};
+use classic_rules::combat::city::CITY_ATTACK_RANGE;
 use classic_rules::ids::{PlayerId, TileId, UnitHandle};
-use classic_rules::knowledge::actions::unit_actions;
-use classic_rules::knowledge::public::PlayerQueries;
-use classic_rules::{ClassicGame, Command, CompiledRuleset, GameState};
-use kernel::navigation::terrain::{is_hills, is_rough};
+use classic_rules::{Command, CompiledRuleset, GameState};
 use kernel::world::unit::{Stance, UnitCore, MOVE_DENOMINATOR};
 
+use super::known::{Known, OwnCity, SeenCity, SeenUnit};
 use super::{base_strength, Orders, AIMS};
 use crate::trainers::act;
 use crate::trainers::lab::{arms_of, Arm, ARMS};
@@ -151,28 +154,7 @@ impl Third {
 /// city-state, an ally (at peace and a defensive pact, a declaration of friendship, or at war with the foe, unless the
 /// foe is the barbarians: every nation is at war with them), at peace.
 pub fn relation(game: &GameState, rules: &CompiledRuleset, side: PlayerId, foe: PlayerId, owner: PlayerId) -> u8 {
-    use classic_rules::world::player::ClassicPlayers;
-    let _ = rules;
-    let auth = game.view().auth;
-    if owner == side {
-        return R_OWN;
-    }
-    if auth.players().is_barbarian(owner) {
-        return R_BARB;
-    }
-    if auth.diplomacy().at_war(side, owner) {
-        return R_WAR;
-    }
-    if auth.players().is_city_state(owner) {
-        return R_CS;
-    }
-    let round = auth.turn().round;
-    let rel = auth.module().relations();
-    let co_belligerent = owner != foe && !auth.players().is_barbarian(foe) && auth.diplomacy().at_war(owner, foe);
-    if co_belligerent || rel.has_pact(side, owner, round) || rel.are_friends(side, owner, round) {
-        return R_ALLY;
-    }
-    R_PEACE
+    Known::new(game, rules, side).relation(foe, owner)
 }
 
 /// Hostile to the side: at war or the barbarians.
@@ -255,14 +237,6 @@ pub fn pause_history(on: bool) {
     HISTORY.with(|h| h.borrow_mut().paused = on);
 }
 
-fn hp_at(game: &GameState, rules: &CompiledRuleset, t: TileId, side: PlayerId) -> Option<(i64, bool)> {
-    let auth = game.view().auth;
-    if let Some(c) = auth.indexes().city_on_tile(t).and_then(|c| auth.cities().get(c)) {
-        return Some((i64::from(hit_points(auth, rules, c)), true));
-    }
-    auth.indexes().units_on(t).iter().filter_map(|h| auth.units().get(*h)).find(|u| u.core.owner != side).map(|u| (i64::from(u.core.hp), false))
-}
-
 /// Before a command of `side`: what the history needs to tell its outcome (None: not an army unit's, or paused).
 pub fn log_before(game: &GameState, rules: &CompiledRuleset, side: PlayerId, cmd: &Command) -> Option<Pre> {
     let orders = HISTORY.with(|h| {
@@ -277,7 +251,8 @@ pub fn log_before(game: &GameState, rules: &CompiledRuleset, side: PlayerId, cmd
         return None;
     }
     let unit = classic_rules::knowledge::actions::acting_unit(cmd)?;
-    let core = *game.view().auth.units().get(unit)?.core;
+    let k = Known::new(game, rules, side);
+    let core = k.own_core(unit)?;
     let slot = orders.army.iter().position(|a| *a == core.id)? as i16;
     let kind = match cmd {
         Command::MoveUnit { .. } | Command::MarchTo { .. } => HK_MOVE,
@@ -287,8 +262,8 @@ pub fn log_before(game: &GameState, rules: &CompiledRuleset, side: PlayerId, cmd
         Command::Fortify { .. } | Command::SetUpRangedAttack { .. } => 4,
         _ => 5,
     };
-    let target = target_tile(game, cmd);
-    let (target_hp, target_city) = match target.and_then(|t| hp_at(game, rules, t, side)) {
+    let target = k.target_tile(cmd);
+    let (target_hp, target_city) = match target.and_then(|t| k.hp_at(t)) {
         Some((hp, city)) => (Some(hp), city),
         None => (None, false),
     };
@@ -302,54 +277,52 @@ pub fn log_after(game: &GameState, rules: &CompiledRuleset, pre: Option<Pre>, ok
         return;
     }
     let Some(orders) = HISTORY.with(|h| h.borrow().orders.clone()) else { return };
-    let auth = game.view().auth;
-    let now = auth.units().get(p.unit).filter(|u| u.core.id == p.id).map(|u| *u.core);
+    let k = Known::new(game, rules, orders.side);
+    let now = k.own_core(p.unit).filter(|c| c.id == p.id);
     let mut f = [0f32; F_HIST];
     f[p.kind] = 1.0;
     let subject = p.target.or(now.map(|c| c.tile)).unwrap_or(p.tile);
-    subject_numbers(game, &orders, subject, &mut f);
+    subject_numbers(&k, &orders, subject, &mut f);
     if let (Some(t), Some(before)) = (p.target, p.target_hp) {
-        let after = hp_at(game, rules, t, orders.side).filter(|(_, city)| *city == p.target_city).map_or(0, |x| x.0);
+        let after = k.hp_at(t).filter(|(_, city)| *city == p.target_city).map_or(0, |x| x.0);
         f[14] = (before - after).max(0) as f32 / 100.0;
-        f[16] = if after == 0 || (p.target_city && auth.indexes().city_on_tile(t).and_then(|c| auth.cities().get(c)).is_some_and(|c| c.owner == orders.side)) { 1.0 } else { 0.0 };
+        f[16] = if after == 0 || (p.target_city && k.city_owner_on(t) == Some(orders.side)) { 1.0 } else { 0.0 };
     }
     f[15] = f32::from(p.hp.saturating_sub(now.map_or(0, |c| c.hp))) / 100.0;
     f[17] = if now.is_none() { 1.0 } else { 0.0 };
-    f[18] = now.map_or(0, |c| dist(game, c.tile, p.tile)) as f32 / 5.0;
+    f[18] = now.map_or(0, |c| k.dist(c.tile, p.tile)) as f32 / 5.0;
     f[19] = if p.target_city { 1.0 } else { 0.0 };
-    let round = auth.turn().round;
+    let round = k.round();
     HISTORY.with(|h| h.borrow_mut().events.push(Event { round, slot: p.slot, f }));
 }
 
-fn subject_numbers(game: &GameState, orders: &Orders, t: TileId, f: &mut [f32; F_HIST]) {
-    let (ox, oy) = col_row(game, orders.tile);
-    let (x, y) = col_row(game, t);
+fn subject_numbers(k: &Known, orders: &Orders, t: TileId, f: &mut [f32; F_HIST]) {
+    let (ox, oy) = k.col_row(orders.tile);
+    let (x, y) = k.col_row(t);
     f[11] = (x - ox) / 12.0;
     f[12] = (y - oy) / 12.0;
-    f[13] = dist(game, t, orders.tile) as f32 / 12.0;
+    f[13] = k.dist(t, orders.tile) as f32 / 12.0;
 }
 
-/// The foes the side sees (all of them where the play is not in the fog).
-fn foes_seen(game: &GameState, rules: &CompiledRuleset, orders: &Orders) -> std::collections::BTreeMap<kernel::ids::EntityId, TileId> {
-    let auth = game.view().auth;
-    let view = game.player_view(rules, orders.side);
-    auth.indexes().units_of(orders.foe).iter().filter_map(|h| auth.units().get(*h)).map(|u| *u.core).filter(|c| !orders.fog || view.sees_unit(c)).map(|c| (c.id, c.tile)).collect()
+/// The foes the side sees.
+fn foes_seen(k: &Known, orders: &Orders) -> std::collections::BTreeMap<kernel::ids::EntityId, TileId> {
+    k.seen_units(orders.foe).into_iter().map(|u| (u.id, u.tile)).collect()
 }
 
-fn army_now(game: &GameState, orders: &Orders) -> std::collections::BTreeMap<kernel::ids::EntityId, (TileId, u16)> {
-    let auth = game.view().auth;
-    auth.indexes().units_of(orders.side).iter().filter_map(|h| auth.units().get(*h)).filter(|u| orders.army.contains(&u.core.id)).map(|u| (u.core.id, (u.core.tile, u.core.hp))).collect()
+fn army_now(k: &Known, orders: &Orders) -> std::collections::BTreeMap<kernel::ids::EntityId, (TileId, u16)> {
+    k.own_units().into_iter().filter(|(_, c)| orders.army.contains(&c.id)).map(|(_, c)| (c.id, (c.tile, c.hp))).collect()
 }
 
 /// Our turn ends: what the enemy's events will be told against.
 pub fn note_turn_end(game: &GameState, rules: &CompiledRuleset) {
     let Some(orders) = HISTORY.with(|h| h.borrow().orders.clone()) else { return };
-    let snap = (game.view().auth.turn().round, army_now(game, &orders), foes_seen(game, rules, &orders));
+    let k = Known::new(game, rules, orders.side);
+    let snap = (k.round(), army_now(&k, &orders), foes_seen(&k, &orders));
     HISTORY.with(|h| h.borrow_mut().end = Some(snap));
 }
 
 /// The enemy's events since our last turn's end (at the first look of our turn).
-fn note_enemy_events(game: &GameState, rules: &CompiledRuleset, round: u32) {
+fn note_enemy_events(k: &Known, round: u32) {
     let Some((orders, end)) = HISTORY.with(|h| {
         let mut h = h.borrow_mut();
         let o = h.orders.clone()?;
@@ -358,12 +331,10 @@ fn note_enemy_events(game: &GameState, rules: &CompiledRuleset, round: u32) {
         return;
     };
     let (_, army, seen) = end;
-    let now_army = army_now(game, &orders);
-    let now_seen = foes_seen(game, rules, &orders);
-    let foe_cities: Vec<TileId> = {
-        let auth = game.view().auth;
-        auth.indexes().cities_of(orders.foe).iter().filter_map(|c| auth.cities().get(*c)).map(|c| c.tile).collect()
-    };
+    let now_army = army_now(k, &orders);
+    let now_seen = foes_seen(k, &orders);
+    // The foe's cities the side knows (in sight, or as last sighted).
+    let foe_cities: Vec<TileId> = k.foreign_cities(orders.foe).into_iter().map(|c| c.tile).collect();
     let mut events = Vec::new();
     for (id, (tile, hp)) in &army {
         let after = now_army.get(id);
@@ -374,10 +345,10 @@ fn note_enemy_events(game: &GameState, rules: &CompiledRuleset, round: u32) {
         let mut f = [0f32; F_HIST];
         f[HK_HIT] = 1.0;
         let t = after.map_or(*tile, |x| x.0);
-        subject_numbers(game, &orders, t, &mut f);
+        subject_numbers(k, &orders, t, &mut f);
         f[15] = f32::from(lost) / 100.0;
         f[17] = if after.is_none() { 1.0 } else { 0.0 };
-        f[19] = if foe_cities.iter().any(|c| dist(game, *c, t) <= CITY_ATTACK_RANGE) { 1.0 } else { 0.0 };
+        f[19] = if foe_cities.iter().any(|c| k.dist(*c, t) <= CITY_ATTACK_RANGE) { 1.0 } else { 0.0 };
         let slot = orders.army.iter().position(|a| a == id).map_or(-1, |s| s as i16);
         events.push(Event { round, slot, f });
     }
@@ -385,7 +356,7 @@ fn note_enemy_events(game: &GameState, rules: &CompiledRuleset, round: u32) {
         if !seen.contains_key(id) {
             let mut f = [0f32; F_HIST];
             f[HK_SEEN] = 1.0;
-            subject_numbers(game, &orders, *t, &mut f);
+            subject_numbers(k, &orders, *t, &mut f);
             events.push(Event { round, slot: -1, f });
         }
     }
@@ -393,7 +364,7 @@ fn note_enemy_events(game: &GameState, rules: &CompiledRuleset, round: u32) {
         if !now_seen.contains_key(id) {
             let mut f = [0f32; F_HIST];
             f[HK_GONE] = 1.0;
-            subject_numbers(game, &orders, *t, &mut f);
+            subject_numbers(k, &orders, *t, &mut f);
             events.push(Event { round, slot: -1, f });
         }
     }
@@ -499,24 +470,23 @@ pub fn reset_history() {
 }
 
 /// The first look of a round: this turn's start becomes the remembered one.
-fn remember_turn_start(game: &GameState, field: &Field, round: u32) {
+fn remember_turn_start(field: &Field, round: u32) {
     HISTORY.with(|h| {
         let mut h = h.borrow_mut();
         if h.round == Some(round) {
             return;
         }
-        let now: std::collections::BTreeMap<_, _> = field.own.iter().chain(&field.foes).map(|u| (u.id, (u.tile, u.hp))).collect();
+        let now: std::collections::BTreeMap<_, _> = field.own.iter().map(|u| (u.id, (u.tile, u.hp))).chain(field.foes.iter().map(|u| (u.id, (u.tile, u.hp)))).collect();
         h.prev = std::mem::replace(&mut h.this, now);
         h.round = Some(round);
-        let _ = game;
     });
 }
 
 /// The first look of a round (the history's enemy events).
-fn first_look(game: &GameState, rules: &CompiledRuleset, round: u32) {
+fn first_look(k: &Known, round: u32) {
     let new = HISTORY.with(|h| h.borrow().round != Some(round));
     if new {
-        note_enemy_events(game, rules, round);
+        note_enemy_events(k, round);
     }
 }
 
@@ -526,7 +496,7 @@ fn history_off() -> bool {
     *OFF.get_or_init(|| std::env::var_os("ARMY_NET_NO_HISTORY").is_some())
 }
 
-fn since_last_turn(u: &UnitCore) -> (f32, f32) {
+fn since_last_turn(u: &Nums) -> (f32, f32) {
     if history_off() {
         return (0.0, 0.0);
     }
@@ -605,76 +575,83 @@ fn round_all(v: &mut [f32]) {
     }
 }
 
-fn dist(game: &GameState, a: TileId, b: TileId) -> i32 {
-    game.view().auth.map().dimensions.distance(a, b).unwrap_or(99)
+/// A unit's numbers as the side knows them: its own (all of them), or another player's (what the game shows of it:
+/// kind, tile, owner and hit points; its private numbers read as those of a fresh unit that has not moved or struck).
+#[derive(Debug, Clone, Copy)]
+struct Nums {
+    handle: UnitHandle,
+    id: kernel::ids::EntityId,
+    tile: TileId,
+    owner: PlayerId,
+    kind: classic_rules::ids::UnitKindId,
+    hp: u16,
+    moves_left: u16,
+    moves_max: u16,
+    attacks_made: u8,
+    fortified: bool,
+    set_up: bool,
+    level: u8,
+    experience: u32,
 }
 
-/// Column and row of a tile (offset coordinates of the map).
-fn col_row(game: &GameState, t: TileId) -> (f32, f32) {
-    let w = game.view().auth.map().dimensions.width as u32;
-    ((t.0 % w) as f32, (t.0 / w) as f32)
+impl Nums {
+    fn own(handle: UnitHandle, c: &UnitCore) -> Nums {
+        Nums { handle, id: c.id, tile: c.tile, owner: c.owner, kind: c.kind, hp: c.hp, moves_left: c.moves_left, moves_max: c.moves_max, attacks_made: c.attacks_made, fortified: matches!(c.stance, Stance::Fortified { .. }), set_up: matches!(c.stance, Stance::SetUp), level: c.level, experience: c.experience }
+    }
+
+    fn seen(rules: &CompiledRuleset, u: &SeenUnit) -> Nums {
+        let moves_max = (rules.units[u.kind.0 as usize].movement as u16).saturating_mul(MOVE_DENOMINATOR);
+        Nums { handle: u.handle, id: u.id, tile: u.tile, owner: u.owner, kind: u.kind, hp: u.hp, moves_left: moves_max, moves_max, attacks_made: 0, fortified: false, set_up: false, level: 1, experience: 0 }
+    }
 }
 
-/// The facts about the two sides that every token and candidate reads, gathered once per moment.
+/// The facts about the two sides that every token and candidate reads, gathered once per moment, all of them as the
+/// side knows them (`Known`).
 struct Field {
-    own: Vec<UnitCore>,
-    foes: Vec<UnitCore>,
-    foe_cities: Vec<TileId>,
-    own_cities: Vec<TileId>,
-    /// The third parties' units (with their relation; the fog families: those seen) and cities.
-    third: Vec<(UnitCore, u8)>,
-    third_cities: Vec<(TileId, u8)>,
+    own: Vec<Nums>,
+    foes: Vec<Nums>,
+    foe_cities: Vec<SeenCity>,
+    own_cities: Vec<OwnCity>,
+    /// The third parties' units the side sees (with their relation) and the cities it knows.
+    third: Vec<(Nums, u8)>,
+    third_cities: Vec<(SeenCity, u8)>,
 }
 
 impl Field {
-    fn gather(game: &GameState, rules: &CompiledRuleset, orders: &Orders) -> Field {
-        let auth = game.view().auth;
-        let units_of = |p: PlayerId| -> Vec<UnitCore> {
-            let mut v: Vec<UnitCore> = auth.indexes().units_of(p).iter().filter_map(|h| auth.units().get(*h)).map(|u| *u.core).collect();
-            v.sort_by_key(|c| c.id);
-            v
-        };
-        let cities_of = |p: PlayerId| -> Vec<TileId> {
-            let mut v: Vec<TileId> = auth.indexes().cities_of(p).iter().filter_map(|c| auth.cities().get(*c)).map(|c| c.tile).collect();
-            v.sort_by_key(|t| t.0);
-            v
-        };
-        let mut foes = units_of(orders.foe);
-        let others: Vec<PlayerId> = (0..auth.players().count() as u8).map(PlayerId).filter(|p| *p != orders.side && *p != orders.foe).collect();
-        let mut third: Vec<(UnitCore, u8)> = Vec::new();
-        let mut third_cities: Vec<(TileId, u8)> = Vec::new();
-        for p in &others {
-            let units = units_of(*p);
-            let cities = cities_of(*p);
+    fn gather(k: &Known, orders: &Orders) -> Field {
+        let rules = k.rules();
+        let own: Vec<Nums> = k.own_units().iter().map(|(h, c)| Nums::own(*h, c)).collect();
+        let foes: Vec<Nums> = k.seen_units(orders.foe).iter().map(|u| Nums::seen(rules, u)).collect();
+        let mut third: Vec<(Nums, u8)> = Vec::new();
+        let mut third_cities: Vec<(SeenCity, u8)> = Vec::new();
+        for p in (0..k.player_count()).map(PlayerId).filter(|p| *p != orders.side && *p != orders.foe) {
+            let units = k.seen_units(p);
+            let cities = k.foreign_cities(p);
             if units.is_empty() && cities.is_empty() {
                 continue;
             }
-            let r = relation(game, rules, orders.side, orders.foe, *p);
-            third.extend(units.into_iter().map(|u| (u, r)));
+            let r = k.relation(orders.foe, p);
+            third.extend(units.iter().map(|u| (Nums::seen(rules, u), r)));
             third_cities.extend(cities.into_iter().map(|c| (c, r)));
         }
-        if orders.fog {
-            let view = game.player_view(rules, orders.side);
-            foes.retain(|c| view.sees_unit(c));
-            third.retain(|(c, _)| view.sees_unit(c));
-        }
         third.sort_by_key(|(c, _)| c.id);
-        third_cities.sort_by_key(|(t, _)| t.0);
-        Field { own: units_of(orders.side), foes, foe_cities: cities_of(orders.foe), own_cities: cities_of(orders.side), third, third_cities }
+        third_cities.sort_by_key(|(c, _)| c.tile.0);
+        Field { own, foes, foe_cities: k.foreign_cities(orders.foe), own_cities: k.own_cities(), third, third_cities }
     }
 
     /// The third parties' military units at war with the side (their threat enters the extras, not the old numbers).
-    fn war_third<'a>(&'a self, rules: &'a CompiledRuleset) -> impl Iterator<Item = &'a UnitCore> + 'a {
+    fn war_third<'a>(&'a self, rules: &'a CompiledRuleset) -> impl Iterator<Item = &'a Nums> + 'a {
         self.third.iter().filter(move |(u, r)| hostile(*r) && !act::is_civilian(rules, u.kind)).map(|(u, _)| u)
     }
 
     /// The third parties' war threat on tile `t`: (reach it next turn, adjacent, the nearest's distance).
-    fn war_third_threat(&self, game: &GameState, rules: &CompiledRuleset, t: TileId) -> (i32, i32, i32) {
+    fn war_third_threat(&self, k: &Known, t: TileId) -> (i32, i32, i32) {
+        let rules = k.rules();
         let mut reach = 0;
         let mut adj = 0;
         let mut near = 30;
         for u in self.war_third(rules) {
-            let d = dist(game, u.tile, t);
+            let d = k.dist(u.tile, t);
             if d <= act::moves_of(rules, u.kind) + act::range_of(rules, u.kind).unwrap_or(1) {
                 reach += 1;
             }
@@ -686,33 +663,35 @@ impl Field {
         (reach, adj, near)
     }
 
-    fn military_foes<'a>(&'a self, rules: &'a CompiledRuleset) -> impl Iterator<Item = &'a UnitCore> + 'a {
+    fn military_foes<'a>(&'a self, rules: &'a CompiledRuleset) -> impl Iterator<Item = &'a Nums> + 'a {
         self.foes.iter().filter(move |u| !act::is_civilian(rules, u.kind))
     }
 
     /// Foe military units that could strike `t` in their next turn (move + reach).
-    fn threat(&self, game: &GameState, rules: &CompiledRuleset, t: TileId) -> i32 {
-        self.military_foes(rules).filter(|u| dist(game, u.tile, t) <= act::moves_of(rules, u.kind) + act::range_of(rules, u.kind).unwrap_or(1)).count() as i32
+    fn threat(&self, k: &Known, t: TileId) -> i32 {
+        let rules = k.rules();
+        self.military_foes(rules).filter(|u| k.dist(u.tile, t) <= act::moves_of(rules, u.kind) + act::range_of(rules, u.kind).unwrap_or(1)).count() as i32
     }
 
-    fn nearest_foe(&self, game: &GameState, rules: &CompiledRuleset, t: TileId) -> i32 {
-        self.military_foes(rules).map(|u| dist(game, u.tile, t)).min().unwrap_or(30)
+    fn nearest_foe(&self, k: &Known, t: TileId) -> i32 {
+        self.military_foes(k.rules()).map(|u| k.dist(u.tile, t)).min().unwrap_or(30)
     }
 
-    fn adjacent(&self, game: &GameState, rules: &CompiledRuleset, t: TileId, except: Option<kernel::ids::EntityId>) -> (i32, i32) {
-        let foes = self.military_foes(rules).filter(|u| dist(game, u.tile, t) == 1).count() as i32;
-        let friends = self.own.iter().filter(|u| Some(u.id) != except && !act::is_civilian(rules, u.kind) && dist(game, u.tile, t) <= 1).count() as i32;
+    fn adjacent(&self, k: &Known, t: TileId, except: Option<kernel::ids::EntityId>) -> (i32, i32) {
+        let rules = k.rules();
+        let foes = self.military_foes(rules).filter(|u| k.dist(u.tile, t) == 1).count() as i32;
+        let friends = self.own.iter().filter(|u| Some(u.id) != except && !act::is_civilian(rules, u.kind) && k.dist(u.tile, t) <= 1).count() as i32;
         (foes, friends)
     }
 
-    fn in_city_fire(&self, game: &GameState, t: TileId) -> bool {
-        self.foe_cities.iter().any(|c| dist(game, *c, t) <= CITY_ATTACK_RANGE)
+    fn in_city_fire(&self, k: &Known, t: TileId) -> bool {
+        self.foe_cities.iter().any(|c| k.dist(c.tile, t) <= CITY_ATTACK_RANGE)
     }
 
-    fn refuge_distance(&self, game: &GameState, orders: &Orders, t: TileId) -> i32 {
+    fn refuge_distance(&self, k: &Known, orders: &Orders, t: TileId) -> i32 {
         match orders.refuge {
-            Some(r) => dist(game, r, t),
-            None => self.own_cities.iter().map(|c| dist(game, *c, t)).min().unwrap_or(30),
+            Some(r) => k.dist(r, t),
+            None => self.own_cities.iter().map(|c| k.dist(c.tile, t)).min().unwrap_or(30),
         }
     }
 }
@@ -727,14 +706,18 @@ pub fn arm_slot(rules: &CompiledRuleset, kind: classic_rules::ids::UnitKindId) -
     base.and_then(|a| ARMS.iter().position(|x| x == a)).unwrap_or(ARMS.len())
 }
 
-/// The tokens of the moment for `orders.side`.
+/// The tokens of the moment for `orders.side`, from what the side knows.
 pub fn tokens(game: &GameState, rules: &CompiledRuleset, orders: &Orders) -> Tokens {
-    let field = Field::gather(game, rules, orders);
-    let auth = game.view().auth;
-    let round = auth.turn().round;
-    first_look(game, rules, round);
-    remember_turn_start(game, &field, round);
-    let (ox, oy) = col_row(game, orders.tile);
+    build_tokens(&Known::new(game, rules, orders.side), orders)
+}
+
+fn build_tokens(k: &Known, orders: &Orders) -> Tokens {
+    let rules = k.rules();
+    let field = Field::gather(k, orders);
+    let round = k.round();
+    first_look(k, round);
+    remember_turn_start(&field, round);
+    let (ox, oy) = k.col_row(orders.tile);
     let (hist, hist_slot, hist_age) = history_tokens(round);
     let mut t = Tokens { feat: Vec::new(), dist: Vec::new(), selectable: Vec::new(), unit: Vec::new(), tile: Vec::new(), pos: Vec::new(), price: orders.price, hist, hist_slot, hist_age, xfeat: Vec::new(), third: Third::default() };
     // The objective.
@@ -745,7 +728,7 @@ pub fn tokens(game: &GameState, rules: &CompiledRuleset, orders: &Orders) -> Tok
     f[7 + AIMS] = left as f32 / 30.0;
     f[8 + AIMS] = orders.rounds as f32 / 30.0;
     f[9 + AIMS] = if orders.optional { 1.0 } else { 0.0 };
-    let own_army: Vec<&UnitCore> = field.own.iter().filter(|u| orders.army.contains(&u.id)).collect();
+    let own_army: Vec<&Nums> = field.own.iter().filter(|u| orders.army.contains(&u.id)).collect();
     f[10 + AIMS] = own_army.len() as f32 / 8.0;
     f[11 + AIMS] = field.military_foes(rules).count() as f32 / 8.0;
     f[12 + AIMS] = own_army.iter().map(|u| f32::from(u.hp)).sum::<f32>() / 800.0;
@@ -755,22 +738,20 @@ pub fn tokens(game: &GameState, rules: &CompiledRuleset, orders: &Orders) -> Tok
     t.selectable.push(false);
     t.unit.push(None);
     t.tile.push(orders.tile);
-    let view = game.player_view(rules, orders.side);
-    let foe_rel = relation(game, rules, orders.side, orders.foe, orders.foe);
+    let foe_rel = k.relation(orders.foe, orders.foe);
     // Units: ours, then theirs.
     for (own, list) in [(true, &field.own), (false, &field.foes)] {
         for u in list.iter() {
             if t.len() >= T_MAX {
                 break;
             }
-            let Some(h) = auth.indexes().units_on(u.tile).iter().copied().find(|h| auth.units().get(*h).is_some_and(|x| x.core.id == u.id)) else { continue };
-            let promotable = own && orders.army.contains(&u.id) && !view.promotions_available(h).is_empty();
+            let promotable = own && orders.army.contains(&u.id) && k.promotions_available(u.handle);
             // A ranged unit set up (or with no moves left) may still shoot this turn.
             let may_shoot = act::range_of(rules, u.kind).is_some() && u.attacks_made == 0;
             let selectable = own && orders.army.contains(&u.id) && (u.moves_left > 0 || promotable || may_shoot);
             let mut f = [0f32; F_TOK];
             f[if own { TOK_OWN } else { TOK_FOE }] = 1.0;
-            unit_features(game, rules, orders, &field, u, own, if own { orders.side } else { orders.foe }, promotable, (ox, oy), &mut f);
+            unit_features(k, orders, &field, u, own, promotable, (ox, oy), &mut f);
             f[42] = if selectable { 1.0 } else { 0.0 };
             let (gained, moved) = since_last_turn(u);
             f[46] = gained;
@@ -778,7 +759,7 @@ pub fn tokens(game: &GameState, rules: &CompiledRuleset, orders: &Orders) -> Tok
             let mut x = [0f32; X_TOK];
             x[usize::from(if own { R_OWN } else { foe_rel })] = 1.0;
             if own {
-                let (reach, adj, near) = field.war_third_threat(game, rules, u.tile);
+                let (reach, adj, near) = field.war_third_threat(k, u.tile);
                 x[6] = reach as f32 / 4.0;
                 x[7] = adj as f32 / 3.0;
                 x[8] = near as f32 / 12.0;
@@ -786,25 +767,24 @@ pub fn tokens(game: &GameState, rules: &CompiledRuleset, orders: &Orders) -> Tok
             t.feat.push(f);
             t.xfeat.push(x);
             t.selectable.push(selectable);
-            t.unit.push(Some(h));
+            t.unit.push(Some(u.handle));
             t.tile.push(u.tile);
         }
     }
     // Cities.
-    for (own, list) in [(true, &field.own_cities), (false, &field.foe_cities)] {
+    for (own, list) in [(true, field.own_cities.iter().map(|c| CityNums::own(c)).collect::<Vec<_>>()), (false, field.foe_cities.iter().map(CityNums::seen).collect::<Vec<_>>())] {
         for c in list.iter() {
             if t.len() >= T_MAX {
                 break;
             }
-            let Some(city) = auth.indexes().city_on_tile(*c).and_then(|h| auth.cities().get(h)) else { continue };
-            let f = city_features(game, rules, orders, city, *c, own, (ox, oy));
+            let f = city_features(k, orders, c, own, (ox, oy));
             let mut x = [0f32; X_TOK];
             x[usize::from(if own { R_OWN } else { foe_rel })] = 1.0;
             t.feat.push(f);
             t.xfeat.push(x);
             t.selectable.push(false);
             t.unit.push(None);
-            t.tile.push(*c);
+            t.tile.push(c.tile);
         }
     }
     for f in t.feat.iter_mut() {
@@ -818,34 +798,53 @@ pub fn tokens(game: &GameState, rules: &CompiledRuleset, orders: &Orders) -> Tok
     t.dist = vec![0; n * n];
     for i in 0..n {
         for j in 0..n {
-            t.dist[i * n + j] = dist(game, t.tile[i], t.tile[j]).clamp(0, i32::from(D_MAX)) as u8;
+            t.dist[i * n + j] = k.dist(t.tile[i], t.tile[j]).clamp(0, i32::from(D_MAX)) as u8;
         }
     }
-    t.third = third_tokens(game, rules, orders, &field, &t, (ox, oy));
+    t.third = third_tokens(k, orders, &field, &t, (ox, oy));
     t
 }
 
+/// A city's numbers as the side knows them: its own (all), another player's (the owner's population, the health bar
+/// in sight; the strength and whether it struck are not shown: they read as an unhurt city that may still strike).
+#[derive(Debug, Clone, Copy)]
+struct CityNums {
+    tile: TileId,
+    population: u32,
+    health: f32,
+    strength: i64,
+    struck: bool,
+}
+
+impl CityNums {
+    fn own(c: &OwnCity) -> CityNums {
+        CityNums { tile: c.tile, population: c.population, health: c.health, strength: c.strength, struck: c.struck }
+    }
+
+    fn seen(c: &SeenCity) -> CityNums {
+        CityNums { tile: c.tile, population: c.population, health: c.health.unwrap_or(1.0), strength: 0, struck: false }
+    }
+}
+
 /// A city's token numbers (`own`: the side's; else number 45 is 0).
-fn city_features(game: &GameState, rules: &CompiledRuleset, orders: &Orders, city: &classic_rules::world::city::CityCore, c: TileId, own: bool, (ox, oy): (f32, f32)) -> [f32; F_TOK] {
-    let auth = game.view().auth;
+fn city_features(k: &Known, orders: &Orders, city: &CityNums, own: bool, (ox, oy): (f32, f32)) -> [f32; F_TOK] {
     let mut f = [0f32; F_TOK];
     f[TOK_CITY] = 1.0;
-    let (x, y) = col_row(game, c);
+    let (x, y) = k.col_row(city.tile);
     f[4] = (x - ox) / 12.0;
     f[5] = (y - oy) / 12.0;
-    f[6] = dist(game, c, orders.tile) as f32 / 12.0;
-    f[7] = f32::from(hit_points(auth, rules, city)) / f32::from(max_hit_points(auth, rules, city).max(1));
-    f[11] = city_strength(auth, rules, city) as f32 / 100.0 / orders.mean_strength;
-    f[12] = if city.strike_made { 0.0 } else { 1.0 };
-    f[43] = if c == orders.tile { 1.0 } else { 0.0 };
+    f[6] = k.dist(city.tile, orders.tile) as f32 / 12.0;
+    f[7] = city.health;
+    f[11] = city.strength as f32 / 100.0 / orders.mean_strength;
+    f[12] = if city.struck { 0.0 } else { 1.0 };
+    f[43] = if city.tile == orders.tile { 1.0 } else { 0.0 };
     f[44] = city.population as f32 / 10.0;
     f[45] = if own { 1.0 } else { 0.0 };
     f
 }
 
 /// The third tokens of the moment (`Third`): in the window, nearest to the objective first, within the budget.
-fn third_tokens(game: &GameState, rules: &CompiledRuleset, orders: &Orders, field: &Field, main: &Tokens, origin: (f32, f32)) -> Third {
-    let auth = game.view().auth;
+fn third_tokens(k: &Known, orders: &Orders, field: &Field, main: &Tokens, origin: (f32, f32)) -> Third {
     let budget = X_CAP.min(FIELD_BUDGET.saturating_sub(main.len()));
     let mut out = Third::default();
     if budget == 0 {
@@ -853,32 +852,31 @@ fn third_tokens(game: &GameState, rules: &CompiledRuleset, orders: &Orders, fiel
     }
     // (distance to the objective, unit 0 / city 1, order key, index).
     let mut pick: Vec<(i32, u8, u64, usize)> = Vec::new();
-    for (k, (u, _)) in field.third.iter().enumerate() {
+    for (i, (u, _)) in field.third.iter().enumerate() {
         if orders.window.index(u.tile).is_some() {
-            pick.push((dist(game, u.tile, orders.tile), 0, u.id.0, k));
+            pick.push((k.dist(u.tile, orders.tile), 0, u.id.0, i));
         }
     }
-    for (k, (c, _)) in field.third_cities.iter().enumerate() {
-        if orders.window.index(*c).is_some() {
-            pick.push((dist(game, *c, orders.tile), 1, u64::from(c.0), k));
+    for (i, (c, _)) in field.third_cities.iter().enumerate() {
+        if orders.window.index(c.tile).is_some() {
+            pick.push((k.dist(c.tile, orders.tile), 1, u64::from(c.tile.0), i));
         }
     }
     pick.sort_unstable();
     pick.truncate(budget);
-    for (_, kind, _, k) in pick {
+    for (_, kind, _, i) in pick {
         let (f, tile, r) = if kind == 0 {
-            let (u, r) = &field.third[k];
+            let (u, r) = &field.third[i];
             let mut f = [0f32; F_TOK];
             f[TOK_FOE] = 1.0;
-            unit_features(game, rules, orders, field, u, false, u.owner, false, origin, &mut f);
+            unit_features(k, orders, field, u, false, false, origin, &mut f);
             let (gained, moved) = since_last_turn(u);
             f[46] = gained;
             f[47] = moved;
             (f, u.tile, *r)
         } else {
-            let (c, r) = field.third_cities[k];
-            let Some(city) = auth.indexes().city_on_tile(c).and_then(|h| auth.cities().get(h)) else { continue };
-            (city_features(game, rules, orders, city, c, false, origin), c, r)
+            let (c, r) = &field.third_cities[i];
+            (city_features(k, orders, &CityNums::seen(c), false, origin), c.tile, *r)
         };
         let mut f = f;
         round_all(&mut f);
@@ -893,20 +891,21 @@ fn third_tokens(game: &GameState, rules: &CompiledRuleset, orders: &Orders, fiel
     out.dist = vec![0; n * m];
     for i in 0..n {
         for j in 0..m {
-            out.dist[i * m + j] = dist(game, main.tile[i], out.tile[j]).clamp(0, i32::from(D_MAX)) as u8;
+            out.dist[i * m + j] = k.dist(main.tile[i], out.tile[j]).clamp(0, i32::from(D_MAX)) as u8;
         }
     }
     out
 }
 
 #[allow(clippy::too_many_arguments)]
-fn unit_features(game: &GameState, rules: &CompiledRuleset, orders: &Orders, field: &Field, u: &UnitCore, own: bool, owner: PlayerId, promotable: bool, (ox, oy): (f32, f32), f: &mut [f32; F_TOK]) {
-    let auth = game.view().auth;
+fn unit_features(k: &Known, orders: &Orders, field: &Field, u: &Nums, own: bool, promotable: bool, (ox, oy): (f32, f32), f: &mut [f32; F_TOK]) {
+    let rules = k.rules();
     let d = &rules.units[u.kind.0 as usize];
-    let (x, y) = col_row(game, u.tile);
+    let (x, y) = k.col_row(u.tile);
+    let ground = k.ground(u.tile).unwrap_or_default();
     f[4] = (x - ox) / 12.0;
     f[5] = (y - oy) / 12.0;
-    f[6] = dist(game, u.tile, orders.tile) as f32 / 12.0;
+    f[6] = k.dist(u.tile, orders.tile) as f32 / 12.0;
     f[7] = f32::from(u.hp) / 100.0;
     f[8] = if u.moves_max > 0 { f32::from(u.moves_left) / f32::from(u.moves_max) } else { 0.0 };
     f[9] = f32::from(u.moves_max) / f32::from(MOVE_DENOMINATOR) / 5.0;
@@ -915,30 +914,30 @@ fn unit_features(game: &GameState, rules: &CompiledRuleset, orders: &Orders, fie
     f[12] = f32::from(d.ranged_strength) / orders.mean_strength;
     f[13] = act::range_of(rules, u.kind).unwrap_or(0) as f32 / 3.0;
     f[14 + arm_slot(rules, u.kind)] = 1.0;
-    f[27] = if matches!(u.stance, Stance::Fortified { .. }) { 1.0 } else { 0.0 };
-    f[28] = if matches!(u.stance, Stance::SetUp) { 1.0 } else { 0.0 };
-    f[29] = if d.domain == classic_rules::rules::content::Domain::Land && auth.map().is_water(u.tile) { 1.0 } else { 0.0 };
+    f[27] = if u.fortified { 1.0 } else { 0.0 };
+    f[28] = if u.set_up { 1.0 } else { 0.0 };
+    f[29] = if d.domain == classic_rules::rules::content::Domain::Land && ground.water { 1.0 } else { 0.0 };
     f[30] = f32::from(u.level) / 5.0;
     f[31] = u.experience as f32 / 60.0;
     f[32] = if promotable { 1.0 } else { 0.0 };
-    f[33] = act::defence(game, rules, u.tile, owner) as f32 / 100.0;
-    f[34] = if is_hills(auth.map(), u.tile) { 1.0 } else { 0.0 };
-    f[35] = if is_rough(rules, auth.map(), u.tile) { 1.0 } else { 0.0 };
+    f[33] = k.defence(u.tile, u.owner) as f32 / 100.0;
+    f[34] = if ground.hills { 1.0 } else { 0.0 };
+    f[35] = if ground.rough { 1.0 } else { 0.0 };
     if own {
-        f[36] = if field.in_city_fire(game, u.tile) { 1.0 } else { 0.0 };
-        let (foes, friends) = field.adjacent(game, rules, u.tile, Some(u.id));
+        f[36] = if field.in_city_fire(k, u.tile) { 1.0 } else { 0.0 };
+        let (foes, friends) = field.adjacent(k, u.tile, Some(u.id));
         f[37] = foes as f32 / 3.0;
         f[38] = friends as f32 / 3.0;
-        f[39] = field.threat(game, rules, u.tile) as f32 / 4.0;
-        f[40] = field.nearest_foe(game, rules, u.tile) as f32 / 12.0;
-        f[41] = field.refuge_distance(game, orders, u.tile) as f32 / 12.0;
+        f[39] = field.threat(k, u.tile) as f32 / 4.0;
+        f[40] = field.nearest_foe(k, u.tile) as f32 / 12.0;
+        f[41] = field.refuge_distance(k, orders, u.tile) as f32 / 12.0;
     } else {
         // The foe's view of the same: our units next to it, our units that reach it.
-        let near_own = field.own.iter().filter(|o| !act::is_civilian(rules, o.kind) && dist(game, o.tile, u.tile) == 1).count();
+        let near_own = field.own.iter().filter(|o| !act::is_civilian(rules, o.kind) && k.dist(o.tile, u.tile) == 1).count();
         f[37] = near_own as f32 / 3.0;
-        let reach = field.own.iter().filter(|o| !act::is_civilian(rules, o.kind) && dist(game, o.tile, u.tile) <= act::moves_of(rules, o.kind) + act::range_of(rules, o.kind).unwrap_or(1)).count();
+        let reach = field.own.iter().filter(|o| !act::is_civilian(rules, o.kind) && k.dist(o.tile, u.tile) <= act::moves_of(rules, o.kind) + act::range_of(rules, o.kind).unwrap_or(1)).count();
         f[39] = reach as f32 / 4.0;
-        f[40] = field.own.iter().filter(|o| !act::is_civilian(rules, o.kind)).map(|o| dist(game, o.tile, u.tile)).min().unwrap_or(30) as f32 / 12.0;
+        f[40] = field.own.iter().filter(|o| !act::is_civilian(rules, o.kind)).map(|o| k.dist(o.tile, u.tile)).min().unwrap_or(30) as f32 / 12.0;
     }
 }
 
@@ -948,18 +947,21 @@ fn pos_of(orders: &Orders, t: TileId) -> i16 {
 
 /// The legal actions of our unit `unit` now, with their features; "done" first.
 pub fn candidates(game: &GameState, rules: &CompiledRuleset, orders: &Orders, unit: UnitHandle) -> Vec<Candidate> {
+    build_candidates(&Known::new(game, rules, orders.side), orders, unit)
+}
+
+fn build_candidates(k: &Known, orders: &Orders, unit: UnitHandle) -> Vec<Candidate> {
     let mut out = Vec::new();
-    let Some(me) = act::core_of(game, unit) else { return out };
-    let field = Field::gather(game, rules, orders);
-    let here = Spot::of(game, rules, orders, &field, &me, me.tile);
-    let mut done = Candidate { feat: [0.0; F_ACT], x: cand_extras(game, rules, orders, &field, me.tile, None), promo: 0, pos: pos_of(orders, me.tile), action: Action::Done };
+    let Some(me) = k.own_core(unit) else { return out };
+    let field = Field::gather(k, orders);
+    let here = Spot::of(k, orders, &field, &me, me.tile);
+    let mut done = Candidate { feat: [0.0; F_ACT], x: cand_extras(k, orders, &field, me.tile, None), promo: 0, pos: pos_of(orders, me.tile), action: Action::Done };
     done.feat[Kind::Done as usize] = 1.0;
     here.write(&here, &mut done.feat);
     out.push(done);
-    let Some((near, _)) = game.ai_local_observation(rules, orders.side, unit, RADIUS) else { return out };
-    let reach = act::reachable(game, rules, orders.side, unit);
-    for cmd in unit_actions(&near) {
-        let Some(c) = candidate(game, rules, orders, &field, &me, &here, &reach, cmd) else { continue };
+    let Some((commands, reach)) = k.legal(unit, RADIUS) else { return out };
+    for cmd in commands {
+        let Some(c) = candidate(k, orders, &field, (unit, &me), &here, &reach, cmd) else { continue };
         out.push(c);
     }
     for c in out.iter_mut() {
@@ -971,26 +973,17 @@ pub fn candidates(game: &GameState, rules: &CompiledRuleset, orders: &Orders, un
 
 /// A candidate's extras (`X_ACT`): the relation of the strike's target (`target`: its owner) and "declares war", the
 /// third parties' war threat on the candidate's tile `t`.
-fn cand_extras(game: &GameState, rules: &CompiledRuleset, orders: &Orders, field: &Field, t: TileId, target: Option<PlayerId>) -> [f32; X_ACT] {
+fn cand_extras(k: &Known, orders: &Orders, field: &Field, t: TileId, target: Option<PlayerId>) -> [f32; X_ACT] {
     let mut x = [0f32; X_ACT];
     if let Some(owner) = target {
-        let r = relation(game, rules, orders.side, orders.foe, owner);
+        let r = k.relation(orders.foe, owner);
         x[usize::from(r)] = 1.0;
         x[X_DECLARES] = if hostile(r) || r == R_OWN { 0.0 } else { 1.0 };
     }
-    let (reach, adj, _) = field.war_third_threat(game, rules, t);
+    let (reach, adj, _) = field.war_third_threat(k, t);
     x[7] = reach as f32 / 4.0;
     x[8] = adj as f32 / 3.0;
     x
-}
-
-/// The owner of what a strike at `t` hits: the city's, else the first unit's not of the side.
-fn target_owner(game: &GameState, orders: &Orders, t: TileId) -> Option<PlayerId> {
-    let auth = game.view().auth;
-    if let Some(c) = auth.indexes().city_on_tile(t).and_then(|c| auth.cities().get(c)) {
-        return Some(c.owner);
-    }
-    auth.indexes().units_on(t).iter().filter_map(|h| auth.units().get(*h)).map(|u| u.core.owner).find(|o| *o != orders.side)
 }
 
 /// The facts of one tile for one of our units.
@@ -1013,27 +1006,27 @@ struct Spot {
 }
 
 impl Spot {
-    fn of(game: &GameState, rules: &CompiledRuleset, orders: &Orders, field: &Field, me: &UnitCore, t: TileId) -> Spot {
-        let auth = game.view().auth;
-        let (x, y) = col_row(game, t);
-        let (ux, uy) = col_row(game, me.tile);
-        let (adj_foes, adj_friends) = field.adjacent(game, rules, t, Some(me.id));
+    fn of(k: &Known, orders: &Orders, field: &Field, me: &UnitCore, t: TileId) -> Spot {
+        let (x, y) = k.col_row(t);
+        let (ux, uy) = k.col_row(me.tile);
+        let (adj_foes, adj_friends) = field.adjacent(k, t, Some(me.id));
+        let ground = k.ground(t).unwrap_or_default();
         Spot {
             tile: t,
             dq: x - ux,
             dr: y - uy,
-            defence: act::defence(game, rules, t, orders.side) as f32,
-            hills: is_hills(auth.map(), t),
-            rough: is_rough(rules, auth.map(), t),
-            city_fire: field.in_city_fire(game, t),
+            defence: k.defence(t, orders.side) as f32,
+            hills: ground.hills,
+            rough: ground.rough,
+            city_fire: field.in_city_fire(k, t),
             adj_foes,
             adj_friends,
-            threat: field.threat(game, rules, t),
-            nearest_foe: field.nearest_foe(game, rules, t),
-            objective: dist(game, t, orders.tile),
-            refuge: field.refuge_distance(game, orders, t),
+            threat: field.threat(k, t),
+            nearest_foe: field.nearest_foe(k, t),
+            objective: k.dist(t, orders.tile),
+            refuge: field.refuge_distance(k, orders, t),
             on_objective: t == orders.tile,
-            own_land: auth.map().owner(t).flatten() == Some(orders.side),
+            own_land: k.own_land(t),
         }
     }
 
@@ -1074,19 +1067,8 @@ fn kind_of(cmd: &Command) -> Option<Kind> {
     })
 }
 
-/// The tile an attack command aims at.
-fn target_tile(game: &GameState, cmd: &Command) -> Option<TileId> {
-    let auth = game.view().auth;
-    match *cmd {
-        Command::AttackUnit { defender, .. } => auth.units().get(defender).map(|u| u.core.tile),
-        Command::AttackCity { city, .. } => auth.cities().get(city).map(|c| c.tile),
-        Command::RangedAttack { target, .. } | Command::AirSweep { target, .. } => Some(target),
-        _ => None,
-    }
-}
-
 #[allow(clippy::too_many_arguments)]
-fn candidate(game: &GameState, rules: &CompiledRuleset, orders: &Orders, field: &Field, me: &UnitCore, here: &Spot, reach: &[(TileId, u16)], cmd: Command) -> Option<Candidate> {
+fn candidate(k: &Known, orders: &Orders, field: &Field, (unit, me): (UnitHandle, &UnitCore), here: &Spot, reach: &[(TileId, u16)], cmd: Command) -> Option<Candidate> {
     let kind = kind_of(&cmd)?;
     let mut f = [0f32; F_ACT];
     f[kind as usize] = 1.0;
@@ -1095,12 +1077,12 @@ fn candidate(game: &GameState, rules: &CompiledRuleset, orders: &Orders, field: 
     let mut target = None;
     match &cmd {
         Command::MoveUnit { destination, .. } => {
-            let spot = Spot::of(game, rules, orders, field, me, *destination);
+            let spot = Spot::of(k, orders, field, me, *destination);
             spot.write(here, &mut f);
             subject = *destination;
             let left = reach.iter().find(|(t, _)| t == destination).map_or(0, |(_, l)| *l);
             f[27] = if me.moves_max > 0 { f32::from(left) / f32::from(me.moves_max) } else { 0.0 };
-            let (blow, count) = blows_from(game, rules, field, me, *destination);
+            let (blow, count) = blows_from(k, field, (unit, me), *destination);
             f[28] = blow;
             f[29] = count as f32 / 3.0;
         }
@@ -1109,51 +1091,44 @@ fn candidate(game: &GameState, rules: &CompiledRuleset, orders: &Orders, field: 
             here.write(here, &mut f);
         }
         Command::AttackUnit { .. } | Command::AttackCity { .. } | Command::RangedAttack { .. } | Command::AirSweep { .. } => {
-            let t = target_tile(game, &cmd)?;
+            let t = k.target_tile(&cmd)?;
             subject = t;
-            target = target_owner(game, orders, t);
-            let spot = Spot::of(game, rules, orders, field, me, t);
+            target = k.target_owner(t);
+            let spot = Spot::of(k, orders, field, me, t);
             spot.write(here, &mut f);
-            strike_features(game, rules, orders, me, t, &mut f);
+            strike_features(k, orders, (unit, me), t, &mut f);
         }
         _ => here.write(here, &mut f),
     }
-    Some(Candidate { feat: f, x: cand_extras(game, rules, orders, field, subject, target), promo, pos: pos_of(orders, subject), action: Action::Command(cmd) })
-}
-
-fn field_unit(game: &GameState, me: &UnitCore) -> Option<UnitHandle> {
-    let auth = game.view().auth;
-    auth.indexes().units_on(me.tile).iter().copied().find(|h| auth.units().get(*h).is_some_and(|u| u.core.id == me.id))
+    Some(Candidate { feat: f, x: cand_extras(k, orders, field, subject, target), promo, pos: pos_of(orders, subject), action: Action::Command(cmd) })
 }
 
 /// The best blow `me` could deal from `from` (dealt over the defender's hit points, 1 = a kill) and how
-/// many foes it could strike there.
-fn blows_from(game: &GameState, rules: &CompiledRuleset, field: &Field, me: &UnitCore, from: TileId) -> (f32, i32) {
-    let Some(h) = field_unit(game, me) else { return (0.0, 0) };
-    let reach = act::range_of(rules, me.kind).unwrap_or(1);
+/// many foes it could strike there: the foes the side sees, by the interface's combat preview.
+fn blows_from(k: &Known, field: &Field, (unit, me): (UnitHandle, &UnitCore), from: TileId) -> (f32, i32) {
+    let reach = act::range_of(k.rules(), me.kind).unwrap_or(1);
     let mut best = 0f32;
     let mut count = 0;
     for foe in field.foes.iter() {
-        if dist(game, foe.tile, from) > reach {
+        if k.dist(foe.tile, from) > reach {
             continue;
         }
         count += 1;
-        if let Some((dealt, _, hp)) = act::preview(game, rules, h, Some(from), foe.tile) {
+        if let Some((dealt, _, hp)) = k.preview(unit, Some(from), foe.tile) {
             best = best.max((dealt as f32 / (hp.max(1)) as f32).min(1.0));
         }
     }
     for c in field.foe_cities.iter() {
-        if dist(game, *c, from) <= reach {
+        if k.dist(c.tile, from) <= reach {
             count += 1;
         }
     }
     (best, count)
 }
 
-fn strike_features(game: &GameState, rules: &CompiledRuleset, orders: &Orders, me: &UnitCore, t: TileId, f: &mut [f32; F_ACT]) {
-    let auth = game.view().auth;
-    let Some(h) = field_unit(game, me) else { return };
-    match act::preview(game, rules, h, None, t) {
+fn strike_features(k: &Known, orders: &Orders, (unit, me): (UnitHandle, &UnitCore), t: TileId, f: &mut [f32; F_ACT]) {
+    let rules = k.rules();
+    match k.preview(unit, None, t) {
         Some((dealt, taken, hp)) => {
             f[30] = dealt as f32 / 100.0;
             f[31] = taken as f32 / 100.0;
@@ -1163,12 +1138,12 @@ fn strike_features(game: &GameState, rules: &CompiledRuleset, orders: &Orders, m
         }
         None => f[39] = 1.0,
     }
-    if let Some(u) = auth.indexes().units_on(t).iter().filter_map(|x| auth.units().get(*x)).find(|u| u.core.owner != orders.side) {
-        f[35] = if act::range_of(rules, u.core.kind).is_some() { 1.0 } else { 0.0 };
-        f[36] = if act::is_civilian(rules, u.core.kind) { 1.0 } else { 0.0 };
-        f[38] = base_strength(rules, u.core.kind) / orders.mean_strength;
+    if let Some(u) = k.seen_unit_on(t) {
+        f[35] = if act::range_of(rules, u.kind).is_some() { 1.0 } else { 0.0 };
+        f[36] = if act::is_civilian(rules, u.kind) { 1.0 } else { 0.0 };
+        f[38] = base_strength(rules, u.kind) / orders.mean_strength;
     }
-    if auth.indexes().city_on_tile(t).is_some() {
+    if k.city_owner_on(t).is_some() {
         f[37] = 1.0;
     }
 }

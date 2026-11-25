@@ -149,7 +149,7 @@ pub fn start(rules: &CompiledRuleset, game: &GameState, scene: &Scene, orders: &
     let o = json!({
         "aim": orders.aim.index(), "tile": orders.tile.0, "refuge": orders.refuge.map_or(-1, |t| t.0 as i64),
         "optional": orders.optional, "start_round": orders.start_round, "rounds": orders.rounds, "army": army,
-        "mean_strength": orders.mean_strength, "fog": orders.fog, "price": orders.price,
+        "mean_strength": orders.mean_strength, "fog": orders.fog, "price": orders.price, "obs_version": super::known::OBS_VERSION,
         "statics": hex16(&orders.statics), "map_window": [orders.window.q0, orders.window.r0, orders.window.map_w, orders.window.map_h],
         "window": [q0, r0, w, map_w], "far_cities": far, "city_handles": city_handles,
         "promos": track.promos().iter().map(|p| p.0).collect::<Vec<u16>>(),

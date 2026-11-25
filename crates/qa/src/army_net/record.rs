@@ -574,7 +574,7 @@ pub fn close(row: Option<&crate::trainers::Row>) {
         return;
     };
     let rule_version = row.info.get("rule_version").and_then(|v| v.parse::<u8>().ok());
-    let mut meta = serde_json::json!({"family": row.family, "era": row.era, "instance": row.instance, "attempt": row.attempt, "player": row.player, "win": row.win, "rounds": row.rounds, "measures": row.measures, "rule_version": rule_version});
+    let mut meta = serde_json::json!({"family": row.family, "era": row.era, "instance": row.instance, "attempt": row.attempt, "player": row.player, "win": row.win, "rounds": row.rounds, "measures": row.measures, "rule_version": rule_version, "obs_version": super::known::OBS_VERSION});
     // Sampling mode (`army_net::sample`): the copy and the net's own log-probs of its sampled decisions.
     if let Some(serde_json::Value::Object(h)) = super::sample::header() {
         for (k, v) in h {

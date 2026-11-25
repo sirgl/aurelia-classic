@@ -33,3 +33,33 @@ def test_selection_falls_back_to_the_start():
     from aurelia_nn.rl3.select_ckpt import pick
     t = [{"update": 0, "drops": [], "mean": 0.70}, {"update": 50, "drops": ["siege"], "mean": 0.80}]
     assert pick(t)["update"] == 0
+
+
+def refused(fn, *args):
+    try:
+        fn(*args)
+    except SystemExit:
+        return True
+    return False
+
+
+def test_records_of_the_full_state_are_refused():
+    from aurelia_nn.rl3.learner import refuse_obs_versions
+    refuse_obs_versions([{"obs_version": 2}, {"obs_version": 2}])
+    for bad in ({}, {"obs_version": 1}):
+        assert refused(refuse_obs_versions, [{"obs_version": 2}, bad])
+
+
+def test_lengths_rows_of_the_full_state_are_refused():
+    import json
+    import tempfile
+    from pathlib import Path
+    from aurelia_nn.rl3.scenes import Pool
+    d = Path(tempfile.mkdtemp())
+    kept, rows = d / "k.jsonl", d / "r.jsonl"
+    kept.write_text(json.dumps({"family": "duel", "era": "classical", "instance": 1, "attempt": 0}) + "\n")
+    row = {"player": "army-net", "family": "duel", "era": "classical", "instance": 1, "attempt": 0, "rounds": 5, "win": True}
+    rows.write_text(json.dumps(dict(row, info={"obs_version": "2"})) + "\n")
+    assert Pool(str(kept), str(rows)).families == ["duel"]
+    rows.write_text(json.dumps(row) + "\n")
+    assert refused(Pool, str(kept), str(rows))

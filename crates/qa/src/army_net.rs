@@ -10,6 +10,7 @@
 //! - `model`: the forward pass in f32 on the CPU, weights exported from MLX (`army/export.py`).
 //! - `seat`: the player `army-net` of `ai-exam suite`.
 
+pub mod known;
 pub mod map_conv;
 pub mod model;
 pub mod obsdump;
@@ -89,7 +90,7 @@ pub struct Orders {
     pub rounds: u32,
     /// The units the net commands (our military scene pieces).
     pub army: Vec<EntityId>,
-    /// The mean base strength of the scene's military units (melee or ranged, whichever is higher):
+    /// The mean base strength of our military units and of the foes the side sees at the start (melee or ranged, whichever is higher):
     /// strengths enter the net relative to it, so every era reads alike.
     pub mean_strength: f32,
     /// The map window of the encoder (variant B), around the arena's centre.
@@ -98,7 +99,9 @@ pub struct Orders {
     pub statics: Vec<f32>,
     /// The window's relation planes (`[tile][S_REL]`, `statics_rel_of`): the third parties' land by relation at the start.
     pub statics_rel: Vec<f32>,
-    /// The memory families (`trainers::memory`): the tokens hold only the foes our side sees.
+    /// A label of the scene: the family hides the foe at the start (memory, air-recon, the look and history families).
+    /// It no longer changes what the net sees: every family shows the net only what its side knows (`known`); the
+    /// label is written into the observation dump and the reports.
     pub fog: bool,
     /// The stake (`price_of`): the capture's worth in units / 8, the time pressure, "given".
     pub price: [f32; 3],
@@ -209,67 +212,19 @@ impl MapWindow {
 
 /// The static planes of the window: on the map, hills, mountain, water, rough, defence (ours), a river on
 /// a side, road, owned by us, owned by the foe, an improvement, a citadel's damage, the objective, the
-/// refuge, our city, the foe's city.
+/// refuge, our city, the foe's city. Over the tiles the side has explored, as it last saw them (`Known::statics`); an
+/// unexplored tile has only "on the map" and the objective and refuge marks.
 pub fn statics_of(rules: &CompiledRuleset, game: &GameState, win: &MapWindow, side: PlayerId, foe: PlayerId, objective: TileId, refuge: Option<TileId>) -> Vec<f32> {
-    use kernel::navigation::terrain::{is_hills, is_mountain, is_rough};
-    let auth = game.view().auth;
-    let map = auth.map();
-    let mut v = vec![0f32; W * W * S_CH];
-    for i in 0..W * W {
-        let Some(t) = win.tile(i) else { continue };
-        let f = &mut v[i * S_CH..(i + 1) * S_CH];
-        let owner = map.owner(t).flatten();
-        let city = auth.indexes().city_on_tile(t).and_then(|c| auth.cities().get(c)).map(|c| c.owner);
-        let citadel = map.improvement(t).flatten().filter(|_| !map.pillaged(t)).and_then(|x| rules.improvements.get(x.0 as usize)).is_some_and(|d| d.nearby_enemy_damage > 0);
-        let river = map.dimensions.neighbors(t).into_iter().any(|n| map.river_between(t, n));
-        let flags = [true, is_hills(map, t), is_mountain(map, t), map.is_water(t), is_rough(rules, map, t)];
-        for (k, b) in flags.iter().enumerate() {
-            f[k] = f32::from(u8::from(*b));
-        }
-        f[5] = observe::f16_round(act::defence(game, rules, t, side) as f32 / 100.0);
-        f[6] = f32::from(u8::from(river));
-        f[7] = f32::from(u8::from(map.road(t)));
-        f[8] = f32::from(u8::from(owner == Some(side)));
-        f[9] = f32::from(u8::from(owner == Some(foe)));
-        f[10] = f32::from(u8::from(map.working_improvement(t).is_some()));
-        f[11] = f32::from(u8::from(citadel));
-        f[12] = f32::from(u8::from(t == objective));
-        f[13] = f32::from(u8::from(Some(t) == refuge));
-        f[14] = f32::from(u8::from(city == Some(side)));
-        f[15] = f32::from(u8::from(city == Some(foe)));
-    }
-    v
+    known::Known::new(game, rules, side).statics(win, foe, objective, refuge)
 }
 
 /// The relation planes of the window (typed tokens, step 1.5): the land of a third party (a player other than `side` and
 /// `foe`) by its relation to `side` (`observe::relation`): an ally, a nation at peace, at war, a city-state, the
 /// barbarians; and a third party's city. The planes "ours" and "the foe's" stay in `statics_of` (8, 9, 14, 15). The
 /// relations are the start's, as the ownership planes; a declaration of war later shows in the tokens' relation.
+/// Over the explored tiles only (`Known::statics_rel`).
 pub fn statics_rel_of(rules: &CompiledRuleset, game: &GameState, win: &MapWindow, side: PlayerId, foe: PlayerId) -> Vec<f32> {
-    let auth = game.view().auth;
-    let map = auth.map();
-    let mut v = vec![0f32; W * W * S_REL];
-    for i in 0..W * W {
-        let Some(t) = win.tile(i) else { continue };
-        let f = &mut v[i * S_REL..(i + 1) * S_REL];
-        if let Some(owner) = map.owner(t).flatten().filter(|o| *o != side && *o != foe) {
-            let r = observe::relation(game, rules, side, foe, owner);
-            let k = match r {
-                observe::R_ALLY => Some(0),
-                observe::R_PEACE => Some(1),
-                observe::R_WAR => Some(2),
-                observe::R_CS => Some(3),
-                observe::R_BARB => Some(4),
-                _ => None,
-            };
-            if let Some(k) = k {
-                f[k] = 1.0;
-            }
-        }
-        let city = auth.indexes().city_on_tile(t).and_then(|c| auth.cities().get(c)).map(|c| c.owner);
-        f[5] = f32::from(u8::from(city.is_some_and(|o| o != side && o != foe)));
-    }
-    v
+    known::Known::new(game, rules, side).statics_rel(win, foe)
 }
 
 impl Orders {
@@ -282,7 +237,10 @@ impl Orders {
             _ => scene.target.or(scene.hold).or(scene.refuge).unwrap_or(scene.centre),
         };
         let army: Vec<EntityId> = scene.mine.iter().filter(|p| in_army(rules, p.kind)).map(|p| p.id).collect();
-        let strengths: Vec<f32> = scene.mine.iter().chain(&scene.theirs).filter(|p| !act::is_civilian(rules, p.kind)).map(|p| base_strength(rules, p.kind)).collect();
+        // The normaliser reads the army and the foes the side sees (a foe in the fog is not in it): the kind of a piece is
+        // known only when the piece is our own or in sight.
+        let k = known::Known::new(game, rules, scene.learner);
+        let strengths: Vec<f32> = scene.mine.iter().chain(&scene.theirs).filter_map(|p| k.kind_if_known(p.h, p.id)).filter(|kind| !act::is_civilian(rules, *kind)).map(|kind| base_strength(rules, kind)).collect();
         let mean_strength = if strengths.is_empty() { 1.0 } else { strengths.iter().sum::<f32>() / strengths.len() as f32 };
         let optional = scene.fam == Fam::Prey && scene.info.get("expected").is_some_and(|e| e == "either");
         let start_round = game.view().auth.turn().round;

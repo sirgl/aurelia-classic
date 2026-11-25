@@ -21,6 +21,7 @@ from mlx.utils import tree_flatten, tree_map
 
 from aurelia_nn.army import train_m as TM
 from aurelia_nn.army.model_m import PLANS, SLOTS
+from aurelia_nn.tacsim import armyrl
 from aurelia_nn.army.train_m import DEC_KEYS, NOTE_LABELS, PAD, UNROLL_KEYS, body_any, hist_mask, hist_rows, map_feats_rows, plan_batch, unroll_one_n
 
 U_DIM = 16
@@ -66,6 +67,18 @@ def lost_slots(flat):
     return [i for i, p in enumerate(flat.ptr) if p >= 0 and slot[flat.tok_off[i] + p] < 0]
 
 
+OBS_VERSION = 2   # Rust's `known::OBS_VERSION`: the net observes only what its side knows
+
+
+def refuse_obs_versions(plays):
+    """The learner reads records of ONE observation version, the honest one (2). A record of version 1 (or unmarked) holds tokens of the full
+    state of the game: a net trained on them is not told what its side knows."""
+    bad = collections.Counter(armyrl.play_obs_version(m) for m in plays)
+    bad.pop(OBS_VERSION, None)
+    if bad:
+        raise SystemExit(f"learner: records of observation version {dict(sorted(bad.items()))} (plays per version), the learner reads version {OBS_VERSION} only")
+
+
 class Batch:
     """The device arrays of the plays of a step: decisions, plan, advantages, the maps."""
 
@@ -73,6 +86,7 @@ class Batch:
         ids = list(range(len(stream))) if ids is None else ids
         self.tm = max(stream.t_max, 1)
         self.flat = flat = stream.flat(ids)
+        refuse_obs_versions(flat.plays)
         lost = lost_slots(flat)
         if lost:
             raise ValueError(f"{len(lost)} decisions of the record pick a unit without an army slot (first: {lost[:5]}): the record's ids were read after the command")

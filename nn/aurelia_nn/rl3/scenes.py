@@ -4,6 +4,7 @@ import collections
 import json
 import random
 
+OBS_VERSION = 2   # Rust's `known::OBS_VERSION`: the net observes only what its side knows
 ERAS = ["ancient", "classical", "medieval", "renaissance", "industrial", "modern", "atomic", "information"]
 
 
@@ -21,6 +22,9 @@ class Pool:
             r = json.loads(line)
             if r.get("player") != "army-net":
                 continue
+            v = int((r.get("info") or {}).get("obs_version", 1))
+            if v != OBS_VERSION:
+                raise SystemExit(f"scenes: the lengths rows were played under observation version {v} (family {r['family']}); the loop reads version {OBS_VERSION} only")
             key = (r["family"], r["era"], r["instance"], r["attempt"])
             self.length[key] = max(int(r["rounds"]), 1)
             self.start_win[r["family"]][0] += int(bool(r["win"]))
