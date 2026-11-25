@@ -266,7 +266,7 @@ class Anchor:
     A play without `rule_version` counts as version 1 (in `v2_path`: as `v2_unmarked_version` when that is given). A `v2_path` play of another version than the current one is refused.
     The plays of the families in `exclude` are never drawn (they are not checked)."""
 
-    def __init__(self, path, plays, seed, model, exclude=(), v2_path=None, legacy_version=None, v2_unmarked_version=None, obs_version=None):
+    def __init__(self, path, plays, seed, model, exclude=(), v2_path=None, legacy_version=None, v2_unmarked_version=None, obs_version=None, boost=None):
         from aurelia_nn.army import train_m as TM
         from aurelia_nn.army.train import SIEGE, best_teachers, decision_weights
         self.TM = TM
@@ -279,6 +279,7 @@ class Anchor:
         self.best, _ = best_teachers(self.stream.metas)
         self.decision_weights = decision_weights
         self.up = set(SIEGE) | {"ambush-fog", "hunt-fog"}
+        self.boost = dict(boost or {})   # family -> factor of its plays' decision weights in the anchor batch (on top of `up`'s 2)
         self.tm = self.stream.t_max
         self.plays = plays
         self.rng = random.Random(seed * 7919 + 1)
@@ -327,7 +328,7 @@ class Anchor:
     def device(self, ids):
         flat = self.stream.flat(ids)
         w = self.decision_weights(flat, self.best, 0.1, 2.0)
-        w = [x * (2.0 if flat.plays[p]["family"] in self.up else 1.0) for x, p in zip(w, flat.play)]
+        w = [x * (2.0 if flat.plays[p]["family"] in self.up else 1.0) * self.boost.get(flat.plays[p]["family"], 1.0) for x, p in zip(w, flat.play)]
         w = [0.0 if pt < -1 else x for x, pt in zip(w, flat.ptr)]
         return self.TM.DeviceM(flat, w, self.tm, 128)
 

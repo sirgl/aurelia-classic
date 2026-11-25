@@ -82,6 +82,14 @@ def save_state(a, model, opt, state, name):
     os.replace(os.path.join(d, "latest.json.tmp"), os.path.join(d, "latest.json"))
 
 
+def parse_boost(text):
+    """'siege,ram:3' -> {'siege': 3.0, 'ram': 3.0}; '' -> {}."""
+    if not text:
+        return {}
+    fams, factor = text.rsplit(":", 1)
+    return {f: float(factor) for f in fams.split(",") if f}
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", required=True)
@@ -94,6 +102,7 @@ def main(argv=None):
     ap.add_argument("--anchor-plays", type=int, default=32)
     ap.add_argument("--anchor-auto", type=float, default=3.0, help="lambda = this x ||g_RL|| / ||g_anchor|| of update 1 (one digit); 0: --anchor-w")
     ap.add_argument("--anchor-w", type=float, default=0.1)
+    ap.add_argument("--anchor-boost", default="", help="FAMILY,FAMILY,...:FACTOR the anchor's decision weights of these families are multiplied by FACTOR (on top of the existing 2 of the siege families)")
     ap.add_argument("--anchor-exclude", default="", help="comma-separated families the anchor never draws")
     ap.add_argument("--P", type=int, default=96)
     ap.add_argument("--G", type=int, default=8)
@@ -140,7 +149,7 @@ def main(argv=None):
         opt.init(model.trainable_parameters())
         opt.state = tree_unflatten(list(mx.load(os.path.join(a.out, f"{name}.opt.safetensors")).items()))
         print(f"resumed from {name}: update {state['update']}", flush=True)
-    anchor = armyrl.Anchor(a.anchor, a.anchor_plays, a.seed, model, exclude=tuple(x for x in a.anchor_exclude.split(",") if x), v2_path=a.anchor_v2, v2_unmarked_version=2 if a.anchor_v2 else None, obs_version=scenes.OBS_VERSION)
+    anchor = armyrl.Anchor(a.anchor, a.anchor_plays, a.seed, model, exclude=tuple(x for x in a.anchor_exclude.split(",") if x), v2_path=a.anchor_v2, v2_unmarked_version=2 if a.anchor_v2 else None, obs_version=scenes.OBS_VERSION, boost=parse_boost(a.anchor_boost))
     t_run = time.time()
     pending = None  # the overlapped actor: (process, start time, udir)
 
