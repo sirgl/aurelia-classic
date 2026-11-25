@@ -1,6 +1,6 @@
-//! The "where to look" families (Roman, 24 Nov: "for aircraft you must look where they will strike. Or a sudden attack on another
-//! city"): the danger arises OUTSIDE the area of the current operation and the right move needs a timely look there. The win rules,
-//! the gates and the design decisions are fixed in work/nets/trainers-hist/GATES.md ("G7 (look)") before the first run.
+//! The "where to look" families (the requirement: for aircraft the army must look where they will strike, or where a
+//! sudden attack on another city will come from): the danger arises OUTSIDE the area of the current operation and the right move needs a timely look there. The win rules,
+//! the gates and the design decisions were fixed before the first run.
 //!
 //! Every family has an OPERATION (our army besieges an enemy walled city 5 tiles east, or our ships / fighters are on a task), a
 //! THREAT outside it, and two kinds of teacher:

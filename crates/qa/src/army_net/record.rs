@@ -19,7 +19,7 @@
 //! C × F_ACT f16 | C u16 promotion + 1 | T i16 window index | C i16 window index | T i16 army slot (-1: none) |
 //! TRACK i16 the teacher's own state | H u16 | H × F_HIST f16 history tokens | H i16 their army slot | H u8 their
 //! age` (version 4, `"ARM4"`; version 3 ends at the track). Version 2 (`"ARMP"`) had no slots and no track, and 0 for the flags.
-//! Version 5 (`"ARM5"`, typed tokens and the third parties, `work/nets/net-types/GATES.md` "gate T1"): after the static
+//! Version 5 (`"ARM5"`, typed tokens and the third parties, gate T1 of the typed-token plan): after the static
 //! planes `W × W × S_REL f16` relation planes; a decision ends with `T × X_TOK f16 the tokens' extras | C × X_ACT f16 the
 //! candidates' extras | X u16 | X × F_TOK f16 the third tokens | X × X_TOK f16 their extras | X i16 their window index |
 //! T × X u8 distances main token -> third token`. T + X is the decision's field token count.

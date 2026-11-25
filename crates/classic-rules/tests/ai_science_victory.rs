@@ -236,7 +236,7 @@ fn the_space_finish_ai_builds_the_project_in_the_strong_city() {
 
 /// `tall-real` (`ai::tall_real`) plans its spaceship as `space-finish` does where the science
 /// victory fits the game: the capital busy with a building takes the project. Parts built and not
-/// installed by the end lost victories to the plain march order (tuning log, work/nets/tall).
+/// installed by the end lost victories to the plain march order (tuning log, the tall lane's notes).
 #[cfg(feature = "experimental-ai")]
 #[test]
 fn tall_real_plans_its_spaceship() {

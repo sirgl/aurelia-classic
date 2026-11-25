@@ -1,4 +1,4 @@
-//! Typed tokens and the third parties in the army net's input (step 1.5, `work/nets/net-types/GATES.md` "gate T1"):
+//! Typed tokens and the third parties in the army net's input (step 1.5, gate T1 of the typed-token plan):
 //! a net converted to the typed code (the new encoders copies of the unit's, every new output zero) plays as the old
 //! net, also after a game the old net saved in the middle of a third-party scene is loaded: the game through the save
 //! format, the memory through its sidecar (format 1, unchanged), the third parties' tokens and their relations rebuilt

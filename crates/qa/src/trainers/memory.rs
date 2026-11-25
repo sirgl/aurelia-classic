@@ -1,4 +1,4 @@
-//! The memory trainers (work/nets/army-net/M-HANDOFF.md, proof (c)): the right act depends on something the
+//! The memory trainers (the memory-net handoff, proof (c)): the right act depends on something the
 //! army saw earlier and does not see now. These families play in the fog: each side sees what its units and
 //! cities see (the rules' sight: units 2, cities 3, hills, mountains and forests shut the line), and the army
 //! net's tokens hold only the foes our side sees (`army_net::Orders::fog`).

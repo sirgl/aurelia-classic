@@ -1,7 +1,7 @@
 //! The science flow's levers of `net2` (`science-flow` only, `TurnBrief::science_flow`): the share of the science
 //! specialists' slots filled (`weights::SCIENTISTS`), the rivals a research agreement with pays our race and the cadence
 //! of the ladder to it (`weights::AGREEMENT`), and the gold their agreements need until a partner lets it wait too long
-//! (`r::CHEST_WAIT`, from `plan::ScienceMemory`) (work/nets/science-flow/SCIENCE-FLOW.md). The executors read
+//! (`r::CHEST_WAIT`, from `plan::ScienceMemory`) (the science-flow lane's notes). The executors read
 //! `plan::Science`; nothing here moves a citizen or proposes a deal.
 
 use crate::ai::strategy_net::{Intent, Milli};

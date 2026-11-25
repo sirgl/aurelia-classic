@@ -1,4 +1,4 @@
-//! The army net (`work/nets/army-net/DESIGN.md`): a learned policy that conducts the army of one side
+//! The army net (the army-net design note): a learned policy that conducts the army of one side
 //! for a turn, unit decision by unit decision, toward an objective given from above. A MEASUREMENT
 //! tool of the trainers (`ai-exam suite`, classic/docs/ai-trainers.md): it changes no rule and no AI.
 //!

@@ -34,7 +34,7 @@ old `standard` has no such section and loads as `net2` with an empty memory.
 | Standard speed, offsets 1852–1853 | 400 | 68.6 % | 202 / 82 | 8 / 3 (offset 1853: 6 / 0) |
 | duel | — | 48.8 % (parity) | — | — |
 
-Gates of round 5 that failed as written (Roman decides on accepting them): the exam lost A5 mild, A6 medium, D3
+Gates of round 5 that failed as written (the owner decides on accepting them): the exam lost A5 mild, A6 medium, D3
 strong and HMO5 mild; A5 `nobody_attacked` 0.863 against a gate of 0.861 (a diagnostic, not a goal); HD8
 `script_white_peace` 0.70 against a gate of 0.5.
 
@@ -42,7 +42,7 @@ strong and HMO5 mild; A5 `nobody_attacked` 0.863 against a gate of 0.861 (a diag
 
 Old build: the merge of `ai/net2` into main (`ai/promote-net2` bfe8966) before the promotion commit. New build: the
 promotion commit. Whole games: `ai-tournament --candidate standard --baseline pre-net2 --suite pace` on the new build,
-fresh offsets (not in `work/nets/STATE.md` nor in any gates file); shares pooled with `work/nets/tools/victory-share.py`.
+fresh offsets (not in the STATE lane's notes.md` nor in any gates file); shares pooled with the tools lane's notes.
 Every run goes through `work/res/res`.
 
 | gate | what | pass |
@@ -54,15 +54,15 @@ Every run goes through `work/res/res`.
 | P4 | AI ms p50 a turn, from P1's games | ≤ 1.15 × `pre-net2`'s; p95 reported |
 | P5 | `cargo nextest run --profile full` with `experimental-ai` and without it, the doc tests, platform client + kernel + render; the fast tier's budget (`tools/test-budget.py`) | all green; every re-pin named with its reason |
 | P6 | the game built without `experimental-ai` plays `net2`: `ai_experimental_off` pinned on the feature-on game of `net2` | green |
-| P7 | the bench quick: `bench.py run --clone work/nets/promote-net2 --candidate standard --baseline pre-net2 --level quick --parallel 2` | reported |
+| P7 | the bench quick: `bench.py run --clone <clone> --candidate standard --baseline pre-net2 --level quick --parallel 2` | reported |
 | P8 | a save made by today's main build loads into the promoted build and plays on | the game goes on, no panic |
 
-The results are in `work/nets/promote-net2/PROMOTE.md`.
+The results are in the promote-net2 lane's notes.
 
 ## The stack that declares war stays a menace (lane `capitals`, 23 November)
 
 The promotion's P2 failed by capitals lost at Standard speed (8 against 5, 1.6×). Six capitals lost by `standard` were
-traced (`work/nets/capitals`, `NET2_TRACE` and a scratch trace of `defence::watch`, not kept). In each the
+traced (the capitals lane's notes, `NET2_TRACE` and a scratch trace of `defence::watch`, not kept). In each the
 rival's army stood at our cities at peace, `menace` read it (R11), and on the turn the rival declared war R11 was set to
 0: it was read at peace only. With it the military price's tilt (800 · max menace), the guard (1200 · the stack's
 menace) and the defence posture's term (1500 · max menace) fell to 0, and war weariness pushed the tilt below zero.
@@ -72,7 +72,7 @@ guard 0; the capital fell at r183. The fix reads R11 at war as well (`rival_inpu
 `ai_net2_inputs::the_stack_that_declares_war_stays_a_menace` (read from the game, the menace, the max menace and the
 defence term hold across the declaration; it fails with R11 read at peace only).
 
-Whole games, `standard` against `pre-net2`, Standard speed (gates in `work/nets/capitals/GATES.md`, written before the
+Whole games, `standard` against `pre-net2`, Standard speed (gates in the capitals lane's notes, written before the
 acceptance run):
 
 | run | games | capitals lost | victory-weighted share |
@@ -103,4 +103,4 @@ them off (`TurnBrief::science_flow`; the input is 0 and the memory writes no byt
 
 The chest is released by the net: `r::CHEST_WAIT` (the rounds the chest held a partner's gold unsigned, over
 `gate::CHEST_WAIT_ROUNDS`) lowers `AGREEMENT` until the rival is no tie. The look, the measurements and the gates are in
-`work/nets/science-flow/SCIENCE-FLOW.md`.
+the science-flow lane's notes.

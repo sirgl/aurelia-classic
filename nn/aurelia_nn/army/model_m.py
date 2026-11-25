@@ -1,4 +1,4 @@
-"""Variant M of the army net (work/nets/army-net/M-HANDOFF.md): A plus a learned memory kept between our turns.
+"""Variant M of the army net (the memory-net handoff): A plus a learned memory kept between our turns.
 
 - Per-unit memory u_s in R^16 for army slot s (the unit's index in the army, < SLOTS), zero at the play's start.
   A unit's token adds `um(u_s)`. At our turn's end (a memory-state decision) every army token updates its slot:

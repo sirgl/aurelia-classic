@@ -1,4 +1,4 @@
-//! The links the tricks chain repaired (work/nets/tricks/CHAIN.md): each test is one link, `net2`'s output read by the
+//! The links the tricks chain repaired (the tricks lane's notes): each test is one link, `net2`'s output read by the
 //! executor in the code path the human-defence exam exercises, and the play as today without a plan.
 //!
 //! The scene (as `ai_net2_diplomacy`): P0 the seat, P1 and P2 nations, four city-states; P0 is ally of `cs(0)`.

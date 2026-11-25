@@ -1410,7 +1410,7 @@ Tuning numbers of the computer players (`classic/crates/classic-rules/src/ai`). 
 
 | Name | Value | Meaning | Source | File |
 |---|---|---|---|---|
-| `RAID` | `true` | The switch of the raid (the stop rule of work/nets/tricks/GATES.md). | own value (source not recorded) | `offence.rs` |
+| `RAID` | `true` | The switch of the raid (the stop rule of the tricks lane's notes). | own value (source not recorded) | `offence.rs` |
 
 ### `operations.rs`
 
@@ -1476,7 +1476,7 @@ Tuning numbers of the computer players (`classic/crates/classic-rules/src/ai`). 
 
 | Name | Value | Meaning | Source | File |
 |---|---|---|---|---|
-| `PRICES_PEACE` | `true` | The switch of this lever (the stop rule of work/nets/tricks/GATES.md): false gives the peace answer back its pricing by a running operation alone. | own value (source not recorded) | `orders.rs` |
+| `PRICES_PEACE` | `true` | The switch of this lever (the stop rule of the tricks lane's notes): false gives the peace answer back its pricing by a running operation alone. | own value (source not recorded) | `orders.rs` |
 
 ### `pantheon.rs`
 

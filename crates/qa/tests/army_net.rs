@@ -1,4 +1,4 @@
-//! The army net's DAgger probe (`aurelia_qa::army_net::seat`, work/nets/army-net/DESIGN.md): when the net
+//! The army net's DAgger probe (`aurelia_qa::army_net::seat`, the army-net design note): when the net
 //! plays exactly as the expert, the probe's labels are the expert's own. The staged-assault expert keeps its
 //! commitments between turns (`Scene::track`: engaged, waited, resting); a probe that loses them answers every
 //! turn as its first ("wait for the stage"), which is what DAgger round 1 recorded before the fix.

@@ -1,5 +1,5 @@
 """Variant M (learned memory) of the army net: imitation with the memory unrolled over whole plays
-(work/nets/army-net/M-HANDOFF.md, «Training»).
+(the memory-net handoff, «Training»).
 
 python -m aurelia_nn.army.train_m --train runs/teach-train-m.bin --hold runs/teach-hold-m.bin --out runs/netM0
 

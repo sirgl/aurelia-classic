@@ -108,7 +108,7 @@ pub fn read(obs: &AIObservation<'_>, brief: &TurnBrief, state: &AiState, rules: 
         }
         // R11: its military power inside our borders or near our cities, over ours there, at peace and at war. At war the
         // stack is the attack itself: read at peace only, `menace` fell to 0 on the turn of the declaration, and with
-        // it the military price, the guard and the defence posture that answered the stack (work/nets/capitals: 6 of 6
+        // it the military price, the guard and the defence posture that answered the stack (the capitals lane's notes: 6 of 6
         // traced capitals lost at Standard speed, e.g. offset 3340 seed 3340001 r172→r173 menace 930 → 0, military
         // tilt 744 → −94, the capital lost 10 rounds later).
         row.stack = stack(obs, brief, rules, &known, r);

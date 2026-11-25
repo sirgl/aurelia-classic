@@ -1,4 +1,4 @@
-//! The tactics exam (`aurelia_qa::grounds::exam`; /Users/roman.ivanov/civ/work/nets/exam/REPORT.md).
+//! The tactics exam (`aurelia_qa::grounds::exam`).
 //!
 //! `ai-exam run --out DIR [--scenes t1a,t2,...] [--players standard,unit-net,hybrid,war-pays] [--instances 80]
 //!   [--offset 0] [--jobs 4] [--control]`

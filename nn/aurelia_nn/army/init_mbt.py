@@ -1,4 +1,4 @@
-"""MBT from an MB net (step 1.5, `work/nets/net-types/GATES.md` "gate T1"): the typed tokens and the third parties' path
+"""MBT from an MB net (step 1.5, gate T1 of the typed-token plan): the typed tokens and the third parties' path
 added so that the net plays exactly as before.
 
 python -m aurelia_nn.army.init_mbt --from WEIGHTS.safetensors --out DIR [--random-new SEED]

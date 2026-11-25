@@ -1,5 +1,5 @@
-//! The camp trainers (Roman, 24 Nov: "an attack on a barbarian camp, a trainer, and the same with a neutral's units
-//! beside it that can take it: teach the army to act so that OUR unit takes the camp").
+//! The camp trainers (the requirement: an attack on a barbarian camp, and the same with a neutral's units
+//! beside it that can take it: teach the army to act so that OUR unit takes the camp).
 //!
 //! THE RULES AS FOUND (`classic-rules/src/systems/barbarians.rs`; Unciv's `BarbarianManager` and `BarbarianEncampment`):
 //! a camp is an improvement on a tile the barbarians own no city on; a camp spawns a defender on its own tile when no

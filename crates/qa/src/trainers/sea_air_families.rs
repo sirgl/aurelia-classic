@@ -1,4 +1,4 @@
-//! The naval and air trainers (work/nets/TRAINERS-PLAN.md, lane "Sea and air"): four families on the sea and in
+//! The naval and air trainers (the trainers plan, lane "Sea and air"): four families on the sea and in
 //! the air, each with the scene, the win rule, a scripted enemy, the right teacher, a naive one and (by the
 //! suite's own controls) the passive and random plays.
 //!

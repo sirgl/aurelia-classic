@@ -174,7 +174,7 @@ among them) play their switches without the flags, as measured: on `pre-next`. `
 `wonder-cancel`, `wonder-race` and `next-race` keep their flags and play as measured; a book on `standard`
 (`book@standard`) plays on `pre-next`. The chance table of `next-race` and `wonder-race` is not the game's.
 
-Measured on the bench (pace, Quick, against the old `standard`; programme `work/nets`): `next-w` 83.2 % victory-weighted
+Measured on the bench (pace, Quick, against the old `standard`; programme of the nets lane): `next-w` 83.2 % victory-weighted
 (80.6–85.8 %) on offsets 234–237 (800 games), the guard on the standard suite 73.0 % (68.8–77.0 %). The checks of the
 promotion (the new `standard` plays the games of the old `next-w`, `pre-next` those of the old `standard`, the other
 variants theirs, and the time of a turn) are in the lane's log; the smoke pin of `ai_bench` moves to the hash of the
@@ -194,7 +194,7 @@ levers of the rules: gifts to that rival's city-state allies priced with its own
 delegates in the host election (`victory_watch::host_choice`). Outbidding with gold is out of reach (an alliance
 costs 1.3–3.5 thousand gold; the richest rival seat holds a median of 796). Bench only, `experimental-ai`.
 
-Measured (pace, Quick; programme `work/nets`): against `standard` 60.4 % victory-weighted on offsets 460–463
+Measured (pace, Quick; programme of the nets lane): against `standard` 60.4 % victory-weighted on offsets 460–463
 (800 games) and 58.3 % on the reviewer's 475–476; `standard`'s diplomatic victories fall to 1.3 % of its seats from
 6.25 % in its mirror. With every seat a guard, fewer games end in a real victory (0.795 of `standard`'s mirror on
 475–476): about 44 % of the stopped diplomatic victories become science victories, the rest reach the time limit.
@@ -224,7 +224,7 @@ it was measured: `next-w` (the play of the thirteenth promotion), `vote-guard`, 
 `landless-plan`, the variants on `pre-next` and the books (`book@standard` plays on `pre-next`, as before); `next-x`
 stays as an alias that plays as `standard`.
 
-Measured on the bench (pace, Quick, against the old `standard`; programme `work/nets`): `next-x` 59.4 % victory-weighted
+Measured on the bench (pace, Quick, against the old `standard`; programme of the nets lane): `next-x` 59.4 % victory-weighted
 on 12 November; the control on the main of 14 November is in the programme's log. The checks of the promotion (the new
 `standard` plays the games of the old `next-x`, `pre-next-x` those of the old `standard`, the other variants theirs, and
 the time of a turn) are in the lane's log.
@@ -257,7 +257,7 @@ Measured on the bench (pace, Quick, against the old `standard`): `nets-x-site` 6
 (offsets 1500–1503; 238 real victories against 113, risings of rebels 4 against 15), 62.9 % on the replication
 (1512–1513), the AI's time of a turn 0.97×. The checks of the promotion (the new `standard` plays the games of the old
 `nets-x-site`, `pre-nets-x` those of the old `standard`, the other variants theirs, the time of a turn) are in
-`work/nets/nets-x/PROMOTE.md`.
+the nets-x lane's notes.
 
 No save section is added: a save of the old `standard` loads into the new one.
 
@@ -267,7 +267,7 @@ No save section is added: a save of the old `standard` loads into the new one.
 the strategist's pass (its intent through `intent_step` with `net2`'s tilt, its levers to the executors through
 `TurnBrief::net2`) and its site head in place of the guarded site score. `pre-net2` is the standard before it (the mind of
 `nets-x-site`, bench only); `nets-x-site` plays as `pre-net2`, and `net2` stays as an alias that plays as `standard`. The
-gates and their results are in classic/docs/ai-net2.md and `work/nets/promote-net2/PROMOTE.md`.
+gates and their results are in classic/docs/ai-net2.md and the promote-net2 lane's notes.
 
 ## Not done
 

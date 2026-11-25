@@ -6,7 +6,7 @@
 //! the tokens' tiles (the attention bias). Candidates: the legal actions of one of our units, each
 //! `F_ACT` numbers and a promotion id.
 //!
-//! Typed tokens and the third parties (step 1.5 of the general-AI plan, `work/nets/net-types/GATES.md` "gate T1"):
+//! Typed tokens and the third parties (step 1.5 of the general-AI plan, gate T1 of the typed-token plan):
 //! every token and candidate also has its EXTRAS (`X_TOK`, `X_ACT` numbers: the relation one-hot and the threat of the
 //! third parties at war with us), and the units and cities of the players other than the side and `orders.foe` inside
 //! the map window are the THIRD tokens (`Tokens::third`), read by the net through a separate path. The main stream and

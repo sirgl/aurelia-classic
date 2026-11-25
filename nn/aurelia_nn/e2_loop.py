@@ -85,9 +85,9 @@ from . import train_e2
 from .model import save_checkpoint
 from .train_imitation import pick_device
 
-NN_DATA = Path("/Users/roman.ivanov/civ/work/nn-data")
-# The machine's single GPU lock (`/Users/roman.ivanov/civ/work/gpu-run.sh`: `/usr/bin/lockf -k`, flock(2)).
-GPU_LOCK = Path("/Users/roman.ivanov/civ/work/.gpu.lock")
+NN_DATA = Path(os.environ.get("NN_DATA", "nn-data"))
+# The machine's single GPU lock (flock(2) on this file; `$GPU_LOCK`, default `.gpu.lock` under the data directory).
+GPU_LOCK = Path(os.environ.get("GPU_LOCK", str(NN_DATA / ".gpu.lock")))
 BIN = NN_DATA / "bin"
 MODES = {
     "all": {},

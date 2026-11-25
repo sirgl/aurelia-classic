@@ -697,7 +697,7 @@ and the vulture at 50-70) and `positions-mid` (round 200: HW2, HCS, OW2, OCS), 1
 40 (defence) and 30 (offence) played to the end of the game. The army tricks (HMO1, HMO3, HMT2, HMO8) are the
 run after `8d7a166` (the army gathers beyond the city's strike). The end-of-game victory weight is shown with
 its standard error; most of its deltas are within 1.5 of it. Summary and the plain-words list:
-`work/nets/stress4/HUMANS.md`.
+the stress4 lane's notes.
 
 ### Defence
 
@@ -891,7 +891,7 @@ at the strong level (citadels and war): -0.04, inside its gate.
 Run on 22 November 2026: 100 positions of the pace suite (Small, six nations, Quick, standard AI, rounds 100-110;
 C5 at rounds 150-160 from a second set), every arm played out to the end of the game (an arm costs about 5 CPU
 seconds, so all 100 instances carry the end metrics). Gates unchanged. Raw rows: `runs/wave1`, `runs/b1b`, `runs/d1b`,
-`runs/c5`, `runs/random` (under `work/nets/stress/`). A situation is built on 81 positions (A5, B1, B4: the others have no
+`runs/c5`, `runs/random` (under the stress lane's notes). A situation is built on 81 positions (A5, B1, B4: the others have no
 two nations on one landmass), 57 (D1), 100 (A1, B9), 61 (C5: the congress is founded on 61).
 
 ## Measurement fixes after the first run (gates not changed)

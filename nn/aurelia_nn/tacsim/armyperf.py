@@ -208,7 +208,9 @@ def machine():
     import subprocess
     la = os.getloadavg()
     try:
-        gpu = subprocess.run(["sh", "-c", "lsof /Users/roman.ivanov/civ/work/.gpu.lock 2>/dev/null | wc -l"], capture_output=True, text=True).stdout.strip()
+        # The GPU lock file of the machine's job broker, named by AURELIA_GPU_LOCK; "?" when none is named.
+        lock = os.environ.get("AURELIA_GPU_LOCK", "")
+        gpu = subprocess.run(["lsof", lock], capture_output=True, text=True).stdout.count("\n") if lock else "?"
     except Exception:
         gpu = "?"
     return {"loadavg": [round(x, 2) for x in la], "gpu_lock_lines": gpu, "time": time.strftime("%Y-%m-%d %H:%M:%S")}

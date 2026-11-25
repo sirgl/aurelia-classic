@@ -923,11 +923,11 @@ pub enum Variant {
     /// `net2-off`: `Net2` with no part of `net2` playing; every decision is `nets-x-site`'s, the check that the
     /// ablation's fallback is exact. Bench only (`experimental-ai`).
     Net2Off,
-    /// `peace-fix` (work/nets/tricks/CHAIN.md D8, tac/runs/C1.md): `Standard` with the war's going on priced also
+    /// `peace-fix` (the tricks lane's notes D8, tac/runs/C1.md): `Standard` with the war's going on priced also
     /// without an operation at peace time (`values_war_at_peace`), the fix alone for its own promotion gate. Bench only
     /// (`experimental-ai`).
     PeaceFix,
-    /// `science-flow` (work/nets/science-flow/SCIENCE-FLOW.md): `Standard` with `net2`'s science-flow neurons on
+    /// `science-flow` (the science-flow lane's notes): `Standard` with `net2`'s science-flow neurons on
     /// (`net2::weights::AGREEMENT`, `SCIENTISTS`; `Net2Plan::science`): the research agreements and the scientists of a
     /// seat that races to the spaceship. Bench only (`experimental-ai`).
     ScienceFlow,

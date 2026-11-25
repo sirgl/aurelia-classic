@@ -1,4 +1,4 @@
-"""Variant MB of the army net (M-HANDOFF.md, Roman's line B + memory): M plus B's hex-conv map encoder, encoded ONCE
+"""Variant MB of the army net (the memory-net handoff: line B + memory): M plus B's hex-conv map encoder, encoded ONCE
 per turn (from the turn's first moment; no updates within the turn) at MAP_CH channels over the 24 x 24 window.
 
 The encoder is B's (`model.py`: 1 x 1 projection, 4 residual blocks of two hex convolutions, dilations as B); its
@@ -485,7 +485,7 @@ class MBENet(MBNet):
         return mx.where(cmask, s, NEG)
 
 
-# MBT: typed tokens and the third parties (work/nets/net-types/GATES.md "gate T1"; model.rs `TypedW`). Token types.
+# MBT: typed tokens and the third parties (gate T1 of the typed-token plan; model.rs `TypedW`). Token types.
 TYPES = 5
 TY_OBJ, TY_UNIT, TY_CITY, TY_TUNIT, TY_TCITY = range(TYPES)
 # The third tokens a batch holds at most (observe.rs X_CAP).
@@ -496,7 +496,7 @@ MBT_PARAMS = ('ty_obj1', 'ty_obj2', 'ty_city1', 'ty_city2', 'ty_emb', 'ty_x', 't
 
 
 class MBTNet(MBNet):
-    """MB with typed tokens and the third parties' input (step 1.5; `work/nets/net-types/GATES.md` "gate T1"). Starts equal
+    """MB with typed tokens and the third parties' input (step 1.5; gate T1 of the typed-token plan). Starts equal
     to MB (`init_mbt.py`): the new encoders are copies of the unit's, every new projection and output is zero, the new
     candidate kind's shift is -10.
     - Main tokens (the objective, our and the foe's units, cities): each type its encoder (the unit's is e1 / e2, the

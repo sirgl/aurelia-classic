@@ -19,7 +19,7 @@ changes no rule and no AI (`ai-tournament --solo standard --suite standard --spe
 
 `DIR/rows.jsonl` holds every play (`info.stage`: `solver`, `passive`, `random`, `player`), `DIR/kept.jsonl` the
 attempt kept per instance (or `attempt: null`: unsolved). A run resumes: what DIR holds is not played again. The
-tables and Roman's page: `/Users/roman.ivanov/civ/work/nets/trainers/tools/summary.py` and `page.py`.
+tables and the report page: the trainers lane's `summary.py` and `page.py` (not in this repository).
 
 ## The scene
 
@@ -284,7 +284,7 @@ modern 14/100 and atomic 0/100, bombard modern and information 0/100 (the era's 
 retreat information 12/100, airstrike atomic 25/100, harass medieval 1/100 (no script catches keshiks with foot and
 one horse).
 
-Roman's page: `/Users/roman.ivanov/civ/work/trainers-2026-11-23.html`.
+The report page of 23 Nov is not kept in this repository.
 
 ## Part 2 measurement: the planned assault (23 November 2026, `runs/t2`, `runs/t2-tac2`, 100 instances a cell)
 

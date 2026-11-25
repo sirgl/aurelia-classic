@@ -78,7 +78,7 @@ struct Options {
     pace: u32,
     ideal: bool,
     /// `--trace FILE`: one JSON line per living seat every `trace_every` rounds and one per game at its end
-    /// (`trace_line`, `trace_end`); the science flow's look (work/nets/science-flow).
+    /// (`trace_line`, `trace_end`); the science flow's look (the science-flow lane).
     trace: Option<String>,
     trace_every: u32,
 }

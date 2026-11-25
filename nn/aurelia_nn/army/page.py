@@ -1,4 +1,4 @@
-"""Roman's page of the army net (Russian): the trainer table, the learning curves as inline SVG, the data, parity
+"""The report page of the army net (Russian): the trainer table, the learning curves as inline SVG, the data, parity
 and decision time. python -m aurelia_nn.army.page --spec page.json --out FILE.html
 
 page.json: {"headline": str, "verdict": [str], "nets": [{"name", "curves": path}], "table": path (table.py),

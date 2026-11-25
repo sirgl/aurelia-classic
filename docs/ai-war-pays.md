@@ -109,7 +109,7 @@ the war line's own binary against its `standard`). `next-war` is the game's AI o
 `siege_call`) and the switches of `war-open` (`ClassicMind::new`). Nothing was tuned in the merge.
 On the tuning offset 200 (100 solo pace games) it starts 98 operations and 36 % take a city at 6.3 units
 lost an operation (`siege-call` on its own line: 89, 38 %, 6.25; the new `standard`: 9 operations, none
-took a city). The acceptance is in the lane's log (work/nets/next2/LOG.md).
+took a city). The acceptance is in the lane's log (the next2 lane's notes).
 
 ## 9. `next-war-retake`: the retake of `retake2` on `next-war` (11 November)
 
@@ -132,4 +132,4 @@ and `Hold` are never returned by `call`. They stay as fitted (pressing beat ever
 variant): `next-war-retake` opened a retake case in 146 seat-turns on 38 cities, and 30 of 82 cities lost by an AI seat
 were held by it again within 8 rounds; `next-war` 0 cases, 2 of 50. Operations 98 and 98, 37.8 % and 35.7 % took a city.
 No integration defect was found, so nothing was tuned: `next-war-retake` is frozen as merged. The acceptance is in the
-lane's log (work/nets/next2/LOG.md).
+lane's log (the next2 lane's notes).

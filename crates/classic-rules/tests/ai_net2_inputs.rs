@@ -363,7 +363,7 @@ fn r11_a_stack_at_the_border() {
     let stack = rival(&i, A).stack;
     assert!(stack > 500, "five against one: {stack}");
     assert_eq!(i.cities[0].stack_owner, Some(A));
-    // At war the stack is the attack itself: the input stays (work/nets/capitals: read at peace only, the menace and
+    // At war the stack is the attack itself: the input stays (the capitals lane's notes: read at peace only, the menace and
     // every lever answering it fell to 0 on the turn of the declaration).
     game.debug_force_war(&rules, US, A);
     advance(&mut game, &rules, 1);
@@ -381,7 +381,7 @@ fn pass(inputs: &Inputs, game: &GameState) -> Pass {
 
 #[test]
 fn the_stack_that_declares_war_stays_a_menace() {
-    // work/nets/capitals, offset 3340 seed 3340001 seat 4: a rival's stack at our capital declares war. With R11 read at
+    // the capitals lane's notes, offset 3340 seed 3340001 seat 4: a rival's stack at our capital declares war. With R11 read at
     // peace only, `menace` fell from 930 to 0 on that turn, and with it the levers that answered the stack (the
     // military price tilt 800 · max menace, the guard 1200 · stack menace, the defence posture 1500 · max menace); the
     // capital fell 10 rounds later. Read from the game, the answer holds across the declaration.

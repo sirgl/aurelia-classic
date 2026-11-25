@@ -1,4 +1,4 @@
-//! `science-flow` (work/nets/science-flow/SCIENCE-FLOW.md): the science specialists' executor reads `net2`'s level and
+//! `science-flow` (the science-flow lane's notes): the science specialists' executor reads `net2`'s level and
 //! keeps each city's food; the research agreement's ties lift `net2`'s denial for the friendship and the agreement
 //! only, get the ladder at their cadence, and keep the agreement's gold (the rules' cost) in the allocator's chest until
 //! the partner signs or the friendship ends; `standard` plays none of it. The tests name classic content only to set

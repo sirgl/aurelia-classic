@@ -674,7 +674,7 @@ pub const CITY_CAP: Neuron = Neuron {
     ],
 };
 
-// ---- the science flow (work/nets/science-flow/SCIENCE-FLOW.md): played by `science-flow` only (`TurnBrief::science_flow`) ----
+// ---- the science flow (the science-flow lane's notes): played by `science-flow` only (`TurnBrief::science_flow`) ----
 
 /// The share of its science specialists' slots a seat fills (`Science::scientists`; the executor
 /// `citizens::science_specialist_commands` keeps each city's food at `gate::SCIENTIST_FOOD`). Why (the look, 80 self-play

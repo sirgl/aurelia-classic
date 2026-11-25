@@ -1,4 +1,4 @@
-//! The tactics exam (`ai-exam`; /Users/roman.ivanov/civ/work/nets/exam/REPORT.md): scenes of a few
+//! The tactics exam (`ai-exam`): scenes of a few
 //! units (the tactician: T1-T5) and of an operation (the commander: C1, C3) that a named AI variant plays
 //! like a player, with no scripted help (`BattleScene::strike` and `hunt` are NOT used: the unit fights
 //! of the training ladders are won with the oracle's strikes under a named learner mind). A measurement:
@@ -1543,7 +1543,7 @@ pub fn play(rules: &CompiledRuleset, mut game: GameState, mut run: Run, instance
     let reference = player.starts_with("ref-").then_some(player);
     let ceiling = player == CEILING;
     // `v2`: the big net's only weights on disk (read only), in process (`net:v2:FILE`); EXAM_V2 names another file.
-    let v2 = format!("net:v2:{}", std::env::var("EXAM_V2").unwrap_or_else(|_| "/Users/roman.ivanov/civ/work/v2-gpu/data/C-cont.v2".to_owned()));
+    let v2 = format!("net:v2:{}", std::env::var("EXAM_V2").unwrap_or_else(|_| "data/C-cont.v2".to_owned()));
     let base = if reference.is_some() || ceiling { "standard" } else if player == "v2" { v2.as_str() } else { player };
     let nations = majors(&game);
     let mut seats = Vec::new();

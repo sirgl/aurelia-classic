@@ -1672,7 +1672,7 @@ pub fn running_case(brief: &TurnBrief, state: &AiState, rules: &CompiledRuleset,
     Some(case)
 }
 
-/// `running_case` of an assault with no operation (work/nets/tricks/CHAIN.md D8, tac/runs/C1.md): the units with
+/// `running_case` of an assault with no operation (the tricks lane's notes D8, tac/runs/C1.md): the units with
 /// `UnitTask::Assault` on a seen city of `enemy` (the planners' assault group; the exam's C1 army) priced as the
 /// operation they are, the group its own army and need (nothing missing), the walk of its farthest member and the
 /// siege. The best such city; None without an assault on the enemy. Without it the peace layer priced a war with no

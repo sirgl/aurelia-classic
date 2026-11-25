@@ -1,5 +1,5 @@
 //! The offence of the addendum (work/new-net-offence-addendum-2026-11-22.md §3.3) whose inputs `net2` already has,
-//! wired now (work/nets/tricks/CHAIN.md, Roman: «не только защищаться от этих техник, но и их использовать»).
+//! wired now (the tricks lane's notes, the requirement: not only defend against these techniques but use them).
 //! The driver keeps these levers only for the variants that play the offence (`Variant::net2_offence`: `net2`,
 //! `net2-tac`, the ablation's; not `net2-defence`, the control), and clears them otherwise (`clear`).
 //!
@@ -14,7 +14,7 @@ use super::levers::Pass;
 use super::plan::{Net2Plan, OrderPhase, WarPlan};
 use super::weights::r;
 
-/// The switch of the raid (the stop rule of work/nets/tricks/GATES.md).
+/// The switch of the raid (the stop rule of the tricks lane's notes).
 pub const RAID: bool = true;
 
 /// The offence's levers on the turn's plan (`plan.war`'s order, `plan.offence`).

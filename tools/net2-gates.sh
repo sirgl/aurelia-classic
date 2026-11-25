@@ -14,7 +14,7 @@
 #   CLONE   the integrated checkout's classic/ directory      (default: the directory above tools/)
 #   BIN     directory of the built binaries                   (default: $CARGO_TARGET_DIR/release, else $CLONE/../target-own/release)
 #   OUT     where the runs and reports go                     (default: $CLONE/../net2-gates-out)
-#   POS     the exam's positions: rounds 100-110              (default: work/nets/stress/runs/positions, two levels above CLONE/..)
+#   POS     the exam's positions: rounds 100-110              (default: stress/runs/positions, two levels above CLONE/..)
 #   JOBS    threads of every run                              (default: $RES_THREADS, else 4)
 #   CAND    the candidate variant                             (default: net2)
 #   BASE    the baseline variant                              (default: nets-x-site)

@@ -1,5 +1,5 @@
-//! The third-party trainers (Roman, 24 Nov: "a nation that is not our enemy stands on the battlefield: teach the
-//! army to tell it from a foe, to use it, and to keep its word with it"). Seven families on a lab of three nations
+//! The third-party trainers (the requirement: a nation that is not our enemy stands on the battlefield; teach the
+//! army to tell it from a foe, to use it, and to keep its word with it). Seven families on a lab of three nations
 //! (`lab::third_lab`: the learner, the enemy at war with it, a THIRD nation at peace with both; `Scene::neutral` is the
 //! third nation, `Scene::third` its pieces, a scripted human like the camp families' neutral).
 //!

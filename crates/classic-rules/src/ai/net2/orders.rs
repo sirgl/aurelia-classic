@@ -1,4 +1,4 @@
-//! What the war order promises the executors that price a war (work/nets/tricks/CHAIN.md, D8).
+//! What the war order promises the executors that price a war (the tricks lane's notes, D8).
 //!
 //! The peace answer (`peace::Negotiation::answer`) refuses a white peace only while going on is worth more
 //! (`WarProspect`), and going on was priced by a running operation alone: a seat at war with an order of `net2` on the
@@ -9,7 +9,7 @@
 
 use super::plan::{TargetInputs, WarPlan};
 
-/// The switch of this lever (the stop rule of work/nets/tricks/GATES.md): false gives the peace answer back its
+/// The switch of this lever (the stop rule of the tricks lane's notes): false gives the peace answer back its
 /// pricing by a running operation alone.
 pub const PRICES_PEACE: bool = true;
 use crate::ai::strategy_net::Milli;

@@ -1,4 +1,4 @@
-//! Scratch trace of the decisions the human tricks exercise (`TRICKS_TRACE=<file>`, work/nets/tricks/CHAIN.md):
+//! Scratch trace of the decisions the human tricks exercise (`TRICKS_TRACE=<file>`, the tricks lane's notes):
 //! one JSON line per answer to an offer, per gift and per peace decision, with the `net2` outputs it read. It
 //! decides nothing: without the variable it writes nothing and costs one environment read a call.
 

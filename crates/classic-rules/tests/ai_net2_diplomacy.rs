@@ -119,7 +119,7 @@ fn p4_a_distrusted_partners_later_flows_are_worth_nothing_and_the_sale_is_refuse
     // The gold that today's value allows: the most the seat pays and still says yes.
     let most = (1..2000u32).take_while(|g| value(&game, &rules, None, &pays(*g)) >= 0).last().expect("some price passes");
     // A lump of our gold for flows later is a credit: only the rounds a peace treaty guarantees count, whatever the
-    // trust (`net2::credit`, work/nets/tricks/CHAIN.md D1/D2: the swindler of the first sale is trusted fully).
+    // trust (`net2::credit`, the tricks lane's notes D1/D2: the swindler of the first sale is trusted fully).
     let full = value(&game, &rules, Some(plan(vec![read(P1, 1000, Help::Give)])), &pays(most));
     assert!(full < 0, "a rival we trust fully: the lump is not paid ({full})");
     let mid = value(&game, &rules, Some(plan(vec![read(P1, 700, Help::Give)])), &flows);

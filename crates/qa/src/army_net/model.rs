@@ -340,7 +340,7 @@ const TY_CITY: usize = 2;
 const TY_TUNIT: usize = 3;
 const TY_TCITY: usize = 4;
 
-/// MBT's weights (`work/nets/net-types/GATES.md` "gate T1"): the objective's and the city's encoders (`ty_obj1/2`,
+/// MBT's weights (gate T1 of the typed-token plan): the objective's and the city's encoders (`ty_obj1/2`,
 /// `ty_city1/2`; the unit's is `e1`/`e2`), the type embedding `ty_emb` [TYPES][d], the extras' projection `ty_x`
 /// [X_TOK][d]; the third tokens' encoders (`tp_u1/2` units, `tp_c1/2` cities), their extras' projection `tp_x`, and per
 /// layer a separate cross-attention of the stream to them (the layer's q / k / v, norm1 on their embedding, a null key

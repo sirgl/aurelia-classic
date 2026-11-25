@@ -1,1 +1,1 @@
-"""The army net (work/nets/army-net/DESIGN.md): data, model, training, export, parity."""
+"""The army net (the army-net design note): data, model, training, export, parity."""

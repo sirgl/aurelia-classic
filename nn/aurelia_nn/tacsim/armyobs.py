@@ -1,5 +1,5 @@
 """The army net's observation in MLX, batched over scenes: the twin of `crates/qa/src/army_net/observe.rs`
-(work/nets/army-net/OBSERVATION-SCHEMA.md) on the simulator's state tables.
+(the observation-schema note) on the simulator's state tables.
 
     python -m aurelia_nn.tacsim.armyobs DUMP.jsonl [--limit N] [--show 5]   # the parity check against Rust
 

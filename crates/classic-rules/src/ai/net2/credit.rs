@@ -1,5 +1,5 @@
 //! `credit[r]`: the share of a flow paid for now that `net2` expects to receive beyond the rounds the rules
-//! guarantee (work/nets/tricks/CHAIN.md, D1/D2/D3/D6; design §4.6 "items we give first are paid against items
+//! guarantee (the tricks lane's notes, D1/D2/D3/D6; design §4.6 "items we give first are paid against items
 //! that flow later at trust[r]", completed).
 //!
 //! Why a separate lever and not `trust`: the swindler of the first sale is a friend with no past betrayal, so its

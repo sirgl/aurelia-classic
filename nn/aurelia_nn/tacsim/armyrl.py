@@ -291,7 +291,7 @@ def main(argv=None):
     ap.add_argument("--price", action="store_true", help="step 1.8: the price in the reward: the six price families as `f@careful` / `f@anycost` lines (a group = a scene under one stake), package 1's two families added; two optimisers")
     ap.add_argument("--price-lr-mult", type=float, default=10.0, help="the lr of w_price / w_price_all as a multiple of --lr")
     ap.add_argument("--price-G", type=int, default=0, help="copies of a price-line group (0: --G)")
-    ap.add_argument("--D-file", default="/Users/roman.ivanov/civ/work/nets/army-net/runs/teach7p-D.json", help="teach7p's per-family any-cost best rates (the bars of the any-cost lines)")
+    ap.add_argument("--D-file", default=os.environ.get("ARMY_D_FILE", ""), help="a JSON file of the per-family any-cost best rates, {family: {\"anycost\": {name: rate}}} (the bars of the any-cost lines; needed with --price; default: $ARMY_D_FILE)")
     ap.add_argument("--new-layers", default="", help="net-deep: comma list of layer indices that are new (their own lr group)")
     ap.add_argument("--new-lr-mult", type=float, default=1.0, help="the new layers learn at this multiple of --lr")
     ap.add_argument("--split", type=int, default=70, help="training scenes: instances below it; the rest of --train is the validation set")
@@ -319,6 +319,8 @@ def main(argv=None):
     bars = {}
     for ln, (f, form) in fam_of_line.items():
         if form == PR.ANYCOST:
+            if not a.D_file:
+                raise SystemExit("--price needs --D-file (or $ARMY_D_FILE): the any-cost best rates per family")
             best = max(json.load(open(a.D_file))[f]["anycost"].values())
             bars[ln] = ("anycost", best, 0.9 * best)
         else:

@@ -13,7 +13,7 @@ deals `peace::Negotiation::resource`: a second copy is worth 0) and "a tile is i
 city site). The science victory needs one copy for each part while the part is alive (from its
 completion to its installation) and one for each part factory (`derived::resources::production_resources`:
 no part starts or completes without a free copy). The strategist has no input about the copies of its
-goal and no output for them. Diagnosis, channel by channel: `work/nets/exam/SHIP-LOG.md` (ref
+goal and no output for them. Diagnosis, channel by channel: the exam lane's notes (ref
 `exam/spaceship-aluminium`).
 
 **Class.** A resource an item of the strategist's goal needs (`required_resources`,
@@ -146,7 +146,7 @@ the candidate's games. The defect metrics come from the read-only probe `AURELIA
 If `standard`'s share in S1 is below 10 % in the mirror, the defect does not show at this scale: S1 is
 reported and S2 decides.
 
-**The situation exam.** `ai-stress run` on the positions `work/nets/stress/runs/positions` (200 pace
+**The situation exam.** `ai-stress run` on the positions the stress lane's notes (200 pace
 Quick logs of `standard` to round 112), situations A1 and B9 at three strengths, every arm played to the
 end; the variant of every seat is set by `--variant` (`standard`, then `strategist-x`, the same
 instances). Accept on the odd instances 1…59 (30 positions × 3 levels); tune on the even ones. Means over
@@ -188,7 +188,7 @@ The probe counts a quest by its city-state, nation, kind and start; 48.6 quests 
 
 ### Tuning (even seeds and instances only: offsets 1200, 1202; exam instances 0, 2, …, 58)
 
-Diagnosis first (`work/nets/lane-strategy/CONCLUSIONS.md` §4–7, traces `runs/trace-*`): in B9 the seats that met
+Diagnosis first (the lane-strategy lane's notes §4–7, traces `runs/trace-*`): in B9 the seats that met
 the leader read its technologies from the literacy row shared by score (32–50 of 81 while it knows ~70); half the
 seats never meet it; no met seat changes posture. In A5 the disarmed neighbour reads as an average army (the
 soldiers row, 10 [8…14]), so S-4 as designed would not fire: not written.
@@ -246,7 +246,7 @@ every seat (`runs/stress-final`, `runs/stress-standard`; `tools/stress-gates.py`
 
 Defect 3 is moved (denunciations, no help to the leader, the leader wins less often) but not fixed: no war on it.
 
-## Review conditions (22 Nov, after the independent review `work/nets/lane-strategy/REVIEW.md`)
+## Review conditions (22 Nov, after the independent review the lane-strategy lane's notes)
 
 Written before the runs below; the gates are not changed after them.
 
