@@ -1,0 +1,97 @@
+# Night 4 of the M5 kit: long RL on the honest net input (tools/m5/campaign4.py, docs/m5/PROMPT-4.md).
+# The queue = the P0 jobs below, then the runs of [night] expanded in the order base-s1, boost-s1, base-s2, boost-s2, ...
+# each followed by its tables job. A job with an "ok" line in lab/runs/campaign4/results.jsonl is never redone; a restart
+# resumes at the first job without one (an RL run continues from its newest checkpoint). A job whose estimate does not end
+# before the deadline minus report_min is recorded "skipped_deadline" (the queue goes on: a shorter later job may fit).
+# A job with fatal = true that fails stops the whole queue (the P0 sanity: a different binary must not run the night).
+# `tools/m5/campaign4.sh plan` prints the queue with the end time of every job.
+
+[campaign]
+deadline_hours = 6.5        # from the first start (fixed in lab/runs/campaign4/deadline.json); M5_DEADLINE=HH:MM overrides
+report_min = 25             # left at the end for the summary, the report and the push
+retries = 1                 # a failed job is retried this many times, then "failed_final"
+threads_default = 6         # until the threads job has measured
+cpu_budget = 18             # the largest thread count the broker may be asked for
+
+[data]
+quick_families = "siege,ram,assault-heal,city-fire,hill-archers,planned-assault,promotion-choice,rush,raid,prey,focus,snipe"
+siege_group = "siege,planned-assault,promotion-choice,assault-heal,city-fire,hill-archers,citadel"
+anchor_boost_factor = 3     # G1.10h, "the one written attempt": the siege group's anchor weight x3
+teach_r_families = ""       # empty: every family of kept-r (the recipe of the anchor of G1.10h); smoke: a short list
+teach_r2_families = "convoy,guard,snipe"
+teach_to = 80               # the teachers play instances 0..79
+lengths_to = 60             # the greedy pass of the start net over instances 0..59
+hold_from = 80
+hold_to = 100
+threads_probe = [6, 18]
+
+# The runs. The same recipe as the gate G1.10h run (nothing tuned) except the length: 600 updates.
+[night]
+seeds = [1, 2, 3]
+arms = ["base", "boost"]          # base = the recipe of G1.10h; boost = the same + --anchor-boost, lambda fixed at the base's of the same seed
+updates = 600
+ckpt_every = 5                    # so that 185 exists; the campaign keeps 50-multiples, 185 and the last and deletes the rest after the tables
+val_every = 50
+window = 16
+table_ckpts = [185, 400, 600]
+keep_ckpts = [185, 400, 600]      # besides every multiple of 50 and the last
+est_rl_min = 85                   # minutes ON THE M5 for 600 updates (M4: 7.5 s an update + 13 validations of 35 s); rescaled after the first run
+est_tables_min = 8
+
+[smoke]                           # `campaign4 --smoke`: every job kind once with tiny budgets, in lab-smoke/ (the real lab never sees it)
+deadline_hours = 2
+families = "siege,citadel,guard,ram"
+teach_r_families = "siege,citadel,ram"
+teach_r2_families = "guard"
+teach_to = 3
+lengths_to = 60
+threads_probe = [1, 3]
+quick_families = "siege,ram"
+siege_group = "siege,citadel"
+seeds = [1]
+updates = 2
+ckpt_every = 1
+val_every = 2
+table_ckpts = [1, 2]
+keep_ckpts = [1, 2]
+P = 8
+G = 2
+K = 2
+window = 4
+val_to = 63
+
+[[job]]
+name = "setup"
+kind = "setup"
+est_min = 12
+
+[[job]]
+name = "seed"
+kind = "seed"
+after = ["setup"]
+est_min = 1
+
+[[job]]
+name = "threads"
+kind = "threads"            # the actor's thread count: the full honest table of N175 at 6 and at 18 threads, the faster one is used for the night
+after = ["seed"]
+est_min = 3
+
+[[job]]
+name = "sanity"
+kind = "sanity"             # P0: honest N175 full + quick, and N175T quick, play for play against the M4's rows; any difference stops the night
+after = ["threads"]
+est_min = 3
+fatal = true
+
+[[job]]
+name = "teach"
+kind = "teach"              # the anchor's teacher recordings (teach-r-train.bin ~9.8 GB, p7-teach-train.bin ~0.15 GB) with this commit's binary
+after = ["sanity"]
+est_min = 8
+
+[[job]]
+name = "lengths"
+kind = "lengths"            # the greedy lengths of the start net N175T on the training scenes (the loop's sampled rounds are drawn within them)
+after = ["sanity"]
+est_min = 4

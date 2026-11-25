@@ -1,0 +1,8 @@
+# The broker's budget for the night-4 kit (the vendored broker reads it through RES_CONFIG, see env.sh).
+# The efficiency cores are used too: the actor's threads are chosen by the threads job of the campaign (6 or 18, measured).
+cpu_charger = 18
+cpu_battery = 6
+cpu_floor = 2
+other_load_allowed = 2
+disk_min_gb = 25
+mlx_gb = 40
