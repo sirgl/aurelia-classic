@@ -483,3 +483,152 @@ class MBENet(MBNet):
         fu = tok[mx.arange(tok.shape[0]), unit]
         s = s - self.wounded_term(cand, self.wounded_gate(tok, unit, slot, um, pm), 1.0 - fu[:, 36], fu[:, 39])
         return mx.where(cmask, s, NEG)
+
+
+# MBT: typed tokens and the third parties (work/nets/net-types/GATES.md "gate T1"; model.rs `TypedW`). Token types.
+TYPES = 5
+TY_OBJ, TY_UNIT, TY_CITY, TY_TUNIT, TY_TCITY = range(TYPES)
+# The third tokens a batch holds at most (observe.rs X_CAP).
+X_CAP = 16
+# The candidate extra "declares war" (observe.rs X_DECLARES).
+X_DECLARES = 6
+MBT_PARAMS = ('ty_obj1', 'ty_obj2', 'ty_city1', 'ty_city2', 'ty_emb', 'ty_x', 'tp_u1', 'tp_u2', 'tp_c1', 'tp_c2', 'tp_x', 'tp_null', 'tp_dist', 'tp_o', 'cx', 'c_new')
+
+
+class MBTNet(MBNet):
+    """MB with typed tokens and the third parties' input (step 1.5; `work/nets/net-types/GATES.md` "gate T1"). Starts equal
+    to MB (`init_mbt.py`): the new encoders are copies of the unit's, every new projection and output is zero, the new
+    candidate kind's shift is -10.
+    - Main tokens (the objective, our and the foe's units, cities): each type its encoder (the unit's is e1 / e2, the
+      objective's ty_obj1 / 2, the city's ty_city1 / 2), plus ty_emb[type] and the extras (record v5: the relation one-hot,
+      the third parties' war threat) through ty_x.
+    - Third tokens (a third party's units and cities, record v5): their encoder (tp_u1 / 2, tp_c1 / 2), ty_emb[3 | 4], their
+      extras through tp_x, m_tok of the map at their tile. Per layer the stream (queries: the layer's q, the plan tokens
+      included) attends to them with its own softmax over a null key (tp_null[l, h]) and them, plus tp_dist[l, h, distance]
+      for a main token's query (0 for a plan token's); keys / values: the layer's k / v on norm1 of their embedding; the
+      context enters the residual through tp_o[l] (zero at the start), after the self-attention's output.
+    - The map: m_in reads M_IN + S_REL planes (the relation planes after the tokens' facts; their columns zero at the start).
+    - Candidates: their extras through cx into the scorer's first layer; the logit plus c_new x "declares war"."""
+
+    def __init__(self, d=64, heads=4, layers=3, ff=128, promos=400, map_ch=MAP_CH):
+        super().__init__(d=d, heads=heads, layers=layers, ff=ff, promos=promos, map_ch=map_ch)
+        from .data import F_TOK, REL_NAMES, S_REL, X_ACT, X_TOK
+        from .model import D_MAX
+        self.config['typed'] = {'types': ['objective', 'unit', 'city', 'third-unit', 'third-city'], 'x_tok': X_TOK, 'x_act': X_ACT,
+                                'rel': list(REL_NAMES), 's_rel': S_REL, 'x_cap': X_CAP}
+        self.m_in = nn.Linear(M_IN + S_REL, map_ch)
+        self.ty_obj1, self.ty_city1, self.tp_u1, self.tp_c1 = (nn.Linear(F_TOK, d) for _ in range(4))
+        self.ty_obj2, self.ty_city2, self.tp_u2, self.tp_c2 = (nn.Linear(d, d) for _ in range(4))
+        self.ty_emb = mx.zeros((TYPES, d))
+        self.ty_x = mx.zeros((X_TOK, d))
+        self.tp_x = mx.zeros((X_TOK, d))
+        self.tp_null = mx.zeros((layers, heads))
+        self.tp_dist = mx.zeros((layers, heads, D_MAX + 1))
+        self.tp_o = [nn.Linear(d, d) for _ in range(layers)]
+        for o in self.tp_o:
+            o.weight = mx.zeros((d, d))
+            o.bias = mx.zeros((d,))
+        self.cx = mx.zeros((X_ACT, d))
+        self.c_new = mx.array([-10.0])
+
+    def encode_turn(self, statics, tok, pos, srel=None):
+        """The turn's map [B, W*W, C] from its first moment: the old planes, then the relation planes."""
+        p = map_planes(statics, tok, pos)
+        if srel is None:
+            srel = mx.zeros(p.shape[:2] + (self.m_in.weight.shape[1] - p.shape[-1],))
+        return self.encode(mx.concatenate([p, srel], axis=-1))
+
+    def embed_main(self, tok, xtok):
+        """[B, T, d]: each main token through its type's encoder, plus its type embedding and its extras' projection."""
+        hu = self.e2(nn.relu(self.e1(tok)))
+        hc = self.ty_city2(nn.relu(self.ty_city1(tok)))
+        ho = self.ty_obj2(nn.relu(self.ty_obj1(tok)))
+        is_obj = tok[..., 0:1] > 0.5
+        is_city = tok[..., 3:4] > 0.5
+        h = mx.where(is_obj, ho, mx.where(is_city, hc, hu))
+        ty = mx.where(is_obj[..., 0], TY_OBJ, mx.where(is_city[..., 0], TY_CITY, TY_UNIT))
+        return h + self.ty_emb[ty] + xtok @ self.ty_x
+
+    def embed_third(self, third, third_x, gthird, third_ok):
+        """[B, X, d]: the third tokens' embedding."""
+        is_city = third[..., 3:4] > 0.5
+        e = mx.where(is_city, self.tp_c2(nn.relu(self.tp_c1(third))), self.tp_u2(nn.relu(self.tp_u1(third))))
+        ty = mx.where(is_city[..., 0], TY_TCITY, TY_TUNIT)
+        e = e + self.ty_emb[ty] + third_x @ self.tp_x
+        if gthird is not None:
+            e = e + mx.where(third_ok[..., None], self.m_tok(gthird), 0.0)
+        return e
+
+    def body_t(self, b, um, pm):
+        """The body on a batch dict (`DeviceM.batch_m` with record v5's keys and `map_feats`): H [B, T + PLANS, d]."""
+        return self.body_mbt(b['tok'], b['dist'], b['tmask'], b['slot'], um, pm, b['gtok'], b['tok_ok'], b['mmean'], b['xtok'],
+                             b['third'], b['third_x'], b.get('gthird'), b.get('third_ok'), b['xmask'], b['tdist'])
+
+    def body_mbt(self, tok, dist, tmask, slot, um, pm, gtok, tok_ok, mmean, xtok, third, third_x, gthird, third_ok, xmask, tdist):
+        b, t, _ = tok.shape
+        h = self.embed_main(tok, xtok)
+        has = slot >= 0
+        us = um[mx.arange(b)[:, None], mx.maximum(slot, 0)]
+        h = h + mx.where(has[..., None], self.um(us), 0.0)
+        h = h + mx.where(tok_ok[..., None], self.m_tok(gtok), 0.0)
+        pooled = self.m_pool(mmean)
+        h = mx.concatenate([h[:, :1] + pooled[:, None, :], h[:, 1:]], axis=1)
+        x = mx.concatenate([h, pm], axis=1)
+        mask = mx.concatenate([tmask, mx.ones((b, PLANS), dtype=mx.bool_)], axis=1)
+        is_plan = mx.concatenate([mx.zeros((t,), dtype=mx.bool_), mx.ones((PLANS,), dtype=mx.bool_)])
+        pair_plan = is_plan[:, None] | is_plan[None, :]
+        dpad = mx.pad(dist, [(0, 0), (0, PLANS), (0, PLANS)])
+        te = self.embed_third(third, third_x, gthird, third_ok)
+        tdpad = mx.pad(tdist, [(0, 0), (0, PLANS), (0, 0)])
+        qmain = mx.concatenate([mx.ones((t,), dtype=mx.bool_), mx.zeros((PLANS,), dtype=mx.bool_)])
+        for li, layer in enumerate(self.layers):
+            x = self.layer_mbt(layer, self.tp_o[li], x, dpad, mask, pair_plan, self.plan_bias[li], te, xmask, tdpad, qmain,
+                               self.tp_null[li], self.tp_dist[li])
+        return self.norm(x)
+
+    @staticmethod
+    def layer_mbt(layer, tp_o, h, dist, key_mask, pair_plan, pbias, te, xmask, tdist, qmain, nbias, dbias):
+        import math
+        from .model import NEG
+        b, t, d = h.shape
+        heads = layer.heads
+        dh = d // heads
+        m = te.shape[1]
+        a = layer.norm1(h)
+        q = layer.q(a).reshape(b, t, heads, dh).transpose(0, 2, 1, 3)
+        k = layer.k(a).reshape(b, t, heads, dh).transpose(0, 2, 1, 3)
+        v = layer.v(a).reshape(b, t, heads, dh).transpose(0, 2, 1, 3)
+        sc = 1.0 / math.sqrt(dh)
+        s = (q @ k.transpose(0, 1, 3, 2)) * sc
+        bias = layer.dist_bias[:, dist].transpose(1, 0, 2, 3)
+        bias = mx.where(pair_plan[None, None], pbias[None, :, None, None], bias)
+        s = s + bias + mx.where(key_mask[:, None, None, :], 0.0, NEG)
+        w = mx.softmax(s, axis=-1)
+        ctx = (w @ v).transpose(0, 2, 1, 3).reshape(b, t, d)
+        # The third parties: their own softmax over [null, third tokens].
+        at = layer.norm1(te)
+        kt = layer.k(at).reshape(b, m, heads, dh).transpose(0, 2, 1, 3)
+        vt = layer.v(at).reshape(b, m, heads, dh).transpose(0, 2, 1, 3)
+        tb = dbias[:, tdist].transpose(1, 0, 2, 3)  # [B, H, T, X]
+        tb = mx.where(qmain[None, None, :, None], tb, 0.0)
+        st = (q @ kt.transpose(0, 1, 3, 2)) * sc + tb + mx.where(xmask[:, None, None, :], 0.0, NEG)
+        s0 = mx.broadcast_to(nbias[None, :, None, None], (b, heads, t, 1))
+        wt = mx.softmax(mx.concatenate([s0, st], axis=-1), axis=-1)
+        ctxt = (wt[..., 1:] @ vt).transpose(0, 2, 1, 3).reshape(b, t, d)
+        h = h + layer.o(ctx) + tp_o(ctxt)
+        mm = layer.norm2(h)
+        return h + layer.f2(nn.relu(layer.f1(mm)))
+
+    def action_logits_t(self, h, b):
+        """[B, C]: MB's scorer with the candidates' extras (cx) and the new kind's shift (c_new)."""
+        from .model import NEG
+        bs = h.shape[0]
+        hu = h[mx.arange(bs), b['unit']]
+        h0 = h[:, 0]
+        pre = self.c1(b['cand']) + self.promo[b['promo']] + mx.where(b['cand_ok'][..., None], self.m_cand(b['gcand']), 0.0) + b['xcand'] @ self.cx
+        c = self.c2(nn.relu(pre))
+        hu_b = mx.broadcast_to(hu[:, None, :], c.shape)
+        h0_b = mx.broadcast_to(h0[:, None, :], c.shape)
+        joint = mx.concatenate([hu_b, h0_b, c, hu_b * c], axis=-1)
+        s = self.s2(nn.relu(self.s1(joint)))[..., 0] + self.c_new[0] * b['xcand'][..., X_DECLARES]
+        return mx.where(b['cmask'], s, NEG)

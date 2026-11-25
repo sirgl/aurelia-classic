@@ -91,6 +91,8 @@ pub struct Orders {
     pub window: MapWindow,
     /// The window's static planes (`[tile][S_CH]`, f16-rounded): the ground and who holds it at the start.
     pub statics: Vec<f32>,
+    /// The window's relation planes (`[tile][S_REL]`, `statics_rel_of`): the third parties' land by relation at the start.
+    pub statics_rel: Vec<f32>,
     /// The memory families (`trainers::memory`): the tokens hold only the foes our side sees.
     pub fog: bool,
     /// The stake (`price_of`): the capture's worth in units / 8, the time pressure, "given".
@@ -165,6 +167,8 @@ pub fn price_of(family: &str, units: usize, deadline: Option<u32>) -> [f32; 3] {
 pub const W: usize = 24;
 /// Static planes of a window tile (`statics_of`).
 pub const S_CH: usize = 16;
+/// Relation planes of a window tile (`statics_rel_of`; typed tokens, step 1.5).
+pub const S_REL: usize = 6;
 
 /// A 24 x 24 window of the map in its axial coordinates (column q, row r), clamped to the map.
 #[derive(Debug, Clone, Copy)]
@@ -232,6 +236,37 @@ pub fn statics_of(rules: &CompiledRuleset, game: &GameState, win: &MapWindow, si
     v
 }
 
+/// The relation planes of the window (typed tokens, step 1.5): the land of a third party (a player other than `side` and
+/// `foe`) by its relation to `side` (`observe::relation`): an ally, a nation at peace, at war, a city-state, the
+/// barbarians; and a third party's city. The planes "ours" and "the foe's" stay in `statics_of` (8, 9, 14, 15). The
+/// relations are the start's, as the ownership planes; a declaration of war later shows in the tokens' relation.
+pub fn statics_rel_of(rules: &CompiledRuleset, game: &GameState, win: &MapWindow, side: PlayerId, foe: PlayerId) -> Vec<f32> {
+    let auth = game.view().auth;
+    let map = auth.map();
+    let mut v = vec![0f32; W * W * S_REL];
+    for i in 0..W * W {
+        let Some(t) = win.tile(i) else { continue };
+        let f = &mut v[i * S_REL..(i + 1) * S_REL];
+        if let Some(owner) = map.owner(t).flatten().filter(|o| *o != side && *o != foe) {
+            let r = observe::relation(game, rules, side, foe, owner);
+            let k = match r {
+                observe::R_ALLY => Some(0),
+                observe::R_PEACE => Some(1),
+                observe::R_WAR => Some(2),
+                observe::R_CS => Some(3),
+                observe::R_BARB => Some(4),
+                _ => None,
+            };
+            if let Some(k) = k {
+                f[k] = 1.0;
+            }
+        }
+        let city = auth.indexes().city_on_tile(t).and_then(|c| auth.cities().get(c)).map(|c| c.owner);
+        f[5] = f32::from(u8::from(city.is_some_and(|o| o != side && o != foe)));
+    }
+    v
+}
+
 impl Orders {
     /// The orders of the learner's side in a trainer scene.
     pub fn of_scene(rules: &CompiledRuleset, game: &GameState, scene: &Scene) -> Orders {
@@ -248,7 +283,8 @@ impl Orders {
         let start_round = game.view().auth.turn().round;
         let window = MapWindow::around(game, scene.centre);
         let statics = statics_of(rules, game, &window, scene.learner, scene.enemy, tile, scene.refuge);
-        Orders { side: scene.learner, foe: scene.enemy, aim, tile, refuge: scene.refuge, optional, start_round, rounds: scene.rounds, army, mean_strength: mean_strength.max(1.0), window, statics, fog: crate::trainers::memory::is_memory(scene.fam), price: price_override().map(|f| price_set(&f, scene.fam.name(), scene.mine.len(), scene.rounds, scene.deadline).unwrap_or_else(|| panic!("ARMY_PRICE={f}: not a price form (a,b,c | careful | anycost[:D])"))).unwrap_or_else(|| price_of(scene.fam.name(), scene.mine.len(), Some(scene.deadline.unwrap_or(scene.rounds)))) }
+        let statics_rel = statics_rel_of(rules, game, &window, scene.learner, scene.enemy);
+        Orders { side: scene.learner, foe: scene.enemy, aim, tile, refuge: scene.refuge, optional, start_round, rounds: scene.rounds, army, mean_strength: mean_strength.max(1.0), window, statics, statics_rel, fog: crate::trainers::memory::is_memory(scene.fam), price: price_override().map(|f| price_set(&f, scene.fam.name(), scene.mine.len(), scene.rounds, scene.deadline).unwrap_or_else(|| panic!("ARMY_PRICE={f}: not a price form (a,b,c | careful | anycost[:D])"))).unwrap_or_else(|| price_of(scene.fam.name(), scene.mine.len(), Some(scene.deadline.unwrap_or(scene.rounds)))) }
     }
 }
 

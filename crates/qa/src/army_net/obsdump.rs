@@ -163,6 +163,9 @@ pub fn start(rules: &CompiledRuleset, game: &GameState, scene: &Scene, orders: &
         // The scene's private facts the family scripts read (the memory families' side, hiding place and first step): info only.
         "centre": scene.centre.0, "info": scene.info,
     });
+    // Typed tokens (step 1.5): the window's relation planes.
+    let mut o = o;
+    o["statics_rel"] = json!(hex16(&orders.statics_rel));
     let mut line = json!({"type": "scene", "play": name, "scene": sc, "initial": initial, "orders": o, "kinds": kinds});
     // Info-only: the units' combat percents without their promotions at the scene's start (when the profiles' `contexts`
     // are measured), per slot and per third-seat id (`kind_contexts`; the twin's schedule adds the change since).
@@ -420,7 +423,8 @@ pub fn moment(rules: &CompiledRuleset, game: &GameState, orders: &Orders, tokens
             let list = observe::candidates(game, rules, orders, h);
             let feat: Vec<f32> = list.iter().flat_map(|c| c.feat.iter().copied()).collect();
             let acts: Vec<Value> = list.iter().map(|c| action_of(rules, game, &mut play.track, c)).collect();
-            cands.insert(i.to_string(), json!({"feat": hex16(&feat), "act": acts}));
+            let x: Vec<f32> = list.iter().flat_map(|c| c.x.iter().copied()).collect();
+            cands.insert(i.to_string(), json!({"feat": hex16(&feat), "act": acts, "x": hex16(&x)}));
         }
         let wm: Vec<i64> = ids
             .iter()
@@ -462,6 +466,15 @@ pub fn moment(rules: &CompiledRuleset, game: &GameState, orders: &Orders, tokens
             // The history tokens the net reads (MBH; every net's tokens carry them): numbers (f16 bits), army slots, ages.
             "hist": {"f": hex16(&tokens.hist.iter().flat_map(|f| f.iter().copied()).collect::<Vec<f32>>()), "slot": tokens.hist_slot, "age": tokens.hist_age},
         }));
+        // Typed tokens (step 1.5): the main tokens' extras and the third tokens (numbers, extras, window index, tile,
+        // the main x third distances), as the net reads them.
+        if let Some(m) = play.moment.as_mut() {
+            let th = &tokens.third;
+            let xf: Vec<f32> = tokens.xfeat.iter().flat_map(|x| x.iter().copied()).collect();
+            let tf: Vec<f32> = th.feat.iter().flat_map(|x| x.iter().copied()).collect();
+            let tx: Vec<f32> = th.x.iter().flat_map(|x| x.iter().copied()).collect();
+            m["typed"] = json!({"xfeat": hex16(&xf), "third": {"n": th.len(), "feat": hex16(&tf), "x": hex16(&tx), "pos": th.pos, "tile": th.tile.iter().map(|t| t.0).collect::<Vec<u32>>(), "dist": th.dist.iter().map(|d| format!("{d:02x}")).collect::<String>()}});
+        }
     });
 }
 

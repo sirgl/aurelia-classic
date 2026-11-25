@@ -128,7 +128,7 @@ fn the_army_nets_memory_survives_a_save_and_load_mid_siege() {
             seat::set_save_at(None);
             (row.win, row.rounds, row.trace)
         };
-        let at = |sidecar| Some(seat::SaveAt { round: 3, dir: dir.clone(), sidecar });
+        let at = |sidecar| Some(seat::SaveAt { round: 3, dir: dir.clone(), sidecar, ..Default::default() });
         assert_eq!(run("ref-planned", at(true)), run("ref-planned", None), "#{instance}: the save format keeps the scene (the reference plays the same)");
         let plain = run("army-net", None);
         assert!(plain.1 > 3, "#{instance}: the play lasts past the save");
