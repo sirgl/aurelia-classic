@@ -332,7 +332,7 @@ impl<'i, 'o, 'a> Negotiation<'i, 'o, 'a> {
             return ours + their_loss;
         }
         // `strategist-x`: no strategic copy for the rival running away (a part of its spaceship may
-        // wait for it; Vox Populi's rule of no aluminium to a nation close to the spaceship, by class).
+        // wait for it; no aluminium to a nation close to its spaceship, by class).
         if !luxury && crate::ai::diplomacy::denied(self.input.brief, other) {
             return self.gold(crate::ai::diplomacy::REFUSED);
         }
