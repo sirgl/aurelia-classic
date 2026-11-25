@@ -112,10 +112,97 @@ class Layer(nn.Module):
         return h + self.f2(nn.relu(self.f1(m)))
 
 
+# The SwiGLU width with the parameters of the classic 64 -> 128 -> 64 ReLU MLP: 2 x 64 x 86 + 86 x 64 + 64 = 16 576 =
+# 64 x 128 + 128 + 128 x 64 + 64 (w1, w3 without bias, w2 with).
+SWIGLU_FF = {64: 86}
+
+
+class ModernLayer(nn.Module):
+    """A modern transformer layer (net-deep, GATES.md D1, arm B), the same interface as `Layer`:
+    RMSNorm before attention and MLP (`rms1`, `rms2`); QK-norm (RMSNorm over each head's 16 numbers of q and of k,
+    weights `qn`, `kn` shared by the heads, then the usual 1 / sqrt(dh)); the distance bias as `Layer`; an output gate
+    on the attention (ctx x sigmoid(g(rms1(h))), elementwise, before `o`; Qwen's gated attention); a SwiGLU MLP
+    w2(silu(w1 m) x w3 m) with the classic MLP's parameter count. `crates/qa/src/army_net/model.rs` is the same arithmetic."""
+
+    def __init__(self, d, heads, ff=None):
+        super().__init__()
+        self.heads = heads
+        dh = d // heads
+        ff = ff or SWIGLU_FF.get(d, (4 * d) // 3)
+        self.rms1 = nn.RMSNorm(d, eps=1e-5)
+        self.q = nn.Linear(d, d)
+        self.k = nn.Linear(d, d)
+        self.v = nn.Linear(d, d)
+        self.qn = nn.RMSNorm(dh, eps=1e-5)
+        self.kn = nn.RMSNorm(dh, eps=1e-5)
+        self.g = nn.Linear(d, d)
+        self.o = nn.Linear(d, d)
+        self.dist_bias = mx.zeros((heads, D_MAX + 1))
+        self.rms2 = nn.RMSNorm(d, eps=1e-5)
+        self.w1 = nn.Linear(d, ff, bias=False)
+        self.w3 = nn.Linear(d, ff, bias=False)
+        self.w2 = nn.Linear(ff, d)
+
+    def zero_out(self):
+        """The layer adds nothing: its attention output and its MLP output projections are zero (the gate left at 0.5)."""
+        d = self.o.weight.shape[0]
+        self.o.weight = mx.zeros(self.o.weight.shape)
+        self.o.bias = mx.zeros((d,))
+        self.w2.weight = mx.zeros(self.w2.weight.shape)
+        self.w2.bias = mx.zeros((d,))
+        self.g.weight = mx.zeros(self.g.weight.shape)
+        self.g.bias = mx.zeros((d,))
+
+    def forward(self, h, bias, key_mask):
+        """h [b, t, d]; bias [b, heads, t, t] (the distance / plan bias); key_mask [b, t]."""
+        b, t, d = h.shape
+        dh = d // self.heads
+        a = self.rms1(h)
+        q = self.qn(self.q(a).reshape(b, t, self.heads, dh)).transpose(0, 2, 1, 3)
+        k = self.kn(self.k(a).reshape(b, t, self.heads, dh)).transpose(0, 2, 1, 3)
+        v = self.v(a).reshape(b, t, self.heads, dh).transpose(0, 2, 1, 3)
+        s = (q @ k.transpose(0, 1, 3, 2)) * (1.0 / math.sqrt(dh))
+        s = s + bias + mx.where(key_mask[:, None, None, :], 0.0, NEG)
+        w = mx.softmax(s, axis=-1)
+        ctx = (w @ v).transpose(0, 2, 1, 3).reshape(b, t, d)
+        ctx = ctx * mx.sigmoid(self.g(a))
+        h = h + self.o(ctx)
+        m = self.rms2(h)
+        return h + self.w2(nn.silu(self.w1(m)) * self.w3(m))
+
+    def __call__(self, h, dist, key_mask):
+        bias = self.dist_bias[:, dist].transpose(1, 0, 2, 3)
+        return self.forward(h, bias, key_mask)
+
+
+def zero_out_classic(layer):
+    """A classic `Layer` that adds nothing: `o` and `f2` zero."""
+    d = layer.o.weight.shape[0]
+    layer.o.weight = mx.zeros(layer.o.weight.shape)
+    layer.o.bias = mx.zeros((d,))
+    layer.f2.weight = mx.zeros(layer.f2.weight.shape)
+    layer.f2.bias = mx.zeros((d,))
+
+
+def make_layer(kind, d, heads, ff):
+    return ModernLayer(d, heads) if kind == 'm' else Layer(d, heads, ff)
+
+
+def shape_of(w):
+    """(layers, kinds) of a net's weights dict: the count of `layers.N` and 'm' where layer N is modern ('c' classic)."""
+    idx = sorted({int(k.split('.')[1]) for k in w if k.startswith('layers.')})
+    kinds = ''.join('m' if f'layers.{i}.rms1.weight' in w else 'c' for i in idx)
+    return len(idx), kinds
+
+
 class ArmyNet(nn.Module):
-    def __init__(self, d=64, heads=4, layers=3, ff=128, promos=400, map_ch=0):
+    def __init__(self, d=64, heads=4, layers=3, ff=128, promos=400, map_ch=0, kinds=None):
         super().__init__()
         self.config = {'d': d, 'heads': heads, 'layers': layers, 'ff': ff, 'f_tok': F_TOK, 'f_act': F_ACT, 'promos': promos, 'dmax': D_MAX, 'map_ch': map_ch}
+        kinds = kinds or 'c' * layers
+        assert len(kinds) == layers and set(kinds) <= {'c', 'm'}, kinds
+        if 'm' in kinds:
+            self.config['kinds'] = kinds
         self.has_map = map_ch > 0
         if self.has_map:
             assert map_ch == d, 'the map features enter through d x d projections'
@@ -126,7 +213,7 @@ class ArmyNet(nn.Module):
             self.m_pool = nn.Linear(map_ch, d)
         self.e1 = nn.Linear(F_TOK, d)
         self.e2 = nn.Linear(d, d)
-        self.layers = [Layer(d, heads, ff) for _ in range(layers)]
+        self.layers = [make_layer(kinds[i], d, heads, ff) for i in range(layers)]
         self.norm = nn.LayerNorm(d, eps=1e-5)
         self.pointer = nn.Linear(d, 1)
         self.end = nn.Linear(d, 1)

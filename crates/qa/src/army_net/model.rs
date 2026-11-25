@@ -21,6 +21,9 @@ pub struct Config {
     pub f_act: usize,
     pub promos: usize,
     pub dmax: usize,
+    /// One char per layer: 'c' classic, 'm' modern (`army/model.py`, `ModernLayer`). None: all classic.
+    #[serde(default)]
+    pub kinds: Option<String>,
 }
 
 #[derive(Debug, serde::Deserialize)]
@@ -248,6 +251,45 @@ fn kv_get(key: Vec<u32>, make: impl FnOnce() -> Vec<f32>) -> std::rc::Rc<Vec<f32
 
 static NET_IDS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
 
+/// A modern layer (`army/model.py`, `ModernLayer`): RMSNorm, QK-norm, gated attention with the distance bias, SwiGLU.
+#[derive(Debug, Clone)]
+struct Modern {
+    rms1: Vec<f32>,
+    q: Dense,
+    k: Dense,
+    v: Dense,
+    g: Dense,
+    o: Dense,
+    /// `[dh]`, shared by the heads.
+    qn: Vec<f32>,
+    kn: Vec<f32>,
+    /// `[heads][dmax + 1]`.
+    bias: Vec<f32>,
+    rms2: Vec<f32>,
+    w1: Dense,
+    w3: Dense,
+    w2: Dense,
+}
+
+#[derive(Debug, Clone)]
+enum Block {
+    Classic(Layer),
+    Modern(Modern),
+}
+
+/// `y = x / sqrt(mean(x^2) + 1e-5) * w` (MLX `nn.RMSNorm`).
+fn rms_norm(x: &[f32], w: &[f32], y: &mut [f32]) {
+    let ms = x.iter().map(|v| v * v).sum::<f32>() / x.len() as f32;
+    let inv = 1.0 / (ms + 1e-5).sqrt();
+    for i in 0..x.len() {
+        y[i] = x[i] * inv * w[i];
+    }
+}
+
+fn sigmoid(x: f32) -> f32 {
+    1.0 / (1.0 + (-x).exp())
+}
+
 /// The loaded net.
 #[derive(Debug, Clone)]
 pub struct Net {
@@ -256,7 +298,7 @@ pub struct Net {
     pub config: Config,
     e1: Dense,
     e2: Dense,
-    layers: Vec<Layer>,
+    layers: Vec<Block>,
     norm: Norm,
     pointer: Dense,
     end: Dense,
@@ -687,10 +729,43 @@ impl Net {
             Dense::new(w, shape, b)
         };
         let norm = |name: &str| -> Result<Norm, String> { Ok(Norm { g: get(&format!("{name}.weight"))?.1.clone(), b: get(&format!("{name}.bias"))?.1.clone() }) };
+        let kinds: Vec<char> = match &c.kinds {
+            Some(k) => k.chars().collect(),
+            None => vec!['c'; c.layers],
+        };
+        if kinds.len() != c.layers || kinds.iter().any(|k| !matches!(k, 'c' | 'm')) {
+            return Err(format!("kinds {:?} for {} layers", c.kinds, c.layers));
+        }
+        let plain = |name: &str, n_in: usize, n_out: usize| -> Result<Dense, String> {
+            let (shape, w) = get(&format!("{name}.weight"))?;
+            if shape.as_slice() != [n_in, n_out] {
+                return Err(format!("{name} is {shape:?}, not [{n_in}, {n_out}]"));
+            }
+            Dense::new(w, shape, &vec![0.0; n_out])
+        };
         let mut layers = Vec::new();
-        for l in 0..c.layers {
+        for (l, kind) in kinds.iter().enumerate() {
             let p = format!("layers.{l}");
-            layers.push(Layer {
+            if *kind == 'm' {
+                let ff = get(&format!("{p}.w1.weight"))?.0.get(1).copied().ok_or("w1 is not 2-D")?;
+                layers.push(Block::Modern(Modern {
+                    rms1: get(&format!("{p}.rms1.weight"))?.1.clone(),
+                    q: dense(&format!("{p}.q"))?,
+                    k: dense(&format!("{p}.k"))?,
+                    v: dense(&format!("{p}.v"))?,
+                    g: dense(&format!("{p}.g"))?,
+                    o: dense(&format!("{p}.o"))?,
+                    qn: get(&format!("{p}.qn.weight"))?.1.clone(),
+                    kn: get(&format!("{p}.kn.weight"))?.1.clone(),
+                    bias: get(&format!("{p}.dist_bias"))?.1.clone(),
+                    rms2: get(&format!("{p}.rms2.weight"))?.1.clone(),
+                    w1: plain(&format!("{p}.w1"), c.d, ff)?,
+                    w3: plain(&format!("{p}.w3"), c.d, ff)?,
+                    w2: dense(&format!("{p}.w2"))?,
+                }));
+                continue;
+            }
+            layers.push(Block::Classic(Layer {
                 norm1: norm(&format!("{p}.norm1"))?,
                 q: dense(&format!("{p}.q"))?,
                 k: dense(&format!("{p}.k"))?,
@@ -700,7 +775,10 @@ impl Net {
                 norm2: norm(&format!("{p}.norm2"))?,
                 f1: dense(&format!("{p}.f1"))?,
                 f2: dense(&format!("{p}.f2"))?,
-            });
+            }));
+        }
+        if kinds.contains(&'m') && ["h1.weight", "hx_slope", "nx_slope", "n1.weight", "ty_emb"].iter().any(|n| t.contains_key(*n)) {
+            return Err("a net with modern layers has no history, notes or typed tokens (hist, xhist, xnotes, notes, ty_emb)".into());
         }
         let map = if t.contains_key("m_in.weight") {
             let mut convs = Vec::new();
@@ -1370,7 +1448,14 @@ impl Net {
         });
         let mut a = vec![0.0; total * d];
         let hist_in = if he.is_empty() { None } else { Some((he.as_slice(), hslots.as_slice(), qslots.as_slice())) };
-        for (li, layer) in self.layers.iter().enumerate() {
+        for (li, block) in self.layers.iter().enumerate() {
+            let layer = match block {
+                Block::Classic(layer) => layer,
+                Block::Modern(m) => {
+                    self.modern(m, li, &tokens.dist, n, total, &mut h);
+                    continue;
+                }
+            };
             let q = self.attend(layer, li, &tokens.dist, n, total, &mut h, &mut a, hist_in);
             if let (Some(xw), Some(xi)) = (self.xhist.as_ref(), xin.as_ref()) {
                 let heads = self.config.heads;
@@ -1467,6 +1552,76 @@ impl Net {
         q
     }
 
+    /// A modern layer (`ModernLayer.forward`): gated QK-normed attention with the distance bias (and the plan
+    /// pairs' bias, as `attend`), then the SwiGLU MLP, both added to `h`.
+    fn modern(&self, m: &Modern, li: usize, dist: &[u8], n_real: usize, n: usize, h: &mut [f32]) {
+        let d = self.config.d;
+        let heads = self.config.heads;
+        let dh = d / heads;
+        let nb = self.config.dmax + 1;
+        let plan_bias = self.mem.as_ref().map(|mem| &mem.plan_bias[li * heads..(li + 1) * heads]);
+        let mut a = vec![0.0; n * d];
+        for i in 0..n {
+            rms_norm(&h[i * d..(i + 1) * d], &m.rms1, &mut a[i * d..(i + 1) * d]);
+        }
+        let mut q = m.q.rows(&a, n);
+        let mut k = m.k.rows(&a, n);
+        let v = m.v.rows(&a, n);
+        let gate = m.g.rows(&a, n);
+        let mut tmp = vec![0.0; dh];
+        for i in 0..n * heads {
+            rms_norm(&q[i * dh..(i + 1) * dh], &m.qn, &mut tmp);
+            q[i * dh..(i + 1) * dh].copy_from_slice(&tmp);
+            rms_norm(&k[i * dh..(i + 1) * dh], &m.kn, &mut tmp);
+            k[i * dh..(i + 1) * dh].copy_from_slice(&tmp);
+        }
+        let scale = 1.0 / (dh as f32).sqrt();
+        let mut ctx = vec![0.0; n * d];
+        let mut s = vec![0.0; n];
+        for hd in 0..heads {
+            for i in 0..n {
+                let qi = &q[i * d + hd * dh..i * d + hd * dh + dh];
+                let mut max = f32::NEG_INFINITY;
+                for j in 0..n {
+                    let kj = &k[j * d + hd * dh..j * d + hd * dh + dh];
+                    let bias = if i < n_real && j < n_real { m.bias[hd * nb + usize::from(dist[i * n_real + j])] } else { plan_bias.map_or(0.0, |p| p[hd]) };
+                    s[j] = dot(qi, kj) * scale + bias;
+                    max = max.max(s[j]);
+                }
+                let mut sum = 0.0;
+                for x in s.iter_mut() {
+                    *x = (*x - max).exp();
+                    sum += *x;
+                }
+                let out = &mut ctx[i * d + hd * dh..i * d + hd * dh + dh];
+                for j in 0..n {
+                    let w = s[j] / sum;
+                    let vj = &v[j * d + hd * dh..j * d + hd * dh + dh];
+                    for c in 0..dh {
+                        out[c] += w * vj[c];
+                    }
+                }
+            }
+        }
+        for (c, g) in ctx.iter_mut().zip(&gate) {
+            *c *= sigmoid(*g);
+        }
+        for (x, y) in h.iter_mut().zip(m.o.rows(&ctx, n)) {
+            *x += y;
+        }
+        for i in 0..n {
+            rms_norm(&h[i * d..(i + 1) * d], &m.rms2, &mut a[i * d..(i + 1) * d]);
+        }
+        let mut f = m.w1.rows(&a, n);
+        let u = m.w3.rows(&a, n);
+        for (x, y) in f.iter_mut().zip(&u) {
+            *x = *x * sigmoid(*x) * y;
+        }
+        for (x, y) in h.iter_mut().zip(m.w2.rows(&f, n)) {
+            *x += y;
+        }
+    }
+
     /// MBH / MBN: the cross-attention of the `n` stream tokens (queries `q`) to the facts or the notes, its own
     /// softmax over the null key and them (`null`, `same`, `slope`: this layer's per head), through `out` into `h`.
     #[allow(clippy::too_many_arguments)]
@@ -1475,7 +1630,7 @@ impl Net {
         let heads = self.config.heads;
         let dh = d / heads;
         let nh = xi.he.len() / d;
-        let li = self.layers.iter().position(|l| std::ptr::eq(l, layer)).unwrap_or(usize::MAX);
+        let li = self.layers.iter().position(|b| matches!(b, Block::Classic(l) if std::ptr::eq(l, layer))).unwrap_or(usize::MAX);
         let (kh, vh) = self.key_values(li, layer, &xi.he);
         let scale = 1.0 / (dh as f32).sqrt();
         let mut ctx = vec![0.0; n * d];

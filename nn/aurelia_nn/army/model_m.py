@@ -20,7 +20,7 @@ import mlx.core as mx
 import mlx.nn as nn
 
 from .data import F_TOK
-from .model import D_MAX, NEG, ArmyNet
+from .model import D_MAX, NEG, ArmyNet, ModernLayer
 
 SLOTS = 16
 U = 16
@@ -56,8 +56,8 @@ def gru(x, h, wx, bx, wh, bh):
 
 
 class MemNet(ArmyNet):
-    def __init__(self, d=64, heads=4, layers=3, ff=128, promos=400):
-        super().__init__(d=d, heads=heads, layers=layers, ff=ff, promos=promos, map_ch=0)
+    def __init__(self, d=64, heads=4, layers=3, ff=128, promos=400, kinds=None):
+        super().__init__(d=d, heads=heads, layers=layers, ff=ff, promos=promos, map_ch=0, kinds=kinds)
         self.config['memory'] = {'slots': SLOTS, 'u': U, 'plans': PLANS}
         x_in = d + F_TOK
         s = lambda n_in, shape: mx.random.uniform(-1.0 / math.sqrt(n_in), 1.0 / math.sqrt(n_in), shape)
@@ -173,6 +173,10 @@ class MemNet(ArmyNet):
 
     @staticmethod
     def layer_m(layer, h, dist, key_mask, pair_plan, pbias):
+        if isinstance(layer, ModernLayer):
+            bias = layer.dist_bias[:, dist].transpose(1, 0, 2, 3)
+            bias = mx.where(pair_plan[None, None], pbias[None, :, None, None], bias)
+            return layer.forward(h, bias, key_mask)
         b, t, d = h.shape
         heads = layer.heads
         dh = d // heads

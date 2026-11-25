@@ -292,6 +292,8 @@ def main(argv=None):
     ap.add_argument("--price-lr-mult", type=float, default=10.0, help="the lr of w_price / w_price_all as a multiple of --lr")
     ap.add_argument("--price-G", type=int, default=0, help="copies of a price-line group (0: --G)")
     ap.add_argument("--D-file", default="/Users/roman.ivanov/civ/work/nets/army-net/runs/teach7p-D.json", help="teach7p's per-family any-cost best rates (the bars of the any-cost lines)")
+    ap.add_argument("--new-layers", default="", help="net-deep: comma list of layer indices that are new (their own lr group)")
+    ap.add_argument("--new-lr-mult", type=float, default=1.0, help="the new layers learn at this multiple of --lr")
     ap.add_argument("--split", type=int, default=70, help="training scenes: instances below it; the rest of --train is the validation set")
     a = ap.parse_args(argv)
     mx.set_memory_limit(16 << 30)
@@ -353,6 +355,10 @@ def main(argv=None):
     if not a.no_eval0 and not a.probe:
         held_eval(0)
     opt = optim.Adam(learning_rate=a.lr)
+    if a.new_layers:
+        new_l = {f"layers.{i}." for i in a.new_layers.split(",")}
+        opt = optim.MultiOptimizer([optim.Adam(learning_rate=a.lr * a.new_lr_mult), opt], [lambda path, _: any(path.startswith(x) for x in new_l)])
+        curve["new_layers"] = {"layers": sorted(new_l), "lr": a.lr * a.new_lr_mult}
     opt_price = optim.Adam(learning_rate=a.lr * a.price_lr_mult) if a.price else None
     rl_grad = make_rl_grad(model, brain)
     turn_grad = armymemgrad.make_turn_gradient(model, brain, logp_parts) if a.mem_grad else None

@@ -46,7 +46,13 @@ def main():
         from .model_mb import MBANet, MBHNet, MBNet, MBNNet
         from .model_mb import MBENet, MBTNet
         cls = MBTNet if 'ty_emb' in w else (MBNNet if 'nx_slope' in w else (MBHNet if 'hx_slope' in w else (MBANet if 'w_price' in w else (MBENet if 'ww' in w else MBNet))))
-        model = cls(promos=w['promo'].shape[0] - 1, map_ch=w['m_in.weight'].shape[0])
+        from .model import shape_of
+        n, kinds = shape_of(w)
+        # net-deep: the layer count and kinds from the weights (3 classic layers: as before; modern layers: MBNet only).
+        deep = {} if kinds == 'ccc' else {'layers': n, 'kinds': kinds}
+        if deep and cls is not MBNet:
+            raise ValueError(f'modern layers are for the plain MBNet, not {cls.__name__}')
+        model = cls(promos=w['promo'].shape[0] - 1, map_ch=w['m_in.weight'].shape[0], **deep)
     else:
         model = (MHNet if 'h1.weight' in w else MemNet)(promos=w['promo'].shape[0] - 1)
     model.load_weights(a.weights)
