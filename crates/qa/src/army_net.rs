@@ -16,6 +16,7 @@ pub mod obsdump;
 pub mod observe;
 pub mod parity;
 pub mod record;
+pub mod sample;
 pub mod seat;
 
 use classic_rules::ids::{PlayerId, TileId};

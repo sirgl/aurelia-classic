@@ -341,6 +341,18 @@ pub fn end_turn(game: &GameState, rules: &CompiledRuleset) {
     }
 }
 
+/// The net's own decision (`seat::turn`, sampling mode): its tokens at the moment, the unit's candidates (empty for the end and for an
+/// unlabelled first moment), the pick (token index, -1 end, -2 none) and the action it applied. Returns its index in the play.
+pub fn push_net(game: &GameState, tokens: &Tokens, candidates: &[Candidate], pointer: i16, action: i16, round: u32) -> usize {
+    let Some(orders) = with(|r| r.orders.clone()) else { return 0 };
+    let ids = ids_of(game, &orders, tokens);
+    with(|r| {
+        r.decisions.push(Decision { tokens: tokens.clone(), candidates: candidates.to_vec(), pointer, action, round: round as u16, ids, hp: BTreeMap::new(), end: pointer == -1, danger: Vec::new(), flags: 0, track: NO_TRACK });
+        r.decisions.len() - 1
+    })
+    .unwrap_or(0)
+}
+
 /// The pointer's "end" at this moment, as a decision (a probe found nothing the army should do; a probe's
 /// whole turn on a copy ends): not a memory state.
 pub fn push_end(game: &GameState, rules: &CompiledRuleset) {
@@ -524,7 +536,13 @@ pub fn close(row: Option<&crate::trainers::Row>) {
         ACTIVE.with(|a| a.borrow_mut().take());
         return;
     };
-    let meta = serde_json::json!({"family": row.family, "era": row.era, "instance": row.instance, "attempt": row.attempt, "player": row.player, "win": row.win, "rounds": row.rounds, "measures": row.measures});
+    let mut meta = serde_json::json!({"family": row.family, "era": row.era, "instance": row.instance, "attempt": row.attempt, "player": row.player, "win": row.win, "rounds": row.rounds, "measures": row.measures});
+    // Sampling mode (`army_net::sample`): the copy and the net's own log-probs of its sampled decisions.
+    if let Some(serde_json::Value::Object(h)) = super::sample::header() {
+        for (k, v) in h {
+            meta[k] = v;
+        }
+    }
     let out = finish(meta);
     LAST.with(|l| *l.borrow_mut() = out);
 }
