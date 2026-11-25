@@ -19,7 +19,8 @@ import mlx.nn as nn
 from .data import S_REL
 from .export import export
 from .model import M_IN
-from .model_mb import MBNet, MBTNet
+from .model_mb import MBNet, MBNNet, MBTNet
+from .model_mbtn import MBTNNet
 
 
 def convert(w, seed=None):
@@ -30,9 +31,11 @@ def convert(w, seed=None):
     layers = 1 + max(int(k.split('.')[1]) for k in w if k.startswith('layers.'))
     heads = w['layers.0.dist_bias'].shape[0]
     ff = w['layers.0.f1.weight'].shape[0]
-    base = MBNet(d=d, heads=heads, layers=layers, ff=ff, promos=promos, map_ch=map_ch)
+    # A net with the notes (MBN: `nx_slope`) becomes MBTN: the typed tokens and the third parties on top of the notes (step 1.10).
+    notes = 'nx_slope' in w
+    base = (MBNNet if notes else MBNet)(d=d, heads=heads, layers=layers, ff=ff, promos=promos, map_ch=map_ch)
     base.load_weights(list(w.items()))
-    net = MBTNet(d=d, heads=heads, layers=layers, ff=ff, promos=promos, map_ch=map_ch)
+    net = (MBTNNet if notes else MBTNet)(d=d, heads=heads, layers=layers, ff=ff, promos=promos, map_ch=map_ch)
     flat = dict(nn.utils.tree_flatten(base.parameters()))
     rnd = seed is not None
     if rnd:
@@ -76,7 +79,7 @@ def main():
     os.makedirs(a.out, exist_ok=True)
     net.save_weights(os.path.join(a.out, 'weights.safetensors'))
     export(net, os.path.join(a.out, 'army-net.bin'))
-    print(f'{a.out}: MBT from {a.src}' + (f' (new parts drawn, seed {a.random_new})' if a.random_new is not None else ' (function-preserving start)'))
+    print(f'{a.out}: {type(net).__name__} from {a.src}' + (f' (new parts drawn, seed {a.random_new})' if a.random_new is not None else ' (function-preserving start)'))
 
 
 if __name__ == '__main__':

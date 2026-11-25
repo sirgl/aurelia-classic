@@ -328,6 +328,9 @@ pub fn turn_end(game: &GameState, rules: &CompiledRuleset) {
             let round = game.view().auth.turn().round.saturating_sub(run.orders.start_round);
             NOTES.with(|n| n.borrow_mut().push(format!("r{round} {}", ns.written.join(" · "))));
         }
+        if super::sample::on() {
+            super::sample::note_memory(&state);
+        }
         run.state = state;
         run.memory_ns += t_mem.elapsed().as_nanos() as u64;
     });

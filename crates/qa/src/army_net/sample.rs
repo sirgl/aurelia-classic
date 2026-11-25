@@ -42,6 +42,9 @@ struct State {
     copy: usize,
     log: Vec<(usize, f32, Option<f32>)>,
     fallbacks: u32,
+    /// The memory (and notes) state after each of our turn ends, flattened: what the next turn's decisions read.
+    memory: Vec<f32>,
+    memory_len: usize,
 }
 
 thread_local! {
@@ -62,7 +65,7 @@ pub fn begin(cfg: &Config, key: &str, copy: usize) -> bool {
         h = mix(h ^ u64::from(b));
     }
     h = mix(h ^ (copy as u64 + 1).wrapping_mul(0x9e3779b97f4a7c15));
-    STATE.with(|s| *s.borrow_mut() = Some(State { rng: h, rounds: rounds.clone(), copy, log: Vec::new(), fallbacks: 0 }));
+    STATE.with(|s| *s.borrow_mut() = Some(State { rng: h, rounds: rounds.clone(), copy, log: Vec::new(), fallbacks: 0, memory: Vec::new(), memory_len: 0 }));
     true
 }
 
@@ -127,6 +130,45 @@ pub fn note(index: usize, lp_ptr: f32, lp_act: Option<f32>) {
     });
 }
 
+/// The memory after our turn ends (`seat::turn_end`), kept for the learner: the learner reads the memory and the notes the
+/// decisions of the next turn read from here instead of recomputing them (a recomputed hidden state can differ in a
+/// discrete element and move a decision by 0.1 in the log-probability: the 5 outliers of the first measurement).
+/// Layout per turn: u [SLOTS * U_DIM], p [PLANS * d], alive [SLOTS], then the notes (stage 6, stage_age, engaged,
+/// waited, free 8, change_age, reason 4, rest = pull 16, rest_age = pull_age 16), in the order of the net's note stream.
+pub fn note_memory(state: &super::model::MemoryState) {
+    STATE.with(|s| {
+        if let Some(s) = s.borrow_mut().as_mut() {
+            let before = s.memory.len();
+            s.memory.extend_from_slice(&state.u);
+            s.memory.extend_from_slice(&state.p);
+            s.memory.extend_from_slice(&state.alive);
+            if let Some(n) = state.notes.as_ref() {
+                s.memory.extend_from_slice(&n.stage);
+                s.memory.extend_from_slice(&[n.stage_age, n.engaged, n.waited]);
+                s.memory.extend_from_slice(&n.free);
+                s.memory.push(n.change_age);
+                s.memory.extend_from_slice(&n.reason);
+                s.memory.extend_from_slice(&n.pull);
+                s.memory.extend_from_slice(&n.pull_age);
+            }
+            s.memory_len = s.memory.len() - before;
+        }
+    });
+}
+
+fn base64(bytes: &[u8]) -> String {
+    const T: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let mut out = String::with_capacity(bytes.len().div_ceil(3) * 4);
+    for c in bytes.chunks(3) {
+        let n = (u32::from(c[0]) << 16) | (u32::from(*c.get(1).unwrap_or(&0)) << 8) | u32::from(*c.get(2).unwrap_or(&0));
+        out.push(T[(n >> 18) as usize & 63] as char);
+        out.push(T[(n >> 12) as usize & 63] as char);
+        out.push(if c.len() > 1 { T[(n >> 6) as usize & 63] as char } else { '=' });
+        out.push(if c.len() > 2 { T[n as usize & 63] as char } else { '=' });
+    }
+    out
+}
+
 pub fn note_fallback() {
     STATE.with(|s| {
         if let Some(s) = s.borrow_mut().as_mut() {
@@ -139,7 +181,8 @@ pub fn note_fallback() {
 pub fn header() -> Option<serde_json::Value> {
     STATE.with(|s| {
         s.borrow().as_ref().map(|s| {
-            serde_json::json!({"copy": s.copy, "fallbacks": s.fallbacks, "sample": s.log.iter().map(|(i, p, a)| serde_json::json!([i, p, a])).collect::<Vec<_>>()})
+            serde_json::json!({"copy": s.copy, "fallbacks": s.fallbacks, "sample": s.log.iter().map(|(i, p, a)| serde_json::json!([i, p, a])).collect::<Vec<_>>(),
+                "memory_len": s.memory_len, "memory": base64(&s.memory.iter().flat_map(|x| x.to_le_bytes()).collect::<Vec<u8>>())})
         })
     })
 }

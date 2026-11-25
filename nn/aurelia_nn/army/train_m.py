@@ -586,9 +586,11 @@ AUX_KEYS = ('aux_unit', 'aux_plan', 'aux_target', 'stage_acc', 'known', 'stage_o
 # Parts summed over the turns of the unroll (not averaged): counts whose ratios are pooled over the states.
 SUM_KEYS = ('stage_ok_n', 'known_n', 'note_stage_ok', 'note_waited_ok', 'note_rest_ok', 'note_rest_n', 'note_n', 'note_engaged_ok')
 NOTE_AUX_KEYS = ('note_rest', 'note_reason', 'note_stage_ok', 'note_waited_ok', 'note_rest_ok', 'note_rest_n', 'note_n', 'note_engaged_ok')
-UNROLL_KEYS = ('tok', 'dist', 'tmask', 'slot', 'track', 'tis', 'eta', 'hist', 'hmask', 'hslot', 'hage', 'price')
+# Record v5's typed keys ride along the plain ones: a typed net's body (MBT, MBTN) reads them; the other nets ignore them.
+TYPED_KEYS = ('xtok', 'xcand', 'third', 'third_x', 'tpos', 'xmask', 'tdist')
+UNROLL_KEYS = ('tok', 'dist', 'tmask', 'slot', 'track', 'tis', 'eta', 'hist', 'hmask', 'hslot', 'hage', 'price') + TYPED_KEYS
 DEC_KEYS = ('tok', 'dist', 'tmask', 'slot', 'sel', 'unit', 'cand', 'promo', 'cmask', 'ptr', 'act', 'has_act', 'win', 'lost', 'danger', 'w', 'hist', 'hmask', 'hslot',
-            'hage', 'price', 'capture', 'dphi')
+            'hage', 'price', 'capture', 'dphi') + TYPED_KEYS
 DEC_OUT = ('main', 'val', 'w', 'dsum', 'dn') + HEAD_KEYS
 # History ablation (proof (a) of MH): the history masked everywhere.
 ABLATE = {'history': False}
