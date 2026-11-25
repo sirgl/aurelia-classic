@@ -71,10 +71,10 @@ def rows_of(udir):
 
 def save_state(a, model, opt, state, name):
     d = a.out
-    model.save_weights(os.path.join(d, f"{name}.safetensors.tmp"))
-    os.replace(os.path.join(d, f"{name}.safetensors.tmp"), os.path.join(d, f"{name}.safetensors"))
-    mx.save_safetensors(os.path.join(d, f"{name}.opt.safetensors.tmp"), dict(tree_flatten(opt.state)))
-    os.replace(os.path.join(d, f"{name}.opt.safetensors.tmp"), os.path.join(d, f"{name}.opt.safetensors"))
+    model.save_weights(os.path.join(d, f"{name}.tmp.safetensors"))
+    os.replace(os.path.join(d, f"{name}.tmp.safetensors"), os.path.join(d, f"{name}.safetensors"))
+    mx.save_safetensors(os.path.join(d, f"{name}.opt.tmp.safetensors"), dict(tree_flatten(opt.state)))
+    os.replace(os.path.join(d, f"{name}.opt.tmp.safetensors"), os.path.join(d, f"{name}.opt.safetensors"))
     tmp = os.path.join(d, f"{name}.state.json.tmp")
     json.dump(state, open(tmp, "w"))
     os.replace(tmp, os.path.join(d, f"{name}.state.json"))
