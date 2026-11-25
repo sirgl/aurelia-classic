@@ -657,6 +657,9 @@ pub fn turn(rules: &CompiledRuleset, game: &mut GameState, orders: &Orders, scen
             }
         }
         let t1 = Instant::now();
+        // Sampling mode (`sample`, opt-in): the round of this turn, relative to the scene's start.
+        let rel = game.view().auth.turn().round.saturating_sub(orders.start_round);
+        let sampling = super::sample::on() && super::sample::sampled(rel);
         let slots = if memory.is_some() { super::record::slots_of(game, orders, &tokens) } else { Vec::new() };
         let mem_in = memory.as_ref().map(|state| super::model::MemIn { state, slots: &slots });
         if super::obsdump::wanted() {
@@ -672,8 +675,31 @@ pub fn turn(rules: &CompiledRuleset, game: &mut GameState, orders: &Orders, scen
         timing.observe_ns += (t_obs - t0).as_nanos() as u64;
         let _ = t_map;
         timing.forward_ns += (t2 - t1).as_nanos() as u64;
-        let Some((at, best)) = pick else { break };
-        if end >= best {
+        let Some((mut at, best)) = pick else { break };
+        let mut lp_ptr = 0.0f32;
+        let ends = if sampling {
+            let (c, lp) = super::sample::pointer(&logits, end);
+            lp_ptr = lp;
+            match c {
+                Some(i) => {
+                    at = i;
+                    false
+                }
+                None => true,
+            }
+        } else {
+            end >= best
+        };
+        // Sampling mode records the net's own decisions: a sampled turn's every decision, an other turn's first moment (for the map).
+        if super::sample::on() && super::record::active() {
+            if ends && sampling {
+                let i = super::record::push_net(game, &tokens, &[], -1, -1, rel);
+                super::sample::note(i, lp_ptr, None);
+            } else if step == 0 && !sampling {
+                super::record::push_net(game, &tokens, &[], -2, -1, rel);
+            }
+        }
+        if ends {
             timing.decisions += 1;
             follow(-1, -1);
             super::obsdump::choice(-1, -1);
@@ -695,6 +721,14 @@ pub fn turn(rules: &CompiledRuleset, game: &mut GameState, orders: &Orders, scen
         }
         let mut order: Vec<usize> = (0..candidates.len()).collect();
         order.sort_by(|a, b| scores[*b].total_cmp(&scores[*a]).then(a.cmp(b)));
+        let mut lp_act = None;
+        if sampling && !order.is_empty() {
+            let (a, lp) = super::sample::action(&scores);
+            lp_act = Some(lp);
+            order.retain(|x| *x != a);
+            order.insert(0, a);
+        }
+        let first_pick = order.first().copied();
         let mut acted = false;
         let mut chosen = -1i16;
         for i in order {
@@ -714,6 +748,16 @@ pub fn turn(rules: &CompiledRuleset, game: &mut GameState, orders: &Orders, scen
             act::stand(game, rules, unit);
         }
         super::obsdump::choice(at as i64, if acted { i64::from(chosen) } else { -1 });
+        if super::sample::on() && super::record::active() {
+            if sampling {
+                let applied = if acted { chosen } else { 0 };
+                if lp_act.is_some() && first_pick.is_some_and(|f| f as i16 != applied) {
+                    super::sample::note_fallback();
+                }
+                let i = super::record::push_net(game, &tokens, &candidates, at as i16, applied, rel);
+                super::sample::note(i, lp_ptr, lp_act);
+            }
+        }
         if decision_trace_on() {
             let round = game.view().auth.turn().round.saturating_sub(orders.start_round);
             trace_decision(scene, orders, &tokens, &memory, &slots, (at, &logits, end), &candidates, &scores, if acted { chosen } else { 0 }, core, round);

@@ -328,14 +328,28 @@ fn run(rules: &CompiledRuleset, o: &Opts) -> Result<(), String> {
         }
         let Ok((game, scene)) = families::build(rules, f, e, i, a) else { return };
         for p in todo {
-            crate::army_net::record::want(record_out.is_some());
-            match play(rules, game.clone(), scene.clone(), p, false) {
-                Ok(r) => write_row(&tag(r, "player")),
-                Err(err) => eprintln!("{} {p}: {err}", scene.label(rules)),
-            }
-            crate::army_net::record::want(false);
-            if let (Some(out), Some((bytes, _))) = (record_out.as_ref(), crate::army_net::record::take_last()) {
-                let _ = out.lock().unwrap().write_all(&bytes);
+            // Sampling mode (`ARMY_SAMPLE_PLAN`, opt-in): a scene of the plan is played G times by the army net, sampling in its plan's rounds.
+            let sample_cfg = crate::army_net::sample::config().filter(|_| p == "army-net");
+            let key = format!("{}/{}/{}/{}", f.name(), e, i, a);
+            let copies = match sample_cfg {
+                Some(cfg) if cfg.plan.contains_key(&key) => cfg.copies,
+                Some(_) => continue,
+                None => 1,
+            };
+            for copy in 0..copies {
+                if let Some(cfg) = sample_cfg {
+                    crate::army_net::sample::begin(cfg, &key, copy);
+                }
+                crate::army_net::record::want(record_out.is_some());
+                match play(rules, game.clone(), scene.clone(), p, false) {
+                    Ok(r) => write_row(&tag(r, "player")),
+                    Err(err) => eprintln!("{} {p}: {err}", scene.label(rules)),
+                }
+                crate::army_net::record::want(false);
+                crate::army_net::sample::end();
+                if let (Some(out), Some((bytes, _))) = (record_out.as_ref(), crate::army_net::record::take_last()) {
+                    let _ = out.lock().unwrap().write_all(&bytes);
+                }
             }
         }
         let n = count.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1;
