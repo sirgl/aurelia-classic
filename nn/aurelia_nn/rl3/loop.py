@@ -154,8 +154,12 @@ def main(argv=None):
         p, t = run_actor(a, wbin, udir, sorted({k["family"] for _, k, _ in sel}), a.jobs)
         return p, t, udir, n_of, len(sel)
 
-    if a.val_every and state["update"] == 0 and not os.path.exists(os.path.join(a.out, "val", "u0000")):
-        validate(a, model, 0, fams)
+    def val_due(u):
+        return bool(a.val_every) and (u % a.val_every == 0 or u == a.updates)
+
+    # The validation of the state we start from (update 0, or the update a restart resumes at, when a crash came between its checkpoint and its validation).
+    if val_due(state["update"]) and not os.path.exists(os.path.join(a.out, "val", f"u{state['update']:04d}", "done")):
+        validate(a, model, state["update"], fams)
     for u in range(state["update"] + 1, a.updates + 1):
         if time.time() - t_run > a.minutes * 60:
             break
@@ -215,12 +219,10 @@ def main(argv=None):
             shutil.rmtree(udir, ignore_errors=True)
         del bt, stream
         mx.clear_cache()
-        if u % a.ckpt_every == 0:
+        if u % a.ckpt_every == 0 or u == a.updates:
             save_state(a, model, opt, state, f"ckpt-{u:04d}")
-        if a.val_every and u % a.val_every == 0:
+        if val_due(u):
             validate(a, model, u, fams)
-    if state["update"] % a.ckpt_every:
-        save_state(a, model, opt, state, f"ckpt-{state['update']:04d}")
     if pending is not None:
         pending[0].kill()
     open(os.path.join(a.out, "done"), "w").write(str(state["update"]))
@@ -245,6 +247,8 @@ def validate(a, model, u, fams):
     log(a.out, {"validation": u, "seconds": round(secs, 1), "rc": rc, "family_mean": round(mean, 4), "plays": sum(n for _, n in per.values()),
                 "rates": {f: round(w / n, 3) for f, (w, n) in sorted(per.items())}})
     os.remove(wbin)
+    if rc == 0:
+        open(os.path.join(d, "done"), "w").write(str(u))
 
 
 if __name__ == "__main__":

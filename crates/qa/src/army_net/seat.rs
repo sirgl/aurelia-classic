@@ -696,10 +696,10 @@ pub fn turn(rules: &CompiledRuleset, game: &mut GameState, orders: &Orders, scen
         // Sampling mode records the net's own decisions: a sampled turn's every decision, an other turn's first moment (for the map).
         if super::sample::on() && super::record::active() {
             if ends && sampling {
-                let i = super::record::push_net(game, &tokens, &[], -1, -1, rel);
+                let i = super::record::push_net(super::record::ids_now(game, &tokens), &tokens, &[], -1, -1, rel);
                 super::sample::note(i, lp_ptr, None);
             } else if step == 0 && !sampling {
-                super::record::push_net(game, &tokens, &[], -2, -1, rel);
+                super::record::push_net(super::record::ids_now(game, &tokens), &tokens, &[], -2, -1, rel);
             }
         }
         if ends {
@@ -732,6 +732,8 @@ pub fn turn(rules: &CompiledRuleset, game: &mut GameState, orders: &Orders, scen
             order.insert(0, a);
         }
         let first_pick = order.first().copied();
+        // The decision's ids, before the command changes the game (see `record::push_net`).
+        let ids = if super::sample::on() && super::record::active() { super::record::ids_now(game, &tokens) } else { Vec::new() };
         let mut acted = false;
         let mut chosen = -1i16;
         for i in order {
@@ -757,7 +759,7 @@ pub fn turn(rules: &CompiledRuleset, game: &mut GameState, orders: &Orders, scen
                 if lp_act.is_some() && first_pick.is_some_and(|f| f as i16 != applied) {
                     super::sample::note_fallback();
                 }
-                let i = super::record::push_net(game, &tokens, &candidates, at as i16, applied, rel);
+                let i = super::record::push_net(ids, &tokens, &candidates, at as i16, applied, rel);
                 super::sample::note(i, lp_ptr, lp_act);
             }
         }

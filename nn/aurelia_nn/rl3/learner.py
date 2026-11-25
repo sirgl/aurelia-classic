@@ -58,6 +58,14 @@ def advantages(metas):
     return adv, live, scenes
 
 
+def lost_slots(flat):
+    """The decisions whose picked unit has no army slot in the record (pointer >= 0, slot -1). The net read that unit's memory by its slot, so the
+    learner would read another memory than the net did and every log-probability of the decision would be off (the step 1.10 parity outliers:
+    the recorder looked the ids up after the command had run, and a unit killed by it lost its slot). Returns the flat indices."""
+    slot = memoryview(flat.slot).cast("h")
+    return [i for i, p in enumerate(flat.ptr) if p >= 0 and slot[flat.tok_off[i] + p] < 0]
+
+
 class Batch:
     """The device arrays of the plays of a step: decisions, plan, advantages, the maps."""
 
@@ -65,6 +73,9 @@ class Batch:
         ids = list(range(len(stream))) if ids is None else ids
         self.tm = max(stream.t_max, 1)
         self.flat = flat = stream.flat(ids)
+        lost = lost_slots(flat)
+        if lost:
+            raise ValueError(f"{len(lost)} decisions of the record pick a unit without an army slot (first: {lost[:5]}): the record's ids were read after the command")
         self.adv, self.live, self.scenes = advantages(flat.plays)
         labelled = [i for i, p in enumerate(flat.ptr) if p >= -1]
         self.n_live = sum(1 for i in labelled if self.live[flat.play[i]])

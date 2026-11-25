@@ -349,14 +349,23 @@ pub fn end_turn(game: &GameState, rules: &CompiledRuleset) {
 
 /// The net's own decision (`seat::turn`, sampling mode): its tokens at the moment, the unit's candidates (empty for the end and for an
 /// unlabelled first moment), the pick (token index, -1 end, -2 none) and the action it applied. Returns its index in the play.
-pub fn push_net(game: &GameState, tokens: &Tokens, candidates: &[Candidate], pointer: i16, action: i16, round: u32) -> usize {
-    let Some(orders) = with(|r| r.orders.clone()) else { return 0 };
-    let ids = ids_of(game, &orders, tokens);
+///
+/// `ids` are the army ids of the tokens AS THE DECISION SAW THEM (`ids_now`, taken BEFORE the command runs): after a command the unit
+/// that acted can be gone (killed by the counter-strike, a spent missile or plane), and an id looked up afterwards is `None`, which
+/// writes slot -1 for the acting token and the learner then reads a different memory slot than the net did (the 26 parity outliers
+/// of step 1.10). Nothing here reads the game after the fact.
+pub fn push_net(ids: Vec<Option<EntityId>>, tokens: &Tokens, candidates: &[Candidate], pointer: i16, action: i16, round: u32) -> usize {
     with(|r| {
         r.decisions.push(Decision { tokens: tokens.clone(), candidates: candidates.to_vec(), pointer, action, round: round as u16, ids, hp: BTreeMap::new(), end: pointer == -1, danger: Vec::new(), flags: 0, track: NO_TRACK });
         r.decisions.len() - 1
     })
     .unwrap_or(0)
+}
+
+/// The army ids of the tokens now, for `push_net`: call it before the decision's command runs.
+pub fn ids_now(game: &GameState, tokens: &Tokens) -> Vec<Option<EntityId>> {
+    let Some(orders) = with(|r| r.orders.clone()) else { return Vec::new() };
+    ids_of(game, &orders, tokens)
 }
 
 /// The pointer's "end" at this moment, as a decision (a probe found nothing the army should do; a probe's
