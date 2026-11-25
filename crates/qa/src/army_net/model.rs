@@ -190,6 +190,8 @@ pub struct Net {
     notes: Option<NoteW>,
     /// Variant MBA: the stake's projection `[3][d]` (None: no price input).
     price: Option<Vec<f32>>,
+    /// Step 1.8 (MBP): the stake's projection `w_price_all` `[3][d]` added to EVERY army token (None: none).
+    price_all: Option<Vec<f32>>,
     /// Variant MBH: the history's separate cross-attention (None: none).
     xhist: Option<XHistW>,
     /// Variant MBN: the notes' separate cross-attention and heads (None: none).
@@ -637,11 +639,21 @@ impl Net {
         } else {
             None
         };
+        let price_all = if t.contains_key("w_price_all") {
+            let (shape, w) = get("w_price_all")?;
+            if shape.as_slice() != [3, c.d] {
+                return Err(format!("w_price_all is {shape:?}, not [3, {}]", c.d));
+            }
+            Some(w.clone())
+        } else {
+            None
+        };
         Ok(Net {
             ww,
             xnotes,
             xhist,
             price,
+            price_all,
             notes,
             hist,
             mem,
@@ -1030,6 +1042,16 @@ impl Net {
             enc.pool.apply(&mean, &mut y);
             for c in 0..d {
                 h[c] += y[c];
+            }
+        }
+        // MBP (step 1.8): the stake's projection on every army token (`w_price_all` [3, d]); the plan tokens are not army tokens.
+        if let Some(wa) = self.price_all.as_ref() {
+            for row in h.chunks_mut(d).take(n) {
+                for (k, p) in tokens.price.iter().enumerate() {
+                    for c in 0..d {
+                        row[c] += p * wa[k * d + c];
+                    }
+                }
             }
         }
         // MBA: the stake's projection on the objective token (`w_price` [3, d]).

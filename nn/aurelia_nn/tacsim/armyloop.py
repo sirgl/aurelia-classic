@@ -29,10 +29,11 @@ PER_UNIT = 6
 def load_net(path):
     from aurelia_nn.army.model_m import MemNet
     from aurelia_nn.army.model_mb import MBANet, MBHNet, MBNet, MBNNet
+    from aurelia_nn.army.model_mbp import MBPNet
     w = mx.load(path)
     if "m_in.weight" in w:
-        # MBH (the history; an MBA net) and MBN (the notes; an MB net) by their own parameters.
-        cls = MBHNet if "hx_slope" in w else (MBNNet if "nx_slope" in w else (MBANet if "w_price" in w else MBNet))
+        # MBH (the history; an MBA net) and MBN (the notes; an MB net) by their own parameters; MBP: the notes and the stake (step 1.8).
+        cls = MBHNet if "hx_slope" in w else ((MBPNet if "w_price_all" in w else MBNNet) if "nx_slope" in w else (MBANet if "w_price" in w else MBNet))
         model = cls(promos=w["promo"].shape[0] - 1, map_ch=w["m_in.weight"].shape[0])
     else:
         model = MemNet(promos=w["promo"].shape[0] - 1)
@@ -46,7 +47,9 @@ class Brain:
 
     def __init__(self, model):
         from aurelia_nn.army.model_mb import MBANet, MBHNet, MBNet, MBNNet
+        from aurelia_nn.army.model_mbp import MBPNet
         self.m = model
+        self.pricep = isinstance(model, MBPNet)
         self.has_map = isinstance(model, MBNet)
         self.price = isinstance(model, MBANet)
         # MBN: the notes the net wrote at its last turn's end (`x["ns"]`); MBH: the history's tokens (`x["hist"]`).
@@ -71,6 +74,9 @@ class Brain:
                 hx = x["hist"]
                 return m.body_mbh(tok["feat"], tok["dist"], tok["mask"], tok["slot"], um, pm, gtok, pos >= 0, mmean, price,
                                   hx["hist"], hx["hmask"], hx["hslot"], hx["hage"], hx["hplan"])[0]
+            if self.pricep:
+                off = mx.zeros((pos.shape[0],), dtype=mx.bool_)
+                return m.body_mbp(tok["feat"], tok["dist"], tok["mask"], tok["slot"], um, pm, gtok, pos >= 0, mmean, x["ns"], off, price)
             if self.notes:
                 off = mx.zeros((pos.shape[0],), dtype=mx.bool_)
                 return m.body_mbn(tok["feat"], tok["dist"], tok["mask"], tok["slot"], um, pm, gtok, pos >= 0, mmean, x["ns"], off)
