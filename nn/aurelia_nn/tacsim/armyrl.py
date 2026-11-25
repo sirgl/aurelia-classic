@@ -32,10 +32,14 @@ from mlx.utils import tree_flatten, tree_map
 
 from . import armymemgrad
 from . import armyobs as A
+from . import armyprice as PR
 from .armyloop import Brain, load_net
 from .armyplay import Game
 
 FAMILIES = ["siege", "ram", "bombard", "promotion-choice", "planned-assault", "raid", "prey", "assault-heal", "hill-archers", "city-fire"]
+# Package 1's two families (their stake is their own: the "at any cost" families), played by `--price` (step 1.8).
+PACKAGE1 = ["assault-peace", "assault-reinforce"]
+PRICE_KEYS = ("w_price", "w_price_all")
 SIEGE_UP = None
 
 
@@ -51,15 +55,22 @@ def line_of(sc):
     return "prey-land" if fam == "prey" and sc["orders"].get("context") == "land" else fam
 
 
-def evaluate(plays, brain):
-    """Greedy own play of every held-out play once: {line: [wins, plays]}."""
-    g = Game(plays, 1, brain)
+def evaluate(plays, brain, price=False):
+    """Greedy own play of every held-out play once: {line: [wins, plays]}. With `price` (step 1.8) each play of a price family
+    is played three times (its own stake, `careful`, `anycost:D`) and counted on its line `f`, `f@careful`, `f@anycost`."""
+    entries = []
+    for p in plays:
+        fam = p[0]["play"].split("/")[0]
+        entries += [PR.Entry(p, f) for f in ((PR.NATIVE, PR.CAREFUL, PR.ANYCOST) if price and fam in PR.PRICE_D else (PR.NATIVE,))]
+    g = Game([e.play for e in entries], 1, brain)
     setup(g)
-    v = g.play().tolist()
+    PR.prepare_game(g, entries)
+    g.play()
+    rw = PR.rewards(g, entries, 1)
     out = collections.defaultdict(lambda: [0, 0])
-    for b, x in enumerate(v):
-        k = line_of(plays[b][0])
-        out[k][0] += int(x == 1)
+    for e, r in zip(entries, rw):
+        k = line_of(e.play[0]) if e.form == PR.NATIVE else e.line
+        out[k][0] += int(r == 1.0)
         out[k][1] += 1
     return dict(out)
 
@@ -101,18 +112,27 @@ def allocate(P, families, rate, bars, min_each, boost):
     return n, wts
 
 
-def advantages(verdict, P, G):
-    R = [1.0 if v == 1 else 0.0 for v in verdict]
+def advantages(verdict, P, G, rewards=None, gkey=None):
+    """Group-normalised advantages; row p + P k is copy k of play p; the plays with the same `gkey` form ONE group (a scene under one
+    stake; a group of more than G copies is the same scene played twice). `rewards`: the per-row reward (step 1.8: the price form's
+    verdict); None: the verdict == win. Returns (advantages, rewards, live: per play)."""
+    R = rewards if rewards is not None else [1.0 if v == 1 else 0.0 for v in verdict]
+    gkey = list(range(P)) if gkey is None else gkey
+    members = collections.defaultdict(list)
+    for p in range(P):
+        members[gkey[p]].append(p)
     adv = [0.0] * (P * G)
     live = [False] * P
-    for p in range(P):
-        rs = [R[p + P * k] for k in range(G)]
-        mean = sum(rs) / G
-        std = (sum((x - mean) ** 2 for x in rs) / G) ** 0.5
+    for plays in members.values():
+        rows = [p + P * k for p in plays for k in range(G)]
+        rs = [R[i] for i in rows]
+        mean = sum(rs) / len(rs)
+        std = (sum((x - mean) ** 2 for x in rs) / len(rs)) ** 0.5
         if std > 1e-6:
-            live[p] = True
-            for k in range(G):
-                adv[p + P * k] = (rs[k] - mean) / (std + 1e-6)
+            for p in plays:
+                live[p] = True
+            for i, x in zip(rows, rs):
+                adv[i] = (x - mean) / (std + 1e-6)
     return adv, R, live
 
 
@@ -268,6 +288,10 @@ def main(argv=None):
     ap.add_argument("--anchor-only", action="store_true", help="the control: no play, no RL; each update is the anchor's step alone")
     ap.add_argument("--no-eval0", action="store_true")
     ap.add_argument("--mem-grad", type=int, default=0, help="the RL gradient through the memory's last W turns' steps (armymemgrad); 0: the memory is an input")
+    ap.add_argument("--price", action="store_true", help="step 1.8: the price in the reward: the six price families as `f@careful` / `f@anycost` lines (a group = a scene under one stake), package 1's two families added; two optimisers")
+    ap.add_argument("--price-lr-mult", type=float, default=10.0, help="the lr of w_price / w_price_all as a multiple of --lr")
+    ap.add_argument("--price-G", type=int, default=0, help="copies of a price-line group (0: --G)")
+    ap.add_argument("--D-file", default="/Users/roman.ivanov/civ/work/nets/army-net/runs/teach7p-D.json", help="teach7p's per-family any-cost best rates (the bars of the any-cost lines)")
     ap.add_argument("--split", type=int, default=70, help="training scenes: instances below it; the rest of --train is the validation set")
     a = ap.parse_args(argv)
     mx.set_memory_limit(16 << 30)
@@ -276,23 +300,36 @@ def main(argv=None):
     mx.random.seed(a.seed)
     os.makedirs(a.out, exist_ok=True)
     t0 = time.time()
-    train_all = A.load(a.train, families=FAMILIES)
-    held = A.load(a.held, families=FAMILIES)
+    FAMS = FAMILIES + (PACKAGE1 if a.price else [])
+    train_all = [p for path in a.train.split(",") for p in A.load(path, families=FAMS)]
+    held = [p for path in a.held.split(",") for p in A.load(path, families=FAMS)]
     inst = lambda p: int(p[0]["play"].split("/")[2])
     val = [p for p in train_all if inst(p) >= a.split]
     train_all = [p for p in train_all if inst(p) < a.split]
     by_fam = collections.defaultdict(list)
     for p in train_all:
         by_fam[p[0]["play"].split("/")[0]].append(p)
-    fams = [f for f in FAMILIES if by_fam.get(f)]
-    bars = bars_from(a.bars, set(fams))
-    print(f"loaded {len(train_all)} training plays ({', '.join(f'{f} {len(by_fam[f])}' for f in fams)}), {len(val)} validation plays (instances >= {a.split}), {len(held)} held-out plays in {time.time() - t0:.0f}s", flush=True)
+    fams_f = [f for f in FAMS if by_fam.get(f)]
+    bars_f = bars_from(a.bars, set(fams_f))
+    # The RL lines: a family, or with --price a price family's two lines (careful / anycost).
+    lines = [PR.line_name(f, form) for f, form in PR.lines_of(fams_f, a.price)]
+    fam_of_line = {PR.line_name(f, form): (f, form) for f, form in PR.lines_of(fams_f, a.price)}
+    bars = {}
+    for ln, (f, form) in fam_of_line.items():
+        if form == PR.ANYCOST:
+            best = max(json.load(open(a.D_file))[f]["anycost"].values())
+            bars[ln] = ("anycost", best, 0.9 * best)
+        else:
+            bars[ln] = bars_f[f]
+    fams = lines
+    print(f"loaded {len(train_all)} training plays ({', '.join(f'{f} {len(by_fam[f])}' for f in fams_f)}), {len(val)} validation plays (instances >= {a.split}), {len(held)} held-out plays in {time.time() - t0:.0f}s", flush=True)
+    print("lines: " + " ".join(lines), flush=True)
     print("bars: " + ", ".join(f"{f} {bars[f][0]} {bars[f][1]:.3f} -> {bars[f][2]:.3f}" for f in fams), flush=True)
     model = load_net(a.weights)
     brain = Brain(model)
     ref = Brain(load_net(a.weights))
-    anchor = Anchor(a.anchor, a.anchor_plays, a.seed, model, exclude=FAMILIES if a.anchor_skip_twin else ()) if a.anchor else None
-    curve = {"settings": {k: v for k, v in vars(a).items()}, "bars": {f: list(bars[f]) for f in fams}, "train_plays": {f: len(by_fam[f]) for f in fams},
+    anchor = Anchor(a.anchor, a.anchor_plays, a.seed, model, exclude=FAMS if a.anchor_skip_twin else ()) if a.anchor else None
+    curve = {"settings": {k: v for k, v in vars(a).items()}, "bars": {f: list(bars[f]) for f in fams}, "train_plays": {f: len(by_fam[f]) for f in fams_f},
              "held_plays": len(held), "val_plays": len(val), "held": [], "val": [], "updates": []}
     if anchor:
         curve["anchor"] = {"plays": len(anchor.stream), "pool": len(anchor.pool), "decisions": anchor.stream.decisions, "best": {f: list(v) for f, v in anchor.best.items()}}
@@ -306,7 +343,7 @@ def main(argv=None):
             if not plays:
                 continue
             t = time.time()
-            r = evaluate(plays, brain)
+            r = evaluate(plays, brain, a.price)
             w = sum(x[0] for x in r.values()); n = sum(x[1] for x in r.values())
             fam_mean = sum(v[0] / v[1] for k, v in r.items() if k != "prey-land") / max(1, sum(1 for k in r if k != "prey-land"))
             curve[name].append({"update": u, "lines": r, "wins": w, "plays": n, "family_mean": round(fam_mean, 4)})
@@ -316,6 +353,7 @@ def main(argv=None):
     if not a.no_eval0 and not a.probe:
         held_eval(0)
     opt = optim.Adam(learning_rate=a.lr)
+    opt_price = optim.Adam(learning_rate=a.lr * a.price_lr_mult) if a.price else None
     rl_grad = make_rl_grad(model, brain)
     turn_grad = armymemgrad.make_turn_gradient(model, brain, logp_parts) if a.mem_grad else None
     rate = {}
@@ -341,10 +379,17 @@ def main(argv=None):
                 held_eval(u)
             continue
         n_of, wts = allocate(a.P, fams, rate, bars, a.min_per_family, a.boost)
-        sub = []
-        for f in fams:
-            sub += random.sample(by_fam[f], min(n_of[f], len(by_fam[f])))
-        P, G = len(sub), a.G
+        entries, gkey = [], []
+        for ln in fams:
+            f, form = fam_of_line[ln]
+            dup = -(-a.price_G // a.G) if (a.price and form != PR.NATIVE and a.price_G > a.G) else 1
+            for p in random.sample(by_fam[f], min(n_of[ln], len(by_fam[f]))):
+                for _ in range(dup):
+                    gkey.append(len(gkey) if dup == 1 else (ln, id(p)))
+                    entries.append(PR.Entry(p, form))
+        # A group = a scene under one stake (G copies): the copies of a price line's group may be more (`--price-G`).
+        P, G = len(entries), a.G
+        sub = [e.play for e in entries]
         plan = collections.defaultdict(lambda: [False] * (P * G))
         for pi, p in enumerate(sub):
             L = play_length(p)
@@ -353,14 +398,15 @@ def main(argv=None):
                     plan[r][pi + P * k] = True
         g = Game(sub, G, brain, salt=False)
         setup(g)
+        PR.prepare_game(g, entries)
         if a.mem_grad:
             g.mem_tape = armymemgrad.Tape(armymemgrad.wanted_turns(plan, a.mem_grad))
         g.sample_plan = {r: mx.array(m) for r, m in plan.items()}
         g.sample_key = mx.random.key(a.seed * 100003 + u)
         g.play()
         verdict = g.verdict.tolist()
-        adv, R, live = advantages(verdict, P, G)
-        fam_of = [p[0]["play"].split("/")[0] for p in sub]
+        adv, R, live = advantages(verdict, P, G, PR.rewards(g, entries, G), gkey)
+        fam_of = [e.line for e in entries]
         per = collections.defaultdict(lambda: [0, 0.0, 0])  # plays, reward sum, live groups
         for pi, f in enumerate(fam_of):
             per[f][0] += 1
@@ -411,6 +457,14 @@ def main(argv=None):
                 total, nrm = optim.clip_grad_norm(total, a.clip)
                 norm = nrm.item()
                 if norm == norm and norm < float("inf"):
+                    if opt_price is not None:
+                        # The stake's projections have their own Adam (lr x --price-lr-mult); the main Adam sees zero for them.
+                        gp = {k: total[k] for k in PRICE_KEYS}
+                        total = dict(total)
+                        for k in PRICE_KEYS:
+                            total[k] = mx.zeros_like(total[k])
+                        model.update(opt_price.apply_gradients(gp, {k: getattr(model, k) for k in PRICE_KEYS}))
+                        row["w_price_norm"] = [round(mx.sum(getattr(model, k) ** 2).item() ** 0.5, 5) for k in PRICE_KEYS]
                     opt.update(model, total)
                     mx.eval(model.parameters(), opt.state)
                 else:
@@ -420,7 +474,7 @@ def main(argv=None):
         row["seconds"] = round(time.time() - tu, 1)
         curve["updates"].append(row)
         print(json.dumps({k: v for k, v in row.items() if k not in ("families", "weights")}) + " | " +
-              " ".join(f"{f[:8]} {v['reward']:.2f}/{v['live']}" for f, v in row["families"].items()), flush=True)
+              " ".join(f"{f[:18]} {v['reward']:.2f}/{v['live']}" for f, v in row["families"].items()), flush=True)
         done = u
         del g
         mx.clear_cache()

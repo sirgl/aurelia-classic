@@ -202,3 +202,64 @@ def spawn_profiles(sim, s, scenes):
         if bool(mx.any(known).item()):
             s = sim.put_spawn_profile(s, slot, known, first)
     return s
+
+
+# ------------------------------------------------------------------------------------------ step 1.8: the price in the RL reward
+
+# The six families of the paired price data (teach7p): the deadline D of the "any cost" form (`army-net/runs/teach7p-D.json`).
+PRICE_D = {"planned-assault": 8, "assault-heal": 6, "siege": 7, "city-fire": 6, "hill-archers": 7, "promotion-choice": 9}
+NATIVE, CAREFUL, ANYCOST = "native", "careful", "anycost"
+
+
+class Entry:
+    """One RL group: a scene under one price form. `form` native (the scene's own stake; the family's own verdict), careful (the
+    form's stake; the family's verdict) or anycost (the stake of `anycost:D`; the reward 1 when the capture comes at a round <= D,
+    losses free, so the play goes on past the loss cap). `line` names the (family, form) the group belongs to."""
+
+    def __init__(self, play, form=NATIVE):
+        self.play = play
+        self.family = play[0]["play"].split("/")[0]
+        self.form = form
+        self.D = PRICE_D.get(self.family) if form == ANYCOST else None
+        self.line = self.family if form == NATIVE else f"{self.family}@{form}"
+        o = play[0]["orders"]
+        if form == NATIVE:
+            self.price = [float(x) for x in o["price"]]
+        else:
+            name = "careful" if form == CAREFUL else f"anycost:{self.D}"
+            self.price = price_set(name, self.family, play[0]["scene"]["n_mine"], o["rounds"], o.get("deadline"))
+
+
+def lines_of(families, price):
+    """The RL lines of a family list: with `price`, each of the six price families gets `f@careful` and `f@anycost`."""
+    out = []
+    for f in families:
+        if price and f in PRICE_D:
+            out += [(f, CAREFUL), (f, ANYCOST)]
+        else:
+            out.append((f, NATIVE))
+    return out
+
+
+def line_name(family, form):
+    return family if form == NATIVE else f"{family}@{form}"
+
+
+def prepare_game(game, entries):
+    """Put the entries' stakes and the per-row play-on into a Game built from `[e.play for e in entries]` (rows p + P k)."""
+    import mlx.core as mx
+    idx = game.idx
+    game.price = mx.take(mx.array([e.price for e in entries], dtype=mx.float32), idx, axis=0)
+    game.pr.play_on = mx.take(mx.array([e.form == ANYCOST for e in entries]), idx)
+
+
+def rewards(game, entries, copies):
+    """[P * copies] the reward of each row: anycost 1 when taken at a round in 0..D, else the family's verdict == win."""
+    v = game.verdict.tolist()
+    taken = game.pr.taken_round.tolist()
+    P = len(entries)
+    out = []
+    for row in range(P * copies):
+        e = entries[row % P]
+        out.append(1.0 if (0 <= taken[row] <= e.D if e.form == ANYCOST else v[row] == 1) else 0.0)
+    return out
