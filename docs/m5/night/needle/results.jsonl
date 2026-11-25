@@ -1,0 +1,81 @@
+{"length": 64, "needles": 1, "d": 64, "layers": 3, "params": 113440, "steps_run": 1250, "best_acc": 0.9985, "final_acc": 0.9985, "seconds": 3.4, "steps_per_s": 372.99}
+{"length": 64, "needles": 1, "d": 64, "layers": 4, "params": 146912, "skipped": "skipped: smaller net passed"}
+{"length": 64, "needles": 1, "d": 64, "layers": 6, "params": 213856, "skipped": "skipped: smaller net passed"}
+{"length": 64, "needles": 1, "d": 96, "layers": 3, "params": 243872, "skipped": "skipped: smaller net passed"}
+{"length": 64, "needles": 1, "d": 96, "layers": 4, "params": 318656, "skipped": "skipped: smaller net passed"}
+{"length": 64, "needles": 1, "d": 128, "layers": 3, "params": 423456, "skipped": "skipped: smaller net passed"}
+{"length": 64, "needles": 1, "d": 96, "layers": 6, "params": 468224, "skipped": "skipped: smaller net passed"}
+{"length": 64, "needles": 1, "d": 128, "layers": 4, "params": 555936, "skipped": "skipped: smaller net passed"}
+{"length": 64, "needles": 1, "d": 128, "layers": 6, "params": 820896, "skipped": "skipped: smaller net passed"}
+{"length": 64, "needles": 3, "d": 64, "layers": 3, "params": 113440, "steps_run": 500, "best_acc": 0.9984, "final_acc": 0.9984, "seconds": 1.3, "steps_per_s": 393.68}
+{"length": 64, "needles": 3, "d": 64, "layers": 4, "params": 146912, "skipped": "skipped: smaller net passed"}
+{"length": 64, "needles": 3, "d": 64, "layers": 6, "params": 213856, "skipped": "skipped: smaller net passed"}
+{"length": 64, "needles": 3, "d": 96, "layers": 3, "params": 243872, "skipped": "skipped: smaller net passed"}
+{"length": 64, "needles": 3, "d": 96, "layers": 4, "params": 318656, "skipped": "skipped: smaller net passed"}
+{"length": 64, "needles": 3, "d": 128, "layers": 3, "params": 423456, "skipped": "skipped: smaller net passed"}
+{"length": 64, "needles": 3, "d": 96, "layers": 6, "params": 468224, "skipped": "skipped: smaller net passed"}
+{"length": 64, "needles": 3, "d": 128, "layers": 4, "params": 555936, "skipped": "skipped: smaller net passed"}
+{"length": 64, "needles": 3, "d": 128, "layers": 6, "params": 820896, "skipped": "skipped: smaller net passed"}
+{"length": 64, "needles": 5, "d": 64, "layers": 3, "params": 113440, "steps_run": 500, "best_acc": 1.0, "final_acc": 1.0, "seconds": 1.3, "steps_per_s": 373.55}
+{"length": 64, "needles": 5, "d": 64, "layers": 4, "params": 146912, "skipped": "skipped: smaller net passed"}
+{"length": 64, "needles": 5, "d": 64, "layers": 6, "params": 213856, "skipped": "skipped: smaller net passed"}
+{"length": 64, "needles": 5, "d": 96, "layers": 3, "params": 243872, "skipped": "skipped: smaller net passed"}
+{"length": 64, "needles": 5, "d": 96, "layers": 4, "params": 318656, "skipped": "skipped: smaller net passed"}
+{"length": 64, "needles": 5, "d": 128, "layers": 3, "params": 423456, "skipped": "skipped: smaller net passed"}
+{"length": 64, "needles": 5, "d": 96, "layers": 6, "params": 468224, "skipped": "skipped: smaller net passed"}
+{"length": 64, "needles": 5, "d": 128, "layers": 4, "params": 555936, "skipped": "skipped: smaller net passed"}
+{"length": 64, "needles": 5, "d": 128, "layers": 6, "params": 820896, "skipped": "skipped: smaller net passed"}
+{"length": 128, "needles": 1, "d": 64, "layers": 3, "params": 117536, "steps_run": 3000, "best_acc": 0.0371, "final_acc": 0.0371, "seconds": 13.6, "steps_per_s": 220.86}
+{"length": 128, "needles": 1, "d": 64, "layers": 4, "params": 151008, "steps_run": 3000, "best_acc": 0.0596, "final_acc": 0.0596, "seconds": 17.5, "steps_per_s": 171.69}
+{"length": 128, "needles": 1, "d": 64, "layers": 6, "params": 217952, "steps_run": 3000, "best_acc": 0.0376, "final_acc": 0.0312, "seconds": 25.6, "steps_per_s": 117.03}
+{"length": 128, "needles": 1, "d": 96, "layers": 3, "params": 250016, "steps_run": 2250, "best_acc": 0.9917, "final_acc": 0.9917, "seconds": 12.8, "steps_per_s": 175.53}
+{"length": 128, "needles": 1, "d": 96, "layers": 4, "params": 324800, "skipped": "skipped: smaller net passed"}
+{"length": 128, "needles": 1, "d": 128, "layers": 3, "params": 431648, "skipped": "skipped: smaller net passed"}
+{"length": 128, "needles": 1, "d": 96, "layers": 6, "params": 474368, "skipped": "skipped: smaller net passed"}
+{"length": 128, "needles": 1, "d": 128, "layers": 4, "params": 564128, "skipped": "skipped: smaller net passed"}
+{"length": 128, "needles": 1, "d": 128, "layers": 6, "params": 829088, "skipped": "skipped: smaller net passed"}
+{"length": 128, "needles": 3, "d": 64, "layers": 3, "params": 117536, "steps_run": 1000, "best_acc": 0.9997, "final_acc": 0.9997, "seconds": 4.7, "steps_per_s": 212.44}
+{"length": 128, "needles": 3, "d": 64, "layers": 4, "params": 151008, "skipped": "skipped: smaller net passed"}
+{"length": 128, "needles": 3, "d": 64, "layers": 6, "params": 217952, "skipped": "skipped: smaller net passed"}
+{"length": 128, "needles": 3, "d": 96, "layers": 3, "params": 250016, "skipped": "skipped: smaller net passed"}
+{"length": 128, "needles": 3, "d": 96, "layers": 4, "params": 324800, "skipped": "skipped: smaller net passed"}
+{"length": 128, "needles": 3, "d": 128, "layers": 3, "params": 431648, "skipped": "skipped: smaller net passed"}
+{"length": 128, "needles": 3, "d": 96, "layers": 6, "params": 474368, "skipped": "skipped: smaller net passed"}
+{"length": 128, "needles": 3, "d": 128, "layers": 4, "params": 564128, "skipped": "skipped: smaller net passed"}
+{"length": 128, "needles": 3, "d": 128, "layers": 6, "params": 829088, "skipped": "skipped: smaller net passed"}
+{"length": 128, "needles": 5, "d": 64, "layers": 3, "params": 117536, "steps_run": 750, "best_acc": 0.9997, "final_acc": 0.9997, "seconds": 3.6, "steps_per_s": 205.91}
+{"length": 128, "needles": 5, "d": 64, "layers": 4, "params": 151008, "skipped": "skipped: smaller net passed"}
+{"length": 128, "needles": 5, "d": 64, "layers": 6, "params": 217952, "skipped": "skipped: smaller net passed"}
+{"length": 128, "needles": 5, "d": 96, "layers": 3, "params": 250016, "skipped": "skipped: smaller net passed"}
+{"length": 128, "needles": 5, "d": 96, "layers": 4, "params": 324800, "skipped": "skipped: smaller net passed"}
+{"length": 128, "needles": 5, "d": 128, "layers": 3, "params": 431648, "skipped": "skipped: smaller net passed"}
+{"length": 128, "needles": 5, "d": 96, "layers": 6, "params": 474368, "skipped": "skipped: smaller net passed"}
+{"length": 128, "needles": 5, "d": 128, "layers": 4, "params": 564128, "skipped": "skipped: smaller net passed"}
+{"length": 128, "needles": 5, "d": 128, "layers": 6, "params": 829088, "skipped": "skipped: smaller net passed"}
+{"length": 256, "needles": 1, "d": 64, "layers": 3, "params": 125728, "steps_run": 3000, "best_acc": 0.0386, "final_acc": 0.0234, "seconds": 39.3, "steps_per_s": 76.24}
+{"length": 256, "needles": 1, "d": 64, "layers": 4, "params": 159200, "steps_run": 3000, "best_acc": 0.0386, "final_acc": 0.0303, "seconds": 55.4, "steps_per_s": 54.2}
+{"length": 256, "needles": 1, "d": 64, "layers": 6, "params": 226144, "steps_run": 3000, "best_acc": 0.0386, "final_acc": 0.0283, "seconds": 80.3, "steps_per_s": 37.35}
+{"length": 256, "needles": 1, "d": 96, "layers": 3, "params": 262304, "steps_run": 3000, "best_acc": 0.0386, "final_acc": 0.0342, "seconds": 48.7, "steps_per_s": 61.6}
+{"length": 256, "needles": 1, "d": 96, "layers": 4, "params": 337088, "steps_run": 3000, "best_acc": 0.0386, "final_acc": 0.0229, "seconds": 65.5, "steps_per_s": 45.78}
+{"length": 256, "needles": 1, "d": 128, "layers": 3, "params": 448032, "steps_run": 3000, "best_acc": 0.0386, "final_acc": 0.0273, "seconds": 57.0, "steps_per_s": 52.63}
+{"length": 256, "needles": 1, "d": 96, "layers": 6, "params": 486656, "steps_run": 3000, "best_acc": 0.0386, "final_acc": 0.0278, "seconds": 100.4, "steps_per_s": 29.89}
+{"length": 256, "needles": 1, "d": 128, "layers": 4, "params": 580512, "steps_run": 3000, "best_acc": 0.0376, "final_acc": 0.0264, "seconds": 73.3, "steps_per_s": 40.9}
+{"length": 256, "needles": 1, "d": 128, "layers": 6, "params": 845472, "steps_run": 3000, "best_acc": 0.04, "final_acc": 0.0278, "seconds": 115.3, "steps_per_s": 26.01}
+{"length": 256, "needles": 3, "d": 64, "layers": 3, "params": 125728, "steps_run": 3000, "best_acc": 0.0347, "final_acc": 0.0316, "seconds": 40.5, "steps_per_s": 74.12}
+{"length": 256, "needles": 3, "d": 64, "layers": 4, "params": 159200, "steps_run": 3000, "best_acc": 0.0602, "final_acc": 0.0602, "seconds": 54.0, "steps_per_s": 55.54}
+{"length": 256, "needles": 3, "d": 64, "layers": 6, "params": 226144, "steps_run": 3000, "best_acc": 0.0335, "final_acc": 0.0312, "seconds": 79.6, "steps_per_s": 37.7}
+{"length": 256, "needles": 3, "d": 96, "layers": 3, "params": 262304, "steps_run": 1750, "best_acc": 0.9995, "final_acc": 0.9995, "seconds": 28.5, "steps_per_s": 61.35}
+{"length": 256, "needles": 3, "d": 96, "layers": 4, "params": 337088, "skipped": "skipped: smaller net passed"}
+{"length": 256, "needles": 3, "d": 128, "layers": 3, "params": 448032, "skipped": "skipped: smaller net passed"}
+{"length": 256, "needles": 3, "d": 96, "layers": 6, "params": 486656, "skipped": "skipped: smaller net passed"}
+{"length": 256, "needles": 3, "d": 128, "layers": 4, "params": 580512, "skipped": "skipped: smaller net passed"}
+{"length": 256, "needles": 3, "d": 128, "layers": 6, "params": 845472, "skipped": "skipped: smaller net passed"}
+{"length": 256, "needles": 5, "d": 64, "layers": 3, "params": 125728, "steps_run": 1750, "best_acc": 0.9994, "final_acc": 0.9994, "seconds": 23.5, "steps_per_s": 74.32}
+{"length": 256, "needles": 5, "d": 64, "layers": 4, "params": 159200, "skipped": "skipped: smaller net passed"}
+{"length": 256, "needles": 5, "d": 64, "layers": 6, "params": 226144, "skipped": "skipped: smaller net passed"}
+{"length": 256, "needles": 5, "d": 96, "layers": 3, "params": 262304, "skipped": "skipped: smaller net passed"}
+{"length": 256, "needles": 5, "d": 96, "layers": 4, "params": 337088, "skipped": "skipped: smaller net passed"}
+{"length": 256, "needles": 5, "d": 128, "layers": 3, "params": 448032, "skipped": "skipped: smaller net passed"}
+{"length": 256, "needles": 5, "d": 96, "layers": 6, "params": 486656, "skipped": "skipped: smaller net passed"}
+{"length": 256, "needles": 5, "d": 128, "layers": 4, "params": 580512, "skipped": "skipped: smaller net passed"}
+{"length": 256, "needles": 5, "d": 128, "layers": 6, "params": 845472, "skipped": "skipped: smaller net passed"}

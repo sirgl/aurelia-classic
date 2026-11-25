@@ -1,0 +1,660 @@
+{
+ "name": "arm-loop3x2 vs arm-base",
+ "A": "arm-base",
+ "B": "arm-loop3x2",
+ "spec": {
+  "alpha": 0.05,
+  "min_n": 5,
+  "ci_level": 0.95,
+  "bootstrap_reps": 2000,
+  "bootstrap_seed": 1,
+  "seed_z": 2.0,
+  "name": "arm-loop3x2 vs arm-base",
+  "harm": {
+   "tolerance_pts": 5
+  },
+  "mean": {
+   "slices": [
+    "twin"
+   ],
+   "min_gain_pts": 0
+  }
+ },
+ "slices": [
+  "twin"
+ ],
+ "pass": false,
+ "gates": [
+  {
+   "name": "harm",
+   "pass": true,
+   "text": "no family dropped by more than 5 points with Holm-adjusted p < 0.05, over 10 families",
+   "detail": {
+    "drops": [],
+    "unstable_below": [],
+    "not_shown_within_tolerance": [
+     "twin/hill-archers",
+     "twin/planned-assault",
+     "twin/promotion-choice",
+     "twin/raid",
+     "twin/ram",
+     "twin/siege"
+    ],
+    "mode": "significance",
+    "families": 10
+   }
+  },
+  {
+   "name": "mean",
+   "pass": false,
+   "text": "mean over 10 families up: paired bootstrap 95 % CI lower bound above 0 points",
+   "detail": {
+    "families": 10,
+    "a": 0.8160597285967258,
+    "b": 0.8340617120673407,
+    "delta": 0.01800198347061489,
+    "ci": [
+     -0.004798436922298546,
+     0.038646713929884946
+    ]
+   }
+  }
+ ],
+ "summary": {
+  "mean": {
+   "families": 10,
+   "a": 0.8160597285967258,
+   "b": 0.8340617120673407,
+   "delta": 0.01800198347061489,
+   "ci": [
+    -0.004798436922298546,
+    0.038646713929884946
+   ]
+  },
+  "status_counts": {
+   "up": 0,
+   "down": 0,
+   "same": 10,
+   "DROP": 0
+  },
+  "bh": {
+   "significant": 0,
+   "families": 10
+  },
+  "seed_disagree": []
+ },
+ "families": {
+  "twin/assault-heal": {
+   "n": 140,
+   "a_wins": 110,
+   "b_wins": 118,
+   "a_rate": 0.7857142857142857,
+   "b_rate": 0.8428571428571429,
+   "a_ci": [
+    0.7105956160814108,
+    0.8455722694217819
+   ],
+   "b_ci": [
+    0.773525579783431,
+    0.8938758828204002
+   ],
+   "delta": 0.05714285714285714,
+   "delta_ci": [
+    -0.014273736160101691,
+    0.12930896119384905
+   ],
+   "b_worse": 9,
+   "b_better": 17,
+   "p_two": 0.16863754391670346,
+   "p_worse": 0.9622406512498852,
+   "p_better": 0.08431877195835173,
+   "fisher_p_two": 0.281979178857195,
+   "dropped": 0,
+   "seeds": [
+    {
+     "seed": 0,
+     "n": 140,
+     "a_rate": 0.7857142857142857,
+     "b_rate": 0.8428571428571429,
+     "delta": 0.05714285714285714,
+     "var": 0.0013032069970845483,
+     "p_two": 0.16863754391670346
+    }
+   ],
+   "seed_disagree": false,
+   "seed_sd_b": null,
+   "slice": "twin",
+   "family": "assault-heal",
+   "name": "twin/assault-heal",
+   "best_teacher": null,
+   "best_teacher_rate": 0.0,
+   "in_harm_set": true,
+   "p_two_holm": 1.0,
+   "p_worse_holm": 1.0,
+   "p_better_holm": 0.7588689476251655,
+   "p_two_bh": 0.8431877195835173,
+   "status": "same",
+   "drop": false,
+   "bh_sig": false,
+   "mde_paired": 0.12438005719866072,
+   "mde_unpaired": 0.18868000727330078,
+   "discordant": 0.18571428571428572
+  },
+  "twin/bombard": {
+   "n": 59,
+   "a_wins": 50,
+   "b_wins": 54,
+   "a_rate": 0.847457627118644,
+   "b_rate": 0.9152542372881356,
+   "a_ci": [
+    0.7348201621622644,
+    0.9176153600140352
+   ],
+   "b_ci": [
+    0.8164820473258972,
+    0.9632579669823632
+   ],
+   "delta": 0.06779661016949153,
+   "delta_ci": [
+    -0.029309846793088082,
+    0.17218229178806155
+   ],
+   "b_worse": 2,
+   "b_better": 6,
+   "p_two": 0.28906250000000033,
+   "p_worse": 0.96484375,
+   "p_better": 0.14453125000000017,
+   "fisher_p_two": 0.3939416491103451,
+   "dropped": 0,
+   "seeds": [
+    {
+     "seed": 0,
+     "n": 59,
+     "a_rate": 0.847457627118644,
+     "b_rate": 0.9152542372881356,
+     "delta": 0.06779661016949153,
+     "var": 0.002220285423534052,
+     "p_two": 0.28906250000000033
+    }
+   ],
+   "seed_disagree": false,
+   "seed_sd_b": null,
+   "slice": "twin",
+   "family": "bombard",
+   "name": "twin/bombard",
+   "best_teacher": null,
+   "best_teacher_rate": 0.0,
+   "in_harm_set": true,
+   "p_two_holm": 1.0,
+   "p_worse_holm": 1.0,
+   "p_better_holm": 1.0,
+   "p_two_bh": 0.9635416666666679,
+   "status": "same",
+   "drop": false,
+   "bh_sig": false,
+   "mde_paired": null,
+   "mde_unpaired": 0.2872765456110675,
+   "discordant": 0.13559322033898305
+  },
+  "twin/city-fire": {
+   "n": 140,
+   "a_wins": 129,
+   "b_wins": 132,
+   "a_rate": 0.9214285714285714,
+   "b_rate": 0.9428571428571428,
+   "a_ci": [
+    0.8647850070923281,
+    0.9555626240248808
+   ],
+   "b_ci": [
+    0.8912967078209393,
+    0.9707635147090092
+   ],
+   "delta": 0.02142857142857143,
+   "delta_ci": [
+    -0.032134014756079625,
+    0.07737344231527495
+   ],
+   "b_worse": 5,
+   "b_better": 8,
+   "p_two": 0.5810546874999993,
+   "p_worse": 0.8665771484374999,
+   "p_better": 0.29052734374999967,
+   "fisher_p_two": 0.6357241640470102,
+   "dropped": 0,
+   "seeds": [
+    {
+     "seed": 0,
+     "n": 140,
+     "a_rate": 0.9214285714285714,
+     "b_rate": 0.9428571428571428,
+     "delta": 0.02142857142857143,
+     "var": 0.0006599854227405247,
+     "p_two": 0.5810546874999993
+    }
+   ],
+   "seed_disagree": false,
+   "seed_sd_b": null,
+   "slice": "twin",
+   "family": "city-fire",
+   "name": "twin/city-fire",
+   "best_teacher": null,
+   "best_teacher_rate": 0.0,
+   "in_harm_set": true,
+   "p_two_holm": 1.0,
+   "p_worse_holm": 1.0,
+   "p_better_holm": 1.0,
+   "p_two_bh": 1.0,
+   "status": "same",
+   "drop": false,
+   "bh_sig": false,
+   "mde_paired": 0.08452017647879465,
+   "mde_unpaired": 0.1465950046853289,
+   "discordant": 0.09285714285714286
+  },
+  "twin/hill-archers": {
+   "n": 140,
+   "a_wins": 112,
+   "b_wins": 110,
+   "a_rate": 0.8,
+   "b_rate": 0.7857142857142857,
+   "a_ci": [
+    0.7261308550867984,
+    0.8578454246915539
+   ],
+   "b_ci": [
+    0.7105956160814108,
+    0.8455722694217819
+   ],
+   "delta": -0.014285714285714285,
+   "delta_ci": [
+    -0.0890188512292562,
+    0.06038640471752661
+   ],
+   "b_worse": 15,
+   "b_better": 13,
+   "p_two": 0.8505540192127291,
+   "p_worse": 0.42527700960636455,
+   "p_better": 0.714205905795096,
+   "fisher_p_two": 0.8828734313661568,
+   "dropped": 0,
+   "seeds": [
+    {
+     "seed": 0,
+     "n": 140,
+     "a_rate": 0.8,
+     "b_rate": 0.7857142857142857,
+     "delta": -0.014285714285714285,
+     "var": 0.0014271137026239068,
+     "p_two": 0.8505540192127291
+    }
+   ],
+   "seed_disagree": false,
+   "seed_sd_b": null,
+   "slice": "twin",
+   "family": "hill-archers",
+   "name": "twin/hill-archers",
+   "best_teacher": null,
+   "best_teacher_rate": 0.0,
+   "in_harm_set": true,
+   "p_two_holm": 1.0,
+   "p_worse_holm": 1.0,
+   "p_better_holm": 1.0,
+   "p_two_bh": 1.0,
+   "status": "same",
+   "drop": false,
+   "bh_sig": false,
+   "mde_paired": 0.12922363281250002,
+   "mde_unpaired": 0.18589794356699912,
+   "discordant": 0.2
+  },
+  "twin/planned-assault": {
+   "n": 134,
+   "a_wins": 69,
+   "b_wins": 72,
+   "a_rate": 0.5149253731343284,
+   "b_rate": 0.5373134328358209,
+   "a_ci": [
+    0.431076014846751,
+    0.5979428306749237
+   ],
+   "b_ci": [
+    0.4530302463172683,
+    0.6195168674869184
+   ],
+   "delta": 0.022388059701492536,
+   "delta_ci": [
+    -0.06794267887839393,
+    0.11204951325353428
+   ],
+   "b_worse": 18,
+   "b_better": 21,
+   "p_two": 0.7492586247608435,
+   "p_worse": 0.7388013097515793,
+   "p_better": 0.37462931238042174,
+   "fisher_p_two": 0.806767308894249,
+   "dropped": 0,
+   "seeds": [
+    {
+     "seed": 0,
+     "n": 134,
+     "a_rate": 0.5149253731343284,
+     "b_rate": 0.5373134328358209,
+     "delta": 0.022388059701492536,
+     "var": 0.00216823545449407,
+     "p_two": 0.7492586247608435
+    }
+   ],
+   "seed_disagree": false,
+   "seed_sd_b": null,
+   "slice": "twin",
+   "family": "planned-assault",
+   "name": "twin/planned-assault",
+   "best_teacher": null,
+   "best_teacher_rate": 0.0,
+   "in_harm_set": true,
+   "p_two_holm": 1.0,
+   "p_worse_holm": 1.0,
+   "p_better_holm": 1.0,
+   "p_two_bh": 1.0,
+   "status": "same",
+   "drop": false,
+   "bh_sig": false,
+   "mde_paired": 0.1598934344391325,
+   "mde_unpaired": 0.20550817426933768,
+   "discordant": 0.291044776119403
+  },
+  "twin/prey-either": {
+   "n": 160,
+   "a_wins": 145,
+   "b_wins": 153,
+   "a_rate": 0.90625,
+   "b_rate": 0.95625,
+   "a_ci": [
+    0.8510879733686995,
+    0.9423619930544526
+   ],
+   "b_ci": [
+    0.9124569584575362,
+    0.9786483884484656
+   ],
+   "delta": 0.05,
+   "delta_ci": [
+    -0.0057487893889539565,
+    0.10878340543387846
+   ],
+   "b_worse": 6,
+   "b_better": 14,
+   "p_two": 0.1153182983398437,
+   "p_worse": 0.9793052673339844,
+   "p_better": 0.05765914916992185,
+   "fisher_p_two": 0.12029812402962578,
+   "dropped": 0,
+   "seeds": [
+    {
+     "seed": 0,
+     "n": 160,
+     "a_rate": 0.90625,
+     "b_rate": 0.95625,
+     "delta": 0.05,
+     "var": 0.000765625,
+     "p_two": 0.1153182983398437
+    }
+   ],
+   "seed_disagree": false,
+   "seed_sd_b": null,
+   "slice": "twin",
+   "family": "prey-either",
+   "name": "twin/prey-either",
+   "best_teacher": null,
+   "best_teacher_rate": 0.0,
+   "in_harm_set": true,
+   "p_two_holm": 1.0,
+   "p_worse_holm": 1.0,
+   "p_better_holm": 0.5765914916992185,
+   "p_two_bh": 0.8431877195835173,
+   "status": "same",
+   "drop": false,
+   "bh_sig": false,
+   "mde_paired": 0.09466552734375,
+   "mde_unpaired": 0.14168009984958826,
+   "discordant": 0.125
+  },
+  "twin/promotion-choice": {
+   "n": 140,
+   "a_wins": 130,
+   "b_wins": 129,
+   "a_rate": 0.9285714285714286,
+   "b_rate": 0.9214285714285714,
+   "a_ci": [
+    0.8735102126286542,
+    0.9607416156261346
+   ],
+   "b_ci": [
+    0.8647850070923281,
+    0.9555626240248808
+   ],
+   "delta": -0.007142857142857143,
+   "delta_ci": [
+    -0.05872056394470392,
+    0.043493065197429744
+   ],
+   "b_worse": 6,
+   "b_better": 5,
+   "p_two": 1.0,
+   "p_worse": 0.5000000000000004,
+   "p_better": 0.7255859374999996,
+   "fisher_p_two": 1.0,
+   "dropped": 0,
+   "seeds": [
+    {
+     "seed": 0,
+     "n": 140,
+     "a_rate": 0.9285714285714286,
+     "b_rate": 0.9214285714285714,
+     "delta": -0.007142857142857143,
+     "var": 0.0005608600583090379,
+     "p_two": 1.0
+    }
+   ],
+   "seed_disagree": false,
+   "seed_sd_b": null,
+   "slice": "twin",
+   "family": "promotion-choice",
+   "name": "twin/promotion-choice",
+   "best_teacher": null,
+   "best_teacher_rate": 0.0,
+   "in_harm_set": true,
+   "p_two_holm": 1.0,
+   "p_worse_holm": 1.0,
+   "p_better_holm": 1.0,
+   "p_two_bh": 1.0,
+   "status": "same",
+   "drop": false,
+   "bh_sig": false,
+   "mde_paired": 0.07613525390625,
+   "mde_unpaired": 0.1429522627592637,
+   "discordant": 0.07857142857142857
+  },
+  "twin/raid": {
+   "n": 160,
+   "a_wins": 145,
+   "b_wins": 141,
+   "a_rate": 0.90625,
+   "b_rate": 0.88125,
+   "a_ci": [
+    0.8510879733686995,
+    0.9423619930544526
+   ],
+   "b_ci": [
+    0.8219771441876508,
+    0.9226451319940766
+   ],
+   "delta": -0.025,
+   "delta_ci": [
+    -0.08516861470423683,
+    0.03398608312280713
+   ],
+   "b_worse": 13,
+   "b_better": 9,
+   "p_two": 0.5234670639038077,
+   "p_worse": 0.26173353195190385,
+   "p_better": 0.8568606376647954,
+   "fisher_p_two": 0.5868442991475644,
+   "dropped": 0,
+   "seeds": [
+    {
+     "seed": 0,
+     "n": 160,
+     "a_rate": 0.90625,
+     "b_rate": 0.88125,
+     "delta": -0.025,
+     "var": 0.0008554687499999999,
+     "p_two": 0.5234670639038077
+    }
+   ],
+   "seed_disagree": false,
+   "seed_sd_b": null,
+   "slice": "twin",
+   "family": "raid",
+   "name": "twin/raid",
+   "best_teacher": null,
+   "best_teacher_rate": 0.0,
+   "in_harm_set": true,
+   "p_two_holm": 1.0,
+   "p_worse_holm": 1.0,
+   "p_better_holm": 1.0,
+   "p_two_bh": 1.0,
+   "status": "same",
+   "drop": false,
+   "bh_sig": false,
+   "mde_paired": 0.09972610473632813,
+   "mde_unpaired": 0.14168009984958826,
+   "discordant": 0.1375
+  },
+  "twin/ram": {
+   "n": 40,
+   "a_wins": 38,
+   "b_wins": 38,
+   "a_rate": 0.95,
+   "b_rate": 0.95,
+   "a_ci": [
+    0.8349612263085903,
+    0.9861793326138516
+   ],
+   "b_ci": [
+    0.8349612263085903,
+    0.9861793326138516
+   ],
+   "delta": 0.0,
+   "delta_ci": [
+    -0.07885944107755805,
+    0.07885944107755805
+   ],
+   "b_worse": 0,
+   "b_better": 0,
+   "p_two": 1.0,
+   "p_worse": 1.0,
+   "p_better": 1.0,
+   "fisher_p_two": 1.0,
+   "dropped": 0,
+   "seeds": [
+    {
+     "seed": 0,
+     "n": 40,
+     "a_rate": 0.95,
+     "b_rate": 0.95,
+     "delta": 0.0,
+     "var": 0.0,
+     "p_two": 1.0
+    }
+   ],
+   "seed_disagree": false,
+   "seed_sd_b": null,
+   "slice": "twin",
+   "family": "ram",
+   "name": "twin/ram",
+   "best_teacher": null,
+   "best_teacher_rate": 0.0,
+   "in_harm_set": true,
+   "p_two_holm": 1.0,
+   "p_worse_holm": 1.0,
+   "p_better_holm": 1.0,
+   "p_two_bh": 1.0,
+   "status": "same",
+   "drop": false,
+   "bh_sig": false,
+   "mde_paired": null,
+   "mde_unpaired": 0.30790944175288504,
+   "discordant": 0.0
+  },
+  "twin/siege": {
+   "n": 130,
+   "a_wins": 78,
+   "b_wins": 79,
+   "a_rate": 0.6,
+   "b_rate": 0.6076923076923076,
+   "a_ci": [
+    0.5140839982119533,
+    0.6801756895491603
+   ],
+   "b_ci": [
+    0.5218241149108931,
+    0.6873786257549217
+   ],
+   "delta": 0.007692307692307693,
+   "delta_ci": [
+    -0.08539415039354345,
+    0.10055553235100333
+   ],
+   "b_worse": 19,
+   "b_better": 20,
+   "p_two": 1.0,
+   "p_worse": 0.6253706876195786,
+   "p_better": 0.5000000000000011,
+   "fisher_p_two": 0.9999999999999871,
+   "dropped": 0,
+   "seeds": [
+    {
+     "seed": 0,
+     "n": 130,
+     "a_rate": 0.6,
+     "b_rate": 0.6076923076923076,
+     "delta": 0.007692307692307693,
+     "var": 0.002307237141556668,
+     "p_two": 1.0
+    }
+   ],
+   "seed_disagree": false,
+   "seed_sd_b": null,
+   "slice": "twin",
+   "family": "siege",
+   "name": "twin/siege",
+   "best_teacher": null,
+   "best_teacher_rate": 0.0,
+   "in_harm_set": true,
+   "p_two_holm": 1.0,
+   "p_worse_holm": 1.0,
+   "p_better_holm": 1.0,
+   "p_two_bh": 1.0,
+   "status": "same",
+   "drop": false,
+   "bh_sig": false,
+   "mde_paired": 0.164794921875,
+   "mde_unpaired": 0.2119262119511226,
+   "discordant": 0.3
+  }
+ },
+ "harm_set": [
+  "twin/assault-heal",
+  "twin/bombard",
+  "twin/city-fire",
+  "twin/hill-archers",
+  "twin/planned-assault",
+  "twin/prey-either",
+  "twin/promotion-choice",
+  "twin/raid",
+  "twin/ram",
+  "twin/siege"
+ ]
+}

@@ -1,0 +1,12 @@
+{
+ "state": "finished",
+ "current": "-",
+ "done": 26,
+ "total": 26,
+ "failed": [],
+ "skipped": [],
+ "elapsed_h": 6.73,
+ "updated": "2026-11-25 06:37:52",
+ "smoke": false,
+ "deadline": "2026-11-25 08:00"
+}

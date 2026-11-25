@@ -1,0 +1,9 @@
+{
+ "git_head": "970d839",
+ "mlx": "0.32.4 True",
+ "chip": "Apple M5 Max",
+ "macos": "27.2.1",
+ "cores_perf": 6,
+ "ram_gb": 128,
+ "scene_rule_version": "1"
+}
