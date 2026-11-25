@@ -1069,7 +1069,7 @@ pub fn dump_one(rules: &CompiledRuleset, fam: Fam, era: u8, instance: usize, att
         }
     }
     Ok(json!({"scene": scene, "initial": initial, "steps": steps, "stop": stop, "seed": seed, "slots": slots.ids.len(), "planted": planted, "paths": paths,
-        "play_s": play_started.elapsed().as_secs_f64(), "actions": actions, "rounds_played": rounds_played}))
+        "play_s": play_started.elapsed().as_secs_f64(), "actions": actions, "rounds_played": rounds_played, "rule_version": super::scene_rule::written_version()}))
 }
 
 /// The multi-turn path cost of each piece to `n` goals spread over the window (every k-th tile, a
@@ -1203,6 +1203,7 @@ fn aggressive_pick(game: &GameState, win: &Window, opts: &[(String, i32, Command
 /// scene: `--family duel --era medieval --instance 3 --attempt 0`.
 pub fn main(rules: &CompiledRuleset, args: &[String]) -> Result<(), String> {
     let mut kept: Option<String> = None;
+    let mut kept_version: Option<u8> = None;
     let mut families_filter: Option<Vec<String>> = None;
     let mut per_cell = 4usize;
     let mut rounds = 10u32;
@@ -1221,6 +1222,7 @@ pub fn main(rules: &CompiledRuleset, args: &[String]) -> Result<(), String> {
         let mut v = || it.next().cloned().ok_or(format!("{a} needs a value"));
         match a.as_str() {
             "--kept" => kept = Some(v()?),
+            "--kept-version" => kept_version = Some(match v()?.as_str() { "1" => 1, "2" => 2, w => return Err(format!("--kept-version 1|2, not {w}")) }),
             "--families" => families_filter = Some(v()?.split(',').map(str::to_owned).collect()),
             "--per-cell" => per_cell = v()?.parse().map_err(|e| format!("{e}"))?,
             "--rounds" => rounds = v()?.parse().map_err(|e| format!("{e}"))?,
@@ -1248,12 +1250,14 @@ pub fn main(rules: &CompiledRuleset, args: &[String]) -> Result<(), String> {
     } else {
         let text = std::fs::read_to_string(kept.as_deref().ok_or("--kept or --family/--era")?).map_err(|e| e.to_string())?;
         let mut per: BTreeMap<(String, String), usize> = BTreeMap::new();
+        let mut entries: Vec<super::suite::Kept> = Vec::new();
         for l in text.lines() {
             let k: super::suite::Kept = serde_json::from_str(l).map_err(|e| e.to_string())?;
             let Some(a) = k.attempt else { continue };
             if families_filter.as_ref().is_some_and(|f| !f.contains(&k.family)) {
                 continue;
             }
+            entries.push(k.clone());
             let n = per.entry((k.family.clone(), k.era.clone())).or_default();
             if *n >= per_cell {
                 continue;
@@ -1261,6 +1265,8 @@ pub fn main(rules: &CompiledRuleset, args: &[String]) -> Result<(), String> {
             *n += 1;
             cells.push((Fam::parse(&k.family)?, lab::era_index(rules, &k.era).ok_or("era")?, k.instance, a));
         }
+        let playing: Vec<&str> = entries.iter().map(|k| k.family.as_str()).collect();
+        super::suite::check_kept(&entries, &playing, super::scene_rule::version(), kept_version)?;
     }
     let file = std::sync::Mutex::new(std::fs::File::create(&out).map_err(|e| e.to_string())?);
     let started = std::time::Instant::now();

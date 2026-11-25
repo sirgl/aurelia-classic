@@ -1,0 +1,4 @@
+{
+  "families": ["convoy", "guard"],
+  "doc": "Families whose scene depends on the scene rule version (scene_rule::version): rows, records and kept sets of these are comparable only inside one version. Proved by the qa test the_families_that_depend_on_the_rule_version_are_the_listed_ones."
+}

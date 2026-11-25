@@ -524,7 +524,8 @@ pub fn close(row: Option<&crate::trainers::Row>) {
         ACTIVE.with(|a| a.borrow_mut().take());
         return;
     };
-    let meta = serde_json::json!({"family": row.family, "era": row.era, "instance": row.instance, "attempt": row.attempt, "player": row.player, "win": row.win, "rounds": row.rounds, "measures": row.measures});
+    let rule_version = row.info.get("rule_version").and_then(|v| v.parse::<u8>().ok());
+    let meta = serde_json::json!({"family": row.family, "era": row.era, "instance": row.instance, "attempt": row.attempt, "player": row.player, "win": row.win, "rounds": row.rounds, "measures": row.measures, "rule_version": rule_version});
     let out = finish(meta);
     LAST.with(|l| *l.borrow_mut() = out);
 }

@@ -472,3 +472,62 @@ fn the_third_nation_is_no_foe_token_until_it_is_at_war() {
     let third: Vec<_> = sc.third.iter().filter_map(|p| act::core_of(&g, p.h)).map(|c| c.tile).collect();
     assert!(!third.is_empty() && third.iter().all(|t| !foes.contains(t)), "the neutral's tiles are no foe tiles");
 }
+
+/// The class guard of the rule version. A row, a record or a kept set of a family whose scene depends on the rule
+/// version is comparable only inside one version, so the list of those families (`rule_dependent.json`, read by the
+/// Rust tools and by the Python gate tools) must be exactly the families that differ: every family is rebuilt under both
+/// versions (the era claims, the scene, its pieces and info) and a family with a learner's civilian is listed too (the
+/// rule's civilians pass plays it). A new dependence of another family on the version fails here until the list names it.
+#[test]
+fn the_families_that_depend_on_the_rule_version_are_the_listed_ones() {
+    use aurelia_qa::trainers::scene_rule::{dependent_families, with_version};
+    let rules = ClassicBench::rules();
+    let eras = lab::era_names(&rules).len() as u8;
+    let digest = |v: u8, fam: Fam, e: u8, i: usize, a: u32| {
+        with_version(v, || {
+            let claims = lab::lab(&rules, e).map(|l| fam.claims(&rules, &l.kinds)).unwrap_or(false);
+            match families::build(&rules, fam, e, i, a) {
+                Ok((g, s)) => (format!("{claims} {:?} {:?} {:?} {:?} {:?}", tiles(&g, &s), s.refuge, s.rounds, s.info, s.aim_learner), s.mine.iter().any(|p| p.role == "civilian")),
+                Err(err) => (format!("{claims} err {err}"), false),
+            }
+        })
+    };
+    let mut found: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
+    for fam in Fam::ALL {
+        for e in 0..eras {
+            for i in 0..2 {
+                for a in 0..2 {
+                    let (d1, civ1) = digest(1, fam, e, i, a);
+                    let (d2, civ2) = digest(2, fam, e, i, a);
+                    if d1 != d2 || civ1 || civ2 {
+                        found.insert(fam.name().to_owned());
+                    }
+                }
+            }
+        }
+    }
+    let mut listed = dependent_families();
+    listed.sort();
+    assert_eq!(found.into_iter().collect::<Vec<_>>(), listed, "rule_dependent.json is the families whose scene differs between rule versions 1 and 2 (or has a learner's civilian)");
+}
+
+/// A kept set is played only under the version it was proven under, for the dependent families; an old file (no
+/// `rule_version`) needs the version named by `--kept-version`; the other families do not care.
+#[test]
+fn a_kept_set_of_another_rule_version_is_refused() {
+    let k = |family: &str, v: Option<u8>| suite::Kept { family: family.to_owned(), era: "medieval".into(), instance: 0, attempt: Some(0), solver: None, tried: 1, passive_won: 0, unbuilt: 0, rule_version: v };
+    let playing = ["guard", "convoy", "duel"];
+    assert!(suite::check_kept(&[k("guard", Some(2)), k("convoy", Some(2))], &playing, 2, None).is_ok());
+    let wrong = suite::check_kept(&[k("guard", Some(1))], &playing, 2, None).unwrap_err();
+    assert!(wrong.contains("version 1") && wrong.contains("version 2"), "{wrong}");
+    let none = suite::check_kept(&[k("convoy", None)], &playing, 2, None).unwrap_err();
+    assert!(none.contains("--kept-version"), "{none}");
+    assert!(suite::check_kept(&[k("convoy", None)], &playing, 2, Some(2)).is_ok(), "kept-r2 with the version named");
+    assert!(suite::check_kept(&[k("convoy", None)], &playing, 2, Some(1)).is_err(), "kept-r named as 1, played under 2");
+    assert!(suite::check_kept(&[k("convoy", None)], &playing, 1, Some(1)).is_ok(), "kept-r under ARMY_SCENE_RULE_VERSION=1");
+    assert!(suite::check_kept(&[k("duel", None), k("guard", Some(2))], &playing, 2, None).is_ok(), "a family that does not depend on the version needs no marker");
+    assert!(suite::check_kept(&[k("guard", Some(1))], &["duel"], 2, None).is_ok(), "a family not played is not checked");
+    // The kept set's identity is a function of its bytes.
+    assert_eq!(suite::file_id("a\n"), suite::file_id("a\n"));
+    assert_ne!(suite::file_id("a\n"), suite::file_id("b\n"));
+}
