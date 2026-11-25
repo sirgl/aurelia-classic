@@ -551,6 +551,28 @@ class Sim:
         moves_left = mx.where(g <= scale[:, None], scale[:, None] - g, (turns + 1) * scale[:, None] - g)
         return g, scale, mx.where(reached, turns, -1), mx.where(reached, moves_left, -1)
 
+    # True: the heavy parts run masked in every call, without the host read that skips them where no row needs them
+    # (`armyfast`'s `branchless`; the masked rows do not change, so the state is the same).
+    branchless = False
+
+    def promo_mask_all(self, s):
+        """`promo_mask` of every slot at once [B, U, NP] (the slot alive taken from the state)."""
+        B, U, NP = s["u_prom"].shape
+        level = mx.maximum(s["u_level"], 1)
+        pct = mx.maximum(s["p_xp_needed_pct"], -100)
+        need = mx.maximum((10 * level * (level + 1) // 2) * (100 + pct) // 100, 1)
+        held = s["u_prom"]
+        fit = mx.take(self.z["z_fit"], self.tid, axis=0)
+        req, anyof = mx.take(self.z["z_req"], self.tid, axis=0), mx.take(self.z["z_anyof"], self.tid, axis=0)  # [B, NP, R]
+        def at(ix):
+            n = ix.shape[1] * ix.shape[2]
+            flat = mx.broadcast_to(mx.maximum(ix, 0).reshape(B, 1, n), (B, U, n))
+            return mx.take_along_axis(held, flat, axis=2).reshape((B, U) + ix.shape[1:])
+        req_ok = mx.all((req < 0)[:, None] | at(req), axis=3)
+        any_ok = ~mx.take(self.z["z_has_any"], self.tid, axis=0)[:, None] | mx.any((anyof >= 0)[:, None] & at(anyof), axis=3)
+        ready = s["u_alive"] & (s["u_xp"] >= need)
+        return ready[:, :, None] & fit & ~held & req_ok & any_ok
+
     def promo_mask(self, s, slot, alive):
         """[B, NP]: the promotions the unit may take now (`validate_promote`: enough experience for its
         level, `available_promotions`: choosable for its kind, not held, prerequisites held)."""
@@ -1125,7 +1147,7 @@ class Sim:
         left_t = mx.max(mx.where(hit, left, -1), axis=1)
         mvv = mvv & (left_t >= 0)
         # (the walk and the attack are the heavy parts: skipped where no row moves or strikes)
-        if bool(mx.any(mvv).item()):
+        if self.branchless or bool(mx.any(mvv).item()):
             end_tile, end_left, steps, walked = self.walk(s, slot, mk, tgt, mk["foreign_l"])
             # A walk that ends where it started (the first step is blocked by a unit the mover did not see) changes nothing:
             # no moves spent, the stance kept (the dump's MoveUnit event of such an order has no unit row).
@@ -1136,7 +1158,7 @@ class Sim:
             s = self.refresh_allowance(s, slot, tile, end_tile, mvv)
         # Attack.
         atk = take & (verb == V_ATTACK)
-        if bool(mx.any(atk).item()):
+        if self.branchless or bool(mx.any(atk).item()):
             s = self.attack(s, side, slot, tgt, atk)
         return s
 

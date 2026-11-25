@@ -165,6 +165,7 @@ class Obs:
         # the candidates' blow previews (None: counted per call).
         self.fog_any = bool(mx.any(tab.t["fog"]).item())
         self.nfo = None
+        self.pack_bucket = None
 
     # ------------------------------------------------------------------ shared facts
 
@@ -315,7 +316,12 @@ class Obs:
         uq, ur = fd["uq"], fd["ur"]
         mean = t["mean"][:, None]
         rng = self.kind(s, "range")
-        promos = self.promo_any(s) if sim.f["promo"] else mx.zeros((B, U), dtype=mx.bool_)
+        if not sim.f["promo"]:
+            promos = mx.zeros((B, U), dtype=mx.bool_)
+        elif sim.branchless:
+            promos = mx.any(sim.promo_mask_all(s), axis=2)
+        else:
+            promos = self.promo_any(s)
         promotable = own & in_army & promos
         may_shoot = (rng >= 0) & (s["u_att"] == 0)
         selectable = own & in_army & ((s["u_mv"] > 0) | promotable | may_shoot)
@@ -554,8 +560,11 @@ class Obs:
             return zero, zero, zero, mx.zeros((B, N), dtype=mx.bool_)
         if 2 * P >= B * N:
             return self.preview(s, me, frm, to, valid, from_real, ranged_only)
-        idx = mx.argsort(mx.where(flat, 0, B * N) + mx.arange(B * N, dtype=I32))[:P].astype(I32)
+        # `pack_bucket` (`armyfast`): the pairs padded to a bucket size with invalid ones (their results zeroed).
+        Pb = self.pack_bucket(P, B * N) if self.pack_bucket else P
+        idx = mx.argsort(mx.where(flat, 0, B * N) + mx.arange(B * N, dtype=I32))[:Pb].astype(I32)
         row = idx // N
+        ok_p = mx.arange(Pb) < P
         sub = {k: mx.take(v, row, axis=0) for k, v in s.items()}
         sim = self.sim
         saved = (sim.cs, sim.tid, sim.n_pieces, sim.B, self.tab, self.t)
@@ -565,10 +574,10 @@ class Obs:
         self.t = self.tab.t
         try:
             dealt, taken, dhp, ok = self.preview(sub, mx.take(me, row), mx.take(frm.reshape(-1), idx)[:, None], mx.take(to.reshape(-1), idx)[:, None],
-                                                 mx.ones((P, 1), dtype=mx.bool_), from_real, ranged_only)
+                                                 ok_p[:, None], from_real, ranged_only)
         finally:
             sim.cs, sim.tid, sim.n_pieces, sim.B, self.tab, self.t = saved
-        back = lambda v: mx.zeros((B * N,), dtype=I32).at[idx].add(v[:, 0].astype(I32)).reshape(B, N)
+        back = lambda v: mx.zeros((B * N,), dtype=I32).at[idx].add(mx.where(ok_p, v[:, 0].astype(I32), 0)).reshape(B, N)
         return back(dealt), back(taken), back(dhp), back(ok) > 0
 
     # The fighters of the preview: [B, N] fields (the attacker as it would stand on `frm`, the defenders by slot).
