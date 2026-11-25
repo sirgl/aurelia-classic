@@ -135,6 +135,9 @@ pub fn claims(f: Fam, k: &super::lab::EraKinds) -> bool {
     let land = k.has(Arm::Melee) && k.has(Arm::Ranged);
     match f {
         Fam::CityReinforced | Fam::TwoFronts | Fam::SecondCity | Fam::TwinSiege => land && k.has(Arm::Siege),
+        // The ridge hides the sniper from an army that sees one tile; from the industrial era on the kinds see over it and
+        // the scene refuses to build ("the sniper is in sight"). The lane's held-out runs covered these four eras only.
+        Fam::FogSniper => land && k.era <= 3,
         _ => land,
     }
 }
