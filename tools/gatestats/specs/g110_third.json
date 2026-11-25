@@ -1,0 +1,65 @@
+{
+ "name": "G1.10 third parties: mean of four families at least 15 points up, camp-race at least 60 percent",
+ "alpha": 0.05,
+ "min_n": 10,
+ "bootstrap_reps": 4000,
+ "mean": {
+  "slices": [
+   "full"
+  ],
+  "exclude": [
+   "*/duel",
+   "*/focus",
+   "*/hold",
+   "*/choke",
+   "*/bait",
+   "*/kite",
+   "*/raid",
+   "*/counter",
+   "*/siege",
+   "*/ram",
+   "*/rush",
+   "*/retreat",
+   "*/flank",
+   "*/general",
+   "*/citadel",
+   "*/bombard",
+   "*/sink",
+   "*/airstrike",
+   "*/prey",
+   "*/wounded",
+   "*/harass",
+   "*/surrounded",
+   "*/assault-heal",
+   "*/promotion-choice",
+   "*/hill-archers",
+   "*/city-fire",
+   "*/planned-assault",
+   "*/ambush-fog",
+   "*/hunt-fog",
+   "*/assault-reinforce",
+   "*/assault-peace",
+   "*/convoy",
+   "*/guard",
+   "*/snipe",
+   "*/camp",
+   "*/neutral-path",
+   "*/ally-siege",
+   "*/defend-friend",
+   "*/capital-race",
+   "*/naval-duel",
+   "*/landing-escort",
+   "*/air-intercept",
+   "*/air-recon",
+   "*/prey-land",
+   "*/prey-either"
+  ],
+  "min_gain_pts": 15
+ },
+ "rate_floor": {
+  "families": [
+   "full/camp-race"
+  ],
+  "min_rate": 0.6
+ }
+}

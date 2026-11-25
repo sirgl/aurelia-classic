@@ -1,0 +1,4 @@
+{"A_label": "N175", "B_label": "CANDIDATE",
+ "slices": [
+  {"name": "full", "kept": "KEPT_ALL", "window": [80, 100], "A": ["REF/full/rows.jsonl"], "B": ["CAND/full/rows.jsonl"]},
+  {"name": "quick", "kept": "KEPT_ALL", "window": [80, 100], "A": ["REF/quick/rows.jsonl"], "B": ["CAND/quick/rows.jsonl"]}]}

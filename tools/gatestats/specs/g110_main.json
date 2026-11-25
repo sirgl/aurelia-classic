@@ -1,0 +1,36 @@
+{
+ "name": "G1.10 main: no harm on the full and quick tables, mean over the 32 within -1.5 points",
+ "alpha": 0.05,
+ "min_n": 10,
+ "bootstrap_reps": 4000,
+ "harm": {
+  "tolerance_pts": 8,
+  "exclude": [
+   "*/prey-land"
+  ]
+ },
+ "mean": {
+  "slices": [
+   "full"
+  ],
+  "exclude": [
+   "*/prey-land",
+   "*/assault-peace",
+   "*/assault-reinforce",
+   "*/camp",
+   "*/camp-race",
+   "*/ally-siege",
+   "*/capital-race",
+   "*/closed-borders",
+   "*/defend-friend",
+   "*/neutral-joins-war",
+   "*/neutral-path",
+   "*/spare-friends",
+   "*/naval-duel",
+   "*/landing-escort",
+   "*/air-intercept",
+   "*/air-recon"
+  ],
+  "min_gain_pts": -1.5
+ }
+}

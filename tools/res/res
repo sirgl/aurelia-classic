@@ -1,0 +1,7 @@
+#!/bin/sh
+# The resource broker (CPU slots, one GPU lock, disk and RAM guards, a queue). See docs/m5-RUNBOOK.md.
+d=$(cd "$(dirname "$0")" && pwd)
+for py in "$RES_PYTHON" "$d/../../.venv-m5/bin/python" python3; do
+  [ -n "$py" ] && command -v "$py" >/dev/null 2>&1 && exec "$py" -I "$d/res.py" "$@"
+done
+echo "res: no python3 found" >&2; exit 1

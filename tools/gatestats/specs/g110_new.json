@@ -1,0 +1,25 @@
+{
+ "name": "G1.10 families new to RL: mean above the reference",
+ "alpha": 0.05,
+ "min_n": 10,
+ "bootstrap_reps": 4000,
+ "mean": {
+  "slices": [
+   "full"
+  ],
+  "exclude": [
+   "*/siege",
+   "*/ram",
+   "*/bombard",
+   "*/promotion-choice",
+   "*/planned-assault",
+   "*/raid",
+   "*/prey-land",
+   "*/prey-either",
+   "*/assault-heal",
+   "*/hill-archers",
+   "*/city-fire"
+  ],
+  "min_gain_pts": 0
+ }
+}
