@@ -190,7 +190,9 @@ def main(argv=None):
         loss, g, info, bt = learner.step(model, stream, a.window)
         row.update({k: info[k] for k in ("plays", "scenes", "decisions", "live_decisions", "groups_with_gradient", "memory_drift", "read_s", "gradient_s", "states")})
         row["learner_s"] = round(time.time() - t1, 2)
-        if a.parity_every and not a.overlap and (u == 1 or u % a.parity_every == 0):
+        # Sampled actions the true world refused (the honest input builds candidates from what the side knows): the plays that had one.
+        row["fallback_plays"] = sum(1 for m in bt.flat.plays if m.get("fallbacks"))
+        if a.parity_every and not a.overlap and (u == 1 or u % a.parity_every == 0 or u == a.updates):
             par = learner.check(model, bt)  # the weights are still the actor's: the record and the learner must agree
             row["parity"] = {k: par[k] for k in ("values", "max", "over_1e-4", "over_1e-2")}
             if par["over_1e-2"]:
