@@ -43,7 +43,7 @@
 //! - sink: every embarked enemy unit dead within 6 rounds.
 //! - airstrike: 2 enemy units killed within 6 rounds (bombers based in our city, a melee spotter in
 //!   front: an air strike needs its target in sight).
-//! - prey (an opportunity, Roman's rule: the right call depends on the context): context `land`
+//! - prey (an opportunity, the rule: the right call depends on the context): context `land`
 //!   (one landmass, a short route, no other threat: attacking is expected): the weak city taken within
 //!   14 rounds. Context `sea` (the city over water) and `guarded` (a strong army of the enemy beside
 //!   the city): either call is fine: WIN = the city taken, or at least 75 % of our army alive when 14
@@ -155,6 +155,12 @@ impl Fam {
     /// had on their own lane (a kept file and the lane's gates name scenes by seed), so merging lanes that each appended
     /// families after the same base does not redraw any lane's scenes; the numbers of different lanes may coincide, which
     /// only correlates the random streams of two different builders. The rest: the position in the enum, as always.
+    ///
+    /// Nine ids are therefore shared (34 to 42: camp / naval-duel / feint, camp-race / landing-escort / fog-sniper, and so
+    /// on; the exact groups are pinned in `tests/ai_trainers.rs`). They stay as they are: renumbering any of them would
+    /// redraw its scenes and invalidate the kept files and the gates that name them. A NEW family must not share an id: it
+    /// takes one that no family uses (the next position in the enum is free). The tests `seed_ids_are_frozen` and
+    /// `only_the_nine_known_groups_share_a_seed_id` fail on a moved id and on a new collision.
     pub fn seed_id(self) -> u64 {
         match self {
             Fam::NavalDuel => 34,

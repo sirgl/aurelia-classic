@@ -1,6 +1,6 @@
-//! The history and multi-front families (work/nets/TRAINERS-PLAN.md): the right act depends on what the army saw in the
+//! The history and multi-front families (the trainers plan): the right act depends on what the army saw in the
 //! rounds before (feint, fog-sniper, city-reinforced, scout-report) or on how it divides itself between two goals
-//! (two-fronts, second-city). The win rules are fixed in work/nets/trainers-hist/GATES.md before any run.
+//! (two-fronts, second-city). The win rules were fixed before any run.
 //!
 //! Every march scene is built so that WAITING one round for more evidence is too late: the enemy at its decision
 //! round stands 4 tiles from each city it may attack (it strikes in the second round after), the army 4 tiles from
@@ -136,7 +136,7 @@ pub fn claims(f: Fam, k: &super::lab::EraKinds) -> bool {
     match f {
         Fam::CityReinforced | Fam::TwoFronts | Fam::SecondCity | Fam::TwinSiege => land && k.has(Arm::Siege),
         // The ridge hides the sniper from an army that sees one tile; from the industrial era on the kinds see over it and
-        // the scene refuses to build ("the sniper is in sight"). The lane's held-out runs covered these four eras only.
+        // the scene refuses to build ("the sniper is in sight"). `fog_sniper_claims_exactly_the_eras_it_builds` (tests/ai_trainers.rs) fails when this bound drifts from the builder.
         Fam::FogSniper => land && k.era <= 3,
         _ => land,
     }

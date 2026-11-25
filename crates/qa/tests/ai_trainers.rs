@@ -472,3 +472,115 @@ fn the_third_nation_is_no_foe_token_until_it_is_at_war() {
     let third: Vec<_> = sc.third.iter().filter_map(|p| act::core_of(&g, p.h)).map(|c| c.tile).collect();
     assert!(!third.is_empty() && third.iter().all(|t| !foes.contains(t)), "the neutral's tiles are no foe tiles");
 }
+
+/// Every family's seed id, frozen: a kept file and the gates of the integrated lanes name scenes by seed, so no id may move.
+const SEED_IDS: [(&str, u64); 60] = [
+    ("duel", 0),
+    ("focus", 1),
+    ("hold", 2),
+    ("choke", 3),
+    ("bait", 4),
+    ("kite", 5),
+    ("guard", 6),
+    ("convoy", 7),
+    ("raid", 8),
+    ("counter", 9),
+    ("siege", 10),
+    ("ram", 11),
+    ("rush", 12),
+    ("retreat", 13),
+    ("flank", 14),
+    ("general", 15),
+    ("citadel", 16),
+    ("bombard", 17),
+    ("sink", 18),
+    ("airstrike", 19),
+    ("prey", 20),
+    ("wounded", 21),
+    ("harass", 22),
+    ("snipe", 23),
+    ("surrounded", 24),
+    ("assault-heal", 25),
+    ("promotion-choice", 26),
+    ("hill-archers", 27),
+    ("city-fire", 28),
+    ("planned-assault", 29),
+    ("ambush-fog", 30),
+    ("hunt-fog", 31),
+    ("assault-reinforce", 32),
+    ("assault-peace", 33),
+    ("camp", 34),
+    ("camp-race", 35),
+    ("neutral-path", 36),
+    ("ally-siege", 37),
+    ("defend-friend", 38),
+    ("closed-borders", 39),
+    ("spare-friends", 40),
+    ("neutral-joins-war", 41),
+    ("capital-race", 42),
+    ("naval-duel", 34),
+    ("landing-escort", 35),
+    ("air-intercept", 36),
+    ("air-recon", 37),
+    ("feint", 34),
+    ("fog-sniper", 35),
+    ("city-reinforced", 36),
+    ("scout-report", 37),
+    ("two-fronts", 38),
+    ("second-city", 39),
+    ("twin-siege", 40),
+    ("air-threat", 41),
+    ("surprise-attack", 42),
+    ("naval-approach", 43),
+    ("blind-sector", 44),
+    ("second-front", 45),
+    ("bait-look", 46),
+];
+
+#[test]
+fn seed_ids_are_frozen() {
+    assert_eq!(SEED_IDS.len(), Fam::ALL.len(), "a family was added or removed: add it to SEED_IDS with an id no family uses");
+    for fam in Fam::ALL {
+        let frozen = SEED_IDS.iter().find(|(n, _)| *n == fam.name()).unwrap_or_else(|| panic!("{} is not in SEED_IDS: add it with an id no family uses", fam.name()));
+        assert_eq!(fam.seed_id(), frozen.1, "{}: its seed id moved; every scene of the family would be redrawn and the kept files invalid", fam.name());
+    }
+}
+
+/// The nine ids that several families share (the lanes were merged after each had appended families; renumbering would
+/// invalidate their kept files). The set is closed: a new family must take an id that no family uses.
+#[test]
+fn only_the_nine_known_groups_share_a_seed_id() {
+    let known: [(u64, &[&str]); 9] = [
+        (34, &["camp", "naval-duel", "feint"]),
+        (35, &["camp-race", "landing-escort", "fog-sniper"]),
+        (36, &["neutral-path", "air-intercept", "city-reinforced"]),
+        (37, &["ally-siege", "air-recon", "scout-report"]),
+        (38, &["defend-friend", "two-fronts"]),
+        (39, &["closed-borders", "second-city"]),
+        (40, &["spare-friends", "twin-siege"]),
+        (41, &["neutral-joins-war", "air-threat"]),
+        (42, &["capital-race", "surprise-attack"]),
+    ];
+    let mut by_id: std::collections::BTreeMap<u64, Vec<&str>> = std::collections::BTreeMap::new();
+    for fam in Fam::ALL {
+        by_id.entry(fam.seed_id()).or_default().push(fam.name());
+    }
+    let shared: Vec<(u64, Vec<&str>)> = by_id.into_iter().filter(|(_, v)| v.len() > 1).collect();
+    let expected: Vec<(u64, Vec<&str>)> = known.iter().map(|(i, v)| (*i, v.to_vec())).collect();
+    assert_eq!(shared, expected, "a family shares a seed id it should not: pick an id that no family uses (see Fam::seed_id)");
+}
+
+/// fog-sniper claims exactly the eras its scene builds in (the builder refuses where the kinds see over the ridge), so the
+/// claim cannot drift from the builder in either direction.
+#[test]
+fn fog_sniper_claims_exactly_the_eras_it_builds() {
+    let rules = ClassicBench::rules();
+    let eras = lab::era_names(&rules);
+    for e in 0..eras.len() as u8 {
+        let l = lab::lab(&rules, e).unwrap();
+        let builds = (0..suite::ATTEMPTS).any(|a| families::build(&rules, Fam::FogSniper, e, 0, a).is_ok());
+        let claims = Fam::FogSniper.claims(&rules, &l.kinds);
+        // An era without the land arms is not claimed and not built either.
+        assert_eq!(claims, builds, "fog-sniper in {}: claims {claims}, builds {builds}", eras[e as usize]);
+    }
+}
